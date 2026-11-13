@@ -251,7 +251,7 @@ console.log('\n=== a line of thinking, renamed or deleted from its card ===');
   ok('  and offers neither where they cannot be done (a Core chat)', !/>Rename</.test(neither) && !/>Delete</.test(neither));
   const app = read('components/LogosApp.tsx');
   const menu = app.slice(app.indexOf('const l5Menu: L5MenuItem[] = ['), app.indexOf('];', app.indexOf('const l5Menu: L5MenuItem[] = [')));
-  ok('the menu no longer holds "Manage conversations" or "How Socria works with you"', menu.length > 0 && !/Manage conversations/.test(menu) && !/How Socria works with you/.test(menu) && /label: 'Write'/.test(menu), menu);
+  ok('the menu no longer holds "Manage conversations" or "How Socria works with you"', !/Manage conversations/.test(menu) && !/How Socria works with you/.test(menu) && !/label: 'Write'/.test(menu), menu);
   const write = app.slice(app.indexOf('function openWriting()'), app.indexOf('function openWritingPassage'));
   ok('Write from the Universal Map opens in a line of thinking instead of doing nothing', /if \(l5Home \|\| !activeIdRef\.current\) \{\s*if \(!newFromHome\(\)\) return;/.test(write), write);
   ok('  and the map passes its rename and delete to the line of thinking itself', /onRename=\{\(id, title\) =>/.test(app) && /onDelete=\{\(id\) => void deleteSession\(id\)\}/.test(app));

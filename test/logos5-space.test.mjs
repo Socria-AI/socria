@@ -222,13 +222,17 @@ console.log('\n=== consistency pass: made things seen whole, enlarged, found ===
     // the More menu, trimmed: no novelties; the experiments live in the account sheet
     const menu = app.slice(app.indexOf('const l5Menu: L5MenuItem[] = ['), app.indexOf('const experiments:'));
     const sheet = read('components/account/AccountSheet.tsx');
-    ok('  More no longer offers saving the map as an image, Synthesize, hiding the bars, AR Mode, big-screen mode or turning hands on', !/Save the map as an image|label: 'Synthesize'|Hide the bars|label: 'AR Mode'|'Big-screen mode'|label: 'Use your hands'/.test(menu) && /label: 'Write'/.test(menu) && /label: 'Live guidance'/.test(menu) && /label: 'What Socria does'/.test(menu));
-    ok('  but a way out of a running experiment stays in More', /cabin \? \[\{ label: 'Leave big-screen mode'/.test(menu) && /handsWanted \? \[\{ label: 'Stop using your hands'/.test(menu));
+    // NO MORE MENU: it is empty, and what it held is in Manage account ("In Socria"); the ways out of an experiment are
+    // in the account's Experiments, where they always were too
+    ok('  there is no More menu: it holds nothing', /const l5Menu: L5MenuItem\[\] = \[\];/.test(app));
+    const tools = app.slice(app.indexOf('const accountTools'), app.indexOf('const experiments:'));
+    ok('  Manage account holds what it did — Live guidance, What Socria does — and no novelty, no Write', /label: 'Live guidance'/.test(tools) && /label: 'What Socria does'/.test(tools) && !/label: 'Write'|Save the map as an image|label: 'Synthesize'|Hide the bars|label: 'AR Mode'|label: 'Use your hands'/.test(tools) && /tools=\{accountTools\}/.test(app) && /<span className="lbl">In Socria<\/span>/.test(sheet));
+    ok('  the ways out of a running experiment are in the account’s Experiments', /cabin \? \{ label: 'Leave big-screen mode'/.test(app) && /\{ label: 'Stop using your hands', hint: 'Turns the camera off', onSelect: stopYourHands \}/.test(app));
     ok('  Account has an Experiments section with them, each closing the sheet and starting', /experiments=\{experiments\}/.test(app) && /<span className="lbl">Experiments<\/span>/.test(sheet) && /\['acct-labs', 'Experiments'\]/.test(sheet) && /onClose\(\);\s*x\.onSelect\(\);/.test(sheet));
     ok('  Quick capture is off unless a deployment turns it on', /capture: on\(env\.capture\)/.test(read('lib/logos4/flags.ts')));
   }
   ok('  the account sheet opens Memory in the app, not the old page', /onMemory=\{cloud \? \(\) => setL5Mind\(true\) : undefined\}/.test(app) && /onMemory \? \(/.test(read('components/account/AccountSheet.tsx')));
-  ok('  the Universal Map’s header says More and the shortcut, as a line’s does', /<L5Menu label="More" items=\{menu\} word button="More" \/>/.test(read('components/logos5/L5Chrome.tsx')) && /className="l5-kbd l5-unibtn-k"/.test(app));
+  ok('  the Universal Map’s header draws More only when it holds something (it holds nothing now), and the shortcut', /\{menu\.length > 0 && <L5Menu label="More" items=\{menu\} word button="More" \/>\}/.test(read('components/logos5/L5Chrome.tsx')) && /className="l5-kbd l5-unibtn-k"/.test(app));
   const ctl = read('components/logos5/l5-controls.css');
   ok('the paper is light again: its grain barely there (.055, was .18), and drawn once on the Universal Map', /0 0 0 \.055 0'\/%3E/.test(ctl) && /\.l5h-main \{ background-image: none; \}/.test(read('components/logos5/revision2.css')));
 }

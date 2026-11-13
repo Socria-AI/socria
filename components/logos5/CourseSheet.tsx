@@ -2,7 +2,7 @@
 // components/logos5/CourseSheet.tsx — HOW YOUR COURSE TEACHES AND TESTS, AND HOW SOCRIA KNOWS.
 //
 // The course profile (lib/teaching), inside Logos 5 rather than beside it: opened from the chatbox's chip when a
-// course is in play, from "+" and from More. It shows
+// course is in play, from "+" and from Artifacts. It shows
 //
 //   · whether this conversation is using the course, and why — and lets the person say otherwise;
 //   · what the profile changes in Socria, from the same codes a turn uses (lib/teaching/use.ts effectsOf), and a
@@ -78,6 +78,8 @@ export interface CourseSheetProps {
   onPractice: (profile: CourseProfile) => void;
   onEvidence: (e: Evidence, name: string, file?: string) => void;
   onDelete: (profile: string) => void;
+  /** drawn as an artifact, in the Artifacts view — no scrim, no dialog, no ×: it is one of the things made here */
+  inline?: boolean;
 }
 
 const when = (t: number) => {
@@ -97,6 +99,7 @@ export function CourseSheet(p: CourseSheetProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const profile = p.profiles.find((x) => x.id === p.focus) ?? p.profiles[0] ?? null;
   useEffect(() => {
+    if (p.inline) return;
     closeRef.current?.focus();
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -176,15 +179,17 @@ export function CourseSheet(p: CourseSheetProps) {
   const waiting = profile ? profile.digests.filter((d) => NEEDS_PERMISSION.has(d.material.kind) && !d.material.allowed) : [];
 
   return (
-    <div className={`cs-wrap${p.narrow ? ' is-narrow' : ''}`}>
-      <div className="cs-scrim" onClick={p.onClose} aria-hidden="true" />
-      <section className="cs l5-sheet" role="dialog" aria-modal="true" aria-labelledby="cs-title">
+    <div className={`cs-wrap${p.narrow ? ' is-narrow' : ''}${p.inline ? ' is-inline' : ''}`}>
+      {!p.inline && <div className="cs-scrim" onClick={p.onClose} aria-hidden="true" />}
+      <section className={`cs${p.inline ? ' is-inline' : ' l5-sheet'}`} {...(p.inline ? { 'aria-labelledby': 'cs-title' } : { role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'cs-title' })}>
         <header className="cs-head">
           <div className="cs-bar">
             <span className="l5-label">Course profile</span>
-            <button ref={closeRef} type="button" className="l5-icon cs-x" aria-label="Close the course profile" onClick={p.onClose}>
-              ×
-            </button>
+            {!p.inline && (
+              <button ref={closeRef} type="button" className="l5-icon cs-x" aria-label="Close the course profile" onClick={p.onClose}>
+                ×
+              </button>
+            )}
           </div>
           {p.profiles.length > 1 && (
             <nav className="cs-courses" aria-label="Your courses">

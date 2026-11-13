@@ -113,7 +113,7 @@ export default function ChatPage() {
   const [sharedOpen, setSharedOpen] = useState<string | null>(null);
   /** what is shared with this person (/api/shared): listed under Shared with you, and a shared Project's name */
   const [sharedItems, setSharedItems] = useState<SharedIn[]>([]);
-  /** "Join with a code", open (from the More menu or under Shared with you) */
+  /** "Join with a code", open (from Share or under Shared with you) */
   const [joinOpen, setJoinOpen] = useState(false);
   /** the Share sheet, open for one thing */
   const [shareFor, setShareFor] = useState<{ type: ResourceType; id: string; title: string } | null>(null);

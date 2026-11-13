@@ -298,7 +298,7 @@ ok('the reply gate drops a prediction on both paths, and counts it', /drop: \(x\
 ok('a quiz is a quiz to MR too: course practice runs under MR’s quiz contract', /QUIZ\.test\(lastText\)/.test(route) && /Quiz me in the style of/.test(read('components/LogosApp.tsx')));
 const app = read('components/LogosApp.tsx');
 ok('the app sends the pack only where the ledger goes — never into a conversation others read', /if \(shared \|\| !coursesRef\.current\.length\) return \{\};/.test(app) && /course: packOf\(hit\.profile, hit\.why\)/.test(app));
-ok('the profile opens from the chatbox’s chip, from "+" and from More', /<CourseChip label=\{profileLabel\(courseHere\.profile\)\}/.test(app) && /label: 'Course profile'/.test(app) && /label: 'Your courses'/.test(app));
+ok('the profile is an artifact: in Artifacts, opened from the chatbox’s chip and from "+"', /<CourseChip label=\{profileLabel\(courseHere\.profile\)\} onOpen=\{\(\) => openCourse\(/.test(app) && /label: 'Course profile'/.test(app) && /key: 'c:course',\s*kind: 'Course profile'/.test(app) && /showArtifact\('c:course'\)/.test(app) && !/label: 'Your courses'/.test(app) && /\binline\b/.test(app));
 const ld = read('lib/local-data.ts');
 const fnBody = (name) => {
   const at = ld.indexOf(`export function ${name}(`);

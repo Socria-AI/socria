@@ -134,10 +134,10 @@ ok(
 );
 ok('a line of thinking with a map opens on its Logic Map', /\?\? \(cabin && map\.nodes\.length > 0 \? \{ view: 'logic_map', beside: null \} : OPENING\)/.test(app));
 ok(
-  'the dock goes to the Universal Map, the views, Write and Memory',
+  'the dock goes to the Universal Map, the views and Memory (Write is retired)',
   /onMap=\{goHome\}/.test(app) &&
     /setScreen\(\(s\) => choose\(v, s\)\)/.test(app) &&
-    /onWrite=\{openWriting\}/.test(app) &&
+    !/onWrite=\{openWriting\}/.test(app) &&
     /onMemory=\{cloud \? \(\) => setL5Mind\(true\) : undefined\}/.test(app) &&
     /onLeave=\{\(\) => setCabinMode\(false\)\}/.test(app)
 );

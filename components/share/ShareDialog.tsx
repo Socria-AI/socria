@@ -323,10 +323,16 @@ export function ShareDialog({
                       <button className="sh-small" disabled={busy} onClick={() => void act({ action: 'code', role: state.code!.role, fresh: true })}>New code</button>
                     </div>
                   )}
-                  <span className="sh-sub">Readable aloud — for a room, a call, a class. Joined with “Join with a code”, in the More menu.</span>
+                  <span className="sh-sub">Readable aloud — for a room, a call, a class. Joined with “Join with a code”, at the foot of Share.</span>
                 </div>
               </div>
             )}
+
+            {/* someone else's code: joined here, where sharing is (it was in the More menu) */}
+            <div className="sh-joinhere">
+              <span className="sh-sub">Have a code from someone else?</span>
+              <JoinWithCode onDone={onClose} />
+            </div>
 
             <p className="sh-privacy">
               {type === 'project'

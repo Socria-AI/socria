@@ -51,7 +51,7 @@ export function AccountSheet({
   onClose,
   isOne = false,
   plan,
-  onRetakeTour, onMemory, experiments = [], trial = null,
+  onRetakeTour, onMemory, tools = [], experiments = [], trial = null,
 }: {
   open: boolean;
   onClose: () => void;
@@ -68,6 +68,8 @@ export function AccountSheet({
   onRetakeTour?: () => void;
   /** Memory in the app itself (the header's Memory): when given, the sheet opens it there rather than going to /memory */
   onMemory?: () => void;
+  /** What the More menu held (it is gone): a new line, Project home, Live guidance, the tutorials, Socria One */
+  tools?: { label: string; hint: string; onSelect: () => void }[];
   /** The experiments (Use your hands, AR Mode, big-screen mode): novelties that work, kept here rather than in the app's menu */
   experiments?: { label: string; hint: string; onSelect: () => void }[];
   /** The seven-day trial (lib/trial.ts), as the server keeps it: which day, today's tokens, or over */
@@ -357,6 +359,29 @@ export function AccountSheet({
               </div>
             </div>
 
+            {/* What the More menu held, here now: each closes the sheet and goes. */}
+            {tools.length > 0 && (
+              <div className="sec" id="acct-tools">
+                <span className="lbl">In Socria</span>
+                <div className="acts">
+                  {tools.map((x) => (
+                    <button
+                      key={x.label}
+                      type="button"
+                      className="act"
+                      onClick={() => {
+                        onClose();
+                        x.onSelect();
+                      }}
+                    >
+                      <span className="t">{x.label}</span>
+                      <span className="d">{x.hint}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* The experiments: kept out of the app's menu, one press away here. Each closes the sheet and starts. */}
             {experiments.length > 0 && (
               <div className="sec" id="acct-labs">
@@ -422,6 +447,7 @@ const JUMPS: [string, string][] = [
   ['acct-you', 'Personalization'],
   ['acct-data', 'Your thinking'],
   ['acct-device', 'This device'],
+  ['acct-tools', 'In Socria'],
   ['acct-labs', 'Experiments'],
 ];
 

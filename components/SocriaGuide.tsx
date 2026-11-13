@@ -2,7 +2,7 @@
 
 // components/SocriaGuide.tsx — WHAT SOCRIA DOES: short tutorials, one at a time.
 //
-// Reached from the More menu. It replaces the old walk through what Logos could
+// Reached from Manage account. It replaces the old walk through what Logos could
 // do (Logos 2 and 3's map, cards, "+ View" and Draft), which described a
 // screen that no longer exists. These are the screen as it is: the Universal
 // Map, a line of thinking and its four views (Conversation, Files, Artifacts,
@@ -438,25 +438,6 @@ export function socriaTutorials(o: { capture: boolean; memory: boolean }): Tutor
       note: 'Your documents are never changed.',
       demo: ContentDemo,
     },
-    {
-      id: 'write',
-      name: 'Write',
-      title: (
-        <>
-          Your page — Socria only when you <em>ask</em>.
-        </>
-      ),
-      stand:
-        'A word processor beside your thinking. Select your own words and ask Socria to check them, improve them, or think them through with you. Nothing reaches the page unless you put it there.',
-      steps: [
-        <>Open Write from More, top right, or Start writing in Artifacts.</>,
-        <>Write as you would anywhere — headings, tables, pictures; Word and PDF out.</>,
-        <>Open the Socria panel for Check, Improve or Think it through.</>,
-      ],
-      demo: WriteDemo,
-      try: { label: 'Open Write', run: 'onWrite' },
-      one: true,
-    },
     o.capture
       ? {
           id: 'capture',
@@ -468,7 +449,7 @@ export function socriaTutorials(o: { capture: boolean; memory: boolean }): Tutor
           ),
           stand: 'Two taps: open it, and save. A photo is one more. Nothing is sent or filed until you choose.',
           steps: [
-            <>Open Quick capture from More, top right, or the + beside the box.</>,
+            <>Open Quick capture from Manage account, or the + beside the box.</>,
             <>Or start any message with “capture:” — it is kept, not sent.</>,
             <>Later: think it through, add it to the map, or use it in a message.</>,
           ],

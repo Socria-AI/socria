@@ -18,7 +18,7 @@ ok('  each can still be put away', (app.match(/className="lg-annot-x"/g) ?? []).
 
 console.log('=== the chats bar and header, put away ===');
 // Logos 5: "Hide the bars" is no longer in the More menu (a novelty); saying "hide the bars" still does it, and the way back stays
-ok('the bars are put away only by asking, not from the menu, and always come back', !/label: 'Hide the bars'/.test(app) && /case 'bars':\s*hideChrome\(cmd\.hide\)/.test(app) && /onClick=\{\(\) => hideChrome\(false\)\}/.test(app) && /<L5Menu label="More" items=\{l5Menu\} word button="More" \/>/.test(app));
+ok('the bars are put away only by asking, not from the menu, and always come back', !/label: 'Hide the bars'/.test(app) && /case 'bars':\s*hideChrome\(cmd\.hide\)/.test(app) && /onClick=\{\(\) => hideChrome\(false\)\}/.test(app) && /const moreEl = null;/.test(app));
 // the canvas: Zoom out sits before Split View in the same corner
 ok('  at the right, beside the account control', /<div className="l5v-top-r">[\s\S]{0,1200}\{presence\}\s*\{menu\}\s*\{account\}\s*<\/div>/.test(shell) && /account=\{accountEl\}/.test(app));
 ok('  the rail closes with it', /const listOpen = l5Manage && railOpen && !chromeHidden;/.test(app) && /\$\{listOpen \? ' list-open' : ' rail-closed'\}/.test(app) && /open=\{railOpen && !chromeHidden\}/.test(app));

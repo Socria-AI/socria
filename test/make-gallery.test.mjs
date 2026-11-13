@@ -135,9 +135,9 @@ ok('  hands down what is shared, only when signed in', /shared=\{isSignedIn \? s
 const opener = page.match(/function openShared\(it: SharedIn\) \{[\s\S]*?\n  \}/)?.[0] ?? '';
 ok('  a Project opens its home; a line of thinking, together; a Core conversation, beside', /it\.type === 'project'\) return setHomeProject\(it\.id\)/.test(opener) && /it\.kind === 'logos'\) return window\.location\.assign\(`\/chat\?s=\$\{encodeURIComponent\(it\.id\)\}&shared=1`\)/.test(opener) && /setSharedOpen\(it\.id\)/.test(opener), opener);
 ok('  and the rewards popups keep quiet while it is open', /!sheet && !joinOpen/.test(page));
-ok('the More menu has "Join with a code" when there is somewhere to join', /\.\.\.\(onJoinWithCode \? \[\{ label: 'Join with a code'/.test(app));
 const sd = read('components/share/ShareDialog.tsx');
-ok('the Share sheet says where the code is entered now', /Joined with “Join with a code”, in the More menu\./.test(sd) && !/in the sidebar/.test(sd));
+ok('Join with a code is in Share now, not a menu', /<JoinWithCode onDone=\{onClose\} \/>/.test(sd) && !/label: 'Join with a code'/.test(app));
+ok('the Share sheet says where the code is entered now', /Joined with “Join with a code”, at the foot of Share\./.test(sd) && !/in the sidebar/.test(sd));
 
 console.log(`\nmake-gallery: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

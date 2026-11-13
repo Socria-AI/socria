@@ -207,8 +207,8 @@ export function L5Header({
           </button>
         )}
         {presence}
-        {/* the same word as a line's header (Revision II: icons become words) — one More, wherever you are */}
-        <L5Menu label="More" items={menu} word button="More" />
+        {/* no More menu: what it held is in Manage account (and Join with a code in Share) */}
+        {menu.length > 0 && <L5Menu label="More" items={menu} word button="More" />}
         {account}
       </div>
     </header>

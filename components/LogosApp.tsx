@@ -517,7 +517,7 @@ export function LogosApp({
   /** what is shared with them (/api/shared); undefined signed out — the contents column then has no such group */
   shared?: SharedIn[];
   onOpenShared?: (item: SharedIn) => void;
-  /** signed in: "Join with a code", in the More menu and under Shared with you */
+  /** signed in: "Join with a code", in Share and under Shared with you */
   onJoinWithCode?: () => void;
 } = {}) {
   const { isLoaded, isSignedIn, user } = useUser();
@@ -6003,8 +6003,12 @@ export function LogosApp({
       case 'redo':
         return { said: undoNow(true) };
       case 'writing':
-        openWriting();
-        return { said: 'Opened your writing.' };
+        // Write is retired: writing begun before stays in Artifacts, and nothing new starts here
+        if (writingShown) {
+          showArtifact('w:doc');
+          return { said: 'Opened your writing, in Artifacts.' };
+        }
+        return { said: 'Write is no longer part of Socria. Ask Socria to draft something and it appears in the conversation.' };
       case 'synthesize': {
         if (!sid || !mapRef.current.nodes.length) return { said: 'There is nothing on the Logic Map to synthesize yet.' };
         if (synthBusy) return { said: 'A synthesis is already on its way.' };
@@ -6201,8 +6205,9 @@ export function LogosApp({
       said('Open a line of thinking first — dictation writes into its writing.');
       return;
     }
-    if (!limits.draftSpace) {
-      said('Writing is part of Socria One.');
+    // Write is retired: dictation goes into writing begun before, and nowhere new
+    if (!limits.draftSpace || !writingShown) {
+      said('Write is no longer part of Socria, so there is nowhere to dictate into. Say what you think, and Socria answers.');
       return;
     }
     if (!writingOnScreen()) openWriting();
@@ -8607,7 +8612,7 @@ export function LogosApp({
             explored={exploredIds}
             changed={changed}
             relevant={relevant}
-            canFocus={limits.draftSpace}
+            canFocus={false}
             onFocus={(node) => addNodeToDraft(node)}
             grounded={groundedCounts}
             onAddContext={openAddContext}
@@ -8738,6 +8743,11 @@ export function LogosApp({
     return courseFor(courses, { linked: courseLinks[activeId] ?? null, docs: [...letters.keys(), ...(study?.state.files.map((f) => f.doc) ?? [])], text: typeof asked?.content === 'string' ? asked.content : '' });
   })();
   // ── the course profile's actions (components/logos5/CourseSheet.tsx) ──
+  /** The course profile, opened where it lives: an artifact of this line of thinking, in Artifacts. */
+  function openCourse(id: string | null) {
+    setCourseOpen(id);
+    showArtifact('c:course');
+  }
   const keepCourse = async (next: CourseProfile, was: string) => {
     const saved = await putProfile(next, was);
     if (saved) setCourseOpen(saved.id);
@@ -8838,27 +8848,21 @@ export function LogosApp({
   // Renaming, deleting and filing a line of thinking are on its card on the
   // Universal Map (components/logos5/UniverseParts.tsx PreviewCard), where it
   // lives, rather than in a list brought back from here.
-  const l5Menu: L5MenuItem[] = [
-    // Logos 5: the header has no "+", so a new line of thinking is the first thing here, at any size; on a
-    // phone, search is here too, so the title is not "Sh…".
-    ...(activeId && !l5Home ? [{ label: 'New line of thinking', onSelect: () => void newFromHome() }] : []),
-    ...(phone && activeId && !l5Home ? [{ label: 'Search everything', hint: 'Conversations, files and artifacts', onSelect: () => setSearchOpen(Date.now()) }] : []),
-    { label: 'Write', hint: limits.draftSpace ? 'Your writing and notes — Socria only when you ask' : 'Part of Socria One', onSelect: openWriting },
-    // Quick capture is off unless a deployment turns it on (lib/logos4/flags.ts); saving the map as an image is the
-    // map's own (its view's actions), Synthesize is the Content and Logic Map views' own, and hiding the bars is gone
+  // NO MORE MENU: what it held is in Manage account (the account sheet's "In Socria"). Write is gone, Join with
+  // a code is in Share, and the course profile is an artifact (Artifacts, or the box's +).
+  const l5Menu: L5MenuItem[] = [];
+  const accountTools: { label: string; hint: string; onSelect: () => void }[] = [
+    ...(activeId && !l5Home ? [{ label: 'New line of thinking', hint: 'A blank one, beside this', onSelect: () => void newFromHome() }] : []),
+    ...(phone ? [{ label: 'Search everything', hint: 'Conversations, files and artifacts', onSelect: () => setSearchOpen(Date.now()) }] : []),
+    // Quick capture is off unless a deployment turns it on (lib/logos4/flags.ts)
     ...(LOGOS4.capture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', onSelect: () => setCaptureOpen(true) }] : []),
-    ...(onJoinWithCode ? [{ label: 'Join with a code', hint: 'Open what someone shared with you', onSelect: onJoinWithCode }] : []),
-    // LOGOS 6: the Project this line is filed in, its home a press away — before, only a link reached it
+    // LOGOS 6: the Project this line is filed in
     ...(L6.links && active?.projectId && onOpenProject && projects?.some((x) => x.id === active.projectId)
       ? [{ label: 'Project home', hint: projects.find((x) => x.id === active.projectId)?.name ?? 'Its goals, and what it rests on', onSelect: () => { l6track('level_changed', { door: 'line', level: 'project', kind: 'press' }); onOpenProject(active.projectId!); } }]
       : []),
     { label: 'Live guidance', hint: one ? 'Socria shows you how, on your camera · early access' : 'Socria shows you how, on your camera · Socria One', onSelect: one ? openGuide : () => askOne(FEATURE_NOTE.experiments, false, 'experiments') },
-    // while big-screen mode is on, the way out stays here, where it is looked for; the rest of the experiments are in Account
-    ...(cabin ? [{ label: 'Leave big-screen mode', hint: 'Back to the usual layout', onSelect: () => setCabinMode(false) }] : []),
-    ...(handsWanted ? [{ label: 'Stop using your hands', hint: 'Turns the camera off', onSelect: stopYourHands }] : []),
-    { label: 'Your courses', hint: 'How each course teaches and tests, read from your materials', onSelect: () => setCourseOpen(courseHere?.profile.id ?? null) },
-    { label: 'What Socria does', hint: 'Short tutorials, one at a time', sep: true, onSelect: () => setGuideOpen(true) },
-    ...(!one ? [{ label: 'Socria One', hint: 'No daily limit, with Voice, sharing and the experiments', onSelect: () => askOne(undefined, false, 'menu') }] : oneManageable ? [{ label: 'Manage Socria One', onSelect: manageOne }] : []),
+    { label: 'What Socria does', hint: 'Short tutorials, one at a time', onSelect: () => setGuideOpen(true) },
+    ...(!one ? [{ label: 'Socria One', hint: 'No daily limit, with Voice, sharing and the experiments', onSelect: () => askOne(undefined, false, 'menu') }] : oneManageable ? [{ label: 'Manage Socria One', hint: 'Your plan and billing', onSelect: manageOne }] : []),
   ];
   // The experiments: novelties that work, kept out of the way in Account (components/account/AccountSheet.tsx).
   // They are Socria One's (lib/entitlements.ts): on the trial each is named, marked Socria One, and opens
@@ -9202,11 +9206,11 @@ export function LogosApp({
           <>
             <MakePicker value={makeId} onChange={pickMake} open={makeOpen} onOpenChange={setMakeOpen} bare />
             <ConcisePicker value={replyLength} onChange={pickLength} />
-            {courseHere && <CourseChip label={profileLabel(courseHere.profile)} onOpen={() => setCourseOpen(courseHere.profile.id)} />}
+            {courseHere && <CourseChip label={profileLabel(courseHere.profile)} onOpen={() => openCourse(courseHere.profile.id)} />}
           </>
         }
         // Logos 5: Make lives under "+", beside Attach, Search my files and ∑ — and the course profile
-        plusItems={[{ label: 'Make', hint: 'A chart, a table, a timeline — drawn in Artifacts', onSelect: () => setMakeOpen(true) }, { label: 'Course profile', hint: 'How your course teaches and tests — from your syllabus, slides and past exams', onSelect: () => setCourseOpen(courseHere?.profile.id ?? null) }]}
+        plusItems={[{ label: 'Make', hint: 'A chart, a table, a timeline — drawn in Artifacts', onSelect: () => setMakeOpen(true) }, { label: 'Course profile', hint: 'How your course teaches and tests — from your syllabus, slides and past exams, in Artifacts', onSelect: () => openCourse(courseHere?.profile.id ?? null) }]}
         onSearchFiles={() => setSearchOpen(Date.now())}
         // the Answer Guard, on the chatbox's first line beside "Asking about" (Logos 5, One view)
         guide={guarded && l5 ? { onHint: () => void send('Can I have another hint?'), onReveal: reveal, busy } : null}
@@ -9361,6 +9365,43 @@ export function LogosApp({
     if (sid) setMadeRec(writeMade(browserStorage(), sid, k, 'declined'));
   }
   const artifactItems: ArtifactItem[] = [
+    // THE COURSE PROFILE: how this course teaches and tests, read from its materials — an artifact like any other
+    // here, rather than a sheet of its own; there once there is a profile, or once it is asked for
+    ...(courses.length || artKey === 'c:course'
+      ? [
+          {
+            key: 'c:course',
+            kind: 'Course profile',
+            title: (courses.find((x) => x.id === courseOpen) ?? courseHere?.profile ?? courses[0]) ? profileLabel((courses.find((x) => x.id === courseOpen) ?? courseHere?.profile ?? courses[0])!) : 'Your course',
+            bare: true,
+            render: () => (
+              <CourseSheet
+          profiles={courses}
+          focus={courseOpen || null}
+          active={courseHere ? { id: courseHere.profile.id, why: courseHere.why } : null}
+          linked={activeId ? courseLinks[activeId] ?? null : null}
+          reading={courseReading}
+          notice={courseNotice}
+          narrow={narrow}
+          inConversation={!!activeId && !l5Home}
+          onClose={() => setCourseOpen(false)}
+          inline
+          onFocus={(id) => setCourseOpen(id)}
+          onAdd={(files, opts) => void addCourseFiles(files, opts)}
+          onKind={(id, doc, kind) => void setCourseKind(id, doc, kind)}
+          onAllow={(id, doc, ok) => void allowCourse(id, doc, ok)}
+          onRemove={(id, doc) => void removeCourseMaterial(id, doc)}
+          onCorrect={(id, obs, verdict, note) => void correctCourse(id, obs, verdict, note)}
+          onRestore={(id, obs) => void restoreCourse(id, obs)}
+          onLink={linkCourse}
+          onPractice={practiseCourse}
+          onEvidence={openCourseEvidence}
+          onDelete={(id) => void deleteCourse(id)}
+        />
+            ),
+          },
+        ]
+      : []),
     // THE WRITING: the person's own document — one artifact among the rest, there once they
     // have started it (Start writing, Write in the menu, Add to notes) and never chosen for them
     ...(writingShown
@@ -9493,7 +9534,7 @@ export function LogosApp({
         selected={deskOpenItem ? deskOpenItem.key : artKey}
         onSelect={deskOpenItem ? (key) => deskOpenAt(key) : showArtifact}
         narrow={narrow}
-        onWrite={limits.draftSpace && !writingShown ? openWriting : undefined}
+        onWrite={undefined}
         // choose what to make, then say what it is about: in the conversation, beside (on a phone, as the view)
         onMake={
           togetherReadOnly
@@ -10575,10 +10616,8 @@ export function LogosApp({
       <AccountControl onOpen={() => setAcctOpen(true)} isOne={one} />
     </span>
   ) : null;
-  const moreEl = (
-    // Revision II: a word, not a glyph
-    <L5Menu label="More" items={l5Menu} word button="More" />
-  );
+  // no More menu (its contents are in Manage account)
+  const moreEl = null;
   // THE SWITCH (Logos 5): the four views in the header's middle — Chat · Files n · Artifacts n · Logic Map. Zoomed out
   // (the canvas), none is chosen; pressing one brings it close.
   const switchEl = activeId && !spaceOn ? (
@@ -11045,7 +11084,6 @@ export function LogosApp({
             if ((homeShown || l5Mind) && activeId) openFromHome(activeId);
             setScreen((s) => choose(v, s));
           }}
-          onWrite={openWriting}
           onMemory={cloud ? () => setL5Mind(true) : undefined}
           onLeave={() => setCabinMode(false)}
         />
@@ -11148,10 +11186,9 @@ export function LogosApp({
           onNew: () => void newFromHome(),
           onSearch: () => setSearchOpen(Date.now()),
           ...(LOGOS4.capture ? { onCapture: () => setCaptureOpen(true) } : {}),
-          ...(limits.draftSpace ? { onWrite: openWriting } : {}),
           ...(cloud ? { onMemory: () => setL5Mind(true) } : {}),
         }}
-        writeIncluded={!!limits.draftSpace}
+        writeIncluded={false}
         capture={LOGOS4.capture}
         memory={cloud}
       />
@@ -11275,30 +11312,6 @@ export function LogosApp({
           one account surface in the product rather than two that drift. */}
       <LiveGuide open={liveOpen} onClose={() => setLiveOpen(false)} access={arAccess ? (arAccess.tester ? 'tester' : 'preview') : 'unknown'} onKeep={keepGuide} sessionId={activeId} />
       {/* How the course teaches and tests (lib/teaching), inside Logos 5: from the chatbox's chip, "+" and More */}
-      {courseOpen !== false && (
-        <CourseSheet
-          profiles={courses}
-          focus={courseOpen}
-          active={courseHere ? { id: courseHere.profile.id, why: courseHere.why } : null}
-          linked={activeId ? courseLinks[activeId] ?? null : null}
-          reading={courseReading}
-          notice={courseNotice}
-          narrow={narrow}
-          inConversation={!!activeId && !l5Home}
-          onClose={() => setCourseOpen(false)}
-          onFocus={(id) => setCourseOpen(id)}
-          onAdd={(files, opts) => void addCourseFiles(files, opts)}
-          onKind={(id, doc, kind) => void setCourseKind(id, doc, kind)}
-          onAllow={(id, doc, ok) => void allowCourse(id, doc, ok)}
-          onRemove={(id, doc) => void removeCourseMaterial(id, doc)}
-          onCorrect={(id, obs, verdict, note) => void correctCourse(id, obs, verdict, note)}
-          onRestore={(id, obs) => void restoreCourse(id, obs)}
-          onLink={linkCourse}
-          onPractice={practiseCourse}
-          onEvidence={openCourseEvidence}
-          onDelete={(id) => void deleteCourse(id)}
-        />
-      )}
       <AccountSheet
         trial={plan === 'one' ? null : trial}
         open={acctOpen}
@@ -11308,6 +11321,7 @@ export function LogosApp({
         // the tutorials say the same, one at a time — rather than a tour that ends before it starts
         onRetakeTour={() => (typeof document !== 'undefined' && document.querySelectorAll('[data-tour]').length >= 2 ? setTourOpen(true) : setGuideOpen(true))}
         onMemory={cloud ? () => setL5Mind(true) : undefined}
+        tools={accountTools}
         experiments={experiments}
       />
 

@@ -103,3 +103,10 @@
 @media (forced-colors: active) {
   .logos-root .cs-conf::before, .logos-root .cs-basis::before { forced-color-adjust: none; border-color: CanvasText; }
 }
+
+/* THE COURSE PROFILE AS AN ARTIFACT: drawn in the Artifacts view like anything else made here — in the page,
+   no fixed sheet, no scrim, no edge of its own, no entrance */
+.logos-root .cs-wrap.is-inline { position: static; inset: auto; z-index: auto; display: block; }
+.logos-root .cs.is-inline { position: static; width: auto; max-width: none; height: auto; max-height: none; border: 0; box-shadow: none; background: transparent; animation: none; }
+.logos-root .cs.is-inline .cs-head { padding-left: 0; padding-right: 0; }
+.logos-root .cs.is-inline .cs-scroll { overflow: visible; padding-left: 0; padding-right: 0; }

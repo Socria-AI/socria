@@ -134,3 +134,5 @@ html:is([data-theme='dark'],[data-theme='one'],[data-theme='night']) .sh-btn.is-
 .sh-joinsheet{width:min(420px,100%)}
 .sh-joinsheet .sh-quiet{margin:10px 0 14px}
 .sh-joinsheet .sh-join input{font-size:15px}
+/* Join with a code, at the foot of Share (it was in the More menu) */
+.sh-joinhere{display:grid;gap:6px;margin:16px 0 0;padding-top:14px;border-top:1px solid var(--ink-10, rgba(35,36,31,.1))}
