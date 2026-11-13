@@ -1388,12 +1388,19 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
     const right = px > W - 90;
     return { px, py, tx: right ? px - 9 : px + 9, ty: k.kind === 'turning' && !k.max ? py + 18 : py - 9, anchor: right ? ('end' as const) : ('start' as const) };
   };
-  /** A curve's name at its right end, where it is inside the window. */
+  /**
+   * A curve's name at its right end, where it is inside the window. Names that would sit on one another are not
+   * stacked (a nudged name lets go of its line): the later one is left off, and the legend still names its curve.
+   */
+  const placedNames: number[] = [];
   const endLabel = (cc: Compiled, text: string, key: string, tone: string) => {
     for (let i = 0; i <= 40; i++) {
       const x = x1 - ((x1 - x0) * i) / 80;
       const y = cc.eval({ ...values, x });
       if (Number.isFinite(y) && y >= y0 && y <= y1) {
+        const at = Math.max(12, Y(y) - 8);
+        if (placedNames.some((p) => Math.abs(p - at) < 16)) return null;
+        placedNames.push(at);
         return (
           <text key={key} className={`ln-curve-name ${tone}`} x={X(x) - 4} y={Math.max(12, Y(y) - 8)} textAnchor="end">
             {text}

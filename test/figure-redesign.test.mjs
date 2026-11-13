@@ -43,6 +43,8 @@ console.log('\n=== a graph in a reply is a figure ===');
   const W = Number(out.match(/<svg viewBox="0 0 ([\d.]+) /)?.[1]);
   const xNums = [...(out.match(/<g class="ln-axes is-labels"[^>]*>([\s\S]*?)<\/g>/)?.[1] ?? '').matchAll(/<text x="([\d.]+)" y="[\d.]+" text-anchor="middle">/g)].map((m) => Number(m[1]));
   ok('…and the numbers along it keep clear of the right end, where the curves are named', W > 0 && xNums.length > 0 && xNums.every((x) => x < W - 48), J({ W, xNums }));
+  const names = [...out.matchAll(/class="ln-curve-name[^"]*" x="[\d.]+" y="([\d.]+)"[^>]*>([^<]+)<\/text>/g)].map((m) => ({ y: Number(m[1]), n: m[2] }));
+  ok('curve names never sit on one another: the later is left off, the legend names it', names.length >= 2 && names.every((a, i) => names.every((b, j) => i === j || Math.abs(a.y - b.y) >= 16)), J(names));
   const ONE = { type: 'graph', expr: 'x^2 - 4', x: [-3, 3], params: [], features: [] };
   const one = html(h(I.RichText, { rich: true, text: fence(ONE) }));
   ok('a lone unnamed curve: both axes named', /class="is-name"[^>]*>x</.test(one) && /class="is-name"[^>]*>y</.test(one));
@@ -83,6 +85,12 @@ console.log('\n=== MathViz, as a figure ===');
   ok('the narration a quiet line, nothing pulsing', /\.lg-viz-narr-mark \{ display: none; \}/.test(block) && /\.lg-viz-narr,\s*\.logos-root \.lg-viz-narr\.is-below \{[^}]*background: none;/.test(block));
   ok('the readings a row of words, not boxes', /\.lg-viz-readout \{[^}]*border: 0;[^}]*background: none;/.test(block));
   ok('one filled control: the transport and Edit are words', /\.lg-viz-transport \{[^}]*border: 0;[^}]*background: none;/.test(block) && /\.lg-viz-editbtn \{\s*border: 0;\s*background: none;/.test(block));
+}
+
+console.log('\n=== the typing dots keep to their own dots ===');
+{
+  const l5 = css('components/logos5/l5.css');
+  ok('only the indicator\'s own children are dots: an italic letter in a reply on the dot grid stays a letter', /\.logos-root \.l5-dots > i \{\s*width: 6px;/.test(l5) && !/\.l5-dots i[ ,:{]/.test(l5.replace(/\/\*[\s\S]*?\*\//g, '')));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
