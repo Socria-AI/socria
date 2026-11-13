@@ -2174,3 +2174,266 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
   .logos-root .ln-diagram .ln-dg-link { stroke: CanvasText; }
   .logos-root .ln-diagram marker path { fill: CanvasText; }
 }
+
+/* ── a figure, not a box: graphs, simulations and charts (November 2026) ───────────────────────────────────────
+   Drawn as the conversation's other figures are (components/logos6/logos6.css): between two hairlines, a small
+   label over a serif title, the picture, one line of readings. One legend: each equation carries its curve's key, so
+   the numbers on the picture are only the ones that matter. The grid is faint and horizontal; numbers sit on the
+   axes, over the curves, on a paper-coloured outline. Curves wear the graph palette (--ln-g1..3, app/globals.css);
+   text never wears a curve's colour. */
+.logos-root .ln:is(.ln-graph, .ln-sim, .ln-chart) {
+  margin: 0.5em 0 1.1em;
+  padding: 14px 0 12px;
+  border: 0;
+  border-top: 1px solid var(--ln-hair);
+  border-bottom: 1px solid var(--ln-hair);
+  border-radius: 0;
+  background: none;
+}
+html:is([data-theme="dark"], [data-theme="one"]) .logos-root .ln:is(.ln-graph, .ln-sim, .ln-chart) {
+  background: none;
+}
+/* Celestial keeps its surface under a figure (a star is not data), so the figure keeps a little room inside it */
+html[data-theme="night"] .logos-root .ln:is(.ln-graph, .ln-sim, .ln-chart) {
+  padding-left: 12px;
+  padding-right: 12px;
+  border-radius: 10px;
+}
+.logos-root .ln .ln-figcap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  margin: 0 0 8px;
+}
+.logos-root .ln .ln-kind {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--c-ink-45, var(--ln-ink-60));
+}
+.logos-root .ln .ln-figcap .ln-title,
+.logos-root .ln:is(.ln-sim, .ln-chart) > .ln-title {
+  display: inline;
+  margin: 0;
+  font-family: var(--l5-serif, Georgia, serif);
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: -0.003em;
+  color: var(--ln-ink);
+}
+.logos-root .ln:is(.ln-sim, .ln-chart) > .ln-title {
+  display: block;
+  margin: 0 0 8px;
+}
+
+/* the legend: each equation with its curve's key, the numbers in it to drag */
+.logos-root .ln-graph .ln-graph-head {
+  display: block;
+  margin: 0 0 2px;
+}
+.logos-root .ln-graph .ln-eqs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 24px;
+}
+.logos-root .ln-graph .ln-eq {
+  font-size: 17px;
+  line-height: 1.7;
+}
+.logos-root .ln-graph .ln-eq::before {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 2px;
+  margin: 0 9px 0 0;
+  border-radius: 2px;
+  vertical-align: 0.32em;
+  background: var(--ln-g1);
+}
+.logos-root .ln-graph .ln-eq.is-second::before { background: var(--ln-g2); }
+.logos-root .ln-graph .ln-eq.is-third::before { background: var(--ln-g3); }
+.logos-root .ln.ln-graph .ln-eq .ln-eq-name,
+.logos-root .ln.ln-graph .ln-eq:is(.is-second, .is-third) .ln-eq-name {
+  margin-right: 8px;
+  font-family: var(--font-sans, Inter), system-ui, sans-serif;
+  font-size: 13.5px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ln-ink-70);
+}
+.logos-root .ln-graph .ln-scrub {
+  color: var(--ln-primary);
+  border-bottom-color: rgba(var(--ln-tint), 0.6);
+}
+.logos-root .ln-graph .ln-hint {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--ln-ink-60);
+}
+
+/* the picture */
+.logos-root .ln:is(.ln-graph, .ln-sim) .ln-plot {
+  margin: 10px 0 2px;
+}
+.logos-root .ln:is(.ln-graph, .ln-sim) .ln-axes line {
+  stroke: rgba(var(--ln-tint), 0.08);
+}
+.logos-root .ln:is(.ln-graph, .ln-sim) .ln-axes line:is(.is-axis, .is-tick),
+.logos-root .ln-sim .ln-ground {
+  stroke: color-mix(in srgb, var(--ln-ink) 30%, transparent);
+}
+.logos-root .ln:is(.ln-graph, .ln-sim) .ln-axes text {
+  font-size: 11px;
+  fill: var(--ln-ink-60);
+  font-variant-numeric: tabular-nums;
+  paint-order: stroke;
+  stroke: var(--ln-ground);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+.logos-root .ln:is(.ln-graph, .ln-sim) .ln-axes text.is-name {
+  font-family: var(--l5-serif, Georgia, serif);
+  font-size: 15px;
+  font-style: italic;
+}
+.logos-root .ln:is(.ln-graph, .ln-sim) .ln-curve {
+  stroke: var(--ln-g1);
+  stroke-width: 2;
+}
+.logos-root .ln-graph .ln-curve.is-second { stroke: var(--ln-g2); }
+.logos-root .ln-graph .ln-curve.is-third { stroke: var(--ln-g3); }
+.logos-root .ln:is(.ln-graph, .ln-sim) .ln-curve.is-ghost {
+  stroke-opacity: 0.35;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+.logos-root .ln-graph .ln-curve-name,
+.logos-root .ln-graph .ln-curve-name:is(.is-second, .is-third) {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  fill: var(--ln-ink-70);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+.logos-root .ln:is(.ln-graph, .ln-sim) .ln-pt {
+  fill: var(--ln-g1);
+  stroke: var(--ln-ground);
+  stroke-width: 2;
+}
+.logos-root .ln-graph .ln-feat.is-crossing .ln-pt { fill: var(--ln-ink); }
+.logos-root .ln-graph .ln-pt.is-ghost {
+  fill: var(--ln-ground);
+  stroke: color-mix(in srgb, var(--ln-g1) 55%, transparent);
+  stroke-width: 1.5;
+}
+.logos-root .ln-graph :is(.ln-feat, .ln-probe) text {
+  font-size: 11.5px;
+  font-weight: 500;
+  fill: var(--ln-ink-70);
+  stroke-width: 4px;
+}
+.logos-root .ln-graph .ln-probe circle { stroke: var(--ln-g1); }
+/* what is read off the curve — the chord, the tangent that matches it, the tangent — in the second colour */
+.logos-root .ln-graph :is(.ln-chord, .ln-tan, .ln-mv) line { stroke: var(--ln-g2); }
+.logos-root .ln-graph .ln-mv circle { fill: var(--ln-g2); }
+.logos-root .ln-graph .ln-mv text { fill: var(--ln-ink); stroke-width: 4px; }
+/* a point to drag: filled, ringed in paper, a soft halo that says it can be held */
+.logos-root .ln-graph .ln-handle circle {
+  fill: var(--ln-g1);
+  stroke: var(--ln-ground);
+  stroke-width: 2.5;
+}
+.logos-root .ln-graph .ln-handle circle.ln-halo {
+  fill: var(--ln-g1);
+  fill-opacity: 0.12;
+  stroke: none;
+  transition: fill-opacity 0.15s;
+}
+.logos-root .ln-graph .ln-handle:is(.is-hot, .is-drag) circle.ln-halo { fill-opacity: 0.22; }
+.logos-root .ln-graph .ln-handle.is-locked circle { fill: var(--ln-ink-40); }
+.logos-root .ln-graph .ln-handle.is-locked circle.ln-halo { fill-opacity: 0; }
+.logos-root .ln-graph .ln-handle text { font-style: italic; font-weight: 500; stroke-width: 4px; }
+.logos-root .ln:is(.ln-graph, .ln-sim) .ln-was span::before { border-top-color: var(--ln-g1); }
+.logos-root .ln:is(.ln-graph, .ln-sim) .ln-was .is-ghost::before { border-top: 1.5px dashed color-mix(in srgb, var(--ln-g1) 45%, transparent); }
+
+/* one line of readings, in words */
+.logos-root .ln:is(.ln-graph, .ln-sim) .ln-read {
+  gap: 2px 22px;
+  margin: 10px 0 0;
+}
+.logos-root .ln-graph .ln-graph-read .ln-reading .ln-k,
+.logos-root .ln-sim .ln-read .ln-k {
+  font-size: 13.5px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ln-ink-60);
+}
+
+/* a slider: a hairline track and a small ringed knob. A number already in an equation is dragged there; its own
+   slider stays only where there is no fine pointer, where a number is too small a thing to hold */
+@media (pointer: fine) {
+  .logos-root .ln-graph .ln-var.is-dup { display: none; }
+}
+.logos-root .ln:is(.ln-graph, .ln-sim) .ln-var-k { font-size: 13px; color: var(--ln-ink-60); }
+.logos-root .ln:is(.ln-graph, .ln-sim) input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 26px;
+  background: transparent;
+}
+.logos-root .ln:is(.ln-graph, .ln-sim) input[type="range"]::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ln-ink) 18%, transparent);
+}
+.logos-root .ln:is(.ln-graph, .ln-sim) input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -6px;
+  border: 2px solid var(--ln-ground);
+  border-radius: 50%;
+  background: var(--ln-primary);
+  box-shadow: 0 0 0 1px rgba(var(--ln-tint), 0.35);
+}
+.logos-root .ln:is(.ln-graph, .ln-sim) input[type="range"]::-moz-range-track {
+  height: 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ln-ink) 18%, transparent);
+}
+.logos-root .ln:is(.ln-graph, .ln-sim) input[type="range"]::-moz-range-progress {
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ln-primary);
+}
+.logos-root .ln:is(.ln-graph, .ln-sim) input[type="range"]::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--ln-ground);
+  border-radius: 50%;
+  background: var(--ln-primary);
+  box-shadow: 0 0 0 1px rgba(var(--ln-tint), 0.35);
+}
+.logos-root .ln:is(.ln-graph, .ln-sim) input[type="range"]:focus-visible {
+  outline: 2px solid var(--ln-primary);
+  outline-offset: 2px;
+}
+.logos-root .ln:is(.ln-graph, .ln-sim) input[type="range"]:disabled { opacity: 0.5; }
+
+@media (max-width: 560px) {
+  .logos-root .ln-graph .ln-eq { font-size: 16px; }
+  .logos-root .ln-graph .ln-eqs { gap: 0 18px; }
+  .logos-root .ln .ln-figcap .ln-title,
+  .logos-root .ln:is(.ln-sim, .ln-chart) > .ln-title { font-size: 18px; }
+}
+@media (forced-colors: active) {
+  .logos-root .ln-graph .ln-eq::before { background: CanvasText; }
+  .logos-root .ln-graph .ln-handle circle { fill: Highlight; stroke: Canvas; }
+}

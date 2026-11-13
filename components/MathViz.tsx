@@ -60,10 +60,13 @@ import { TeX } from './TeX';
 import { LogosMark } from './LogosMark';
 import { MathField } from './MathField';
 
+// The teaching tones wear the graph palette (app/globals.css, --ln-g1..3), the same three a graph in a reply wears:
+// the function, what is read off it (a tangent, a derivative), what approximates it or sits under it (a secant, a
+// Taylor polynomial, a Riemann sum). Validated together; the fallbacks are the light steps.
 const TONE: Record<Tone, string> = {
-  primary: 'var(--lg-primary)',
-  accent: 'var(--lg-accent)',
-  tension: 'var(--lg-tension)',
+  primary: 'var(--ln-g1, #456b1f)',
+  accent: 'var(--ln-g2, #2a7bb0)',
+  tension: 'var(--ln-g3, #c27a2e)',
   muted: 'var(--lg-ink-40)',
   ghost: 'var(--lg-ink-24)',
   // The reader's own curves. Distinct from the teaching palette above so it
@@ -83,6 +86,10 @@ const ZOOM_STEP = 1.14;
 const PERSIST_MS = 700;
 
 const PAD = { l: 44, r: 22, t: 20, b: 30 };
+/** The pictures whose axes are plain x and y, named at the axes' ends when the frame does not name them itself. */
+const XY_KINDS = new Set<VizKind>(['function', 'limit', 'derivative', 'riemann', 'taylor', 'ode']);
+/** What the small label over the title calls the picture. */
+const KIND_WORD = (k: VizKind) => (k === 'supply-demand' || k === 'ppc' || k === 'ad-as' || k === 'diagram' ? 'Diagram' : k === 'surface' ? 'Surface' : k === 'flow' ? 'Field' : 'Graph');
 /** The narration column, when there is room for one beside the plot. */
 const NARR_W = 196;
 /** Below this the column would squeeze the plot, so the words go underneath. */
@@ -789,7 +796,12 @@ export function MathViz({
 
   return (
     <div className="lg-viz">
-      {active.title && !draft && <p className="lg-viz-title">{active.title}</p>}
+      {active.title && !draft && (
+        <p className="lg-viz-title">
+          <span className="lg-viz-kind">{KIND_WORD(active.kind)}</span>
+          <span>{active.title}</span>
+        </p>
+      )}
 
       <div className="lg-viz-body">
       <div className="lg-viz-stage" ref={stageRef}>
@@ -841,10 +853,7 @@ export function MathViz({
             </marker>
           </defs>
 
-          {/* grid */}
-          {xTicks.map((x) => (
-            <line key={`gx${x}`} x1={sx(x)} y1={PAD.t} x2={sx(x)} y2={PAD.t + plotH} className="lg-viz-grid" />
-          ))}
+          {/* the grid: faint, horizontal only — a vertical grid read as a cage */}
           {yTicks.map((y) => (
             <line key={`gy${y}`} x1={PAD.l} y1={sy(y)} x2={PAD.l + plotW} y2={sy(y)} className="lg-viz-grid" />
           ))}
@@ -856,18 +865,6 @@ export function MathViz({
           {view.xMin <= 0 && view.xMax >= 0 && (
             <line x1={sx(0)} y1={PAD.t} x2={sx(0)} y2={PAD.t + plotH} className="lg-viz-axis" />
           )}
-
-          {/* tick labels */}
-          {xTicks.filter((x) => x !== 0).map((x) => (
-            <text key={`tx${x}`} x={sx(x)} y={PAD.t + plotH + 16} className="lg-viz-tick" textAnchor="middle">
-              {fmt(x, 3)}
-            </text>
-          ))}
-          {yTicks.filter((y) => y !== 0).map((y) => (
-            <text key={`ty${y}`} x={PAD.l - 7} y={sy(y) + 3} className="lg-viz-tick" textAnchor="end">
-              {fmt(y, 3)}
-            </text>
-          ))}
 
           {/* what each axis measures — a market's quantity and price, a frontier's two goods */}
           {frame.axes && (
@@ -901,6 +898,42 @@ export function MathViz({
               </g>
             ))}
           </g>
+
+          {/* The numbers, over the curves (each on a paper outline, globals.css): on the axes, as on paper, where an
+              axis is in view; along the plot's edge where it is not. */}
+          {(() => {
+            const xAxis = view.yMin <= 0 && view.yMax >= 0 ? sy(0) : null;
+            const yAxis = view.xMin <= 0 && view.xMax >= 0 ? sx(0) : null;
+            const foot = xAxis === null ? PAD.t + plotH + 16 : Math.min(PAD.t + plotH + 16, xAxis + 15);
+            const onY = yAxis !== null && yAxis - PAD.l > 30;
+            return (
+              <g className="lg-viz-ticks" aria-hidden="true">
+                {xAxis !== null && xTicks.filter((x) => x !== 0).map((x) => <line key={`kx${x}`} className="lg-viz-axis" x1={sx(x)} x2={sx(x)} y1={xAxis - 3} y2={xAxis + 3} />)}
+                {onY && yTicks.filter((y) => y !== 0).map((y) => <line key={`ky${y}`} className="lg-viz-axis" x1={yAxis! - 3} x2={yAxis! + 3} y1={sy(y)} y2={sy(y)} />)}
+                {xTicks.filter((x) => x !== 0 && sx(x) < PAD.l + plotW - 14).map((x) => (
+                  <text key={`tx${x}`} x={sx(x)} y={foot} className="lg-viz-tick" textAnchor="middle">
+                    {fmt(x, 3)}
+                  </text>
+                ))}
+                {yTicks.filter((y) => y !== 0 && sy(y) > PAD.t + 8).map((y) => (
+                  <text key={`ty${y}`} x={onY ? yAxis! - 7 : PAD.l - 7} y={sy(y) + 4} className="lg-viz-tick" textAnchor="end">
+                    {fmt(y, 3)}
+                  </text>
+                ))}
+                {!frame.axes && XY_KINDS.has(active.kind) && xAxis !== null && (
+                  <text className="lg-viz-name" x={PAD.l + plotW + 4} y={xAxis + 5}>
+                    {active.varName || 'x'}
+                  </text>
+                )}
+                {!frame.axes && XY_KINDS.has(active.kind) && yAxis !== null && (
+                  // left of the axis: a rule's label (x = a) sits to its right
+                  <text className="lg-viz-name" x={yAxis - 8} y={PAD.t + 4} textAnchor="end">
+                    y
+                  </text>
+                )}
+              </g>
+            );
+          })()}
         </svg>
 
         {/* Sibling of the svg, so the focus-visible rule above can reveal it
@@ -1514,7 +1547,7 @@ function Obj({
           x2={sx(view.xMax)}
           y2={sy(y2)}
           stroke={stroke}
-          strokeWidth={ob.width ?? 1.5}
+          strokeWidth={ob.width ?? 1.75}
           strokeDasharray={dash}
           className="lg-viz-line"
         />
@@ -1542,29 +1575,22 @@ function Obj({
       );
 
     case 'rects':
+      // Each bar a block of its own: a 2px gap of paper between neighbours rather than an outline round each, the end
+      // that meets the curve rounded, the end on the axis square. A bar too thin for a gap is drawn whole.
       return (
         <g>
           {ob.bars.map((b, i) => {
-            const top = Math.min(sy(b.y), sy(0));
-            const h = Math.abs(sy(b.y) - sy(0));
-            const x = sx(b.x0);
-            const w = Math.max(0.5, sx(b.x1) - sx(b.x0));
-            if (!Number.isFinite(top) || !Number.isFinite(h)) return null;
-            return (
-              <rect
-                key={i}
-                x={x}
-                y={top}
-                width={w}
-                height={h}
-                fill={stroke}
-                fillOpacity={0.14}
-                stroke={stroke}
-                strokeOpacity={0.5}
-                strokeWidth={w > 3 ? 1 : 0}
-                className="lg-viz-bar"
-              />
-            );
+            const yb = sy(0), yt = sy(b.y);
+            const x0 = sx(b.x0), x1 = sx(b.x1);
+            if (![yb, yt, x0, x1].every(Number.isFinite)) return null;
+            const gap = x1 - x0 > 6 ? 1 : 0;
+            const l = x0 + gap, r = Math.max(l + 0.5, x1 - gap);
+            const up = yt <= yb;
+            const rr = Math.min(3, (r - l) / 2, Math.abs(yb - yt));
+            const d = up
+              ? `M${l},${yb}V${yt + rr}Q${l},${yt} ${l + rr},${yt}H${r - rr}Q${r},${yt} ${r},${yt + rr}V${yb}Z`
+              : `M${l},${yb}V${yt - rr}Q${l},${yt} ${l + rr},${yt}H${r - rr}Q${r},${yt} ${r},${yt - rr}V${yb}Z`;
+            return <path key={i} d={d} fill={stroke} fillOpacity={0.18} stroke="none" className="lg-viz-bar" />;
           })}
         </g>
       );
@@ -1591,10 +1617,10 @@ function Obj({
           <circle
             cx={sx(ob.x)}
             cy={sy(ob.y)}
-            r={4.5}
+            r={ob.hollow ? 4.5 : 5}
             fill={ob.hollow ? 'var(--lg-paper)' : stroke}
-            stroke={stroke}
-            strokeWidth={1.8}
+            stroke={ob.hollow ? stroke : 'var(--lg-paper)'}
+            strokeWidth={2}
           />
           {ob.label && (
             <text x={sx(ob.x) + 8} y={sy(ob.y) - 8} className="lg-viz-lab" fill={stroke}>

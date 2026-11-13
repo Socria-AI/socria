@@ -3606,6 +3606,27 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 }
 .logos-root .lg-ctxp-connectbtn:hover { background: var(--lg-primary); transform: translateY(-2px); }
 
+/* ── the graph palette (November 2026) ───────────────────────────────
+   The colours a curve wears, in every renderer that draws one: a graph in a reply (components/inline/inline.css)
+   and a picture in Artifacts and the workspace (MathViz). Fixed order: the function, then what is read off it (a
+   tangent, a derivative, a second curve), then what approximates it or sits under it (a Taylor polynomial, a
+   Riemann sum, a third curve). Validated with the dataviz palette check, every pair: on paper and on white (light),
+   on the Dark, One and Celestial grounds (dark; green against ochre is 7.0 for protanopia, inside the band allowed
+   only with a second cue, which every curve has: its key in the legend and its name at its end). Charts of data
+   keep the series palette (components/display/data.css). */
+:root,
+:is(.logos-root, .lg-tokens) {
+  --ln-g1: #456b1f;
+  --ln-g2: #2a7bb0;
+  --ln-g3: #c27a2e;
+}
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]),
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) :is(.logos-root, .lg-tokens) {
+  --ln-g1: #3b7f3a;
+  --ln-g2: #4c8fd6;
+  --ln-g3: #c2843c;
+}
+
 /* ── mathematics: LaTeX, flags, notes ────────────────────────────── */
 .logos-root .lg-tex { line-height: 1.2; }
 .logos-root .lg-tex-block {
@@ -6179,4 +6200,166 @@ html.js-anim .reveal,
   .logos-root .lg-zoom { right: 10px; bottom: 10px; }
   .logos-root .lg-zoom button:not(.lg-zoom-fit) { display: none; }
   .logos-root .lg-zoom .lg-zoom-fit { min-width: 40px; min-height: 40px; }
+}
+
+/* ── MathViz, as a figure (November 2026) ─────────────────────────────────────────────────────────────────────
+   The picture in Artifacts and the workspace, in the same language as a graph in a reply (components/inline/
+   inline.css): a small label over a serif title; a faint horizontal grid; numbers on the axes, over the curves, on a
+   paper outline; curves in the graph palette (--ln-g1..3); labels in ink, never in a curve's colour; the narration a
+   quiet line, not a card; the readings one row of words, not a row of boxes; one filled control (Play), words for the
+   rest; a hairline slider. */
+.logos-root .lg-viz-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  margin: 0 0 6px;
+  text-align: left;
+  font-family: var(--l5-serif, var(--serif, Georgia, serif));
+  font-size: 19px;
+  line-height: 1.25;
+  letter-spacing: -0.003em;
+}
+.logos-root .lg-viz-kind {
+  font-family: var(--font-sans, Inter), system-ui, sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--c-ink-45, var(--lg-ink-60));
+}
+.logos-root .lg-viz-grid { stroke: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.075); }
+.logos-root .lg-viz-axis { stroke: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.3); stroke-width: 1; }
+.logos-root .lg-viz-tick,
+.logos-root .lg-viz-name,
+.logos-root .lg-viz-lab {
+  paint-order: stroke;
+  stroke: var(--lg-paper, #f5f3eb);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+.logos-root .lg-viz-tick {
+  fill: var(--lg-ink-60);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.logos-root .lg-viz-name {
+  fill: var(--lg-ink-60);
+  font-family: var(--l5-serif, var(--serif, Georgia, serif));
+  font-size: 15px;
+  font-style: italic;
+}
+/* a label names a mark; the mark beside it carries the colour */
+.logos-root .lg-viz-lab {
+  fill: var(--lg-ink-70, rgba(35, 36, 31, 0.72));
+  font-size: 12.5px;
+}
+.logos-root .lg-viz-curve { stroke-width: 2; }
+
+/* the narration: a line of reading text under a hairline, nothing that pulses */
+.logos-root .lg-viz-narr,
+.logos-root .lg-viz-narr.is-below {
+  padding: 0 0 0 12px;
+  border-left: 1px solid var(--c-rule, var(--lg-line));
+  border-radius: 0;
+  background: none;
+}
+.logos-root .lg-viz-narr.is-below { margin: 8px 0 0; }
+.logos-root .lg-viz-narr p,
+.logos-root .lg-viz-narr.is-below p {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--lg-ink-70, rgba(35, 36, 31, 0.72));
+}
+.logos-root .lg-viz-narr-mark { display: none; }
+
+/* the readings: one row of words */
+.logos-root .lg-viz-readouts {
+  gap: 2px 22px;
+  padding: 10px 2px 2px;
+}
+.logos-root .lg-viz-readout {
+  gap: 5px;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font-size: 13px;
+}
+.logos-root .lg-viz-readout b {
+  font-family: var(--font-sans, Inter), system-ui, sans-serif;
+  font-weight: 600;
+  color: var(--lg-ink);
+}
+.logos-root .lg-viz-readout.is-askable:hover,
+.logos-root .lg-viz-readout.is-asked {
+  background: none;
+  text-decoration: underline;
+  text-decoration-color: var(--c-ink-25, rgba(35, 36, 31, 0.25));
+  text-underline-offset: 4px;
+}
+
+/* the transport and Edit: words round one filled control */
+.logos-root .lg-viz-transport {
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.logos-root .lg-viz-play { width: 32px; height: 32px; }
+.logos-root .lg-viz-speeds { margin-left: 8px; padding-left: 10px; gap: 2px; }
+.logos-root .lg-viz-speeds button { opacity: 1; color: var(--lg-ink-60); }
+.logos-root .lg-viz-speeds button.is-on {
+  color: var(--lg-ink);
+  background: none;
+  box-shadow: inset 0 -1.5px 0 var(--lg-primary);
+  border-radius: 0;
+}
+.logos-root .lg-viz-editbtn {
+  border: 0;
+  background: none;
+  padding: 7px 6px;
+  color: var(--lg-ink-60);
+  font-size: 13px;
+}
+.logos-root .lg-viz-editbtn:hover { background: none; color: var(--lg-ink); text-decoration: underline; text-underline-offset: 4px; }
+.logos-root .lg-viz-editbtn.is-on { color: var(--lg-primary); }
+
+/* a slider: a hairline track, a small filled knob ringed in paper */
+.logos-root .lg-viz-slider input[type='range']::-webkit-slider-runnable-track {
+  height: 2px;
+  background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.18);
+}
+.logos-root .lg-viz-slider input[type='range']::-moz-range-track {
+  height: 2px;
+  background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.18);
+}
+.logos-root .lg-viz-slider input[type='range']::-moz-range-progress {
+  height: 2px;
+  background: var(--lg-primary);
+}
+.logos-root .lg-viz-slider input[type='range']::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -6px;
+  border: 2px solid var(--lg-paper);
+  background: var(--lg-primary);
+  box-shadow: 0 0 0 1px rgba(var(--lg-primary-rgb, 53, 70, 32), 0.35);
+}
+.logos-root .lg-viz-slider input[type='range']::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--lg-paper);
+  background: var(--lg-primary);
+  box-shadow: 0 0 0 1px rgba(var(--lg-primary-rgb, 53, 70, 32), 0.35);
+}
+.logos-root .lg-viz-slider output {
+  font-family: var(--font-sans, Inter), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+}
+.logos-root .lg-viz-caption {
+  color: var(--lg-ink-60);
+  opacity: 1;
 }

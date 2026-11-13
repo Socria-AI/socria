@@ -1188,34 +1188,67 @@ function pathOf(pts: readonly Pt[], X: (x: number) => number, Y: (y: number) => 
   return d;
 }
 
-/** The grid and axes of a window, its zero lines drawn where they fall inside it. */
-function Grid({ x0, x1, y0, y1, X, Y, W, H }: { x0: number; x1: number; y0: number; y1: number; X: (x: number) => number; Y: (y: number) => number; W: number; H: number }) {
+/**
+ * The grid and axes of a window. In two parts, so nothing a curve passes over is lost: `lines` (faint horizontal
+ * rules, the zero lines) under the curves, `labels` (ticks on the axes, their numbers, the axes' names) over them,
+ * each number on a paper-coloured outline (inline.css). Horizontal rules only: a vertical grid read as a cage.
+ */
+function Grid({ x0, x1, y0, y1, X, Y, W, H, part = 'lines', xName = true }: { x0: number; x1: number; y0: number; y1: number; X: (x: number) => number; Y: (y: number) => number; W: number; H: number; part?: 'lines' | 'labels'; xName?: boolean }) {
   const xs = linearScale([x0, x1], { want: Math.max(3, Math.round(W / 90)) }).ticks.filter((t) => t > x0 && t < x1);
   const ys = linearScale([y0, y1], { want: Math.max(3, Math.round(H / 60)) }).ticks.filter((t) => t > y0 && t < y1);
+  // where the x-axis (y = 0) and the y-axis (x = 0) fall, when they are in the window
   const ax = y0 <= 0 && 0 <= y1 ? Y(0) : null;
   const ay = x0 <= 0 && 0 <= x1 ? X(0) : null;
+  if (part === 'lines') {
+    return (
+      <g className="ln-axes" aria-hidden="true">
+        {ys.filter((t) => t !== 0).map((t) => (
+          <line key={`y${t}`} x1={0} x2={W} y1={Y(t)} y2={Y(t)} />
+        ))}
+        {ax !== null && <line className="is-axis" x1={0} x2={W} y1={ax} y2={ax} />}
+        {ay !== null && <line className="is-axis" x1={ay} x2={ay} y1={0} y2={H} />}
+      </g>
+    );
+  }
+  // numbers sit on the axes, as on paper; with an axis out of view, along the window's edge
+  const foot = ax === null ? H - 4 : Math.min(H - 4, ax + 15);
+  const yLeft = ay !== null && ay > 30;
   return (
-    <g className="ln-axes" aria-hidden="true">
-      {xs.map((t) => (
-        <line key={`x${t}`} x1={X(t)} x2={X(t)} y1={0} y2={H} />
-      ))}
-      {ys.map((t) => (
-        <line key={`y${t}`} x1={0} x2={W} y1={Y(t)} y2={Y(t)} />
-      ))}
-      {ax !== null && <line className="is-axis" x1={0} x2={W} y1={ax} y2={ax} />}
-      {ay !== null && <line className="is-axis" x1={ay} x2={ay} y1={0} y2={H} />}
-      {xs.filter((t) => t !== 0).map((t) => (
-        <text key={`tx${t}`} x={X(t)} y={Math.min(H - 4, (ax ?? H - 16) + 14)} textAnchor="middle">
+    <g className="ln-axes is-labels" aria-hidden="true">
+      {ax !== null && xs.filter((t) => t !== 0).map((t) => <line key={`tx${t}`} className="is-tick" x1={X(t)} x2={X(t)} y1={ax - 3} y2={ax + 3} />)}
+      {ay !== null && ys.filter((t) => t !== 0).map((t) => <line key={`ty${t}`} className="is-tick" x1={ay - 3} x2={ay + 3} y1={Y(t)} y2={Y(t)} />)}
+      {/* the right end is where curves are named (xName off): numbers keep clear of it */}
+      {xs.filter((t) => t !== 0 && X(t) < W - (xName ? 20 : 48)).map((t) => (
+        <text key={`nx${t}`} x={X(t)} y={foot} textAnchor="middle">
           {fmtVal(t)}
         </text>
       ))}
-      {ys.filter((t) => t !== 0).map((t) => (
-        <text key={`ty${t}`} x={Math.min(W - 4, (ay ?? 0) + 6)} y={Y(t) + 4}>
+      {ys.filter((t) => t !== 0 && Y(t) > 16).map((t) => (
+        <text key={`ny${t}`} x={yLeft ? ay! - 7 : Math.min(W - 4, (ay ?? 0) + 7)} y={Y(t) + 4} textAnchor={yLeft ? 'end' : 'start'}>
           {fmtVal(t)}
         </text>
       ))}
+      {ax !== null && xName && (
+        <text className="is-name" x={W - 2} y={foot} textAnchor="end">
+          x
+        </text>
+      )}
+      {ay !== null && (
+        <text className="is-name" x={ay + 8} y={12}>
+          y
+        </text>
+      )}
     </g>
   );
+}
+
+/** The parameters an expression draws as numbers to drag. */
+function scrubbedIn(segs: Seg[] | null | undefined, out = new Set<string>()): Set<string> {
+  for (const g of segs ?? []) {
+    if (g.k === 'param') out.add(g.v);
+    else if (g.k === 'sup') scrubbedIn(g.s, out);
+  }
+  return out;
 }
 
 // ── a graph to change ────────────────────────────────────────────────
@@ -1376,6 +1409,8 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
     return { x1: X(x - L), y1: Y(y - m * L), x2: X(x + L), y2: Y(y + m * L) };
   };
   const shapeParams = spec.params.filter((p) => !positions.has(p.name));
+  // a number drawn in an equation is already a slider there (Scrub): its own slider is for a touch screen
+  const inEquation = scrubbedIn(segs, new Set(others.flatMap((o) => [...scrubbedIn(o.segs)])));
   const ariaParts = [
     `Graph of ${[spec.label ? `${spec.label}, y = ${spec.expr}` : `y = ${spec.expr}`, ...others.map((o) => `${o.label ? `${o.label}, ` : ''}y = ${o.expr}`)].join('; ')}`,
     nowTurn ? `turning point ${fmtPoint(nowTurn)}` : '',
@@ -1386,7 +1421,10 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
   ].filter(Boolean);
   return (
     <div className="ln ln-graph" role="group" aria-label={spec.title || 'A graph you can change'}>
-      {spec.title && <p className="ln-title">{spec.title}</p>}
+      <p className="ln-figcap">
+        <span className="ln-kind">Graph</span>
+        {spec.title && <span className="ln-title">{spec.title}</span>}
+      </p>
       <div className="ln-graph-head">
         <div className="ln-eqs">
           <p className="ln-eq">
@@ -1404,7 +1442,6 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
             </p>
           ))}
         </div>
-        {!locked && (positions.size > 0 ? <span className="ln-hint">Drag the points along the curve</span> : shapeParams.length > 0 ? <span className="ln-hint">Drag a number</span> : null)}
       </div>
       {spec.predict && picked === undefined && !skipped && (
         <Predict
@@ -1497,6 +1534,8 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
             </g>
           )}
           </g>
+          {/* a curve named at its end already stands by the axis's end: the axis is not named over it */}
+          <Grid x0={x0} x1={x1} y0={y0} y1={y1} X={X} Y={Y} W={W} H={H} part="labels" xName={!spec.label && !others.some((o) => o.label)} />
           {reshaped && !spec.quiet && was.crossings.map((k, i) => (fmtPoint(k) !== fmtPoint(readings.crossings[i] ?? { x: NaN, y: NaN }) ? <circle key={`gx${i}`} className="ln-pt is-ghost" cx={X(k.x)} cy={Y(k.y)} r={4} /> : null))}
           {reshaped && startTurn && nowTurn && (startTurn.x !== nowTurn.x || startTurn.y !== nowTurn.y) && <circle className="ln-pt is-ghost" cx={X(startTurn.x)} cy={Y(startTurn.y)} r={4} />}
           {ordered.map((k, i) => {
@@ -1519,7 +1558,8 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
             const p = spec.params.find((q) => q.name === n);
             return (
               <g key={`h${n}`} className={`ln-handle${drag === n ? ' is-drag' : ''}${hot === n ? ' is-hot' : ''}${locked ? ' is-locked' : ''}`} aria-hidden="true">
-                <circle cx={X(x)} cy={Y(y)} r={7} />
+                <circle className="ln-halo" cx={X(x)} cy={Y(y)} r={14} />
+                <circle cx={X(x)} cy={Y(y)} r={6} />
                 <text x={X(x)} y={Y(y) - 12} textAnchor="middle">
                   {p?.label && p.label.length <= 8 ? p.label : n}
                 </text>
@@ -1552,10 +1592,11 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
           ))}
         </p>
       )}
+      {!locked && (positions.size > 0 ? <p className="ln-hint">Drag the points along the curve.</p> : shapeParams.length > 0 ? <p className="ln-hint">Drag a number in the equation.</p> : null)}
       {spec.params.length > 0 && (
         <div className="ln-graph-vars">
           {spec.params.map((p) => (
-            <label key={p.name} className={`ln-var${hot === p.name ? ' is-hot' : ''}`}>
+            <label key={p.name} className={`ln-var${hot === p.name ? ' is-hot' : ''}${!positions.has(p.name) && inEquation.has(p.name) ? ' is-dup' : ''}`}>
               <span className="ln-var-top">
                 <span className="ln-var-k">{p.label}</span>
                 <span className="ln-var-v">{fmtWith(values[p.name] ?? p.value, p.unit)}</span>
