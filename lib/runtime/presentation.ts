@@ -211,6 +211,12 @@ export interface Presentation {
   math?: boolean;
   /** the working offered is faded: the first lines shown, the step that finishes it theirs, asked as its check */
   stepsFaded?: boolean;
+  /**
+   * The turn's note asks the reply to leave one line open (lib/runtime/engagement.ts): the shape's "then stop"
+   * comes after that line, not instead of it. Set when the shape is rendered (renderPresentation's context), where
+   * both are known; never by the planner.
+   */
+  leaveOpen?: boolean;
 }
 
 /**
@@ -1006,6 +1012,13 @@ function leversFor(p: Presentation, element: InlineKind | undefined): string {
  * "Your prose" clauses are left off, the header drops its escape clause, and
  * an element the header calls optional is written here as optional too.
  */
+/**
+ * Where an idea's explanation ends. "Then stop" closed every one of them — right about the lecture it replaced,
+ * and it also told a reply to end with nothing in it to answer. Where the turn's note asks for one closing line
+ * (lib/runtime/engagement.ts: asked out of curiosity), the stop comes after that line.
+ */
+const thenStop = (p: Presentation) => (p.leaveOpen ? "Then the one closing line this turn's note asks for, if there is a real one — and stop." : 'Then stop.');
+
 const SHAPES: Record<ReplyShape, (p: Presentation) => string> = {
   understand: (p) => {
     const element = p.forms.find((k) => k !== 'paths');
@@ -1031,7 +1044,7 @@ const SHAPES: Record<ReplyShape, (p: Presentation) => string> = {
       const carried = element
         ? `Then the ${NOUN[element] ?? 'element'} below carries the parts.`
         : 'Then the parts themselves, briefly, in the order they connect — a sentence each, in prose.';
-      return `\n\nTHE SHAPE OF THIS REPLY — they want to understand something made of parts. Minimum explanation, maximum understanding:\n- Open with one plain sentence on what ties the parts together — what drives it, or the principle that organises it — not the topic's name, its history, or "X is a fundamental concept in…". Keep everything as true as you can state it: where it is contested, say so.\n- ${carried}\n- ${stop ?? `Then stop. No headings or sections, no applications or history they did not ask for${deeperWays}.`}\n${stop ? '' : 'If a sentence carries it, that is the whole reply.\n'}`;
+      return `\n\nTHE SHAPE OF THIS REPLY — they want to understand something made of parts. Minimum explanation, maximum understanding:\n- Open with one plain sentence on what ties the parts together — what drives it, or the principle that organises it — not the topic's name, its history, or "X is a fundamental concept in…". Keep everything as true as you can state it: where it is contested, say so.\n- ${carried}\n- ${stop ?? `${thenStop(p)} No headings or sections, no applications or history they did not ask for${deeperWays}.`}\n${stop || p.leaveOpen ? '' : 'If a sentence carries it, that is the whole reply.\n'}`;
     }
     const after = !element
       ? 'one concrete example or image, if the sentence needs one'
@@ -1048,7 +1061,7 @@ const SHAPES: Record<ReplyShape, (p: Presentation) => string> = {
     const opening = p.guard
       ? 'Open with what the idea rests on, in one plain sentence — never the result they are working toward, which is theirs to reach; not the topic\'s name, its history, or "X is a fundamental concept in…".'
       : 'Open with the central insight in one plain sentence: what it says and why it holds — the relationship itself, not the topic\'s name, its history, or "X is a fundamental concept in…".';
-    return `\n\nTHE SHAPE OF THIS REPLY — they want to understand an idea. Minimum explanation, maximum understanding:\n- ${opening} A condition it is false without (continuity, a sign, a domain, all else equal) belongs in that sentence or the next: never drop one for brevity, and never state something more strongly than it is true.\n- Then only what makes that sentence land: ${after} — not a second explanation of the same thing.\n- ${stop ?? `Then stop. No headings or sections${element === 'compare' ? '' : ', no list of properties'}, no applications, history or proof they did not ask for${deeperWays}.`}\n${stop ? '' : 'If a sentence or two carries it, that is the whole reply.\n'}`;
+    return `\n\nTHE SHAPE OF THIS REPLY — they want to understand an idea. Minimum explanation, maximum understanding:\n- ${opening} A condition it is false without (continuity, a sign, a domain, all else equal) belongs in that sentence or the next: never drop one for brevity, and never state something more strongly than it is true.\n- Then only what makes that sentence land: ${after} — not a second explanation of the same thing.\n- ${stop ?? `${thenStop(p)} No headings or sections${element === 'compare' ? '' : ', no list of properties'}, no applications, history or proof they did not ask for${deeperWays}.`}\n${stop || p.leaveOpen ? '' : 'If a sentence or two carries it, that is the whole reply.\n'}`;
   },
   practical: (p) => {
     const element = p.forms.find((k) => k !== 'paths');
@@ -1103,6 +1116,8 @@ const withoutProse = (g: string) => g.replace(/\s*Your prose:[\s\S]*$/, '');
 export interface PresentationContext {
   /** Socria's own regulation asked this turn to say what was checked (lib/mr/execute.ts VERIFY OUT LOUD) */
   verifyOutLoud?: boolean;
+  /** the turn's note asks for one closing line (lib/runtime/engagement.ts leavesOpen): "then stop" comes after it */
+  leaveOpen?: boolean;
 }
 
 /**
@@ -1112,7 +1127,8 @@ export interface PresentationContext {
  */
 export function renderPresentation(p: Presentation, ctx: PresentationContext = {}): string {
   if (p.place === 'content') return WRITE_UP;
-  const shape = p.shape ? SHAPES[p.shape](p) : '';
+  // the turn's note asks for one closing line (lib/runtime/engagement.ts): the shape's "then stop" comes after it
+  const shape = p.shape ? SHAPES[p.shape](ctx.leaveOpen ? { ...p, leaveOpen: true } : p) : '';
   if (!p.forms.length) return shape;
   const fits = p.forms.filter((k) => p.strong?.includes(k));
   const maybe = p.forms.filter((k) => !fits.includes(k));

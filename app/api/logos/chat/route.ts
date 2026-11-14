@@ -84,9 +84,13 @@ import { extractionContext } from '@/lib/mind/activate';
 import { cleanId, logosMemoryText, logosPersistPolicy } from '@/lib/mind/logos-turn';
 import { waitUntil } from '@vercel/functions';
 import {
-  PERSONA_VERSION,
+  personaVersion,
   allocate,
   allocationMode,
+  engagementMode,
+  engageTrace,
+  leavesOpen,
+  settleEngagement,
   assessNeed,
   buildEvidence,
   checkReply,
@@ -624,11 +628,16 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       keptPolicy = STRICTNESS[whole] > STRICTNESS[windowed] ? whole : windowed;
       return keptPolicy;
     };
+    // LOGOS_ENGAGEMENT: on, shadow (read and traced, nothing changed) or off (lib/runtime/index.ts)
+    const engageMode = engagementMode();
     const personaBlocks = {
       math: looksMathematical(userTexts),
       picture: !!body?.viz || !!body?.vizState,
       build: userTexts.some((t) => !!wantedSimulation(t) || ['model', 'simulation'].includes(constructAsk(t) ?? '')),
       guard: resolveGuard(body?.guard) === 'guard',
+      // where the allocation's engagement reading is acted on, the core's rule for questions lets this turn's
+      // note invite one (lib/runtime/behavior.ts LOGOS5_CORE_INVITED); otherwise the core exactly as it was
+      invites: persona === 'v5' && engageMode === 'on',
     };
     const system =
       persona === 'v5'
@@ -835,6 +844,10 @@ export const POST = withMeter(async function POST(req: NextRequest) {
             state: turnState,
             signals,
             assist: assistInput,
+            // how the reply meets their thinking (lib/runtime/engagement.ts): a dimension of the allocation,
+            // read in code, where the deployment has it on (LOGOS_ENGAGEMENT) — or read and only traced (shadow)
+            engage: engageMode === 'on' ? true : engageMode === 'shadow' ? 'shadow' : false,
+            length: body?.length === 'concise' || body?.length === 'standard' || body?.length === 'detailed' ? body.length : null,
             ...(coreAllocation
               ? {
                   replay: {
@@ -985,6 +998,11 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       }
     }
     const assist = mrRun?.enforced ? mrRun.assist : assistAcs;
+    // the engagement reading closed this turn's question budget itself (allocation.ts `engaged`): on its own
+    // inference, so it may not be what leaves a reply empty (below, after the gate)
+    const engageClosed = !!allocation?.engagement && allocation.engagement.cap === 0 && assistAcs.reasons.some((r) => r.startsWith('engage:'));
+    // the reading for the trace: the one acted on, or — in shadow — the one that only watched
+    const engageRead = allocation?.engagement ?? allocation?.engagementShadow ?? null;
     // the per-turn block renders the move from the allocation: it carries the regulated one
     const allocationShown = allocation && mrRun?.enforced ? { ...allocation, assist } : allocation;
 
@@ -1109,7 +1127,17 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       strong: presentation.strong,
       lean: !!presentation.lean,
       question: /\?\s*$/.test(lastText.trim()) || LIST_ASK.test(lastText),
+      // what the rest of the turn's guidance already says, so the allocation's engagement line never says it twice
+      // (lib/runtime/engagement.ts engagementLine): where it is read, the plan's own closing question, its word
+      // that they answered or that it landed, and MR's "shorter"
+      place: presentation.place,
+      asks: !!explain?.question,
+      answered: !!explain?.fill.answered,
+      landed: !!explain?.reasons.includes('feedback:claims-it'),
+      tight: !!mrRun?.ceiling,
     };
+    // …and the shape's "then stop" comes after the one closing line the note asks for, where it asks for one
+    const leaveOpen = leavesOpen(allocationShown?.engagement, assist.questions, turnView);
 
     // EPISTEMIC CONTROL (lib/runtime/epistemic.ts). What the turn asks for,
     // and the evidence there is for it: their documents' passages, the
@@ -1277,7 +1305,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       // …adjusted, when MR is regulating this turn (lib/mr/execute.ts): only the lines its prompt-level controls need
       fitControlsToForms(mrRun?.block ?? '', presentation) +
       // …and what shape it may take: the inline elements on offer, if any
-      renderPresentation(presentation, { verifyOutLoud: !!mrRun?.block && /VERIFY OUT LOUD/.test(mrRun.block) }) +
+      renderPresentation(presentation, { verifyOutLoud: !!mrRun?.block && /VERIFY OUT LOUD/.test(mrRun.block), leaveOpen }) +
       // …and how to make it understood (lib/runtime/explain.ts): read against the shape above, so nothing is said
       // twice — nothing for a direct answer, a few lines filled with this turn's facts otherwise
       renderTurnGuidance(explain, presentation, { said: { retrieval: assist.retrieval, selfExplain: assist.selfExplain } }) +
@@ -1542,7 +1570,9 @@ export const POST = withMeter(async function POST(req: NextRequest) {
                   : inlineBlock,
               });
               held.push(reply);
-              held.finish(assist.questions);
+              const heldBack = held.finish(assist.questions);
+              // (a budget the engagement reading closed is never what empties a reply — see the streamed path)
+              if (engageClosed && !held.out.trim() && !mrRun?.gate.hardNoQuestions && !mrRun?.gate.dropCheckIns && heldBack.length) held.out += heldBack[0];
               if (g) {
                 // a number with no item after it ("42.") goes out last
                 const out = held.out + g.settle();
@@ -1599,7 +1629,17 @@ export const POST = withMeter(async function POST(req: NextRequest) {
               const delta = chunk.choices?.[0]?.delta?.content ?? '';
               if (delta) gate.push(delta);
             }
-            gate.finish(assist.questions);
+            const heldBack = gate.finish(assist.questions);
+            // A BUDGET THE ENGAGEMENT READING CLOSED IS NEVER WHAT EMPTIES A REPLY (lib/runtime/engagement.ts). It
+            // lowers the budget on its own inference — they are finishing, they let the last question pass — not on
+            // their words; so where the whole reply was one question (a clarification it could not go on without),
+            // that question goes out, as it would have without the reading. A limit they set themselves (MR's
+            // "stop asking", "just tell me") and Core 4's own budget still hold.
+            if (engageClosed && !reply.trim() && !mrRun?.gate.hardNoQuestions && !mrRun?.gate.dropCheckIns && heldBack.length) {
+              sent = true;
+              reply += heldBack[0];
+              controller.enqueue(encoder.encode(heldBack[0]));
+            }
             // What the gate took out, by class — and what the filler classes held back in this mode
             // (LOGOS_TRIM, shadow-first) would have — counts only, never the words (lib/core4/stream-gate.ts)
             {
@@ -1653,6 +1693,12 @@ export const POST = withMeter(async function POST(req: NextRequest) {
             } catch {
               // a trace line is never worth a failed reply
             }
+          }
+          // How the reply met their thinking, content-free: the reading's codes, what they did with Socria's last
+          // question, and whether this reply ended on one — so what an invitation drew can be counted from the next
+          // turn's line (docs/LOGOS-ENGAGEMENT.md). No words, no topic.
+          if (engageRead && reply.trim()) {
+            console.info(`[engage] ${engageTrace(settleEngagement(engageRead, assist.questions))},ended:${/\?["'’”)\]*_]*\s*$/.test(contentAsText(reply).trim()) ? 'question' : 'statement'},mode:${allocation?.engagement ? 'on' : 'shadow'}`);
           }
           // What the reply asserted, labelled, counted — never its content.
           if (evidence && need && reply.trim()) {
@@ -1774,7 +1820,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
         ...(runtime
           ? {
               'X-Socria-Runtime': [
-                persona === 'v5' ? PERSONA_VERSION : 'classic',
+                persona === 'v5' ? personaVersion(personaBlocks) : 'classic',
                 `path=${pathOf({ intent: turnRoute.intent, checked: accuracy.check || searched || docRefs.length > 0 })}`,
                 `intent=${turnRoute.intent}`,
                 `domain=${turnState.domain}`,
@@ -1784,6 +1830,9 @@ export const POST = withMeter(async function POST(req: NextRequest) {
                 // what the question about the documents asked for (lib/docs/intent.ts), and whether a follow-up carried passages
                 ...(docRefs.length ? [`docs=${docRefs.length}:${docShape.kind}${Object.keys(recentCites).length ? ':carried' : ''}${docFocus ? ':focus' : ''}`] : []),
                 ...(allocation ? [`split=${Object.entries(allocation.split).map(([k, v]) => `${k}:${v}`).join(',')}`] : []),
+                // how the reply meets their thinking, as it was finally allowed to (lib/runtime/engagement.ts): codes only
+                // (in shadow, under its own name: what it would have decided, with nothing in the turn changed)
+                ...(engageRead ? [`${allocation?.engagement ? 'engage' : 'engage-shadow'}=${engageTrace(settleEngagement(engageRead, assist.questions))}`] : []),
                 // Core 4's allocation, content-free: the mode and reason code, what is held back and why, never their words
                 ...(allocation?.core
                   ? [

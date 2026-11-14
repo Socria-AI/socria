@@ -459,6 +459,7 @@ both on every push.
 | `LOGOS_ALLOCATION` | `core4`: Core 4's allocator over the replayed conversation (§13) | `lite` (or `off`) restores the split and the move alone; only the Answer Guard withholds |
 | `LOGOS_MR` | on: Metacognitive Regulation (§14, docs/MR.md) | `off` (or 0/false/no): the route byte-identical to the one without it; `shadow` decides and traces without enforcing |
 | `LOGOS_IFR`, `LOGOS_MR_ARM`, `LOGOS_MR_POLICY`, `LOGOS_MR_DELIBERATE`, `LOGOS_MR_STORE`, `LOGOS_MR_EXPERIMENT` | see docs/MR.md §7 | — |
+| `LOGOS_ENGAGEMENT` | unset: `on` outside production, `off` in production. How the reply meets their thinking, read inside the allocation (§37, docs/LOGOS-ENGAGEMENT.md) | `off`: the allocation, the turn's block and the system message byte-identical to the route without it; `shadow`: the reading is made and traced, and nothing else changes |
 
 `NEXT_PUBLIC_LOGOS5=off` still brings back the Logos 4 screen for a
 deployment (lib/logos5/flags.ts). The four views (§5) are not behind a switch
@@ -3389,3 +3390,43 @@ path id, alongside the earlier role ids still counted. The dashboard shows
   only as drawn.
 - Name and role still live in the browser, not the account, so a second device
   asks again if the welcome is replayed. The welcome itself is never shown twice.
+
+## 37. How the reply meets their thinking: engagement, inside the allocation
+
+The allocation (§4.3, §13) decided who does the work and which move helps. It
+did not decide what the reply leaves the person to do with it, and every rule
+that touched the end of a reply closed it: "most replies end on a statement",
+a question only when its answer would change what Socria says next, "Then
+stop", a trailing question deleted outside the budget. Each was right about
+what it removed. Together they made a reply a finished object.
+
+So the allocation carries one more reading, made the way the others are (in
+code, from their words and the transcript, with no model call):
+`RuntimeAllocation.engagement` (`lib/runtime/engagement.ts`). It holds a
+strategy, how strongly the reply invites more (none, subtle, explicit,
+sustained), and what the reply does to the conversation (answer, deepen,
+explore, pivot, invite, conclude). It reads what the person did with Socria's
+last question from the transcript, so a question let pass is not asked again.
+It is at most one line of the turn's block.
+
+- **It only ever lowers the question budget.** Whether a question may ship
+  stays Core 4's budget, MR's regulation and the stream gate (§13, §14).
+- **It adds nothing where something else already decides**: a learning turn
+  (the explanation engine plans the question), something kept with the person,
+  a correction, time pressure, an asked-for length.
+- **It stands down** on anything that may carry distress, and the turn is then
+  exactly what it is without it. Because no list of such words is complete, a
+  line that plays, pushes or adds is given only on positive evidence that the
+  thought is not about the person or the people in their life, and a turn is
+  closed only on a goodbye that is the whole of what was said. The first
+  version failed an adversarial pass on exactly this; the messages it failed
+  on are kept in `evals/engagement/stand-aside.mjs` and held down in tests.
+- **`LOGOS_ENGAGEMENT`** is `on`, `shadow` or `off` (§8). Off in production
+  until someone turns it on. Where it is on, the cached core is sent with its
+  one rule for questions changed (`logos5-v9`); otherwise the core is as it
+  was.
+
+What was audited, the explanations weighed, the rules, the evaluation, what
+has and has not been measured, and how to measure it with people are in
+docs/LOGOS-ENGAGEMENT.md. The scenarios and the runner are in
+`evals/engagement/`.

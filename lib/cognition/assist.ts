@@ -497,6 +497,15 @@ export interface AssistView {
   strong?: readonly string[];
   /** they asked for Socria's own read on a choice that is theirs */
   lean?: boolean;
+  /** where the reply is read: a write-up filed in Content is a document, not a turn of conversation */
+  place?: string;
+  /** the explanation's plan already ends the reply on a question (lib/runtime/explain.ts) */
+  asks?: boolean;
+  /** …or already says they answered Socria's question, or that it has landed */
+  answered?: boolean;
+  landed?: boolean;
+  /** they asked for shorter replies (MR's ceiling): nothing extra is asked of this one */
+  tight?: boolean;
 }
 const MODE_SHAPED: Partial<Record<AssistMode, string>> = {
   explain: 'EXPLAIN — the shape of this reply, below, says how. Understanding is not authorship: explaining a concept takes nothing from them.',

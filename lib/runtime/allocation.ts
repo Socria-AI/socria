@@ -43,6 +43,21 @@
 // the move as they were: an explicit hand-over honoured in full, and only the
 // Answer Guard withholding.
 //
+// AND HOW THE REPLY MEETS THEIR THINKING (engagement.ts, November 2026). Who
+// does the work and which move helps said nothing about what the reply leaves
+// the person to do with it, and every line that touched a reply's end closed
+// it. So the allocation carries one more reading, made the same way — in code,
+// from their words and the transcript: the strategy (the answer itself, being
+// met, play, something left open, their contribution built on, their reasoning
+// drawn out, a clean end), how strongly the reply invites more (none, subtle,
+// explicit, sustained) and what it does to the conversation (answer, deepen,
+// explore, pivot, invite, conclude). It adapts to what they did with Socria's
+// last question, it can only LOWER the move's question budget, and it is one
+// line of the turn's block on the turns that have one. Off unless the caller
+// asks for it (`engage`; the route: LOGOS_ENGAGEMENT), and then this file is
+// exactly what it was; asked for as 'shadow', it is read for the trace and
+// changes nothing.
+//
 // Pure. No model, no network, no clock.
 
 import { splitFor, mustNotPerform, CONTRIBUTION } from '../core4/split';
@@ -53,6 +68,7 @@ import { TALK, type Exchange } from '../cognition/register';
 import { EVIDENCE_WITHHELD, type Allocation, type AllocationMode, type CognitiveSplit, type ExplicitSignals } from '../core4/types';
 import type { TurnState } from './state';
 import { replayConversation, type ReplayInput } from './replay';
+import { engageFor, engagementLine, type Engagement } from './engagement';
 
 export interface RuntimeAllocation {
   split: CognitiveSplit;
@@ -66,6 +82,10 @@ export interface RuntimeAllocation {
   theirs: string[];
   /** Core 4's allocation over the replayed conversation; null without it (LOGOS_ALLOCATION=lite) */
   core: CoreView | null;
+  /** how the reply meets their thinking this turn (engagement.ts); null where the caller did not ask for it */
+  engagement: Engagement | null;
+  /** …read but not acted on (`engage: 'shadow'`): for the trace alone. Nothing in the turn reads it. */
+  engagementShadow?: Engagement;
 }
 
 /** What the reply needs of Core 4's allocation — never shown to the person, never named in a reply. */
@@ -121,6 +141,13 @@ export interface AllocateInput {
    * the move stand alone, as before (LOGOS_ALLOCATION=lite).
    */
   replay?: Pick<ReplayInput, 'checked' | 'asked' | 'instructions'>;
+  /**
+   * Read how the reply meets their thinking (engagement.ts). Unset: the allocation as it was. 'shadow': the reading
+   * is made and returned beside the allocation (engagementShadow), and the allocation is still exactly as it was.
+   */
+  engage?: boolean | 'shadow';
+  /** how much they asked every reply to say (the length setting): Concise leaves a reply nothing extra */
+  length?: 'concise' | 'standard' | 'detailed' | null;
 }
 
 /**
@@ -193,12 +220,13 @@ export function allocate(i: AllocateInput): RuntimeAllocation {
       instructions: i.replay.instructions,
       intent: i.state.intent,
     });
+    const core: CoreView = { mode: a.mode, reasonCode: a.reasonCode, withhold: a.withhold, announce: a.announce };
     return {
       split: a.split,
       ownership: a.ownership,
-      assist: reconcile(chosen, a),
+      ...engaged(i, reconcile(chosen, a), a.split, core),
       ...wordsFor(a.split, i.state.work),
-      core: { mode: a.mode, reasonCode: a.reasonCode, withhold: a.withhold, announce: a.announce },
+      core,
     };
   }
   const core = coreStateFor(i.state, i.signals);
@@ -208,7 +236,35 @@ export function allocate(i: AllocateInput): RuntimeAllocation {
     // Core 4 performs a handed-over task with its supporting split; the same here.
     split = { ...split, creativity: 'share', judgment: 'share', reasoning: split.reasoning === 'scaffold' && i.state.preferences.learning ? 'scaffold' : 'perform' };
   }
-  return { split, ownership, assist: chosen, ...wordsFor(split, i.state.work), core: null };
+  return { split, ownership, ...engaged(i, chosen, split, null), ...wordsFor(split, i.state.work), core: null };
+}
+
+/**
+ * The move with the turn's engagement read beside it. The reading sees the move as the allocation left it and
+ * what the allocation keeps with them; it may close the question budget for a turn (they are finishing; they
+ * let the last question pass) and never opens it — whether a question may ship stays Core 4's budget, MR's
+ * regulation and the stream gate. A self-explanation needs its question, so it goes with the budget.
+ */
+function engaged(i: AllocateInput, assist: AssistDecision, split: CognitiveSplit, core: CoreView | null): { assist: AssistDecision; engagement: Engagement | null; engagementShadow?: Engagement } {
+  if (!i.engage) return { assist, engagement: null };
+  const engagement = engageFor({
+    state: i.state,
+    signals: i.signals,
+    assist,
+    history: i.assist.history,
+    text: i.assist.lastUserText,
+    held: !!core?.withhold || !!i.assist.guard,
+    heard: core?.mode === 'HUMAN_REFLECTS' || core?.reasonCode === 'reflect.heard',
+    handed: !!core && HANDED.has(core.reasonCode),
+    ownReasoning: split.reasoning === 'scaffold' || split.reasoning === 'human',
+    ownJudgment: split.judgment === 'human',
+    group: !!i.assist.group,
+    length: i.length ?? null,
+  });
+  // shadow: what would have been decided, for the trace — the move and the block are untouched
+  if (i.engage === 'shadow') return { assist, engagement: null, engagementShadow: engagement };
+  if (engagement.cap === 1 || assist.questions === 0) return { assist, engagement };
+  return { assist: { ...assist, questions: 0, selfExplain: false, reasons: [...assist.reasons, `engage:${engagement.reasons[0]}`] }, engagement };
 }
 
 /**
@@ -427,6 +483,8 @@ export function renderAllocation(a: RuntimeAllocation, st: TurnState, view: Assi
   const core = renderCore(a, st, view);
   // with a decide block offered, what the decision rests on and any read asked for are the block's to say
   const decideOffered = !!view.forms?.includes('decide');
+  // how the reply meets their thinking (engagement.ts): one line, read against the move's final budget and the reply's shape
+  const invite = engagementLine(a.engagement, a.assist.questions, view);
   const theirs = decideOffered ? a.theirs.map((t) => t.replace('give your own read if they ask; ', '')) : a.theirs;
   if (x.kind === 'task') {
     lines.push(domainLine(st, view, a.split?.reasoning), `You do: ${a.does.join('; ')}.`);
@@ -439,6 +497,7 @@ export function renderAllocation(a: RuntimeAllocation, st: TurnState, view: Assi
     lines.push(...core);
     if (x.saidFeeling) lines.push(ON_TASK[x.saidFeeling]);
     else if (x.joking) lines.push(ON_TASK.joking);
+    if (invite) lines.push(invite);
   } else {
     const line = exchangeLine(x);
     // a position offered beside a decision laid out for them to weigh argues with it
@@ -451,6 +510,7 @@ export function renderAllocation(a: RuntimeAllocation, st: TurnState, view: Assi
     const manner = mannerLine(x);
     if (manner) lines.push(manner);
     if (x.kind === 'conversation' && x.manner.words >= 4 && view.question && !decideOffered) lines.push(QUESTION_LINE);
+    if (invite) lines.push(invite);
   }
   const move = renderAssist(a.assist, view).replace(/^\s+/, '');
   if (!lines.length && !move) return '';

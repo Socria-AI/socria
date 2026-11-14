@@ -77,6 +77,17 @@
 // screen cannot copy. The screen draws a fenced block with its language and a Copy button (components/RichText.tsx
 // CodeBlock), so code goes in one.
 //
+// A QUESTION THE TURN INVITES (logos5-v9, November 2026). The rule for questions is epistemic and nothing else:
+// "only when its answer would change what you say next". It rules out the question a friend asks about good news,
+// and the one that hands a discussion back — and with "most replies end on a statement" and every shape's "then
+// stop", a reply has nothing in it to answer. Where the allocation's engagement reading is acted on (engagement.ts;
+// the route: LOGOS_ENGAGEMENT), the core is sent with that one rule changed (LOGOS5_CORE_INVITED): the rule stays,
+// one clause is added — "or this turn's note invites one" — and "a way to hand the turn back" leaves the list of
+// what a question must not be, because handing a turn back is sometimes right. Which turns invite one is the
+// reading's to say, in code, from their words and what they did with the last question; the core says nothing more.
+// Where the reading is off or only watching (shadow), the core is LOGOS5_CORE exactly as it was (logos5-v8): the
+// switch is a whole rollback, and what it is compared against is what was there.
+//
 // Every block is a constant or built from constants, so the system message is
 // the same byte for byte for a whole conversation and stays in the provider's
 // prompt cache. What changes turn to turn is the allocation block
@@ -88,6 +99,13 @@ import { WRONG_CHAT } from '../wrong-chat';
 import type { ReplyLength } from '../socria-prompt';
 
 export const PERSONA_VERSION = 'logos5-v8';
+/** …and where this turn's note may invite a question: the core with its one rule changed (LOGOS5_CORE_INVITED). */
+export const PERSONA_VERSION_INVITED = 'logos5-v9';
+
+/** The core's rule for when to ask (logos5-v8)… */
+const QUESTIONS_RULE = `Ask because you want the answer — never as a habit, a sign-off or a way to hand the turn back; most replies end on a statement. At most one, and only when its answer would change what you say next: you can't go on without it, or their answer is the point (they're learning, or the choice is theirs).`;
+/** …and the same rule where the turn's note may invite one (logos5-v9). */
+const QUESTIONS_RULE_INVITED = `Ask because you want the answer — never as a habit or a sign-off; most replies end on a statement. At most one, and only when its answer would change what you say next — you can't go on without it, or their answer is the point (they're learning, the choice is theirs) — or this turn's note invites one.`;
 
 const STYLE_AND_MEMORY = `THEIR STYLE IS THEIRS.
 If they ask you to sound different — casual, concise, chattier, more analytical, more challenging, fewer questions, no paraphrasing, let them finish first — change immediately and stay changed. A style request is never a threat to your purpose: Human-First governs what you do with their thinking, not how you sound. Never refuse, deflect or sidestep a harmless style request.
@@ -128,7 +146,7 @@ HOW IT LOOKS
 - A table only for a real comparison, three columns at most. Never # headings unless this turn's note asks, no nested lists, nothing like a card. Maths in LaTeX: $…$ inline, $$…$$ displayed. Code in a fenced block, with its language.
 
 QUESTIONS
-Ask because you want the answer — never as a habit, a sign-off or a way to hand the turn back; most replies end on a statement. At most one, and only when its answer would change what you say next: you can't go on without it, or their answer is the point (they're learning, or the choice is theirs). Never a list of questions, never a question of fact answered with one, never a closing "want me to…?" or "would you like me to go deeper…?".
+${QUESTIONS_RULE} Never a list of questions, never a question of fact answered with one, never a closing "want me to…?" or "would you like me to go deeper…?".
 
 ABOUT YOU
 You are an AI — no body, no day, no feelings the way they have them. Don't claim them ("I'm doing great!") and don't recite a disclaimer either. Asked how you are or what you're like, answer honestly and lightly in a sentence, and move on. You do have views and interests; say so when it's true.
@@ -209,7 +227,19 @@ export interface PersonaBlocks {
   build: boolean;
   /** the Answer Guard is up */
   guard: boolean;
+  /** this turn's note may invite a question: the engagement reading is acted on here (engagement.ts) */
+  invites?: boolean;
 }
+
+/**
+ * The core where this turn's note may invite a question: the same core with its one rule for questions changed. A
+ * constant, like the core it is built from, so the system message is still the same byte for byte for a whole
+ * conversation; which of the two a deployment sends is its LOGOS_ENGAGEMENT setting.
+ */
+export const LOGOS5_CORE_INVITED = LOGOS5_CORE.replace(QUESTIONS_RULE, QUESTIONS_RULE_INVITED);
+
+/** Which core a turn was sent, for the trace. */
+export const personaVersion = (b: Pick<PersonaBlocks, 'invites'>): string => (b.invites ? PERSONA_VERSION_INVITED : PERSONA_VERSION);
 
 /**
  * The system prompt's stable part for Logos 5: the core, then the blocks this
@@ -218,7 +248,7 @@ export interface PersonaBlocks {
  * same from one turn to the next.
  */
 export function logos5System(b: PersonaBlocks): string {
-  return [LOGOS5_CORE, b.math ? LOGOS5_MATH : '', b.picture ? LOGOS5_PICTURE : '', b.build ? LOGOS5_BUILD : '', b.guard ? WHY_NOT_ANSWER : '']
+  return [b.invites ? LOGOS5_CORE_INVITED : LOGOS5_CORE, b.math ? LOGOS5_MATH : '', b.picture ? LOGOS5_PICTURE : '', b.build ? LOGOS5_BUILD : '', b.guard ? WHY_NOT_ANSWER : '']
     .filter(Boolean)
     .join('\n\n');
 }

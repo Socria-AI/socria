@@ -81,7 +81,7 @@ export interface ExchangeInput {
 }
 
 /** Their words without code, quotations or attachment blocks: what they said to Socria. */
-function spoken(text: string): string {
+export function spoken(text: string): string {
   return text
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`[^`\n]*`/g, ' ')
@@ -173,6 +173,64 @@ export function smallTalk(text: string): boolean {
   const parts = clauses(t);
   if (!parts.length || parts.length > 5) return false;
   return parts.every(socialClause);
+}
+
+// ── finishing, and taking it in (lib/runtime/engagement.ts) ─────────────
+//
+// Small talk closes a conversation as often as it opens one, and the reply owes each something different: a
+// hello is answered in kind; "thanks, that's all" is let go. Read from the same phrases, so the two readers
+// never disagree about what small talk is.
+
+/** Does any run of the clause's words say this? ("ok thanks" holds a thanks.) */
+function anyRun(c: string, says: (run: string) => boolean): boolean {
+  const w = c.split(' ');
+  for (let i = 0; i < w.length; i++) for (let j = i + 1; j <= Math.min(w.length, i + 8); j++) if (says(w.slice(i, j).join(' '))) return true;
+  return false;
+}
+/**
+ * "That's all for today": a close the small-talk list stops short of (CLOSING ends at "for now"). Read here, for
+ * wrapsUp alone, so what the register counts as small talk — and so how it sorts a turn — is exactly what it was.
+ */
+const CLOSING_LATER = /^that(?:'s| is) (?:all|it|everything) for (?:today|tonight|the day)$/;
+/**
+ * Thanks, a goodbye, "that's all". Not "anyway" or "well" (they begin a sentence as often as they end a talk),
+ * and not a bare "nope" or "nah", which answers a question.
+ */
+const leaves = (run: string) => THANKS.test(run) || CLOSING_LATER.test(run) || (CLOSING.test(run) && !/^(?:nope|nah)$/.test(run)) || (BYE.test(run) && !/^(?:anyway|well)\b/.test(run));
+
+/**
+ * They are finishing: nothing in the message but thanks, a goodbye or "that's all", with a nod or a laugh
+ * beside it if there is one. A hello is not, and nor is anything that asks.
+ */
+export function wrapsUp(text: string): boolean {
+  const t = spoken(text);
+  if (!t || t.length > 140) return false;
+  const parts = clauses(t);
+  if (!parts.length || parts.length > 5) return false;
+  return parts.every((c) => phraseRun(c, [THANKS, CLOSING, CLOSING_LATER, BYE, ACK, LAUGHTER])) && parts.some((c) => anyRun(c, leaves));
+}
+
+/**
+ * A goodbye in so many words — "bye", "that's all", "gotta go", "that's all for today". More than thanks, which ends
+ * a request as often as a conversation ("My laptop will not turn on. Thanks."): for the last sentence of a message
+ * that says more.
+ */
+const goodbye = (run: string) => CLOSING_LATER.test(run) || (CLOSING.test(run) && !/^(?:nope|nah|no thanks|no thank you)$/.test(run)) || (BYE.test(run) && !/^(?:anyway|well)\b/.test(run));
+export function saysGoodbye(text: string): boolean {
+  const t = spoken(text);
+  if (!t || t.length > 140) return false;
+  const parts = clauses(t);
+  if (!parts.length || parts.length > 5) return false;
+  return parts.every((c) => phraseRun(c, [THANKS, CLOSING, CLOSING_LATER, BYE, ACK, LAUGHTER])) && parts.some((c) => anyRun(c, goodbye));
+}
+
+/** A word that says it landed — "ok", "got it", "makes sense". Not a yes or a no (an answer), not "go on", not a reaction ("wow"). */
+const RECEIPT = /^(?:ok(?:ay)?|k+|cool|great|perfect|awesome|lovely|brilliant|excellent|good|fine|alright|all right|right|i see|got it|gotcha|makes sense|that makes sense|(?:that|this|it) (?:helps|helped|was helpful|is helpful|is great|is perfect|works)(?: (?:a lot|so much|a ton))?|very helpful|super helpful|sounds good|will do|noted|fair(?: enough)?|no worries|no problem|np|good to know)$/;
+
+/** Nothing but a word that it landed: they have taken it in, and ask for nothing more. */
+export function takesIn(text: string): boolean {
+  const parts = clauses(spoken(text));
+  return parts.length > 0 && parts.length <= 3 && parts.every((c) => phraseRun(c, [RECEIPT]));
 }
 
 // ── about Socria ────────────────────────────────────────────────────────
