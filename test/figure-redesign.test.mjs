@@ -58,7 +58,7 @@ console.log('\n=== the figure, styled ===');
 {
   const c = css('components/inline/inline.css');
   const block = c.slice(c.indexOf('/* ── a figure, not a box'));
-  ok('between two hairlines, no box', /\.ln:is\(\.ln-graph, \.ln-sim, \.ln-chart\) \{[^}]*border: 0;[^}]*border-top: 1px solid var\(--ln-hair\);[^}]*border-bottom: 1px solid var\(--ln-hair\);[^}]*border-radius: 0;[^}]*background: none;/.test(block));
+  ok('between two hairlines, no box (graphs, simulations, charts, forces and traces alike)', /\.ln:is\(\.ln-graph, \.ln-sim, \.ln-chart, \.ln-vectors, \.ln-trace\) \{[^}]*border: 0;[^}]*border-top: 1px solid var\(--ln-hair\);[^}]*border-bottom: 1px solid var\(--ln-hair\);[^}]*border-radius: 0;[^}]*background: none;/.test(block));
   ok('curves wear the palette, 2px', /\.ln-curve \{\s*stroke: var\(--ln-g1\);\s*stroke-width: 2;/.test(block) && /is-second \{ stroke: var\(--ln-g2\); \}/.test(block) && /is-third \{ stroke: var\(--ln-g3\); \}/.test(block));
   ok('each equation carries its curve\'s key', /\.ln-graph \.ln-eq::before \{[^}]*background: var\(--ln-g1\);/.test(block));
   ok('text never wears a curve\'s colour: names and end labels in ink', /\.ln-eq-name \{[^}]*color: var\(--ln-ink-70\);/.test(block) && /\.ln-curve-name:is\(\.is-second, \.is-third\) \{[^}]*fill: var\(--ln-ink-70\);/.test(block));

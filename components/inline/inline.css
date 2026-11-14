@@ -2181,7 +2181,7 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
    the numbers on the picture are only the ones that matter. The grid is faint and horizontal; numbers sit on the
    axes, over the curves, on a paper-coloured outline. Curves wear the graph palette (--ln-g1..3, app/globals.css);
    text never wears a curve's colour. */
-.logos-root .ln:is(.ln-graph, .ln-sim, .ln-chart) {
+.logos-root .ln:is(.ln-graph, .ln-sim, .ln-chart, .ln-vectors, .ln-trace) {
   margin: 0.5em 0 1.1em;
   padding: 14px 0 12px;
   border: 0;
@@ -2190,11 +2190,11 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
   border-radius: 0;
   background: none;
 }
-html:is([data-theme="dark"], [data-theme="one"]) .logos-root .ln:is(.ln-graph, .ln-sim, .ln-chart) {
+html:is([data-theme="dark"], [data-theme="one"]) .logos-root .ln:is(.ln-graph, .ln-sim, .ln-chart, .ln-vectors, .ln-trace) {
   background: none;
 }
 /* Celestial keeps its surface under a figure (a star is not data), so the figure keeps a little room inside it */
-html[data-theme="night"] .logos-root .ln:is(.ln-graph, .ln-sim, .ln-chart) {
+html[data-theme="night"] .logos-root .ln:is(.ln-graph, .ln-sim, .ln-chart, .ln-vectors, .ln-trace) {
   padding-left: 12px;
   padding-right: 12px;
   border-radius: 10px;
@@ -2277,7 +2277,7 @@ html[data-theme="night"] .logos-root .ln:is(.ln-graph, .ln-sim, .ln-chart) {
 }
 
 /* the picture */
-.logos-root .ln:is(.ln-graph, .ln-sim) .ln-plot {
+.logos-root .ln:is(.ln-graph, .ln-sim, .ln-vectors) .ln-plot {
   margin: 10px 0 2px;
 }
 .logos-root .ln:is(.ln-graph, .ln-sim) .ln-axes line {
