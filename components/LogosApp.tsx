@@ -10019,12 +10019,27 @@ export function LogosApp({
             kicker: el.lane === 'practice' ? 'Practice' : `Artifact · ${noun}`,
             title: el.title,
             turn: el.turn,
-            preview: <InlineBlock spec={el.spec} open={false} n={el.n} host={{ state, live: false }} renderInline={(t, k) => <RichInline text={t} math keyBase={`bd-${el.key}-${k}`} />} />,
+            preview: <InlineBlock spec={el.spec} open={false} n={el.n} host={{ state, live: false, resolve: (n: number) => resolveInline(msg, n) }} renderInline={(t, k) => <RichInline text={t} math keyBase={`bd-${el.key}-${k}`} />} />,
+            // USED IN PLACE (Logos 6, the Everything view): the element itself, at full size and live — as it now stands
+            // when it was kept (one identity) — and what is done with it kept as it is in the conversation
+            live: (
+              <InlineBlock
+                spec={el.spec}
+                open={false}
+                n={el.n}
+                host={{ state, live: true, resolve: (n: number) => resolveInline(msg, n), ...(!togetherReadOnly ? { onState: (n: number, st: InlineState) => keepInline(msg, n, st) } : {}) }}
+                renderInline={(t, k) => <RichInline text={t} math keyBase={`bdl-${el.key}-${k}`} />}
+              />
+            ),
             ...(said ? { note: said } : {}),
             ...(workspaceOn && !togetherReadOnly
               ? {
                   onOpen: () => {
                     openInline(msg, el.n, el.spec);
+                    setBoardBeside('artifacts');
+                  },
+                  onEdit: () => {
+                    editInline(msg, el.n, el.spec);
                     setBoardBeside('artifacts');
                   },
                 }
@@ -10186,6 +10201,8 @@ export function LogosApp({
               title: c.title ?? '',
               turn: c.turn,
               preview: c.preview ?? undefined,
+              ...(c.live ? { live: c.live } : {}),
+              ...(c.onEdit ? { onEdit: c.onEdit } : {}),
               ...(c.note ? { note: c.note } : {}),
               ...(c.onOpen ? { onOpen: c.onOpen } : {}),
             }));
@@ -10206,7 +10223,7 @@ export function LogosApp({
               lit={litBy(ot, byMsg)}
               picked={focus?.kind === 'node' ? focus.id : null}
               composer={l5Dock}
-              openHero={heroCard ? { node: heroCard.preview, ...(heroCard.onOpen ? { onOpen: heroCard.onOpen } : {}) } : null}
+              openHero={heroCard ? { node: heroCard.live ?? heroCard.preview, ...(heroCard.live ? { live: true } : {}), ...(heroCard.onOpen ? { onOpen: heroCard.onOpen } : {}), ...(heroCard.onEdit ? { onEdit: heroCard.onEdit } : {}) } : null}
               onIdea={(id) => {
                 // the newest turn's idea is where the space rests; any other opens with the turn it came from, and is asked about
                 if (id === auto && !chosen) return;

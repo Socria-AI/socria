@@ -291,5 +291,27 @@ console.log('\n=== moving about the space, as on the Universal Map (lib/logos5/s
   ok('  zooming, Fit, the row and the open idea all count the room: the view never rests in it by itself', J(S.anchorScroll({ left: 700, top: 400 }, { x: 100, y: 100 }, 1, 2, { x: 600, y: 300 })) === J({ left: 900, top: 600 }) && /pendingScroll\.current = \{ left: room\.x, top: room\.y \}/.test(src) && /slackOf\(\)\.x \+ col\.offsetLeft \* zoomRef\.current - 40/.test(src) && /Math\.max\(edge, left - 40\)/.test(src));
 }
 
+console.log('\n=== Logos 6: an element made in the conversation is used where it stands, at full size ===');
+{
+  const live = h('div', { className: 'live-thing' }, h('button', { type: 'button' }, 'B cells'));
+  const x = html(h(S.L5Space, props({ made: [{ key: 'map', kicker: 'Made · Map', title: 'The immune system', turn: 2, preview: h('div', { className: 'the-preview' }), live, onEdit: () => {}, onOpen: () => {} }] })));
+  const card = x.slice(x.indexOf('ls-made is-live'), x.indexOf('ls-made is-live') + 900);
+  ok('the element itself is on its card, live — not a picture of it: no inert wrapper, no scaled preview', /class="ls-made is-live" role="group" aria-label="Made · Map: The immune system"/.test(x) && /class="ls-live"><div class="live-thing"><button type="button">B cells<\/button>/.test(x) && !/the-preview/.test(card) && !/ls-inert|ls-prev/.test(card), card);
+  ok('…the card is not one big button: using the element never opens it', !/class="ls-made is-live"[^>]*role="button"/.test(x) && !/ls-made is-live[^>]*tabindex/.test(x));
+  ok('…Edit and Expand are buttons of their own, in the card’s head', /class="ls-made-head"><span class="ls-t ls-tt">The immune system<\/span><span class="ls-made-acts"><button type="button" class="ls-act"[^>]*>Edit<\/button><button type="button" class="ls-act" aria-label="Expand The immune system"[^>]*>Expand<\/button>/.test(x), card);
+  const noEdit = html(h(S.L5Space, props({ made: [{ key: 'map', kicker: 'Made · Map', title: 'The immune system', turn: 2, live }] })));
+  ok('…where it cannot be changed (someone else’s line), no Edit — Expand still', !/>Edit</.test(noEdit) && />Expand</.test(noEdit));
+  const hero = html(h(S.L5Space, props({ openHero: { node: h('div', { className: 'hero-live' }), live: true, onEdit: () => {}, onOpen: () => {} } })));
+  ok('the open idea’s element is live too, with Edit and Open beside the space as buttons, not the whole of it a button', /class="ls-hero is-live"><div class="hero-live"><\/div><span class="ls-made-acts"><button[^>]*>Edit<\/button><button[^>]*>Open beside the space<\/button>/.test(hero) && !/class="ls-hero is-live"[^>]*role=/.test(hero));
+  const src = read('components/logos5/L5Space.tsx');
+  ok('a press inside a live element uses it — the card moves by its head, never by its parts', /if \(el\.closest\('\.ls-live, \.ls-made-acts, \.ls-hero\.is-live'\)\) return null;/.test(src));
+  ok('Expand shows the live element large, over the space', /<div className="ls-lb-body">\{big\.live \?\? big\.preview\}<\/div>/.test(src));
+  const css = read('components/logos5/space.css');
+  ok('never scaled to fit: full size, scrolling inside the card when taller, never widening its column', /\.ls-live \{ max-height: 560px; overflow: auto; contain: inline-size; \}/.test(css) && !/\.ls-live[^{]*\{[^}]*zoom/.test(css) && /\.ls:not\(\.is-phone\) \.ls-col\.is-made:has\(\.ls-made\.is-live\) \{ width: 400px; \}/.test(css));
+  ok('the reply under it keeps to words: its Keep and Edit are on the element’s card', /\.ls-bub\.has-hero \.ln-keep-row \{ display: none; \}/.test(css));
+  const app = read('components/LogosApp.tsx');
+  ok('the app gives each element card the element live (as it now stands, if kept), what is done with it kept, and Edit', /live: \(\s*<InlineBlock[\s\S]{0,260}host=\{\{ state, live: true, resolve: \(n: number\) => resolveInline\(msg, n\), \.\.\.\(!togetherReadOnly \? \{ onState: \(n: number, st: InlineState\) => keepInline\(msg, n, st\) \} : \{\}\) \}\}/.test(app) && /onEdit: \(\) => \{\s*editInline\(msg, el\.n, el\.spec\);/.test(app) && /\.\.\.\(c\.live \? \{ live: c\.live \} : \{\}\)/.test(app));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -341,3 +341,23 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 /* room to move: the space sits in room of its own on every side, so it can be dragged about even when it fits the
    screen, as the Universal Map can; at the far end of the room the space still fills over half the view */
 .logos-root .ls-slack { position: relative; box-sizing: content-box; width: max-content; padding: 38vh 45vw; }
+
+/* ── USED IN PLACE (Logos 6): a made element live on its card, at full size ─────────────────────────────────────────
+   The card is moved by its head; the element is pressed, dragged and typed into where it is; Edit and Expand are
+   buttons of their own. Never scaled down to fit: taller than the card allows, it scrolls inside it. */
+.logos-root .ls:not(.is-phone) .ls-col.is-made:has(.ls-made.is-live) { width: 400px; }
+.logos-root .ls-made.is-live { cursor: default; gap: 10px; }
+.logos-root .ls-made.is-live:hover { border-color: var(--c-ink-25); }
+.logos-root .ls-made-head { display: flex; align-items: baseline; gap: 10px; cursor: grab; }
+.logos-root .ls-made-head .ls-tt { flex: 1 1 auto; min-width: 0; }
+.logos-root .ls-made-acts { display: inline-flex; flex: none; gap: 14px; }
+.logos-root .ls-act { font: inherit; font-size: 12.5px; font-weight: 500; color: var(--c-ink-45); background: none; border: 0; padding: 2px 0; cursor: pointer; }
+.logos-root .ls-act:hover { color: var(--c-ink); }
+.logos-root .ls-act:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+@media (pointer: coarse) { .logos-root .ls-act { min-height: 44px; } }
+.logos-root .ls-live { max-height: 560px; overflow: auto; contain: inline-size; }
+.logos-root .ls-live > .ln-keepable > .ln, .logos-root .ls-live > .ln { margin: 0; }
+.logos-root .ls-hero.is-live { display: grid; gap: 8px; cursor: default; }
+.logos-root .ls-hero.is-live > .ls-made-acts { justify-self: start; }
+/* the reply under a made element keeps to words: its Keep and Edit are on the element's card */
+.logos-root .ls-bub.has-hero .ln-keep-row { display: none; }

@@ -79,6 +79,14 @@ export interface SpaceThing {
   onOpen?: () => void;
   /** opens straight away (a file opened as itself, components/preview), never enlarged here first */
   direct?: boolean;
+  /**
+   * USED IN PLACE (Logos 6): the element itself, at full size and live — a part of the map pressed, the tax moved —
+   * in place of a picture of it. Its card is moved by its head; Expand and Edit are buttons of their own, so using it
+   * never opens it.
+   */
+  live?: ReactNode;
+  /** Edit: opened in Artifacts with its editor */
+  onEdit?: () => void;
 }
 
 // the same names the views and the menus use: what you brought is Files, what Socria made is Artifacts
@@ -169,7 +177,7 @@ export function L5Space({
   picked: string | null;
   composer: ReactNode;
   /** what the open turn made, drawn large in the open idea (the visual carries it; the bubble keeps to words) */
-  openHero?: { node: ReactNode; onOpen?: () => void } | null;
+  openHero?: { node: ReactNode; onOpen?: () => void; live?: boolean; onEdit?: () => void } | null;
   /** an idea pressed: it opens, with the turn it came from */
   onIdea: (id: string) => void;
   /** the conversation as a page, every turn in order */
@@ -675,6 +683,8 @@ export function L5Space({
   };
   const targetOf = (el: Element, type: string): { kind: 'card'; key: string } | { kind: 'canvas' } | null => {
     if (el.closest('input, textarea, select, a[href], [contenteditable="true"], .ls-zoom-keys, .ls-seeds-box')) return null;
+    // a live element is for using: a press in it presses its parts (the card moves by its head)
+    if (el.closest('.ls-live, .ls-made-acts, .ls-hero.is-live')) return null;
     // Socria's reply is words to read and copy: a mouse selects them, a finger moves the space
     const inReply = !!el.closest('.ls-bub');
     if (inReply && type !== 'touch') return null;
@@ -923,6 +933,31 @@ export function L5Space({
   };
   const thingEl = (c: SpaceThing, what: 'brought' | 'made') => {
     const k = what === 'brought' ? broughtKey(c.key) : madeKey(c.key);
+    if (what === 'made' && c.live) {
+      // USED IN PLACE: the element at full size, live; its head moves it; Edit and Expand are their own buttons
+      const name = c.title || c.kicker;
+      return (
+        <div key={k} className={`ls-it${back(k)}`} data-k={k} style={order(k)}>
+          <div className="ls-made is-live" role="group" aria-label={`${c.kicker}: ${name}`}>
+            <div className="ls-made-head">
+              <span className="ls-t ls-tt">{name}</span>
+              <span className="ls-made-acts">
+                {c.onEdit && (
+                  <button type="button" className="ls-act" onClick={c.onEdit} title="Change it in Artifacts, with its controls beside it">
+                    Edit
+                  </button>
+                )}
+                <button type="button" className="ls-act" onClick={() => setEnlarged(k)} aria-label={`Expand ${name}`} title="See it large, over the space">
+                  Expand
+                </button>
+              </span>
+            </div>
+            <div className="ls-live">{c.live}</div>
+          </div>
+          {words(k)}
+        </div>
+      );
+    }
     // something to look at is enlarged first; with nothing to show, the card opens beside the space as before
     const act = c.direct && c.onOpen ? c.onOpen : c.preview ? () => setEnlarged(k) : c.onOpen;
     return (
@@ -965,18 +1000,38 @@ export function L5Space({
             </span>
             {open.label}
           </h2>
-          {openHero && (
-            <div
-              className="ls-hero"
-              role={openHero.onOpen ? 'button' : undefined}
-              tabIndex={openHero.onOpen ? 0 : undefined}
-              onClick={openHero.onOpen}
-              onKeyDown={press(openHero.onOpen)}
-              aria-label={openHero.onOpen ? 'Open it beside the space' : undefined}
-            >
-              {openHero.node}
-            </div>
-          )}
+          {openHero &&
+            (openHero.live ? (
+              // used where it is: pressing its parts presses them; opening and editing are buttons of their own
+              <div className="ls-hero is-live">
+                {openHero.node}
+                {(openHero.onEdit || openHero.onOpen) && (
+                  <span className="ls-made-acts">
+                    {openHero.onEdit && (
+                      <button type="button" className="ls-act" onClick={openHero.onEdit}>
+                        Edit
+                      </button>
+                    )}
+                    {openHero.onOpen && (
+                      <button type="button" className="ls-act" onClick={openHero.onOpen}>
+                        Open beside the space
+                      </button>
+                    )}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div
+                className="ls-hero"
+                role={openHero.onOpen ? 'button' : undefined}
+                tabIndex={openHero.onOpen ? 0 : undefined}
+                onClick={openHero.onOpen}
+                onKeyDown={press(openHero.onOpen)}
+                aria-label={openHero.onOpen ? 'Open it beside the space' : undefined}
+              >
+                {openHero.node}
+              </div>
+            ))}
         </article>
       )}
       {/* SOCRIA'S BUBBLE: the reply in words, its own bubble pointing at the idea — the one place it is a conversation */}
@@ -1021,7 +1076,7 @@ export function L5Space({
             <CloseGlyph />
           </button>
         </div>
-        <div className="ls-lb-body">{big.preview}</div>
+        <div className="ls-lb-body">{big.live ?? big.preview}</div>
       </div>
     </div>
   ) : null;

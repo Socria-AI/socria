@@ -28,6 +28,10 @@ export interface CanvasCard {
   preview: ReactNode;
   /** drawn large and live when it is in focus; the preview, live, when absent */
   full?: () => ReactNode;
+  /** the element itself at full size and live, where a view draws things to be used in place (Logos 6: Everything) */
+  live?: ReactNode;
+  /** Edit: opened in Artifacts with its editor */
+  onEdit?: () => void;
   /** a line under it: "Kept as you left it" */
   note?: string;
   onAsk?: () => void;

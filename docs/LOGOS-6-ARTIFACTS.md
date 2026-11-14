@@ -54,7 +54,20 @@ Once kept, the conversation draws **the kept artifact as it now stands**, not th
 
 Using an element is a step that Undo takes back, but it is not a version. Consecutive uses by the same person merge into one step (`OpDef.coalesce`), so scrubbing a slider thirty times never pushes real changes out of the history.
 
+### In the Everything view
+
+On a wide screen the Everything view (`components/logos5/L5Space.tsx`) puts the newest reply on one canvas with what it made. Each element the conversation drew is on its own card, and the card holds the element itself, live and at full size, not a picture of it:
+
+- **Use it where it is.** Press a part of the map, fold it, search it, move the tax. What is done there is kept, exactly as in the conversation. Once the element is kept, the card draws the kept version as it now stands.
+- **Using it never opens it.** The card is not a button. It moves by its head, and a press inside the element presses the element's parts. **Edit** (Artifacts, with the editor) and **Expand** (large, over the space, still live) are buttons of their own.
+- **Never shrunk to fit.** The made column is 400 px wide for these cards. A taller element scrolls inside its card; a wider one scrolls inside its own box.
+- **The reply bubble keeps to words.** The element's Keep and Edit are on its card, so the bubble doesn't repeat them.
+
+Other things made (models, tables, files) keep their picture and open when pressed, as before. The page view (`L5Board`) still shows small previews that open beside it.
+
 ---
+
+## 4. The editor---
 
 ## 4. The editor
 
