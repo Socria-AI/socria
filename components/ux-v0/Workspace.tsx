@@ -39,6 +39,7 @@ import {
   type Usage,
   type Viewport,
 } from '@/lib/ux-v0/types';
+import { interleave, searchOpenverse } from '@/lib/ux-v0/image-search';
 import { post } from './api';
 import { BriefDoc } from './BriefDoc';
 import { CardsRail } from './Cards';
@@ -148,38 +149,60 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const placeholders = useMemo(() => (spec ? placeholdersIn(spec) : []), [spec]);
 
   // ── discovery ───────────────────────────────────────────────────────
+  // the keyed libraries the server can ask (Unsplash, Pexels): null until it says, [] when none are set
+  const libraries = useRef<string[] | null>(null);
   const fetchImages = useCallback(
-    async (queries: { category: MoodCategory; query: string; page?: number }[], per = 4): Promise<MoodboardRef[]> => {
+    async (queries: { category: MoodCategory; query: string; page?: number }[], per = 6): Promise<MoodboardRef[]> => {
       if (!queries.length) return [];
       const p = current.current;
       const qs = queries.slice(0, 6).map((q) => ({ ...q, page: q.page ?? p.moodboard.queries.find((x) => x.query === q.query)?.page ?? 1 }));
       setImgBusy('Looking for images…');
       setImgError('');
-      const r = await post<{ results: { category: MoodCategory; query: string; page: number; refs: MoodboardRef[]; error: string }[] }>('/api/ux-v0/images', {
-        projectId: p.id,
-        queries: qs,
-        seen: p.moodboard.seen,
-        per,
-      });
+      const seen = new Set(p.moodboard.seen);
+      // the libraries with keys from the server, which also checks the person is signed in;
+      // Openverse from this browser, which has its own allowance there
+      const askServer = libraries.current === null || libraries.current.length > 0;
+      const [server, open] = await Promise.all([
+        askServer
+          ? post<{ libraries?: string[]; results: { category: MoodCategory; query: string; page: number; next?: number; left?: number; refs: MoodboardRef[]; error: string }[] }>('/api/ux-v0/images', {
+              projectId: p.id,
+              queries: qs,
+              seen: p.moodboard.seen,
+              per,
+            })
+          : Promise.resolve(null),
+        Promise.all(qs.map((q) => searchOpenverse(q, seen, per).catch(() => ({ refs: [] as MoodboardRef[], next: q.page, left: 0, error: 'The image library could not be reached just now.' })))),
+      ]);
       setImgBusy(null);
-      if (!r.ok) {
-        setImgError(r.signIn ? 'Sign in to let SocriaUX find images for the moodboard.' : r.error);
+      if (server && !server.ok && server.signIn) {
+        setImgError('Sign in to let SocriaUX find images for the moodboard.');
         return [];
       }
-      const all = r.data.results.flatMap((x) => x.refs);
-      const errs = r.data.results.filter((x) => x.error && !x.refs.length).map((x) => x.error);
+      if (server?.ok) libraries.current = Array.isArray(server.data.libraries) ? server.data.libraries : null;
+      const results = qs.map((q, i) => {
+        const keyed = server?.ok ? server.data.results.find((x) => x.query === q.query) : undefined;
+        const ov = open[i];
+        const { taken, left } = interleave([keyed?.refs ?? [], ov.refs], seen, per);
+        for (const r of taken) seen.add(r.id);
+        const stay = left > 0 || (keyed?.left ?? 0) > 0 || ov.left > 0 || (keyed?.next ?? q.page + 1) === q.page;
+        // a library that could not be reached, or was busy, says more than one that found nothing
+        const errors = [ov.error, keyed?.error ?? ''].filter(Boolean);
+        const error = taken.length ? '' : errors.find((e) => !/^Nothing found/.test(e)) ?? errors[0] ?? 'Nothing found for that.';
+        return { ...q, refs: taken, next: stay ? q.page : q.page + 1, error };
+      });
+      const all = results.flatMap((x) => x.refs);
       update((p2) => {
         const known = new Set(p2.moodboard.refs.map((x) => x.id));
         const add = all.filter((x) => !known.has(x.id));
         const queriesNext = [...p2.moodboard.queries];
-        for (const res of r.data.results) {
-          const i = queriesNext.findIndex((x) => x.query === res.query);
-          if (i >= 0) queriesNext[i] = { ...queriesNext[i], page: res.page + 1 };
-          else queriesNext.push({ category: res.category, query: res.query, page: res.page + 1 });
+        for (const res of results) {
+          const k = queriesNext.findIndex((x) => x.query === res.query);
+          if (k >= 0) queriesNext[k] = { ...queriesNext[k], page: res.next };
+          else queriesNext.push({ category: res.category, query: res.query, page: res.next });
         }
         return { ...p2, moodboard: { ...p2.moodboard, refs: [...p2.moodboard.refs, ...add], seen: [...new Set([...p2.moodboard.seen, ...add.map((x) => x.id)])], queries: queriesNext.slice(-60) } };
       });
-      if (!all.length && errs.length) setImgError(errs[0]);
+      if (!all.length) setImgError(results.find((x) => x.error)?.error ?? 'Nothing found for that.');
       return all;
     },
     [update, current]
@@ -216,7 +239,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
         moodboard: { ...p2.moodboard, palettes: [...p2.moodboard.palettes, ...d.palettes].slice(-12), type: [...p2.moodboard.type, ...d.type].slice(-12) },
         usage: addUsage(p2.usage, d.usage),
       }));
-      if (d.queries.length) await fetchImages(d.queries, 4);
+      if (d.queries.length) await fetchImages(d.queries, 6);
     },
     [current, update, failed, fetchImages]
   );
@@ -254,7 +277,18 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   };
   const moreImages = () => {
     const recent = current.current.moodboard.queries.slice(-3);
-    fetchImages(recent.map((q) => ({ category: q.category, query: q.query, page: q.page })), 3);
+    fetchImages(recent.map((q) => ({ category: q.category, query: q.query, page: q.page })), 6);
+  };
+  /** more from the searches behind one group of the board */
+  const moreLike = (category: MoodCategory) => {
+    const recent = current.current.moodboard.queries.filter((q) => q.category === category).slice(-2);
+    if (!recent.length) return setImgError('Search for something first, or ask for another direction.');
+    fetchImages(recent.map((q) => ({ category: q.category, query: q.query, page: q.page })), 6);
+  };
+  /** the designer's own search, in any of the libraries */
+  const searchBoard = (category: MoodCategory, query: string) => {
+    const q = query.replace(/\s+/g, ' ').trim().slice(0, 80);
+    if (q) fetchImages([{ category, query: q }], 8);
   };
   const direction = async (aspect: Aspect) => {
     const p = current.current;
@@ -273,7 +307,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const d = r.data;
     update((p2) => ({ ...p2, moodboard: { ...p2.moodboard, palettes: [...p2.moodboard.palettes, ...d.palettes].slice(-12), type: [...p2.moodboard.type, ...d.type].slice(-12) }, usage: addUsage(p2.usage, d.usage) }));
     if (d.direction) say(`Another direction: ${d.direction}`);
-    if (d.queries.length) await fetchImages(d.queries, 4);
+    if (d.queries.length) await fetchImages(d.queries, 6);
   };
 
   // ── the brief ───────────────────────────────────────────────────────
@@ -300,7 +334,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     // the visual direction moved: the board follows, with images to keep or remove
     const qs = r.data.queries ?? [];
     if (qs.length) {
-      const got = await fetchImages(qs, 3);
+      const got = await fetchImages(qs, 4);
       if (got.length) say(`The brief was changed, and its visual direction moved: ${got.length} new image${got.length === 1 ? '' : 's'} on the moodboard to keep or remove.`, 'info', { acts: [{ label: 'See the moodboard', run: () => setView('discovery') }] });
     }
   };
@@ -815,6 +849,8 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                   onType={(id, state) => update((p) => ({ ...p, moodboard: { ...p.moodboard, type: p.moodboard.type.map((x) => (x.id === id ? { ...x, state } : x)) } }))}
                   onDirection={direction}
                   onMore={moreImages}
+                  onMoreLike={moreLike}
+                  onSearch={searchBoard}
                   signedIn={signedIn}
                 />
               </div>

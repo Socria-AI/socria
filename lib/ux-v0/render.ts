@@ -15,7 +15,7 @@
 import { fontStack, fontStylesheet } from './fonts';
 import { contrastRatio } from '../ux/audit';
 import { NEEDS_IMAGE, ensureContrast, kindDef, type DesignSpec, type DesignTokens, type Section } from './spec';
-import type { MoodboardRef } from './types';
+import { creditText, type MoodboardRef } from './types';
 
 export interface Credit {
   id: string;
@@ -472,14 +472,7 @@ function effective(s: Section, im: Images): Section {
 }
 
 function creditLine(ref: MoodboardRef): Credit {
-  const by = ref.creator ? ` by ${ref.creator}` : '';
-  const text =
-    ref.provider === 'unsplash'
-      ? `Photo${by} on Unsplash`
-      : ref.provider === 'pexels'
-        ? `Photo${by} on Pexels`
-        : ref.attribution || `“${ref.title || 'Image'}”${by}${ref.license ? `, ${ref.license}` : ''}`;
-  return { id: ref.id, text, url: ref.sourceUrl || ref.creatorUrl, license: ref.license };
+  return { id: ref.id, text: creditText(ref), url: ref.sourceUrl || ref.creatorUrl, license: ref.license };
 }
 
 /** Draw a spec. `refs`: the project's moodboard references. */

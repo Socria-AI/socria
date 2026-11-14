@@ -67,7 +67,7 @@ const RULES = `Rules for questions:
 - Topics: ${TOPICS.join(', ')}.
 
 Rules for the moodboard:
-- Only when the visual direction is new or moved, give search queries for a licensed photo library: concrete subjects, materials, light and mood (e.g. "morning light espresso bar marble counter", "handmade ceramic cup texture close up", "editorial magazine spread grid layout"). 2–6 queries, each with a category: imagery (photography of the subject world), texture (materials, surfaces, patterns), composition (layouts and compositions to learn from).
+- Only when the visual direction is new or moved, give search queries for licensed photo libraries. Libraries answer SHORT queries: two or three words, a concrete subject first, then at most one quality (e.g. "espresso bar", "marble countertop", "ceramic cup texture", "linen texture", "magazine layout"). Long queries find nothing. 2–6 queries, each with a category: imagery (photography of the subject world), texture (materials, surfaces, patterns), composition (layouts and compositions to learn from). Vary the subjects rather than piling qualities onto one.
 - Never repeat a query already used.
 - Palettes: 0–2, each 4–6 colours as hex with roles (background, surface, text, muted, accent, accent-text, line), only when there is something to base them on.
 - Type pairs: 0–2, display and body chosen ONLY from this list: ${fontMenu()}.
@@ -86,7 +86,7 @@ Respond with ONE JSON object:
 export function directionSystem(): string {
   return `You are SocriaUX. The designer asked to see another direction for one aspect of their moodboard. Propose a genuinely different, still appropriate direction — a contrast to what they have kept, not a variation of it — so they can compare and choose deliberately.
 
-For imagery, texture or composition: 3–5 new search queries for that category (concrete subjects, materials, light, mood), none repeating earlier ones.
+For imagery, texture or composition: 3–5 new search queries for that category, each two or three words with a concrete subject first (e.g. "dusk terrace", "raw concrete texture", "poster grid"), none repeating earlier ones.
 For palette: 2 palettes of 4–6 colours (hex, with roles background, surface, text, muted, accent, accent-text, line).
 For type: 2 pairs, chosen ONLY from: ${fontMenu()}.
 

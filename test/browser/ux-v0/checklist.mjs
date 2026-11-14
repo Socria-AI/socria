@@ -16,6 +16,9 @@ await ctx.route('https://fonts.gstatic.test/**', (r) => {
   const f = r.request().url().endsWith('isi.woff2') ? 'InstrumentSerif-400-italic.woff2' : r.request().url().endsWith('is.woff2') ? 'InstrumentSerif-400.woff2' : 'Inter-100-900.woff2';
   return r.fulfill({ contentType: 'font/woff2', body: readFileSync(ROOT + 'app/fonts/' + f), headers: { 'access-control-allow-origin': '*' } });
 });
+// Openverse is asked from the browser; these checks script every image, so it answers with nothing here
+// (moodboard-live.mjs asks the real one)
+await ctx.route('https://api.openverse.org/**', (r) => r.fulfill({ json: { result_count: 0, page_count: 0, page_size: 20, page: 1, results: [] } }));
 await ctx.route('https://images.example.test/**', (r) => r.fulfill({ contentType: 'image/jpeg', body: readFileSync(FX + r.request().url().split('/').pop()) }));
 
 const IMG = (name, category, title, w = 1600, h = 1067) => ({ provider: 'openverse', providerId: name, id: `openverse:${name}`, url: `https://images.example.test/${name}.jpg`, thumb: `https://images.example.test/${name}.jpg`, width: w, height: h, title, creator: 'A. Photographer', creatorUrl: 'https://example.org/a', sourceUrl: `https://example.org/${name}`, license: 'CC BY 2.0', licenseUrl: 'https://creativecommons.org/licenses/by/2.0/', attribution: `“${title}” by A. Photographer, CC BY 2.0`, category, state: 'proposed' });
@@ -36,7 +39,9 @@ await ctx.route('**/api/ux-v0/**', async (r) => {
   }
   if (url.endsWith('/images')) {
     calls.images.push(body);
-    return r.fulfill({ json: { results: body.queries.map((q) => ({ ...q, refs: LIB[q.category].filter((x) => !body.seen.includes(x.id)).slice(0, body.per).map((x) => ({ ...x, query: q.query })), provider: 'openverse', error: '' })) } });
+    // a different search finds different images: dusk only for the refined direction's own query
+    const pool = (q) => (q.query === 'candlelit cafe evening' ? LIB.imagery.filter((x) => x.id === 'openverse:dusk') : LIB[q.category].filter((x) => x.id !== 'openverse:dusk'));
+    return r.fulfill({ json: { results: body.queries.map((q) => ({ ...q, refs: pool(q).filter((x) => !body.seen.includes(x.id)).slice(0, body.per).map((x) => ({ ...x, query: q.query })), provider: 'openverse', error: '' })) } });
   }
   if (url.endsWith('/brief')) {
     calls.brief.push(body);

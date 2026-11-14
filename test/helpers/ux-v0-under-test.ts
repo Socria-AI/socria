@@ -17,3 +17,4 @@ export * from '@/lib/ux-v0/model';
 export * from '@/lib/ux-v0/switch';
 export { providerOrder, searchImages, pingUse } from '@/lib/ux-v0/images-server';
 export { costOf } from '@/lib/model-router';
+export * from '@/lib/ux-v0/image-search';

@@ -1,6 +1,6 @@
 # SocriaUX v0 — browser checks
 
-Playwright checks for `/ux-v0`. They drive the real app in Chromium, with the model and the image libraries **scripted** (their routes are stubbed in the browser), so they verify how the product behaves, not how well the real model reasons. The real-model run is decision D9 in `docs/SOCRIAUX-V0.md`.
+Playwright checks for `/ux-v0`. They drive the real app in Chromium, with the model and the image libraries **scripted** (their routes are stubbed in the browser), so they verify how the product behaves, not how well the real model reasons. The exception is `moodboard-live.mjs`, which searches the real Openverse. The real-model run is decision D9 in `docs/SOCRIAUX-V0.md`.
 
 They are not part of `npm test`, because they need a running app and a browser. The runner only collects `test/*.test.mjs`.
 
@@ -38,6 +38,7 @@ They are not part of `npm test`, because they need a running app and a browser. 
 | `workflow-b-critique.mjs` | Workflow B end to end. An HTML import in its sandbox: its script, `parent`, storage and the network are all unreachable. Element and area selection, a card and its follow-up, a PNG crop with its one-time thumbnail, reload persistence. |
 | `checklist.mjs` | Refused files, SVG and JPG imports, zoom keys, stepping through the page with what is announced, the missing-files line, workspace widths, the home list and its inline delete, answer and brief editing, refinement moving the board, versions, drops, storage full, a failed call kept with *Try again*. |
 | `acceptance.mjs` | Every kind of element selectable. The highlight through zoom and panning. A card's area returning its heading, text and button. Viewport switches keeping the selection. Forged and malformed messages ignored. axe on the workspace shell. A 4000 px screenshot and a 16 px icon. Zoom about the pointer. Areas in image pixels at any zoom. Crops on 1× and 2× screens. Sign-in at the first model call. Discovery at 390 px. A provider failure on the board. Brief edits through a reload. An area on a generated design. An exact undo. |
+| `moodboard-live.mjs` | The moodboard against the **real** Openverse; it needs network access to `api.openverse.org`, and uses `HTTPS_PROXY` when one is set. Long model queries must still fill every group with relevant, loaded, credited images. Also covered: *More images*, *More like these*, the board's own search, *Replace*, and no image shown twice. |
 | `sections.mjs` | Every section kind and variant, across five styles and three palettes (a light accent and a dark ground among them). Each must render cleanly, keep text at 4.5:1 (over images, at the worst case), give 44 px targets at 390 px, and never scroll sideways. |
 | `gallery.mjs` | Every gallery count from 1 to 8, grid and mosaic, at three widths: no image-sized hole and no overflow. |
 

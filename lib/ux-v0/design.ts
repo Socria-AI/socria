@@ -77,7 +77,7 @@ The brief:
 - pageType: "website" or "app-screen"; platform: "web" or "mobile".${
     refining
       ? `
-- moodboardQueries: ONLY when this change moves the visual direction (light, imagery, texture, mood): 1–3 searches for a licensed photo library that show the new direction, each {"category": "imagery|texture|composition", "query": "concrete subjects, materials, light"}, none repeating a search already used. Otherwise [].`
+- moodboardQueries: ONLY when this change moves the visual direction (light, imagery, texture, mood): 1–3 searches for licensed photo libraries that show the new direction, each {"category": "imagery|texture|composition", "query": "two or three words, a concrete subject first"}, none repeating a search already used. Otherwise [].`
       : ''
   }
 

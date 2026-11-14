@@ -206,13 +206,23 @@ console.log('\n=== moodboard images ===');
   const realFetch = globalThis.fetch;
   globalThis.fetch = async (url) => {
     fetched.push(String(url));
-    return { ok: true, status: 200, json: async () => ({ results: [{ id: 'o1', url: 'https://live.staticflickr.com/o1.jpg', thumbnail: 'https://api.openverse.org/v1/images/o1/thumb/', width: 1000, height: 700, title: 'Espresso', creator: 'Kim', foreign_landing_url: 'https://flickr.com/o1', license: 'by-sa', license_version: '2.0', license_url: 'https://creativecommons.org/licenses/by-sa/2.0/' }, { id: 'o2', url: 'https://live.staticflickr.com/o2.jpg' }] }) };
+    return { ok: true, status: 200, json: async () => ({ photos: [
+      { id: 1, src: { large2x: 'https://images.pexels.com/photos/1/a.jpeg', medium: 'https://images.pexels.com/photos/1/a-m.jpeg' }, width: 1200, height: 800, avg_color: '#776655', alt: 'Marble counter', photographer: 'Kim', photographer_url: 'https://www.pexels.com/@kim', url: 'https://www.pexels.com/photo/1/' },
+      { id: 2, src: { large2x: 'https://images.pexels.com/photos/2/b.jpeg', medium: 'https://images.pexels.com/photos/2/b-m.jpeg' }, width: 1200, height: 800, alt: 'Seen before', photographer: 'Lee', url: 'https://www.pexels.com/photo/2/' },
+    ] }) };
   };
-  const out = await post('images', { projectId: 'uxv0_c', queries: [{ category: 'texture', query: 'marble counter', page: 2 }], seen: ['openverse:o2'], per: 4 }, A);
+  // no keyed library set: the server asks nothing and says so; the browser asks Openverse itself
+  const bare = await post('images', { projectId: 'uxv0_c', queries: [{ category: 'imagery', query: 'espresso bar', page: 1 }], per: 4 }, A);
+  ok('with no keyed library set, the server asks nothing and says so (the browser asks Openverse)', bare.status === 200 && J(bare.json.libraries) === '[]' && bare.json.results[0].refs.length === 0 && fetched.length === 0, J(bare.json));
+  process.env.PEXELS_API_KEY = 'pk';
+  const out = await post('images', { projectId: 'uxv0_c', queries: [{ category: 'texture', query: 'marble counter', page: 2 }], seen: ['pexels:2'], per: 4 }, A);
+  delete process.env.PEXELS_API_KEY;
   globalThis.fetch = realFetch;
-  ok('images come back from a licensed library, with licence and credit', out.status === 200 && out.json.results[0].refs.length === 1 && out.json.results[0].refs[0].license === 'CC BY-SA 2.0' && out.json.results[0].refs[0].creator === 'Kim', J(out.json));
-  ok('…in the category asked for, at the page asked for', out.json.results[0].refs[0].category === 'texture' && fetched[0].includes('page=2'));
-  ok('…never one already seen', !out.json.results[0].refs.some((x) => x.id === 'openverse:o2'));
+  const refs = out.json?.results?.[0]?.refs ?? [];
+  ok('a keyed library answers, with licence and credit', out.status === 200 && J(out.json.libraries) === J(['pexels']) && refs.length === 1 && refs[0].license === 'Pexels License' && refs[0].creator === 'Kim', J(out.json).slice(0, 300));
+  ok('…in the category asked for, at the page asked for, a whole page at a time', refs[0]?.category === 'texture' && fetched[0].includes('page=2') && fetched[0].includes('per_page=20'), fetched[0]);
+  ok('…never one already seen', !refs.some((x) => x.id === 'pexels:2'));
+  ok('…and it says which page to ask for next', out.json.results[0].next === 3 && out.json.results[0].left === 0, J(out.json.results[0]).slice(0, 160));
   ok('no queries, no search', (await post('images', { queries: [] }, A)).status === 400);
 }
 

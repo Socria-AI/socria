@@ -635,11 +635,37 @@ export function normalizeTypePair(v: unknown): TypePair | null {
   };
 }
 
+/**
+ * The credit an image is shown with: its title, creator and licence (Creative
+ * Commons' title–author–licence form, with the source and licence linked where
+ * it is shown), never a library's long legal sentence.
+ */
+export function creditText(r: Pick<MoodboardRef, 'provider' | 'title' | 'creator' | 'license'>): string {
+  const by = r.creator ? ` by ${r.creator}` : '';
+  if (r.provider === 'unsplash') return `Photo${by} on Unsplash`;
+  if (r.provider === 'pexels') return `Photo${by} on Pexels`;
+  const t = (r.title || '').trim();
+  const title = t && !/^(untitled|image|photo|picture)$/i.test(t) ? `“${t.length > 70 ? t.slice(0, 69).trimEnd() + '…' : t}”` : 'Image';
+  return `${title}${by}${r.license ? `, ${r.license}` : ''}`;
+}
+
 export function normalizeMoodboard(v: unknown): Moodboard {
   const r = obj(v);
   const refs = arr(r.refs).map(normalizeRef).filter((x): x is MoodboardRef => !!x);
   const seenIds = new Set<string>();
-  const unique = refs.filter((x) => (seenIds.has(x.id) ? false : (seenIds.add(x.id), true))).slice(-LIMITS.refs);
+  const all = refs.filter((x) => (seenIds.has(x.id) ? false : (seenIds.add(x.id), true)));
+  // over the limit, the board lets go of what was removed first, then the oldest not kept — never a kept image
+  let unique = all;
+  if (all.length > LIMITS.refs) {
+    const drop = new Set<string>();
+    for (const state of ['rejected', 'proposed'] as const) {
+      for (const x of all) {
+        if (all.length - drop.size <= LIMITS.refs) break;
+        if (x.state === state) drop.add(x.id);
+      }
+    }
+    unique = all.filter((x) => !drop.has(x.id));
+  }
   const seen = [...new Set([...strings(r.seen, LIMITS.seen, 120), ...unique.map((x) => x.id)])].slice(-LIMITS.seen);
   const queries = arr(r.queries)
     .map(obj)

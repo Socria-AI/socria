@@ -358,6 +358,18 @@
 .v0-board-group {
   padding: 18px 0 6px;
 }
+/* the designer's own search, under the board's header: a ruled field, a kind, a word to act */
+.v0-board-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 0 0 18px;
+}
+.v0-board-q {
+  flex: 1 1 260px;
+  min-width: 0;
+}
 .v0-group-head {
   display: flex;
   flex-wrap: wrap;

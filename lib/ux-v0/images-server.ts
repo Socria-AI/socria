@@ -1,20 +1,23 @@
 import 'server-only';
-// lib/ux-v0/images-server.ts — moodboard images from licensed libraries, never scraped.
+// lib/ux-v0/images-server.ts — moodboard images from the licensed libraries that need a key.
 //
-// Three providers behind one shape (docs/SOCRIAUX-V0.md, D2):
 //   Unsplash   with UNSPLASH_ACCESS_KEY — the best photography. Its guidelines:
 //              hotlink the returned URLs, credit the photographer and Unsplash
 //              with links (utm_source/utm_medium), and tell its download
 //              endpoint when a photo is used (pingUse).
 //   Pexels     with PEXELS_API_KEY.
-//   Openverse  no key — openly licensed images (Creative Commons and public
-//              domain) with their licence and a ready credit line; the
-//              default, and the fallback when another provider fails.
-// SOCRIAUX_IMAGE_PROVIDER can name one. Every URL kept is one a provider
-// returned; nothing is assembled from model text. Results are cached for a day
-// per query in Next's data cache (no new infrastructure), and ids the project
-// has already seen are left out, so a replacement never repeats.
+//
+// Openverse (no key, openly licensed images) is asked from the person's browser
+// instead (lib/ux-v0/image-search.ts): it limits each caller, so a server asking
+// for everyone would share one small allowance between all of them.
+//
+// Every library configured here is asked at once and the results interleaved.
+// Every URL kept is one a library returned; nothing is assembled from model
+// text. Pages are cached for a day in Next's data cache (no new
+// infrastructure), and ids the project has already seen are left out, so a
+// replacement never repeats.
 
+import { PAGE_SIZE, interleave, mapOpenverse, openverseUrl } from './image-search';
 import { normalizeRef, type MoodCategory, type MoodboardRef, type Provider } from './types';
 
 const UTM = 'utm_source=socria&utm_medium=referral';
@@ -22,21 +25,22 @@ const DAY = 86400;
 
 export interface SearchResult {
   refs: MoodboardRef[];
-  provider: Provider | null;
+  /** the libraries that answered with images */
+  providers: Provider[];
+  /** the page to ask for next: the same one while it still holds unseen images */
+  next: number;
+  left: number;
   error: string;
 }
 
 type Env = Record<string, string | undefined>;
 
+/** The libraries this server can ask: those whose key is set. Openverse only when SOCRIAUX_OPENVERSE_SERVER=1. */
 export function providerOrder(env: Env = process.env): Provider[] {
-  const asked = (env.SOCRIAUX_IMAGE_PROVIDER ?? '').trim().toLowerCase();
   const have: Provider[] = [];
   if (env.UNSPLASH_ACCESS_KEY) have.push('unsplash');
   if (env.PEXELS_API_KEY) have.push('pexels');
-  have.push('openverse');
-  if (asked === 'unsplash' || asked === 'pexels' || asked === 'openverse') {
-    return [asked as Provider, ...have.filter((p) => p !== asked)].filter((p) => p === 'openverse' || have.includes(p));
-  }
+  if (env.SOCRIAUX_OPENVERSE_SERVER === '1') have.push('openverse');
   return have;
 }
 
@@ -93,40 +97,16 @@ async function pexels(query: string, page: number, per: number, env: Env, fetche
   }));
 }
 
-const CC: Record<string, string> = { by: 'CC BY', 'by-sa': 'CC BY-SA', 'by-nd': 'CC BY-ND', cc0: 'CC0', pdm: 'Public domain' };
-
-async function openverse(query: string, page: number, per: number, _env: Env, fetcher: typeof fetch): Promise<Record<string, unknown>[]> {
-  const j = await getJson(
-    `https://api.openverse.org/v1/images/?q=${encodeURIComponent(query)}&page=${page}&page_size=${per}&license_type=commercial,modification&mature=false`,
-    {},
-    fetcher
-  );
-  return (j?.results ?? []).map((p: any) => {
-    const lic = String(p.license ?? '').toLowerCase();
-    const license = `${CC[lic] ?? lic.toUpperCase()}${p.license_version && lic !== 'cc0' && lic !== 'pdm' ? ` ${p.license_version}` : ''}`.trim();
-    return {
-      provider: 'openverse',
-      providerId: String(p.id ?? ''),
-      url: p.url,
-      thumb: p.thumbnail || p.url,
-      width: p.width,
-      height: p.height,
-      title: p.title || '',
-      creator: p.creator || '',
-      creatorUrl: p.creator_url || '',
-      sourceUrl: p.foreign_landing_url || '',
-      license,
-      licenseUrl: p.license_url || '',
-      attribution: p.attribution || `“${p.title || 'Image'}”${p.creator ? ` by ${p.creator}` : ''}${license ? `, ${license}` : ''}`,
-    };
-  });
+async function openverse(query: string, page: number, _per: number, _env: Env, fetcher: typeof fetch): Promise<Record<string, unknown>[]> {
+  return mapOpenverse(await getJson(openverseUrl(query, page), {}, fetcher));
 }
 
-const PROVIDERS: Record<Provider, typeof openverse> = { unsplash, pexels, openverse };
+const PROVIDERS: Record<Provider, (query: string, page: number, per: number, env: Env, fetcher: typeof fetch, category?: MoodCategory) => Promise<Record<string, unknown>[]>> = { unsplash, pexels, openverse };
 
 /**
- * Images for one query, excluding ids already seen. Tries providers in order;
- * a provider that fails or finds nothing hands over to the next.
+ * Images for one query from every library this server can ask, at once,
+ * interleaved, excluding ids already seen. A library that fails does not hold
+ * up the others.
  */
 export async function searchImages(
   q: { category: MoodCategory; query: string; page: number },
@@ -135,23 +115,35 @@ export async function searchImages(
 ): Promise<SearchResult> {
   const env = opts.env ?? process.env;
   const fetcher = opts.fetcher ?? fetch;
-  const per = Math.min(12, Math.max(2, opts.per ?? 6));
-  let lastError = '';
-  for (const provider of providerOrder(env)) {
-    try {
-      const raw = await PROVIDERS[provider](q.query, q.page, per + 4, env, fetcher);
-      const refs = raw
-        .map((r) => normalizeRef({ ...r, category: q.category, query: q.query, state: 'proposed', addedAt: opts.now ?? Date.now() }))
-        .filter((r): r is MoodboardRef => !!r && !seen.has(r.id))
-        .slice(0, per);
-      if (refs.length) return { refs, provider, error: '' };
-      lastError = 'no results';
-    } catch (e) {
-      lastError = e instanceof Error ? e.message : 'failed';
-      console.warn('[ux-v0] %s search failed for "%s": %s', provider, q.query, lastError);
-    }
-  }
-  return { refs: [], provider: null, error: lastError === 'no results' ? 'Nothing found for that.' : 'The image libraries could not be reached just now.' };
+  const per = Math.min(12, Math.max(1, opts.per ?? 6));
+  const providers = providerOrder(env);
+  if (!providers.length) return { refs: [], providers: [], next: q.page, left: 0, error: '' };
+  const lists = await Promise.all(
+    providers.map(async (provider) => {
+      try {
+        const raw = await PROVIDERS[provider](q.query, q.page, PAGE_SIZE, env, fetcher, q.category);
+        return {
+          provider,
+          refs: raw.map((r) => normalizeRef({ ...r, category: q.category, query: q.query, state: 'proposed', addedAt: opts.now ?? Date.now() })).filter((r): r is MoodboardRef => !!r),
+          error: '',
+        };
+      } catch (e) {
+        const error = e instanceof Error ? e.message : 'failed';
+        console.warn('[ux-v0] %s search failed for "%s": %s', provider, q.query, error);
+        return { provider, refs: [] as MoodboardRef[], error };
+      }
+    })
+  );
+  const { taken, left } = interleave(lists.map((l) => l.refs), seen, per);
+  const answered = [...new Set(taken.map((r) => r.provider))] as Provider[];
+  const failed = lists.every((l) => l.error);
+  return {
+    refs: taken,
+    providers: answered,
+    next: left > 0 ? q.page : q.page + 1,
+    left,
+    error: taken.length ? '' : failed ? 'The image libraries could not be reached just now.' : 'Nothing found for that.',
+  };
 }
 
 /** Unsplash asks to be told when a photo is used in a design. Best effort; never fails the request. */

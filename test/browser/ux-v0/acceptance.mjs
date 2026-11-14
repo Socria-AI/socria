@@ -16,6 +16,9 @@ await ctx.route('https://fonts.gstatic.test/**', (r) => {
   const f = r.request().url().endsWith('isi.woff2') ? 'InstrumentSerif-400-italic.woff2' : r.request().url().endsWith('is.woff2') ? 'InstrumentSerif-400.woff2' : 'Inter-100-900.woff2';
   return r.fulfill({ contentType: 'font/woff2', body: readFileSync(ROOT + 'app/fonts/' + f), headers: { 'access-control-allow-origin': '*' } });
 });
+// Openverse is asked from the browser; these checks script every image, so it answers with nothing here
+// (moodboard-live.mjs asks the real one)
+await ctx.route('https://api.openverse.org/**', (r) => r.fulfill({ json: { result_count: 0, page_count: 0, page_size: 20, page: 1, results: [] } }));
 await ctx.route('https://images.example.test/**', (r) => r.fulfill({ contentType: 'image/jpeg', body: readFileSync(FX + r.request().url().split('/').pop()) }));
 
 const IMG = (name, category, title, w = 1600, h = 1067) => ({ provider: 'openverse', providerId: name, id: `openverse:${name}`, url: `https://images.example.test/${name}.jpg`, thumb: `https://images.example.test/${name}.jpg`, width: w, height: h, title, creator: 'A. Photographer', creatorUrl: 'https://example.org/a', sourceUrl: `https://example.org/${name}`, license: 'CC BY 2.0', licenseUrl: 'https://creativecommons.org/licenses/by/2.0/', attribution: `“${title}” by A. Photographer, CC BY 2.0`, category, state: 'proposed' });
@@ -292,7 +295,7 @@ await part('create acceptance', async () => {
   await page.waitForTimeout(400);
   // a provider failure: the board says so and keeps what it has
   const tiles = await page.locator('.v0-tile').count();
-  await page.route('**/api/ux-v0/images', (r) => r.fulfill({ json: { results: [{ category: 'imagery', query: 'x', page: 1, refs: [], provider: null, error: 'The image libraries could not be reached just now.' }] } }));
+  await page.route('**/api/ux-v0/images', (r) => r.fulfill({ json: { results: JSON.parse(r.request().postData()).queries.map((q) => ({ ...q, next: q.page, left: 0, refs: [], providers: [], error: 'The image libraries could not be reached just now.' })) } }));
   await page.getByRole('button', { name: 'More images' }).click();
   await page.waitForTimeout(800);
   const line = await page.locator('.v0-board .v0-error-line').innerText().catch(() => '');

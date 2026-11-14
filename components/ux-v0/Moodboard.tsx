@@ -8,11 +8,11 @@
 // a replacement never brings back an image this project has already seen.
 // Type pairs are set in the real fonts; palettes show their contrast.
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { contrastRatio } from '@/lib/ux/audit';
 import { fontStack, fontStylesheet } from '@/lib/ux-v0/fonts';
 import type { Aspect } from '@/lib/ux-v0/discovery';
-import { MOOD_CATEGORIES, type MoodCategory, type Moodboard as Board, type MoodboardRef, type Palette, type RefState, type TypePair } from '@/lib/ux-v0/types';
+import { MOOD_CATEGORIES, creditText, type MoodCategory, type Moodboard as Board, type MoodboardRef, type Palette, type RefState, type TypePair } from '@/lib/ux-v0/types';
 
 const CAT_LABEL: Record<MoodCategory, string> = { imagery: 'Imagery', texture: 'Texture', composition: 'Composition' };
 
@@ -27,7 +27,40 @@ interface Props {
   onType: (id: string, state: RefState) => void;
   onDirection: (aspect: Aspect) => void;
   onMore: () => void;
+  onMoreLike: (category: MoodCategory) => void;
+  onSearch: (category: MoodCategory, query: string) => void;
   signedIn: boolean;
+}
+
+/** The designer's own search: a few words, in one kind of image. */
+function BoardSearch({ busy, onSearch }: { busy: boolean; onSearch: Props['onSearch'] }) {
+  const [term, setTerm] = useState('');
+  const [cat, setCat] = useState<MoodCategory>('imagery');
+  return (
+    <form
+      className="v0-board-search"
+      role="search"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (term.trim()) onSearch(cat, term.trim());
+      }}
+    >
+      <label className="v0-sr" htmlFor="v0-board-q">
+        Search the image libraries
+      </label>
+      <input id="v0-board-q" className="v0-field v0-board-q" value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Search the libraries — two or three words work best" maxLength={80} />
+      <select className="v0-select" aria-label="Kind of image" value={cat} onChange={(e) => setCat(e.target.value as MoodCategory)}>
+        {MOOD_CATEGORIES.map((c) => (
+          <option key={c} value={c}>
+            {CAT_LABEL[c]}
+          </option>
+        ))}
+      </select>
+      <button type="submit" className="l5-link is-meta is-strong" disabled={busy || !term.trim()}>
+        Search
+      </button>
+    </form>
+  );
 }
 
 function useSpecimenFonts(pairs: TypePair[]) {
@@ -54,21 +87,17 @@ function Tile({ r, onRef, onReplace }: { r: MoodboardRef; onRef: Props['onRef'];
         <span className="v0-credit">
           {r.sourceUrl ? (
             <a href={r.sourceUrl} target="_blank" rel="noreferrer">
-              {r.attribution || r.creator || r.provider}
+              {creditText(r)}
             </a>
           ) : (
-            r.attribution || r.creator || r.provider
+            creditText(r)
           )}
-          {r.license && (
+          {r.licenseUrl && (
             <>
               {' · '}
-              {r.licenseUrl ? (
-                <a href={r.licenseUrl} target="_blank" rel="noreferrer">
-                  {(r.attribution || '').includes(r.license) ? 'licence' : r.license}
-                </a>
-              ) : (r.attribution || '').includes(r.license) ? null : (
-                r.license
-              )}
+              <a href={r.licenseUrl} target="_blank" rel="noreferrer">
+                licence
+              </a>
             </>
           )}
         </span>
@@ -172,13 +201,14 @@ export function Moodboard(p: Props) {
           More images
         </button>
       </header>
+      <BoardSearch busy={!!p.busy} onSearch={p.onSearch} />
       {p.error && (
         <p className="v0-error-line" role="alert">
           {p.error}
         </p>
       )}
       {!shown.length && !palettes.length && !pairs.length && (
-        <p className="v0-empty v0-board-empty">{p.signedIn ? 'Images appear here as the direction becomes clear. Answer a question or two.' : 'Images appear here as the direction becomes clear. Sign in to let SocriaUX find them.'}</p>
+        <p className="v0-empty v0-board-empty">{p.signedIn ? 'Images appear here as the direction becomes clear. Answer a question or two, or search for something above.' : 'Images appear here as the direction becomes clear. Sign in to let SocriaUX find them.'}</p>
       )}
       {MOOD_CATEGORIES.map((c) => {
         const refs = shown.filter((r) => r.category === c);
@@ -187,6 +217,9 @@ export function Moodboard(p: Props) {
           <section key={c} className="v0-board-group" aria-label={CAT_LABEL[c]}>
             <div className="v0-group-head">
               <span className="l5-label">{CAT_LABEL[c]}</span>
+              <button type="button" className="l5-link is-meta" onClick={() => p.onMoreLike(c)} disabled={!!p.busy}>
+                More like these
+              </button>
               <button type="button" className="l5-link is-meta" onClick={() => p.onDirection(c)} disabled={!!p.busy}>
                 Another direction
               </button>
@@ -225,10 +258,7 @@ export function Moodboard(p: Props) {
           <span className="l5-label">Credits for kept images</span>
           <ul>
             {credits.map((r) => (
-              <li key={r.id}>
-                {r.attribution || r.creator}
-                {r.license ? ` — ${r.license}` : ''}
-              </li>
+              <li key={r.id}>{creditText(r)}</li>
             ))}
           </ul>
         </footer>
