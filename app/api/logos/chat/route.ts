@@ -74,6 +74,8 @@ import { GROUP_MAX, addressedBlock, collabBlock, type Seat } from '@/lib/collab'
 import { aboutLine, cleanAboutRef, cleanReplyRef, quoteLine } from '@/lib/chat-thread';
 import { focusBlock, sanitizeFocus } from '@/lib/workspace/focus';
 import { objectsBlock, sanitizeSpace } from '@/lib/objects';
+import { asksToChange, editFocusBlock, editTargetOf, gateEditBlock } from '@/lib/artifact-focus';
+import { qaInline } from '@/lib/artifact-qa';
 import { roleBlock } from '@/lib/onboarding-roles';
 import { nameBlock } from '@/lib/onboarding-name';
 import { wantedSimulation, bareRequest, hasSurface, simulationBlock } from '@/lib/model/wants';
@@ -1222,6 +1224,9 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       // How to read and cite the documents in the conversation — the rules
       // here, the documents themselves in the turn (with their message).
       (docRefs.length ? `\n\n${DOC_RULES}\n` : '');
+    // LOGOS 6: A CHANGE TO AN ARTIFACT THEY CAN SEE is made to that artifact, in place (lib/artifact-focus.ts) — the
+    // kept one open in Artifacts, else the element in Socria's last reply. Only when the words plainly ask for a change.
+    const editTarget = asksToChange(last.content) ? editTargetOf({ text: last.content, space: sanitizeSpace(body?.objects) ?? null, inHand: body?.inHand, messages }) : null;
     const turnContext =
       // When this turn is, where they are: the date and time in their own time zone (lib/runtime/epistemic.ts nowLine)
       nowLine(Date.now(), body?.tz) +
@@ -1278,6 +1283,8 @@ export const POST = withMeter(async function POST(req: NextRequest) {
           .filter(Boolean);
         return objectsBlock(space, { guarded, lastStep, refused }) + (claims.length ? claims.join('\n') + '\n' : '');
       })() +
+      // …and the one they are asking to change: its JSON, and how a change to it is written (an edit block)
+      (editTarget ? editFocusBlock(editTarget) : '') +
       // What they are building — a process, a decision, a timeline — and its
       // spine as it stands, so the reply talks in steps and branches when
       // they are designing a sequence, rather than in loose concepts.
@@ -1470,8 +1477,13 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       shown: { n: 0 },
       // they asked for code, JSON or a config: a ```json block is theirs to read and copy, never an element
       code: CODE_ASKED.test(lastText) || turnState.domain === 'engineering',
+      // each element looked over at the widths it will be seen at, and what can be put right put right (lib/artifact-qa.ts)
+      qa: (spec) => qaInline(spec).spec,
     };
-    const inlineBlock = (chunk: string, open: boolean) => (inlineOn ? gateInlineBlock(chunk, inlineCtx, open) : gateInlineBlock(chunk, { ...inlineCtx, shown: { n: Infinity } }, open));
+    // a change to the artifact they mean (an edit block) is checked whole against it first; anything else is an element
+    const editSeen = { n: 0 };
+    const inlineBlock = (chunk: string, open: boolean) =>
+      gateEditBlock(chunk, editTarget, editSeen, open) ?? (inlineOn ? gateInlineBlock(chunk, inlineCtx, open) : gateInlineBlock(chunk, { ...inlineCtx, shown: { n: Infinity } }, open));
     // MR's reply filters (lib/mr/index.ts replyGate): every interrogative
     // sentence when they told it to stop asking — mid-reply too, not only a
     // closing one — and a claim that THEY improved, which one conversation

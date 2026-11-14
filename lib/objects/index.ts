@@ -131,14 +131,20 @@ export function discover(space: ObjectSpace, text: string, origin: ObjectOrigin 
   return { space: s, made, claims };
 }
 
-/** An operation the words plainly ask for, on the object they are about. */
+/**
+ * An operation the words plainly ask for, on the object they are about. `prefer` is the object in hand — selected,
+ * or open on screen — tried first; a kind that hears only the object in hand (ObjectKind.readOpScope) is tried
+ * for that object alone.
+ */
 export function readOperation(space: ObjectSpace, text: string, prefer?: string | null): { id: string; op: string; args: Record<string, string | number> } | null {
   const order = [activeObject(space, prefer), ...space.objs].filter(Boolean) as ThoughtObject[];
   const seen = new Set<string>();
   for (const o of order) {
     if (seen.has(o.id)) continue;
     seen.add(o.id);
-    const read = kindOf(o.kind)?.readOp(text, currentOf(o));
+    const k = kindOf(o.kind);
+    if (k?.readOpScope === 'in-hand' && o.id !== prefer) continue;
+    const read = k?.readOp(text, currentOf(o));
     if (read) return { id: o.id, ...read };
   }
   return null;

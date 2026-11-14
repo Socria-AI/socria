@@ -32,7 +32,7 @@ import { isTableRule, listLine, parseBlocks, splitInline, splitTableRow, stripMa
 import { capEmphasis, editorialBlocks, layoutReply, plainTermOf, streamingSplit, tableShape, tailShape, termOf, type TailShape } from '@/lib/reply-layout';
 import { MathText } from '@/components/TeX';
 import { SourceCards } from '@/components/SourceCards';
-import { InlineBlock, type InlineHost } from '@/components/inline/InlineUI';
+import { InlineBlock, InlineEdit, type InlineHost } from '@/components/inline/InlineUI';
 import { contentAsText } from '@/lib/inline-ui';
 import { plainText } from '@/lib/logos5/canvas';
 
@@ -343,6 +343,9 @@ function BlockNode({ block, math, k, cite, rich, inline, tail }: { block: Block;
     // An inline element (components/inline/InlineUI.tsx): drawn from its
     // validated spec; what the person does with it goes to the surface's host.
     case 'ui':
+      // a change Socria made to an artifact in place (lib/artifact-focus.ts): the change, on the artifact itself
+      if (block.edit)
+        return <InlineEdit key={k} edit={block.edit} n={block.n} host={inline} renderInline={(t, key) => <Inline text={t} math={math} keyBase={`${k}-${key}`} code={rich} />} />;
       return (
         <InlineBlock
           key={k}

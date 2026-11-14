@@ -474,7 +474,7 @@ html[data-theme="night"] .logos-root .ln-options {
 }
 .logos-root .ln .ln-why {
   flex: none;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -849,7 +849,7 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
 }
 .logos-root .ln .ln-paths-h {
   margin: 0 0 7px;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -1174,7 +1174,8 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
   font-size: 14px;
 }
 .logos-root .ln .ln-eq sup {
-  font-size: 0.62em;
+  /* an exponent still at least 11px on a phone (the reading size is 16px there): small, never tiny */
+  font-size: max(11px, 0.7em);
   line-height: 0;
 }
 .logos-root .ln .ln-eq-v {
@@ -1245,7 +1246,7 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
 }
 .logos-root .ln .ln-axes text,
 .logos-root .ln-try text {
-  font-size: 10.5px;
+  font-size: 11px;
   fill: var(--ln-ink-60);
 }
 .logos-root .ln .ln-curve {
@@ -1325,7 +1326,7 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
 .logos-root .ln .ln-k {
   display: block;
   margin: 0 0 3px;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -1558,7 +1559,7 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
 }
 .logos-root .ln .ln-eq-name {
   margin-right: 8px;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -1774,7 +1775,9 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
 
 /* ── keep: into Artifacts as it was left ── */
 .logos-root .ln-keepable { display: grid; gap: 6px; }
-.logos-root .ln-keepable > .ln-keep {
+.logos-root .ln-keepable > .ln-keep-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; }
+.logos-root .ln-keepable .ln-kept-note { font-size: 12px; color: var(--c-ink-45); }
+.logos-root .ln-keepable .ln-keep {
   justify-self: start;
   display: inline-flex;
   align-items: center;
@@ -1792,10 +1795,10 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
   cursor: pointer;
   transition: color 0.2s;
 }
-.logos-root .ln-keepable > .ln-keep:hover { color: var(--c-ink); }
-.logos-root .ln-keepable > .ln-keep.is-kept { color: var(--c-moss); }
-.logos-root .ln-keepable > .ln-keep:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
-@media (pointer: coarse) { .logos-root :is(.ln-keepable > .ln-keep, .ln .ln-open) { min-height: 44px; } }
+.logos-root .ln-keepable .ln-keep:hover { color: var(--c-ink); }
+.logos-root .ln-keepable .ln-keep.is-kept { color: var(--c-moss); }
+.logos-root .ln-keepable .ln-keep:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+@media (pointer: coarse) { .logos-root :is(.ln-keepable .ln-keep, .ln .ln-open) { min-height: 44px; } }
 
 /* ── how the parts connect (diagram) ──────────────────────────────────
    The picture where there is room; the same parts as a list with
@@ -1870,7 +1873,7 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
   overflow: hidden;
 }
 .logos-root .ln .ln-dg-role {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -2207,7 +2210,7 @@ html[data-theme="night"] .logos-root .ln:is(.ln-graph, .ln-sim, .ln-chart, .ln-v
   margin: 0 0 8px;
 }
 .logos-root .ln .ln-kind {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -2535,7 +2538,7 @@ html[data-theme="night"] .logos-root .ln:is(.ln-graph, .ln-sim, .ln-chart, .ln-v
 }
 .logos-root .ln-trace .ln-cell.is-mark .ln-cell-v { border-color: var(--ln-primary); border-width: 2px; }
 .logos-root .ln-trace .ln-cell.is-done .ln-cell-v { background: color-mix(in srgb, var(--ln-g1) 14%, transparent); }
-.logos-root .ln-trace .ln-cell-i { font-size: 10.5px; color: var(--ln-ink-40); font-variant-numeric: tabular-nums; }
+.logos-root .ln-trace .ln-cell-i { font-size: 11px; color: var(--ln-ink-40); font-variant-numeric: tabular-nums; }
 .logos-root .ln-trace .ln-cell-ptr { font-size: 11px; color: var(--ln-primary); min-height: 14px; font-weight: 600; }
 .logos-root .ln-trace .ln-trace-note { margin: 8px 0 6px; color: var(--ln-ink); line-height: 1.5; }
 .logos-root .ln-trace .ln-trace-note .ln-k { color: var(--ln-ink-60); font-variant-numeric: tabular-nums; margin-right: 6px; }
@@ -2556,3 +2559,96 @@ html[data-theme="night"] .logos-root .ln:is(.ln-graph, .ln-sim, .ln-chart, .ln-v
 @media (prefers-reduced-motion: reduce) {
   .logos-root .ln-trace .ln-cell-v { transition: none; }
 }
+
+/* ── A mind map ───────────────────────────────────────────────────────────────────────────────────────────
+   A figure between hairlines like the graphs. The centre is the one filled shape; first branches are outlined on
+   the paper; deeper parts sit on a faint wash, so depth reads without a legend. Branches are soft green curves;
+   links across the branches each have their own line (causes, leads to, needs, relates to), named in the legend.
+   What is not the selected branch, or not what a search found, steps back — it is never hidden. */
+.logos-root .ln.ln-mind {
+  margin: 0.5em 0 1.1em;
+  padding: 14px 0 12px;
+  border: 0;
+  border-top: 1px solid var(--ln-hair);
+  border-bottom: 1px solid var(--ln-hair);
+  border-radius: 0;
+  background: none;
+}
+html[data-theme="night"] .logos-root .ln.ln-mind { padding-left: 12px; padding-right: 12px; border-radius: 10px; }
+/* a map wider than the column scrolls inside this box at full size — and never widens the column it sits in (its
+   width is the column's, whatever it holds: contain inline-size) */
+.logos-root .ln-mind .ln-mind-plot { margin: 10px 0 4px; overflow-x: auto; contain: inline-size; }
+.logos-root .ln-mind svg { display: block; margin: 0 auto; overflow: visible; }
+.logos-root .ln-mind .ln-mind-branches path { fill: none; stroke: color-mix(in srgb, var(--ln-g1) 46%, transparent); stroke-width: 1.6; transition: opacity 160ms ease, stroke 160ms ease; }
+.logos-root .ln-mind .ln-mind-branches path.is-on { stroke: var(--ln-g1); stroke-width: 2; }
+.logos-root .ln-mind .ln-mind-links path { fill: none; stroke-width: 1.5; transition: opacity 160ms ease; }
+.logos-root .ln-mind .ln-mind-links path.is-causes,
+.logos-root .ln-mind .ln-mind-key.is-causes line { stroke: var(--ln-g2); }
+.logos-root .ln-mind .ln-mind-links path.is-leads,
+.logos-root .ln-mind .ln-mind-key.is-leads line { stroke: var(--ln-g3); }
+.logos-root .ln-mind .ln-mind-links path.is-needs,
+.logos-root .ln-mind .ln-mind-key.is-needs line { stroke: var(--ln-ink-60); stroke-dasharray: 5 4; }
+.logos-root .ln-mind .ln-mind-links path.is-relates,
+.logos-root .ln-mind .ln-mind-key.is-relates line { stroke: var(--ln-ink-40); stroke-dasharray: 1.5 4; stroke-linecap: round; }
+.logos-root .ln-mind .ln-mind-links path.is-on { stroke-width: 2.25; }
+.logos-root .ln-mind .ln-mind-head { fill: var(--ln-ink-60); }
+.logos-root .ln-mind .is-dim { opacity: 0.28; }
+.logos-root .ln-mind .ln-mind-node rect { fill: color-mix(in srgb, var(--ln-g1) 7%, var(--l5-surface, var(--lg-paper, #fbfaf6))); stroke: color-mix(in srgb, var(--ln-g1) 22%, transparent); stroke-width: 1; transition: opacity 160ms ease; }
+.logos-root .ln-mind .ln-mind-node.is-d0 rect { fill: var(--ln-primary); stroke: none; }
+.logos-root .ln-mind .ln-mind-node.is-d1 rect { fill: var(--l5-surface, var(--lg-paper, #fbfaf6)); stroke: color-mix(in srgb, var(--ln-g1) 55%, transparent); stroke-width: 1.4; }
+.logos-root .ln-mind .ln-mind-node text { font-size: 13px; fill: var(--ln-ink); pointer-events: none; }
+.logos-root .ln-mind .ln-mind-node.is-d0 text { fill: var(--l5-surface, var(--lg-paper, #fbfaf6)); font-size: 14.5px; font-weight: 600; }
+.logos-root .ln-mind .ln-mind-node.is-d1 text { font-weight: 600; }
+.logos-root .ln-mind .ln-mind-node [role="button"] { cursor: pointer; outline: none; }
+.logos-root .ln-mind .ln-mind-node [role="button"]:focus-visible rect,
+.logos-root .ln-mind .ln-mind-node.is-on rect { stroke: var(--ln-primary); stroke-width: 2.25; }
+.logos-root .ln-mind .ln-mind-node.is-d0.is-on rect { stroke: var(--ln-g1); }
+.logos-root .ln-mind .ln-mind-node.is-found rect { stroke: var(--ln-g3); stroke-width: 2.25; }
+.logos-root .ln-mind .ln-mind-fold { cursor: pointer; outline: none; }
+.logos-root .ln-mind .ln-mind-fold circle { fill: var(--l5-surface, var(--lg-paper, #fbfaf6)); stroke: color-mix(in srgb, var(--ln-g1) 60%, transparent); stroke-width: 1.2; }
+.logos-root .ln-mind .ln-mind-fold:focus-visible circle { stroke: var(--ln-primary); stroke-width: 2; }
+.logos-root .ln-mind .ln-mind-fold text { font-size: 11px; fill: var(--ln-ink-70); font-variant-numeric: tabular-nums; pointer-events: none; }
+.logos-root .ln-mind .ln-mind-tools { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.logos-root .ln-mind .ln-mind-find {
+  flex: 1;
+  min-width: 0;
+  max-width: 260px;
+  font: inherit;
+  font-size: 13.5px;
+  padding: 6px 10px;
+  border: 1px solid rgba(var(--ln-tint), 0.22);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ln-ink);
+}
+.logos-root .ln-mind .ln-mind-find:focus-visible { outline: 2px solid var(--ln-primary); outline-offset: 1px; }
+.logos-root .ln-mind .ln-mind-count { font-size: 12.5px; color: var(--ln-ink-60); }
+.logos-root .ln-mind .ln-mind-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 6px 0 0; font-size: 12.5px; color: var(--ln-ink-60); }
+.logos-root .ln-mind .ln-mind-key { display: inline-flex; align-items: center; gap: 6px; }
+.logos-root .ln-mind .ln-mind-key line { stroke-width: 2; }
+.logos-root .ln-mind .ln-mind-panel { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--ln-hair); }
+.logos-root .ln-mind .ln-mind-panel-head { margin: 0 0 2px; font-weight: 600; color: var(--ln-ink); }
+.logos-root .ln-mind .ln-mind-panel-detail { margin: 0 0 6px; color: var(--ln-ink-70); line-height: 1.5; }
+.logos-root .ln-mind .ln-mind-panel-rel { margin: 0; font-size: 13.5px; color: var(--ln-ink-60); }
+.logos-root .ln-mind .ln-mind-panel-links { margin: 6px 0 0; padding: 0; list-style: none; font-size: 13.5px; color: var(--ln-ink-60); }
+.logos-root .ln button.ln-link { font: inherit; color: var(--ln-primary); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--ln-primary) 35%, transparent); text-underline-offset: 2px; }
+.logos-root .ln button.ln-link:focus-visible { outline: 2px solid var(--ln-primary); outline-offset: 2px; border-radius: 3px; }
+.logos-root .ln-mind .ln-mind-more { margin: 6px 0 0; }
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .ln-mind .ln-mind-branches path,
+  .logos-root .ln-mind .ln-mind-links path,
+  .logos-root .ln-mind .ln-mind-node rect { transition: none; }
+}
+
+/* ── a change Socria made in place (an edit block): what changed, then the artifact itself ── */
+.logos-root .ln-edited { display: grid; gap: 8px; padding: 12px 0 4px; border-top: 1px solid var(--c-line, rgba(35, 36, 31, 0.12)); }
+.logos-root .ln-edited-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0; }
+.logos-root .ln-edited-name { font-weight: 600; color: var(--c-ink); }
+.logos-root .ln-edited-said { margin: 0; font-size: 14px; color: var(--c-ink-70, #4a4a44); }
+.logos-root .ln-edited > .ln-keep-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; }
+.logos-root .ln-edited .ln-keep { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 0; border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 500; color: var(--c-ink-45); cursor: pointer; }
+.logos-root .ln-edited .ln-keep:hover { color: var(--c-ink); }
+.logos-root .ln-edited .ln-keep.is-kept { color: var(--c-moss); }
+.logos-root .ln-edited .ln-keep:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+.logos-root .ln-edited .ln-kept-note { font-size: 12px; color: var(--c-ink-45); }
+@media (pointer: coarse) { .logos-root .ln-edited .ln-keep { min-height: 44px; } }

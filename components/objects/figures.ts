@@ -84,6 +84,8 @@ export interface FigureProps {
   onWorkspace?: (a: WorkspaceAction) => WorkspaceResult;
   /** ask the experience route — a counterpart's line, suggestions — never applied by itself */
   ask?: AskExperience;
+  /** send a message to the conversation now, about this object (it is selected first, so Socria changes this one) */
+  onSend?: (text: string) => void;
 }
 
 const FIGURES = new Map<string, ComponentType<FigureProps>>();

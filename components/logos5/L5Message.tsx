@@ -117,6 +117,15 @@ export interface L5MessageProps {
   onOpenInline?: (m: LogosMsg, n: number, spec: InlineSpec) => void;
   /** a reply's diagram, opened on the Logic Map as a drawing (Logos 5) */
   onMapInline?: (m: LogosMsg, n: number, spec: InlineSpec) => void;
+  /** a kept element's own version, drawn in its place (one identity, Logos 6) */
+  onResolveInline?: (m: LogosMsg, n: number) => { spec: InlineSpec; state?: InlineState; edits: number } | null;
+  /** Edit under an element: opened in Artifacts with its editor */
+  onEditInline?: (m: LogosMsg, n: number, spec: InlineSpec) => void;
+  /** a change Socria made in place (an edit block): the artifact it changed, as it stands, and whether it can be undone */
+  onResolveEdit?: (m: LogosMsg, n: number, of: string) => { spec: InlineSpec; state?: InlineState; id: string; made: boolean; applied: boolean; undo: boolean } | null;
+  onUndoEdit?: (m: LogosMsg, n: number, of: string) => void;
+  /** a kept artifact drawn on an edit card, worked with there: done to the artifact */
+  onArtifactState?: (id: string, s: InlineState) => void;
   /**
    * A write-up they asked to read and keep (lib/logos5/content.ts): filed in
    * Content and read there, so the conversation shows its title and opening and
@@ -271,7 +280,7 @@ export function L5Message(p: L5MessageProps) {
   const objFx = m.role === 'assistant' ? p.effect?.objects ?? [] : [];
   const whose = p.who === 'You' ? 'your' : `${p.who}’s`;
   // the reply's inline elements: what was done with them, and where their actions go
-  const { onInline, onChoose, onExplore, onOpenInline, onMapInline, latest } = p;
+  const { onInline, onChoose, onExplore, onOpenInline, onMapInline, onResolveInline, onEditInline, onResolveEdit, onUndoEdit, onOpenObject, onArtifactState, latest } = p;
   const inline = useMemo<InlineHost | undefined>(
     () =>
       m.role === 'assistant'
@@ -282,10 +291,16 @@ export function L5Message(p: L5MessageProps) {
             onExplore,
             onOpen: onOpenInline ? (n, spec) => onOpenInline(m, n, spec) : undefined,
             onMap: onMapInline ? (n, spec) => onMapInline(m, n, spec) : undefined,
+            resolve: onResolveInline ? (n) => onResolveInline(m, n) : undefined,
+            onEdit: onEditInline ? (n, spec) => onEditInline(m, n, spec) : undefined,
+            resolveEdit: onResolveEdit ? (n, of) => onResolveEdit(m, n, of) : undefined,
+            onUndoEdit: onUndoEdit ? (n, of) => onUndoEdit(m, n, of) : undefined,
+            onOpenArtifact: onOpenObject,
+            onArtifactState,
             live: !!latest,
           }
         : undefined,
-    [m, onInline, onChoose, onExplore, onOpenInline, onMapInline, latest]
+    [m, onInline, onChoose, onExplore, onOpenInline, onMapInline, onResolveInline, onEditInline, onResolveEdit, onUndoEdit, onOpenObject, onArtifactState, latest]
   );
 
   return (

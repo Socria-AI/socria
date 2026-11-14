@@ -1,5 +1,7 @@
 # Visual explanations: the representation a turn gets
 
+What happens to an element after it is drawn — kept, edited, changed in place by Socria, checked before it is shown — is in `docs/LOGOS-6-ARTIFACTS.md`.
+
 Socria already drew in the conversation: a graph to change (curves, sliders, a tangent, a chord), a small simulation, flows, cycles, trees and causes, timelines, comparisons, worked steps, claims to inspect, and, in the workspace, calculus pictures in MathViz. This work adds what was missing for the brief's core cases, inside the same pipeline:
 
 - a graph's **points**, filled or open (a hole), checked against the curve;

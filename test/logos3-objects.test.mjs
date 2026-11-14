@@ -376,7 +376,7 @@ console.log('\n=== REPRESENTATION BENCHMARK: does the view chosen expose the obj
 console.log('\n=== the wiring ===');
 {
   const app = read('components/LogosApp.tsx');
-  ok('an operation in a message is computed before the reply is asked anything', /const objTurn = takeObjects\(content, atts\)/.test(app) && /readOperation\(space, content, objSelRef\.current\?\.obj\)/.test(app));
+  ok('an operation in a message is computed before the reply is asked anything', /const objTurn = takeObjects\(content, atts\)/.test(app) && /readOperation\(space, content, objSelRef\.current\?\.obj(?: \?\? keptInHand\(\))?\)/.test(app));
   ok('the extraction can add objects, never roll one back', /mergeSpaces\(s\.map\?\.objects, json\.map\.objects\)/.test(app));
   ok('a figure operation calls no model', !/fetch\(/.test(app.slice(app.indexOf('function onObject('), app.indexOf('async function send('))));
   ok('a 2 × 2 matrix on the plane is the same object, followed', /planeOfRef\.current === touched\.id/.test(app));

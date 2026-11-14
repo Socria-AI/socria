@@ -362,7 +362,7 @@ export const CLAIM_HOLDS: readonly ClaimHolds[] = ['yes', 'no', 'partly', 'uncle
  * repaired where the repair is plain (a cycle's loop closed in the order the
  * nodes were given) and otherwise not drawn at all.
  */
-export type DiagramView = 'cycle' | 'tree' | 'flow' | 'causes';
+export type DiagramView = 'cycle' | 'tree' | 'flow' | 'causes' | 'mind';
 export type DiagramRole = 'underlying' | 'trigger' | 'amplifier' | 'effect';
 export interface DiagramNode {
   id: string;
@@ -371,14 +371,22 @@ export interface DiagramNode {
   /** causes only: what part this plays in bringing the effect about */
   role?: DiagramRole;
 }
+/**
+ * What a connection means, in a mind map: part of (the branch it hangs from — the default, and the only kind the
+ * hierarchy is made of), causes, leads to (in sequence), needs (depends on), or relates to (an association). Every
+ * connection but "part of" is a link across the branches, drawn in its own style and named in the legend.
+ */
+export type DiagramRel = 'part' | 'causes' | 'leads' | 'needs' | 'relates';
+export const DIAGRAM_RELS: readonly DiagramRel[] = ['part', 'causes', 'leads', 'needs', 'relates'];
+export type DiagramEdge = [string, string] | [string, string, DiagramRel];
 export interface DiagramSpec {
   type: 'diagram';
   view: DiagramView;
   title?: string;
   nodes: DiagramNode[];
-  edges: [string, string][];
+  edges: DiagramEdge[];
 }
-export const DIAGRAM_VIEWS: readonly DiagramView[] = ['cycle', 'tree', 'flow', 'causes'];
+export const DIAGRAM_VIEWS: readonly DiagramView[] = ['cycle', 'tree', 'flow', 'causes', 'mind'];
 export const DIAGRAM_ROLES: readonly DiagramRole[] = ['underlying', 'trigger', 'amplifier', 'effect'];
 /**
  * FOR AND AGAINST ONE THING. Pros and cons of a single subject have no second
@@ -508,6 +516,10 @@ export const INLINE_LIMITS = {
   diagramMin: 3,
   diagramEdges: 16,
   nodeLabel: 40,
+  /** a mind map: one centre, branches four levels deep at most, a few links across them — more is folded, never crammed */
+  mindNodes: 24,
+  mindDepth: 4,
+  mindLinks: 8,
   nodeDetail: 200,
   /** a tree's levels below its root */
   treeDepth: 3,
@@ -1157,6 +1169,14 @@ const VIEW_WORDS: Record<string, DiagramView> = {
   tree: 'tree', hierarchy: 'tree', 'org chart': 'tree', outline: 'tree', structure: 'tree',
   flow: 'flow', chain: 'flow', process: 'flow', pipeline: 'flow', flowchart: 'flow',
   causes: 'causes', cause: 'causes', causal: 'causes', 'cause and effect': 'causes', 'causes and effects': 'causes', 'causal chain': 'causes',
+  mind: 'mind', 'mind map': 'mind', mindmap: 'mind', 'concept map': 'mind', map: 'mind', radial: 'mind',
+};
+const REL_WORDS: Record<string, DiagramRel> = {
+  part: 'part', 'part of': 'part', has: 'part', contains: 'part', includes: 'part', child: 'part', branch: 'part', hierarchy: 'part', hierarchical: 'part', 'is a': 'part', type: 'part', 'kind of': 'part',
+  causes: 'causes', cause: 'causes', causal: 'causes', drives: 'causes', produces: 'causes', 'leads to effect': 'causes', affects: 'causes', increases: 'causes', decreases: 'causes',
+  leads: 'leads', 'leads to': 'leads', then: 'leads', next: 'leads', sequence: 'leads', sequential: 'leads', precedes: 'leads', before: 'leads', step: 'leads',
+  needs: 'needs', requires: 'needs', 'depends on': 'needs', dependency: 'needs', dependent: 'needs', prerequisite: 'needs', uses: 'needs',
+  relates: 'relates', 'relates to': 'relates', related: 'relates', association: 'relates', associative: 'relates', 'linked to': 'relates', link: 'relates', 'see also': 'relates', compare: 'relates',
 };
 const ROLE_WORDS: Record<string, DiagramRole> = {
   underlying: 'underlying', 'underlying cause': 'underlying', root: 'underlying', 'root cause': 'underlying', structural: 'underlying', background: 'underlying', 'long term': 'underlying', 'long term cause': 'underlying',
@@ -1166,7 +1186,7 @@ const ROLE_WORDS: Record<string, DiagramRole> = {
 };
 
 /** The nodes' ids as one walk round the loop, or null when the edges say something a ring cannot draw. */
-function cycleOrder(ids: readonly string[], edges: readonly [string, string][]): string[] | null {
+function cycleOrder(ids: readonly string[], edges: readonly DiagramEdge[]): string[] | null {
   const n = ids.length;
   // no edges: the order the parts were given is the order round the loop
   if (!edges.length) return [...ids];
@@ -1197,7 +1217,7 @@ function cycleOrder(ids: readonly string[], edges: readonly [string, string][]):
 }
 
 /** Is every part reachable from every other, ignoring which way the arrows point? */
-function connected(ids: readonly string[], edges: readonly [string, string][]): boolean {
+function connected(ids: readonly string[], edges: readonly DiagramEdge[]): boolean {
   const near = new Map(ids.map((id) => [id, [] as string[]]));
   for (const [a, b] of edges) {
     near.get(a)!.push(b);
@@ -1210,7 +1230,7 @@ function connected(ids: readonly string[], edges: readonly [string, string][]): 
 }
 
 /** Does following the arrows ever come back to where it started? */
-function looped(ids: readonly string[], edges: readonly [string, string][]): boolean {
+function looped(ids: readonly string[], edges: readonly DiagramEdge[]): boolean {
   const indeg = new Map(ids.map((id) => [id, 0]));
   for (const [, b] of edges) indeg.set(b, indeg.get(b)! + 1);
   const todo = ids.filter((id) => indeg.get(id) === 0);
@@ -1228,7 +1248,8 @@ function sanitizeDiagram(r: Record<string, unknown>): DiagramSpec | null {
   if (!view) return null;
   const rawNodes = Array.isArray(r.nodes) ? r.nodes : [];
   // more parts than a glance takes is not cut down to fit: which ones to leave out is not the renderer's to choose
-  if (rawNodes.length > L.diagramNodes) return null;
+  // (a mind map holds more, folded below its first levels until opened — lib/artifact-qa.ts)
+  if (rawNodes.length > (view === 'mind' ? L.mindNodes : L.diagramNodes)) return null;
   const nodes: DiagramNode[] = [];
   const byKey = new Map<string, string>();
   const givenId = (v: unknown) => {
@@ -1258,16 +1279,20 @@ function sanitizeDiagram(r: Record<string, unknown>): DiagramSpec | null {
   if (nodes.length < L.diagramMin) return null;
   const ids = nodes.map((x) => x.id);
   const key = (v: unknown) => (typeof v === 'string' || typeof v === 'number' ? byKey.get(String(v).trim()) ?? byKey.get(String(v).trim().toLowerCase()) : undefined);
-  let edges: [string, string][] = [];
-  for (const e of (Array.isArray(r.edges) ? r.edges : []).slice(0, L.diagramEdges * 2)) {
+  let edges: DiagramEdge[] = [];
+  const rels = new Map<string, DiagramRel>();
+  for (const e of (Array.isArray(r.edges) ? r.edges : []).slice(0, (view === 'mind' ? L.mindNodes + L.mindLinks : L.diagramEdges) * 2)) {
     const o = asObj(e);
     const a = key(Array.isArray(e) ? e[0] : o?.from ?? o?.source);
     const b = key(Array.isArray(e) ? e[1] : o?.to ?? o?.target);
     // an edge to a part that is not there, or from a part to itself, draws nothing
     if (!a || !b || a === b || edges.some(([x, y]) => x === a && y === b)) continue;
     edges.push([a, b]);
+    const rw = Array.isArray(e) ? e[2] : o?.rel ?? o?.relation ?? o?.type ?? o?.kind;
+    const rel = typeof rw === 'string' ? REL_WORDS[wordOf(rw)] : undefined;
+    if (rel && rel !== 'part') rels.set(`${a}>${b}`, rel);
   }
-  if (edges.length > L.diagramEdges) return null;
+  if (edges.length > (view === 'mind' ? L.mindNodes - 1 + L.mindLinks : L.diagramEdges)) return null;
   let ordered = nodes;
   if (view === 'cycle') {
     const order = cycleOrder(ids, edges);
@@ -1290,6 +1315,28 @@ function sanitizeDiagram(r: Record<string, unknown>): DiagramSpec | null {
       for (const [x, c] of edges) if (x === p && !depth.has(c)) depth.set(c, depth.get(p)! + 1), todo.push(c);
     }
     if (depth.size !== ids.length || Math.max(...depth.values()) > L.treeDepth) return null;
+  } else if (view === 'mind') {
+    // A MIND MAP: one centre, every other part hanging from exactly one parent along "part of" connections, four
+    // levels at most; the other connections are links across the branches, each with its kind, a few at most.
+    const branches = edges.filter(([a, b]) => !rels.has(`${a}>${b}`));
+    const links = edges.filter(([a, b]) => rels.has(`${a}>${b}`));
+    const parent = new Map<string, string>();
+    for (const [p, c] of branches) {
+      if (parent.has(c)) return null;
+      parent.set(c, p);
+    }
+    const roots = ids.filter((id) => !parent.has(id));
+    if (roots.length !== 1) return null;
+    const depth = new Map([[roots[0], 0]]);
+    const todo = [roots[0]];
+    while (todo.length) {
+      const p = todo.shift()!;
+      for (const [x, c] of branches) if (x === p && !depth.has(c)) depth.set(c, depth.get(p)! + 1), todo.push(c);
+    }
+    if (depth.size !== ids.length || Math.max(...depth.values()) > L.mindDepth || links.length > L.mindLinks) return null;
+    // the centre first, then the branches in the order given: the layout reads them so
+    ordered = [nodes.find((x) => x.id === roots[0])!, ...nodes.filter((x) => x.id !== roots[0])];
+    edges = [...branches.map(([a, b]) => [a, b] as DiagramEdge), ...links.map(([a, b]) => [a, b, rels.get(`${a}>${b}`)!] as DiagramEdge)];
   } else {
     // a flow, or causes: no edges is the chain in the order given (causes: everything leading to the one effect)
     if (!edges.length) {
@@ -1684,6 +1731,11 @@ export interface InlineContext {
    * read as not asked — a json block is an element only when it is wholly one.
    */
   code?: boolean;
+  /**
+   * Looked over before it is shown (lib/artifact-qa.ts qaInline, passed by the route so this module does not import
+   * the layout code): what can be put right without changing what the element says is put right here.
+   */
+  qa?: (spec: InlineSpec) => InlineSpec;
 }
 
 export type InlineVerdict = { ok: true; spec: InlineSpec } | { ok: false; why: string; notice?: string };
@@ -1803,7 +1855,13 @@ export function gateInlineBlock(chunk: string, ctx: InlineContext, open = false)
   // person (the guard, work that is theirs, figures from nowhere) takes a json block out
   if (!v.ok && lang !== 'ui' && JSON_FENCE_ROOM.has(v.why)) return chunk;
   if (!v.ok) return v.notice ? `${v.notice}\n\n` : '';
-  return `${fenceOf(v.spec)}\n\n`;
+  let shown = v.spec;
+  try {
+    shown = ctx.qa ? ctx.qa(v.spec) : v.spec;
+  } catch {
+    shown = v.spec;
+  }
+  return `${fenceOf(shown)}\n\n`;
 }
 const JSON_FENCE_ROOM = new Set(['too-many', 'one-at-a-time', 'no-questions']);
 /** The names a model gives the ui fence when it strays from it — the element it meant, not code to show. */
@@ -1891,6 +1949,46 @@ export function inlinePlainText(spec: InlineSpec): string {
 const UI_FENCE = /```[ \t]*ui[ \t]*\n([\s\S]*?)```/gi;
 
 /** A reply's inline blocks in order, numbered as the renderer numbers them (every ```ui block counts, drawn or not). */
+/**
+ * A CHANGE SOCRIA MADE TO AN ARTIFACT IN PLACE (Logos 6, lib/artifact-focus.ts): a ```ui block of type "edit", in the
+ * canonical form the route's gate wrote — which artifact (`of`: a kept artifact's id, or "<message id>:<n>" for a
+ * reply's element not kept yet), the edits (lib/artifact-edit.ts), and what they change said by the code. Read here
+ * only as far as drawing and applying need; the edits are checked whole again where they are applied.
+ */
+export interface EditSpec {
+  type: 'edit';
+  of: string;
+  title: string;
+  ops: { op: 'add' | 'replace' | 'remove'; path: string; value?: unknown }[];
+  said: string;
+  note?: string;
+}
+export function parseEditSpec(body: string): EditSpec | null {
+  let raw: Record<string, unknown> | null = null;
+  try {
+    raw = JSON.parse(body.trim());
+  } catch {
+    return null;
+  }
+  if (!raw || typeof raw !== 'object' || raw.type !== 'edit') return null;
+  const of = typeof raw.of === 'string' && /^[\w-]{1,64}(?::\d{1,2})?$/.test(raw.of) ? raw.of : null;
+  const ops = Array.isArray(raw.ops) && raw.ops.length && raw.ops.length <= 24 ? raw.ops.filter((o): o is EditSpec['ops'][number] => !!o && typeof o === 'object' && ['add', 'replace', 'remove'].includes((o as { op?: unknown }).op as string) && typeof (o as { path?: unknown }).path === 'string') : [];
+  const said = typeof raw.said === 'string' ? raw.said.replace(/\s+/g, ' ').trim().slice(0, 300) : '';
+  if (!of || !ops.length || ops.length !== (raw.ops as unknown[]).length || !said) return null;
+  const title = typeof raw.title === 'string' ? raw.title.replace(/\s+/g, ' ').trim().slice(0, 80) : '';
+  const note = typeof raw.note === 'string' ? raw.note.replace(/\s+/g, ' ').trim().slice(0, 160) : '';
+  return { type: 'edit', of, title, ops, said, ...(note ? { note } : {}) };
+}
+/** The edit blocks of a reply, each with its position among the reply's ```ui blocks (what its key is made of). */
+export function editsIn(content: string): { n: number; edit: EditSpec }[] {
+  if (!content.includes('```')) return [];
+  return [...content.matchAll(UI_FENCE)].flatMap((m, n) => {
+    const edit = parseEditSpec(m[1]);
+    return edit ? [{ n, edit }] : [];
+  });
+}
+const editLine = (e: EditSpec) => `Changed ${e.title ? `“${e.title}”` : 'it'} in place: ${e.said}.`;
+
 export function specsIn(content: string): (InlineSpec | null)[] {
   if (!content.includes('```')) return [];
   return [...content.matchAll(UI_FENCE)].map((m) => parseInlineSpec(m[1]));
@@ -1900,7 +1998,9 @@ export function specsIn(content: string): (InlineSpec | null)[] {
 export function contentAsText(content: string): string {
   return content.replace(UI_FENCE, (_m, body: string) => {
     const spec = parseInlineSpec(body);
-    return spec ? inlinePlainText(spec) : '';
+    if (spec) return inlinePlainText(spec);
+    const edit = parseEditSpec(body);
+    return edit ? editLine(edit) : '';
   }).replace(/\n{3,}/g, '\n\n').trim();
 }
 
@@ -1934,7 +2034,11 @@ export function contentForHistory(content: string, ui?: Record<string, InlineSta
   return content.replace(UI_FENCE, (_m, body: string) => {
     const spec = parseInlineSpec(body);
     const at = n++;
-    if (!spec) return '';
+    if (!spec) {
+      // a change made in place is said as one, so a later turn knows the artifact changed and was not drawn again
+      const edit = parseEditSpec(body);
+      return edit ? `[${editLine(edit)}]` : '';
+    }
     const was = `${SHOWN_INLINE}${spec.type}: ${historyText(spec).replace(/\s+/g, ' ').slice(0, 240)}`;
     const now = ui?.[String(at)] ? inlineNow(spec, ui[String(at)]) : null;
     return now ? `${was} — now: ${now.slice(0, 280)}]` : `${was}]`;

@@ -9,6 +9,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "verify:views": "node scripts/verify-views.mjs",
+    "verify:artifacts": "node scripts/verify-artifacts.mjs",
     "test": "node test/run.mjs",
     "probe:mind": "node scripts/mind-probe.mjs",
     "doctor:mind": "node scripts/mind-doctor.mjs",

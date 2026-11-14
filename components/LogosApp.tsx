@@ -33,6 +33,7 @@ import {
   kindOf,
   makeDisplay,
   keptFrom,
+  type KeptState,
   localDay,
   mergeSpaces,
   objOf,
@@ -123,7 +124,7 @@ import { saveTemplate, templateChoice, templateOf, templatePayload } from '@/lib
 import { useTemplates } from '@/components/logos5/useTemplates';
 import { MADE_OFFER, madeAsked, madeListed, madeOffer, mapArtifacts, pictureRepeatsDisplay, plotArtifact, readMade, writeMade, type MadeKey, type MadeRecord } from '@/lib/logos5/artifacts';
 import { cleanTitle } from '@/lib/session-rail';
-import { artifactFromSpec, describeInline, inlineFrom, sanitizeInlineState, sanitizeInlineStateOne, specsIn, type DidItem, type InlineSpec, type InlineState } from '@/lib/inline-ui';
+import { artifactFromSpec, describeInline, editsIn, inlineFrom, sanitizeInlineState, sanitizeInlineStateOne, specsIn, type DidItem, type InlineSpec, type InlineState } from '@/lib/inline-ui';
 import { buildStarters, PENDING_TYPES } from '@/lib/starters';
 import { billingError, billingLine } from '@/lib/billing-message';
 import { ContextPanel } from '@/components/ContextPanel';
@@ -157,6 +158,8 @@ import { DOCK_SIDES, Workspace, type DockSide } from '@/components/workspace/Wor
 import { InspectorPanel, ModelPanel, ParamsPanel, TracePanel } from '@/components/workspace/panels';
 import { ScenePanel } from '@/components/scene3d/ScenePanel';
 import { DisplayPanel } from '@/components/display/DisplayPanel';
+import { requestEdit } from '@/components/display/KeptFigure';
+import { landEdit } from '@/lib/artifact-focus';
 import { DocsContext, type DocsApi } from '@/components/display/docs-context';
 import { AUTO_PAGES, docNow, loadDocs, onDoc, pagesToRead, putDoc, putOriginal, readFileAsDoc, readPages as readDocPages } from '@/lib/docs/client';
 import { endActivity, setActivity } from '@/lib/activity';
@@ -4399,7 +4402,7 @@ export function LogosApp({
     let touched: ThoughtObject | null = null;
     // a message that brings an object in is not also an operation on it
     if (space === space0) {
-      const read = readOperation(space, content, objSelRef.current?.obj);
+      const read = readOperation(space, content, objSelRef.current?.obj ?? keptInHand());
       if (read) {
         const r = applyObjectOp(space, read.id, read.op, read.args, { by: 'person' });
         if (r.ok) {
@@ -5215,6 +5218,11 @@ export function LogosApp({
           // Re-sanitised on the server, where every step is RE-COMPUTED from
           // the state before it — so what the reply is told was computed was.
           ...(mapRef.current?.objects ? { objects: mapRef.current.objects } : {}),
+          // the kept artifact open in Artifacts: what "change it" means, when it is said (lib/artifact-focus.ts)
+          ...(() => {
+            const h = keptInHand();
+            return h ? { inHand: h } : {};
+          })(),
           // what they told onboarding they mostly think about (an id, or nothing)
           ...(readRole() ? { role: readRole() } : {}),
           ...(readName() ? { name: readName() } : {}),
@@ -5384,6 +5392,8 @@ export function LogosApp({
       // is read back from there when that line is opened (switchSession);
       // appended here, it was drawn into the other line's Logic Map.
       if (sid === activeIdRef.current) chronRef.current = [...chronRef.current, reply];
+      // a change Socria made to an artifact in place: applied now, as its step (lib/artifact-focus.ts)
+      if (sid === activeIdRef.current) applySocriaEdits(reply);
       if (u && u.entries.length) recurrenceSaidRef.current.add(sid);
       // A thought completed. The proactive check runs from an effect rather
       // than here, so it sees the map this turn produced instead of the one
@@ -5857,6 +5867,13 @@ export function LogosApp({
   const showing = (v: Viewport) => screenRef.current.view === v || screenRef.current.beside === v;
   /** the writing is on screen and open to edit in words */
   const writingOnScreen = () => artShownRef.current === 'w:doc' && showing('artifacts') && !!writeRef.current;
+  /** The kept element open in Artifacts, on screen — the one typed words about "it" are heard against (lib/objects/display-kept.ts). */
+  const keptInHand = (): string | null => {
+    const key = artShownRef.current;
+    if (!key?.startsWith('d:') || !showing('artifacts')) return null;
+    const o = objOf(spaceOf(mapRef.current), key.slice(2));
+    return o?.kind === 'kept' ? o.id : null;
+  };
   /** what is over the line of thinking, where "go back" means back into it */
   const overNow = (): 'home' | 'memory' | null => (l5Mind ? 'memory' : l5Home || !activeIdRef.current ? 'home' : null);
   function commandContext(): CommandContext {
@@ -6261,7 +6278,7 @@ export function LogosApp({
     const mapRemoves = mc && 'edits' in mc ? mc.edits.flatMap((e) => (e.op === 'remove' ? [map.nodes.find((n) => n.id === e.id)?.label ?? ''] : [])).filter(Boolean) : null;
     const dc = writingOnScreen() ? readDocCommand(text) : null;
     const docDelete = dc ? docDeleteOf(writeDocRef.current, dc, { that: docThatRef.current }) : null;
-    const op = readOperation(spaceOf(map), text, objSelRef.current?.obj);
+    const op = readOperation(spaceOf(map), text, objSelRef.current?.obj ?? keptInHand());
     const o = op ? objOf(spaceOf(map), op.id) : null;
     const objectRemove = op && o && /remove|delete|clear|drop|erase|reset|untick/i.test(op.op) ? kindOf(o.kind)?.ops[op.op]?.say(op.args) ?? null : null;
     return riskOf(text, { mapRemoves, docDelete, objectRemove });
@@ -6829,10 +6846,91 @@ export function LogosApp({
   // does with one is theirs and is kept with that message; nothing here calls
   // a model — a tapped choice is simply what they say next.
 
+  /**
+   * ONE IDENTITY (Logos 6): the kept artifact a reply's element became, as it now stands — what the conversation
+   * draws in its place, so a change made in Artifacts or by Socria shows where it was first drawn too. Null when the
+   * element was never kept, or what was kept is gone (the reply's own element is drawn, as before).
+   */
+  function resolveInline(msg: Msg, n: number): { spec: InlineSpec; state?: InlineState; edits: number } | null {
+    const id = msg.ui?.[String(n)]?.artifact;
+    const o = id ? objOf(spaceOf(map), id) : null;
+    if (!o || o.kind !== 'kept') return null;
+    const st = currentOf(o) as KeptState;
+    return { spec: st.spec, ...(st.ui ? { state: st.ui } : {}), edits: o.steps.slice(0, o.at).filter((x) => x.op !== 'state').length };
+  }
+
+  /**
+   * SOCRIA'S CHANGES, MADE IN PLACE (Logos 6, lib/artifact-focus.ts). Each canonical edit block in a reply that landed
+   * is applied to the artifact it names as Socria's step — Undo takes it back, Versions lists it, and the conversation
+   * and Artifacts show the one artifact changed. A reply's element that was not kept yet is kept first (so the change
+   * has an artifact to be made to), linked to where it was drawn. Applied once: the step carries the block's key.
+   * Checked whole again here (the kind's own check), so a change that no longer holds — the artifact moved on since —
+   * changes nothing.
+   */
+  function applySocriaEdits(reply: Msg) {
+    if (!workspaceOn || !reply.id || togetherReadOnly) return;
+    const found = editsIn(reply.content);
+    for (const { n, edit } of found) {
+      const here = sessionsRef.current.find((x) => x.id === activeIdRef.current)?.messages ?? [];
+      const r = landEdit(spaceOf(mapRef.current), edit, `${reply.id}#${n}`, (id) => (here.find((x) => x.id === id) as { id: string; content: string; ui?: Record<string, InlineState> } | undefined) ?? null, {
+        session: activeIdRef.current ?? undefined,
+        said: replyOpening,
+      });
+      if ('skip' in r) continue;
+      if (!commitObjects(r.space, objOf(r.space, r.id))) continue;
+      const linkTo = r.link ? here.find((x) => x.id === r.link!.msg) : null;
+      if (linkTo && r.link) keepInline(linkTo, r.link.n, { artifact: r.id });
+    }
+  }
+
+  /**
+   * The edit card under a reply that changed an artifact: the artifact as it now stands, whether the change is in it,
+   * and whether it can still be undone on its own (it is the latest step).
+   */
+  function resolveEdit(msg: Msg, n: number, of: string): { spec: InlineSpec; state?: InlineState; id: string; made: boolean; applied: boolean; undo: boolean } | null {
+    const space = spaceOf(map);
+    let id: string | null = objOf(space, of)?.kind === 'kept' ? of : null;
+    if (!id) {
+      const m = /^([\w-]{1,64}):(\d{1,2})$/.exec(of);
+      const there = m ? messages.find((x) => x.id === m[1]) : null;
+      id = there?.ui?.[m![2]]?.artifact ?? null;
+    }
+    const o = id ? objOf(space, id) : null;
+    if (!o || o.kind !== 'kept') return null;
+    const st = currentOf(o) as KeptState;
+    const at = o.steps.findIndex((x) => x.args.from === `${msg.id}#${n}`);
+    return { spec: st.spec, ...(st.ui ? { state: st.ui } : {}), id: o.id, made: at >= 0, applied: at >= 0 && at < o.at, undo: at >= 0 && at === o.at - 1 && !togetherReadOnly };
+  }
+
+  /** Undo under an edit card: the artifact back to the version before Socria's change — a seek, so Redo brings it back. */
+  function undoEdit(msg: Msg, n: number, of: string) {
+    const r = resolveEdit(msg, n, of);
+    if (!r?.undo) return;
+    const o = objOf(spaceOf(mapRef.current), r.id);
+    const at = o ? o.steps.findIndex((x) => x.args.from === `${msg.id}#${n}`) : -1;
+    if (o && at >= 0) onObject({ type: 'seek', obj: o.id, at });
+  }
+
+  /** What is done to a kept artifact where the conversation draws it — a slider moved — done to the artifact (op "state"). */
+  function keptArtifactState(id: string, s: InlineState) {
+    const { artifact: _drop, ...rest } = s;
+    void _drop;
+    onObject({ type: 'op', obj: id, op: 'state', args: { state: JSON.stringify(rest) } });
+  }
+
+  /** EDIT, pressed under a reply's element: kept first if it was not, then opened in Artifacts with its editor open. */
+  function editInline(msg: Msg, n: number, spec: InlineSpec) {
+    openInline(msg, n, spec, { edit: true });
+  }
+
   /** What was done with one of a reply's inline elements, merged into what is kept with that message. */
   function keepInline(msg: Msg, n: number, s: InlineState) {
     if (!msg.id) return;
     const key = String(n);
+    // kept: what is done with it here is done to the artifact — one identity, so Artifacts shows it too
+    const linkedId = msg.ui?.[key]?.artifact;
+    const linked = linkedId && !('artifact' in s && Object.keys(s).length === 1) ? objOf(spaceOf(mapRef.current), linkedId) : null;
+    if (linked?.kind === 'kept') return keptArtifactState(linked.id, s);
     const swap: { from?: Msg; to?: Msg } = {};
     patchActive((sn) => ({
       ...sn,
@@ -6986,11 +7084,14 @@ export function LogosApp({
     showObject(made.obj.id);
   }
 
-  function openInline(msg: Msg, n: number, spec: InlineSpec) {
+  function openInline(msg: Msg, n: number, spec: InlineSpec, how?: { edit?: boolean }) {
     if (!workspaceOn) return;
     const space = spaceOf(mapRef.current);
     const had = msg.ui?.[String(n)]?.artifact;
-    if (had && objOf(space, had)) return showObject(had);
+    if (had && objOf(space, had)) {
+      if (how?.edit) requestEdit(had);
+      return showObject(had);
+    }
     if (togetherRef.current?.active && togetherRef.current.role !== 'owner' && togetherRef.current.role !== 'editor') {
       setError('You can look at this line of thinking, but not change it.');
       return;
@@ -7005,6 +7106,7 @@ export function LogosApp({
     if (!made.ok) return setError(made.says);
     if (!commitObjects(made.space, objOf(made.space, made.obj.id))) return;
     keepInline(msg, n, { artifact: made.obj.id });
+    if (how?.edit) requestEdit(made.obj.id);
     showObject(made.obj.id);
   }
 
@@ -8030,6 +8132,9 @@ export function LogosApp({
             ask={askExperience}
             onPrompt={(text) => draftToComposer(text)}
             onDraft={(text) => draftToComposer(text)}
+            // a change the editor's own reading cannot make goes to Socria as a turn — the element is open in
+            // Artifacts, so it is the one in hand the turn is read against (keptInHand)
+            onSend={(text) => void send(text)}
           />
         );
       }
@@ -9662,8 +9767,20 @@ export function LogosApp({
         onHoverNodes={setHoverNodes}
         onShowNodes={showNodes}
         onOpenObject={showObject}
+        // one identity holds for everyone who can see the line of thinking: a reader sees the kept artifact as it now
+        // stands too (resolving only reads); changing it is for those who may
+        {...(m.role === 'assistant' && m.id ? { onResolveInline: resolveInline, onResolveEdit: resolveEdit } : {})}
         {...(m.role === 'assistant' && m.id && !togetherReadOnly
-          ? { onInline: keepInline, onOpenInline: openInline, onMapInline: mapInline, ...(solo && !busy ? { onExplore: chooseInline } : {}), ...(latest && solo && !busy ? { onChoose: chooseInline } : {}) }
+          ? {
+              onInline: keepInline,
+              onOpenInline: openInline,
+              onMapInline: mapInline,
+              onUndoEdit: undoEdit,
+              onArtifactState: keptArtifactState,
+              ...(workspaceOn ? { onEditInline: editInline } : {}),
+              ...(solo && !busy ? { onExplore: chooseInline } : {}),
+              ...(latest && solo && !busy ? { onChoose: chooseInline } : {}),
+            }
           : {})}
         writeUp={writeUp}
         onOpenContent={openContent}
@@ -10399,7 +10516,8 @@ export function LogosApp({
               host={{
                 state,
                 live,
-                ...(live && !togetherReadOnly ? { onState: (n: number, st: InlineState) => keepInline(msg, n, st), onOpen: (n: number, spec: InlineSpec) => openInline(msg, n, spec), onMap: (n: number, spec: InlineSpec) => mapInline(msg, n, spec) } : {}),
+                resolve: (n: number) => resolveInline(msg, n),
+                ...(live && !togetherReadOnly ? { onState: (n: number, st: InlineState) => keepInline(msg, n, st), onOpen: (n: number, spec: InlineSpec) => openInline(msg, n, spec), onMap: (n: number, spec: InlineSpec) => mapInline(msg, n, spec), ...(workspaceOn ? { onEdit: (n: number, spec: InlineSpec) => editInline(msg, n, spec) } : {}) } : {}),
               }}
               renderInline={(t, k) => <RichInline text={t} math keyBase={`cv-${el.key}-${k}`} />}
             />

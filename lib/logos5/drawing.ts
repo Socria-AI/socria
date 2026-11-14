@@ -48,7 +48,7 @@ export function drawingOf(map: Pick<ThinkingMap, 'nodes' | 'edges' | 'title' | '
 // ── a reply's diagram, onto the Logic Map ────────────────────────────
 
 /** What each of a reply's diagram views is as a shape of the map. */
-const SHAPE_OF: Record<DiagramSpec['view'], GrammarId> = { cycle: 'cycle', tree: 'hierarchy', flow: 'process', causes: 'causal' };
+const SHAPE_OF: Record<DiagramSpec['view'], GrammarId> = { cycle: 'cycle', tree: 'hierarchy', flow: 'process', causes: 'causal', mind: 'concept' };
 
 /** Where each of a causes diagram's parts sits — a fishbone's bones. */
 const CAUSE_GROUP: Record<string, string> = { underlying: 'Underlying causes', trigger: 'Trigger', amplifier: 'Made worse by', effect: 'Effect' };
@@ -71,6 +71,11 @@ export function drawingFromInline(spec: DiagramSpec): Drawing {
       const root = !into.has(n.id);
       return { ...base, type: 'entity', role: root ? 'whole' : 'part' };
     }
+    if (spec.view === 'mind') {
+      // the centre is the part nothing hangs it from; a link across a branch does not make a part a child
+      const root = !spec.edges.some((e) => e[1] === n.id && (!e[2] || e[2] === 'part'));
+      return { ...base, type: 'entity', role: root ? 'whole' : 'part' };
+    }
     if (spec.view === 'flow') {
       const start = !into.has(n.id), end = !outOf.has(n.id);
       return { ...base, type: 'step', role: start ? 'start' : end ? 'end' : 'step' };
@@ -79,8 +84,15 @@ export function drawingFromInline(spec: DiagramSpec): Drawing {
     return { ...base, type: r === 'effect' ? 'event' : 'state', role: r === 'effect' ? 'effect' : 'cause', group: CAUSE_GROUP[r] };
   });
   const relation: LogosRelation = spec.view === 'causes' ? 'causes' : spec.view === 'flow' ? 'precedes' : 'leads_to';
-  const edges: LogosEdge[] = spec.edges.map(([from, to]) =>
-    spec.view === 'tree' ? { from: id(to), to: id(from), relation: 'part_of' } : { from: id(from), to: id(to), relation }
+  // a mind map's branches hang parts under the centre (part of, pointing up as a tree's do); its links across keep
+  // their kind — causes, leads to, needs, relates to — as the map's own relations
+  const MIND_REL: Record<string, LogosRelation> = { causes: 'causes', leads: 'leads_to', needs: 'depends', relates: 'relates' };
+  const edges: LogosEdge[] = spec.edges.map(([from, to, rel]) =>
+    spec.view === 'tree' || (spec.view === 'mind' && (!rel || rel === 'part'))
+      ? { from: id(to), to: id(from), relation: 'part_of' }
+      : spec.view === 'mind'
+        ? { from: id(from), to: id(to), relation: MIND_REL[rel!] ?? 'relates' }
+        : { from: id(from), to: id(to), relation }
   );
   return { nodes, edges, kind, ...(spec.title ? { title: spec.title } : {}) };
 }

@@ -17,8 +17,15 @@
 // because parsing is where the bugs are and JSX cannot be tested by the
 // plain-node harness in test/. Everything below returns plain data.
 
-import { INLINE_KINDS, parseInlineSpec, type InlineSpec } from './inline-ui';
+import { INLINE_KINDS, parseEditSpec, parseInlineSpec, type EditSpec, type InlineSpec } from './inline-ui';
 import { hasMath, scanMath } from './tex-split';
+
+/** A finished ```ui block: the element it draws, or — not one — a change Socria made in place (lib/artifact-focus.ts). */
+function uiBlock(body: string, n: number): { kind: 'ui'; spec: InlineSpec | null; open: false; n: number; edit?: EditSpec } {
+  const spec = parseInlineSpec(body);
+  const edit = spec ? null : parseEditSpec(body);
+  return { kind: 'ui', spec, open: false, n, ...(edit ? { edit } : {}) };
+}
 
 /** One run of inline text, and what it is. */
 export interface Inline {
@@ -102,7 +109,7 @@ export type Block =
    * `n`, its position among the reply's inline blocks, which keys its state.
    * `open` while the reply is still writing it.
    */
-  | { kind: 'ui'; spec: InlineSpec | null; open: boolean; n: number; pending?: string }
+  | { kind: 'ui'; spec: InlineSpec | null; open: boolean; n: number; pending?: string; edit?: EditSpec }
   /**
    * A list read as labels and their text — never produced by parseBlocks
    * itself, only by Logos 5's editorial reading of a reply
@@ -712,7 +719,7 @@ function parseLines(text: string, opts: ReadOptions): Block[] {
     if (rich) {
       const one = lines[i].match(UI_ONE_LINE_RE);
       if (one) {
-        blocks.push({ kind: 'ui', spec: parseInlineSpec(one[1]), open: false, n: uiSeen++ });
+        blocks.push(uiBlock(one[1], uiSeen++));
         // what was run on after the closing fence is read as the line it would have been
         if (one[2].trim()) lines[i] = one[2];
         else i++;
@@ -756,7 +763,7 @@ function parseLines(text: string, opts: ReadOptions): Block[] {
         const uiArriving = open && 'ui'.startsWith(lang) && mayBeSpec(said);
         if (isUi || uiArriving) {
           const kind = open ? said.match(/"type"\s*:\s*"([a-z]+)"/)?.[1] : undefined;
-          blocks.push({ kind: 'ui', spec: open ? null : parseInlineSpec(body.join('\n')), open, n: uiSeen++, ...(kind ? { pending: kind } : {}) });
+          blocks.push(open ? { kind: 'ui', spec: null, open, n: uiSeen++, ...(kind ? { pending: kind } : {}) } : uiBlock(body.join('\n'), uiSeen++));
           continue;
         }
         const code = lead ? body.map((l) => l.replace(new RegExp(`^[ \\t]{0,${lead}}`), '')) : body;

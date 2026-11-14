@@ -15,3 +15,57 @@
 .logos-root .kp-body .ln {
   margin: 0;
 }
+
+/* ── The artifact's own workspace (Edit) ──────────────────────────────────────────────────────────────────
+   The artifact large, its controls beside it — below it on a narrow screen. Controls are quiet: small labels in
+   ink-60 over plain fields on a hairline, grouped under a small caps legend, never a stack of cards. */
+.logos-root .kp-edit-host { container-type: inline-size; }
+.logos-root .kp-edit { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); gap: 22px; align-items: start; }
+/* by the room it has, not the screen: beside the board, in a split, on a phone — under 760px the controls go below */
+@container (max-width: 760px) {
+  .logos-root .kp-edit { grid-template-columns: minmax(0, 1fr); }
+  .logos-root .kp-edit-panel { position: static; max-height: none; padding-left: 0; border-left: 0; border-top: 1px solid var(--dsp-line, rgba(35, 36, 31, 0.12)); padding-top: 14px; }
+}
+@media (max-width: 860px) { .logos-root .kp-edit { grid-template-columns: minmax(0, 1fr); } }
+.logos-root .kp-edit-panel { position: sticky; top: 8px; max-height: calc(100vh - 160px); overflow: auto; padding-left: 18px; border-left: 1px solid var(--dsp-line, rgba(35, 36, 31, 0.12)); }
+@media (max-width: 860px) { .logos-root .kp-edit-panel { position: static; max-height: none; padding-left: 0; border-left: 0; border-top: 1px solid var(--dsp-line, rgba(35, 36, 31, 0.12)); padding-top: 14px; } }
+.logos-root .kp-ask { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--dsp-line, rgba(35, 36, 31, 0.12)); }
+.logos-root .kp-ask-row { display: flex; gap: 6px; margin-top: 4px; }
+.logos-root .kp-ask-row input { flex: 1; min-width: 0; font: inherit; font-size: 13.5px; padding: 7px 10px; border: 1px solid var(--dsp-line, rgba(35, 36, 31, 0.18)); border-radius: 8px; background: transparent; color: inherit; }
+.logos-root .kp-ask-row input:focus-visible { outline: 2px solid var(--dsp-primary, #354620); outline-offset: 1px; }
+.logos-root .kp-saving, .logos-root .kp-note { margin: 10px 0 0; font-size: 12.5px; color: var(--lg-ink-60, #6b6b63); }
+.logos-root .kp-versions { margin: 0 0 14px; padding: 10px 0; border-top: 1px solid var(--dsp-line, rgba(35, 36, 31, 0.12)); border-bottom: 1px solid var(--dsp-line, rgba(35, 36, 31, 0.12)); }
+.logos-root .kp-versions ol { margin: 0; padding: 0; list-style: none; max-height: 220px; overflow: auto; }
+.logos-root .kp-versions li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 3px 0; }
+.logos-root .kp-versions li button { font: inherit; font-size: 13.5px; text-align: left; color: var(--lg-ink, #23241f); background: none; border: 0; padding: 2px 0; cursor: pointer; }
+.logos-root .kp-versions li button:hover { color: var(--dsp-primary, #354620); }
+.logos-root .kp-versions li.is-on button { font-weight: 600; color: var(--dsp-primary, #354620); }
+.logos-root .kp-versions li.is-on button::before { content: '● '; font-size: 9px; vertical-align: 2px; }
+.logos-root .kp-v-meta { font-size: 12px; color: var(--lg-ink-40, #9a9a90); }
+.logos-root .kp-v-note { margin: 8px 0 0; font-size: 12.5px; color: var(--lg-ink-60, #6b6b63); }
+.logos-root .kp-export { position: relative; display: inline-flex; }
+.logos-root .kp-export-menu { position: absolute; top: 100%; right: 0; z-index: 5; display: grid; min-width: 150px; padding: 4px; background: var(--l5-surface, var(--lg-paper, #fbfaf6)); border: 1px solid var(--dsp-line, rgba(35, 36, 31, 0.14)); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08); }
+.logos-root .kp-export-menu button { font: inherit; font-size: 13.5px; text-align: left; padding: 7px 10px; background: none; border: 0; border-radius: 6px; cursor: pointer; color: inherit; }
+.logos-root .kp-export-menu button:hover { background: var(--dsp-tint, rgba(53, 70, 32, 0.06)); }
+
+/* the controls (components/display/SpecEditor.tsx) */
+.logos-root .se { display: grid; gap: 10px; }
+.logos-root .se-group { margin: 0; padding: 8px 0 0; border: 0; border-top: 1px solid var(--dsp-line, rgba(35, 36, 31, 0.1)); display: grid; gap: 6px; }
+.logos-root .se-group legend { padding: 0 0 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--lg-ink-60, #6b6b63); }
+.logos-root .se-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 8px; }
+.logos-root .se-step { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 4px 8px; padding: 6px 0; border-bottom: 1px dotted var(--dsp-line, rgba(35, 36, 31, 0.12)); }
+.logos-root .se-step > :not(.se-step-n) { grid-column: 2; }
+.logos-root .se-step-n { grid-row: 1 / span 4; font-size: 12px; color: var(--lg-ink-40, #9a9a90); font-variant-numeric: tabular-nums; padding-top: 18px; }
+.logos-root .se-field { display: grid; gap: 2px; min-width: 64px; flex: 1 1 72px; }
+.logos-root .se-field.is-wide { flex: 3 1 180px; }
+.logos-root .se-k { font-size: 11.5px; color: var(--lg-ink-60, #6b6b63); }
+.logos-root .se-field input, .logos-root .se-field select { font: inherit; font-size: 13.5px; padding: 5px 7px; border: 1px solid var(--dsp-line, rgba(35, 36, 31, 0.18)); border-radius: 6px; background: transparent; color: inherit; min-width: 0; width: 100%; }
+.logos-root .se-field input.is-mono { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 12.5px; }
+.logos-root .se-field input:focus-visible, .logos-root .se-field select:focus-visible { outline: 2px solid var(--dsp-primary, #354620); outline-offset: 1px; }
+.logos-root .se-check { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--lg-ink-70, #4a4a44); padding-bottom: 6px; }
+.logos-root .se-x { font: inherit; font-size: 16px; line-height: 1; width: 28px; height: 30px; color: var(--lg-ink-40, #9a9a90); background: none; border: 0; border-radius: 6px; cursor: pointer; }
+.logos-root .se-x:hover { color: var(--lg-ink, #23241f); background: var(--dsp-tint, rgba(53, 70, 32, 0.06)); }
+.logos-root .se-add { justify-self: start; font: inherit; font-size: 13px; color: var(--dsp-primary, #354620); background: none; border: 0; padding: 4px 0; cursor: pointer; }
+.logos-root .se-add:disabled { color: var(--lg-ink-40, #9a9a90); cursor: default; }
+.logos-root .se-problem { margin: 0; font-size: 12.5px; color: #8a4b12; }
+.logos-root .se-none { margin: 0; font-size: 13.5px; color: var(--lg-ink-60, #6b6b63); }

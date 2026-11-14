@@ -40,3 +40,16 @@ export { listLine, isTableRule, bulletBlock } from '@/lib/rich-text';
 export * from '@/lib/inline-diagram';
 export { InlineSafe, InlineFallback } from '@/components/inline/InlineUI';
 export { fmtNum } from '@/lib/objects/display-data';
+// Logos 6 artifacts: the edit engine, the mind map's layout, the kept element's history (lib/artifact-edit.ts,
+// lib/inline-diagram.ts, lib/objects/display-kept.ts over lib/objects/core.ts)
+export * from '@/lib/artifact-edit';
+export { mindLayout, mindRows, defaultFolds, wrapLabel, REL_SAID } from '@/lib/inline-diagram';
+export { readKeptEdit } from '@/lib/objects/display-kept';
+export { create as createObject, apply as applyObjectStep, seek as seekObject, currentOf, sanitizeSpace } from '@/lib/objects/core';
+// the artifact's editor (components/display/SpecEditor.tsx) and whose words a kept element hears (lib/objects readOperation)
+export { SpecEditor } from '@/components/display/SpecEditor';
+export { readOperation } from '@/lib/objects';
+// Socria's changes made in place (lib/artifact-focus.ts): what asks for one, what it is about, the gate, the landing
+export * from '@/lib/artifact-focus';
+// an artifact looked over before it is shown (lib/artifact-qa.ts)
+export * from '@/lib/artifact-qa';

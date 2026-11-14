@@ -74,8 +74,8 @@ console.log('\n=== the Keep button ===');
   ok('where nothing can be kept (no workspace, someone else’s line), no button', !/ln-keep/.test(R(GRAPH, { live: true, onState: () => {} })));
   const app = read('components/LogosApp.tsx');
   ok('the app: a larger form if there is one, else kept as it was left, from this reply (Socria made it; the footer says so)', /artifactFromSpec\(spec\) \?\? \(kept \? \{ kind: 'kept'/.test(app) && /keptFrom\(spec, msg\.ui\?\.\[String\(n\)\], \{ session: activeIdRef\.current \?\? undefined, message: msg\.id, said: replyOpening\(msg\.content\)/.test(app) && /makeDisplay\(space, a\.kind, a\.state, 'socria'\)/.test(app));
-  ok('…pressed again, what was kept opens (no second copy)', /const had = msg\.ui\?\.\[String\(n\)\]\?\.artifact;\s*if \(had && objOf\(space, had\)\) return showObject\(had\);/.test(app));
-  ok('drawn in Artifacts by the same component, live, with where it came from', /registerFigure\('kept', KeptFigure\)/.test(read('components/display/register.tsx')) && /<InlineBlock spec=\{s\.spec\}/.test(read('components/display/KeptFigure.tsx')) && /Kept from the conversation/.test(read('components/display/KeptFigure.tsx')) && /d\.act\('state', \{ state: JSON\.stringify\(st\) \}\)/.test(read('components/display/KeptFigure.tsx')));
+  ok('…pressed again, what was kept opens (no second copy)', /const had = msg\.ui\?\.\[String\(n\)\]\?\.artifact;\s*if \(had && objOf\(space, had\)\) (?:return showObject\(had\);|\{\s*if \(how\?\.edit\) requestEdit\(had\);\s*return showObject\(had\);\s*\})/.test(app));
+  ok('drawn in Artifacts by the same component, live, with where it came from', /registerFigure\('kept', KeptFigure\)/.test(read('components/display/register.tsx')) && /<InlineBlock spec=\{(?:s\.spec|shown)\}/.test(read('components/display/KeptFigure.tsx')) && /Kept from the conversation/.test(read('components/display/KeptFigure.tsx')) && /d\.act\('state', \{ state: JSON\.stringify\(st\) \}\)/.test(read('components/display/KeptFigure.tsx')));
 }
 
 console.log('\n=== the three new shapes are kept too ===');

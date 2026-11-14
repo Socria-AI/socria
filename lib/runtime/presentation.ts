@@ -171,7 +171,7 @@ export interface PresentationInput {
 
 export type ReplyShape = 'open' | 'deeper' | 'layer' | 'understand' | 'practical';
 export type GraphVariant = 'plot' | 'curve' | 'rate' | 'tangent' | 'market' | 'point' | 'limit' | 'area' | 'monopoly';
-export type DiagramVariant = 'cycle' | 'tree' | 'flow' | 'causes';
+export type DiagramVariant = 'cycle' | 'tree' | 'flow' | 'causes' | 'mind';
 
 /**
  * HOW THE TURN'S EXPLANATION IS REPRESENTED — the allocation's third question, after who thinks and how the reply
@@ -439,6 +439,9 @@ const FORCES_ASK = /\b(?:forces?\s+(?:on|acting|diagram)|free[- ]body|net\s+forc
 const ALGO_ASK = /\b(?:(?:a\s+|the\s+)?(?:stack|queue)s?\b(?!\s+(?:overflow|exchange|trace|of\s+(?:paper|books|cards)))|(?:bubble|insertion|selection|merge|quick|heap|counting|radix)\s*sort|sorting\s+algorithm|binary\s+search|linear\s+search|two[- ]pointers?|sliding\s+window|(?:breadth|depth)[- ]first\s+search|bfs|dfs|dijkstra|euclid(?:'s|ean)?\s+algorithm|stack\s+(?:push|pop)|push\s+and\s+pop|queue\s+(?:enqueue|dequeue)|fibonacci\s+(?:with|using)\s+dynamic|dynamic\s+programming)\b/i;
 const ALGO_HOW = /\b(?:how\s+(?:does|do|is)|walk\s+(?:me\s+)?through|step\s+(?:by|through)|trace|show\s+(?:me\s+)?(?:how|the\s+steps)|explain|visuali[sz]e|work(?:s)?)\b/i;
 
+/** A subject to see whole: a mind map asked for, or how its parts fit together. */
+const MIND_ASK = /\b(?:mind[- ]?map|concept[- ]map|map\s+(?:out|it\s+out)|(?:the\s+)?(?:big|whole)\s+picture\s+of|how\s+(?:do|does)\s+[^?]{3,80}?\s+(?:all\s+)?(?:fit|connect|relate|tie)\s+(?:together|to\s+each\s+other))\b/i;
+
 /** Consumer or producer surplus: an area between demand and a price. */
 const SURPLUS_ASK = /\b(?:consumer|producer)\s+surplus\b/i;
 
@@ -692,12 +695,17 @@ export function planPresentation(i: PresentationInput): Presentation {
   // never in place of a list asked for, and never beside a graph or a simulation that already shows the idea.
   const shown = offered.includes('graph') || offered.includes('sim') || offered.includes('slider');
   const reading = !i.guard && !listAsked && x.kind !== 'brainstorm';
-  if (parts && reading && !shown && understanding) {
+  // (a subject asked for whole, as a map, is the mind map's below: its parts are the map's branches, not a second element)
+  if (parts && reading && !shown && understanding && !MIND_ASK.test(t)) {
     if (parts === 'types') offer('concepts', 'concepts:types');
     else if (offer('diagram', `diagram:${DIAGRAM_OF[parts]}`)) reasons.push(`parts:${parts}`);
   }
+  // a subject to see whole — asked for as a map, or how its parts fit together: a mind map, its centre and branches
+  // first, the rest folded until opened (not where a picture or a decision already carries it)
+  const mindPlan = reading && !own && !shown && !offered.includes('diagram') && !offered.includes('decide') && MIND_ASK.test(t) && work !== 'creation';
+  if (mindPlan) offer('diagram', 'diagram:mind', 'strong');
   // the parts of a subject, to explore one at a time — an overview, not a list of terms and definitions
-  if (reading && !own && !NOT_READING.has(work) && (OVERVIEW.test(t) || FIELD.test(raw))) offer('concepts', 'concepts:overview');
+  else if (reading && !own && !NOT_READING.has(work) && (OVERVIEW.test(t) || FIELD.test(raw))) offer('concepts', 'concepts:overview');
   // events whose order is the point (not under the guard: the gate would drop it, lib/inline-ui.ts) — a
   // timeline asked for by name is the form that fits; a history may be told as a story, so it is offered
   // a timeline of their own events ("what happened in the meeting?") is theirs: Socria was not there
@@ -760,7 +768,7 @@ export function planPresentation(i: PresentationInput): Presentation {
     reasons: reasons.length ? reasons : ['nothing-fits'],
     ...(shape ? { shape } : {}),
     ...(graph && forms.includes('graph') ? { graph } : {}),
-    ...(parts && parts !== 'types' && forms.includes('diagram') ? { diagram: DIAGRAM_OF[parts] } : {}),
+    ...(reasons.includes('diagram:mind') && forms.includes('diagram') ? { diagram: 'mind' as const } : parts && parts !== 'types' && forms.includes('diagram') ? { diagram: DIAGRAM_OF[parts] } : {}),
     ...(fits.length ? { strong: fits } : {}),
     ...(shape === 'understand' && (FULL_DEPTH.test(t) || i.length === 'detailed') ? { depth: true, ...(FULL_DEPTH.test(t) ? {} : { depthFromLength: true }) } : {}),
     ...(i.guard ? { guard: true } : {}),
@@ -920,6 +928,8 @@ const GRAPH_GRAMMAR: Record<GraphVariant, string> = {
  */
 const DIAGRAM_TAIL = ' 3–9 nodes, labels a few words, "detail" a line read when opened. Your prose: one sentence on what ties them together; the nodes carry the parts — do not also list them.';
 const DIAGRAM_GRAMMAR: Record<DiagramVariant, string> = {
+  mind:
+    '{"type":"diagram","view":"mind","title":"How a cell makes energy","nodes":[{"id":"c","label":"Cellular respiration"},{"id":"g","label":"Glycolysis","detail":"glucose split in the cytoplasm"},{"id":"k","label":"Krebs cycle"},{"id":"e","label":"Electron transport"},{"id":"g1","label":"2 ATP"},{"id":"k1","label":"CO₂ released"},{"id":"e1","label":"Most of the ATP"},{"id":"o","label":"Oxygen"}],"edges":[["c","g"],["c","k"],["c","e"],["g","g1"],["k","k1"],["e","e1"],["e","o"],["g","k","leads"],["o","e","needs"]]} — a mind map: one centre (the first node), every other node hanging from exactly one parent ("edges" [parent, child]), four levels at most, 6–24 nodes; links across the branches are a third word — "causes", "leads" (in sequence), "needs" (depends on) or "relates" — a few at most. Labels a few words; "detail" a line, read when the part is opened. A large map is folded below its first levels automatically: give it the parts it needs, not every part there is. Your prose: what ties it together, in a sentence or two — the map carries the parts; do not list them.',
   cycle:
     '{"type":"diagram","view":"cycle","title":"A habit loop","nodes":[{"id":"a","label":"Cue","detail":"the trigger that starts it"},{"id":"b","label":"Craving"},{"id":"c","label":"Response"},{"id":"d","label":"Reward"}],"edges":[["a","b"],["b","c"],["c","d"],["d","a"]]} — a cycle: each stage to the next, and the last back to the first (if it does not come back, "view":"flow").' + DIAGRAM_TAIL,
   tree:

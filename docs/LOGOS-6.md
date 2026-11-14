@@ -4,6 +4,7 @@ This is the system document for Logos 6.
 
 - **The plan** is `docs/LOGOS-6-PLAN.md`: why, what to measure, and the decisions it rests on.
 - **This document** covers what is in the code now, where it lives, how to switch it, and what was deliberately left for later.
+- **Artifacts** (mind maps, the editor, one identity across the conversation and Artifacts, changes made in place, visual QA) are in `docs/LOGOS-6-ARTIFACTS.md`.
 
 Approved on 13 November 2026 as "all phases, to the dev branch". The plan's §10 recommendations were taken as the defaults:
 
