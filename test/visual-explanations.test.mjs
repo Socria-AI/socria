@@ -172,5 +172,76 @@ console.log('\n=== streaming: never a half-made picture ===');
   ok('complete, it is drawn', /ln-graph/.test(html(h(I.RichText, { rich: true, text: full }))));
 }
 
+console.log('\n=== every example Socria is shown is itself a valid picture ===');
+{
+  // the formats in the turn's instructions are copied by the model: an example the validator would refuse teaches a refusal
+  const examplesIn = (text) => {
+    const out = [];
+    for (let at = text.indexOf('{"type"'); at >= 0; at = text.indexOf('{"type"', at + 1)) {
+      let d = 0, str = false, esc = false, end = -1;
+      for (let i = at; i < text.length; i++) {
+        const ch = text[i];
+        if (str) { if (esc) esc = false; else if (ch === '\\') esc = true; else if (ch === '"') str = false; continue; }
+        if (ch === '"') str = true;
+        else if (ch === '{') d++;
+        else if (ch === '}' && --d === 0) { end = i; break; }
+      }
+      if (end > at) out.push(text.slice(at, end + 1));
+    }
+    return out;
+  };
+  const asks = ['A function approaches 2 as x approaches 1, but f(1) = 3. What is the limit and why is it not 3?', 'how do Riemann sums approximate the integral of x^2 from 0 to 2?', 'explain consumer surplus', 'how does a monopoly choose its price and quantity?', 'how does a tax shift supply and demand?', 'explain derivatives as the slope of a tangent line', 'what is the mean value theorem?', 'how does elasticity change along a demand curve?', 'what is the net force on a box pulled at 30 degrees with friction?', 'how does binary search work?', 'explain how a parabola changes when you change a, b and c', 'why does a thrown ball follow a curve?'];
+  let seen = 0;
+  const bad = [];
+  for (const text of asks) {
+    for (const ex of examplesIn(I.renderPresentation(plan(text)))) {
+      seen++;
+      let parsed = null;
+      try { parsed = JSON.parse(ex); } catch { bad.push(`unparseable: ${ex.slice(0, 80)}`); continue; }
+      if (!S(parsed)) bad.push(`refused: ${ex.slice(0, 120)}`);
+    }
+  }
+  ok(`${seen} example formats across the visual cases, every one valid`, seen >= 10 && bad.length === 0, J(bad));
+}
+
+console.log('\n=== adapting to the person, and asking plainly ===');
+{
+  ok('an expert, in their own words, gets the limit in notation — no picture unless they ask to see it', !plan("I'm a mathematician — what is the limit of (x^2-1)/(x-1) as x approaches 1?").forms.includes('graph') && I.routeTurn({ text: "I'm a mathematician — show me the graph of (x^2-1)/(x-1) near x = 1" }).intent === 'visual');
+  // (asked to be shown, it is drawn in the workspace beside the conversation: the route's visual intent, as before)
+  ok('…and the same question from anyone else gets the graph', plan('what is the limit of (x^2-1)/(x-1) as x approaches 1?').graph === 'limit');
+  ok('asked as plainly as "what is the limit?", the acceptance case still gets its graph', plan('A function approaches 2 as x approaches 1, but f(1) = 3. What is the limit?').graph === 'limit');
+  ok('a stack or a queue, asked how it works: its states to step through', plan('how does a stack work?').forms.includes('trace') && !plan('what is a stack overflow error?').forms.includes('trace'));
+}
+
+console.log('\n=== when a picture cannot be drawn, it is said in words ===');
+{
+  // the client wraps every element in InlineSafe; what it shows when drawing throws is InlineFallback (an error
+  // boundary does not run in server rendering, so the fallback itself is what is held down here)
+  const V = S({ type: 'vectors', title: 'Box', unit: 'N', vectors: [{ label: 'pull', mag: 20, angle: 0 }, { label: 'friction', mag: 12, angle: 180 }], params: [] });
+  const T = S({ type: 'trace', title: 'Search', steps: [{ cells: [1, 2], note: 'look at 1' }, { cells: [1, 2], note: 'found 2' }] });
+  const G = S({ type: 'graph', expr: 'x+1', x: [-1, 3], params: [], points: [{ x: 1, y: 2, open: true }, { x: 1, y: 3 }] });
+  ok('forces, in words: each force and their sum', /pull 20 N at 0°; friction 12 N at 180°/.test(html(h(I.InlineFallback, { spec: V }))) && /their sum: 8 N at 0°/.test(html(h(I.InlineFallback, { spec: V }))));
+  ok('a trace, in words: every step', /1\. \[1, 2\] — look at 1/.test(html(h(I.InlineFallback, { spec: T }))) && /2\. \[1, 2\] — found 2/.test(html(h(I.InlineFallback, { spec: T }))));
+  ok('a limit graph, in words: the hole and the value', /open circle[^<]*\(1, 2\)[^<]*filled point at \(1, 3\)/.test(html(h(I.InlineFallback, { spec: G }))));
+  const ui = readFileSync('components/inline/InlineUI.tsx', 'utf8');
+  ok('every element is drawn inside the boundary that falls back to words', /<InlineSafe spec=\{spec\}>/.test(ui) || /InlineSafe/.test(ui.split('export function InlineBlock')[1]?.slice(0, 2000) ?? ''));
+}
+
+console.log('\n=== the comparison with text alone (evals/visual) ===');
+{
+  const { SCENARIOS } = await import('../evals/visual/scenarios.mjs');
+  const miss = [];
+  for (const sc of SCENARIOS) {
+    const p = plan(sc.user);
+    if (sc.expect.form && !p.forms.includes(sc.expect.form)) miss.push(`${sc.id} form`);
+    if (sc.expect.graph && p.graph !== sc.expect.graph) miss.push(`${sc.id} graph`);
+    if (sc.expect.noForm && p.forms.includes(sc.expect.noForm)) miss.push(`${sc.id} noForm`);
+    if (sc.expect.repr && p.repr !== sc.expect.repr) miss.push(`${sc.id} repr ${p.repr}`);
+    const blocks = [...sc.reply.matchAll(/```ui\n([\s\S]*?)```/g)].map((m) => S(JSON.parse(m[1])));
+    if (sc.invalid ? blocks.some(Boolean) : blocks.some((b) => !b)) miss.push(`${sc.id} reply block`);
+  }
+  ok(`the ${SCENARIOS.length} scenarios choose as they say, and their replies' pictures validate (the invalid one is refused)`, miss.length === 0, J(miss));
+}
+
 console.log(`\nvisual explanations: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

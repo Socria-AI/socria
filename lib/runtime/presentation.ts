@@ -436,7 +436,7 @@ const MONOPOLY_ASK = /\b(?:monopol\w+|marginal\s+revenue|mr\s*=\s*mc|price[- ]se
 /** Forces on a body: what pushes and pulls, and what they add up to. */
 const FORCES_ASK = /\b(?:forces?\s+(?:on|acting|diagram)|free[- ]body|net\s+force|resultant|vectors?\s+(?:add|sum|addition|components?)|add(?:ing)?\s+(?:two\s+|the\s+|these\s+)?vectors|(?:tension|normal\s+force|friction)\b[^.?!]{0,60}\b(?:force|block|box|incline|slope|rope)|inclined?\s+plane|equilibrium\s+of\s+forces|(?:balanced|unbalanced)\s+forces|newton'?s\s+(?:first|second|third)\s+law)\b/i;
 /** An algorithm worked through: the steps it takes on some data. */
-const ALGO_ASK = /\b(?:(?:bubble|insertion|selection|merge|quick|heap|counting|radix)\s*sort|sorting\s+algorithm|binary\s+search|linear\s+search|two[- ]pointers?|sliding\s+window|(?:breadth|depth)[- ]first\s+search|bfs|dfs|dijkstra|euclid(?:'s|ean)?\s+algorithm|stack\s+(?:push|pop)|push\s+and\s+pop|queue\s+(?:enqueue|dequeue)|fibonacci\s+(?:with|using)\s+dynamic|dynamic\s+programming)\b/i;
+const ALGO_ASK = /\b(?:(?:a\s+|the\s+)?(?:stack|queue)s?\b(?!\s+(?:overflow|exchange|trace|of\s+(?:paper|books|cards)))|(?:bubble|insertion|selection|merge|quick|heap|counting|radix)\s*sort|sorting\s+algorithm|binary\s+search|linear\s+search|two[- ]pointers?|sliding\s+window|(?:breadth|depth)[- ]first\s+search|bfs|dfs|dijkstra|euclid(?:'s|ean)?\s+algorithm|stack\s+(?:push|pop)|push\s+and\s+pop|queue\s+(?:enqueue|dequeue)|fibonacci\s+(?:with|using)\s+dynamic|dynamic\s+programming)\b/i;
 const ALGO_HOW = /\b(?:how\s+(?:does|do|is)|walk\s+(?:me\s+)?through|step\s+(?:by|through)|trace|show\s+(?:me\s+)?(?:how|the\s+steps)|explain|visuali[sz]e|work(?:s)?)\b/i;
 
 /** Consumer or producer surplus: an area between demand and a price. */
@@ -625,14 +625,19 @@ export function planPresentation(i: PresentationInput): Presentation {
   // which picture the idea needs: the asked plot first; then the idea's own construction — a hole and a value for a
   // limit, an area or its rectangles for an integral, marginal revenue against cost for a price-setter, a surplus
   // between demand and price — before the general ones
-  const variant: GraphVariant | null = plotted ? 'plot' : limitAsk ? 'limit' : areaAsk ? 'area' : monopoly ? 'monopoly' : rate ? (AVERAGE_RATE.test(t) ? 'rate' : 'tangent') : market ? 'market' : elastic ? 'point' : mathRel ? 'curve' : null;
+  // an expert (in their own words: "I'm a mathematician") asking about the idea gets it in notation, compactly — the
+  // picture a beginner is shown is in their way — unless they asked to see it. A plot they asked for is still drawn.
+  const compact = i.signals.expertise === 'expert' && !/\b(?:plot|graph|draw|sketch|show|visuali[sz]e|picture|diagram|see)\b/i.test(t);
+  const variant: GraphVariant | null = plotted ? 'plot' : compact ? null : limitAsk ? 'limit' : areaAsk ? 'area' : monopoly ? 'monopoly' : rate ? (AVERAGE_RATE.test(t) ? 'rate' : 'tangent') : market ? 'market' : elastic ? 'point' : mathRel ? 'curve' : null;
   let graph: GraphVariant | undefined;
   // (not where steps were asked for: the steps are the answer, and a second picture of the same thing is not)
   // (and never on a problem they are working or a proof: "prove by induction that 1 + 2 + … + n = n(n+1)/2" has
   // an equals sign, not a curve to see — the working is the answer there)
   const proving = /\b(?:prove|proof|induction|show\s+that)\b/i.test(t);
   const liveOk = !tender && !story;
-  if (variant && liveOk && !namedLaw && work !== 'creation' && work !== 'diagnosis' && (work !== 'verification' || /\b(?:plot|graph|draw|sketch|show)\b/i.test(t)) && (plotted || (work !== 'practice' && !proving)) && x.kind !== 'brainstorm' && !claim && !comparing && (plotted || !STEPS_ASK.test(t)) && (plotted || understanding || WHY_HOW.test(t) || FORMULA.test(t))) {
+  if (variant && liveOk && !namedLaw && work !== 'creation' && work !== 'diagnosis' && (work !== 'verification' || /\b(?:plot|graph|draw|sketch|show)\b/i.test(t)) && (plotted || (work !== 'practice' && !proving)) && x.kind !== 'brainstorm' && !claim && !comparing && (plotted || !STEPS_ASK.test(t)) && (plotted || understanding || WHY_HOW.test(t) || FORMULA.test(t) || variant === 'limit' || (variant === 'area' && /\b(?:riemann|surplus|area\s+under)\b/i.test(t)))) {
+    // (a limit is what a curve approaches against what it takes: asked as plainly as "what is the limit?", the picture
+    // is the explanation — and so are rectangles under a curve, and a surplus)
     if (offer('graph', `graph:${variant}`)) graph = variant;
   }
   // motion, or something that unfolds in time, asked why or how: one small simulation to try

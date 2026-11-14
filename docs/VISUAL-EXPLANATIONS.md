@@ -39,7 +39,9 @@ The allocation decides who thinks and how the reply meets them. The planner then
 | "how does binary search work", "walk me through bubble sort" | trace |
 | a capital city, a greeting, "speed limit", "upload limit", thanks, a unit conversion | text: nothing drawn |
 
-Beginners and experts: the planner already folds an expert's reply to a single move and leaves the graph out where steps were asked for. Nothing here changes that.
+**Beginners and experts.** Someone who says they are an expert ("I'm a mathematician") gets the idea in notation, without a picture, unless they ask to see it. Asked to be shown, it is drawn in the workspace. Everyone else gets the picture. The planner already folded an expert's reply to a single move and left the graph out where steps were asked for.
+
+**Asked plainly.** A limit is what a curve approaches against the value it takes, so "…what is the limit?" gets its picture as surely as "why is it not 3?" does. Riemann sums and surplus are treated the same way. A stack or a queue, asked how it works, gets its states to step through.
 
 ## 3. The acceptance case
 
@@ -75,9 +77,25 @@ Beginners and experts: the planner already folds an expert's reply to a single m
 
 **Under the Answer Guard,** forces and traces are refused, since they would be the worked answer. Points and areas are drawn without their numbers. Graphs, simulations, forces and traces count as live elements, and a reply carries at most one.
 
-## 5. Tested
+## 5. Against text only
 
-- `test/visual-explanations.test.mjs`, 72 checks:
+`evals/visual/run.mjs` sends 13 cases from this brief through the real route twice: text only (`LOGOS_INLINE=off`) and visual.
+
+| Offline result (`evals/visual/results/offline-2026-11-14.md`) | |
+|---|---|
+| Representation as each case expects | 13 of 13 |
+| Turns given a picture | 10 of 13: a fact, small talk and the expert get none |
+| A valid picture reaches the person intact through the gate | in every visual case; never in the text arm |
+| An invalid picture | refused; its prose reaches them alone |
+| Model calls per turn | 1 in both arms: none added |
+| Cost of the offer | about 1,100 prompt characters (≈ 270 tokens) a turn on average, at most 1,850, all in the per-turn note (the cached system message is unchanged) |
+| Route time with an instant model | about the same in both arms (11 ms median) |
+
+The live mode saves blind pairs for readers. None has been read, so no claim is made about understanding.
+
+## 6. Tested
+
+- `test/visual-explanations.test.mjs`, 82 checks:
   - the planner across the brief's scenarios, including those that must get nothing;
   - the acceptance case, including its three refusals, the readings, the history text and the Answer Guard;
   - derivative slopes, Riemann totals for each rule, and convergence;
@@ -86,14 +104,19 @@ Beginners and experts: the planner already folds an expert's reply to a single m
   - trace validation, rendering and keyboard;
   - refusal of an unreadable formula, of code, and of chart figures that are not in what the person gave;
   - one live element per reply;
-  - a half-streamed block, which draws nothing and shows none of its JSON.
+  - a half-streamed block, which draws nothing and shows none of its JSON;
+  - every example format Socria is shown validates;
+  - the expert rule, the plain limit question, the stack trace;
+  - each new element said in words when it cannot be drawn;
+  - the comparison's scenarios.
 - The existing graph, inline, presentation and explanation suites pass unchanged, as does the full suite.
 - In the browser (Chromium, the production build, desktop 1440 × 900 and an iPhone-sized 390 × 844): the limit graph, Riemann rectangles, forces and a trace, in the real conversation, with no page errors.
 
-## 6. Limits
+## 7. Limits
 
 - **Comprehension is not measured.** Nothing here shows that people understand more from these pictures than from text. A blind comparison needs a live model and readers, as in the engagement evaluation.
-- **"Draw a free body diagram" is not caught.** A request to draw goes to the workspace's own drawing. The forces element is offered when someone asks about forces, not when they ask for a drawing.
+- **"Draw a free body diagram" goes to the workspace.** Requests to draw or be shown something go to the workspace's own picture beside the conversation, as they did before. The forces element is offered inline when someone asks about forces. Offering both would draw the same thing twice.
+- **Error boundaries run only in the browser.** A component that throws falls back to words there (`InlineSafe`). Server rendering cannot exercise that, so the tests hold down the fallback text instead.
 - **Uploaded diagrams are not reconstructed.** Existing behaviour holds: a chart of "their" figures that are not in what they gave is refused, with a line saying so. Reading a screenshot of a graph back into an exact picture is not built.
 - **Some brief items are not separate elements.** Circuits, state machines and system architecture are drawn with the existing diagram views (flow, cycle, tree), not as new kinds. Argument maps and concept networks remain the claim and concept elements and the Logic Map.
 - **A trace is only as right as its steps.** It shows exactly what the reply wrote. The format asks the model to work every step out first, but the states are not re-executed.
