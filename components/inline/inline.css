@@ -2381,19 +2381,19 @@ html[data-theme="night"] .logos-root .ln:is(.ln-graph, .ln-sim, .ln-chart) {
 @media (pointer: fine) {
   .logos-root .ln-graph .ln-var.is-dup { display: none; }
 }
-.logos-root .ln:is(.ln-graph, .ln-sim) .ln-var-k { font-size: 13px; color: var(--ln-ink-60); }
-.logos-root .ln:is(.ln-graph, .ln-sim) input[type="range"] {
+.logos-root .ln:is(.ln-graph, .ln-sim, .ln-vectors) .ln-var-k { font-size: 13px; color: var(--ln-ink-60); }
+.logos-root .ln:is(.ln-graph, .ln-sim, .ln-vectors, .ln-trace) input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   height: 26px;
   background: transparent;
 }
-.logos-root .ln:is(.ln-graph, .ln-sim) input[type="range"]::-webkit-slider-runnable-track {
+.logos-root .ln:is(.ln-graph, .ln-sim, .ln-vectors, .ln-trace) input[type="range"]::-webkit-slider-runnable-track {
   height: 2px;
   border-radius: 2px;
   background: color-mix(in srgb, var(--ln-ink) 18%, transparent);
 }
-.logos-root .ln:is(.ln-graph, .ln-sim) input[type="range"]::-webkit-slider-thumb {
+.logos-root .ln:is(.ln-graph, .ln-sim, .ln-vectors, .ln-trace) input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 14px;
   height: 14px;
@@ -2403,17 +2403,17 @@ html[data-theme="night"] .logos-root .ln:is(.ln-graph, .ln-sim, .ln-chart) {
   background: var(--ln-primary);
   box-shadow: 0 0 0 1px rgba(var(--ln-tint), 0.35);
 }
-.logos-root .ln:is(.ln-graph, .ln-sim) input[type="range"]::-moz-range-track {
+.logos-root .ln:is(.ln-graph, .ln-sim, .ln-vectors, .ln-trace) input[type="range"]::-moz-range-track {
   height: 2px;
   border-radius: 2px;
   background: color-mix(in srgb, var(--ln-ink) 18%, transparent);
 }
-.logos-root .ln:is(.ln-graph, .ln-sim) input[type="range"]::-moz-range-progress {
+.logos-root .ln:is(.ln-graph, .ln-sim, .ln-vectors, .ln-trace) input[type="range"]::-moz-range-progress {
   height: 2px;
   border-radius: 2px;
   background: var(--ln-primary);
 }
-.logos-root .ln:is(.ln-graph, .ln-sim) input[type="range"]::-moz-range-thumb {
+.logos-root .ln:is(.ln-graph, .ln-sim, .ln-vectors, .ln-trace) input[type="range"]::-moz-range-thumb {
   width: 10px;
   height: 10px;
   border: 2px solid var(--ln-ground);
@@ -2421,11 +2421,11 @@ html[data-theme="night"] .logos-root .ln:is(.ln-graph, .ln-sim, .ln-chart) {
   background: var(--ln-primary);
   box-shadow: 0 0 0 1px rgba(var(--ln-tint), 0.35);
 }
-.logos-root .ln:is(.ln-graph, .ln-sim) input[type="range"]:focus-visible {
+.logos-root .ln:is(.ln-graph, .ln-sim, .ln-vectors, .ln-trace) input[type="range"]:focus-visible {
   outline: 2px solid var(--ln-primary);
   outline-offset: 2px;
 }
-.logos-root .ln:is(.ln-graph, .ln-sim) input[type="range"]:disabled { opacity: 0.5; }
+.logos-root .ln:is(.ln-graph, .ln-sim, .ln-vectors, .ln-trace) input[type="range"]:disabled { opacity: 0.5; }
 
 @media (max-width: 560px) {
   .logos-root .ln-graph .ln-eq { font-size: 16px; }
@@ -2436,4 +2436,123 @@ html[data-theme="night"] .logos-root .ln:is(.ln-graph, .ln-sim, .ln-chart) {
 @media (forced-colors: active) {
   .logos-root .ln-graph .ln-eq::before { background: CanvasText; }
   .logos-root .ln-graph .ln-handle circle { fill: Highlight; stroke: Canvas; }
+}
+
+/* ── Points, a shaded region, rectangles (the graph's marks, November 2026) ─────────────────────────────────
+   A filled point is the value the function takes; an open one is a hole — paper inside, the curve's colour round
+   it — drawn over the curve so the line visibly breaks there. Labels in ink, with a paper outline, like every
+   reading. The region is a faint wash of the curve's colour; rectangles are that wash with a paper gap between
+   them, so their count reads at a glance and the curve stays on top. */
+.logos-root .ln-graph .ln-mark circle {
+  stroke: var(--ln-g1);
+  stroke-width: 2;
+  fill: var(--ln-g1);
+}
+.logos-root .ln-graph .ln-mark.is-open circle {
+  fill: var(--l5-surface, var(--lg-paper, #fbfaf6));
+  stroke-width: 2.25;
+}
+.logos-root .ln-graph .ln-mark.is-second circle { stroke: var(--ln-g2); }
+.logos-root .ln-graph .ln-mark.is-filled.is-second circle { fill: var(--ln-g2); }
+.logos-root .ln-graph .ln-mark.is-third circle { stroke: var(--ln-g3); }
+.logos-root .ln-graph .ln-mark.is-filled.is-third circle { fill: var(--ln-g3); }
+.logos-root .ln-graph .ln-mark text {
+  font-size: 11.5px;
+  fill: var(--ln-ink);
+  paint-order: stroke;
+  stroke: var(--l5-surface, var(--lg-paper, #fbfaf6));
+  stroke-width: 3.5px;
+  stroke-linejoin: round;
+  font-variant-numeric: tabular-nums;
+}
+.logos-root .ln-graph .ln-area {
+  fill: var(--ln-g3);
+  fill-opacity: 0.16;
+  stroke: none;
+}
+.logos-root .ln-graph .ln-rects rect {
+  fill: var(--ln-g3);
+  fill-opacity: 0.2;
+  stroke: var(--l5-surface, var(--lg-paper, #fbfaf6));
+  stroke-width: 1;
+}
+.logos-root .ln-graph .ln-rects rect.is-below { fill-opacity: 0.12; }
+
+/* ── Forces at a point ─────────────────────────────────────────────────────────────────────────────────────
+   Arrows from one body, one scale for all of them: the graph palette in turn, the sum dashed in ink. Labels in ink
+   with a paper outline. The axes are hairlines, there for direction only. */
+.logos-root .ln-vectors svg { overflow: visible; }
+.logos-root .ln-vectors .ln-vec-axis { stroke: var(--ln-ink-40); stroke-width: 0.75; stroke-dasharray: 2 4; }
+.logos-root .ln-vectors .ln-vec line { stroke-width: 2.25; stroke-linecap: round; }
+.logos-root .ln-vectors .ln-vec.is-0 line { stroke: var(--ln-g1); }
+.logos-root .ln-vectors .ln-vec.is-0 polygon { fill: var(--ln-g1); }
+.logos-root .ln-vectors .ln-vec.is-1 line { stroke: var(--ln-g2); }
+.logos-root .ln-vectors .ln-vec.is-1 polygon { fill: var(--ln-g2); }
+.logos-root .ln-vectors .ln-vec.is-2 line { stroke: var(--ln-g3); }
+.logos-root .ln-vectors .ln-vec.is-2 polygon { fill: var(--ln-g3); }
+.logos-root .ln-vectors .ln-vec.is-sum line { stroke: var(--ln-ink); stroke-dasharray: 5 4; stroke-width: 1.75; }
+.logos-root .ln-vectors .ln-vec.is-sum polygon { fill: var(--ln-ink); }
+.logos-root .ln-vectors .ln-vec text,
+.logos-root .ln-vectors .ln-vec-bodyname {
+  font-size: 11.5px;
+  fill: var(--ln-ink);
+  paint-order: stroke;
+  stroke: var(--l5-surface, var(--lg-paper, #fbfaf6));
+  stroke-width: 3.5px;
+  stroke-linejoin: round;
+}
+.logos-root .ln-vectors .ln-vec-body { fill: var(--l5-surface, var(--lg-paper, #fbfaf6)); stroke: var(--ln-ink-60); stroke-width: 1.25; }
+.logos-root .ln-vectors input[type="range"] { width: 100%; }
+
+/* ── An algorithm, step by step ────────────────────────────────────────────────────────────────────────────
+   One row of cells, what it is looking at outlined in the primary ink, what is settled washed in the graph's green;
+   indices small under each cell, pointer names under those. Back and Next as words, a step scrubber between. */
+.logos-root .ln-trace:focus-visible { outline: 2px solid var(--ln-primary); outline-offset: 4px; border-radius: 6px; }
+.logos-root .ln-trace .ln-trace-row {
+  display: grid;
+  grid-template-columns: repeat(var(--ln-cells), minmax(0, 1fr));
+  gap: 4px;
+  margin: 10px 0 4px;
+  max-width: calc(var(--ln-cells) * 56px);
+}
+.logos-root .ln-trace.is-stack .ln-trace-row,
+.logos-root .ln-trace.is-queue .ln-trace-row { max-width: calc(var(--ln-cells) * 64px); }
+.logos-root .ln-trace .ln-cell { display: grid; justify-items: center; gap: 2px; min-width: 0; }
+.logos-root .ln-trace .ln-cell-v {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid rgba(var(--ln-tint), 0.22);
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  color: var(--ln-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+.logos-root .ln-trace .ln-cell.is-mark .ln-cell-v { border-color: var(--ln-primary); border-width: 2px; }
+.logos-root .ln-trace .ln-cell.is-done .ln-cell-v { background: color-mix(in srgb, var(--ln-g1) 14%, transparent); }
+.logos-root .ln-trace .ln-cell-i { font-size: 10.5px; color: var(--ln-ink-40); font-variant-numeric: tabular-nums; }
+.logos-root .ln-trace .ln-cell-ptr { font-size: 11px; color: var(--ln-primary); min-height: 14px; font-weight: 600; }
+.logos-root .ln-trace .ln-trace-note { margin: 8px 0 6px; color: var(--ln-ink); line-height: 1.5; }
+.logos-root .ln-trace .ln-trace-note .ln-k { color: var(--ln-ink-60); font-variant-numeric: tabular-nums; margin-right: 6px; }
+.logos-root .ln-trace .ln-trace-nav { display: flex; align-items: center; gap: 10px; }
+.logos-root .ln-trace .ln-trace-nav input[type="range"] { flex: 1; min-width: 60px; }
+.logos-root .ln button.ln-btn {
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ln-primary);
+  background: none;
+  border: 0;
+  padding: 8px 4px;
+  min-height: 40px;
+  cursor: pointer;
+}
+.logos-root .ln button.ln-btn:disabled { color: var(--ln-ink-40); cursor: default; }
+.logos-root .ln button.ln-btn:focus-visible { outline: 2px solid var(--ln-primary); outline-offset: 2px; border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .ln-trace .ln-cell-v { transition: none; }
 }

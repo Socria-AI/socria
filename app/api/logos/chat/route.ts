@@ -121,6 +121,7 @@ import {
   presentationRoom,
   readTurnState,
   renderPresentation,
+  representationOf,
   renderAllocation,
   renderConflicts,
   rewriteCitations,
@@ -1827,6 +1828,8 @@ export const POST = withMeter(async function POST(req: NextRequest) {
                 `work=${turnState.work}`,
                 `exchange=${turnState.exchange.kind}`,
                 `inline=${presentation.forms.join(',') || 'none'}`,
+                // how the explanation is represented this turn (lib/runtime/presentation.ts representationOf): one word
+                `repr=${representationOf({ forms: presentation.forms, timeline: presentation.reasons.includes('sequence:timeline') })}`,
                 // what the question about the documents asked for (lib/docs/intent.ts), and whether a follow-up carried passages
                 ...(docRefs.length ? [`docs=${docRefs.length}:${docShape.kind}${Object.keys(recentCites).length ? ':carried' : ''}${docFocus ? ':focus' : ''}`] : []),
                 ...(allocation ? [`split=${Object.entries(allocation.split).map(([k, v]) => `${k}:${v}`).join(',')}`] : []),

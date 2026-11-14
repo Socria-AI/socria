@@ -71,11 +71,11 @@
 // PURE: the route, the parser (lib/rich-text.ts), the renderer and the tests
 // share it.
 
-import { compileExpr, freeNames } from './logos-math';
+import { compileExpr, freeNames, type CompiledExpr } from './logos-math';
 import { diagramText } from './inline-diagram';
-import { answerOf, checkTyped, compileOver, compileOverT, crossingsOf, curveFeatures, exprWithValues, fmtPoint, fmtVal, meanValue, sampleCurve, slopeAt, timeAt, type Feature } from './inline-math';
+import { answerOf, areaBetween, checkTyped, compileOver, compileOverT, crossingsOf, curveFeatures, exprWithValues, fmtPoint, fmtVal, limitAt, meanValue, riemannRects, sampleCurve, slopeAt, timeAt, type Feature, type RiemannRule } from './inline-math';
 
-export const INLINE_KINDS = ['chart', 'slider', 'compare', 'reasoning', 'options', 'draft', 'concepts', 'sequence', 'paths', 'decide', 'graph', 'sim', 'check', 'steps', 'claim', 'diagram', 'balance', 'equation'] as const;
+export const INLINE_KINDS = ['chart', 'slider', 'compare', 'reasoning', 'options', 'draft', 'concepts', 'sequence', 'paths', 'decide', 'graph', 'sim', 'check', 'steps', 'claim', 'diagram', 'balance', 'equation', 'vectors', 'trace'] as const;
 export type InlineKind = (typeof INLINE_KINDS)[number];
 
 export type ChartBasis = 'given' | 'source' | 'illustrative';
@@ -244,9 +244,38 @@ export interface GraphSpec {
   tangent?: string;
   /** formulas in the parameters, computed live */
   readouts?: ReadoutSpec[];
+  /** points marked on the picture: filled (the curve takes this value) or open (a hole: the curve approaches it) */
+  points?: GraphPoint[];
+  /** a shaded region under the first curve (or between it and another), or rectangles that approximate it */
+  area?: GraphArea;
   /** under the Answer Guard: the lines are drawn, the numbers that would answer it are not */
   quiet?: true;
   predict?: PredictSpec;
+}
+/**
+ * A POINT ON THE PICTURE, CHECKED AGAINST THE CURVE. Its x (and y) are numbers or formulas in the parameters, so it
+ * moves when they do. An open point is a hole: its y must be the value its curve approaches there (from one side at
+ * least), and with no y it is that value. A filled point with no y sits on its curve; a filled point OFF its curve —
+ * f(a) defined as something other than the limit — needs the open point at the same x, or the picture would show a
+ * curve running straight through a value it does not take. A graph whose points disagree with its curves is not drawn.
+ */
+export interface GraphPoint {
+  x: number | string;
+  y?: number | string;
+  open?: true;
+  label?: string;
+  /** which curve it belongs to: 0 (the first, the default), 1 or 2 */
+  curve?: number;
+}
+/** A shaded region: under the first curve from `from` to `to`, down to the x-axis or to another curve — or `rects`. */
+export interface GraphArea {
+  from: number | string;
+  to: number | string;
+  /** shade down to this curve (1 or 2: an index into curves, counting the first as 0) instead of the x-axis */
+  between?: number;
+  /** rectangles instead of the exact area: how many (a number, or the name of a parameter they slide), and where each takes its height */
+  rects?: { n: number | string; rule: RiemannRule };
+  label?: string;
 }
 export type GraphFeature = 'turning' | 'roots' | 'intercept' | 'crossings' | 'mean-value';
 /**
@@ -386,10 +415,36 @@ export interface EquationSpec {
   example?: { tex: string };
 }
 
-export type InlineSpec = ChartSpec | SliderSpec | CompareSpec | ReasoningSpec | OptionsSpec | DraftSpec | ConceptsSpec | SequenceSpec | PathsSpec | DecideSpec | GraphSpec | SimSpec | CheckSpec | StepsSpec | ClaimSpec | DiagramSpec | BalanceSpec | EquationSpec;
+/**
+ * FORCES AT A POINT. Up to five vectors acting on one body — a size and a direction (degrees from the positive x-axis,
+ * anticlockwise), each a number or a formula in up to three parameters they slide — and, unless switched off, their
+ * sum: drawn, with its size and direction read out. Every number is computed from the vectors as they are now.
+ */
+export interface VectorsSpec {
+  type: 'vectors';
+  title?: string;
+  body?: string;
+  vectors: { label: string; mag: number | string; angle: number | string }[];
+  params: ParamSpec[];
+  resultant: boolean;
+  unit?: string;
+}
+/**
+ * AN ALGORITHM, STEP BY STEP. The state after each step — the cells of an array (or a stack, a queue), the ones it is
+ * looking at, the ones that are settled, named pointers — and a line on what that step did. They step through it at
+ * their own pace; nothing is computed by the model as they go, so what they see is exactly what was written.
+ */
+export interface TraceSpec {
+  type: 'trace';
+  title?: string;
+  kind: 'array' | 'stack' | 'queue';
+  steps: { cells: string[]; mark?: number[]; done?: number[]; pointers?: { name: string; at: number }[]; note: string }[];
+}
+
+export type InlineSpec = VectorsSpec | TraceSpec | ChartSpec | SliderSpec | CompareSpec | ReasoningSpec | OptionsSpec | DraftSpec | ConceptsSpec | SequenceSpec | PathsSpec | DecideSpec | GraphSpec | SimSpec | CheckSpec | StepsSpec | ClaimSpec | DiagramSpec | BalanceSpec | EquationSpec;
 
 /** The kinds a person works with — one to a reply: more than one is a dashboard. */
-export const LIVE_KINDS: readonly InlineKind[] = ['graph', 'sim', 'slider', 'decide', 'steps', 'claim'];
+export const LIVE_KINDS: readonly InlineKind[] = ['graph', 'sim', 'slider', 'decide', 'steps', 'claim', 'vectors', 'trace'];
 
 export const INLINE_LIMITS = {
   points: 24,
@@ -815,6 +870,81 @@ function sanitizeReadouts(raw: unknown, names: readonly string[], vals: Record<s
   return out;
 }
 
+/** A number, or a formula in the parameters that is finite as it starts. */
+function numberOrFormula(v: unknown, names: readonly string[], vals: Record<string, number>): number | string | null {
+  if (fin(v)) return r6(v);
+  if (typeof v !== 'string' || !v.trim() || v.length > L.formula) return null;
+  const e = v.trim();
+  const c = compileExpr(e, [...names]);
+  return c && Number.isFinite(c.eval(vals)) ? e : null;
+}
+const RULES: readonly RiemannRule[] = ['left', 'right', 'mid'];
+/**
+ * The points and the region, read against the curves they belong to (see GraphPoint). Returns null — the graph is not
+ * drawn — when a point contradicts its curve; drops what is merely malformed.
+ */
+function sanitizeMarks(r: Record<string, unknown>, cs: readonly CompiledExpr[], names: readonly string[], vals: Record<string, number>, x: [number, number]): { points: GraphPoint[]; area?: GraphArea } | null {
+  const span = x[1] - x[0];
+  const points: GraphPoint[] = [];
+  for (const v of (Array.isArray(r.points) ? r.points : []).slice(0, 6)) {
+    const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+    if (!o) continue;
+    const px = numberOrFormula(o.x, names, vals);
+    if (px === null) continue;
+    const xv = timeAt(px, names, vals);
+    if (!(xv >= x[0] && xv <= x[1])) continue;
+    const curve = fin(o.curve) && Number.isInteger(o.curve) && o.curve >= 0 && o.curve < cs.length ? o.curve : 0;
+    const py = o.y === undefined || o.y === null ? null : numberOrFormula(o.y, names, vals);
+    if (o.y !== undefined && o.y !== null && py === null) continue;
+    const open = o.open === true || o.open === 'true' || o.kind === 'open' || o.style === 'open' || o.hollow === true;
+    const lim = limitAt(cs[curve], vals, xv, span);
+    const yv = py === null ? null : timeAt(py, names, vals);
+    const tol = 1e-2 * Math.max(1, Math.abs(yv ?? 0));
+    const near = (a: number | null) => a !== null && yv !== null && Math.abs(a - yv) <= tol;
+    if (open) {
+      // a hole sits where its curve goes: at the value it approaches from one side at least
+      if (yv === null ? lim.limit === null : !(near(lim.left) || near(lim.right))) return null;
+    } else if (yv === null) {
+      if (lim.value === null) return null;
+    }
+    const label = line(o.label, L.label);
+    points.push({ x: px, ...(py !== null ? { y: py } : {}), ...(open ? { open: true as const } : {}), ...(label ? { label } : {}), ...(curve ? { curve } : {}) });
+  }
+  // a filled point off its curve needs the hole that says the curve does not take it
+  for (const pt of points) {
+    if (pt.open || pt.y === undefined) continue;
+    const xv = timeAt(pt.x, names, vals), yv = timeAt(pt.y, names, vals);
+    const on = cs[pt.curve ?? 0].eval({ ...vals, x: xv });
+    if (Number.isFinite(on) && Math.abs(on - yv) <= 1e-2 * Math.max(1, Math.abs(yv))) continue;
+    const hole = points.some((q) => q.open && (q.curve ?? 0) === (pt.curve ?? 0) && Math.abs(timeAt(q.x, names, vals) - xv) <= 1e-9 * Math.max(1, Math.abs(xv)));
+    if (!hole) return null;
+  }
+  let area: GraphArea | undefined;
+  const a = r.area && typeof r.area === 'object' ? (r.area as Record<string, unknown>) : null;
+  if (a) {
+    const from = numberOrFormula(a.from ?? a.a, names, vals), to = numberOrFormula(a.to ?? a.b, names, vals);
+    if (from === null || to === null) return null;
+    const fv = timeAt(from, names, vals), tv = timeAt(to, names, vals);
+    if (!(fv < tv) || fv < x[0] - 1e-9 || tv > x[1] + 1e-9) return null;
+    const between = fin(a.between) && Number.isInteger(a.between) && a.between >= 1 && a.between < cs.length ? a.between : undefined;
+    const g = between ? (t: number) => cs[between].eval({ ...vals, x: t }) : undefined;
+    if (areaBetween((t) => cs[0].eval({ ...vals, x: t }), fv, tv, g) === null) return null;
+    let rects: GraphArea['rects'];
+    const rr = a.rects && typeof a.rects === 'object' ? (a.rects as Record<string, unknown>) : null;
+    if (rr && !between) {
+      const rule = RULES.includes(rr.rule as RiemannRule) ? (rr.rule as RiemannRule) : 'left';
+      const nName = typeof rr.n === 'string' ? rr.n.trim().toLowerCase() : '';
+      const n = fin(rr.n) && rr.n >= 1 && rr.n <= 200 ? Math.round(rr.n) : names.includes(nName) ? nName : null;
+      if (n === null) return null;
+      if (!riemannRects((t) => cs[0].eval({ ...vals, x: t }), fv, tv, typeof n === 'number' ? n : vals[n], rule)) return null;
+      rects = { n, rule };
+    }
+    const label = line(a.label, L.label);
+    area = { from, to, ...(between ? { between } : {}), ...(rects ? { rects } : {}), ...(label ? { label } : {}) };
+  }
+  return { points, ...(area ? { area } : {}) };
+}
+
 function sanitizeGraph(r: Record<string, unknown>): GraphSpec | null {
   const expr = typeof r.expr === 'string' ? r.expr.trim() : '';
   if (!expr || expr.length > L.formula) return null;
@@ -847,7 +977,7 @@ function sanitizeGraph(r: Record<string, unknown>): GraphSpec | null {
   const y = r.y === undefined ? null : range(r.y);
   // a graph built around a point, a chord or a tangent is about that construction: unasked, nothing else is
   // marked on it (its roots and intercept would crowd the one thing it is there to show)
-  const marks = r.features === undefined && (chord || tangent || at.length) ? [] : DEFAULT_FEATURES;
+  const marks = r.features === undefined && (chord || tangent || at.length || Array.isArray(r.points) || (r.area && typeof r.area === 'object')) ? [] : DEFAULT_FEATURES;
   const named = Array.isArray(r.features) ? new Set((r.features as unknown[]).map(featureOf)) : null;
   const asked = named ? FEATURES.filter((f) => named.has(f)) : [...marks];
   // crossings need a second curve; the mean value point needs a chord
@@ -855,6 +985,10 @@ function sanitizeGraph(r: Record<string, unknown>): GraphSpec | null {
   const readouts = sanitizeReadouts(r.readouts, names, vals);
   const predict = sanitizePredict(r.predict);
   const title = line(r.title, L.title);
+  // points and a region, checked against the curves they belong to: a picture that contradicts its own curve is not drawn
+  const compiled = [c, ...curves.map((g) => compileOver(g.expr, names)!)];
+  const marked = sanitizeMarks(r, compiled, names, vals, x);
+  if (!marked) return null;
   // the first curve's name stays even when it is the only curve ("demand", with a point dragged along it)
   const label = line(r.label, L.label);
   return {
@@ -871,9 +1005,73 @@ function sanitizeGraph(r: Record<string, unknown>): GraphSpec | null {
     ...(chord ? { chord } : {}),
     ...(tangent ? { tangent } : {}),
     ...(readouts.length ? { readouts } : {}),
+    ...(marked.points.length ? { points: marked.points } : {}),
+    ...(marked.area ? { area: marked.area } : {}),
     ...(r.quiet === true ? { quiet: true as const } : {}),
     ...(predict ? { predict } : {}),
   };
+}
+
+/** Forces at a point: one to five vectors, each a size and a direction that are numbers or formulas in the parameters. */
+function sanitizeVectors(r: Record<string, unknown>): VectorsSpec | null {
+  const params = sanitizeParams(r.params, [], 0);
+  if (!params) return null;
+  const names = params.map((p) => p.name);
+  const vals = valuesOf(params);
+  const vectors: VectorsSpec['vectors'] = [];
+  for (const v of (Array.isArray(r.vectors) ? r.vectors : Array.isArray(r.forces) ? r.forces : []).slice(0, 5)) {
+    const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+    const label = line(o?.label ?? o?.name, L.label);
+    const mag = numberOrFormula(o?.mag ?? o?.magnitude ?? o?.size, names, vals);
+    const angle = numberOrFormula(o?.angle ?? o?.direction, names, vals);
+    if (!label || mag === null || angle === null) return null;
+    // a size is never negative: a negative one is a direction written as a size, and the picture would lie
+    if (timeAt(mag, names, vals) < 0) return null;
+    vectors.push({ label, mag, angle });
+  }
+  if (!vectors.length) return null;
+  const title = line(r.title, L.title), body = line(r.body, L.label), unit = line(r.unit, L.unit);
+  return { type: 'vectors', ...(title ? { title } : {}), ...(body ? { body } : {}), vectors, params, resultant: r.resultant !== false, ...(unit ? { unit } : {}) };
+}
+/** The sum of the vectors at these values: its components, size and direction (degrees, −180 to 180). */
+export function vectorSum(spec: VectorsSpec, values: Record<string, number>): { parts: { label: string; mag: number; angle: number; x: number; y: number }[]; x: number; y: number; mag: number; angle: number } {
+  const names = spec.params.map((p) => p.name);
+  const parts = spec.vectors.map((v) => {
+    const mag = timeAt(v.mag, names, values), angle = timeAt(v.angle, names, values);
+    const rad = (angle * Math.PI) / 180;
+    return { label: v.label, mag, angle, x: Math.abs(mag * Math.cos(rad)) < 1e-12 ? 0 : mag * Math.cos(rad), y: Math.abs(mag * Math.sin(rad)) < 1e-12 ? 0 : mag * Math.sin(rad) };
+  });
+  const x = parts.reduce((a, q) => a + (Number.isFinite(q.x) ? q.x : 0), 0), y = parts.reduce((a, q) => a + (Number.isFinite(q.y) ? q.y : 0), 0);
+  const mag = Math.hypot(x, y);
+  return { parts, x, y, mag, angle: mag < 1e-9 ? 0 : (Math.atan2(y, x) * 180) / Math.PI };
+}
+/** An algorithm's states, two to forty, each a row of at most sixteen short cells, with what it looks at and a note. */
+function sanitizeTrace(r: Record<string, unknown>): TraceSpec | null {
+  const kind = r.kind === 'stack' || r.kind === 'queue' ? r.kind : 'array';
+  const steps: TraceSpec['steps'] = [];
+  for (const v of (Array.isArray(r.steps) ? r.steps : Array.isArray(r.states) ? r.states : []).slice(0, 40)) {
+    const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+    const raw = Array.isArray(o?.cells) ? (o!.cells as unknown[]) : Array.isArray(o?.array) ? (o!.array as unknown[]) : null;
+    if (!raw || raw.length > 16) return null;
+    const cells = raw.map((c) => (fin(c) ? String(r6(c)) : line(c, 10)));
+    if (cells.some((c) => !c)) return null;
+    const idx = (list: unknown) => [...new Set((Array.isArray(list) ? list : []).filter((i): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < cells.length))];
+    const mark = idx(o!.mark ?? o!.compare ?? o!.highlight), done = idx(o!.done ?? o!.sorted);
+    const pointers: NonNullable<TraceSpec['steps'][number]['pointers']> = [];
+    const pr = o!.pointers;
+    const entries = Array.isArray(pr) ? pr.map((q) => (q && typeof q === 'object' ? [(q as Record<string, unknown>).name, (q as Record<string, unknown>).at] : [null, null])) : pr && typeof pr === 'object' ? Object.entries(pr as Record<string, unknown>) : [];
+    for (const [name, at] of entries.slice(0, 4)) {
+      const n = line(name, 8);
+      // a pointer may sit one past either end (lo > hi, an empty stack)
+      if (n && Number.isInteger(at) && (at as number) >= -1 && (at as number) <= cells.length) pointers.push({ name: n, at: at as number });
+    }
+    const note = line(o!.note ?? o!.text ?? o!.what, 160);
+    if (!note) return null;
+    steps.push({ cells, ...(mark.length ? { mark } : {}), ...(done.length ? { done } : {}), ...(pointers.length ? { pointers } : {}), note });
+  }
+  if (steps.length < 2) return null;
+  const title = line(r.title, L.title);
+  return { type: 'trace', ...(title ? { title } : {}), kind, steps };
 }
 
 /** A claim inspected: the claim, a verdict, and two to five parts it rests on — no links (a source comes from a search, cited). */
@@ -1275,6 +1473,11 @@ export function sanitizeInlineSpec(raw: unknown): InlineSpec | null {
       return sanitizeDecide(r);
     case 'graph':
       return sanitizeGraph(r);
+    case 'vectors':
+    case 'forces':
+      return sanitizeVectors(r);
+    case 'trace':
+      return sanitizeTrace(r);
     case 'sim':
       return sanitizeSim(r);
     case 'check': {
@@ -1397,6 +1600,8 @@ const REQUIRED: Record<InlineKind, readonly (readonly string[])[]> = {
   diagram: [['view'], ['nodes']],
   balance: [['subject', 'title', 'topic'], ['for', 'pros'], ['against', 'cons']],
   equation: [['tex', 'math', 'latex']],
+  vectors: [['vectors', 'forces']],
+  trace: [['steps', 'states']],
 };
 
 /**
@@ -1533,8 +1738,13 @@ export function checkInlineSpec(spec: InlineSpec, ctx: InlineContext): InlineVer
     // no features, no readings, and the chord and tangent drawn without their slopes
     if (ctx.guard) {
       const { readouts: _r, ...rest } = spec;
-      out = { ...rest, features: [], ...(spec.chord || spec.tangent ? { quiet: true as const } : {}) };
+      // points and a region are drawn without their coordinates and totals: reading them off is theirs
+      out = { ...rest, features: [], ...(spec.chord || spec.tangent || spec.points?.length || spec.area ? { quiet: true as const } : {}) };
     }
+  } else if (spec.type === 'vectors' || spec.type === 'trace') {
+    // the sum of the forces, or the algorithm's states, are what a guarded problem asks them to work out
+    if (ctx.guard) return { ok: false, why: 'guarded' };
+    if (spec.type === 'trace' && ctx.ownReasoning) return { ok: false, why: 'their-reasoning' };
   } else if (spec.type === 'sim') {
     // the same: the picture to try things in, without the readings that would answer it
     if (ctx.guard) {
@@ -1643,7 +1853,9 @@ export function inlinePlainText(spec: InlineSpec): string {
     case 'graph': {
       const vals = valuesOf(spec.params);
       const curves = spec.curves?.length ? `${spec.label ? `${spec.label}: ` : ''}y = ${exprWithValues(spec.expr, vals)}; ${spec.curves.map((c) => `${c.label ? `${c.label}: ` : ''}y = ${exprWithValues(c.expr, vals)}`).join('; ')}` : `y = ${exprWithValues(spec.expr, vals)}`;
-      const marks = [spec.chord ? `the chord from x = ${spec.chord[0]} to x = ${spec.chord[1]} and its slope` : '', spec.tangent ? `the tangent at x = ${spec.tangent} and its slope` : '', spec.features.includes('mean-value') ? 'where a tangent runs parallel to the chord' : '', spec.features.includes('crossings') ? 'where the curves cross' : '', ...(spec.readouts ?? []).map((ro) => `${ro.label} = ${ro.expr}`)].filter(Boolean);
+      const r0 = graphReadings(spec, vals);
+      const pts = r0.points.map((q) => `${q.open ? 'an open circle (the curve approaches but does not take it)' : 'a filled point'} at (${fmtAt(q.x)}, ${fmtAt(q.y)})${q.label ? ` labelled ${q.label}` : ''}`);
+      const marks = [spec.chord ? `the chord from x = ${spec.chord[0]} to x = ${spec.chord[1]} and its slope` : '', spec.tangent ? `the tangent at x = ${spec.tangent} and its slope` : '', spec.features.includes('mean-value') ? 'where a tangent runs parallel to the chord' : '', spec.features.includes('crossings') ? 'where the curves cross' : '', ...pts, r0.area ? areaSaid(r0.area) : '', ...(spec.readouts ?? []).map((ro) => `${ro.label} = ${ro.expr}`)].filter(Boolean);
       return `${spec.title ? `${spec.title}: ` : ''}${curves}${spec.params.length ? ` (${spec.params.map((p) => `${p.label} = ${num(p.value)}`).join(', ')})` : ''}, x from ${num(spec.x[0])} to ${num(spec.x[1])}${marks.length ? `; showing ${marks.join(', ')}` : ''}${spec.predict ? `\n${spec.predict.prompt} ${spec.predict.options.join(' / ')}` : ''}`;
     }
     case 'sim':
@@ -1663,6 +1875,16 @@ export function inlinePlainText(spec: InlineSpec): string {
     }
     case 'equation':
       return [spec.title ?? '', spec.tex, ...(spec.terms ?? []).map((t) => `${t.sym}: ${t.means}`), spec.example ? `For example: ${spec.example.tex}` : ''].filter(Boolean).join('\n');
+    case 'vectors': {
+      const sum = vectorSum(spec, valuesOf(spec.params));
+      const u = spec.unit ? ` ${spec.unit}` : '';
+      return [
+        `${spec.title ? `${spec.title}: ` : ''}vectors on ${spec.body ?? 'one point'} — ${sum.parts.map((q) => `${q.label} ${fmtAt(q.mag)}${u} at ${fmtAt(q.angle)}°`).join('; ')}${spec.params.length ? ` (${spec.params.map((q) => `${q.label} = ${num(q.value)}`).join(', ')})` : ''}`,
+        spec.resultant ? `their sum: ${fmtAt(sum.mag)}${u} at ${fmtAt(sum.angle)}° (components ${fmtAt(sum.x)}, ${fmtAt(sum.y)})` : '',
+      ].filter(Boolean).join('\n');
+    }
+    case 'trace':
+      return [`${spec.title ?? 'Step by step'} (${spec.kind})`, ...spec.steps.map((st, i) => `${i + 1}. [${st.cells.join(', ')}]${st.mark?.length ? ` looking at ${st.mark.map((k) => `#${k}`).join(', ')}` : ''}${st.pointers?.length ? ` ${st.pointers.map((q) => `${q.name}=${q.at}`).join(' ')}` : ''} — ${st.note}`)].join('\n');
   }
 }
 
@@ -1961,6 +2183,10 @@ export function inlineFrom(spec: InlineSpec): string {
       return 'the pros and cons';
     case 'equation':
       return 'the equation';
+    case 'vectors':
+      return 'the forces';
+    case 'trace':
+      return 'the steps of the algorithm';
     default:
       return 'the element';
   }
@@ -1984,12 +2210,16 @@ export interface GraphReadings {
   tangent?: { x: number; y: number; slope: number | null };
   crossings: Feature[];
   readouts: { label: string; value: number; unit?: string; digits?: number }[];
+  /** the points, where they are now */
+  points: { x: number; y: number; open: boolean; label?: string; curve: number }[];
+  /** the region now: its exact (numerical) area and, with rectangles, how many and their total */
+  area?: { from: number; to: number; value: number; n?: number; sum?: number; rule?: RiemannRule; between?: number };
 }
 /** All of it computed on the curve as it is at these values (lib/inline-math.ts) — the same numbers the page draws and Socria is told. */
 export function graphReadings(spec: GraphSpec, values: Record<string, number>): GraphReadings {
   const names = spec.params.map((p) => p.name);
   const c = compileOver(spec.expr, names);
-  const out: GraphReadings = { crossings: [], readouts: [] };
+  const out: GraphReadings = { crossings: [], readouts: [], points: [] };
   if (!c) return out;
   const span = spec.x[1] - spec.x[0];
   const f = (x: number) => c.eval({ ...values, x });
@@ -2007,15 +2237,48 @@ export function graphReadings(spec: GraphSpec, values: Record<string, number>): 
     if (Number.isFinite(x) && Number.isFinite(y)) out.tangent = { x, y, slope: slopeAt(c, values, x, span) };
   }
   if (spec.features.includes('crossings')) {
-    for (const g of spec.curves ?? []) {
-      const cg = compileOver(g.expr, names);
-      if (cg) out.crossings.push(...crossingsOf(c, cg, values, spec.x[0], spec.x[1]));
-    }
+    // every pair of curves: the first against each other one, and then the others against each other — marginal
+    // revenue meets marginal cost on a monopoly's graph, and neither is the first curve
+    const all = [c, ...(spec.curves ?? []).map((g) => compileOver(g.expr, names))];
+    for (let i = 0; i < all.length; i++)
+      for (let j = i + 1; j < all.length; j++) {
+        const a = all[i], b = all[j];
+        if (a && b) out.crossings.push(...crossingsOf(a, b, values, spec.x[0], spec.x[1]));
+      }
   }
   for (const ro of spec.readouts ?? []) {
     const cr = compileExpr(ro.expr, names);
     const v = cr ? cr.eval(values) : NaN;
     if (Number.isFinite(v)) out.readouts.push({ label: ro.label, value: v, ...(ro.unit ? { unit: ro.unit } : {}), ...(ro.digits !== undefined ? { digits: ro.digits } : {}) });
+  }
+  const cs = [c, ...(spec.curves ?? []).map((g) => compileOver(g.expr, names))];
+  for (const pt of spec.points ?? []) {
+    const cc = cs[pt.curve ?? 0];
+    if (!cc) continue;
+    const x = timeAt(pt.x, names, values);
+    if (!Number.isFinite(x)) continue;
+    let y = pt.y === undefined ? NaN : timeAt(pt.y, names, values);
+    if (pt.y === undefined) {
+      const lim = limitAt(cc, values, x, span);
+      y = pt.open ? lim.limit ?? NaN : lim.value ?? NaN;
+      // read off the curve numerically: shown to six places, never as 1.9999999999986
+      if (Number.isFinite(y)) y = Math.round(y * 1e6) / 1e6;
+    }
+    if (Number.isFinite(y)) out.points.push({ x, y, open: !!pt.open, ...(pt.label ? { label: pt.label } : {}), curve: pt.curve ?? 0 });
+  }
+  if (spec.area) {
+    const a = timeAt(spec.area.from, names, values), b = timeAt(spec.area.to, names, values);
+    const g = spec.area.between ? cs[spec.area.between] : null;
+    const lo = Math.max(spec.x[0], Math.min(a, b)), hi = Math.min(spec.x[1], Math.max(a, b));
+    const value = areaBetween(f, lo, hi, g ? (t) => g.eval({ ...values, x: t }) : undefined);
+    if (value !== null && lo < hi) {
+      out.area = { from: lo, to: hi, value, ...(spec.area.between ? { between: spec.area.between } : {}) };
+      if (spec.area.rects) {
+        const n = typeof spec.area.rects.n === 'number' ? spec.area.rects.n : values[spec.area.rects.n];
+        const rs = riemannRects(f, lo, hi, n, spec.area.rects.rule);
+        if (rs) Object.assign(out.area, { n: Math.round(n), sum: rs.sum, rule: spec.area.rects.rule });
+      }
+    }
   }
   return out;
 }
@@ -2042,7 +2305,13 @@ function readingsSaid(spec: GraphSpec, start: Record<string, number>, now: Recor
     out.push(`the curves cross at ${pts}${before && before !== pts ? ` (they crossed at ${before})` : ''}`);
   }
   if (!spec.quiet) for (const ro of r.readouts) out.push(`${ro.label} is ${fmtVal(ro.value, ro.digits)}${ro.unit ? ` ${ro.unit}` : ''}`);
+  if (r.area && !spec.quiet) out.push(areaSaid(r.area, was.area));
   return out;
+}
+/** A region's reading, said: the rectangles' total against the area, or the area alone. */
+export function areaSaid(a: NonNullable<GraphReadings['area']>, was?: GraphReadings['area']): string {
+  if (a.sum !== undefined && a.n !== undefined) return `${a.n} ${a.rule}-endpoint rectangles from x = ${fmtAt(a.from)} to x = ${fmtAt(a.to)} total ${fmtAt(a.sum)}, against an area of ${fmtAt(a.value)} (off by ${fmtAt(Math.abs(a.sum - a.value))})${was?.sum !== undefined && was.n !== a.n ? `; with ${was.n} it was ${fmtAt(was.sum)}` : ''}`;
+  return `the shaded area from x = ${fmtAt(a.from)} to x = ${fmtAt(a.to)} is ${fmtAt(a.value)}`;
 }
 /** A simulation's readings at a setting: "range 8.8 m". */
 function readingsAt(spec: SimSpec, values: Record<string, number>): string {
@@ -2150,6 +2419,17 @@ export function describeInline(spec: InlineSpec, state?: InlineState): string | 
       break;
     case 'concepts':
       if (state.picked !== undefined && spec.items[state.picked]) parts.push(`opened “${spec.items[state.picked].name}”`);
+      break;
+    case 'vectors': {
+      const m = moved(spec.params, state.values);
+      if (!m.length) return null;
+      const sum = vectorSum(spec, { ...valuesOf(spec.params), ...state.values });
+      parts.push(`changed ${m.join(', ')}`);
+      if (spec.resultant) parts.push(`the sum is now ${fmtAt(sum.mag)}${spec.unit ? ` ${spec.unit}` : ''} at ${fmtAt(sum.angle)}°`);
+      break;
+    }
+    case 'trace':
+      if (state.picked !== undefined && spec.steps[state.picked]) parts.push(`stepped to step ${state.picked + 1} of ${spec.steps.length}: [${spec.steps[state.picked].cells.join(', ')}] — ${spec.steps[state.picked].note}`);
       break;
     default:
       return null;

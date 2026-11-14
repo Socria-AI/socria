@@ -3,7 +3,7 @@
 // presentation.ts), the stream gate that checks it, the parser and the
 // components that draw it, and the objects an element opens as in Artifacts.
 export * from '@/lib/inline-ui';
-export { planPresentation, renderPresentation, presentationRoom } from '@/lib/runtime/presentation';
+export { planPresentation, renderPresentation, presentationRoom, representationOf, REPRESENTATIONS } from '@/lib/runtime/presentation';
 export { readTurnState } from '@/lib/runtime/state';
 export { routeTurn } from '@/lib/runtime/orchestrate';
 export { indexWorkspace, searchWorkspace } from '@/lib/runtime/representation';

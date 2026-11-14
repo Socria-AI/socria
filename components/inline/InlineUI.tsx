@@ -28,7 +28,7 @@
 import { Component, useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { compileExpr } from '@/lib/logos-math';
 import { linearScale, scaleAt, fmtNum } from '@/lib/objects/display-data';
-import { CLAIM_SAID, decideLeaning, decideTally, graphReadings, HOLDS_SAID, inlinePlainText, meanSaid, pathAsk, SCORE_SAID, WEIGHT_SAID, type BalanceItem, type BalanceSpec, type DiagramSpec, type EquationSpec, type ChartSpec, type CheckPart, type ClaimSpec, type CompareSpec, type GraphFeature, type ConceptsSpec, type DecideSpec, type DraftSpec, type GraphSpec, type InlineSpec, type InlineState, type OptionsSpec, type ParamSpec, type PathsSpec, type PredictSpec, type ReasoningSpec, type SequenceSpec, type SimSpec, type SliderSpec, type StepsSpec } from '@/lib/inline-ui';
+import { CLAIM_SAID, decideLeaning, decideTally, graphReadings, HOLDS_SAID, inlinePlainText, meanSaid, pathAsk, SCORE_SAID, WEIGHT_SAID, type BalanceItem, type BalanceSpec, type DiagramSpec, type EquationSpec, type ChartSpec, type CheckPart, type ClaimSpec, type CompareSpec, type GraphFeature, type ConceptsSpec, type DecideSpec, type DraftSpec, type GraphSpec, type InlineSpec, type InlineState, type OptionsSpec, type ParamSpec, type PathsSpec, type PredictSpec, type ReasoningSpec, type SequenceSpec, type SimSpec, type SliderSpec, type StepsSpec, areaSaid, vectorSum, type VectorsSpec, type TraceSpec } from '@/lib/inline-ui';
 import { checkTyped, compileOver, compileOverT, curveFeatures, fitWindow, fitWindowAll, fmtPoint, fmtVal, prettyExpr, sampleCurve, samplePath, timeAt, type Feature, type Pt, type Seg } from '@/lib/inline-math';
 import { DIAGRAM_ROLE_SAID, diagramColumns, diagramFigure, linksOf, treeRows } from '@/lib/inline-diagram';
 import { TeX } from '@/components/TeX';
@@ -99,7 +99,7 @@ export function InlineBlock({ spec, open, n, host, renderInline }: { spec: Inlin
 }
 
 /** Kept with a press of Keep: everything but the ways onward (they are only ever a next message), and the three with larger forms of their own. */
-const KEEPABLE = new Set<InlineSpec['type']>(['graph', 'sim', 'claim', 'check', 'steps', 'slider', 'reasoning', 'concepts', 'sequence', 'draft', 'diagram', 'balance', 'equation']);
+const KEEPABLE = new Set<InlineSpec['type']>(['graph', 'sim', 'claim', 'check', 'steps', 'slider', 'reasoning', 'concepts', 'sequence', 'draft', 'diagram', 'balance', 'equation', 'vectors', 'trace']);
 
 /** An element that could not be drawn, said instead: its words where it stood (nothing, if even they cannot be said). */
 export function InlineFallback({ spec }: { spec: InlineSpec }) {
@@ -172,6 +172,10 @@ function drawn(spec: InlineSpec, n: number, host: InlineHost | undefined, state:
       return <InlineBalance spec={spec} renderInline={renderInline} />;
     case 'equation':
       return <InlineEquation spec={spec} renderInline={renderInline} />;
+    case 'vectors':
+      return <InlineVectors spec={spec} state={state} onState={setState} />;
+    case 'trace':
+      return <InlineTrace spec={spec} state={state} onState={setState} />;
   }
 }
 
@@ -1292,7 +1296,7 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
   const [x0, x1] = spec.x;
   const f = (x: number, v: Record<string, number> = values) => (c ? c.eval({ ...v, x }) : NaN);
   const curves = useMemo(() => [c, ...others.map((o) => o.c)].filter(Boolean) as Compiled[], [c, others]);
-  const pointYs = (v: Record<string, number>) => (spec.at ?? []).map((n) => (c ? c.eval({ ...v, x: v[n] }) : NaN)).filter(Number.isFinite);
+  const pointYs = (v: Record<string, number>) => [...(spec.at ?? []).map((n) => (c ? c.eval({ ...v, x: v[n] }) : NaN)), ...graphReadings(spec, v).points.map((q) => q.y)].filter(Number.isFinite);
   // the window: as the reply gave it, or around what matters on every curve as it started — widened, never
   // narrowed, when what they change takes it further
   const auto = useMemo(() => (c ? fitWindowAll(curves, [start], x0, x1, pointYs(start)) : ([-10, 10] as [number, number])), [c, curves, start, x0, x1]);
@@ -1352,6 +1356,18 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
     }
     if (readings.tangent) rows.push({ k: `slope at x = ${fmtVal(readings.tangent.x)}`, v: readings.tangent.slope === null ? 'none — a corner' : fmtVal(readings.tangent.slope) });
     for (const ro of readings.readouts) rows.push({ k: ro.label, v: `${fmtVal(ro.value, ro.digits)}${ro.unit ? ` ${ro.unit}` : ''}` });
+    // a hole and the value taken at the same x: the limit and the function's value, side by side
+    for (const q of readings.points) {
+      if (q.open) rows.push({ k: `as x → ${fmtVal(q.x)}`, v: `y → ${fmtVal(q.y)}` });
+      else if (readings.points.some((o) => o.open && o.x === q.x)) rows.push({ k: `at x = ${fmtVal(q.x)}`, v: `y = ${fmtVal(q.y)}` });
+    }
+    if (readings.area) {
+      if (readings.area.sum !== undefined) {
+        rows.push({ k: `${readings.area.n} rectangles`, v: fmtVal(readings.area.sum) });
+        rows.push({ k: 'area', v: fmtVal(readings.area.value) });
+        rows.push({ k: 'off by', v: fmtVal(Math.abs(readings.area.sum - readings.area.value)) });
+      } else rows.push({ k: spec.area?.label || 'shaded area', v: fmtVal(readings.area.value) });
+    }
   }
   const toPlot = (e: React.PointerEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -1425,6 +1441,8 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
     readings.mean && !spec.quiet ? meanSaid(readings.mean) : '',
     readings.tangent && !spec.quiet ? `slope at x = ${fmtVal(readings.tangent.x)}: ${readings.tangent.slope === null ? 'none, a corner' : fmtVal(readings.tangent.slope)}` : '',
     !spec.quiet && readings.crossings.length ? `the curves meet at ${readings.crossings.map(fmtPoint).join(' and ')}` : '',
+    ...readings.points.map((q) => `${q.open ? 'open circle, a hole,' : 'filled point'} at ${fmtPoint(q)}${q.label ? `, ${q.label}` : ''}`),
+    readings.area && !spec.quiet ? areaSaid(readings.area) : readings.area ? `shaded from x = ${fmtVal(readings.area.from)} to x = ${fmtVal(readings.area.to)}` : '',
   ].filter(Boolean);
   return (
     <div className="ln ln-graph" role="group" aria-label={spec.title || 'A graph you can change'}>
@@ -1503,6 +1521,37 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
           <PlotClip id={clip} W={W} H={H} />
           <Grid x0={x0} x1={x1} y0={y0} y1={y1} X={X} Y={Y} W={W} H={H} />
           <g clipPath={`url(#${clip})`}>
+          {readings.area && (() => {
+            const a = readings.area;
+            const base = a.between ? curves[a.between] : null;
+            const floor = (t: number) => (base ? base.eval({ ...values, x: t }) : 0);
+            const clampY = (v: number) => Y(Math.max(y0 - (y1 - y0), Math.min(y1 + (y1 - y0), v)));
+            if (a.sum !== undefined && a.n && spec.area?.rects) {
+              const w = (a.to - a.from) / a.n;
+              const rule = spec.area.rects.rule;
+              return (
+                <g className="ln-rects" aria-hidden="true">
+                  {Array.from({ length: a.n }, (_, i) => {
+                    const r0 = a.from + i * w, r1 = r0 + w;
+                    const h = f(rule === 'left' ? r0 : rule === 'right' ? r1 : (r0 + r1) / 2);
+                    if (!Number.isFinite(h)) return null;
+                    const top = clampY(Math.max(h, 0)), bottom = clampY(Math.min(h, 0));
+                    return <rect key={i} className={h < 0 ? 'is-below' : ''} x={X(r0) + 0.5} y={top} width={Math.max(0.5, X(r1) - X(r0) - 1)} height={Math.max(0, bottom - top)} />;
+                  })}
+                </g>
+              );
+            }
+            const n = 120;
+            const top: string[] = [], bottom: string[] = [];
+            for (let i = 0; i <= n; i++) {
+              const t = a.from + ((a.to - a.from) * i) / n;
+              const yt = f(t), yb = floor(t);
+              if (!Number.isFinite(yt) || !Number.isFinite(yb)) continue;
+              top.push(`${X(t).toFixed(1)},${clampY(yt).toFixed(1)}`);
+              bottom.unshift(`${X(t).toFixed(1)},${clampY(yb).toFixed(1)}`);
+            }
+            return top.length > 1 ? <polygon className="ln-area" points={[...top, ...bottom].join(' ')} aria-hidden="true" /> : null;
+          })()}
           {reshaped && fit && <path className="ln-curve is-ghost" d={pathOf(fit.pts, X, Y, y0, y1)} />}
           {reshaped &&
             others.map((o, i) => {
@@ -1558,6 +1607,25 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
               </g>
             );
           })}
+          {readings.points.map((q, i) => {
+            if (q.y < y0 || q.y > y1 || q.x < x0 || q.x > x1) return null;
+            const px = X(q.x), py = Y(q.y);
+            const right = px > W - 90;
+            // a filled point and the hole above or below it: their labels go apart, never on each other
+            const other = readings.points.find((o, j) => j !== i && o.x === q.x);
+            const below = other ? q.y < other.y : false;
+            return (
+              <g key={`p${i}`} className={`ln-mark ${q.open ? 'is-open' : 'is-filled'} ${CURVE_TONE[q.curve] ?? ''}`}>
+                <circle cx={px} cy={py} r={q.open ? 4.6 : 4.4} />
+                {/* under the Answer Guard the marks are drawn and their coordinates are not: reading them off is theirs */}
+                {(!spec.quiet || q.label) && (
+                  <text x={right ? px - 9 : px + 9} y={below ? py + 17 : py - 9} textAnchor={right ? 'end' : 'start'}>
+                    {q.label || fmtPoint(q)}
+                  </text>
+                )}
+              </g>
+            );
+          })}
           {(spec.at ?? []).map((n) => {
             const x = values[n];
             const y = f(x);
@@ -1599,7 +1667,8 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
           ))}
         </p>
       )}
-      {!locked && (positions.size > 0 ? <p className="ln-hint">Drag the points along the curve.</p> : shapeParams.length > 0 ? <p className="ln-hint">Drag a number in the equation.</p> : null)}
+      {/* (a number that is in no equation — how many rectangles — has its slider, and no hint pointing at the equation) */}
+      {!locked && (positions.size > 0 ? <p className="ln-hint">Drag the points along the curve.</p> : shapeParams.some((q) => inEquation.has(q.name)) ? <p className="ln-hint">Drag a number in the equation.</p> : null)}
       {spec.params.length > 0 && (
         <div className="ln-graph-vars">
           {spec.params.map((p) => (
@@ -1636,6 +1705,172 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
         </div>
       )}
       {shared && spec.params.length > 0 && <SharedNote what="change" />}
+    </div>
+  );
+}
+
+// ── forces at a point ────────────────────────────────────────────────
+
+/**
+ * Up to five vectors from one point, drawn to one scale, and their sum (dashed) with its size and direction read out;
+ * the sliders change what the vectors are formulas of. Everything drawn is vectorSum's — the same numbers Socria is
+ * told when they ask about it.
+ */
+function InlineVectors({ spec, state, onState }: { spec: VectorsSpec; state?: InlineState; onState: (s: InlineState) => void }) {
+  const start = useMemo(() => Object.fromEntries(spec.params.map((p) => [p.name, p.value])), [spec]);
+  const [values, setValues] = useState<Record<string, number>>(() => ({ ...start, ...(state?.values ?? {}) }));
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+  }, []);
+  const set = (name: string, v: number) => {
+    const next = { ...values, [name]: v };
+    setValues(next);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => onState({ ...state, values: next }), 400);
+  };
+  const sum = useMemo(() => vectorSum(spec, values), [spec, values]);
+  const [ref, width] = useWidth<HTMLDivElement>(420);
+  const W = Math.max(240, Math.min(width, 520));
+  const H = W < 420 ? 220 : 260;
+  const cx = W / 2, cy = H / 2;
+  // one scale for every arrow, so lengths compare honestly; the longest arrow (or the sum) reaches 42% of the shorter side
+  const longest = Math.max(1e-9, ...sum.parts.map((q) => (Number.isFinite(q.mag) ? q.mag : 0)), spec.resultant ? sum.mag : 0);
+  const k = (Math.min(W, H) * 0.42) / longest;
+  const u = spec.unit ? ` ${spec.unit}` : '';
+  const arrow = (x: number, y: number, cls: string, key: string, label?: string) => {
+    const ex = cx + x * k, ey = cy - y * k;
+    const len = Math.hypot(ex - cx, ey - cy);
+    if (len < 1) return null;
+    const ux = (ex - cx) / len, uy = (ey - cy) / len;
+    const head = Math.min(9, len * 0.4);
+    const hx = ex - ux * head, hy = ey - uy * head;
+    const right = ux >= 0;
+    return (
+      <g key={key} className={`ln-vec ${cls}`}>
+        <line x1={cx} y1={cy} x2={hx} y2={hy} />
+        <polygon points={`${ex},${ey} ${hx - uy * head * 0.5},${hy + ux * head * 0.5} ${hx + uy * head * 0.5},${hy - ux * head * 0.5}`} />
+        {label && (
+          <text x={ex + (right ? 6 : -6)} y={ey + (uy > 0 ? 14 : -6)} textAnchor={right ? 'start' : 'end'}>
+            {label}
+          </text>
+        )}
+      </g>
+    );
+  };
+  const aria = [`${spec.title ?? 'Forces'}: ${sum.parts.map((q) => `${q.label} ${fmtVal(q.mag)}${u} at ${fmtVal(q.angle)} degrees`).join('; ')}`, spec.resultant ? `their sum ${fmtVal(sum.mag)}${u} at ${fmtVal(sum.angle)} degrees` : ''].filter(Boolean).join('; ');
+  const balanced = spec.resultant && sum.mag < 1e-6 * Math.max(1, longest);
+  return (
+    <div className="ln ln-vectors" role="group" aria-label={spec.title || 'Forces you can change'}>
+      <p className="ln-figcap">
+        <span className="ln-kind">Forces</span>
+        {spec.title && <span className="ln-title">{spec.title}</span>}
+      </p>
+      <div ref={ref} className="ln-plot">
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img" aria-label={aria}>
+          <line className="ln-vec-axis" x1={8} y1={cy} x2={W - 8} y2={cy} />
+          <line className="ln-vec-axis" x1={cx} y1={8} x2={cx} y2={H - 8} />
+          {sum.parts.map((q, i) => (Number.isFinite(q.x) && Number.isFinite(q.y) ? arrow(q.x, q.y, `is-${i % 3}`, `v${i}`, q.label) : null))}
+          {spec.resultant && !balanced && arrow(sum.x, sum.y, 'is-sum', 'sum', Math.hypot(sum.x, sum.y) * k >= 36 ? 'sum' : undefined)}
+          <rect className="ln-vec-body" x={cx - 9} y={cy - 9} width={18} height={18} rx={3} />
+          {spec.body && (
+            <text className="ln-vec-bodyname" x={cx + 13} y={cy + 22}>
+              {spec.body}
+            </text>
+          )}
+        </svg>
+      </div>
+      <p className="ln-read ln-graph-read" aria-live="polite">
+        {sum.parts.map((q, i) => (
+          <span key={i} className="ln-reading">
+            <span className="ln-k">{q.label}</span>
+            <b>{`${fmtVal(q.mag)}${u} at ${fmtVal(q.angle)}°`}</b>
+          </span>
+        ))}
+        {spec.resultant && (
+          <span className="ln-reading">
+            <span className="ln-k">sum</span>
+            <b>{balanced ? 'zero — they balance' : `${fmtVal(sum.mag)}${u} at ${fmtVal(sum.angle)}°`}</b>
+          </span>
+        )}
+      </p>
+      {spec.params.length > 0 && (
+        <div className="ln-graph-vars">
+          {spec.params.map((p) => (
+            <label key={p.name} className="ln-var">
+              <span className="ln-var-top">
+                <span className="ln-var-k">{p.label}</span>
+                <span className="ln-var-v">{fmtWith(values[p.name] ?? p.value, p.unit)}</span>
+              </span>
+              <input type="range" min={p.min} max={p.max} step={p.step} value={values[p.name] ?? p.value} aria-label={p.label} aria-valuetext={fmtWith(values[p.name] ?? p.value, p.unit)} onChange={(e) => set(p.name, Number(e.target.value))} />
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── an algorithm, step by step ───────────────────────────────────────
+
+/**
+ * The state after each step, one at a time: the cells, the ones being looked at, the ones settled, named pointers
+ * under them, and what the step did. Back and Next (or the arrow keys) move through it; nothing is computed here —
+ * what they see is exactly what was written, so the gate's check of the steps is the check of the picture.
+ */
+function InlineTrace({ spec, state, onState }: { spec: TraceSpec; state?: InlineState; onState: (s: InlineState) => void }) {
+  const last = spec.steps.length - 1;
+  const [at, setAt] = useState(() => Math.min(last, Math.max(0, state?.picked ?? 0)));
+  const go = (i: number) => {
+    const n = Math.min(last, Math.max(0, i));
+    setAt(n);
+    onState({ ...state, picked: n });
+  };
+  const st = spec.steps[at];
+  const width = Math.max(...spec.steps.map((x) => x.cells.length), 1);
+  return (
+    <div
+      className={`ln ln-trace is-${spec.kind}`}
+      role="group"
+      aria-label={spec.title || 'Step through it'}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          go(at + 1);
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          go(at - 1);
+        } else if (e.key === 'Home') go(0);
+        else if (e.key === 'End') go(last);
+      }}
+    >
+      <p className="ln-figcap">
+        <span className="ln-kind">Step by step</span>
+        {spec.title && <span className="ln-title">{spec.title}</span>}
+      </p>
+      <div className="ln-trace-row" style={{ ['--ln-cells' as string]: String(width) }} aria-hidden="true">
+        {st.cells.map((c, i) => (
+          <div key={i} className={`ln-cell${st.mark?.includes(i) ? ' is-mark' : ''}${st.done?.includes(i) ? ' is-done' : ''}`}>
+            <span className="ln-cell-v">{c}</span>
+            <span className="ln-cell-i">{i}</span>
+            <span className="ln-cell-ptr">{(st.pointers ?? []).filter((q) => q.at === i).map((q) => q.name).join(' ')}</span>
+          </div>
+        ))}
+      </div>
+      <p className="ln-trace-note" aria-live="polite">
+        <span className="ln-k">{`Step ${at + 1} of ${spec.steps.length}`}</span> {st.note}
+        <span className="ln-sr">{` The cells: ${st.cells.join(', ')}.${st.mark?.length ? ` Looking at positions ${st.mark.join(' and ')}.` : ''}${st.pointers?.length ? ` ${st.pointers.map((q) => `${q.name} at ${q.at}`).join(', ')}.` : ''}`}</span>
+      </p>
+      <div className="ln-trace-nav">
+        <button type="button" className="ln-btn" onClick={() => go(at - 1)} disabled={at === 0}>
+          Back
+        </button>
+        <input type="range" min={0} max={last} step={1} value={at} aria-label="Step" aria-valuetext={`Step ${at + 1} of ${spec.steps.length}`} onChange={(e) => go(Number(e.target.value))} />
+        <button type="button" className="ln-btn is-next" onClick={() => go(at + 1)} disabled={at === last}>
+          Next
+        </button>
+      </div>
     </div>
   );
 }

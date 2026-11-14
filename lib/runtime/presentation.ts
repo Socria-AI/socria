@@ -170,8 +170,34 @@ export interface PresentationInput {
 }
 
 export type ReplyShape = 'open' | 'deeper' | 'layer' | 'understand' | 'practical';
-export type GraphVariant = 'plot' | 'curve' | 'rate' | 'tangent' | 'market' | 'point';
+export type GraphVariant = 'plot' | 'curve' | 'rate' | 'tangent' | 'market' | 'point' | 'limit' | 'area' | 'monopoly';
 export type DiagramVariant = 'cycle' | 'tree' | 'flow' | 'causes';
+
+/**
+ * HOW THE TURN'S EXPLANATION IS REPRESENTED — the allocation's third question, after who thinks and how the reply
+ * meets them. The planner below decides it from the person's words, the kind of work, what the allocation keeps with
+ * them and the question budget it left (so a guarded problem never gets the picture that would answer it); this names
+ * the decision, for the trace and for measuring it. One of the brief's ten: prose, notation, a function graph, a
+ * scientific diagram, a flow, a timeline, a comparison, an interactive simulation, a map of ideas, or a hybrid of two.
+ */
+export const REPRESENTATIONS = ['text', 'notation', 'graph', 'diagram', 'flow', 'timeline', 'comparison', 'simulation', 'map', 'hybrid'] as const;
+export type Representation = (typeof REPRESENTATIONS)[number];
+const REPRESENTED: Record<InlineKind, Representation> = {
+  chart: 'graph', graph: 'graph', slider: 'simulation', sim: 'simulation', trace: 'simulation', vectors: 'diagram',
+  diagram: 'flow', sequence: 'flow', steps: 'notation', equation: 'notation', check: 'notation',
+  compare: 'comparison', decide: 'comparison', balance: 'comparison', options: 'text', reasoning: 'text', draft: 'text',
+  concepts: 'map', claim: 'map', paths: 'text',
+};
+/** The representation a plan amounts to: what its element shows (a timeline is a sequence with dates), two elements a hybrid, none prose. */
+export function representationOf(p: Pick<Presentation, 'forms'> & { timeline?: boolean; diagramView?: string }): Representation {
+  const shown = p.forms.filter((k) => k !== 'paths');
+  if (!shown.length) return 'text';
+  if (shown.length > 1) return 'hybrid';
+  const k = shown[0];
+  if (k === 'sequence' && p.timeline) return 'timeline';
+  if (k === 'diagram' && p.diagramView && p.diagramView !== 'flow') return 'diagram';
+  return REPRESENTED[k];
+}
 
 export interface Presentation {
   forms: InlineKind[];
@@ -400,6 +426,22 @@ const NOT_RATE = /\bderivative\s+works?\b|\bfirst\s+principles\s+(?:thinking|rea
 const RATE_SOFT = /\b(?:rates?\s+of\s+change|instantaneous\s+(?:rate|speed|velocity)|average\s+(?:rate|slope|velocity|speed)|marginal\s+(?:cost|revenue|product|utility|benefit))\b/i;
 const FINANCE = /\b(?:finance|financial|trading|traders?|options|futures|swaps|hedg\w*|securities|bank(?:s|ing)?|exchange-traded)\b/i;
 /** …of which the average over an interval, set against the rate at a point: the chord and the tangent that matches it. */
+/** Limits and continuity: what a curve approaches, against the value it takes. */
+const LIMIT_ASK = /\b(?:limits?\s+(?:of|as|at)\b|(?:left|right|one|two)[- ]?(?:hand(?:ed)?|sided)\s+limits?|the\s+limit\b|a\s+limit\b|continuit\w*|(?:dis)?continuous|discontinu\w*|removable|jump\s+discontinuit\w*|hole\s+in\s+(?:the|a)\s+graph|open\s+(?:circle|dot|point)|as\s+x\s+(?:approaches|goes\s+to|tends\s+to|gets\s+close)|(?:approaches|tends\s+to)\s+[-−]?\d|x\s*(?:→|->)\s*[-−]?\d|lim\s*_?\s*\{?\s*x)/i;
+const NOT_LIMIT = /\b(?:speed|credit|age|word|character|time|rate|upload|file|size|spending|budget|legal|data|usage)\s+limits?\b|\blimits?\s+(?:of\s+(?:my|our|your|the\s+(?:law|account|plan|app))|on\s+(?:my|our|your))\b/i;
+/** Areas under curves, integrals and their sums. */
+const AREA_ASK = /\b(?:integrals?|integrat(?:e|ion|ing)|area\s+under|riemann|(?:left|right|midpoint)\s+(?:sum|rule|endpoint)|trapezoid(?:al)?\s+rule|definite|antiderivative|accumulat\w+\s+(?:area|change)|fundamental\s+theorem\s+of\s+calculus)\b/i;
+/** Market structure with a price-setter: marginal revenue against marginal cost. */
+const MONOPOLY_ASK = /\b(?:monopol\w+|marginal\s+revenue|mr\s*=\s*mc|price[- ]setter|deadweight\s+loss|profit[- ]maximi[sz]\w*)\b/i;
+/** Forces on a body: what pushes and pulls, and what they add up to. */
+const FORCES_ASK = /\b(?:forces?\s+(?:on|acting|diagram)|free[- ]body|net\s+force|resultant|vectors?\s+(?:add|sum|addition|components?)|add(?:ing)?\s+(?:two\s+|the\s+|these\s+)?vectors|(?:tension|normal\s+force|friction)\b[^.?!]{0,60}\b(?:force|block|box|incline|slope|rope)|inclined?\s+plane|equilibrium\s+of\s+forces|(?:balanced|unbalanced)\s+forces|newton'?s\s+(?:first|second|third)\s+law)\b/i;
+/** An algorithm worked through: the steps it takes on some data. */
+const ALGO_ASK = /\b(?:(?:bubble|insertion|selection|merge|quick|heap|counting|radix)\s*sort|sorting\s+algorithm|binary\s+search|linear\s+search|two[- ]pointers?|sliding\s+window|(?:breadth|depth)[- ]first\s+search|bfs|dfs|dijkstra|euclid(?:'s|ean)?\s+algorithm|stack\s+(?:push|pop)|push\s+and\s+pop|queue\s+(?:enqueue|dequeue)|fibonacci\s+(?:with|using)\s+dynamic|dynamic\s+programming)\b/i;
+const ALGO_HOW = /\b(?:how\s+(?:does|do|is)|walk\s+(?:me\s+)?through|step\s+(?:by|through)|trace|show\s+(?:me\s+)?(?:how|the\s+steps)|explain|visuali[sz]e|work(?:s)?)\b/i;
+
+/** Consumer or producer surplus: an area between demand and a price. */
+const SURPLUS_ASK = /\b(?:consumer|producer)\s+surplus\b/i;
+
 const AVERAGE_RATE = /\b(?:mean\s+value\s+theorem|mvt|rolle'?s\s+theorem|average\s+(?:rate|slope|velocity|speed)|secant(?:\s+lines?)?)\b/i;
 /** Curves that meet and shift: a market, a tax, a price control — never a supply chain. */
 const MARKET_SURE =
@@ -497,7 +539,10 @@ export function planPresentation(i: PresentationInput): Presentation {
   const livedOn = /\bhow\s+(?:do|can|could|would|will)\s+(?:i|we|you)\s+(?:survive|live|get\s+by|pay|qualify|earn|make\s+ends\s+meet|afford)\b/i.test(t);
   const market = !livedOn && (MARKET_SURE.test(t) || (MARKET_SOFT.test(t) && (ECON.test(t) || domain === 'learning' || domain === 'business')));
   const elastic = ELASTIC.test(t) && (mathy || /\b(?:demand|supply|price|prices|pricing)\b/i.test(t));
-  const subject = SUBJECT.test(t) || ((domain === 'math' || domain === 'learning' || domain === 'research') && SUBJECT_GENERIC.test(t)) || mathRel || rate || market || elastic || domain === 'math';
+  const limitAsk = LIMIT_ASK.test(t) && !NOT_LIMIT.test(t) && !/\bcontinuous\s+(?:integration|deployment|delivery|improvement|learning|monitoring|glucose)\b/i.test(t) && (mathy || /\b(?:x|f\s*\(|function|curve|graph|calculus|continuity|discontinu\w*|removable)\b/i.test(t));
+  const areaAsk = (AREA_ASK.test(t) && (mathy || /\b(?:curve|function|calculus|x)\b/i.test(t))) || SURPLUS_ASK.test(t);
+  const monopoly = MONOPOLY_ASK.test(t) && (ECON.test(t) || /\b(?:firm|market|output|quantity)\b/i.test(t) || domain === 'learning' || domain === 'business');
+  const subject = SUBJECT.test(t) || ((domain === 'math' || domain === 'learning' || domain === 'research') && SUBJECT_GENERIC.test(t)) || mathRel || rate || market || elastic || limitAsk || areaAsk || monopoly || domain === 'math';
   const listAsked = LIST_ASK.test(t) || LIST_LEAD.test(t);
   // somebody's own life — their relationships, grief, feelings, self: no table, no recipe, no diagram of it
   // (lib/runtime/asks.ts PERSONAL_LIFE) — and with a sensitive subject (a diagnosis, debt, a divorce) no
@@ -577,7 +622,10 @@ export function planPresentation(i: PresentationInput): Presentation {
   // a curve (elasticity), or the curve's own shape.
   // a quick plot of one function asked for (lib/runtime/plot-ask.ts): that function, drawn in place
   const plotted = quickPlot(t);
-  const variant: GraphVariant | null = plotted ? 'plot' : rate ? (AVERAGE_RATE.test(t) ? 'rate' : 'tangent') : market ? 'market' : elastic ? 'point' : mathRel ? 'curve' : null;
+  // which picture the idea needs: the asked plot first; then the idea's own construction — a hole and a value for a
+  // limit, an area or its rectangles for an integral, marginal revenue against cost for a price-setter, a surplus
+  // between demand and price — before the general ones
+  const variant: GraphVariant | null = plotted ? 'plot' : limitAsk ? 'limit' : areaAsk ? 'area' : monopoly ? 'monopoly' : rate ? (AVERAGE_RATE.test(t) ? 'rate' : 'tangent') : market ? 'market' : elastic ? 'point' : mathRel ? 'curve' : null;
   let graph: GraphVariant | undefined;
   // (not where steps were asked for: the steps are the answer, and a second picture of the same thing is not)
   // (and never on a problem they are working or a proof: "prove by induction that 1 + 2 + … + n = n(n+1)/2" has
@@ -589,6 +637,11 @@ export function planPresentation(i: PresentationInput): Presentation {
   }
   // motion, or something that unfolds in time, asked why or how: one small simulation to try
   if (liveOk && work !== 'creation' && simAsk(t) && WHY_HOW.test(t)) offer('sim', 'sim:try-it');
+  // forces on a body, asked about: the arrows and what they add up to (not their own working, not under the guard)
+  // ("draw a free body diagram" is asking to see it, not to make something of their own)
+  if (liveOk && !i.guard && !i.ownReasoning && (work !== 'creation' || /\b(?:draw|show|sketch)\b/i.test(t)) && FORCES_ASK.test(t) && !offered.includes('graph') && !offered.includes('sim')) offer('vectors', 'vectors:forces');
+  // an algorithm, asked how it works: its steps on a small example, to step through (never code they are writing)
+  if (liveOk && !i.ownReasoning && work !== 'creation' && work !== 'diagnosis' && ALGO_ASK.test(t) && ALGO_HOW.test(t) && !/```/.test(t)) offer('trace', 'trace:algorithm');
   // a claim to check: the verdict, and the parts it rests on to open and doubt (not laid out under the guard)
   if (claim && !i.guard) offer('claim', 'claim:inspect', /\?\s*$/.test(t) ? 'strong' : 'soft');
   // a choice that is theirs: a decision they weigh, not one that leans for them — with Socria's read, once, when asked
@@ -656,7 +709,7 @@ export function planPresentation(i: PresentationInput): Presentation {
   // a practical procedure — setting something up, hiring, a recipe: its steps, in order
   else if (practical && !i.guard && !listAsked && !i.ownReasoning && (kind === 'setup' || kind === 'procedure')) offer('sequence', 'sequence:steps');
   // how a system works, asked about as a whole: its ordered parts may carry it (the four downs)
-  else if (!i.guard && !listAsked && !i.ownReasoning && work !== 'creation' && x.kind !== 'brainstorm' && HOW_IT_WORKS.test(t) && !shown) offer('sequence', 'sequence:how-it-works', 'soft');
+  else if (!i.guard && !listAsked && !i.ownReasoning && work !== 'creation' && x.kind !== 'brainstorm' && HOW_IT_WORKS.test(t) && !shown && !offered.includes('trace')) offer('sequence', 'sequence:how-it-works', 'soft');
   // a practical question about pricing or growth: the options it comes down to, side by side
   if (practical && !offered.length && (kind === 'price' || kind === 'grow')) {
     const priced = kind === 'price';
@@ -768,6 +821,10 @@ const GRAMMAR: Record<InlineKind, string> = {
     '{"type":"diagram","view":"flow","title":"How a fever starts","nodes":[{"id":"a","label":"An infection"},{"id":"b","label":"Immune signals released","detail":"they reach the brain through the blood"},{"id":"c","label":"The brain raises its set point"},{"id":"d","label":"Shivering heats the body"}],"edges":[["a","b"],["b","c"],["c","d"]]} — a chain from cause to effect (it may branch); 3–9 nodes, labels a few words, "detail" a line read when opened. Your prose: what drives it, in a sentence; the nodes carry the parts — do not also list them.',
   balance:
     '{"type":"balance","subject":"Owning a hot tub","for":[{"text":"Unwinding without leaving home","detail":"no booking, no travel"},{"text":"Warmth for stiff muscles"}],"against":[{"text":"Power and water bills"},{"text":"Weekly cleaning and chemicals"}],"turns_on":"how often you would really use it"} — one subject, 2–4 points each side, a few words each, "detail" read when opened; "turns_on" is the one thing that decides which side wins for most people. Your prose: that one thing, in a sentence; do not also list the sides.',
+  vectors:
+    '{"type":"vectors","title":"A box pulled on a rough floor","body":"box","unit":"N","vectors":[{"label":"pull","mag":"p","angle":30},{"label":"friction","mag":12,"angle":180},{"label":"weight","mag":49,"angle":270},{"label":"normal","mag":"49-p*sin(30*pi/180)","angle":90}],"params":[{"name":"p","label":"pull","value":20,"min":0,"max":40,"step":1,"unit":"N"}]} — forces on one body: 1–5 vectors, each a size ("mag", never negative) and a direction ("angle", degrees from the positive x-axis, anticlockwise: 0 right, 90 up, 180 left, 270 down), numbers or formulas in up to three parameters they slide; their sum is drawn and read out, live ("resultant":false to leave it off). Keep the physics true: a normal force that depends on the pull is a formula of it. Your prose: what to try, and what the sum tells them — the readings carry the numbers.',
+  trace:
+    '{"type":"trace","title":"Binary search for 23","kind":"array","steps":[{"cells":[2,5,8,12,16,23,38],"pointers":{"lo":0,"hi":6,"mid":3},"mark":[3],"note":"Middle is 12; 23 is bigger, so drop the left half."},{"cells":[2,5,8,12,16,23,38],"pointers":{"lo":4,"hi":6,"mid":5},"mark":[5],"note":"Middle is 23: found it, at index 5."}]} — an algorithm on a small example: 2–12 steps, each the cells after that step (at most 16, a few characters each), "mark" the positions it is looking at, "done" the ones settled, "pointers" named positions, and a short "note" on what the step did. Work every step out yourself before writing it: they read it step by step, and a wrong state teaches the wrong thing. Your prose: the idea in a sentence; the steps carry the rest.',
   equation:
     '{"type":"equation","tex":"\\\\text{mpg} = \\\\frac{\\\\text{miles}}{\\\\text{gallons}}","terms":[{"sym":"miles","means":"how far you drove"},{"sym":"gallons","means":"the fuel it took"}],"example":{"tex":"\\\\frac{300\\\\text{ miles}}{10\\\\text{ gallons}} = 30\\\\text{ mpg}"}} — the definition as one equation (TeX), each term a line, and one worked example (TeX, optional). Your prose: what it tells you, in a sentence.',
 };
@@ -841,6 +898,12 @@ const GRAPH_GRAMMAR: Record<GraphVariant, string> = {
     '{"type":"graph","title":"The slope at a point","expr":"x^2","x":[-3,3],"params":[{"name":"p","label":"point","value":1,"min":-2.5,"max":2.5,"step":0.1}],"tangent":"p"} — the rate at a point: "tangent" names a parameter that is an x position; the tangent there and its slope are drawn live, and they drag the point along the curve. For the average over an interval instead, "chord":["a","b"] draws the chord between two such positions and its slope. Pick a curve that shows the idea at a glance.' + GRAPH_TAIL,
   market:
     '{"type":"graph","title":"A tax on sellers","expr":"10-x","label":"demand","curves":[{"expr":"2+x+t","label":"supply"}],"x":[0,10],"params":[{"name":"t","label":"tax","value":0,"min":0,"max":4,"step":0.5}],"features":["crossings"]} — curves that meet: the first curve and one or two more ("curves") over the same x and parameters (quantity across, price up), each with a label; "crossings" marks where they meet, live, and where they met at first stays visible as they change things.' + GRAPH_TAIL,
+  limit:
+    '{"type":"graph","title":"The limit, and the value","expr":"(x^2-1)/(x-1)","x":[-1,3],"params":[{"name":"p","label":"x","value":0.2,"min":-0.8,"max":2.8,"step":0.05}],"at":["p"],"points":[{"x":1,"open":true},{"x":1,"y":3}]} — a limit against the value taken: "points" marks an open circle (a hole: "open":true, the value the curve approaches there — give no "y" and it is computed from the curve) and a filled point (the value the function takes, its own "y"). A filled point off the curve needs its open circle at the same x, or the graph is refused; a hole must sit where the curve goes. For the curve, a formula that is undefined at the point ((x^2-1)/(x-1)) or one the hole sits on; "at" gives them a point to drag toward it. Your prose: the limit and the value, each in a few words — the picture carries the rest.' + GRAPH_TAIL,
+  area:
+    '{"type":"graph","title":"Rectangles under y = x²","expr":"x^2","x":[0,2.2],"params":[{"name":"n","label":"rectangles","value":4,"min":1,"max":40,"step":1}],"area":{"from":0,"to":2,"rects":{"n":"n","rule":"left"}}} — an area under the curve: "area" from–to shades it (with "between":1 to shade down to the second curve instead of the axis — a surplus between demand and a price line); "rects" draws Riemann rectangles instead, how many ("n": a number, or the parameter they slide) and where each takes its height ("left", "right", "mid"); their total, the exact area and the gap are computed live.' + GRAPH_TAIL,
+  monopoly:
+    '{"type":"graph","title":"A monopoly picks its output","expr":"12-x","label":"demand","curves":[{"expr":"12-2*x","label":"marginal revenue"},{"expr":"2+c","label":"marginal cost"}],"x":[0,8],"y":[0,13],"params":[{"name":"c","label":"cost shift","value":0,"min":-1,"max":4,"step":0.5}],"features":["crossings"]} — curves that meet: demand, marginal revenue and marginal cost over quantity, each labelled; "crossings" marks where they meet, live. The firm produces where marginal revenue meets marginal cost and charges what demand bears at that quantity — say so in a line; the crossing is computed, never asserted.' + GRAPH_TAIL,
   point:
     '{"type":"graph","title":"Elasticity along a demand curve","expr":"10-x","label":"demand","x":[0,10],"params":[{"name":"q","label":"quantity","value":3,"min":0.5,"max":9.5,"step":0.5}],"at":["q"],"readouts":[{"label":"elasticity","expr":"(10-q)/q","digits":2}]} — a point they drag along the curve ("at" names a parameter that is an x position), with readings that are formulas in the parameters ("readouts"), computed live.' + GRAPH_TAIL,
 };
@@ -1168,6 +1231,8 @@ export function presentationRoom(p: Presentation): number {
   // a diagram is nodes, each with a line to open, and the edges between them
   if (p.forms.includes('diagram')) return 600 + deeper;
   // a graph, a simulation or the working is one longer line of JSON: a cut-off one is not drawn at all
-  if (p.forms.includes('graph') || p.forms.includes('sim') || p.forms.includes('steps')) return 550 + deeper;
+  if (p.forms.includes('graph') || p.forms.includes('sim') || p.forms.includes('steps') || p.forms.includes('vectors')) return 550 + deeper;
+  // an algorithm's states, written out step by step, need the most room of any element
+  if (p.forms.includes('trace')) return 800 + deeper;
   return (['sequence', 'decide', 'claim', 'balance', 'equation'].some((k) => p.forms.includes(k as InlineKind)) ? 450 : 350) + deeper;
 }
