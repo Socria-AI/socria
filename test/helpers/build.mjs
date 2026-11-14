@@ -396,6 +396,8 @@ const MODULES = [
   'test/helpers/preview-under-test.ts',
   // SocriaUX (/ux): the project, the checks, the model's brief and reply, the code, the store
   'test/helpers/ux-under-test.ts',
+  // SocriaUX v0 (/ux-v0): shapes, spec and patches, renderer, sandbox, inspector, selection, gate, prompts, providers
+  'test/helpers/ux-v0-under-test.ts',
 ];
 
 export async function buildAll() {

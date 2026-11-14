@@ -176,3 +176,14 @@ revoke all on mr_ledger from anon, authenticated;
 alter table ux_projects enable row level security;
 alter table ux_projects force row level security;
 revoke all on ux_projects from anon, authenticated;
+
+-- SocriaUX v0 (schema.sql ux_v0_projects, ux_v0_usage): one designer's
+-- projects and spend, reached only through /api/ux-v0/* with the service role.
+alter table ux_v0_projects enable row level security;
+alter table ux_v0_projects force row level security;
+revoke all on ux_v0_projects from anon, authenticated;
+alter table ux_v0_usage enable row level security;
+alter table ux_v0_usage force row level security;
+revoke all on ux_v0_usage from anon, authenticated;
+revoke execute on function bump_ux_v0_usage(text, text, text, integer, integer, bigint, bigint, numeric, bigint) from public, anon, authenticated;
+grant execute on function bump_ux_v0_usage(text, text, text, integer, integer, bigint, bigint, numeric, bigint) to service_role;
