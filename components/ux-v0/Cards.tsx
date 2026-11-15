@@ -35,7 +35,7 @@ function Turn({ t, first, onRetry, pending }: { t: CardTurn; first: boolean; onR
         <p className="v0-error-line" role="alert">
           {t.error}{' '}
           {onRetry && (
-            <button type="button" className="l5-link is-meta is-strong" onClick={onRetry}>
+            <button type="button" className="sb-link is-meta is-strong" onClick={onRetry}>
               Try again
             </button>
           )}
@@ -60,7 +60,7 @@ function Turn({ t, first, onRetry, pending }: { t: CardTurn; first: boolean; onR
               {r.issues.map((x, i) => (
                 <li key={i} className="v0-row">
                   <span className="v0-row-n" aria-hidden="true">
-                    {i + 1}
+                    <span className="sb-glyph is-objection" />
                   </span>
                   <div>
                     <p className="v0-row-text">{x.text}</p>
@@ -84,7 +84,7 @@ function Turn({ t, first, onRetry, pending }: { t: CardTurn; first: boolean; onR
           )}
           {r.alternatives.length > 0 && (
             <div className="v0-alts">
-              <span className="l5-label">You could</span>
+              <span className="sb-label">You could</span>
               <ul>
                 {r.alternatives.map((x, i) => (
                   <li key={i}>
@@ -139,25 +139,25 @@ export function CardView({
       <div className="v0-card-acts">
         {card.state === 'kept' && <span className="v0-state">Kept</span>}
         {card.state !== 'dismissed' && (
-          <button type="button" className={`l5-link is-meta${active ? ' is-strong' : ''}`} onClick={onActivate} aria-pressed={active}>
+          <button type="button" className={`sb-link is-meta${active ? ' is-strong' : ''}`} onClick={onActivate} aria-pressed={active}>
             {active ? 'Replying' : 'Reply'}
           </button>
         )}
         {card.state === 'open' && (
-          <button type="button" className="l5-link is-meta" onClick={() => onState('kept')}>
+          <button type="button" className="sb-link is-meta" onClick={() => onState('kept')}>
             Keep
           </button>
         )}
         {card.state !== 'dismissed' ? (
-          <button type="button" className="l5-link is-meta" onClick={() => onState('dismissed')}>
+          <button type="button" className="sb-link is-meta" onClick={() => onState('dismissed')}>
             Dismiss
           </button>
         ) : (
-          <button type="button" className="l5-link is-meta" onClick={() => onState('open')}>
+          <button type="button" className="sb-link is-meta" onClick={() => onState('open')}>
             Restore
           </button>
         )}
-        <button type="button" className="l5-link is-meta" onClick={onShow}>
+        <button type="button" className="sb-link is-meta" onClick={onShow}>
           Show on design
         </button>
       </div>
@@ -203,7 +203,7 @@ export function CardsRail({
       ))}
       {out.length > 0 && (
         <details className="v0-dismissed">
-          <summary className="l5-link is-meta">Dismissed ({out.length})</summary>
+          <summary className="sb-link is-meta">Dismissed ({out.length})</summary>
           {out.map((c) => (
             <CardView key={c.id} card={c} active={false} pendingTurn={null} onActivate={() => undefined} onShow={() => onShow(c.id)} onState={(s) => onState(c.id, s)} onRetry={() => undefined} />
           ))}

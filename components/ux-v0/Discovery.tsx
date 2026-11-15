@@ -42,13 +42,16 @@ export function QuestionBand({
   }
   if (!q) {
     return (
-      <div className="v0-question is-ready">
-        <span className="l5-label is-lit">{ready ? 'Enough to write the brief' : 'Discovery'}</span>
+      <div className="v0-question is-ready sb-card is-idea">
+        <span className="sb-label v0-asks-label">
+          <span className="sb-glyph" aria-hidden="true" />
+          {ready ? 'Enough to write the brief.' : 'Discovery'}
+        </span>
         <p className="v0-q-text">{ready ? 'SocriaUX has what it needs to draft the brief. Keep what fits on the board below, then write it.' : 'Say more below, or write the brief when you are ready.'}</p>
         {note && <p className="v0-quiet">{note}</p>}
         <div className="v0-q-acts">
-          <button type="button" className="l5-link is-go" onClick={onBrief} disabled={!!busy || answered < 1}>
-            Write the brief <span className="l5-ar">→</span>
+          <button type="button" className="sb-btn is-primary" onClick={onBrief} disabled={!!busy || answered < 1}>
+            Write the brief
           </button>
         </div>
       </div>
@@ -56,9 +59,13 @@ export function QuestionBand({
   }
   const toggle = (o: string) => setChosen((c) => (c.includes(o) ? c.filter((x) => x !== o) : [...c, o]));
   return (
-    <div className="v0-question" aria-live="polite">
-      <span className="l5-label is-asks">
-        Question {n} · {TOPIC_LABEL[q.topic]}
+    <div className="v0-question sb-card is-question sb-floating" aria-live="polite">
+      <span className="sb-label v0-asks-label">
+        <span className="sb-glyph is-question" aria-hidden="true" />
+        Socria asks
+        <span className="v0-asks-n">
+          Question {n}, about {TOPIC_LABEL[q.topic].toLowerCase()}
+        </span>
       </span>
       <p className="v0-q-text">{q.question}</p>
       {q.why && <p className="v0-q-why">{q.why}</p>}
@@ -68,7 +75,7 @@ export function QuestionBand({
             <button
               key={o}
               type="button"
-              className={`l5-link v0-option${chosen.includes(o) ? ' is-on' : ''}`}
+              className={`sb-btn v0-option${chosen.includes(o) ? ' is-on' : ''}`}
               aria-pressed={q.multi ? chosen.includes(o) : undefined}
               disabled={!!busy}
               onClick={() => (q.multi ? toggle(o) : onAnswer(o))}
@@ -80,15 +87,15 @@ export function QuestionBand({
       )}
       <div className="v0-q-acts">
         {q.multi && chosen.length > 0 && (
-          <button type="button" className="l5-link is-go" onClick={() => (onAnswer(chosen.join('; ')), setChosen([]))} disabled={!!busy}>
-            Use {chosen.length === 1 ? 'this' : 'these'} <span className="l5-ar">→</span>
+          <button type="button" className="sb-btn is-primary" onClick={() => (onAnswer(chosen.join('; ')), setChosen([]))} disabled={!!busy}>
+            Use {chosen.length === 1 ? 'this' : 'these'}
           </button>
         )}
-        <button type="button" className="l5-link is-meta" onClick={onSkip} disabled={!!busy}>
+        <button type="button" className="sb-btn is-sm v0-on-q" onClick={onSkip} disabled={!!busy}>
           Skip
         </button>
         {answered >= 2 && (
-          <button type="button" className="l5-link is-meta" onClick={onBrief} disabled={!!busy}>
+          <button type="button" className="sb-btn is-sm v0-on-q" onClick={onBrief} disabled={!!busy}>
             Write the brief now
           </button>
         )}
@@ -108,12 +115,12 @@ export function QuestionsRail({ discovery, intent, onEdit, onIntent }: { discove
   return (
     <div className="v0-rail-body">
       <section className="v0-cellset">
-        <span className="l5-label">What you want to make</span>
+        <span className="sb-label">What you want to make</span>
         <EditLine value={intent} onSave={onIntent} />
       </section>
       {discovery.understanding.summary && (
         <section className="v0-cellset">
-          <span className="l5-label">Understood so far</span>
+          <span className="sb-label">Understood so far</span>
           <p className="v0-body">{discovery.understanding.summary}</p>
           {known.length > 0 && (
             <dl className="v0-kv">
@@ -128,7 +135,7 @@ export function QuestionsRail({ discovery, intent, onEdit, onIntent }: { discove
         </section>
       )}
       <section className="v0-cellset">
-        <span className="l5-label">Answered</span>
+        <span className="sb-label">Answered</span>
         {!answered.length && <p className="v0-empty">Nothing yet.</p>}
         <ol className="v0-answers">
           {answered.map((q) => (
@@ -150,7 +157,7 @@ function EditLine({ value, onSave }: { value: string; onSave: (v: string) => voi
     return (
       <p className="v0-body v0-editable">
         {value || '—'}{' '}
-        <button type="button" className="l5-link is-meta" onClick={() => (setV(value), setEditing(true))}>
+        <button type="button" className="sb-link is-meta" onClick={() => (setV(value), setEditing(true))}>
           Edit
         </button>
       </p>
@@ -160,10 +167,10 @@ function EditLine({ value, onSave }: { value: string; onSave: (v: string) => voi
     <div className="v0-editline">
       <textarea className="v0-field" rows={2} value={v} onChange={(e) => setV(e.target.value)} aria-label="Edit" />
       <span className="v0-q-acts">
-        <button type="button" className="l5-link is-meta is-strong" onClick={() => (onSave(v.trim()), setEditing(false))} disabled={!v.trim()}>
+        <button type="button" className="sb-link is-meta is-strong" onClick={() => (onSave(v.trim()), setEditing(false))} disabled={!v.trim()}>
           Save
         </button>
-        <button type="button" className="l5-link is-meta" onClick={() => setEditing(false)}>
+        <button type="button" className="sb-link is-meta" onClick={() => setEditing(false)}>
           Cancel
         </button>
       </span>

@@ -30,7 +30,7 @@ interface Props {
 function Field({ label, value, onChange, rows = 2, hint }: { label: string; value: string; onChange: (v: string) => void; rows?: number; hint?: string }) {
   return (
     <label className="v0-brief-field">
-      <span className="l5-label">{label}</span>
+      <span className="sb-label">{label}</span>
       <textarea className="v0-field" rows={rows} value={value} onChange={(e) => onChange(e.target.value)} />
       {hint && <span className="v0-quiet">{hint}</span>}
     </label>
@@ -59,7 +59,7 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
     <div className="v0-brief">
       <header className="v0-brief-head">
         <div>
-          <span className="l5-label">
+          <span className="sb-label">
             Brief · version {version} · {approved ? 'approved' : 'draft'}
           </span>
           <h2 className="v0-brief-title">{brief.objective}</h2>
@@ -79,7 +79,7 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
         </div>
         <div className="v0-brief-col">
           <div className="v0-brief-field">
-            <span className="l5-label">Palette</span>
+            <span className="sb-label">Palette</span>
             <ul className="v0-pal-edit">
               {brief.palette.map((c, i) => (
                 <li key={i}>
@@ -122,7 +122,7 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
             </ul>
           </div>
           <div className="v0-brief-field">
-            <span className="l5-label">Typography</span>
+            <span className="sb-label">Typography</span>
             <div className="v0-type-pick">
               <select className="v0-select" value={brief.typography.display} onChange={(e) => set('typography', { ...brief.typography, display: e.target.value })} aria-label="Display face">
                 {FONTS.map((f) => (
@@ -144,7 +144,7 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
             {brief.typography.rationale && <p className="v0-quiet">{brief.typography.rationale}</p>}
           </div>
           <div className="v0-brief-field">
-            <span className="l5-label">References</span>
+            <span className="sb-label">References</span>
             {!kept.length && <p className="v0-quiet">No images kept on the moodboard. The design will use variants that need none.</p>}
             <div className="v0-ref-strip">
               {kept.map((r) => {
@@ -165,7 +165,7 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
             </div>
           </div>
           <div className="v0-brief-field">
-            <span className="l5-label">Kind of design</span>
+            <span className="sb-label">Kind of design</span>
             <div className="v0-type-pick">
               <select className="v0-select" value={brief.pageType} onChange={(e) => set('pageType', e.target.value as DesignBrief['pageType'])} aria-label="Kind of design">
                 <option value="website">Website</option>
@@ -181,10 +181,10 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
       </div>
 
       <footer className="v0-brief-foot">
-        <button type="button" className="l5-btn is-primary" onClick={onApprove} disabled={!!busy}>
+        <button type="button" className="sb-btn is-primary" onClick={onApprove} disabled={!!busy}>
           {busy ? busy : approved && hasDesign ? 'Generate again from this brief' : 'Approve and generate'}
         </button>
-        <button type="button" className="l5-link" onClick={onBack}>
+        <button type="button" className="sb-link" onClick={onBack}>
           Back to the moodboard
         </button>
         <span className="v0-quiet">Edit anything above directly, or say what to change below.</span>

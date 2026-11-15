@@ -96,7 +96,7 @@ const selBox = async () => { const b = await page.locator('.v0-sel').first().bou
 const send = async (text) => {
   const n = critiques.length;
   await page.locator('.v0-compose textarea').fill(text);
-  await page.locator('.v0-compose .l5-btn.is-primary').click();
+  await page.locator('.v0-compose .sb-btn.is-primary').click();
   for (let i = 0; i < 40 && critiques.length === n; i++) await page.waitForTimeout(150);
   return critiques.at(-1);
 };
@@ -251,7 +251,7 @@ await part('retina crop', async () => {
     await p2.mouse.up();
     await p2.waitForSelector('.v0-sel.is-region', { timeout: 5000 });
     await p2.locator('.v0-compose textarea').fill('Crop check');
-    await p2.locator('.v0-compose .l5-btn.is-primary').click();
+    await p2.locator('.v0-compose .sb-btn.is-primary').click();
     for (let i = 0; i < 40 && !seen.length; i++) await p2.waitForTimeout(150);
     const crop = seen[0]?.selection?.crop;
     const size = crop ? await p2.evaluate((u) => new Promise((res) => { const i = new Image(); i.onload = () => res([i.naturalWidth, i.naturalHeight]); i.src = u; }), crop.dataUrl) : null;
@@ -286,7 +286,7 @@ await part('create acceptance', async () => {
     const r = (sel) => document.querySelector(sel)?.getBoundingClientRect();
     const inside = (b) => !!b && b.left >= -0.5 && b.right <= window.innerWidth + 0.5;
     const over = (a, b) => !!a && !!b && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-    return { send: inside(r('.v0-compose .l5-btn.is-primary')), guide: inside(r('.v0-guide')), field: inside(r('.v0-compose textarea')), steps: inside(r('.v0-steps')), clash: over(r('.v0-steps'), r('.v0-home')), tab: Math.round(r('.v0-steps .l5-tab')?.height ?? 0) };
+    return { send: inside(r('.v0-compose .sb-btn.is-primary')), guide: inside(r('.v0-guide')), field: inside(r('.v0-compose textarea')), steps: inside(r('.v0-steps')), clash: over(r('.v0-steps'), r('.v0-home')), tab: Math.round(r('.v0-steps .sb-seg-item')?.height ?? 0) };
   });
   check('…with nothing clipped or covered: the composer, its button, the steps and the mark', fit.send && fit.guide && fit.field && fit.steps && !fit.clash, JSON.stringify(fit));
   check('…and the steps are big enough to tap', fit.tab >= 44, `${fit.tab}px`);
@@ -301,7 +301,7 @@ await part('create acceptance', async () => {
   const line = await page.locator('.v0-board .v0-error-line').innerText().catch(() => '');
   check('a provider failure is said on the board, which keeps what it has', /could not be reached/.test(line) && (await page.locator('.v0-tile').count()) === tiles && tiles > 0, `${tiles} tiles · ${line}`);
   await page.unroute('**/api/ux-v0/images');
-  for (let i = 0; i < 6; i++) { const k = page.locator('.v0-tile .l5-link', { hasText: /^Keep$/ }).first(); if (await k.count()) await k.click(); }
+  for (let i = 0; i < 6; i++) { const k = page.locator('.v0-tile .sb-link', { hasText: /^Keep$/ }).first(); if (await k.count()) await k.click(); }
   await page.getByRole('button', { name: 'Neighbours who come for the ritual' }).click();
   await page.waitForSelector('text=Enough to write the brief', { timeout: 10000 });
   await page.getByRole('button', { name: /Write the brief/ }).first().click();
@@ -335,7 +335,7 @@ await part('create acceptance', async () => {
   await page.frameLocator('iframe.v0-frame').locator('h1').click();
   await page.waitForSelector('.v0-sel', { timeout: 5000 });
   await page.locator('.v0-compose textarea').fill('Make the headline about first light');
-  await page.locator('.v0-compose .l5-btn.is-primary').click();
+  await page.locator('.v0-compose .sb-btn.is-primary').click();
   await page.waitForFunction(() => document.querySelector('.v0-notice')?.textContent?.includes('Changed'), null, { timeout: 10000 });
   await page.waitForTimeout(1500);
   const changed = await bodyHtml();

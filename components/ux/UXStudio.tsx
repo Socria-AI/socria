@@ -17,6 +17,7 @@ import { deleteProject, loadProject, newer, readIndex, saveProject } from '@/lib
 import { TEMPLATES, artboardFromTemplate, exampleProject, type TemplateId } from '@/lib/ux/templates';
 import { UXWorkspace } from './UXWorkspace';
 import { boardSizeFor, readScreenshot } from './image';
+import '@/components/brand/socria-brand.css';
 import './ux.css';
 
 type Start = TemplateId | 'upload';
@@ -194,7 +195,7 @@ export function UXStudio({ signedIn }: { signedIn: boolean }) {
   const remoteOnly = cloud.filter((c) => !localIds.has(c.id));
 
   return (
-    <div className="uxs lg-tokens">
+    <div className="uxs sb lg-tokens">
       <header className="uxs-head">
         <a href="/" className="uxh-home" aria-label="Socria">
           <img src="/socria-mark.png" alt="" width={24} height={24} />

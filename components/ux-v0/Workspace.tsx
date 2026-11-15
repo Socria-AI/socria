@@ -679,7 +679,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const isPage = !!doc;
 
   return (
-    <div className="v0 lg-tokens">
+    <div className="v0 sb">
       <header className="v0-head">
         <div className="v0-head-l">
           <button type="button" className="v0-home" onClick={onExit} aria-label="All designs">
@@ -695,9 +695,9 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
           <input className="v0-name" value={project.name} onChange={(e) => update((p) => ({ ...p, name: e.target.value.slice(0, 80) }))} aria-label="Design name" />
         </div>
         {steps.length > 0 && (
-          <nav className="l5-tabs v0-steps" aria-label="Steps">
+          <nav className="sb-seg v0-steps" aria-label="Steps">
             {steps.map((s) => (
-              <button key={s.id} type="button" className={`l5-tab${view === s.id ? ' is-on' : ''}`} aria-current={view === s.id ? 'step' : undefined} disabled={!s.ok} onClick={() => setView(s.id)}>
+              <button key={s.id} type="button" className={`sb-seg-item${view === s.id ? ' is-on' : ''}`} aria-current={view === s.id ? 'step' : undefined} disabled={!s.ok} onClick={() => setView(s.id)}>
                 {s.label}
               </button>
             ))}
@@ -711,7 +711,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
             {SAVE_WORDS[save]}
           </span>
           {!signedIn && (
-            <a className="l5-link is-meta is-strong" href="/sign-in?redirect_url=/ux-v0">
+            <a className="sb-link is-meta is-strong" href="/sign-in?redirect_url=/ux-v0">
               Sign in
             </a>
           )}
@@ -725,43 +725,43 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
         <main className="v0-main">
           {view === 'design' && (isPage || fileUrl) && (
             <div className="v0-toolbar" role="toolbar" aria-label="Canvas">
-              <span className="l5-tabs is-tight" role="radiogroup" aria-label="Select">
-                <button type="button" role="radio" aria-checked={mode === 'element'} className={`l5-tab${mode === 'element' ? ' is-on' : ''}`} onClick={() => setMode('element')} disabled={!isPage} title="Select an element (E)">
+              <span className="sb-seg is-tight" role="radiogroup" aria-label="Select">
+                <button type="button" role="radio" aria-checked={mode === 'element'} className={`sb-seg-item${mode === 'element' ? ' is-on' : ''}`} onClick={() => setMode('element')} disabled={!isPage} title="Select an element (E)">
                   Element
                 </button>
-                <button type="button" role="radio" aria-checked={mode === 'area'} className={`l5-tab${mode === 'area' ? ' is-on' : ''}`} onClick={() => setMode('area')} title="Drag to select an area (A)">
+                <button type="button" role="radio" aria-checked={mode === 'area'} className={`sb-seg-item${mode === 'area' ? ' is-on' : ''}`} onClick={() => setMode('area')} title="Drag to select an area (A)">
                   Area
                 </button>
               </span>
               {isPage && (
-                <span className="l5-tabs is-tight" role="radiogroup" aria-label="Viewport">
+                <span className="sb-seg is-tight" role="radiogroup" aria-label="Viewport">
                   {(['desktop', 'tablet', 'mobile'] as Viewport[]).map((v) => (
-                    <button key={v} type="button" role="radio" aria-checked={project.viewport === v} className={`l5-tab${project.viewport === v ? ' is-on' : ''}`} onClick={() => switchViewport(v)}>
+                    <button key={v} type="button" role="radio" aria-checked={project.viewport === v} className={`sb-seg-item${project.viewport === v ? ' is-on' : ''}`} onClick={() => switchViewport(v)}>
                       {v === 'desktop' ? 'Desktop' : v === 'tablet' ? 'Tablet' : 'Mobile'}
                     </button>
                   ))}
                 </span>
               )}
               <span className="v0-zoom">
-                <button type="button" className="l5-link is-meta" onClick={() => stage.current?.zoomBy(1 / 1.2)} aria-label="Zoom out">
+                <button type="button" className="sb-link is-meta" onClick={() => stage.current?.zoomBy(1 / 1.2)} aria-label="Zoom out">
                   −
                 </button>
-                <button type="button" className="l5-link is-meta v0-zoom-v" onClick={() => stage.current?.fit()} title="Fit to screen (⌘0)">
+                <button type="button" className="sb-link is-meta v0-zoom-v" onClick={() => stage.current?.fit()} title="Fit to screen (⌘0)">
                   {Math.round(zoom * 100)}%
                 </button>
-                <button type="button" className="l5-link is-meta" onClick={() => stage.current?.zoomBy(1.2)} aria-label="Zoom in">
+                <button type="button" className="sb-link is-meta" onClick={() => stage.current?.zoomBy(1.2)} aria-label="Zoom in">
                   +
                 </button>
               </span>
               {spec && !imported && (
                 <span className="v0-zoom">
-                  <button type="button" className="l5-link is-meta" onClick={() => stepVersion(-1)} disabled={project.specIndex <= 0}>
+                  <button type="button" className="sb-link is-meta" onClick={() => stepVersion(-1)} disabled={project.specIndex <= 0}>
                     Undo
                   </button>
-                  <button type="button" className="l5-link is-meta" onClick={() => stepVersion(1)} disabled={project.specIndex >= project.specs.length - 1}>
+                  <button type="button" className="sb-link is-meta" onClick={() => stepVersion(1)} disabled={project.specIndex >= project.specs.length - 1}>
                     Redo
                   </button>
-                  <button type="button" className="l5-link is-meta" onClick={() => setView('discovery')}>
+                  <button type="button" className="sb-link is-meta" onClick={() => setView('discovery')}>
                     Moodboard
                   </button>
                 </span>
@@ -772,9 +772,9 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
           <div className="v0-center">
             {view === 'intent' && (
               <div className="v0-intent">
-                <span className="l5-label">Create · SocriaUX v0</span>
+                <span className="sb-label">Create · SocriaUX v0</span>
                 <h1 className="v0-intent-q">What do you want to make?</h1>
-                <div className="l5-compose-line v0-intent-line">
+                <div className="sb-compose-line v0-intent-line">
                   <textarea
                     rows={2}
                     value={intentText}
@@ -788,13 +788,13 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                       }
                     }}
                   />
-                  <button type="button" className="l5-btn is-primary" onClick={() => begin(intentText)} disabled={!intentText.trim() || !!busy}>
+                  <button type="button" className="sb-btn is-primary" onClick={() => begin(intentText)} disabled={!intentText.trim() || !!busy}>
                     Begin
                   </button>
                 </div>
                 <div className="v0-examples">
                   {EXAMPLES.map((x) => (
-                    <button key={x} type="button" className="l5-link is-meta" onClick={() => setIntentText(x)}>
+                    <button key={x} type="button" className="sb-link is-meta" onClick={() => setIntentText(x)}>
                       {x}
                     </button>
                   ))}
@@ -813,11 +813,11 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                   if (f) importFile(f);
                 }}
               >
-                <span className="l5-label">Critique · SocriaUX v0</span>
+                <span className="sb-label">Critique · SocriaUX v0</span>
                 <h1 className="v0-intent-q">Bring a design to look at closely.</h1>
                 <p className="v0-body">An HTML file (drawn in a sealed sandbox), or a PNG, JPG or SVG. Then select an element or drag across an area, and say what you see.</p>
                 <div className="v0-q-acts">
-                  <button type="button" className="l5-btn is-primary" onClick={() => fileInput.current?.click()}>
+                  <button type="button" className="sb-btn is-primary" onClick={() => fileInput.current?.click()}>
                     Choose a file
                   </button>
                   <span className="v0-quiet">or drop it here · HTML and SVG up to 2 MB, images up to 15 MB</span>
@@ -913,16 +913,16 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
             <div className={`v0-notice${notice.kind === 'error' ? ' is-error' : ''}`} role={notice.kind === 'error' ? 'alert' : 'status'}>
               <span>{notice.text}</span>
               {notice.signIn && (
-                <a className="l5-link is-meta is-strong" href="/sign-in?redirect_url=/ux-v0">
+                <a className="sb-link is-meta is-strong" href="/sign-in?redirect_url=/ux-v0">
                   Sign in
                 </a>
               )}
               {notice.acts?.map((a) => (
-                <button key={a.label} type="button" className={`l5-link is-meta${a.strong ? ' is-strong' : ''}`} onClick={() => (a.run(), setNotice(null))}>
+                <button key={a.label} type="button" className={`sb-link is-meta${a.strong ? ' is-strong' : ''}`} onClick={() => (a.run(), setNotice(null))}>
                   {a.label}
                 </button>
               ))}
-              <button type="button" className="l5-link is-meta v0-notice-x" onClick={() => setNotice(null)} aria-label="Dismiss">
+              <button type="button" className="sb-link is-meta v0-notice-x" onClick={() => setNotice(null)} aria-label="Dismiss">
                 ×
               </button>
             </div>
@@ -954,9 +954,9 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
         </main>
 
         <aside className="v0-rail" aria-label="Design details">
-          <div className="l5-tabs is-tight v0-rail-tabs" role="tablist">
+          <div className="sb-seg is-tight v0-rail-tabs" role="tablist">
             {railTabs.map((t) => (
-              <button key={t.id} type="button" role="tab" aria-selected={rail === t.id} className={`l5-tab${rail === t.id ? ' is-on' : ''}`} onClick={() => setRail(t.id)}>
+              <button key={t.id} type="button" role="tab" aria-selected={rail === t.id} className={`sb-seg-item${rail === t.id ? ' is-on' : ''}`} onClick={() => setRail(t.id)}>
                 {t.label}
               </button>
             ))}
@@ -1015,7 +1015,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
             {rail === 'history' && (
               <div className="v0-rail-body">
                 <section className="v0-cellset">
-                  <span className="l5-label">Versions of the design</span>
+                  <span className="sb-label">Versions of the design</span>
                   <ol className="v0-versions">
                     {project.specs
                       .map((s, i) => ({ s, i }))
@@ -1032,7 +1032,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                 </section>
                 {spec && spec.notes.length > 0 && (
                   <section className="v0-cellset">
-                    <span className="l5-label">Adjusted for you</span>
+                    <span className="sb-label">Adjusted for you</span>
                     <ul className="v0-plain">
                       {spec.notes.map((n, i) => (
                         <li key={i}>{n}</li>
@@ -1042,7 +1042,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                 )}
                 {placeholders.length > 0 && (
                   <section className="v0-cellset">
-                    <span className="l5-label">Placeholders to fill</span>
+                    <span className="sb-label">Placeholders to fill</span>
                     <p className="v0-quiet">Facts SocriaUX did not have and would not invent.</p>
                     <ul className="v0-plain">
                       {placeholders.map((x) => (
@@ -1053,7 +1053,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                 )}
                 {rendered && rendered.credits.length > 0 && (
                   <section className="v0-cellset">
-                    <span className="l5-label">Image credits on the page</span>
+                    <span className="sb-label">Image credits on the page</span>
                     <ul className="v0-plain">
                       {rendered.credits.map((c) => (
                         <li key={c.id}>{c.text}</li>
@@ -1065,7 +1065,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                   <section className="v0-cellset">
                     <button
                       type="button"
-                      className="l5-link is-meta is-strong"
+                      className="sb-link is-meta is-strong"
                       onClick={() => {
                         const url = URL.createObjectURL(new Blob([rendered.html], { type: 'text/html' }));
                         const a = document.createElement('a');
@@ -1084,7 +1084,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
             {rail === 'file' && imported && (
               <div className="v0-rail-body">
                 <section className="v0-cellset">
-                  <span className="l5-label">The file</span>
+                  <span className="sb-label">The file</span>
                   <dl className="v0-kv">
                     <dt>Name</dt>
                     <dd>{imported.name}</dd>
@@ -1106,16 +1106,16 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                 </section>
                 {imported.kind === 'html' && (
                   <section className="v0-cellset">
-                    <span className="l5-label">Page scripts</span>
+                    <span className="sb-label">Page scripts</span>
                     <p className="v0-quiet">The page is drawn in a sealed sandbox: it cannot reach Socria or the network. Its own scripts are off unless you switch them on.</p>
-                    <button type="button" className="l5-link is-meta is-strong" onClick={() => update((p) => (p.artifact?.type === 'imported' ? { ...p, artifact: { ...p.artifact, runScripts: !p.artifact.runScripts } } : p))}>
+                    <button type="button" className="sb-link is-meta is-strong" onClick={() => update((p) => (p.artifact?.type === 'imported' ? { ...p, artifact: { ...p.artifact, runScripts: !p.artifact.runScripts } } : p))}>
                       {imported.runScripts ? 'Turn the page’s scripts off' : 'Run the page’s scripts (sandboxed)'}
                     </button>
                   </section>
                 )}
                 {imported.missing.length > 0 && (
                   <section className="v0-cellset">
-                    <span className="l5-label">Could not load</span>
+                    <span className="sb-label">Could not load</span>
                     <p className="v0-quiet">A single HTML file cannot bring the files it links to; these are missing from the drawing.</p>
                     <ul className="v0-plain v0-mono">
                       {imported.missing.map((m) => (
@@ -1126,12 +1126,12 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                 )}
                 {imported.summary && (
                   <section className="v0-cellset">
-                    <span className="l5-label">{imported.kind === 'html' ? 'Outline' : 'SocriaUX’s reading of it'}</span>
+                    <span className="sb-label">{imported.kind === 'html' ? 'Outline' : 'SocriaUX’s reading of it'}</span>
                     <p className="v0-body v0-pre">{imported.summary}</p>
                   </section>
                 )}
                 <section className="v0-cellset">
-                  <button type="button" className="l5-link is-meta" onClick={() => fileInput.current?.click()}>
+                  <button type="button" className="sb-link is-meta" onClick={() => fileInput.current?.click()}>
                     Replace the file
                   </button>
                 </section>

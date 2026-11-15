@@ -52,14 +52,14 @@ out('facts: ' + (await page.locator('.v0-facts li').allInnerTexts()).map((t) => 
 await page.screenshot({ path: S + 'v0-03-selected.png' });
 // comment → card
 await page.locator('.v0-compose textarea').fill('Is this the strongest call to action on the page?');
-await page.locator('.v0-compose .l5-btn.is-primary').click();
+await page.locator('.v0-compose .sb-btn.is-primary').click();
 await page.waitForSelector('.v0-card .v0-read', { timeout: 8000 });
 const c1 = critiques[0];
 out('request: tag=' + c1.selection.element.tag + ' kind=' + c1.kind + ' facts=' + c1.selection.measured.length + ' outline=' + (c1.summary || '').split('\n')[0] + ' thumb=' + !!c1.thumb);
 await page.screenshot({ path: S + 'v0-04-card.png' });
 // follow-up on the same card
 await page.locator('.v0-compose textarea').fill('But the tan is our brand colour.');
-await page.locator('.v0-compose .l5-btn.is-primary').click();
+await page.locator('.v0-compose .sb-btn.is-primary').click();
 await page.waitForFunction(() => document.querySelectorAll('.v0-card .v0-turn').length >= 2 && document.querySelectorAll('.v0-card .v0-read').length >= 2, null, { timeout: 8000 });
 out('follow-up history sent: ' + critiques[1].history.length + ' turn(s); cards: ' + (await page.locator('.v0-card').count()));
 // area selection
@@ -88,14 +88,14 @@ await page.mouse.move(im.x + im.width * 0.99, im.y + im.height * 0.08, { steps: 
 await page.mouse.up();
 await page.waitForSelector('.v0-sel.is-region', { timeout: 5000 });
 await page.locator('.v0-compose textarea').fill('Why does this navigation feel cluttered?');
-await page.locator('.v0-compose .l5-btn.is-primary').click();
+await page.locator('.v0-compose .sb-btn.is-primary').click();
 await page.waitForSelector('.v0-card .v0-read', { timeout: 8000 });
 const c3 = critiques.at(-1);
 out('png request: crop=' + (c3.selection.crop?.dataUrl.length || 0) + ' bytes, thumb=' + (c3.thumb ? c3.thumb.length : 0) + ' bytes, kind=' + c3.kind);
 await page.screenshot({ path: S + 'v0-06-png.png' });
 // a second comment on the PNG: no thumbnail now (the reading was kept)
 await page.locator('.v0-compose textarea').fill('And the hero buttons?');
-await page.locator('.v0-compose .l5-btn.is-primary').click();
+await page.locator('.v0-compose .sb-btn.is-primary').click();
 await page.waitForFunction(() => document.querySelectorAll('.v0-card .v0-turn').length >= 2, null, { timeout: 8000 });
 out('second png request thumb: ' + (critiques.at(-1).thumb ? 'sent' : 'not sent') + ', summary: ' + (critiques.at(-1).summary || '').slice(0, 60));
 // reload keeps everything

@@ -29,27 +29,27 @@ export function Inspect({ sel, onStep, onClear, onPickElement }: { sel: Selectio
         <div className="v0-inspect-acts" role="group" aria-label="Move the selection">
           {el && onStep && (
             <>
-              <button type="button" className="l5-link is-meta is-strong" onClick={() => onStep('parent')}>
+              <button type="button" className="sb-link is-meta is-strong" onClick={() => onStep('parent')}>
                 Select its parent
               </button>
               {el.children > 0 && (
-                <button type="button" className="l5-link is-meta" onClick={() => onStep('child')}>
+                <button type="button" className="sb-link is-meta" onClick={() => onStep('child')}>
                   First inside it
                 </button>
               )}
               {el.siblings > 0 && (
                 <>
-                  <button type="button" className="l5-link is-meta" onClick={() => onStep('prev')}>
+                  <button type="button" className="sb-link is-meta" onClick={() => onStep('prev')}>
                     Previous
                   </button>
-                  <button type="button" className="l5-link is-meta" onClick={() => onStep('next')}>
+                  <button type="button" className="sb-link is-meta" onClick={() => onStep('next')}>
                     Next
                   </button>
                 </>
               )}
             </>
           )}
-          <button type="button" className="l5-link is-meta" onClick={onClear}>
+          <button type="button" className="sb-link is-meta" onClick={onClear}>
             Clear
           </button>
         </div>
@@ -57,7 +57,7 @@ export function Inspect({ sel, onStep, onClear, onPickElement }: { sel: Selectio
 
       {sel.measured.length > 0 && (
         <section className="v0-cellset">
-          <span className="l5-label">Measured</span>
+          <span className="sb-label">Measured</span>
           <ul className="v0-facts">
             {sel.measured.map((m, i) => (
               <li key={i} className={m.ok ? '' : 'is-fail'}>
@@ -74,7 +74,7 @@ export function Inspect({ sel, onStep, onClear, onPickElement }: { sel: Selectio
 
       {el && (
         <section className="v0-cellset">
-          <span className="l5-label">Element</span>
+          <span className="sb-label">Element</span>
           <dl className="v0-kv">
             <dt>Tag</dt>
             <dd>
@@ -109,7 +109,7 @@ export function Inspect({ sel, onStep, onClear, onPickElement }: { sel: Selectio
               <Swatch v={el.background} /> {el.background}
             </dd>
           </dl>
-          <span className="l5-label v0-sub">Styles</span>
+          <span className="sb-label v0-sub">Styles</span>
           <dl className="v0-kv">
             {KEY_STYLES.filter((k) => el.styles[k] && !/^(normal|none|0px|auto)$/.test(el.styles[k])).map((k) => (
               <div key={k} className="v0-kv-row">
@@ -125,7 +125,7 @@ export function Inspect({ sel, onStep, onClear, onPickElement }: { sel: Selectio
 
       {sel.region && (
         <section className="v0-cellset">
-          <span className="l5-label">Area</span>
+          <span className="sb-label">Area</span>
           <p className="v0-quiet">
             {Math.round(sel.region.box.w)} × {Math.round(sel.region.box.h)} at {Math.round(sel.region.box.x)}, {Math.round(sel.region.box.y)}
             {sel.region.container ? ` · inside ${sel.region.container}` : ''}

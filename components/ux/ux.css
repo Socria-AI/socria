@@ -1,42 +1,49 @@
-/* components/ux/ux.css — SocriaUX.
+/* components/ux/ux.css — SocriaUX, in the Socria brandbook (Version 1, November 2026).
  *
- * Logos's language, applied to a design tool: warm paper, hairlines instead of
- * boxes, moss for the one thing that turns, Instrument Serif for what is said
- * and Inter for what is operated. The designer's own work sits on a notebook
- * grid in the middle and is the only saturated thing on the screen; everything
- * around it is quiet on purpose.
+ * The first SocriaUX, drawn in the brand being tried on /ux and /ux-v0: paper
+ * ground, white surfaces instead of outlines, pills for controls, segmented
+ * tabs, sentence-case labels, Old Standard for what Socria says and Geist for
+ * what is operated. The brand pass at the end of this sheet does the
+ * structure; the tokens below carry the colour.
  */
 
 .uxr,
 .uxs {
-  --ux-paper: #f5f3eb;
-  --ux-panel: #faf8f2;
-  --ux-raise: #fffdf8;
+  /* the Socria brandbook (Version 1): paper ground, white surfaces, ink words, deep moss for the
+     person and the one filled control; tokens of the old SocriaUX kept as names, pointed at the brand */
+  --ux-paper: #faf9f6;
+  --ux-panel: #faf9f6;
+  --ux-raise: #ffffff;
   --ux-white: #ffffff;
-  --ux-ink: #23241f;
-  --ux-ink-70: rgba(35, 36, 31, 0.74);
-  --ux-ink-60: rgba(35, 36, 31, 0.66);
-  --ux-ink-45: rgba(35, 36, 31, 0.5);
-  --ux-ink-20: rgba(35, 36, 31, 0.2);
-  --ux-line: rgba(53, 70, 32, 0.14);
-  --ux-line-2: rgba(53, 70, 32, 0.22);
+  --ux-ink: #20201b;
+  --ux-ink-70: rgba(32, 32, 27, 0.78);
+  --ux-ink-60: rgba(32, 32, 27, 0.68);
+  --ux-ink-45: rgba(32, 32, 27, 0.66);
+  --ux-ink-20: rgba(32, 32, 27, 0.2);
+  --ux-line: rgba(32, 32, 27, 0.1);
+  --ux-line-2: rgba(32, 32, 27, 0.18);
   --ux-moss: #354620;
   /* one green (test/ux-consistency): #354620 is every accent */
   --ux-moss-tone: #354620;
   --ux-moss-hover: #2a381a;
   --ux-moss-700: #354620;
-  --ux-moss-wash: rgba(53, 70, 32, 0.07);
-  --ux-moss-wash-2: rgba(53, 70, 32, 0.12);
-  --ux-rust: #9c5b3c;
-  --ux-prussian: #26485a;
-  --ux-gold: #8f7a3f;
-  --ux-high: #9c3b2c;
-  --ux-medium: #a8692a;
-  --ux-low: #5f6f8a;
-  --ux-r: 10px;
-  --ux-shadow: 0 1px 2px rgba(35, 36, 31, 0.04), 0 10px 30px -18px rgba(35, 36, 31, 0.35);
-  --ux-shadow-up: 0 14px 28px -16px rgba(35, 36, 31, 0.42);
-  font-family: var(--sans, Inter), system-ui, sans-serif;
+  --ux-moss-wash: #edf0e4;
+  --ux-moss-wash-2: #e1e7d2;
+  /* each colour one job: burgundy what Socria adds and what is wrong, lake the evidence, the accents never lead */
+  --ux-rust: #7b2633;
+  --ux-prussian: #3f7c85;
+  --ux-gold: #7a5a12;
+  --ux-high: #7b2633;
+  --ux-medium: #8a4a10;
+  --ux-low: #1c3faa;
+  --ux-r: 14px;
+  /* only what floats casts a shadow */
+  --ux-shadow: none;
+  --ux-shadow-up: 0 10px 28px -14px rgba(32, 32, 27, 0.32), 0 2px 6px -3px rgba(32, 32, 27, 0.1);
+  /* Old Standard is Socria's voice; Geist is the person, the interface and the record */
+  --serif: var(--font-old-standard), Georgia, serif;
+  --sans: var(--font-geist), system-ui, sans-serif;
+  font-family: var(--sans), system-ui, sans-serif;
   color: var(--ux-ink);
   -webkit-font-smoothing: antialiased;
 }
@@ -2265,4 +2272,185 @@ textarea.uxr-input {
 }
 @media (prefers-reduced-motion: reduce) {
   .uxp, .uxl, .uxs-example { transition: none; }
+}
+
+
+/* ── the brand pass (Socria brandbook, Version 1) ───────────────────
+   Surfaces, not outlines; pills for every control; segmented, not underlined;
+   only what floats casts a shadow; sentence case, never letter-spaced capitals. */
+
+/* labels: sentence case in Geist 600 */
+.uxr .uxr-eyebrow,
+.uxs .uxr-eyebrow,
+.uxr .uxc-pop-chip,
+.uxr .uxm-kind,
+.uxr .uxl-layer-kind,
+.uxr .uxl-linked span,
+.uxr .uxp-who,
+.uxr .uxp-sug-type {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.uxs .uxr-eyebrow,
+.uxr .uxr-eyebrow {
+  font-size: 13px;
+  color: var(--ux-ink);
+}
+
+/* cards and lists: white surfaces with no outline */
+.uxs .uxs-new,
+.uxs .uxs-start,
+.uxs .uxs-list,
+.uxr .uxl-layers,
+.uxr .uxl-linked,
+.uxr .uxl-altform,
+.uxr .uxl-template,
+.uxr .uxw-stagehint,
+.uxr .uxm-health,
+.uxr .uxm-node,
+.uxr .uxm-elchip,
+.uxr .uxp-principle,
+.uxr .uxp-sug,
+.uxr .uxp-finding,
+.uxr .uxp-note-row,
+.uxr .uxp-addnote,
+.uxr .uxp-frame,
+.uxr .uxp-code {
+  border-color: transparent;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: none;
+}
+/* a card's kind in its tint: research is evidence (lake), a decision is the person's (moss) */
+.uxr .uxp-rnote {
+  border-color: transparent;
+  background: #e0eaeb;
+  border-radius: 16px;
+}
+.uxr .uxp-dec {
+  border-color: transparent;
+  background: #e7ebdc;
+  border-radius: 16px;
+}
+.uxs .uxs-example {
+  background: #e7ebdc;
+  color: var(--ux-ink);
+  border-radius: 20px;
+}
+.uxs .uxs-example:hover {
+  transform: none;
+  background: #dfe5d0;
+}
+.uxs .uxs-example .uxr-eyebrow {
+  color: var(--ux-moss);
+}
+.uxs .uxs-example-title {
+  color: var(--ux-ink);
+}
+.uxs .uxs-example-note {
+  color: var(--ux-ink-70);
+}
+
+/* what floats: popovers, the canvas toolbar, the map's tools, the composer */
+.uxr .uxc-pop,
+.uxr .uxm-edgepop,
+.uxr .uxw-toolbar,
+.uxr .uxm-tools,
+.uxr .uxp-input-row {
+  border-color: transparent;
+  background: #ffffff;
+  box-shadow: var(--ux-shadow-up);
+}
+.uxr .uxw-toolbar,
+.uxr .uxm-tools {
+  border-radius: 999px;
+}
+.uxr .uxp-input-row {
+  border-radius: 20px;
+}
+
+/* controls: pills, no outlines; the one filled control stays deep moss */
+.uxr .uxr-btn.ghost,
+.uxs .uxr-btn.ghost,
+.uxr .uxr-chip,
+.uxs .uxr-chip,
+.uxr .uxh-signin,
+.uxr .uxh-toggle,
+.uxr .uxm-add {
+  border-color: transparent;
+  background: #edece6;
+  color: var(--ux-ink);
+}
+.uxr .uxr-btn.ghost:hover:not(:disabled),
+.uxs .uxr-btn.ghost:hover:not(:disabled),
+.uxr .uxr-chip:hover,
+.uxr .uxh-signin:hover,
+.uxr .uxh-toggle:hover {
+  background: #e3e2db;
+}
+.uxr .uxr-chip.is-on,
+.uxr .uxr-btn.ghost.is-on {
+  background: var(--ux-paper);
+  box-shadow: 0 0 0 1px var(--ux-line-2);
+}
+.uxr .uxr-btn.ghost.danger {
+  color: var(--ux-rust);
+}
+.uxr .uxr-select,
+.uxs .uxr-select {
+  border-color: transparent;
+  border-radius: 999px;
+  background-color: #edece6;
+  font-weight: 500;
+}
+.uxr .uxr-input,
+.uxs .uxr-input {
+  border-color: transparent;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--ux-line-2);
+  font-weight: 500;
+}
+.uxr .uxr-input:focus,
+.uxs .uxr-input:focus,
+.uxr .uxr-select:focus {
+  box-shadow: inset 0 0 0 2px var(--ux-moss);
+}
+
+/* segmented, not underlined: the chosen one sits on paper */
+.uxr .uxr-seg,
+.uxr .uxp-mode-row {
+  border-color: transparent;
+  background: #edece6;
+}
+.uxr .uxr-seg button.is-on {
+  background: var(--ux-paper);
+  color: var(--ux-ink);
+  box-shadow: 0 0 0 1px var(--ux-line-2);
+}
+.uxr .uxp-tabs {
+  align-self: flex-start;
+  max-width: calc(100% - 24px);
+  gap: 2px;
+  margin: 10px 12px 6px;
+  padding: 3px;
+  border-bottom: 0;
+  border-radius: 999px;
+  background: #edece6;
+}
+.uxr .uxp-tab {
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--ux-ink-70);
+}
+.uxr .uxp-tab.is-on {
+  background: var(--ux-paper);
+  color: var(--ux-ink);
+  box-shadow: 0 0 0 1px var(--ux-line-2);
+}
+.uxr .uxp-tab.is-on::after {
+  display: none;
 }

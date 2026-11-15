@@ -56,7 +56,7 @@ function BoardSearch({ busy, onSearch }: { busy: boolean; onSearch: Props['onSea
           </option>
         ))}
       </select>
-      <button type="submit" className="l5-link is-meta is-strong" disabled={busy || !term.trim()}>
+      <button type="submit" className="sb-link is-meta is-strong" disabled={busy || !term.trim()}>
         Search
       </button>
     </form>
@@ -103,18 +103,18 @@ function Tile({ r, onRef, onReplace }: { r: MoodboardRef; onRef: Props['onRef'];
         </span>
         <span className="v0-tile-acts">
           {r.state === 'kept' ? (
-            <button type="button" className="l5-link is-meta is-strong" onClick={() => onRef(r.id, 'proposed')} aria-pressed="true">
+            <button type="button" className="sb-link is-meta is-strong" onClick={() => onRef(r.id, 'proposed')} aria-pressed="true">
               Kept
             </button>
           ) : (
-            <button type="button" className="l5-link is-meta is-strong" onClick={() => onRef(r.id, 'kept')} aria-pressed="false">
+            <button type="button" className="sb-link is-meta is-strong" onClick={() => onRef(r.id, 'kept')} aria-pressed="false">
               Keep
             </button>
           )}
-          <button type="button" className="l5-link is-meta" onClick={() => onReplace(r)}>
+          <button type="button" className="sb-link is-meta" onClick={() => onReplace(r)}>
             Replace
           </button>
-          <button type="button" className="l5-link is-meta" onClick={() => onRef(r.id, 'rejected')}>
+          <button type="button" className="sb-link is-meta" onClick={() => onRef(r.id, 'rejected')}>
             Remove
           </button>
         </span>
@@ -141,10 +141,10 @@ function PaletteRow({ p, onPalette }: { p: Palette; onPalette: Props['onPalette'
         {p.name} · text on background {ratio.toFixed(1)}:1{ratio < 4.5 ? ' — too faint for body text' : ''}
       </p>
       <span className="v0-tile-acts">
-        <button type="button" className="l5-link is-meta is-strong" onClick={() => onPalette(p.id, p.state === 'kept' ? 'proposed' : 'kept')} aria-pressed={p.state === 'kept'}>
+        <button type="button" className="sb-link is-meta is-strong" onClick={() => onPalette(p.id, p.state === 'kept' ? 'proposed' : 'kept')} aria-pressed={p.state === 'kept'}>
           {p.state === 'kept' ? 'Kept' : 'Keep'}
         </button>
-        <button type="button" className="l5-link is-meta" onClick={() => onPalette(p.id, 'rejected')}>
+        <button type="button" className="sb-link is-meta" onClick={() => onPalette(p.id, 'rejected')}>
           Remove
         </button>
       </span>
@@ -166,10 +166,10 @@ function TypeCard({ t, sample, onType }: { t: TypePair; sample: string; onType: 
         {t.note ? ` — ${t.note}` : ''}
       </p>
       <span className="v0-tile-acts">
-        <button type="button" className="l5-link is-meta is-strong" onClick={() => onType(t.id, t.state === 'kept' ? 'proposed' : 'kept')} aria-pressed={t.state === 'kept'}>
+        <button type="button" className="sb-link is-meta is-strong" onClick={() => onType(t.id, t.state === 'kept' ? 'proposed' : 'kept')} aria-pressed={t.state === 'kept'}>
           {t.state === 'kept' ? 'Kept' : 'Keep'}
         </button>
-        <button type="button" className="l5-link is-meta" onClick={() => onType(t.id, 'rejected')}>
+        <button type="button" className="sb-link is-meta" onClick={() => onType(t.id, 'rejected')}>
           Remove
         </button>
       </span>
@@ -187,7 +187,7 @@ export function Moodboard(p: Props) {
   return (
     <div className="v0-board" aria-label="Moodboard">
       <header className="v0-board-head">
-        <span className="l5-label">Moodboard</span>
+        <span className="sb-label">Moodboard</span>
         <span className="v0-quiet">
           {shown.length} image{shown.length === 1 ? '' : 's'} · {kept} kept
         </span>
@@ -197,7 +197,7 @@ export function Moodboard(p: Props) {
             {p.busy}
           </span>
         )}
-        <button type="button" className="l5-link is-meta" onClick={p.onMore} disabled={!!p.busy || !p.board.queries.length}>
+        <button type="button" className="sb-link is-meta" onClick={p.onMore} disabled={!!p.busy || !p.board.queries.length}>
           More images
         </button>
       </header>
@@ -216,11 +216,11 @@ export function Moodboard(p: Props) {
         return (
           <section key={c} className="v0-board-group" aria-label={CAT_LABEL[c]}>
             <div className="v0-group-head">
-              <span className="l5-label">{CAT_LABEL[c]}</span>
-              <button type="button" className="l5-link is-meta" onClick={() => p.onMoreLike(c)} disabled={!!p.busy}>
+              <span className="sb-label">{CAT_LABEL[c]}</span>
+              <button type="button" className="sb-link is-meta" onClick={() => p.onMoreLike(c)} disabled={!!p.busy}>
                 More like these
               </button>
-              <button type="button" className="l5-link is-meta" onClick={() => p.onDirection(c)} disabled={!!p.busy}>
+              <button type="button" className="sb-link is-meta" onClick={() => p.onDirection(c)} disabled={!!p.busy}>
                 Another direction
               </button>
             </div>
@@ -235,11 +235,11 @@ export function Moodboard(p: Props) {
       {(palettes.length > 0 || pairs.length > 0) && (
         <section className="v0-board-group" aria-label="Colour and type">
           <div className="v0-group-head">
-            <span className="l5-label">Colour and type</span>
-            <button type="button" className="l5-link is-meta" onClick={() => p.onDirection('palette')} disabled={!!p.busy}>
+            <span className="sb-label">Colour and type</span>
+            <button type="button" className="sb-link is-meta" onClick={() => p.onDirection('palette')} disabled={!!p.busy}>
               Another palette
             </button>
-            <button type="button" className="l5-link is-meta" onClick={() => p.onDirection('type')} disabled={!!p.busy}>
+            <button type="button" className="sb-link is-meta" onClick={() => p.onDirection('type')} disabled={!!p.busy}>
               Another type pair
             </button>
           </div>
@@ -255,7 +255,7 @@ export function Moodboard(p: Props) {
       )}
       {credits.length > 0 && (
         <footer className="v0-credits">
-          <span className="l5-label">Credits for kept images</span>
+          <span className="sb-label">Credits for kept images</span>
           <ul>
             {credits.map((r) => (
               <li key={r.id}>{creditText(r)}</li>

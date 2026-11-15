@@ -11,7 +11,7 @@ import { deleteProject, getProject, listProjects, putProject } from '@/lib/ux-v0
 import { makeProject, normalizeProject, type DesignProject, type ProjectSummary } from '@/lib/ux-v0/types';
 import { checkFile } from './files';
 import { Workspace } from './Workspace';
-import '@/components/logos5/l5-controls.css';
+import '@/components/brand/socria-brand.css';
 import './ux-v0.css';
 
 const idFromUrl = () => {
@@ -133,7 +133,7 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
   const elsewhere = remote.filter((r) => !local.has(r.id));
 
   return (
-    <div className="v0 v0-home-page lg-tokens">
+    <div className="v0 v0-home-page sb">
       <header className="v0-head">
         <div className="v0-head-l">
           <a className="v0-home" href="/">
@@ -146,11 +146,11 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
         </div>
         <div className="v0-head-r">
           {signedIn ? (
-            <a className="l5-link is-meta" href="/account">
+            <a className="sb-link is-meta" href="/account">
               Account
             </a>
           ) : (
-            <a className="l5-link is-meta is-strong" href="/sign-in?redirect_url=/ux-v0">
+            <a className="sb-link is-meta is-strong" href="/sign-in?redirect_url=/ux-v0">
               Sign in
             </a>
           )}
@@ -158,10 +158,10 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
       </header>
       <main className="v0-landing">
         <section className="v0-way">
-          <span className="l5-label">Create</span>
+          <span className="sb-label">Create</span>
           <h1 className="v0-intent-q">What do you want to make?</h1>
           <p className="v0-body">SocriaUX asks before it designs: a few precise questions, a moodboard of real, licensed imagery, and a brief you approve. Then it generates the design — and you question and change it.</p>
-          <div className="l5-compose-line v0-intent-line">
+          <div className="sb-compose-line v0-intent-line">
             <textarea
               rows={2}
               value={intent}
@@ -175,7 +175,7 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
                 }
               }}
             />
-            <button type="button" className="l5-btn is-primary" onClick={() => start('create', { intent: intent.trim() })} disabled={!intent.trim()}>
+            <button type="button" className="sb-btn is-primary" onClick={() => start('create', { intent: intent.trim() })} disabled={!intent.trim()}>
               Begin
             </button>
           </div>
@@ -194,11 +194,11 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
             if (f) start('critique', { file: f });
           }}
         >
-          <span className="l5-label">Critique</span>
+          <span className="sb-label">Critique</span>
           <h2 className="v0-way-title">Bring a design to look at closely.</h2>
           <p className="v0-body">HTML, PNG, JPG or SVG — choose one, or drop it here. Select an element or drag across an area, say what you see, and reason it through.</p>
-          <button type="button" className="l5-link is-go" onClick={() => fileInput.current?.click()}>
-            Choose a file <span className="l5-ar">→</span>
+          <button type="button" className="sb-link is-go" onClick={() => fileInput.current?.click()}>
+            Choose a file <span className="sb-ar">→</span>
           </button>
         </section>
         {error && (
@@ -207,12 +207,12 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
           </p>
         )}
         <section className="v0-list" aria-label="Your designs">
-          <span className="l5-label">Your designs</span>
+          <span className="sb-label">Your designs</span>
           {ready && !list.length && !elsewhere.length && <p className="v0-empty">None yet. They are kept in this browser{signedIn ? ' and with your account' : '; sign in to keep them across devices'}.</p>}
           <ul>
             {list.map((s) =>
               deleting === s.id ? (
-                <li key={s.id} className="l5-row v0-list-row">
+                <li key={s.id} className="sb-row v0-list-row">
                   <div
                     className="v0-confirm"
                     role="group"
@@ -225,31 +225,31 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
                       Delete “{s.name}” and its cards? It goes from this browser{signedIn ? ' and from your account' : ''}, and cannot be brought back.
                     </p>
                     <div className="v0-confirm-acts">
-                      <button type="button" className="l5-btn is-sm is-danger is-solid" onClick={() => remove(s)}>
+                      <button type="button" className="sb-btn is-sm is-danger is-solid" onClick={() => remove(s)}>
                         Delete it
                       </button>
-                      <button type="button" className="l5-btn is-sm" autoFocus onClick={() => setDeleting(null)}>
+                      <button type="button" className="sb-btn is-sm" autoFocus onClick={() => setDeleting(null)}>
                         Keep it
                       </button>
                     </div>
                   </div>
                 </li>
               ) : (
-                <li key={s.id} className="l5-row v0-list-row">
+                <li key={s.id} className="sb-row v0-list-row">
                   <button type="button" className="v0-list-open" onClick={() => openById(s.id)}>
                     <span className="v0-cell-title">{s.name}</span>
                     <span className="v0-quiet">
                       {s.mode === 'create' ? 'Create' : 'Critique'} · {s.cards} card{s.cards === 1 ? '' : 's'} · {ago(s.updatedAt)}
                     </span>
                   </button>
-                  <button type="button" className="l5-link is-meta" onClick={() => setDeleting(s.id)}>
+                  <button type="button" className="sb-link is-meta" onClick={() => setDeleting(s.id)}>
                     Delete
                   </button>
                 </li>
               )
             )}
             {elsewhere.map((s) => (
-              <li key={s.id} className="l5-row v0-list-row">
+              <li key={s.id} className="sb-row v0-list-row">
                 <button type="button" className="v0-list-open" onClick={() => openById(s.id)}>
                   <span className="v0-cell-title">{s.name}</span>
                   <span className="v0-quiet">From another device · {ago(s.updatedAt)}</span>

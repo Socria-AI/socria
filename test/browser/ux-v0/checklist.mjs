@@ -105,7 +105,7 @@ const drag = async (fx0, fy0, fx1, fy1) => {
 const comment = async (text) => {
   const before = critiques.length;
   await page.locator('.v0-compose textarea').fill(text);
-  await page.locator('.v0-compose .l5-btn.is-primary').click();
+  await page.locator('.v0-compose .sb-btn.is-primary').click();
   await page.waitForFunction((n) => window.__n === undefined && true, before);
   for (let i = 0; i < 40 && critiques.length === before; i++) await page.waitForTimeout(200);
   return critiques.at(-1);
@@ -280,12 +280,12 @@ await part('create details', async () => {
   await page.locator('.v0-group-head', { hasText: 'Imagery' }).getByRole('button', { name: 'Another direction' }).click();
   for (let i = 0; i < 25 && calls.discover.length === nd; i++) await page.waitForTimeout(200);
   check('“Another direction” asks for contrasting queries for that aspect', calls.discover.at(-1)?.action === 'direction' && calls.discover.at(-1)?.aspect === 'imagery', JSON.stringify({ action: calls.discover.at(-1)?.action, aspect: calls.discover.at(-1)?.aspect }));
-  for (let i = 0; i < 6; i++) { const k = page.locator('.v0-tile .l5-link', { hasText: /^Keep$/ }).first(); if (await k.count()) await k.click(); }
+  for (let i = 0; i < 6; i++) { const k = page.locator('.v0-tile .sb-link', { hasText: /^Keep$/ }).first(); if (await k.count()) await k.click(); }
   await page.getByRole('button', { name: 'Neighbours who come for the ritual' }).click();
   await page.waitForSelector('text=Enough to write the brief', { timeout: 10000 });
   await page.getByRole('tab', { name: 'Questions' }).click().catch(() => {});
   const na = calls.discover.length;
-  await page.locator('.v0-answers .l5-link', { hasText: 'Edit' }).first().click();
+  await page.locator('.v0-answers .sb-link', { hasText: 'Edit' }).first().click();
   await page.locator('.v0-editline textarea').fill('Neighbours, and the people who stay to work');
   await page.locator('.v0-editline').getByRole('button', { name: 'Save' }).click();
   for (let i = 0; i < 25 && calls.discover.length === na; i++) await page.waitForTimeout(200);
@@ -299,7 +299,7 @@ await part('create details', async () => {
   await page.waitForTimeout(700);
   check('a direct edit to the brief needs no model call', calls.brief.length === nb && (await aud.inputValue()).includes('remote workers'), `${nb} → ${calls.brief.length} calls`);
   await page.locator('.v0-compose textarea').fill('Make the personality warmer and less formal');
-  await page.locator('.v0-compose .l5-btn.is-primary').click();
+  await page.locator('.v0-compose .sb-btn.is-primary').click();
   for (let i = 0; i < 25 && calls.brief.length === nb; i++) await page.waitForTimeout(200);
   const rb = calls.brief.at(-1);
   const moved = await page.waitForFunction(() => document.querySelector('.v0-notice')?.textContent?.includes('visual direction moved'), null, { timeout: 8000 }).then(() => true).catch(() => false);
@@ -318,7 +318,7 @@ await part('create details', async () => {
   await page.frameLocator('iframe.v0-frame').locator('h1').click();
   await page.waitForSelector('.v0-sel', { timeout: 5000 });
   await page.locator('.v0-compose textarea').fill('Make the headline about first light');
-  await page.locator('.v0-compose .l5-btn.is-primary').click();
+  await page.locator('.v0-compose .sb-btn.is-primary').click();
   await page.waitForFunction(() => document.querySelector('.v0-notice')?.textContent?.includes('Changed'), null, { timeout: 10000 });
   await page.waitForTimeout(1500);
   check('the change applied', (await fr().locator('h1').innerText()).includes('first light'));
@@ -385,7 +385,7 @@ await part('model failure', async () => {
   await page.waitForSelector('.v0-sel', { timeout: 5000 });
   failCritique = true;
   await page.locator('.v0-compose textarea').fill('Is this the strongest call to action?');
-  await page.locator('.v0-compose .l5-btn.is-primary').click();
+  await page.locator('.v0-compose .sb-btn.is-primary').click();
   const shown = await page.waitForFunction(() => /did not answer/.test(document.querySelector('.v0-card')?.textContent || ''), null, { timeout: 8000 }).then(() => true).catch(() => false);
   const card = await page.locator('.v0-card').first().innerText().catch(() => '');
   check('a failed call keeps the comment on its card, with the reason', shown && card.includes('Is this the strongest call to action?'), card.replace(/\n/g, ' | ').slice(0, 160));
