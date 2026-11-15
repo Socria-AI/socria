@@ -41,7 +41,13 @@ export type WorkspaceAction =
   | { type: 'branch'; obj: string; at: number; from?: string }
   | { type: 'forget'; obj: string; before: number }
   | { type: 'forgetMap'; before: number }
-  | { type: 'open'; obj: string };
+  | { type: 'open'; obj: string }
+  /**
+   * A quiz asks the conversation around it (lib/objects/display-quiz.ts): an answer was graded or the quiz finished
+   * (the learning ledger and the completion note), go deeper on a missed question, practise the weak spots, take
+   * another quiz, or go back to the conversation.
+   */
+  | { type: 'quiz'; obj: string; action: 'graded' | 'finished' | 'deep-dive' | 'practice' | 'another' | 'return'; q?: string; how?: 'reasoning' | 'similar' | 'concept' };
 
 export interface WorkspaceResult {
   ok: boolean;
@@ -86,6 +92,8 @@ export interface FigureProps {
   ask?: AskExperience;
   /** send a message to the conversation now, about this object (it is selected first, so Socria changes this one) */
   onSend?: (text: string) => void;
+  /** the conversation this is drawn in — for a request that must name it (a quiz graded without an account) */
+  session?: string;
 }
 
 const FIGURES = new Map<string, ComponentType<FigureProps>>();

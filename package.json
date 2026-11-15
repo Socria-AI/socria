@@ -11,6 +11,7 @@
     "verify:views": "node scripts/verify-views.mjs",
     "verify:artifacts": "node scripts/verify-artifacts.mjs",
     "verify:map": "node scripts/verify-map.mjs --shots --perf --flow",
+    "verify:quiz": "node scripts/verify-quiz.mjs",
     "test": "node test/run.mjs",
     "probe:mind": "node scripts/mind-probe.mjs",
     "doctor:mind": "node scripts/mind-doctor.mjs",

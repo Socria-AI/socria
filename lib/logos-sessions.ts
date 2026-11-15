@@ -61,8 +61,11 @@ export interface LogosMsg {
    * (lib/logos5/templates.ts), read by the map pass and nowhere else.
    */
   make?: { template?: { name: string; blocks: unknown[] } };
-  /** said, not typed — Socria Voice (lib/voice/speech.ts): marked with a microphone, and read generously for a misheard word */
-  via?: 'voice';
+  /**
+   * said, not typed — Socria Voice (lib/voice/speech.ts): marked with a microphone, and read generously for a
+   * misheard word; or 'quiz': a request the quiz took (lib/quiz), so the reply engine does not quiz in words too
+   */
+  via?: 'voice' | 'quiz';
   /** the web pages this reply was given to read (lib/chat-thread.ts cleanWebSources) — listed under it, never their text */
   sources?: { query: string; list: WebSourceRef[] };
   /**

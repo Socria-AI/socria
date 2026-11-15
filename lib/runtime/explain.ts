@@ -38,6 +38,7 @@
 // with three moves the ladder needed (transfer, predict, diagnose). Invisible: no
 // mode, no badge, no setting. LOGOS_EXPLAIN=off takes it out without a deploy.
 
+import { sanitizeEvidence, type QuizEvidence } from '@/lib/quiz/evidence';
 import type { ExplicitSignals } from '../core4/types';
 import { SHOWN_INLINE, type InlineKind } from '../inline-ui';
 import type { Presentation } from './presentation';
@@ -106,6 +107,8 @@ export interface LedgerEntry {
   fade?: number;
   /** ways in that left them lost on this concept, most recent first */
   failed?: Approach[];
+  /** what quizzes have shown on it beyond right and wrong: recent answers, where a mistake stands (lib/quiz/evidence.ts) */
+  q?: QuizEvidence;
 }
 
 /** What Socria's reply did, saved on the reply as the client received it: enum codes and the concept, nothing else. */
@@ -557,6 +560,8 @@ export function noteTopic(
     box,
     ...(fade ? { fade } : {}),
     ...(failed?.length ? { failed } : {}),
+    // what quizzes have shown is kept as it was; lib/quiz/mastery.ts moves it
+    ...(prev.q ? { q: prev.q } : {}),
   };
   const rest = ledger.filter((_, j) => j !== i);
   return [next, ...rest].slice(0, LEDGER_MAX);
@@ -582,6 +587,7 @@ export function sanitizeLedger(raw: unknown, now: number): LedgerEntry[] {
     const met = n(o?.met, now);
     const fade = n(o?.fade, 3);
     const failed = Array.isArray(o?.failed) ? (o!.failed as unknown[]).filter((a): a is Approach => typeof a === 'string' && (APPROACHES as readonly string[]).includes(a)).slice(0, 3) : [];
+    const q = sanitizeEvidence(o?.q, now);
     out.push({
       topic,
       seen: n(o?.seen, 9999),
@@ -592,6 +598,7 @@ export function sanitizeLedger(raw: unknown, now: number): LedgerEntry[] {
       box: n(o?.box, INTERVAL_DAYS.length - 1),
       ...(fade ? { fade } : {}),
       ...(failed.length ? { failed } : {}),
+      ...(q ? { q } : {}),
     });
   }
   return out;

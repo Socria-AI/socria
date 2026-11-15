@@ -134,6 +134,13 @@ export const EVENTS = [
   'simpler_deeper',
   'explain_back',
   'guess_first',
+  // quizzes (lib/quiz): made (`count` questions, `scope` the mode, `trigger` why — request, weak spots, another,
+  // retest), finished (`count` the share right, 0–100), a deeper look at a missed question (`trigger` how), and a
+  // follow-up asked for (`trigger`) — counts only, never a question or an answer
+  'quiz_created',
+  'quiz_completed',
+  'quiz_deep_dive',
+  'quiz_follow_up',
   // a checkout begun, with the last Logos 6 capability used in the seven days before it (`kind`)
   // and the moment that opened the sheet (`trigger`) — the observational half of H5
   'one_checkout_context',

@@ -385,7 +385,7 @@ console.log('the wiring');
   const src = ['components/logos5/useSocriaVoice.ts', 'components/logos5/SocriaVoice.tsx', 'lib/voice/speech.ts', 'components/LogosApp.tsx'].map(read).join('\n');
   ok('no speech synthesis anywhere: Socria answers in text', !/speechSynthesis|SpeechSynthesisUtterance|\.speak\(/.test(src));
   const conv = read('app/api/conversations/route.ts');
-  ok('  "said" is saved with the message, and only on the person’s turns', /m\.role === 'user' && m\.via === 'voice' \? 'voice'/.test(conv) && /\.\.\.\(via \? \{ via \} : \{\}\)/.test(conv));
+  ok('  "said" is saved with the message, and only on the person’s turns', /m\.role === 'user' && \(m\.via === 'voice' \|\| m\.via === 'quiz'\) \? m\.via/.test(conv) && /\.\.\.\(via \? \{ via \} : \{\}\)/.test(conv));
   const ear = read('components/logos5/useSocriaVoice.ts');
   ok('the microphone is released on pause, off, and when the page goes', /getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\)/.test(ear) && /dispose\(\)/.test(ear) && /visibilitychange/.test(ear));
   ok('  nothing is recorded between turns: a turn’s samples are kept only while it is spoken', /turnFrames = null/.test(ear) && !/localStorage|indexedDB/.test(ear));

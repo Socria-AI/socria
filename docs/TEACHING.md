@@ -184,6 +184,16 @@ concept, so a mistake is explained another way.
 
 ## 7. Adaptive assessment
 
+**A request to be quizzed now makes a quiz artifact** (`docs/QUIZZES.md`). The course profile shapes it through
+`styleOf` (`lib/quiz/style.ts`): the same formats, demands, traps and targets as below, each with its basis
+(observed, inferred or unknown). Its questions are generated and checked on the server, graded against sealed
+keys, and the review and mastery evidence go to the learning ledger. The student's message is kept with
+`via: 'quiz'`, which MR reads as a quiz already made. So no quiz contract is taken up in the chat, and the chat
+explains the quiz from its recorded facts.
+
+The rest of this section describes chat practice turns, which remain for practice that is not a quiz request: "walk
+me through a problem like this", or a quiz request sent with a new attachment.
+
 A turn is practice when the planner reads a request to practise or MR's own quiz pattern matches
 (`lib/mr/ifr.ts` `QUIZ`). MR's quiz contract then keeps the difficulty (`preserve_challenge`): course
 practice does not bypass MR. The practice spec (`practiceSpec`) asks for:

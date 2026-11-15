@@ -18,6 +18,7 @@ import './display-data';
 import './display-market';
 import './display-worksheet';
 import './display-exercise';
+import './display-quiz';
 import './display-compare';
 import './display-venn';
 import './display-numberline';

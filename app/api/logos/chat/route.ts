@@ -264,6 +264,9 @@ const MAX_MESSAGES_ACCEPTED = 400;
 /** Characters of documents shown to the model on one turn — the most relevant passages of a long one. */
 const DOC_BUDGET = 36_000;
 
+/** What MR reads in place of a quiz request the quiz artifact took: that a quiz was made, not a request to be quizzed in words. */
+const QUIZ_TAKEN = '[They asked for a quiz; it was made as a quiz artifact in the conversation.]';
+
 export const POST = withMeter(async function POST(req: NextRequest) {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -1050,7 +1053,9 @@ export const POST = withMeter(async function POST(req: NextRequest) {
         const mrStyle = styleAsks(body?.style);
         const mrInput = {
           conversationKey: mrKey,
-          messages: usable.map((m: { role: 'user' | 'assistant'; content: string }) => ({ role: m.role, content: m.content })),
+          // a quiz request the quiz artifact took (via 'quiz', lib/quiz) is not a request for a quiz in words: MR would
+          // hold answers back for the rest of the conversation, and the review after the quiz is there to be explained
+          messages: usable.map((m: { role: 'user' | 'assistant'; content: string; via?: string }) => ({ role: m.role, content: m.via === 'quiz' ? QUIZ_TAKEN : m.content })),
           signals,
           acs: { assist: assistAcs, core: allocation?.core ?? null, split: allocation?.split ?? null },
           turnState,

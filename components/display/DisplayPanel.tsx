@@ -35,6 +35,7 @@ export function DisplayPanel({
   onPrompt,
   onDraft,
   onSend,
+  session,
   pick = true,
 }: {
   obj: ThoughtObject | null;
@@ -58,6 +59,8 @@ export function DisplayPanel({
   onDraft?: (text: string) => void;
   /** send a message about the display now (Ask Socria, in an artifact's editor) */
   onSend?: (text: string) => void;
+  /** the conversation it is drawn in (a quiz names it when graded without an account) */
+  session?: string;
   /**
    * The strip of the other displays and "New…". Off where the place the
    * display is shown has its own (Logos 5's Artifacts strip, Content's reader).
@@ -112,6 +115,7 @@ export function DisplayPanel({
         history={history}
         me={me}
         shared={shared}
+        {...(session ? { session } : {})}
         {...(readOnly ? {} : { onOp: (op: string, args: Record<string, string | number>) => onOp(op, args), onWorkspace, ask, ...(onDraft ? { onDraft } : {}), ...(onSend ? { onSend } : {}) })}
       />
     </div>
