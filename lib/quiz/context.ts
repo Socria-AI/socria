@@ -45,7 +45,9 @@ export function listed(xs: readonly string[]): string {
 
 /** What Socria says when a quiz is ready: how many, on what, from what, in which mode — one or two lines. */
 export function readyNote(q: { count: number; title: string; mode: 'practice' | 'marks' | 'exam'; sources: string[]; grounding: 'grounded' | 'mixed' | 'general'; style: 'observed' | 'inferred' | 'unknown'; course: string | null; missing: string[]; reason?: string }): string {
-  const what = q.reason === 'weak-spots' ? `A ${q.count}-question practice on what you missed` : q.reason === 'retest' ? `${q.count} questions like the one you missed` : `Here's a ${q.count}-question quiz on ${q.title.toLowerCase()}`;
+  // "an 8-question", "an 11-question", "an 18-question": the article goes by how the number is said
+  const an = /^(8|11|18|8\d)$/.test(String(q.count)) ? 'an' : 'a';
+  const what = q.reason === 'weak-spots' ? `${an === 'an' ? 'An' : 'A'} ${q.count}-question practice on what you missed` : q.reason === 'retest' ? `${q.count} questions like the one you missed` : `Here's ${an} ${q.count}-question quiz on ${q.title.toLowerCase()}`;
   const from = q.sources.length ? `, from ${listed(q.sources.slice(0, 2))}${q.sources.length > 2 ? ` and ${q.sources.length - 2} more` : ''}` : q.grounding === 'general' ? ', from general knowledge of the subject (no course material was available)' : '';
   const style = q.style === 'observed' && q.course ? ` The questions follow how ${q.course} has asked before — new questions, not a forecast of the exam.` : '';
   const mode = q.mode === 'exam' ? ' Exam conditions: results at the end.' : q.mode === 'marks' ? ' You\'ll see right or wrong as you go; explanations at the end.' : '';

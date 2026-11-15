@@ -14,14 +14,35 @@
 // The reference is Next's digest of the error, which is what the server's
 // log is searchable by — never the error's own message, which can carry
 // anything.
-import { useEffect } from 'react';
+//
+// One breakage is not a fault in the page at all: a tab left open across a
+// deploy asks for code the new version no longer serves (lib/stale-deploy.ts).
+// That one loads the page fresh, once, and says Socria was updated.
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { isStaleDeployError, reloadForUpdate } from '@/lib/stale-deploy';
 import './app-shell.css';
 
 export default function PageError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  const [updating, setUpdating] = useState(() => isStaleDeployError(error));
   useEffect(() => {
     console.error('[socria] a page stopped:', error);
+    // a reload already tried within the minute means the failure is real: say so rather than loop
+    if (isStaleDeployError(error) && !reloadForUpdate()) setUpdating(false);
   }, [error]);
+
+  if (updating) {
+    return (
+      <div className="app-root">
+        <div className="plate-wrap gone">
+          <div className="plate wide" role="status">
+            <p className="eyebrow">Socria was just updated</p>
+            <h1 style={{ marginTop: '12px' }}>Loading the new version…</h1>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-root">

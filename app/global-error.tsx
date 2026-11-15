@@ -4,16 +4,34 @@
 // so it brings its own <html> and <body> and nothing it can fail to load.
 // The brand book's paper, ink and moss, inline; the same honest words as
 // app/error.tsx; and one way back that cannot depend on the app working.
-import { useEffect } from 'react';
+//
+// A tab left open across a deploy (lib/stale-deploy.ts) loads the new version,
+// once, instead.
+import { useEffect, useState } from 'react';
+import { isStaleDeployError, reloadForUpdate } from '@/lib/stale-deploy';
 
 const paper = '#F5F3EB';
 const ink = '#23241F';
 const moss = '#354620';
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  const [updating, setUpdating] = useState(() => isStaleDeployError(error));
   useEffect(() => {
     console.error('[socria] the app stopped:', error);
+    if (isStaleDeployError(error) && !reloadForUpdate()) setUpdating(false);
   }, [error]);
+
+  if (updating) {
+    return (
+      <html lang="en">
+        <body style={{ margin: 0, background: paper, color: ink, fontFamily: 'Georgia, "Times New Roman", serif' }}>
+          <main role="status" style={{ minHeight: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px' }}>
+            <p style={{ margin: 0, fontSize: '1.4rem' }}>Socria was just updated. Loading the new version…</p>
+          </main>
+        </body>
+      </html>
+    );
+  }
 
   return (
     <html lang="en">
