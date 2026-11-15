@@ -107,7 +107,7 @@ When signed in, memory's recorded conflicts that this line touches are offered a
 - **The Universal Map:**
   - Idea chips are buttons that open their idea.
   - A touch pinch into a conversation goes down into it, as a trackpad's does.
-  - `/` brings back the search box. Dragging files onto the map brings it back too.
+  - `/` (or ⌘K) opens Find on your map; with no map drawn it brings back the search box. Dragging files onto the map brings the box back too. (Logos 6 map overhaul: `docs/LOGOS-6-UNIVERSAL-MAP.md`.)
 - **The space** has *Logic Map* and *Focus* in its toolbar.
 - **Add as idea.** Alt+Enter, or the word under the box: a card of the person's own, with no reply and no tokens.
 - **Project home** is in the More menu of a filed line, and is the first breadcrumb in Focus.

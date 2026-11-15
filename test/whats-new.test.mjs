@@ -127,7 +127,7 @@ console.log('=== what it says ===');
   ok('  and the drawing is hidden from a screen reader', /class="wn-art" aria-hidden="true"/.test(html));
   ok('kept, counted plainly', U.keptLine(0) === 'Nothing you had was lost.' && U.keptLine(1) === 'Your conversation is on it — nothing was lost.' && U.keptLine(1204) === 'All 1,204 of your conversations are on it — nothing was lost.');
   const src = read('components/onboarding/WhatsNew.tsx');
-  ok('the second beat reads the map and its four lenses', /Your map, not a list\./.test(src) && ['Today', 'This week', 'This month', 'All time'].every((l) => src.includes(`'${l}'`)) && /as a line through time/.test(src));
+  ok('the second beat reads the map and its four scales, one map at each', /Your map, not a list\./.test(src) && ['Today', 'Week', 'Month', 'All Time'].every((l) => src.includes(`'${l}'`)) && !/line through time/.test(src) && !src.includes('wn-as-time'));
   ok('the third is the box, and Projects', /Everything starts in one box\./.test(src) && /Search or start something new…/.test(src) && /drag a conversation onto one to file it/.test(src));
   ok('the last button shows the map over it, or opens it from the chat', /'Show me my map'/.test(src) && /'Take me to my map'/.test(src));
   ok('Esc skips, the arrows step', /e\.key === 'Escape'[\s\S]{0,80}onSkip\(\)/.test(src) && /'ArrowRight'/.test(src) && /'ArrowLeft'/.test(src));

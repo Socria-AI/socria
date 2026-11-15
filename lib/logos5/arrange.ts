@@ -1,8 +1,8 @@
 // lib/logos5/arrange.ts — HOW THE PERSON HAS ARRANGED THEIR UNIVERSAL MAP.
 //
 // Everything here is the person's own choice, and nothing else: how much of
-// it the map shows (Today, This week — the map — or This month, All time —
-// in order, timeline.ts), where they put a
+// it the map shows (Today, Week, Month or All Time — one map at four scales,
+// lib/logos5/scales.ts), where they put a
 // conversation, the subject they gave one by dragging it there, the order of
 // the clusters, which they starred and which they put out of sight, the links
 // and the notes they drew, how the map is shown, and the views they saved.
@@ -21,14 +21,14 @@
 // everything else; `w:…` and `m:…` are weeks and months. An arrangement kept
 // before the map was grouped this way still reads: its pins in a Project still
 // hold (This week is drawn by subject), and an older way of grouping all of it
-// — by subject, by week, `map`, `columns`, `timeline` — is All time.
+// — by subject, by week, `map`, `columns`, `timeline` (the line through time
+// that All Time once was) — is All Time, the map.
 //
 // PURE.
 
 /**
- * How much of it the Universal Map shows: today's learning and what it builds
- * on, or this week by subject — each a map — or this month, or all of it, in
- * order (timeline.ts).
+ * How much of the Universal Map is shown: Today, Week, Month or All Time —
+ * the same map at four temporal scales (lib/logos5/scales.ts).
  */
 export type HomeMode = 'today' | 'week' | 'month' | 'all';
 export type LabelLevel = 'minimal' | 'titles' | 'ideas';

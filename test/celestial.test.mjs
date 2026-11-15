@@ -149,7 +149,7 @@ console.log('=== the map as a star chart ===');
   ok('  drawn by the map itself', /className="l5b-link-comet"/.test(read('components/logos5/UniverseBubbles.tsx')));
   ok('orbits turn, comets run, questions twinkle — only when motion is welcome', /@media \(prefers-reduced-motion: no-preference\) \{\s*\/\* the orbits turn[\s\S]*?cel-orbit[\s\S]*?cel-comet[\s\S]*?cel-twinkle-pip/.test(uni));
   ok('  each orbit at its own pace, and seamless (a whole number of dashes)', /stroke-dashoffset: -96;/.test(uni) && 96 % 8 === 0);
-  ok('the words float on glass', /:is\(\.l5b-card, \.l5h-find, \.l5h-lens, \.l5t-scrub-bar\) \{\s*background: rgba\(10, 16, 38, 0\.6\);/.test(uni));
+  ok('the words float on glass', /:is\(\.l5b-card, \.l5h-find, \.l5h-lens\) \{\s*background: rgba\(10, 16, 38, 0\.6\);/.test(uni));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

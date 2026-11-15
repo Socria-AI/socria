@@ -34,9 +34,11 @@
 // map already joins is said on that curve's card instead, with Edit and Forget.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { cameraTransform, fitCamera, isDrag, keepInView, pinchCamera, readWheel, toWorld, zoomAt, KEY_PAN, type Camera } from '@/lib/canvas';
+import { cameraTransform, fitCamera, isDrag, keepInView, readWheel, toWorld, KEY_PAN, type Camera } from '@/lib/canvas';
+import { aggregated, camBetween, circleIn, lodFor, namesFromFar, revealOrder, tagsAt, viewCovers, viewOf, withinBudget, BUDGET, PER_FRAME, type Lod, type View } from '@/lib/logos5/mapLod';
+import type { Scale } from '@/lib/logos5/scales';
 import { boxAround, freshness, nearestWay, noteBox, type Box, type Match, type SharedIdea, type Tile } from '@/lib/logos5/universe';
-import { bubbleLayout, foldedBox, type BubbleCluster, type BubbleLens, type BubbleLink } from '@/lib/logos5/bubbles';
+import { bubbleLayout, bubblePlaces, foldedBox, type BubbleCluster, type BubbleLink } from '@/lib/logos5/bubbles';
 import { mapProvenance, type MapMemory } from '@/lib/logos5/memoryAtlas';
 import { PROJECT_COLOR_KEYS, type Homes } from '@/lib/logos5/spatial';
 import type { Arrangement } from '@/lib/logos5/arrange';
@@ -86,6 +88,55 @@ export interface MapMemoryLayer {
   onForget: (id: string) => void;
 }
 
+/** The camera, moved from outside the map: a search or Recent goes to what was found; Back returns. */
+export interface MapNav {
+  /** glide to a conversation, light it, and open its card */
+  focus: (id: string, o?: { card?: boolean }) => void;
+  /** glide to several at once — a subject, or the conversations that hold an idea — and light them */
+  focusMany: (ids: readonly string[]) => void;
+  /** back to where the map was before the last focus */
+  back: () => void;
+  /** the whole of what is on the map, in view */
+  fit: () => void;
+  /**
+   * Remember where the camera is now, as where Back returns to after the next focus. Called before a search widens
+   * the scale: a wider scale refits the map at once (with reduced motion, before the focus has begun), and Back
+   * should return to where the person was, not to that refit.
+   */
+  mark: () => void;
+}
+
+/** The zoom the CSS reads changes in steps of this much (in log zoom, about 6%): see applyCam. */
+const K_STEP = 0.06;
+
+/** A region's dashed ring is dashed along at most this many units of length (see the ring's pathLength). */
+const RING_DASHES_MAX = 1600;
+
+/** How far out and in the Universal Map goes: far enough to see every subject of All Time at once, near enough to read a quick question. */
+const MIN_K = 0.06;
+const MAX_K = 2.6;
+const clampK = (k: number) => Math.min(MAX_K, Math.max(MIN_K, k));
+/** Zoom keeping the point under (px, py) where it is (lib/canvas.ts zoomAt, with the map's own range). */
+function zoomTo(c: Camera, k: number, px: number, py: number): Camera {
+  const to = clampK(k);
+  const w = toWorld(c, px, py);
+  return { x: px - w.x * to, y: py - w.y * to, k: to };
+}
+/** Two fingers: the zoom their spread says, the point between them kept under them (lib/canvas.ts pinchCamera, with the map's range). */
+function pinchTo(start: Camera, a0: { x: number; y: number }, b0: { x: number; y: number }, a1: { x: number; y: number }, b1: { x: number; y: number }): Camera {
+  const d0 = Math.hypot(b0.x - a0.x, b0.y - a0.y) || 1;
+  const d1 = Math.hypot(b1.x - a1.x, b1.y - a1.y) || 1;
+  const k = clampK(start.k * (d1 / d0));
+  const m0 = { x: (a0.x + b0.x) / 2, y: (a0.y + b0.y) / 2 };
+  const m1 = { x: (a1.x + b1.x) / 2, y: (a1.y + b1.y) / 2 };
+  const w = toWorld(start, m0.x, m0.y);
+  return { x: m1.x - w.x * k, y: m1.y - w.y * k, k };
+}
+/** Arrival delays are capped, so a large map never waits seconds for its last conversation to come in. */
+const ARRIVE_MAX = 1100;
+/** How long a conversation coming onto the map (a wider scale) or leaving it (a narrower one) takes to fade. */
+const SCALE_FADE = 420;
+
 type Drag =
   | { kind: 'nodes'; ids: string[]; dx: number; dy: number; over: string | null }
   | { kind: 'note'; id: string; dx: number; dy: number }
@@ -117,7 +168,8 @@ const ARRIVE = { circle: 0, circleStep: 70, hub: 140, hubStep: 70, line: 240, do
 const MEM_INSET = 5 + 11 / 2;
 
 export function BubbleMap({
-  lens,
+  scale,
+  visible,
   tiles,
   tileById,
   homes,
@@ -141,10 +193,15 @@ export function BubbleMap({
   opened,
   backOf,
   memory = null,
+  navRef,
+  onNav,
   acts,
 }: {
-  lens: BubbleLens;
-  /** Today: every conversation shown (the day and what it builds on are chosen from them); This week: the week's */
+  /** how much of the map is lit (lib/logos5/scales.ts): Today, Week, Month or All Time — where each one is never depends on it */
+  scale: Scale;
+  /** the conversations on the map at this scale */
+  visible: ReadonlySet<string>;
+  /** every conversation shown, at any scale: the whole map is laid out from these, once */
   tiles: readonly Tile[];
   tileById: Map<string, Tile>;
   homes: Homes;
@@ -177,16 +234,119 @@ export function BubbleMap({
   backOf?: ReadonlyMap<string, { id: string; at: number }>;
   /** what Socria remembers, hung beside what it came from; null with Memory off, signed out, or nothing to draw */
   memory?: MapMemoryLayer | null;
+  /** the camera, moved from outside: a search or Recent goes to a conversation, Back returns */
+  navRef?: React.MutableRefObject<MapNav | null>;
+  /** whether there is somewhere to go back to, for the page to offer it */
+  onNav?: (s: { canBack: boolean }) => void;
   acts: BubbleActs;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
-  const [cam, setCamState] = useState<Camera>({ x: 0, y: 0, k: 1 });
-  const camRef = useRef(cam);
-  const setCam = useCallback((c: Camera) => {
-    camRef.current = c;
-    setCamState(c);
+  const sizeRef = useRef(size);
+  sizeRef.current = size;
+  // ── THE CAMERA: moved on the page itself, frame by frame, never through React. React hears of it only when
+  // what is drawn has to change: the level of detail crossed a boundary (lib/logos5/mapLod.ts, with hysteresis),
+  // the camera left the part of the world last culled to, or it has come to rest (a trailing commit). ──
+  const worldRef = useRef<HTMLDivElement>(null);
+  const camRef = useRef<Camera>({ x: 0, y: 0, k: 1 });
+  const [view, setView] = useState<{ cam: Camera; lod: Lod; cull: View | null }>({ cam: { x: 0, y: 0, k: 1 }, lod: 'mid', cull: null });
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  /** the camera as last committed: for what is drawn, never for where it is drawn */
+  const cam = view.cam;
+  // Where the camera is goes to the one element that reads it (the night sky's drift), and the zoom to the map only
+  // when it has changed: a custom property set on the map restyles everything under it, so a pan that set one every
+  // frame restyled every conversation every frame.
+  const skyRef = useRef<HTMLDivElement>(null);
+  const kSaid = useRef('');
+  const applyCam = useCallback(() => {
+    const c = camRef.current;
+    if (worldRef.current) worldRef.current.style.transform = cameraTransform(c);
+    const sky = skyRef.current;
+    if (sky) {
+      sky.style.setProperty('--cx', `${Math.round(c.x)}px`);
+      sky.style.setProperty('--cy', `${Math.round(c.y)}px`);
+    }
+    const b = box.current;
+    // the zoom the CSS reads (words faded by their size on screen, names held at one size, hairlines) is said in steps
+    // of about 6%: each change repaints every word on the map, so a smooth zoom repainted all of it on every frame,
+    // while the step is too small to see in anything sized from it (within 3%)
+    const k = Math.exp(Math.round(Math.log(c.k) / K_STEP) * K_STEP).toFixed(3);
+    if (b && k !== kSaid.current) {
+      kSaid.current = k;
+      b.style.setProperty('--k', k);
+    }
   }, []);
+  const commitRaf = useRef(0);
+  const idle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const commit = useCallback(() => {
+    commitRaf.current = 0;
+    const c = camRef.current;
+    const { w, h } = sizeRef.current;
+    setView((v) => ({ cam: c, lod: lodFor(c.k, v.lod), cull: w && h ? viewOf(c, w, h, 0.6) : null }));
+  }, []);
+  const setCam = useCallback(
+    (c: Camera) => {
+      camRef.current = c;
+      applyCam();
+      const v = viewRef.current;
+      const { w, h } = sizeRef.current;
+      const needs = lodFor(c.k, v.lod) !== v.lod || !v.cull || !viewCovers(v.cull, c, w, h) || Math.abs(Math.log(c.k / (v.cam.k || 1))) > 0.35;
+      if (needs && !commitRaf.current) commitRaf.current = requestAnimationFrame(commit);
+      if (idle.current) clearTimeout(idle.current);
+      idle.current = setTimeout(() => {
+        if (!commitRaf.current) commitRaf.current = requestAnimationFrame(commit);
+      }, 160);
+    },
+    [applyCam, commit]
+  );
+  // after every render the page carries the live camera: a render never puts an older one back
+  useBeforePaint(() => applyCam());
+  // ── a glide: the camera eased from where it is to where it is going; reduced motion, straight there ──
+  const flight = useRef(0);
+  const reduced = useRef(false);
+  useEffect(() => {
+    const m = typeof window !== 'undefined' ? window.matchMedia?.('(prefers-reduced-motion: reduce)') : null;
+    reduced.current = !!m?.matches;
+    const on = () => (reduced.current = !!m?.matches);
+    m?.addEventListener?.('change', on);
+    return () => {
+      m?.removeEventListener?.('change', on);
+      if (flight.current) cancelAnimationFrame(flight.current);
+      if (commitRaf.current) cancelAnimationFrame(commitRaf.current);
+      if (idle.current) clearTimeout(idle.current);
+    };
+  }, []);
+  const stopFlight = useCallback(() => {
+    if (flight.current) cancelAnimationFrame(flight.current);
+    flight.current = 0;
+  }, []);
+  const flyTo = useCallback(
+    (to: Camera, ms = 680, then?: () => void) => {
+      stopFlight();
+      const from = camRef.current;
+      const { w, h } = sizeRef.current;
+      if (reduced.current || ms <= 0 || !w || !h) {
+        setCam(to);
+        commit();
+        then?.();
+        return;
+      }
+      const t0 = performance.now();
+      const step = (t: number) => {
+        const p = Math.min(1, (t - t0) / ms);
+        setCam(camBetween(from, to, p, w, h));
+        if (p < 1) flight.current = requestAnimationFrame(step);
+        else {
+          flight.current = 0;
+          commit();
+          then?.();
+        }
+      };
+      flight.current = requestAnimationFrame(step);
+    },
+    [setCam, commit, stopFlight]
+  );
   const [drag, setDrag] = useState<Drag | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const [cardFor, setCardFor] = useState<string | null>(null);
@@ -206,13 +366,49 @@ export function BubbleMap({
   const folded = useMemo(() => new Set(Object.entries(arr.frames).filter(([, f]) => f.collapsed).map(([k]) => k)), [arr.frames]);
   // what the layout needs of a memory: its words and where it came from (the rest is how it is drawn)
   const memIn = useMemo(() => memory?.list.map((m) => ({ id: m.id, text: m.text, from: m.from })), [memory?.list]);
-  const L = useMemo(
-    () => bubbleLayout({ lens, tiles, all, homes, ideas, links: arr.links, now, narrow, folded: lens === 'week' ? folded : undefined, opened, resumeId, cardFor, size: arr.display.size, ideaLinks: arr.display.ideas, canMake: !!acts.onNewProject && lens === 'week', start: !!acts.onStart, strictToday: lens === 'today', ...(memIn?.length ? { memories: memIn } : {}) }),
-    [lens, tiles, all, homes, ideas, arr.links, now, narrow, folded, opened, resumeId, cardFor, arr.display.size, arr.display.ideas, acts.onNewProject, !!acts.onStart, memIn]
+  // THE WHOLE MAP, LAID OUT ONCE (lib/logos5/bubbles.ts): every conversation shown, whatever the scale, so a
+  // conversation is in the same place on Today as on All Time; the scale only says which are lit.
+  // two stages: where everything is (expensive, kept across scales), then what the scale lights over it (cheap)
+  const placeIn = useMemo(
+    () => ({ lens: 'week' as const, tiles, all, homes, ideas, links: arr.links, now, narrow, folded, opened, resumeId, size: arr.display.size, canMake: !!acts.onNewProject }),
+    [tiles, all, homes, ideas, arr.links, now, narrow, folded, opened, resumeId, arr.display.size, acts.onNewProject]
   );
+  const P = useMemo(() => bubblePlaces(placeIn), [placeIn]);
+  const L = useMemo(
+    () => bubbleLayout({ ...placeIn, cardFor, ideaLinks: arr.display.ideas, start: !!acts.onStart, visible, foldedInBounds: scale === 'all', ...(memIn?.length ? { memories: memIn } : {}) }, P),
+    [placeIn, P, cardFor, arr.display.ideas, !!acts.onStart, visible, scale, memIn]
+  );
+  // ── coming and going: what a wider scale brings fades in; what a narrower one leaves fades out ──
+  const [leaving, setLeaving] = useState<ReadonlySet<string>>(() => new Set());
+  const [entering, setEntering] = useState<ReadonlySet<string>>(() => new Set());
+  const visWas = useRef(visible);
+  useEffect(() => {
+    const was = visWas.current;
+    if (was === visible) return;
+    visWas.current = visible;
+    const gone = new Set([...was].filter((id) => !visible.has(id)));
+    const come = new Set([...visible].filter((id) => !was.has(id)));
+    setLeaving(gone);
+    setEntering(come);
+    const t = setTimeout(() => {
+      setLeaving(new Set());
+      setEntering(new Set());
+    }, SCALE_FADE + 60);
+    return () => clearTimeout(t);
+  }, [visible]);
+  /** on the map now, or still fading out of it */
+  const lit = useCallback((id: string) => visible.has(id) || leaving.has(id), [visible, leaving]);
+  /** after the first arrival, something culled into view simply appears: only a scale's change fades */
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSettled(true), ARRIVE_MAX + 700);
+    return () => clearTimeout(t);
+  }, []);
+  /** the conversation a search, Recent or Back has just gone to: lit for a moment */
+  const [spot, setSpot] = useState<readonly string[]>([]);
   const memOf = useMemo(() => new Map((memory?.list ?? []).map((m) => [m.id, m])), [memory?.list]);
   const titleOf = (id: string) => tileById.get(id)?.title ?? null;
-  const notes = lens === 'week' ? arr.notes : [];
+  const notes = arr.notes;
   const content = useMemo<Box>(() => boxAround([L.bounds, ...notes.map(noteBox)]), [L.bounds, notes]);
   const sel = useMemo(() => new Set(selected), [selected]);
   const starred = useMemo(() => new Set(arr.starred), [arr.starred]);
@@ -245,14 +441,36 @@ export function BubbleMap({
     return () => ro?.disconnect();
   }, []);
 
-  const fitNow = useCallback(() => {
-    if (!size.w || !size.h || !content.w) return;
-    const c = fitCamera(content, size.w, size.h, { pad: narrow ? 14 : 28, insets: { top, right: 0, bottom, left: 0 }, maxK: 1, minK: narrow ? 0.62 : 0.34, align: narrow ? 'start' : 'center' });
-    setCam(c);
-  }, [size.w, size.h, content, narrow, top, bottom, setCam]);
+  const fitCam = useCallback(
+    (to: Box) => fitCamera(to, size.w, size.h, { pad: narrow ? 14 : 28, insets: { top, right: 0, bottom, left: 0 }, maxK: 1, minK: MIN_K, align: narrow && to.w * 0.62 <= size.w ? 'start' : 'center' }),
+    [size.w, size.h, narrow, top, bottom]
+  );
+  const fitNow = useCallback(
+    (glide = false) => {
+      if (!size.w || !size.h || !content.w) return;
+      const c = fitCam(content);
+      if (glide) flyTo(c, 640);
+      else {
+        stopFlight();
+        setCam(c);
+        commit();
+      }
+    },
+    [size.w, size.h, content, fitCam, setCam, flyTo, stopFlight, commit]
+  );
   const fitted = useRef('');
   /** the person has moved or zoomed the map since it was last fitted */
   const touched = useRef(false);
+  // A NEW SCALE: the same map, more or less of it lit — the camera glides out to take in what came, or in to
+  // what is left, from where it is; nothing is laid out again
+  const scaleWas = useRef(scale);
+  useBeforePaint(() => {
+    if (scaleWas.current === scale) return;
+    scaleWas.current = scale;
+    if (!fitted.current) return;
+    touched.current = false;
+    fitNow(true);
+  }, [scale, fitNow]);
   useBeforePaint(() => {
     const want = String(fitKey);
     if (fitted.current === want || !size.w || !content.w) return;
@@ -265,7 +483,7 @@ export function BubbleMap({
   useBeforePaint(() => {
     const was = fittedTo.current;
     fittedTo.current = { w: size.w, h: size.h, cw: content.w, ch: content.h, top, bottom };
-    if (!was.w || touched.current || !fitted.current) return;
+    if (!was.w || touched.current || !fitted.current || flight.current) return;
     if (Math.abs(was.w - size.w) > 40 || Math.abs(was.h - size.h) > 40 || Math.abs(was.cw - content.w) > 24 || Math.abs(was.ch - content.h) > 24 || Math.abs(was.top - top) > 6 || Math.abs(was.bottom - bottom) > 6) fitNow();
   }, [size, content.w, content.h, top, bottom, fitNow]);
 
@@ -278,6 +496,7 @@ export function BubbleMap({
   wheelRef.current = (e: WheelEvent) => {
     if ((e.target as Element | null)?.closest?.('.l5h-palette, textarea, input')) return;
     e.preventDefault();
+    stopFlight();
     acts.onPreview(null, null);
     touched.current = true;
     const it = readWheel(e);
@@ -289,7 +508,7 @@ export function BubbleMap({
       if (hub) {
         const hr = hub.getBoundingClientRect();
         const full = hr.width >= Math.min(r.width, r.height) * 0.62;
-        const stuck = zoomAt(c, c.k * it.factor, e.clientX - r.left, e.clientY - r.top).k <= c.k + 1e-4;
+        const stuck = zoomTo(c, c.k * it.factor, e.clientX - r.left, e.clientY - r.top).k <= c.k + 1e-4;
         if (full || stuck) {
           diveRef.current += it.factor - 1;
           if (diveRef.current > 0.18) {
@@ -302,7 +521,7 @@ export function BubbleMap({
       }
     }
     diveRef.current = 0;
-    setCam(keep(it.kind === 'zoom' ? zoomAt(c, c.k * it.factor, e.clientX - r.left, e.clientY - r.top) : { ...c, x: c.x + it.dx, y: c.y + it.dy }));
+    setCam(keep(it.kind === 'zoom' ? zoomTo(c, c.k * it.factor, e.clientX - r.left, e.clientY - r.top) : { ...c, x: c.x + it.dx, y: c.y + it.dy }));
   };
   useEffect(() => {
     const el = box.current;
@@ -334,12 +553,70 @@ export function BubbleMap({
     const sy = n.y * c.k + c.y;
     const margin = 60;
     if (sx >= margin && sy >= top + margin / 2 && sx <= size.w - margin && sy <= size.h - bottom - margin / 2) return;
-    setCam({ ...c, x: size.w / 2 - n.x * c.k, y: (size.h + top - bottom) / 2 - n.y * c.k });
+    flyTo({ ...c, x: size.w / 2 - n.x * c.k, y: (size.h + top - bottom) / 2 - n.y * c.k }, 320);
   };
+  // ── GOING TO WHAT WAS FOUND: a search, Recent, Back (components/logos5/Universe.tsx asks; positions never move,
+  // so the camera can set off before a wider scale has even lit what it is going to) ──
+  const backStack = useRef<Camera[]>([]);
+  const marked = useRef<Camera | null>(null);
+  const pushBack = () => {
+    backStack.current = [...backStack.current.slice(-9), marked.current ?? camRef.current];
+    marked.current = null;
+    onNav?.({ canBack: true });
+  };
+  useEffect(() => {
+    if (!spot.length) return;
+    const t = setTimeout(() => setSpot([]), 2600);
+    return () => clearTimeout(t);
+  }, [spot]);
+  if (navRef)
+    navRef.current = {
+      focus: (id, o) => {
+        const n = L.byId.get(id);
+        if (!n || !size.w) return;
+        pushBack();
+        touched.current = true;
+        acts.onPreview(null, null);
+        acts.onSelect([id]);
+        setSpot([id]);
+        // near enough to read it, never nearer than it already was
+        const k = Math.max(camRef.current.k, 1.05);
+        flyTo({ k, x: size.w / 2 - n.x * k, y: (size.h + top - bottom) / 2 - n.y * k }, 720, () => {
+          if (o?.card !== false) setTimeout(() => acts.onPreview(id, screenRect(id)), 90);
+        });
+      },
+      focusMany: (ids) => {
+        const pts = ids.map((id) => L.byId.get(id)).filter((p): p is NonNullable<typeof p> => !!p);
+        if (!pts.length || !size.w) return;
+        if (pts.length === 1) return navRef.current?.focus(ids.find((id) => L.byId.has(id))!);
+        pushBack();
+        touched.current = true;
+        acts.onPreview(null, null);
+        setSpot(ids.filter((id) => L.byId.has(id)));
+        flyTo(fitCam(boxAround(pts.map((p) => ({ x: p.x - p.r - 30, y: p.y - p.r - 30, w: 2 * p.r + 60, h: 2 * p.r + 60 })))), 720);
+      },
+      back: () => {
+        const c = backStack.current.pop();
+        onNav?.({ canBack: backStack.current.length > 0 });
+        if (!c) return;
+        acts.onPreview(null, null);
+        // the Back control goes once there is nowhere further back: the map keeps the keyboard
+        box.current?.focus({ preventScroll: true });
+        flyTo(c, 640);
+      },
+      fit: () => {
+        touched.current = false;
+        fitNow(true);
+      },
+      mark: () => {
+        marked.current = camRef.current;
+      },
+    };
+
   /** What a point on the map is in: a circle, a folded one's name and dots (an empty Project's too), or "+ New project". */
   const dropAt = (x: number, y: number): string | null => {
     const near = (b: { x: number; y: number; w: number; h: number }) => x >= b.x - 12 && x <= b.x + b.w + 12 && y >= b.y - 12 && y <= b.y + b.h + 12;
-    for (const c of L.clusters) if (c.folded ? near(foldedBox(c)) : Math.hypot(x - c.x, y - c.y) <= c.r) return c.key;
+    for (const c of L.clusters) if (c.folded ? near(foldedBox(c)) : c.region !== null && Math.hypot(x - (c.region?.x ?? c.x), y - (c.region?.y ?? c.y)) <= (c.region?.r ?? c.r)) return c.key;
     return L.make && acts.onNewProject && near(L.make) ? NEW_PROJECT : null;
   };
 
@@ -363,6 +640,7 @@ export function BubbleMap({
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     const target = targetOf(e.target as Element);
     if (!target) return;
+    stopFlight();
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.current.size === 2) {
       // two fingers: zoom and move, whatever the first one was doing
@@ -396,7 +674,7 @@ export function BubbleMap({
       const r = box.current!.getBoundingClientRect();
       const off = (p: { x: number; y: number }) => ({ x: p.x - r.left, y: p.y - r.top });
       touched.current = true;
-      const next = keep(pinchCamera(g.cam0, off(g.pinch.a0), off(g.pinch.b0), off(pts[0]), off(pts[1])));
+      const next = keep(pinchTo(g.cam0, off(g.pinch.a0), off(g.pinch.b0), off(pts[0]), off(pts[1])));
       setCam(next);
       // ONE SPACE, BY TOUCH TOO (Logos 6): a pinch that opens a conversation until it fills the view goes down
       // into it, as a trackpad's does — before, a touch pinch only ever zoomed
@@ -477,7 +755,7 @@ export function BubbleMap({
       const c = camRef.current;
       const a = toWorld(c, Math.min(d.x0, d.x1), Math.min(d.y0, d.y1));
       const b = toWorld(c, Math.max(d.x0, d.x1), Math.max(d.y0, d.y1));
-      const ids = [...L.byId.entries()].filter(([, n]) => n.x > a.x && n.x < b.x && n.y > a.y && n.y < b.y).map(([id]) => id);
+      const ids = [...L.byId.entries()].filter(([id, n]) => visible.has(id) && n.x > a.x && n.x < b.x && n.y > a.y && n.y < b.y).map(([id]) => id);
       acts.onSelect(ids, e.shiftKey);
     }
   };
@@ -510,7 +788,7 @@ export function BubbleMap({
         const dy = e.key === 'ArrowUp' ? KEY_PAN : e.key === 'ArrowDown' ? -KEY_PAN : 0;
         return setCam(keep({ ...c, x: c.x + dx, y: c.y + dy }));
       }
-      const among = [...L.byId.entries()].filter(([id]) => !matchOf || matchOf(id)).map(([id, n]) => ({ id, x: n.x - 6, y: n.y - 6, w: 12, h: 12 }));
+      const among = [...L.byId.entries()].filter(([id]) => visible.has(id) && (!matchOf || matchOf(id))).map(([id, n]) => ({ id, x: n.x - 6, y: n.y - 6, w: 12, h: 12 }));
       const from = cur ? L.byId.get(cur) : null;
       const next = from ? nearestWay(ways[e.key], { x: from.x - 6, y: from.y - 6, w: 12, h: 12 }, among) : (resumeId && among.find((n) => n.id === resumeId)?.id) || among[0]?.id || null;
       if (!next) return;
@@ -529,9 +807,9 @@ export function BubbleMap({
       e.preventDefault();
       return acts.onPreview(cur, screenRect(cur));
     }
-    if (e.key === '+' || e.key === '=') return (touched.current = true), setCam(keep(zoomAt(camRef.current, camRef.current.k * 1.2, size.w / 2, size.h / 2)));
-    if (e.key === '-') return (touched.current = true), setCam(keep(zoomAt(camRef.current, camRef.current.k / 1.2, size.w / 2, size.h / 2)));
-    if (e.key === '0') return (touched.current = false), fitNow();
+    if (e.key === '+' || e.key === '=') return (touched.current = true), flyTo(keep(zoomTo(camRef.current, camRef.current.k * 1.25, size.w / 2, size.h / 2)), 220);
+    if (e.key === '-') return (touched.current = true), flyTo(keep(zoomTo(camRef.current, camRef.current.k / 1.25, size.w / 2, size.h / 2)), 220);
+    if (e.key === '0') return (touched.current = false), fitNow(true);
   };
 
   // ── drawing ──
@@ -561,7 +839,7 @@ export function BubbleMap({
   // the order things arrive in as the map comes in
   const clusterIndex = useMemo(() => new Map(L.clusters.map((c, i) => [c.key, i])), [L.clusters]);
   const hubIndex = useMemo(() => new Map(L.hubs.map((h, i) => [h.id, i])), [L.hubs]);
-  const hubArrives = (id: string) => ARRIVE.hub + (hubIndex.get(id) ?? 0) * ARRIVE.hubStep + (clusterIndex.get(L.byId.get(id)?.g ?? '') ?? 0) * 40;
+  const hubArrives = (id: string) => Math.min(ARRIVE_MAX, ARRIVE.hub + (hubIndex.get(id) ?? 0) * ARRIVE.hubStep + (clusterIndex.get(L.byId.get(id)?.g ?? '') ?? 0) * 40);
   const backFor = (c: BubbleCluster) => {
     if (!backOf || !acts.onBack) return null;
     for (const id of c.ids) {
@@ -579,14 +857,81 @@ export function BubbleMap({
   const memDim = (from: readonly string[]) => (matchOf && from.every((id) => !matchOf(id)) ? ' is-dim' : '');
   const memArrives = (i: number) => Math.min(ARRIVE.card - 40, ARRIVE.mem + i * ARRIVE.memStep);
 
+  // ── WHAT IS DRAWN, ONE BY ONE (lib/logos5/mapLod.ts): what is on the map (or fading out of it), in or near the
+  // view, not inside a subject drawn from far away as one region, and within the level's budget — what is chosen,
+  // here, found or pointed at always. Everything else costs nothing until the camera comes to it. ──
+  const lod = view.lod;
+  const full = useMemo(() => {
+    const agg = new Set<string>();
+    for (const c of L.clusters) if (!c.folded && c.region && aggregated(lod, c.region.shown)) agg.add(c.key);
+    const must = new Set<string>([...selected, ...spot, ...(activeId ? [activeId] : []), ...(hover ? [hover] : []), ...(drag?.kind === 'nodes' ? drag.ids : [])]);
+    const cull = view.cull;
+    const near = (id: string, x: number, y: number, r: number, g: string) => lit(id) && (must.has(id) || (!agg.has(g) && (!cull || circleIn(cull, x, y, r + 140))));
+    const hubs = L.hubs.filter((h) => near(h.id, h.x, h.y, h.r, h.g));
+    const dots = L.dots.filter((d) => near(d.id, d.x, d.y, d.r, d.g));
+    const kept = new Set(withinBudget([...hubs.map((h) => ({ id: h.id, score: 1000 + h.r })), ...dots.map((d) => ({ id: d.id, score: d.r }))], BUDGET[lod], must).map((x) => x.id));
+    return { agg, must, ids: kept, hubs: hubs.filter((h) => kept.has(h.id)), dots: dots.filter((d) => kept.has(d.id)) };
+  }, [L, lod, view.cull, lit, selected, spot, activeId, hover, drag]);
+  // PROGRESSIVE: many conversations coming into the drawing at once (lib/logos5/mapLod.ts revealOrder) are added a
+  // frame's worth at a time, the middle of the view first; the order is settled once for each new set, in render, so
+  // the first frame never mounts them all
+  const drawnRef = useRef<ReadonlySet<string>>(new Set());
+  const [grown, setGrown] = useState(0);
+  const progress = useRef<{ of: typeof full | null; order: string[] | null; n: number }>({ of: null, order: null, n: 0 });
+  if (progress.current.of !== full) {
+    const c = camRef.current;
+    const { w, h } = sizeRef.current;
+    const r = revealOrder([...full.hubs, ...full.dots], drawnRef.current, full.must, { x: (w / 2 - c.x) / (c.k || 1), y: (h / 2 - c.y) / (c.k || 1) });
+    progress.current = r ? { of: full, order: r.order, n: r.first + PER_FRAME } : { of: full, order: null, n: 0 };
+  }
+  const draw = useMemo(() => {
+    const r = progress.current;
+    if (!r.order || r.n >= r.order.length) return full;
+    const ids = new Set(r.order.slice(0, r.n));
+    return { ...full, ids, hubs: full.hubs.filter((x) => ids.has(x.id)), dots: full.dots.filter((x) => ids.has(x.id)) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [full, grown]);
+  useEffect(() => {
+    drawnRef.current = draw.ids;
+    const r = progress.current;
+    if (!r.order || r.n >= r.order.length) return;
+    const t = requestAnimationFrame(() => {
+      r.n += PER_FRAME;
+      setGrown((g) => g + 1);
+    });
+    return () => cancelAnimationFrame(t);
+  }, [draw]);
+  /** from far away, only the names that fit without overlapping, the largest subjects first */
+  const farNames = useMemo(
+    () => (lod === 'far' ? namesFromFar(L.clusters.filter((c) => !c.folded && c.region).map((c) => ({ key: c.key, x: c.region!.x, y: c.region!.y, r: c.region!.r, w: c.label.w })), cam.k) : null),
+    [lod, L.clusters, cam.k]
+  );
+  /** a session whose own words are too small at this zoom gets its name beside it, where one fits (lib/logos5/mapLod.ts tagsAt) */
+  const tags = useMemo(() => {
+    if (lod === 'near') return null;
+    const k = cam.k;
+    const small = draw.hubs.filter((h) => h.font * k < 11.5);
+    return tagsAt(
+      small.map((h) => ({ id: h.id, x: h.x, y: h.y, r: h.r, w: Math.min(176, nodeLabel(tileById.get(h.id)?.title ?? '').length * 6.9 + 6) })),
+      k,
+      60,
+      // never over another disc or quick question drawn, whether or not it wants a name of its own
+      [...draw.hubs, ...draw.dots]
+    );
+  }, [lod, cam.k, draw.hubs, draw.dots, tileById]);
+  const spotSet = useMemo(() => new Set(spot), [spot]);
+  const motion = (id: string) => (leaving.has(id) ? ' is-leaving' : entering.has(id) ? ' is-entering' : '') + (spotSet.has(id) ? ' is-spot' : '');
+  /** a subject drawn from far away as one region: its largest sessions shown in it, the rest counted */
+  const aggOf = (c: BubbleCluster) => L.hubs.filter((h) => h.g === c.key && visible.has(h.id)).sort((a, b) => b.r - a.r).slice(0, 5);
+
   return (
     <div
       ref={box}
-      className={`l5h-map l5b lens-${lens}${narrow ? ' is-narrow' : ''}${arr.display.labels === 'minimal' ? ' is-minimal' : ''}${drag ? ` is-${drag.kind}` : ''}${linkFrom ? ' is-linking' : ''}${selectMode ? ' is-selecting' : ''}${litSet && !matchOf ? ' has-lit' : ''}`}
-      style={css({ '--cx': `${Math.round(cam.x)}px`, '--cy': `${Math.round(cam.y)}px`, '--k': cam.k.toFixed(3) })}
+      className={`l5h-map l5b scale-${scale} lod-${lod}${settled ? ' is-settled' : ''}${spot.length ? ' has-spot' : ''}${narrow ? ' is-narrow' : ''}${arr.display.labels === 'minimal' ? ' is-minimal' : ''}${drag ? ` is-${drag.kind}` : ''}${linkFrom ? ' is-linking' : ''}${selectMode ? ' is-selecting' : ''}${litSet && !matchOf ? ' has-lit' : ''}`}
+      data-lod={lod}
       tabIndex={0}
       role="group"
-      aria-label={`Your conversations, ${lens === 'today' ? 'today’s and what they build on' : 'this week’s'}, by subject. Arrow keys go from one to the next; Enter opens it.`}
+      aria-label={`Your conversations, ${scale === 'today' ? 'today’s' : scale === 'week' ? 'this week’s' : scale === 'month' ? 'this month’s' : 'all of them'}, by subject. Arrow keys go from one to the next; Enter opens it.`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -596,23 +941,36 @@ export function BubbleMap({
       }}
       onDoubleClick={(e) => {
         const t = targetOf(e.target as Element);
-        if (t?.kind === 'canvas' && lens === 'week') {
+        if (t?.kind === 'canvas') {
           const w = world(e);
           acts.onNote(w.x, w.y);
         } else if (t?.kind === 'note') setEditNote(t.id);
       }}
       onKeyDown={onKeyDown}
     >
-      <div className="l5n-sky" aria-hidden="true" />
-      <div className="l5h-world" style={{ transform: cameraTransform(cam) }}>
+      <div className="l5n-sky" ref={skyRef} aria-hidden="true" />
+      <div className="l5h-world" ref={worldRef}>
+        {/* each subject's ground: a soft field the size of its region at this scale, deeper when drawn from far away as one */}
+        {L.clusters.map((c) =>
+          !c.folded && c.region ? (
+            <div
+              key={`g:${c.key}`}
+              className={`l5b-field${c.kind === 'project' ? ' is-project' : ''}${draw.agg.has(c.key) ? ' is-agg' : ''}${c.ids.every(dimmed) ? ' is-dim' : ''}`}
+              style={{ left: c.region.x - c.region.r, top: c.region.y - c.region.r, width: 2 * c.region.r, height: 2 * c.region.r, ...css({ '--c': colorVar(c.color) }) }}
+              aria-hidden="true"
+            />
+          ) : null
+        )}
         <svg className="l5b-lines" aria-hidden="true">
+          {/* the masks that draw a curve out as the map arrives: only while it arrives. Each covers the whole map, and a
+              masked line is rasterised through it in every tile, so once drawn the curves are plain paths */}
           <defs>
-            {L.links.map((l) => (
+            {!settled && L.links.map((l) => (
               <mask key={l.key} id={`l5b-m-${maskId(l.key)}`} maskUnits="userSpaceOnUse" x={content.x - 400} y={content.y - 400} width={content.w + 800} height={content.h + 800}>
                 <path className="l5b-draw" d={pathOf(l)} pathLength={1} style={css({ '--d': `${ARRIVE.link + L.links.indexOf(l) * ARRIVE.linkStep}ms` })} />
               </mask>
             ))}
-            {L.memories.map((mm, i) =>
+            {!settled && L.memories.map((mm, i) =>
               mm.from.map((f) => {
                 const d = tetherOf(at(f), mm);
                 return d ? (
@@ -624,34 +982,39 @@ export function BubbleMap({
             )}
           </defs>
           {L.clusters
-            .filter((c) => !c.folded)
+            .filter((c) => !c.folded && c.region)
             .map((c, i) => (
               <circle
                 key={c.key}
-                className={`l5b-ring${c.kind === 'project' ? ' is-project' : ''}${over === c.key ? ' is-over' : ''}${c.ids.every(dimmed) ? ' is-dim' : ''}`}
-                cx={c.x}
-                cy={c.y}
-                r={c.r}
-                style={css({ '--c': colorVar(c.color), '--d': `${ARRIVE.circle + i * ARRIVE.circleStep}ms` })}
+                className={`l5b-ring${c.kind === 'project' ? ' is-project' : ''}${over === c.key ? ' is-over' : ''}${c.ids.every(dimmed) ? ' is-dim' : ''}${draw.agg.has(c.key) ? ' is-agg' : ''}`}
+                cx={c.region!.x}
+                cy={c.region!.y}
+                r={c.region!.r}
+                // the dashes counted against at most 1600 units of length: a small ring is dashed exactly as before; a
+                // very large one (All Time, thousands of conversations) has longer dashes rather than thousands more,
+                // which the browser would otherwise rasterise one by one in every tile the ring crosses
+                pathLength={Math.min(Math.round(2 * Math.PI * c.region!.r), RING_DASHES_MAX)}
+                // as properties too, so a change of scale moves and grows the ring where the browser can ease it
+                style={css({ cx: `${c.region!.x}px`, cy: `${c.region!.y}px`, r: `${c.region!.r}px`, '--c': colorVar(c.color), '--d': `${Math.min(ARRIVE_MAX, ARRIVE.circle + i * ARRIVE.circleStep)}ms` })}
               />
             ))}
-          {L.joins.map(([a, b]) => {
+          {(lod === 'far' ? [] : L.joins.filter(([a, b]) => draw.ids.has(a) && draw.ids.has(b))).map(([a, b]) => {
             const p = at(a);
             const q = at(b);
             if (!p || !q) return null;
             const e = edge(p, q);
             return <path key={`j:${a}>${b}`} className={`l5b-join${lineLit([a, b])}${dimmed(a) && dimmed(b) ? ' is-dim' : ''}`} d={`M${e.x1},${e.y1} L${e.x2},${e.y2}`} pathLength={1} style={css({ '--d': `${hubArrives(b) + 120}ms` })} />;
           })}
-          {L.spokes.map(([d, h]) => {
+          {(lod === 'far' ? [] : L.spokes.filter(([d, h]) => draw.ids.has(d) && draw.ids.has(h))).map(([d, h]) => {
             const p = at(h);
             const q = at(d);
             if (!p || !q) return null;
             const e = edge(p, q);
             return <path key={`s:${d}`} className={`l5b-spoke${lineLit([d, h])}${dimmed(d) ? ' is-dim' : ''}`} d={`M${e.x1},${e.y1} L${e.x2},${e.y2}`} pathLength={1} style={css({ '--d': `${hubArrives(h) + ARRIVE.line}ms` })} />;
           })}
-          {L.links.map((l) => (
+          {L.links.filter((l) => lit(l.a) && lit(l.b)).map((l) => (
             <g key={l.key} className={`l5b-link is-${l.kind}${L.card?.link === l.key ? ' is-carded' : ''}${lineLit([l.a, l.b])}${dimmed(l.a) && dimmed(l.b) ? ' is-dim' : ''}`}>
-              <path className="l5b-link-line" d={pathOf(l)} mask={`url(#l5b-m-${maskId(l.key)})`} />
+              <path className="l5b-link-line" d={pathOf(l)} mask={settled ? undefined : `url(#l5b-m-${maskId(l.key)})`} />
               {/* a comet along it, once it is drawn — shown on Celestial alone (universe.css) */}
               <path className="l5b-link-comet" d={pathOf(l)} pathLength={1} style={css({ '--d': `${ARRIVE.link + L.links.indexOf(l) * ARRIVE.linkStep}ms` })} />
               <path
@@ -667,11 +1030,11 @@ export function BubbleMap({
             </g>
           ))}
           {/* what Socria remembers: a dotted tether from each conversation it came from, drawn out to its mark */}
-          {L.memories.map((mm) =>
+          {(lod === 'far' ? [] : L.memories.filter((mm) => mm.from.some((f) => draw.ids.has(f)))).map((mm) =>
             mm.from.map((f) => {
               const d = tetherOf(at(f), mm);
               const m = memOf.get(mm.id);
-              return d && m ? <path key={`t:${mm.id}:${f}`} className={`l5b-tether${m.waiting ? ' is-waiting' : ''}${memLit(mm.from)}${memDim(mm.from)}`} d={d} mask={`url(#l5b-t-${maskId(`${mm.id}-${f}`)})`} /> : null;
+              return d && m ? <path key={`t:${mm.id}:${f}`} className={`l5b-tether${m.waiting ? ' is-waiting' : ''}${memLit(mm.from)}${memDim(mm.from)}`} d={d} mask={settled ? undefined : `url(#l5b-t-${maskId(`${mm.id}-${f}`)})`} /> : null;
             })
           )}
         </svg>
@@ -713,13 +1076,14 @@ export function BubbleMap({
                 ))}
               </button>
             )
-          ) : (
+          ) : !c.region ? null : (
             <SubjectName
               key={`n:${c.key}`}
-              c={c}
-              lens={lens}
+              c={c.region.label === c.label ? c : { ...c, label: c.region.label }}
+              lens="week"
+              hushed={draw.agg.has(c.key) || (!!farNames && !farNames.has(c.key))}
               acts={acts}
-              arrives={ARRIVE.circle + (clusterIndex.get(c.key) ?? 0) * ARRIVE.circleStep + 160}
+              arrives={Math.min(ARRIVE_MAX, ARRIVE.circle + (clusterIndex.get(c.key) ?? 0) * ARRIVE.circleStep + 160)}
               back={backFor(c)}
               backTitle={(id) => tileById.get(id)?.title ?? 'a conversation'}
               palette={palette}
@@ -753,9 +1117,42 @@ export function BubbleMap({
           </div>
         )}
 
-        {L.start && acts.onStart && <StartDisc x={L.start.x} y={L.start.y} r={L.start.r} onStart={acts.onStart} delay={ARRIVE.circle + L.clusters.length * ARRIVE.circleStep + 200} className="is-map" />}
+        {L.start && acts.onStart && <StartDisc x={L.start.x} y={L.start.y} r={L.start.r} onStart={acts.onStart} delay={Math.min(ARRIVE_MAX, ARRIVE.circle + L.clusters.length * ARRIVE.circleStep + 200)} className="is-map" />}
 
-        {L.hubs.map((h) => {
+        {/* FROM FAR AWAY, A BUSY SUBJECT IS ONE REGION (lib/logos5/mapLod.ts): its largest sessions in it, how many it
+            holds, and pressing it goes in to them — every one of them is still there, one press away */}
+        {L.clusters
+          .filter((c) => !c.folded && c.region && draw.agg.has(c.key))
+          .map((c) => {
+            const reg = c.region!;
+            const big = aggOf(c);
+            return (
+              <div key={`a:${c.key}`} className="l5b-agg" style={css({ '--c': colorVar(c.color) })}>
+                {big.map((h) => (
+                  <span key={h.id} className="l5b-agg-pip" aria-hidden="true" style={{ left: h.x - h.r, top: h.y - h.r, width: 2 * h.r, height: 2 * h.r }} />
+                ))}
+                <button
+                  type="button"
+                  data-control
+                  className={`l5b-agg-go${farNames && !farNames.has(c.key) ? ' is-hushed' : ''}`}
+                  style={{ left: reg.x, top: reg.y }}
+                  onClick={() => {
+                    touched.current = true;
+                    // the button goes once the map is near enough to draw the subject's conversations: the map keeps
+                    // the keyboard, so + - 0 and the arrows still work after it
+                    box.current?.focus({ preventScroll: true });
+                    flyTo(fitCam({ x: reg.x - reg.r, y: reg.y - reg.r, w: 2 * reg.r, h: 2 * reg.r }), 620);
+                  }}
+                  aria-label={`${c.field ? `${c.field}, ` : ''}${c.name}: ${reg.shown === 1 ? 'one conversation' : `${reg.shown} conversations`}. Go in to them.`}
+                >
+                  <span className="l5b-agg-n">{c.field ? `${c.field} · ${c.name}` : c.name}</span>
+                  <span className="l5b-agg-c">{reg.shown === 1 ? 'One conversation' : `${reg.shown} conversations`}</span>
+                </button>
+              </div>
+            );
+          })}
+
+        {draw.hubs.map((h) => {
           const tile = tileById.get(h.id);
           if (!tile) return null;
           const s = shiftOf(h.id);
@@ -764,7 +1161,7 @@ export function BubbleMap({
             <div
               key={h.id}
               className={[
-                'l5b-hub',
+                'l5b-hub' + motion(h.id),
                 h.shade ? 'is-shade' : '',
                 h.halo ? 'has-halo' : '',
                 h.focus ? 'is-focus' : '',
@@ -774,6 +1171,7 @@ export function BubbleMap({
                 matchOf && m ? 'is-found' : '',
                 litSet?.has(h.id) && !sel.has(h.id) ? 'is-lit' : '',
                 drag?.kind === 'nodes' && drag.ids.includes(h.id) ? 'is-lifted' : '',
+                tags?.has(h.id) ? 'has-beside' : '',
               ]
                 .filter(Boolean)
                 .join(' ')}
@@ -783,7 +1181,8 @@ export function BubbleMap({
                 width: 2 * h.r,
                 height: 2 * h.r,
                 transform: s.x || s.y ? `translate(${s.x}px, ${s.y}px)` : undefined,
-                ...css({ '--c': colorOf(tile, h.g), '--r': `${h.r}px`, '--f': `${h.font}px`, '--lines': h.lines, '--d': `${hubArrives(h.id)}ms` }),
+                // --fn and --rn unitless: the words fade in by their size on screen (font × zoom), never forced bigger than the disc
+                ...css({ '--c': colorOf(tile, h.g), '--r': `${h.r}px`, '--rn': h.r, '--f': `${h.font}px`, '--fn': h.font, '--lines': h.lines, '--d': `${hubArrives(h.id)}ms` }),
               }}
               data-node={h.id}
               role="button"
@@ -808,7 +1207,7 @@ export function BubbleMap({
                     )}
                   </span>
                   {/* on Today every one says "today": said once, by the lens, not on each */}
-                  {(L.lens === 'today' ? h.sub.replace(/^today(?: · )?/, '') : h.sub) && <span className="l5b-hub-s">{L.lens === 'today' ? h.sub.replace(/^today(?: · )?/, '') : h.sub}</span>}
+                  {(scale === 'today' ? h.sub.replace(/^today(?: · )?/, '') : h.sub) && <span className="l5b-hub-s">{scale === 'today' ? h.sub.replace(/^today(?: · )?/, '') : h.sub}</span>}
                 </span>
                 {tile.open && (
                   <span className="l5b-ask" title="Socria asked something and is waiting for you">
@@ -821,21 +1220,25 @@ export function BubbleMap({
                   </span>
                 )}
               </span>
+              {tags?.has(h.id) && (
+                <span className="l5b-beside" aria-hidden="true">
+                  {nodeLabel(tile.title)}
+                </span>
+              )}
             </div>
           );
         })}
 
-        {L.dots.map((d) => {
+        {draw.dots.map((d, k) => {
           const tile = tileById.get(d.id);
           if (!tile) return null;
           const s = shiftOf(d.id);
           const m = matchOf ? matchOf(d.id) : null;
-          const k = L.dots.indexOf(d);
           return (
             <div
               key={d.id}
               className={[
-                'l5b-dot',
+                'l5b-dot' + motion(d.id),
                 tile.kind === 'core' ? 'is-chat' : '',
                 d.named ? 'is-named' : '',
                 `side-${d.side}`,
@@ -848,7 +1251,7 @@ export function BubbleMap({
               ]
                 .filter(Boolean)
                 .join(' ')}
-              style={{ left: d.x + s.x, top: d.y + s.y, ...css({ '--c': colorOf(tile, d.g), '--r': `${d.r}px`, '--d': `${(d.hub ? hubArrives(d.hub) : ARRIVE.hub) + ARRIVE.dot + k * ARRIVE.dotStep}ms` }) }}
+              style={{ left: d.x + s.x, top: d.y + s.y, ...css({ '--c': colorOf(tile, d.g), '--r': `${d.r}px`, '--d': `${Math.min(ARRIVE_MAX, (d.hub ? hubArrives(d.hub) : ARRIVE.hub) + ARRIVE.dot + k * ARRIVE.dotStep)}ms` }) }}
               data-node={d.id}
               role="button"
               tabIndex={matchOf && !m ? -1 : 0}
@@ -880,7 +1283,7 @@ export function BubbleMap({
 
         {L.memories.map((mm, i) => {
           const m = memOf.get(mm.id);
-          if (!m) return null;
+          if (!m || lod === 'far' || !mm.from.some((f) => draw.ids.has(f))) return null;
           const said = mapProvenance(m, mm.from[0], titleOf);
           const where = mm.from.map((f) => `“${titleOf(f) ?? 'a conversation'}”`).join(' and ');
           return (
@@ -908,7 +1311,7 @@ export function BubbleMap({
           );
         })}
 
-        {L.card && cardMem && cardLink && (
+        {L.card && lod !== 'far' && cardMem && cardLink && (
           <MemoryCard
             m={cardMem}
             link={cardLink}
@@ -933,7 +1336,7 @@ export function BubbleMap({
           />
         )}
 
-        {L.card && !cardMem && (
+        {L.card && lod !== 'far' && !cardMem && (
           <div
             className={`l5b-card${cardLink?.kind === 'own' ? ' is-own' : ' is-idea'}`}
             style={{ left: L.card.x, top: L.card.y, width: L.card.w, ...css({ '--d': `${ARRIVE.card}ms` }) }}
@@ -1021,13 +1424,13 @@ export function BubbleMap({
 
       {/* the one zoom control's order (universe.css .l5h-zoom): − then + then Fit — no readout here */}
       <div className="l5h-zoom" data-control style={{ bottom: bottom + 14 }}>
-        <button type="button" aria-label="Zoom out" onClick={() => ((touched.current = true), setCam(keep(zoomAt(camRef.current, camRef.current.k / 1.25, size.w / 2, size.h / 2))))}>
+        <button type="button" aria-label="Zoom out" onClick={() => ((touched.current = true), flyTo(keep(zoomTo(camRef.current, camRef.current.k / 1.4, size.w / 2, size.h / 2)), 260))}>
           −
         </button>
-        <button type="button" aria-label="Zoom in" onClick={() => ((touched.current = true), setCam(keep(zoomAt(camRef.current, camRef.current.k * 1.25, size.w / 2, size.h / 2))))}>
+        <button type="button" aria-label="Zoom in" onClick={() => ((touched.current = true), flyTo(keep(zoomTo(camRef.current, camRef.current.k * 1.4, size.w / 2, size.h / 2)), 260))}>
           +
         </button>
-        <button type="button" className="is-fit" aria-label="Fit the map to the screen" onClick={() => ((touched.current = false), fitNow())}>
+        <button type="button" className="is-fit" aria-label="Fit the map to the screen" onClick={() => ((touched.current = false), fitNow(true))}>
           Fit
         </button>
       </div>
@@ -1184,6 +1587,7 @@ const maskId = (key: string) => key.replace(/[^A-Za-z0-9_-]/g, '_');
 function SubjectName({
   c,
   lens,
+  hushed = false,
   acts,
   arrives,
   back,
@@ -1194,7 +1598,9 @@ function SubjectName({
   setRenaming,
 }: {
   c: BubbleCluster;
-  lens: BubbleLens;
+  lens: 'today' | 'week';
+  /** from far away, a name that would overlap a larger subject's waits */
+  hushed?: boolean;
   acts: BubbleActs;
   arrives: number;
   back: { id: string; at: number } | null;
@@ -1208,7 +1614,7 @@ function SubjectName({
   const read = c.kind === 'course' || c.kind === 'field';
   const canFold = lens === 'week' || c.far;
   return (
-    <div className={`l5b-name${project ? ' is-project' : ''}`} style={{ left: c.label.x, top: c.label.y, ...css({ '--c': colorVar(c.color), '--d': `${arrives}ms` }) }} data-control>
+    <div className={`l5b-name${project ? ' is-project' : ''}${hushed ? ' is-hushed' : ''}`} style={{ left: c.label.x, top: c.label.y, ...css({ '--c': colorVar(c.color), '--d': `${arrives}ms`, '--rx': `${c.region?.x ?? c.x}px`, '--ry': `${c.region?.y ?? c.y}px` }) }} data-control>
       {renaming?.key === c.key ? (
         <form
           className="l5n-frename"

@@ -10,8 +10,8 @@
 //   killed   the chat window is gone and nothing in it was lost — the drawing
 //            folds a conversation into the map, bubble by bubble
 //   map      how to read it: subjects as circles, conversations as discs, a
-//            link you made as a dashed line; the lenses at the top, Today and
-//            This week as a map, This month and All time as a line through time
+//            link you made as a dashed line; the scales at the top, Today, Week,
+//            Month and All Time, each the same map with more or less of it lit
 //   box      everything starts in the one box at the foot — ask, or drop your
 //            notes in and they are sorted onto the map — and Projects are on it
 //
@@ -181,8 +181,8 @@ export function WhatsNew({
                 line is a link you made between subjects.
               </p>
               <p className="wn-sf wn-sf-2 wn-fade" style={{ '--d': '.6s' } as React.CSSProperties}>
-                The lens at the top shows <em>Today</em> or <em>This week</em> as a map, and <em>This month</em> or{' '}
-                <em>All time</em> as a line through time.
+                The scale at the top shows <em>Today</em>, <em>Week</em>, <em>Month</em> or <em>All Time</em> — the same map, more or
+                less of it, each conversation where it always is.
               </p>
             </>
           )}
@@ -366,22 +366,9 @@ function ArtFold() {
   );
 }
 
-/** The lens pill, its thumb walking Today → This week → This month → All time. */
-const LENSES = ['Today', 'This week', 'This month', 'All time'];
+/** The scale pill, its thumb walking Today → Week → Month → All Time over the one map. */
+const LENSES = ['Today', 'Week', 'Month', 'All Time'];
 const PILL = { x: 48, y: 12, w: 264, h: 26 };
-
-const BEADS: { x: number; r: number; c: 1 | 2; halo?: boolean }[] = [
-  { x: 44, r: 5, c: 1 },
-  { x: 70, r: 9, c: 2 },
-  { x: 98, r: 6, c: 1 },
-  { x: 128, r: 13, c: 1 },
-  { x: 160, r: 7, c: 2 },
-  { x: 190, r: 10, c: 1 },
-  { x: 224, r: 17, c: 1, halo: true },
-  { x: 256, r: 6, c: 2 },
-  { x: 284, r: 12, c: 2 },
-  { x: 312, r: 7, c: 1 },
-];
 
 function ArtRead() {
   const id = useId().replace(/[^a-zA-Z0-9_-]/g, '');
@@ -397,30 +384,7 @@ function ArtRead() {
           </text>
         ))}
       </g>
-      <g className="wn-as-map">
-        <TheMap id={id} labels base=".25s" />
-      </g>
-      <g className="wn-as-time">
-        <line className="wn-base" x1={28} y1={178} x2={332} y2={178} />
-        {['AUG', 'SEP', 'OCT'].map((m, k) => (
-          <g key={m}>
-            <line className="wn-tick" x1={74 + k * 100} y1={190} x2={74 + k * 100} y2={196} />
-            <text className="wn-name" x={74 + k * 100} y={210}>
-              {m}
-            </text>
-          </g>
-        ))}
-        <path className="wn-link" d="M 128 165 C 168 108, 246 108, 284 166" />
-        {BEADS.map((b, k) => (
-          <g key={k}>
-            {b.halo && <circle className="wn-halo" cx={b.x} cy={178} r={b.r + 6} />}
-            <circle className={`wn-disc c${b.c}`} cx={b.x} cy={178} r={b.r} />
-          </g>
-        ))}
-        <text className="wn-dotl" x={224} y={148}>
-          Pricing
-        </text>
-      </g>
+      <TheMap id={id} labels base=".25s" />
     </svg>
   );
 }

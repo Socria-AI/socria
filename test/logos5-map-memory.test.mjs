@@ -239,8 +239,8 @@ console.log('\n=== the map, drawn ===');
   const off = html(h(U.UniverseView, { ...base, initial: offArr, signedIn: true, memory: NODES }));
   ok('Memory off: the key is there, not pressed; nothing of it is drawn', /l5h-tool is-mem" aria-pressed="false"/.test(off) && !off.includes('l5b-mem') && !off.includes('l5h-legend') && !off.includes('l5h-mem-n'));
   ok('  and the map is drawn exactly as it is signed out', world(off) === world(out) && world(out).length > 1000);
-  const today = html(h(U.UniverseView, { ...base, initial: { ...week0, mode: 'all' }, signedIn: true, memory: NODES }));
-  ok('on the line through time there is no layer to show, so no key', !today.includes('l5h-tool is-mem'));
+  const allTime = html(h(U.UniverseView, { ...base, initial: { ...week0, mode: 'all' }, signedIn: true, memory: NODES }));
+  ok('All Time is the same map, so its Memory key is there too', allTime.includes('l5h-tool is-mem'));
 }
 
 console.log('\n=== what a conversation taught Socria, on its card ===');

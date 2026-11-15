@@ -225,6 +225,8 @@ mark, the count, List and the account — the box is no longer in it.
   inside its circle, and the card sits clear of all of it.
 - Nothing is made up. A line of thinking with nothing in it is not drawn.
 
+> **Replaced in Logos 6.** The line through time is gone: Today, Week, Month and All Time are one spatial map at four scales, each conversation in the same place at every scale. See `docs/LOGOS-6-UNIVERSAL-MAP.md`. What follows is kept as the record of Logos 5.
+
 **How much of it: Today · This week · This month · All time.** The two
 short stretches are a map — what joins up and what stands alone. The two long
 ones are a line through time, the oldest on the left and the newest on the
@@ -279,8 +281,10 @@ arrives last; on the line the newest rise first, back from today, and each
 thread is drawn along. Another week comes in the same way. With reduced
 motion asked for, everything is simply there.
 
+> **Replaced in Logos 6.** The line through time is gone: Today, Week, Month and All Time are one spatial map at four scales, each conversation in the same place at every scale. See `docs/LOGOS-6-UNIVERSAL-MAP.md`. What follows is kept as the record of Logos 5.
+
 **In order: This month and All time** (`lib/logos5/timeline.ts`,
-`components/logos5/UniverseTime.tsx`) — the long stretches as a line through
+`components/logos5/UniverseTime.tsx`, both removed in Logos 6) — the long stretches as a line through
 time, so a conversation is remembered by roughly when it was.
 - **Each stays where it began.** A conversation is placed at its first
   message and never moves; opening it again does not carry it to the end.
@@ -955,8 +959,8 @@ everyone has.
 | What a conversation is about, without asking: courses, codes, fields (pure) | `lib/logos5/subjects.ts` |
 | Who is what on the map: sessions and quick questions, subjects' homes, Today and what it builds on (pure) | `lib/logos5/spatial.ts` |
 | The map as subjects: circles, discs, spokes, folded subjects, packing, the curves across and the card over one (pure) | `lib/logos5/bubbles.ts` |
-| In order: where each began, threads, lanes, the floor, quiet stretches, names, days (pure) | `lib/logos5/timeline.ts` |
-| The line drawn: scrolling, ↩, the whole history at the foot, search, the card | `components/logos5/UniverseTime.tsx`, `universe.css` (search `in order`) |
+| In order: where each began, threads, lanes, the floor, quiet stretches, names, days (pure) | `lib/logos5/timeline.ts` (removed in Logos 6) |
+| The line drawn: scrolling, ↩, the whole history at the foot, search, the card | `components/logos5/UniverseTime.tsx` (removed in Logos 6) |
 | How the person arranged it: the model, its bounds, every change (pure); kept in the browser and the account | `lib/logos5/arrange.ts`, `components/logos5/useArrangement.ts`, `app/api/profile/route.ts` |
 | The page (its name, the lenses, the legend, the box at its foot), the map drawn, the pieces; every theme, and the star chart on Celestial; coming in | `components/logos5/Universe.tsx`, `UniverseBubbles.tsx`, `UniverseParts.tsx`, `universe.css` |
 | The themes, Celestial among them, and the picker | `lib/theme.ts`, `app/themes.css`, `components/account/ThemePicker.tsx` |
@@ -1294,6 +1298,8 @@ tied to today's work as a dot, so a newly drawn chat may show as a hub only in
 This week or on the line.
 
 ### In order: the Universal Map as a line through time
+
+> **Replaced in Logos 6.** The line through time is gone: Today, Week, Month and All Time are one spatial map at four scales, each conversation in the same place at every scale. See `docs/LOGOS-6-UNIVERSAL-MAP.md`. What follows is kept as the record of Logos 5.
 
 How much of the map is shown is now Today · This week · This month · All
 time: the short stretches a map, the long ones a line through time (§5, "In
@@ -1982,7 +1988,7 @@ beautiful, and less chatbot like. more or so ideas to explore".
     free spot nearest the middle of the subjects (below first, then round the sides), clear of every ring, disc,
     name, card, remembered chip and line, its words clear too, and the map is fitted with it. On a phone, where the
     map is as wide as the screen and read from the top, it leads the column, centred over the first subject.
-  - *This month and All time:* the next thing on the line after Now (`lib/logos5/timeline.ts` `plus`), level
+  - *This month and All time (until Logos 6, which made them the map):* the next thing on the line after Now (`lib/logos5/timeline.ts` `plus`), level
     with the first lane and past the words of everything begun today; the line is made long enough to hold it.
   - *A lens with nothing yet:* the same disc in the middle, over what the lens says (over Alex's "No sessions
     recorded today…" on an empty Today, which stays).

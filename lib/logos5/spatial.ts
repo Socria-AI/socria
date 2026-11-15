@@ -11,8 +11,8 @@
 //     nothing has to be filed — then everything else;
 //   • Today: what was worked on today (or, before anything has been, the last
 //     day something was) and the earlier conversations it builds on.
-// bubbles.ts draws Today and This week from these, each subject a circle;
-// timeline.ts draws This month and All time as a line through time.
+// bubbles.ts draws the map from these, each subject a region, at every scale
+// (Today, Week, Month, All Time: lib/logos5/scales.ts).
 //
 // Deterministic — no randomness, no clock (the time is passed in) — so the
 // same conversations draw the same map on every screen.

@@ -5,7 +5,7 @@
 // opens when one is pressed (and, with Memory on, what the conversation taught
 // Socria); the box that finds or starts; the View menu; the tray of hidden
 // ones; and the bar for several chosen at once. The map itself
-// is UniverseBubbles.tsx, the line through time UniverseTime.tsx, and the
+// is UniverseBubbles.tsx, finding on it MapFind.tsx, and the
 // whole is Universe.tsx.
 
 import { useFilePreview } from '@/components/preview/context';
@@ -18,7 +18,7 @@ import { relTime } from '@/lib/logos-sessions';
 import type { Attachment } from '@/lib/logos-attachments';
 import type { Look, Match, Tile } from '@/lib/logos5/universe';
 import { STUDY_ACCEPT, intentOf, type Intent } from '@/lib/logos5/study';
-import { COLOR_BY, LABELS, SIZE_BY, type Arrangement, type ColorBy, type Display, type HomeMode, type LabelLevel, type SizeBy } from '@/lib/logos5/arrange';
+import { COLOR_BY, LABELS, SIZE_BY, type Arrangement, type ColorBy, type Display, type LabelLevel, type SizeBy } from '@/lib/logos5/arrange';
 import { useVoiceInput } from '@/components/useVoiceInput';
 import { HoldMic, type Hold } from '@/components/LogosComposer';
 import { clock, insertSpoken } from '@/lib/logos4/voice';
@@ -59,7 +59,7 @@ const STAR = 'M12 3.8l2.5 5.2 5.6.7-4.1 3.9 1 5.6L12 16.5l-5 2.7 1-5.6L3.9 9.7l5
 
 /**
  * The big + that starts something new, drawn in the map itself: an ink disc as big as a conversation's, at a
- * place the layout chose (lib/logos5/bubbles.ts startSpot, lib/logos5/timeline.ts plus), its words under it.
+ * place the layout chose (lib/logos5/bubbles.ts startSpot), its words under it.
  * Not a box: there is nothing to type into here; it opens a new line of thinking, whose chatbox is the box.
  */
 export function StartDisc({ x, y, r, onStart, delay = 0, className = '', bare = false }: { x: number; y: number; r: number; onStart: () => void; delay?: number; className?: string; bare?: boolean }) {
@@ -113,8 +113,6 @@ const ACT_ICON = {
   move: 'M3.5 7.5a2 2 0 012-2h4l2 2h7a2 2 0 012 2v7.5a2 2 0 01-2 2h-13a2 2 0 01-2-2zM12 11v5M9.5 13.5h5',
   more: 'M5.5 12h.01M12 12h.01M18.5 12h.01',
   link: 'M10 14a4 4 0 005.66 0l3-3a4 4 0 00-5.66-5.66l-1 1M14 10a4 4 0 00-5.66 0l-3 3a4 4 0 005.66 5.66l1-1',
-  week: 'M4.5 6.5h15v13h-15zM4.5 10.5h15M8.5 4v4M15.5 4v4',
-  time: 'M12 7v5l3 2M20 12a8 8 0 11-16 0 8 8 0 0116 0z',
   back: 'M9 7L4.5 11.5 9 16M5 11.5h9.5a5 5 0 010 10H12',
   subject: 'M4 12.5l7.5-7.5h7v7L11 19.5zM15 8.5h.01',
   rename: 'M5 19l4-1L19 8l-3-3L6 15zM14 7l3 3',
@@ -163,10 +161,6 @@ export interface PreviewActs {
   onFileHere?: () => void;
   /** put in a subject by hand: back to the one it was read as */
   onUnsubject?: () => void;
-  /** in order: the week it began in, as a map */
-  onWeek?: () => void;
-  /** on a map: where it is in time */
-  onTime?: () => void;
   /** a new name for it */
   onRename?: (title: string) => void;
   /** gone, with everything in it — asked once more before it happens */
@@ -396,18 +390,6 @@ export function PreviewCard({
           <button type="button" role="menuitem" className="l5-mi" onClick={() => (setMore(false), acts.onLink!())}>
             <ActIcon name="link" />
             Link to…
-          </button>
-        )}
-        {acts.onWeek && (
-          <button type="button" role="menuitem" className="l5-mi" onClick={() => (setMore(false), acts.onWeek!())}>
-            <ActIcon name="week" />
-            See that week as a map
-          </button>
-        )}
-        {acts.onTime && (
-          <button type="button" role="menuitem" className="l5-mi" onClick={() => (setMore(false), acts.onTime!())} title="All time, at the day it began">
-            <ActIcon name="time" />
-            Find it in time
           </button>
         )}
         {pinned && acts.onUnpin && (
@@ -992,7 +974,6 @@ function Check({ label, on, onFlip, hint }: { label: string; on: boolean; onFlip
 
 export function ViewMenu({
   arr,
-  lens,
   groups,
   hasChats = true,
   hiddenCount,
@@ -1008,7 +989,6 @@ export function ViewMenu({
   onClose,
 }: {
   arr: Arrangement;
-  lens: HomeMode;
   /** every subject there is — Projects, courses, fields — to choose which are shown */
   groups: { key: string; name: string }[];
   /** any Core chat drawn by its name alone (signed out); signed in, every chat is a conversation here and there is nothing to put away */
@@ -1042,22 +1022,16 @@ export function ViewMenu({
     };
   }, [onClose]);
   const shown = (k: string) => !arr.projects || arr.projects.includes(k);
-  // in order (This month, All time) the line itself is the picture: nothing is placed, coloured or sized another way
-  const inTime = lens === 'month' || lens === 'all';
+  // every scale is the same map (Today, Week, Month, All Time): what it shows and how is chosen once, for all of them
   return (
     <div className="l5h-vm" ref={ref} role="dialog" aria-label="How the map is shown">
       <section>
         <h4>Show</h4>
         {hasChats && <Check label="Earlier chats" on={arr.display.chats} onFlip={() => onDisplay({ chats: !arr.display.chats })} />}
-        {!inTime && <Check label="Ideas they share" on={arr.display.ideas} onFlip={() => onDisplay({ ideas: !arr.display.ideas })} />}
-        {!inTime && (
-          <>
-            <Seg label="Labels" value={arr.display.labels} options={LABELS} said={LABEL_SAID} onPick={(v) => onDisplay({ labels: v })} />
-            <Seg label="Colour by" value={arr.display.color} options={COLOR_BY} said={COLOR_SAID} onPick={(v) => onDisplay({ color: v })} />
-            <Seg label="Size by" value={arr.display.size} options={SIZE_BY} said={SIZE_SAID} onPick={(v) => onDisplay({ size: v })} />
-          </>
-        )}
-        {inTime && <p className="l5h-vm-note">In order: each where it began, joined when it followed on within a week.</p>}
+        <Check label="Ideas they share" on={arr.display.ideas} onFlip={() => onDisplay({ ideas: !arr.display.ideas })} />
+        <Seg label="Labels" value={arr.display.labels} options={LABELS} said={LABEL_SAID} onPick={(v) => onDisplay({ labels: v })} />
+        <Seg label="Colour by" value={arr.display.color} options={COLOR_BY} said={COLOR_SAID} onPick={(v) => onDisplay({ color: v })} />
+        <Seg label="Size by" value={arr.display.size} options={SIZE_BY} said={SIZE_SAID} onPick={(v) => onDisplay({ size: v })} />
       </section>
       {groups.length > 1 && (
         <section>

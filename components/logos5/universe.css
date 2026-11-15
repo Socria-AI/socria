@@ -2,12 +2,13 @@
  *
  * "Your map, not a list": the page's name at the top left, the four lenses in
  * the serif at the top right, what the marks mean and the box that searches
- * or starts at the foot. Today and This week are drawn as subjects
- * (UniverseBubbles.tsx, laid out by lib/logos5/bubbles.ts): each a dashed
- * circle, a real study session a disc in its colour with its name inside, a
- * quick question a dot on a spoke; This month and All time are a line through
- * time (UniverseTime.tsx). World sizes (inside .l5h-world) are in map units:
- * the camera scales them.
+ * or starts at the foot. It is one map at four scales — Today, Week, Month and
+ * All Time (lib/logos5/scales.ts) — drawn as subjects (UniverseBubbles.tsx, laid
+ * out once by lib/logos5/bubbles.ts): each a region, a real study session a disc
+ * in its colour with its name inside, a quick question a dot on a spoke; a scale
+ * lights more or less of it, and the zoom decides how much detail is drawn
+ * (lib/logos5/mapLod.ts). World sizes (inside .l5h-world) are in map units: the
+ * camera scales them.
  *
  * Colours are variables, so the reader's theme (app/themes.css) recolours the
  * map without a rule of its own: a subject's colour (--sc-*), a kind's (--lk-*),
@@ -1489,588 +1490,6 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   background: rgba(255, 255, 255, 0.04);
 }
 
-/* ── in order: This month and All time (UniverseTime.tsx, lib/logos5/timeline.ts) ──
- * The oldest on the left, the newest on the right. The line scrolls; what
- * stays put over it — a thread's name held at the left edge, the days along
- * the foot, the whole history under them — is drawn over it, in screen units. */
-.logos-root .l5 .l5t {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1;
-}
-.logos-root .l5 .l5t-scroll {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 96px;
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
-  cursor: grab;
-  outline: none;
-}
-.logos-root .l5 .l5t-scroll::-webkit-scrollbar {
-  display: none;
-}
-.logos-root .l5 .l5t-scroll:active {
-  cursor: grabbing;
-}
-.logos-root .l5 .l5t-scroll:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--c-moss);
-}
-.logos-root .l5 .l5t-track {
-  position: relative;
-}
-/* weeks, months, this week, now, a folded stretch */
-.logos-root .l5 .l5t-wk {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  border-left: 1px dashed color-mix(in srgb, var(--lg-ink) 13%, transparent);
-  pointer-events: none;
-}
-.logos-root .l5 .l5t-wk span {
-  position: absolute;
-  top: 10px;
-  left: 9px;
-  white-space: nowrap;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--c-ink-45);
-}
-.logos-root .l5 .l5t-wk.is-month {
-  border-left-style: solid;
-  border-left-color: color-mix(in srgb, var(--lg-ink) 20%, transparent);
-}
-.logos-root .l5 .l5t-wk.is-month span {
-  color: var(--lg-ink-60);
-}
-.logos-root .l5 .l5t-thisweek {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  background: linear-gradient(180deg, rgba(var(--l5h-gold-rgb), 0.08), rgba(var(--l5h-gold-rgb), 0.03));
-  border-left: 1px solid rgba(var(--l5h-gold-rgb), 0.38);
-  pointer-events: none;
-}
-.logos-root .l5 .l5t-thisweek span {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  white-space: nowrap;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--l5h-gold-ink);
-}
-.logos-root .l5 .l5t-now {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  border-left: 1.5px dashed rgba(var(--l5h-gold-rgb), 0.55);
-  pointer-events: none;
-}
-.logos-root .l5 .l5t-now span {
-  position: absolute;
-  top: 7px;
-  left: -24px;
-  padding: 2px 9px;
-  border-radius: 999px;
-  background: var(--l5h-gold);
-  color: var(--l5h-gold-on);
-  font-size: 11px;
-  font-weight: 600;
-}
-.logos-root .l5 .l5t-gap {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  border-left: 1px dashed color-mix(in srgb, var(--lg-ink) 16%, transparent);
-  border-right: 1px dashed color-mix(in srgb, var(--lg-ink) 16%, transparent);
-  background: repeating-linear-gradient(135deg, transparent 0 10px, color-mix(in srgb, var(--lg-ink) 3%, transparent) 10px 11px);
-  text-align: center;
-  pointer-events: none;
-}
-.logos-root .l5 .l5t-gap-mark {
-  font-size: 18px;
-  letter-spacing: 0.2em;
-  color: var(--c-ink-45);
-}
-.logos-root .l5 .l5t-gap-t {
-  font-family: var(--l5-serif);
-  font-style: italic;
-  font-size: 15px;
-  color: var(--lg-ink-60);
-}
-.logos-root .l5 .l5t-gap-s {
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--c-ink-45);
-}
-/* the threads */
-.logos-root .l5 .l5t-lines {
-  position: absolute;
-  left: 0;
-  top: 0;
-  pointer-events: none;
-}
-.logos-root .l5 .l5t-line {
-  fill: none;
-  stroke: var(--c);
-  stroke-width: 2.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.logos-root .l5 .l5t-halo {
-  fill: none;
-  stroke: var(--c);
-  stroke-width: 9;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  opacity: 0.12;
-}
-.logos-root .l5 .l5t-lines .is-dim {
-  opacity: 0.28;
-}
-.logos-root .l5 .l5t-name {
-  position: absolute;
-  transform: translateY(-50%);
-  white-space: nowrap;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--c);
-  pointer-events: none;
-}
-.logos-root .l5 .l5t-name.is-dim {
-  opacity: 0.3;
-}
-.logos-root .l5 .l5t-back {
-  position: absolute;
-  z-index: 2;
-  transform: translate(-100%, -50%);
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 22px;
-  padding: 0 9px;
-  border: 1px dashed color-mix(in srgb, var(--c) 55%, transparent);
-  border-radius: 999px;
-  background: var(--l5-surface);
-  font: inherit;
-  font-size: 11px;
-  color: var(--lg-ink-60);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.logos-root .l5 .l5t-back b {
-  font-weight: 500;
-  color: var(--lg-ink);
-}
-.logos-root .l5 .l5t-back:hover,
-.logos-root .l5 .l5t-back:focus-visible {
-  border-style: solid;
-  border-color: var(--c);
-}
-.logos-root .l5 .l5t-back:focus-visible {
-  outline: 2px solid var(--c-moss);
-  outline-offset: 2px;
-}
-.logos-root .l5 .l5t-back.is-dim {
-  opacity: 0.3;
-}
-/* a conversation: its star, and its words under or over it */
-.logos-root .l5 .l5t-bead {
-  position: absolute;
-  z-index: 1;
-  width: 0;
-  height: 0;
-  cursor: pointer;
-  outline: none;
-}
-.logos-root .l5 .l5t-hit {
-  position: absolute;
-  left: -18px;
-  top: -18px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-}
-.logos-root .l5 .l5t-star {
-  position: absolute;
-  left: calc(var(--r) * -1);
-  top: calc(var(--r) * -1);
-  width: calc(var(--r) * 2);
-  height: calc(var(--r) * 2);
-  border-radius: 50%;
-  background: var(--c);
-  box-shadow: 0 0 0 2.5px var(--lg-paper), 0 0 0 calc(2.5px + var(--r) * 0.55) color-mix(in srgb, var(--c) 14%, transparent);
-  transition: box-shadow 0.15s, transform 0.15s;
-}
-.logos-root .l5 .l5t-bead.is-hub .l5t-star::after {
-  content: '';
-  position: absolute;
-  inset: 32%;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--lg-paper) 72%, transparent);
-}
-.logos-root .l5 .l5t-bead.is-dot .l5t-star {
-  box-shadow: 0 0 0 2px var(--lg-paper);
-  opacity: 0.8;
-}
-.logos-root .l5 .l5t-bead.is-chat .l5t-star {
-  background: var(--lg-paper);
-  box-shadow: inset 0 0 0 1.6px var(--c), 0 0 0 2px var(--lg-paper);
-}
-.logos-root .l5 .l5t-bead:hover .l5t-star {
-  transform: scale(1.15);
-}
-.logos-root .l5 .l5t-bead:focus-visible .l5t-star,
-.logos-root .l5 .l5t-bead.is-sel .l5t-star {
-  box-shadow: 0 0 0 2.5px var(--lg-paper), 0 0 0 5px var(--lg-primary);
-}
-.logos-root .l5 .l5t-bead.is-here .l5t-star {
-  box-shadow: 0 0 0 2.5px var(--lg-paper), 0 0 0 6px rgba(var(--l5h-gold-rgb), 0.55);
-}
-.logos-root .l5 .l5t-bead.is-found .l5t-star {
-  box-shadow: 0 0 0 2.5px var(--lg-paper), 0 0 0 6px rgba(var(--l5h-gold-rgb), 0.6), 0 0 22px 8px rgba(var(--l5h-gold-rgb), 0.3);
-  opacity: 1;
-}
-.logos-root .l5 .l5t-bead.is-dim {
-  opacity: 0.3;
-}
-.logos-root .l5 .l5t-bead.is-flash .l5t-star {
-  animation: l5t-flash 1.1s ease-out 2;
-}
-@keyframes l5t-flash {
-  0% {
-    box-shadow: 0 0 0 2.5px var(--lg-paper), 0 0 0 4px rgba(var(--l5h-gold-rgb), 0.9), 0 0 0 0 rgba(var(--l5h-gold-rgb), 0.5);
-  }
-  100% {
-    box-shadow: 0 0 0 2.5px var(--lg-paper), 0 0 0 4px rgba(var(--l5h-gold-rgb), 0), 0 0 0 26px rgba(var(--l5h-gold-rgb), 0);
-  }
-}
-.logos-root .l5 .l5t-words {
-  position: absolute;
-  left: calc(var(--lw) / -2);
-  width: var(--lw);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  text-align: center;
-}
-.logos-root .l5 .l5t-bead.is-below .l5t-words {
-  top: calc(var(--r) + 8px);
-}
-.logos-root .l5 .l5t-bead.is-above .l5t-words {
-  bottom: calc(var(--r) + 8px);
-}
-.logos-root .l5 .l5t-bead.is-bare .l5t-words {
-  display: none;
-}
-.logos-root .l5 .l5t-t {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  font-family: var(--l5-serif);
-  font-size: 16px;
-  line-height: 1.08;
-  color: var(--lg-ink);
-  text-wrap: balance;
-  text-shadow: 0 0 3px var(--lg-paper), 0 0 8px var(--lg-paper);
-}
-.logos-root .l5 .l5t-last {
-  white-space: nowrap;
-}
-.logos-root .l5 .l5t-starred {
-  font-family: system-ui, sans-serif;
-  font-size: 0.78em;
-  color: #c9a24a;
-}
-.logos-root .l5 .l5t-bead.is-dot .l5t-t {
-  font-style: italic;
-  font-size: 14.5px;
-  color: var(--lg-ink-60);
-}
-.logos-root .l5 .l5t-k {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  max-width: 100%;
-  white-space: nowrap;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-  color: var(--c-ink-45);
-  text-shadow: 0 0 3px var(--lg-paper), 0 0 8px var(--lg-paper);
-}
-/* over the line, in screen units */
-.logos-root .l5 .l5t-pins {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 96px;
-  z-index: 3;
-  overflow: hidden;
-  pointer-events: none;
-}
-.logos-root .l5 .l5t-pins::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 64px;
-  background: linear-gradient(90deg, var(--lg-paper) 15%, transparent);
-}
-.logos-root .l5 .l5t-name.is-pinned {
-  left: 16px;
-}
-.logos-root .l5 .l5t-name.is-pinned::before {
-  content: '← ';
-  letter-spacing: 0;
-  font-weight: 400;
-}
-.logos-root .l5 .l5t-name.is-floor {
-  color: var(--c-ink-45);
-}
-.logos-root .l5 .l5t-name.is-floor::before {
-  content: none;
-}
-.logos-root .l5 .l5t-axis {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 64px;
-  z-index: 3;
-  height: 32px;
-  border-top: 1px solid color-mix(in srgb, var(--lg-ink) 12%, transparent);
-  pointer-events: none;
-}
-.logos-root .l5 .l5t-day {
-  position: absolute;
-  top: 9px;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  font-size: 11px;
-  color: var(--c-ink-45);
-}
-.logos-root .l5 .l5t-day.is-week,
-.logos-root .l5 .l5t-day.is-month {
-  font-weight: 600;
-  color: var(--lg-ink-60);
-}
-.logos-root .l5 .l5t-day.is-today {
-  font-weight: 600;
-  color: var(--l5h-gold-ink);
-}
-.logos-root .l5 .l5t-more,
-.logos-root .l5 .l5t-today {
-  position: absolute;
-  z-index: 5;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 34px;
-  padding: 0 14px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 999px;
-  background: var(--l5-surface);
-  box-shadow: var(--l5-shadow);
-  font: inherit;
-  font-size: 12.5px;
-  color: var(--lg-primary);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.logos-root .l5 .l5t-more small,
-.logos-root .l5 .l5t-today small {
-  font-size: 11.5px;
-  color: var(--c-ink-45);
-}
-.logos-root .l5 .l5t-more.is-l {
-  left: 14px;
-  top: calc(50% - 48px);
-  transform: translateY(-50%);
-}
-.logos-root .l5 .l5t-today {
-  right: 16px;
-  top: calc(50% - 48px);
-  transform: translateY(-50%);
-}
-/* the whole history, at the foot */
-.logos-root .l5 .l5t-scrub {
-  position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: 14px;
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.logos-root .l5 .l5t-scrub-say {
-  flex: none;
-  width: 150px;
-  font-size: 11.5px;
-  line-height: 1.3;
-  color: var(--c-ink-45);
-}
-.logos-root .l5 .l5t-scrub-bar {
-  position: relative;
-  flex: 1 1 auto;
-  min-width: 0;
-  height: 32px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 10px;
-  background: var(--l5-surface);
-  box-shadow: var(--l5-shadow);
-  cursor: pointer;
-  touch-action: none;
-}
-.logos-root .l5 .l5t-scrub-m {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  padding: 3px 0 0 5px;
-  border-left: 1px solid color-mix(in srgb, var(--lg-ink) 10%, transparent);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--c-ink-45);
-  pointer-events: none;
-}
-.logos-root .l5 .l5t-scrub-gap {
-  position: absolute;
-  top: 6px;
-  bottom: 6px;
-  background: repeating-linear-gradient(135deg, transparent 0 3px, color-mix(in srgb, var(--lg-ink) 12%, transparent) 3px 4px);
-  pointer-events: none;
-}
-.logos-root .l5 .l5t-scrub-t {
-  position: absolute;
-  bottom: 5px;
-  width: 3px;
-  height: 13px;
-  margin-left: -1.5px;
-  border-radius: 2px;
-  background: var(--c);
-  pointer-events: none;
-}
-.logos-root .l5 .l5t-scrub-t.is-dot {
-  width: 2px;
-  height: 8px;
-  opacity: 0.6;
-}
-.logos-root .l5 .l5t-scrub-t.is-hit {
-  background: #c9a24a;
-  box-shadow: 0 0 0 2px rgba(var(--l5h-gold-rgb), 0.35);
-  opacity: 1;
-}
-.logos-root .l5 .l5t-scrub-win {
-  position: absolute;
-  top: -4px;
-  height: 38px;
-  border: 2px solid var(--lg-primary);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--lg-primary) 7%, transparent);
-  pointer-events: none;
-}
-
-/* what is said at the foot sits over the history, not on it */
-.logos-root .l5 .l5h-main.is-time .l5h-said {
-  bottom: 120px;
-}
-/* the week, as a map: its name over it, and a way back to other weeks */
-
-/* the week before, the week after: a glyph each, bare (.l5-icon) — no frame, no wash; it darkens */
-.logos-root .l5 .l5h-wt-step {
-  width: 32px;
-  height: 32px;
-  display: inline-grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
-  font: inherit;
-  font-size: 15px;
-  line-height: 1;
-  color: var(--c-ink-60);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: color 0.2s;
-}
-.logos-root .l5 .l5h-wt-step:hover:not(:disabled) {
-  color: var(--c-ink);
-}
-.logos-root .l5 .l5h-wt-step:focus-visible {
-  outline: 2px solid var(--c-moss);
-  outline-offset: 2px;
-}
-.logos-root .l5 .l5h-wt-step:disabled {
-  color: var(--c-ink-25);
-  cursor: default;
-}
-
-.logos-root .l5 .l5h-vm-note {
-  margin: 4px 0 0;
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--lg-ink-60);
-}
-@media (max-width: 640px) {
-  .logos-root .l5 .l5t-scroll,
-  .logos-root .l5 .l5t-pins {
-    bottom: 100px;
-  }
-  .logos-root .l5 .l5t-axis {
-    bottom: 68px;
-  }
-  .logos-root .l5 .l5t-scrub {
-    left: 12px;
-    right: 12px;
-    bottom: 22px;
-  }
-  .logos-root .l5 .l5t-t {
-    font-size: 14.5px;
-  }
-  .logos-root .l5 .l5t-more.is-l {
-    left: 10px;
-  }
-  .logos-root .l5 .l5t-today {
-    right: 10px;
-  }
-  
-  
-}
-@media (prefers-reduced-motion: reduce) {
-  .logos-root .l5 .l5t-bead.is-flash .l5t-star {
-    animation: none;
-    box-shadow: 0 0 0 2.5px var(--lg-paper), 0 0 0 5px rgba(var(--l5h-gold-rgb), 0.8);
-  }
-}
-
 /* ── the page: its name, how much of it, what the marks mean, and the box at its foot ──
  * As the person's design draws it: "Everything you've studied / Your map, not
  * a list" at the top left; the four lenses, in the serif, at the top right;
@@ -2288,9 +1707,6 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
 }
 .logos-root .l5 .l5h-bar-sel {
   bottom: calc(var(--l5h-foot, 92px) + 10px);
-}
-.logos-root .l5 .l5h-main.is-time .l5h-said {
-  bottom: calc(var(--l5h-foot, 92px) + 120px);
 }
 .logos-root .l5 .l5h-banner,
 .logos-root .l5 .l5h-drawing {
@@ -3019,12 +2435,12 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   box-shadow: 0 0 0 3px rgba(var(--c-moss-rgb), 0.14);
 }
 
-/* ── coming in: each lens, and each week, arrives drawn ─────────────
+/* ── coming in: the map arrives drawn ─────────────
  * The circles open, the sessions rise into place a few at a time, the joins
  * and spokes are drawn out to what they hang from, the quick questions
  * settle with their words, the curves across subjects are drawn along, and
- * the card arrives last. The line through time comes in from today back:
- * the newest rise first and each thread is drawn along. */
+ * the card arrives last. A change of scale after that only fades what comes
+ * and goes (Logos 6: nothing moves). */
 @keyframes l5b-open {
   from {
     opacity: 0;
@@ -3132,18 +2548,6 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
 .logos-root .l5 .l5b-card {
   animation: l5b-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0ms) both;
 }
-/* the line through time */
-.logos-root .l5 .l5t {
-  animation: l5b-fade 0.35s ease-out both;
-}
-.logos-root .l5 .l5t-bead > :is(.l5t-star, .l5t-words) {
-  animation: l5b-rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) var(--in, 0ms) both;
-}
-.logos-root .l5 :is(.l5t-line, .l5t-halo) {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  animation: l5b-draw-in 1.1s cubic-bezier(0.5, 0, 0.3, 1) 0.18s forwards;
-}
 /* the page's name and the box: in once, when the map first opens (a fade only: nothing here may become what the tools are placed in) */
 .logos-root .l5 .l5h-title,
 .logos-root .l5 .l5h-right {
@@ -3153,12 +2557,11 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   animation: l5b-fade 0.6s ease-out 0.15s both;
 }
 @media (prefers-reduced-motion: reduce) {
-  .logos-root .l5 :is(.l5b-ring, .l5b-name, .l5b-fold, .l5b-make, .l5b-hub-in, .l5b-pip, .l5b-dot-t, .l5b-fold-pip, .l5b-card, .l5t, .l5h-title, .l5h-right, .l5h-foot),
-  .logos-root .l5 .l5t-bead > :is(.l5t-star, .l5t-words),
+  .logos-root .l5 :is(.l5b-ring, .l5b-name, .l5b-fold, .l5b-make, .l5b-hub-in, .l5b-pip, .l5b-dot-t, .l5b-fold-pip, .l5b-card, .l5h-title, .l5h-right, .l5h-foot),
   .logos-root .l5 .l5h-find-list {
     animation: none;
   }
-  .logos-root .l5 :is(.l5b-join, .l5b-spoke, .l5b-draw, .l5t-line, .l5t-halo) {
+  .logos-root .l5 :is(.l5b-join, .l5b-spoke, .l5b-draw) {
     animation: none;
     stroke-dasharray: none;
     stroke-dashoffset: 0;
@@ -3306,7 +2709,7 @@ html[data-theme="night"] .logos-root .l5 .l5b-dot-t {
   text-shadow: 0 0 3px rgba(3, 5, 13, 0.95), 0 0 10px rgba(3, 5, 13, 0.8);
 }
 /* the words on glass */
-html[data-theme="night"] .logos-root .l5 :is(.l5b-card, .l5h-find, .l5h-lens, .l5t-scrub-bar) {
+html[data-theme="night"] .logos-root .l5 :is(.l5b-card, .l5h-find, .l5h-lens) {
   background: rgba(10, 16, 38, 0.6);
   -webkit-backdrop-filter: blur(16px) saturate(150%);
   backdrop-filter: blur(16px) saturate(150%);
@@ -3334,17 +2737,6 @@ html[data-theme="night"] .logos-root .l5 .l5b-card-s {
 }
 html[data-theme="night"] .logos-root .l5 .l5b-card-s em {
   color: #f0d79b;
-}
-/* the line through time: each session a star on the plane of the galaxy */
-html[data-theme="night"] .logos-root .l5 .l5t-star {
-  background: radial-gradient(circle, #fff 0%, color-mix(in srgb, var(--c) 70%, #fff) 30%, var(--c) 66%);
-  box-shadow: 0 0 calc(var(--r) * 1.2) calc(var(--r) * 0.2) color-mix(in srgb, var(--c) 55%, transparent), 0 0 calc(var(--r) * 3) calc(var(--r) * 0.5) color-mix(in srgb, var(--c) 14%, transparent);
-}
-html[data-theme="night"] .logos-root .l5 .l5t-bead.is-hub .l5t-star::after {
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 70%);
-}
-html[data-theme="night"] .logos-root .l5 .l5t-line {
-  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--c) 70%, transparent));
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -3534,18 +2926,13 @@ html[data-theme="night"] .logos-root .l5 .l5t-line {
    At most seven words (lib/logos5/title.ts nodeLabel), on one line, with an
    ellipsis when it would run past its room. Inside a hub's disc the words keep
    the lines the disc has room for — clamped, never overflowing it. */
-.logos-root .l5 .l5b-dot-t,
-.logos-root .l5 .l5t-t {
+.logos-root .l5 .l5b-dot-t {
   display: block;
   -webkit-line-clamp: unset;
   max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.logos-root .l5 .l5t-words {
-  width: var(--lw);
-  max-width: var(--lw);
 }
 
 /* Today with nothing begun today: one quiet invitation, in the middle */
@@ -3882,10 +3269,9 @@ html[data-theme="night"] .logos-root .l5 .l5b-mem-m {
   margin-top: 12px;
 }
 
-/* THE + (UniverseParts.tsx StartDisc): drawn in the map itself, not standing under it — in Today and This week a
-   disc as big as a conversation's, in the free room the layout found among the subjects (lib/logos5/bubbles.ts
-   startSpot); on the timeline the next thing after Now (lib/logos5/timeline.ts plus); in a lens with nothing yet,
-   in the middle over its words. An ink disc with the plus, a slow ring of moss round it, and its words under it.
+/* THE + (UniverseParts.tsx StartDisc): drawn in the map itself, not standing under it — at every scale a disc as
+   big as a conversation's, in the free room the layout found among the subjects (lib/logos5/bubbles.ts
+   startSpot); in a scale with nothing yet, in the middle over its words. An ink disc with the plus, a slow ring of moss round it, and its words under it.
    It opens a new line of thinking, which waits with ideas to explore and its chatbox ready. */
 .logos-root .l5 .l5plus {
   position: absolute; z-index: 4; display: block; padding: 0; border: 0; border-radius: 999px;
@@ -3918,12 +3304,11 @@ html[data-theme="night"] .logos-root .l5 .l5b-mem-m {
   font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif); font-size: 32px; line-height: 1.05; letter-spacing: -0.01em;
   color: var(--c-ink); white-space: nowrap; pointer-events: none;
 }
-/* on a phone the timeline and an empty lens are drawn at full size; the map is drawn smaller, so its + keeps 32px */
+/* on a phone an empty scale is drawn at full size; the map is drawn smaller, so its + keeps 32px */
 .logos-root .l5 .l5h.is-narrow .l5plus:not(.is-map) .l5plus-t { font-size: 18px; top: calc(100% + 12px); }
 @media (prefers-reduced-motion: no-preference) {
   .logos-root .l5 .l5plus-ping { animation: l5plusPing 2.4s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)) calc(var(--d, 0ms) + 700ms) 2 both; }
-  .logos-root .l5 .l5plus.is-map,
-  .logos-root .l5 .l5plus.is-time { animation: l5b-pop 0.55s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)) var(--d, 0ms) both; }
+  .logos-root .l5 .l5plus.is-map { animation: l5b-pop 0.55s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)) var(--d, 0ms) both; }
 }
 @media (prefers-reduced-motion: reduce) {
   .logos-root .l5 .l5plus-o { transition: none; }
@@ -3940,4 +3325,623 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 }
 html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .l5 .l5plus-o {
   box-shadow: 0 0 0 5px var(--c-paper), 0 0 0 8px var(--plus-ring), 0 0 52px 16px var(--plus-glow), 0 22px 44px -20px rgba(0, 0, 0, 0.85);
+}
+
+/* ══ THE UNIVERSAL MAP, ONE MAP AT FOUR SCALES (Logos 6) ═══════════════════
+ * components/logos5/UniverseBubbles.tsx: the whole map laid out once; a scale lights part of it; the camera's
+ * zoom decides the level of detail (lib/logos5/mapLod.ts: .lod-far / .lod-mid / .lod-near on the map, changed
+ * with hysteresis). Everything here follows the map's own tokens, so the light, dark, One and Night themes hold.
+ * ─────────────────────────────────────────────────────────────────────── */
+
+/* a subject's ground: a soft field the size of its region, its colour barely there — deeper seen from far away,
+   where it is how a subject is recognised. It grows and moves with the region when the scale changes. */
+.logos-root .l5 .l5b-field {
+  position: absolute;
+  z-index: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--c) 10%, transparent) 0%, color-mix(in srgb, var(--c) 5%, transparent) 62%, color-mix(in srgb, var(--c) 0%, transparent) 100%);
+  transition: left 0.62s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)), top 0.62s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)), width 0.62s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)), height 0.62s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)), opacity 0.3s;
+  animation: l5b-fade 0.9s ease-out both;
+}
+.logos-root .l5 .l5b.lod-far .l5b-field {
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--c) 22%, transparent) 0%, color-mix(in srgb, var(--c) 12%, transparent) 58%, color-mix(in srgb, var(--c) 0%, transparent) 100%);
+}
+.logos-root .l5 .l5b-field.is-agg {
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--c) 30%, transparent) 0%, color-mix(in srgb, var(--c) 16%, transparent) 55%, color-mix(in srgb, var(--c) 0%, transparent) 100%);
+}
+.logos-root .l5 .l5b-field.is-dim {
+  opacity: 0.4;
+}
+/* the ring follows its region: moved and grown, eased, where the browser eases circle geometry */
+.logos-root .l5 .l5b .l5b-ring {
+  transition: cx 0.62s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)), cy 0.62s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)), r 0.62s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)), stroke 0.2s, fill 0.2s, opacity 0.3s;
+}
+.logos-root .l5 .l5b.lod-far .l5b-ring {
+  stroke-dasharray: none;
+  stroke: color-mix(in srgb, var(--c) 34%, transparent);
+  stroke-width: calc(1.2px / var(--k, 1));
+}
+.logos-root .l5 .l5b .l5b-name {
+  transition: left 0.62s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)), top 0.62s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)), opacity 0.28s;
+}
+/* from far away a name that would overlap a larger subject's waits, and a subject drawn as one region says its
+   name in the middle of it instead */
+.logos-root .l5 .l5b .l5b-name.is-hushed {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* A SESSION'S WORDS, BY THEIR SIZE ON SCREEN: in the map's own units, faded in as the zoom brings them to a
+   readable size (font × zoom from 10 to 13.5 pixels) — never enlarged past the disc to stay legible from far away,
+   so nothing pops: they arrive as the camera comes closer, and go as it leaves. */
+.logos-root .l5 .l5b .l5b-hub-t {
+  font-size: var(--f, 18px);
+}
+.logos-root .l5 .l5b .l5b-hub-words {
+  opacity: clamp(0, calc((var(--fn, 18) * var(--k, 1) - 10) / 3.5), 1);
+  transition: opacity 0.18s linear;
+}
+.logos-root .l5 .l5b .l5b-hub-s {
+  opacity: clamp(0, calc((var(--fn, 18) * var(--k, 1) - 13) / 3), 1);
+}
+.logos-root .l5 .l5b :is(.l5b-ask, .l5b-made) {
+  opacity: clamp(0, calc((var(--rn, 50) * var(--k, 1) - 22) / 8), 1);
+}
+/* a quick question's words: close up, or when it is pointed at, found or gone to */
+.logos-root .l5 .l5b:is(.lod-far, .lod-mid) .l5b-dot:not(.is-lit, .is-found, .is-spot, .is-sel, :hover, :focus-visible) .l5b-dot-t {
+  opacity: 0;
+}
+/* the lines inside a subject are for close up; the curves between subjects stay, quieter, from far away */
+.logos-root .l5 .l5b.lod-far .l5b-link-line {
+  stroke-width: calc(1.4px / var(--k, 1));
+  stroke-dasharray: calc(6px / var(--k, 1)) calc(7px / var(--k, 1));
+  opacity: 0.55;
+}
+
+/* FROM FAR AWAY, A BUSY SUBJECT IS ONE REGION: its largest sessions as plain discs in its field, and its name and
+   how many it holds in the middle, at one size on screen whatever the zoom. Pressed, the camera goes in. */
+.logos-root .l5 .l5b-agg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.logos-root .l5 .l5b-agg-pip {
+  position: absolute;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c) 78%, #1d2018);
+  opacity: 0.85;
+  box-shadow: 0 0 0 calc(2px / var(--k, 1)) color-mix(in srgb, var(--c) 18%, transparent);
+  animation: l5b-fade 0.4s ease-out both;
+}
+.logos-root .l5 .l5b-agg-go {
+  position: absolute;
+  z-index: 4;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 7px 14px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lg-paper) 86%, transparent);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 10px 26px -14px rgba(var(--lg-ink-rgb, 35, 36, 31), 0.45), 0 0 0 1px color-mix(in srgb, var(--c) 28%, transparent);
+  color: var(--lg-ink);
+  white-space: nowrap;
+  cursor: zoom-in;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(calc(1 / var(--k, 1)));
+  transform-origin: 0 0;
+  translate: 0 0;
+  transition: opacity 0.25s, box-shadow 0.2s;
+  animation: l5b-fade 0.4s ease-out both;
+  backdrop-filter: blur(2px);
+}
+/* (translate(-50%,-50%) is applied after the scale: the label stays centred on the region at any zoom) */
+.logos-root .l5 .l5b-agg-go {
+  transform: scale(calc(1 / var(--k, 1))) translate(-50%, -50%);
+}
+.logos-root .l5 .l5b-agg-go:hover,
+.logos-root .l5 .l5b-agg-go:focus-visible {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 14px 30px -14px rgba(var(--lg-ink-rgb, 35, 36, 31), 0.55), 0 0 0 1.5px color-mix(in srgb, var(--c) 70%, transparent);
+  outline: none;
+}
+.logos-root .l5 .l5b-agg-go.is-hushed {
+  opacity: 0;
+  pointer-events: none;
+}
+.logos-root .l5 .l5b-agg-n {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--c) 62%, var(--lg-ink));
+}
+.logos-root .l5 .l5b-agg-c {
+  font-family: var(--l5-serif);
+  font-size: 15px;
+  line-height: 1.1;
+  color: var(--lg-ink);
+}
+
+/* GONE TO: what a search, Recent or Back went to — a ring that opens out once from it, and it stays marked a moment */
+.logos-root .l5 .l5b-hub.is-spot .l5b-disc,
+.logos-root .l5 .l5b-dot.is-spot .l5b-pip {
+  box-shadow: 0 0 0 3px var(--lg-paper), 0 0 0 5.5px color-mix(in srgb, var(--c) 85%, var(--lg-ink)), 0 18px 34px -16px color-mix(in srgb, var(--c) 80%, #000);
+}
+.logos-root .l5 .l5b-hub.is-spot .l5b-hub-in::after,
+.logos-root .l5 .l5b-dot.is-spot .l5b-pip::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--c) 70%, var(--lg-ink));
+  pointer-events: none;
+  animation: l5b-spot 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) 0.65s both;
+}
+@keyframes l5b-spot {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+/* the rest stand back while something is gone to */
+.logos-root .l5 .l5b.has-spot :is(.l5b-hub, .l5b-dot):not(.is-spot) {
+  opacity: 0.55;
+  transition: opacity 0.4s;
+}
+
+/* COMING AND GOING with the scale: what a wider scale brings fades in, what a narrower one leaves fades out — no
+   pop, no flash; and once the map has come in, what panning brings into view is simply there */
+@keyframes l5b-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.logos-root .l5 .l5b.is-settled :is(.l5b-hub-in, .l5b-pip, .l5b-dot-t, .l5b-fold-pip, .l5b-card, .l5b-name, .l5b-fold, .l5b-make) {
+  animation: none;
+}
+.logos-root .l5 .l5b.is-settled :is(.l5b-join, .l5b-spoke, .l5b-draw) {
+  animation: none;
+  stroke-dashoffset: 0;
+  stroke-dasharray: none;
+}
+.logos-root .l5 .l5b .l5b-hub.is-entering .l5b-hub-in,
+.logos-root .l5 .l5b .l5b-dot.is-entering .l5b-pip,
+.logos-root .l5 .l5b .l5b-dot.is-entering .l5b-dot-t {
+  animation: l5b-enter 0.42s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+.logos-root .l5 .l5b :is(.l5b-hub, .l5b-dot).is-leaving {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.32s ease-in;
+}
+
+/* ── FIND ON YOUR MAP (components/logos5/MapFind.tsx) ── */
+.logos-root .l5 .l5h-findmap {
+  position: relative;
+  z-index: 30;
+}
+.logos-root .l5 .l5f-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 8px 0 12px;
+  border: 1px solid color-mix(in srgb, var(--lg-ink) 13%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lg-paper) 92%, transparent);
+  color: color-mix(in srgb, var(--lg-ink) 70%, transparent);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, box-shadow 0.2s;
+}
+.logos-root .l5 .l5f-trigger:hover,
+.logos-root .l5 .l5f-trigger:focus-visible {
+  border-color: color-mix(in srgb, var(--lg-ink) 26%, transparent);
+  color: var(--lg-ink);
+  box-shadow: 0 6px 18px -12px rgba(var(--lg-ink-rgb, 35, 36, 31), 0.4);
+  outline: none;
+}
+.logos-root .l5 .l5f-kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--lg-ink) 7%, transparent);
+  font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: color-mix(in srgb, var(--lg-ink) 55%, transparent);
+}
+.logos-root .l5 .l5f {
+  position: absolute;
+  top: -4px;
+  right: 0;
+  width: min(460px, calc(100vw - 32px));
+  max-height: min(68vh, 620px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  background: var(--lg-paper);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--lg-ink) 10%, transparent), 0 28px 60px -28px rgba(var(--lg-ink-rgb, 35, 36, 31), 0.45), 0 8px 18px -12px rgba(var(--lg-ink-rgb, 35, 36, 31), 0.22);
+  overflow: hidden;
+  animation: l5f-open 0.2s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+@keyframes l5f-open {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.logos-root .l5 .l5f-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 12px 12px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--lg-ink) 8%, transparent);
+  color: color-mix(in srgb, var(--lg-ink) 55%, transparent);
+}
+.logos-root .l5 .l5f-field input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  border: 0;
+  background: none;
+  color: var(--lg-ink);
+  font: inherit;
+  font-size: 16px;
+  outline: none;
+}
+.logos-root .l5 .l5f-field input::placeholder {
+  color: color-mix(in srgb, var(--lg-ink) 38%, transparent);
+}
+.logos-root .l5 .l5f-close {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.logos-root .l5 .l5f-close:hover {
+  background: color-mix(in srgb, var(--lg-ink) 6%, transparent);
+  color: var(--lg-ink);
+}
+.logos-root .l5 .l5f-list,
+.logos-root .l5 .l5f-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.logos-root .l5 .l5f-list {
+  flex: 1;
+  overflow: auto;
+  padding: 6px 6px 4px;
+  overscroll-behavior: contain;
+}
+.logos-root .l5 .l5f-group + .l5f-group {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid color-mix(in srgb, var(--lg-ink) 6%, transparent);
+}
+.logos-root .l5 .l5f-group-t {
+  margin: 6px 10px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--lg-ink) 48%, transparent);
+}
+.logos-root .l5 .l5f-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 10px;
+}
+.logos-root .l5 .l5f-row.is-active {
+  background: color-mix(in srgb, var(--lg-ink) 5.5%, transparent);
+}
+.logos-root .l5 .l5f-go {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 9px 8px 9px 10px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.logos-root .l5 .l5f-mark {
+  flex: none;
+  margin-top: 2px;
+  color: color-mix(in srgb, var(--lg-ink) 60%, transparent);
+}
+.logos-root .l5 .l5f-mark.is-conv {
+  color: color-mix(in srgb, var(--lg-primary, #2f3a22) 85%, var(--lg-ink));
+}
+.logos-root .l5 .l5f-text {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.logos-root .l5 .l5f-title {
+  overflow: hidden;
+  font-family: var(--l5-serif);
+  font-size: 16px;
+  line-height: 1.25;
+  color: var(--lg-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.logos-root .l5 .l5f-row.is-subject .l5f-title,
+.logos-root .l5 .l5f-row.is-idea .l5f-title {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+.logos-root .l5 .l5f-excerpt {
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--lg-ink) 62%, transparent);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.logos-root .l5 .l5f :is(.l5f-title, .l5f-excerpt) mark {
+  padding: 0 1px;
+  border-radius: 3px;
+  background: color-mix(in srgb, rgb(var(--l5h-gold-rgb, 178, 140, 54)) 26%, transparent);
+  color: inherit;
+}
+.logos-root .l5 .l5f-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 11.5px;
+  color: color-mix(in srgb, var(--lg-ink) 50%, transparent);
+}
+.logos-root .l5 .l5f-where {
+  font-weight: 500;
+  color: color-mix(in srgb, var(--lg-ink) 62%, transparent);
+}
+.logos-root .l5 .l5f-out {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, rgb(var(--l5h-gold-rgb, 178, 140, 54)) 16%, transparent);
+  color: color-mix(in srgb, rgb(var(--l5h-gold-rgb, 178, 140, 54)) 70%, var(--lg-ink));
+}
+.logos-root .l5 .l5f-row.is-out .l5f-title {
+  color: color-mix(in srgb, var(--lg-ink) 78%, transparent);
+}
+.logos-root .l5 .l5f-open {
+  flex: none;
+  height: 28px;
+  margin-right: 6px;
+  padding: 0 11px;
+  border: 1px solid color-mix(in srgb, var(--lg-ink) 14%, transparent);
+  border-radius: 999px;
+  background: var(--lg-paper);
+  color: color-mix(in srgb, var(--lg-ink) 75%, transparent);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s, border-color 0.15s;
+}
+.logos-root .l5 .l5f-row:is(.is-active, :hover, :focus-within) .l5f-open {
+  opacity: 1;
+}
+.logos-root .l5 .l5f-open:hover {
+  border-color: color-mix(in srgb, var(--lg-ink) 30%, transparent);
+  color: var(--lg-ink);
+}
+.logos-root .l5 .l5f-none {
+  margin: 0;
+  padding: 22px 18px;
+  font-size: 14px;
+  color: color-mix(in srgb, var(--lg-ink) 60%, transparent);
+}
+.logos-root .l5 .l5f-hint {
+  margin: 0;
+  padding: 8px 16px 10px;
+  border-top: 1px solid color-mix(in srgb, var(--lg-ink) 6%, transparent);
+  font-size: 11px;
+  color: color-mix(in srgb, var(--lg-ink) 45%, transparent);
+}
+.logos-root .l5 .l5f.is-narrow {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  left: 12px;
+  width: auto;
+  max-height: calc(100vh - 120px);
+}
+/* the way back after a jump: one pill, low in the middle of the map */
+.logos-root .l5 .l5h-backwrap {
+  position: absolute;
+  left: 50%;
+  z-index: 25;
+  transform: translateX(-50%);
+}
+.logos-root .l5 .l5f-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px 0 13px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--lg-ink);
+  color: var(--lg-paper);
+  font: inherit;
+  font-size: 13.5px;
+  box-shadow: 0 14px 30px -14px rgba(var(--lg-ink-rgb, 35, 36, 31), 0.6);
+  cursor: pointer;
+  animation: l5f-open 0.24s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+.logos-root .l5 .l5f-back:hover {
+  filter: brightness(1.12);
+}
+@media (max-width: 720px) {
+  .logos-root .l5 .l5f-trigger-l {
+    display: none;
+  }
+  .logos-root .l5 .l5f-trigger {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+}
+/* dark themes: the fields a touch brighter, the discs in a region from far away lighter */
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .l5 .l5b-field {
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--c) 16%, transparent) 0%, color-mix(in srgb, var(--c) 7%, transparent) 62%, color-mix(in srgb, var(--c) 0%, transparent) 100%);
+}
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .l5 .l5b-agg-pip {
+  background: var(--c);
+}
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .l5 .l5b-agg-go {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 40%, transparent), 0 12px 28px -14px rgba(0, 0, 0, 0.6);
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .l5 :is(.l5b-field, .l5b-agg-pip, .l5b-agg-go, .l5f, .l5f-back),
+  .logos-root .l5 .l5b :is(.l5b-hub.is-entering .l5b-hub-in, .l5b-dot.is-entering .l5b-pip, .l5b-dot.is-entering .l5b-dot-t),
+  .logos-root .l5 :is(.l5b-hub.is-spot .l5b-hub-in, .l5b-dot.is-spot .l5b-pip)::after {
+    animation: none;
+  }
+  .logos-root .l5 .l5b :is(.l5b-field, .l5b-ring, .l5b-name, .l5b-hub, .l5b-dot) {
+    transition: none;
+  }
+}
+
+/* a session's name beside it when its own words are too small at this zoom: under the disc, at one size on screen,
+   given out so that none overlaps another or a disc (lib/logos5/mapLod.ts tagsAt) */
+.logos-root .l5 .l5b-beside {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  z-index: 3;
+  max-width: 180px;
+  overflow: hidden;
+  font-family: var(--l5-serif);
+  font-size: 13px;
+  line-height: 17px;
+  color: color-mix(in srgb, var(--lg-ink) 84%, transparent);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 0 3px var(--lg-paper), 0 0 6px var(--lg-paper), 0 0 10px var(--lg-paper);
+  pointer-events: none;
+  transform: scale(calc(1 / var(--k, 1))) translate(-50%, 4px);
+  transform-origin: 0 0;
+  animation: l5b-fade 0.25s ease-out both;
+}
+.logos-root .l5 .l5b-hub:is(:hover, .is-lit, .is-sel, .is-spot) .l5b-beside {
+  color: var(--lg-ink);
+}
+/* a quick question's dot stays findable from further away */
+.logos-root .l5 .l5b:is(.lod-mid, .lod-far) .l5b-dot .l5b-pip {
+  /* never smaller than about three pixels on screen, however far out */
+  scale: max(1, calc(0.62 / var(--k, 1)));
+}
+/* a busy subject from far away: its name and how many, as type on a soft halo — no box over its discs */
+.logos-root .l5 .l5b-agg-go {
+  padding: 4px 8px;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.logos-root .l5 .l5b-agg-go:is(:hover, :focus-visible) {
+  background: color-mix(in srgb, var(--lg-paper) 70%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 45%, transparent);
+}
+.logos-root .l5 .l5b-agg-go :is(.l5b-agg-n, .l5b-agg-c) {
+  text-shadow: 0 0 4px var(--lg-paper), 0 0 8px var(--lg-paper), 0 0 14px var(--lg-paper), 0 0 22px var(--lg-paper);
+}
+.logos-root .l5 .l5b-agg-n {
+  font-size: 11.5px;
+}
+.logos-root .l5 .l5b-agg-c {
+  font-size: 16px;
+}
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .l5 .l5b-agg-go {
+  box-shadow: none;
+}
+
+/* on a phone: the scales and the tools on one row, and Find on your map the row's width under them — a field to
+   press, where a thumb finds it */
+.logos-root .l5 .l5h.is-narrow .l5h-right {
+  flex-wrap: wrap;
+}
+.logos-root .l5 .l5h.is-narrow .l5h-findmap {
+  order: 3;
+  flex: 1 0 100%;
+}
+.logos-root .l5 .l5h.is-narrow .l5f-trigger {
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  justify-content: flex-start;
+  border-radius: 12px;
+}
+.logos-root .l5 .l5h.is-narrow .l5f-trigger .l5f-trigger-l {
+  display: inline;
+}
+
+/* a session named beside its disc says it once: its own words, too small to read at this zoom, are not drawn too */
+.logos-root .l5 .l5b .l5b-hub.has-beside .l5b-hub-words {
+  opacity: 0;
+}
+/* "Start something new" by its size on screen, as a session's words are: gone before it is too small to read */
+.logos-root .l5 .l5b .l5plus.is-map .l5plus-t {
+  opacity: clamp(0, calc((32 * var(--k, 1) - 10) / 4), 1);
+  transition: opacity 0.18s linear;
+}
+/* from far away the curves between subjects are quieter still: the regions and their names lead */
+.logos-root .l5 .l5b.lod-far .l5b-link-line {
+  opacity: 0.4;
+}
+/* a busy subject seen from far away: its discs a little quieter, so its name and count read over them */
+.logos-root .l5 .l5b-agg-pip {
+  opacity: 0.6;
+}
+/* the map passes under the header when moved: a soft wash of the page behind the header keeps its words readable */
+.logos-root .l5 .l5h-top::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 -36px 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--lg-paper) 94%, transparent) 0%, color-mix(in srgb, var(--lg-paper) 76%, transparent) 58%, color-mix(in srgb, var(--lg-paper) 0%, transparent) 100%);
+}
+/* a Core chat's dot is an open ring close up; from further away a ring that thin is lost, so it is filled with its colour, lightly */
+.logos-root .l5 .l5b:is(.lod-mid, .lod-far) .l5b-dot.is-chat .l5b-pip {
+  background: color-mix(in srgb, var(--c) 62%, var(--lg-paper));
+}
+/* the lines on a layer of their own: a pan that brings conversations into view (their joins drawn, others let go)
+   re-rasterises the lines alone, not the discs and fields under them as well (measured: scripts/verify-map.mjs --perf) */
+.logos-root .l5 .l5b .l5b-lines {
+  will-change: transform;
 }

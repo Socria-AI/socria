@@ -106,7 +106,12 @@ export interface Tile {
   about: About;
 }
 
-const MAX_TILES = 150;
+/**
+ * How many conversations the map holds, the most recent first. All Time is meant to be all of it: the map is
+ * laid out once and drawn with level of detail (lib/logos5/mapLod.ts), so it was raised from 150: what is left is a
+ * guard against an unbounded list, not a view of the most recent.
+ */
+const MAX_TILES = 4000;
 const MAX_IDEAS = 12;
 
 /**

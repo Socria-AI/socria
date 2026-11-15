@@ -62,7 +62,8 @@ console.log('\n=== a conversation, as a tile ===');
   ]);
   const T = new Map(tiles.map((t) => [t.id, t]));
   ok('a line of thinking with nothing in it is not on the map; a Core chat is', !T.has('e') && T.get('k')?.kind === 'core' && T.get('k').look === 'chat');
-  ok('newest first, at most a hundred and fifty', J(tiles.map((t) => t.id)) === J(['q', 'a', 'y', 'k', 's']) && H.tilesOf(Array.from({ length: 170 }, (_, i) => conv(`c${i}`, `C ${i}`, { last: i }))).length === 150, J(tiles.map((t) => t.id)));
+  // All Time is all of it (laid out once, drawn with level of detail): no longer cut at a hundred and fifty
+  ok('newest first, every one of them (up to a guard of four thousand)', J(tiles.map((t) => t.id)) === J(['q', 'a', 'y', 'k', 's']) && H.tilesOf(Array.from({ length: 170 }, (_, i) => conv(`c${i}`, `C ${i}`, { last: i }))).length === 170 && H.tilesOf(Array.from({ length: 4010 }, (_, i) => conv(`c${i}`, `C ${i}`, { last: i / 100 }))).length === 4000, J(tiles.map((t) => t.id)));
   ok('its kind: a study is a study; otherwise what the map says it is', T.get('s').look === 'study' && T.get('a').look === 'deciding' && T.get('y').look === 'thinking' && T.get('a').lookSaid === 'Deciding');
   ok('what was made in it is counted apart from its kind', T.get('s').made === 1 && T.get('a').made === 0);
   ok('its graph: a study’s topics, then its map’s ideas; an edge to a card not there is dropped', T.get('s').ideas[0].from === 'topic' && T.get('s').edges.some((e) => e.from === 'topic:t1') && T.get('a').edges.length === 4);
