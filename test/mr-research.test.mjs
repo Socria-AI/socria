@@ -212,6 +212,7 @@ console.log('limits and fields');
 ok('validity limits name the honest ones', ['English', 'structural', 'Satisfaction is not learning', 'single', 'blind', 'Novelty'].every((w) => VALIDITY_LIMITS.some((l) => l.includes(w))), VALIDITY_LIMITS.length);
 ok('validity limits are fixed', Object.isFrozen(VALIDITY_LIMITS) && VALIDITY_LIMITS.length >= 8);
 ok('the minimal fields hold no id and no text field', !MINIMAL_FIELDS.some((f) => /user_id|conversation_id|content|quote|text|message|^codes\.policyVersion$|composedOf\.#/.test(f)), MINIMAL_FIELDS.filter((f) => /user_id|conversation_id|content|quote|text|message/.test(f)).join(','));
+ok('the reply measures are on the minimal fields, and the hypotheses about a question are not', MINIMAL_FIELDS.includes('codes.reply.words') && !MINIMAL_FIELDS.includes('codes.react.alreadyGiven') && !MINIMAL_FIELDS.includes('codes.react.relevance'));
 ok('the minimal fields start with the event’s own', ['v', 'study', 'participant', 'conversation', 'day', 'turn', 'kind', 'arm', 'ifr', 'policyVersion'].every((f) => MINIMAL_FIELDS.includes(f)) && Object.isFrozen(MINIMAL_FIELDS));
 
 console.log(`\nmr-research: ${pass} passed, ${fail} failed`);

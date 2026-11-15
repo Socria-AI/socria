@@ -528,6 +528,26 @@ const FRICTION_METRICS: readonly string[] = ['friction', 'unwanted_questions', '
 /** Satisfaction and its look-alikes: how they felt about a reply. Never the thing a promotion rests on (proxy gaming). */
 const SATISFACTION = /satisf|thumbs|csat|\bnps\b|nps_|stars?\b|liked|likes\b|helpful|sentiment|positive_feedback|happiness|enjoy/i;
 
+/**
+ * Engagement and its look-alikes: how long they stayed, how much was written,
+ * how many questions went back and forth. Any of these moves when help gets
+ * worse as easily as when it gets better (a longer session can be a stuck
+ * one; one question per reply can be one question too many), so none of them
+ * may be the thing a promotion rests on. The benchmark reports them as
+ * separate vectors with intervals; they are never a primary.
+ *
+ * Raw question counts are among them whatever their direction: fewer
+ * questions in total (questions_asked, question_count, questions_total)
+ * rewards a policy that never asks, even where one question was the right
+ * move. questions_asked keeps its direction in METRIC_DIRECTION and stays a
+ * friction measure (evidence level I), reported beside the rest; it is only
+ * never the primary. unwanted_questions, the questions the person did not
+ * need, is the question measure a promotion may rest on. retention is not
+ * here: it is the learning-retention outcome (OUTCOME_DIMENSIONS), not how
+ * long anybody stayed.
+ */
+const ENGAGEMENT_PROXY = /engag|session_?length|time_?on|words_?per|reply_?(?:length|words)|first_?reply_?words|excess_?words|questions_?per|messages_?per|one_?question|questions?_?asked|questions?_?count|questions?_?total/i;
+
 const validCI = (m: MetricCI | undefined): m is MetricCI =>
   !!m &&
   [m.mean, m.lo, m.hi, m.n].every((x) => typeof x === 'number' && Number.isFinite(x)) &&
@@ -594,6 +614,9 @@ export function promotionVerdict(r: EvaluationReport, c: PromotionCriteria = PRO
       if (!(e.lo > c.primaryLowerBoundAbove)) reasons.push(e.diff > 0 ? 'primary_ci_includes_no_effect' : 'primary_not_better');
     }
   }
+  // Said as well as whatever the chain above found, so an engagement primary is named as one even
+  // when it has no known direction (and would be refused for that alone).
+  if (ENGAGEMENT_PROXY.test(primary)) reasons.push('primary_is_engagement_proxy');
 
   // Guardrails: both required ones named, measured in both arms, and not worse beyond the margin.
   const guardrails = Array.isArray(r.guardrails) ? r.guardrails : [];
@@ -638,7 +661,8 @@ const worse = (r: EvaluationReport, metric: string) => {
  *        independent_performance is better than baseline.
  *   III  longitudinal transfer: that was measured across sessions.
  *   IV   architecture effect: the candidate is `full` and it beats BOTH the
- *        prompt-only reflection arm and the state-only arm on the primary.
+ *        prompt-only reflection arm and the state-only arm on the primary
+ *        (never satisfaction, never an engagement proxy).
  */
 export function evidenceLevel(r: EvaluationReport): 'none' | 'I' | 'II' | 'III' | 'IV' {
   if (!r || !Array.isArray(r.arms) || r.randomized !== true) return 'none';
@@ -654,6 +678,7 @@ export function evidenceLevel(r: EvaluationReport): 'none' | 'I' | 'II' | 'III' 
   const levelIV =
     r.candidate === 'full' &&
     !SATISFACTION.test(primary) &&
+    !ENGAGEMENT_PROXY.test(primary) &&
     (['prompt_reflection', 'state_only'] as const).every((arm) => compared.includes(arm) && better(r, primary, 'full', arm));
   return levelIV ? 'IV' : 'III';
 }

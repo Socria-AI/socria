@@ -221,7 +221,7 @@ const CONTROL_KEYS: readonly ControlKey[] = [
   'answerFirst',
   'noRevealAnswers',
 ];
-const STRATEGIES: readonly NonNullable<TypedControls['strategy']>[] = ['direct', 'execute', 'worked_example', 'guided', 'preserve_challenge', 'edit_as_asked'];
+const STRATEGIES: readonly NonNullable<TypedControls['strategy']>[] = ['direct', 'execute', 'worked_example', 'guided', 'preserve_challenge', 'edit_as_asked', 'diagnose', 'next_step'];
 const SCOPES = ['turn', 'turns', 'conversation', 'standing'];
 const TARGETS: readonly Target[] = ['acs', 'behavior', 'epistemic', 'orchestration'];
 const LOOPS: readonly MRDecision['loop'][] = ['fast', 'deliberative', 'longitudinal'];
@@ -242,7 +242,7 @@ function controlValid(key: ControlKey, v: unknown): boolean {
     case 'verbosity':
       return isObj(v) && isInt(v.ceilingTokens) && v.ceilingTokens > 0;
     case 'verification':
-      return v === 'explicit';
+      return v === 'explicit' || v === 'suggest';
     case 'simplify':
     case 'answerFirst':
     case 'noRevealAnswers':
@@ -461,8 +461,8 @@ const DIRECT: ReadonlySet<PreferenceCode> = new Set(['direct']);
 const NO_QUESTIONS: ReadonlySet<PreferenceCode> = new Set(['no_questions']);
 const WANTS_QUESTIONS: ReadonlySet<PreferenceCode> = new Set(['wants_questions', 'quiz']);
 /** hands over less than they asked for */
-const LESS_DIRECT_ACTIONS: ReadonlySet<string> = new Set(['guided_discovery', 'preserve_challenge', 'more_scaffolding']);
-const LESS_DIRECT_STRATEGIES: ReadonlySet<string> = new Set(['guided', 'preserve_challenge']);
+const LESS_DIRECT_ACTIONS: ReadonlySet<string> = new Set(['guided_discovery', 'preserve_challenge', 'more_scaffolding', 'diagnose', 'next_step']);
+const LESS_DIRECT_STRATEGIES: ReadonlySet<string> = new Set(['guided', 'preserve_challenge', 'diagnose', 'next_step']);
 
 /**
  * Integrity over the history of decisions in a conversation.
@@ -481,7 +481,8 @@ const LESS_DIRECT_STRATEGIES: ReadonlySet<string> = new Set(['guided', 'preserve
  *   params.excessiveWindow turns, once that many turns exist. An instruction
  *   of theirs in force on every turn is them, not MR acting too much.
  * goal_drift (revert, block) — the current decision hands over less (guided
- *   discovery, a preserved challenge, more scaffolding) while their "just
+ *   discovery, a preserved challenge, more scaffolding, the key point with a
+ *   question about what they meant, a single next step) while their "just
  *   tell me / show me the steps" is in force; raises questions while their
  *   "stop asking" is in force; or takes questions away while their "ask me /
  *   quiz me" is in force. Where two of their own instructions conflict, the
@@ -584,9 +585,14 @@ export function checkHistory(i: {
  *                value, observed). Satisfaction and friction cannot show it.
  *   interaction  "the help went better" needs task completion or friction;
  *                their saying thanks alone cannot show it.
+ * Reactions (the recorded react measures: "that makes sense", a clarified
+ * reading, an answer given back) are what a person said or did next, not an
+ * independent attempt, so a capability claim built on them is named
+ * alongside satisfaction and friction. They never count as interaction
+ * evidence either: a reply that got a reaction is not a reply that helped.
  * The finding blocks the claim; nothing is done to the conversation.
  */
-export function checkOutcomeUse(outcomes: readonly OutcomeVector[], claim: 'interaction' | 'capability'): IntegrityFinding[] {
+export function checkOutcomeUse(outcomes: readonly OutcomeVector[], claim: 'interaction' | 'capability', extra: { reactions?: readonly unknown[] } = {}): IntegrityFinding[] {
   const list = (outcomes ?? []).filter((o) => isObj(o));
   const turn = list.reduce((m, o) => (isInt(o.turn) ? Math.max(m, o.turn) : m), 0);
   const known = (v: unknown) => v !== undefined && v !== 'unknown';
@@ -595,7 +601,8 @@ export function checkOutcomeUse(outcomes: readonly OutcomeVector[], claim: 'inte
     const independent = list.some((o) => known(o.independentPerformance?.value) && o.independentPerformance?.provenance === 'observed');
     if (independent) return [];
     const frictioned = list.some((o) => known(o.friction?.value));
-    const detail = satisfied || frictioned ? `capability_from:${[satisfied ? 'satisfaction' : '', frictioned ? 'friction' : ''].filter(Boolean).join('+')}` : 'capability_without_evidence';
+    const reacted = Array.isArray(extra?.reactions) && extra.reactions.length > 0;
+    const detail = satisfied || frictioned || reacted ? `capability_from:${[satisfied ? 'satisfaction' : '', frictioned ? 'friction' : '', reacted ? 'reaction' : ''].filter(Boolean).join('+')}` : 'capability_without_evidence';
     return [finding('proxy_gaming', 'block', turn, detail, 'none')];
   }
   const interaction = list.some((o) => known(o.taskCompletion?.value) || known(o.friction?.value));

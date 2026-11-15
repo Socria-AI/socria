@@ -322,5 +322,190 @@ console.log('\n=== content-free and deterministic ===');
   ok('refs are {turn, role, code} with code-shaped codes', refs.every((r) => J(Object.keys(r).sort()) === J(['code', 'role', 'turn']) && /^[a-z_]+(?:\.[a-z0-9_]+)+$/.test(r.code)), J(refs));
 }
 
+// ── the shape of a reply (replyShape): a measure, never read by regulation ──
+//
+// Review fixes C.3–C.10 and D.11 (findings F38, F39, F44, F45, F46, N17): what
+// is put to them is read as the stream gate reads it, the actionable estimate
+// knows the common instructions and the noun phrases that look like them, a
+// check is a check, code asks nothing, a symbol line is no sentence, and a
+// reply with no letter in it is unreadable.
+
+console.log('\n=== measures: a question the reply does not put to them (F38) ===');
+{
+  const S = M.replyShape;
+  const heading = S('## Why does this happen?\n\nThe cache is stale, so the old value is served until the entry expires.');
+  ok('a question as a markdown heading: no question, does not open with one', heading.questions === 0 && heading.explicitQuestions === 0 && heading.opensWithQuestion === false && heading.wordsBeforeQuestion === -1, J(heading));
+  const rhet = S('Why does the cache serve old data? Because the entry has not expired yet, so the old value is served.');
+  ok('a question the next sentence answers ("Because …"): no question, and the answer is where it is actionable', rhet.questions === 0 && rhet.explicitQuestions === 0 && rhet.opensWithQuestion === false && rhet.firstActionable === 1, J(rhet));
+  for (const [label, t] of [
+    ['"…? Only if …"', 'Get the lighter laptop. Should you pay for the extended warranty? Only if you tend to drop things.'],
+    ['"…? No, …"', 'Tokyo is easy for visitors. Do you need to know Japanese? No, signs are in English almost everywhere.'],
+    ['"Is it safe…? It is, …"', 'Book an aisle seat and walk every hour. Is it safe to fly while pregnant? It is, until about 36 weeks for most airlines.'],
+    ['"Q: …? A: Yes, …"', 'Q: Do I need a visa?\nA: Yes, if you stay longer than 90 days.'],
+    ['a bold label line, answered below', '**Why does the cache go stale?**\n\nEntries live until they expire, so an old value stays until then.'],
+    ['"…? Not much — …"', 'Does the brand matter? Not much — fit matters more.'],
+  ])
+    ok(`self-answered, ${label}: no question put to them`, S(t).questions === 0, J(S(t)));
+  // near-misses: still put to them
+  const mind = S('The rent gap is the real cost. How do you feel about that? It is about 4800 a year.');
+  ok('near-miss: a question about their mind stays theirs, whatever follows it', mind.questions === 1 && mind.wordsBeforeQuestion === 7, J(mind));
+  const own = S('Which router do you have? The fix depends on the brand.');
+  ok('near-miss: a question the next sentence does not answer is put to them, and opens the reply', own.questions === 1 && own.opensWithQuestion === true && own.wordsBeforeQuestion === 0, J(own));
+  const boldYou = S('**What is your budget?**\n\nPrices start at 900.');
+  ok('near-miss: a bold line addressed to them is still a question', boldYou.questions === 1 && boldYou.opensWithQuestion === true, J(boldYou));
+  const two = S('Is the light on the router green? And does it drop on every device or just the laptop?');
+  ok('near-miss: two questions in a row, neither answered: two', two.questions === 2 && two.explicitQuestions === 2, J(two));
+  const tail = S('In short, AI does well on narrow problems with clear goals. Do you mean in your own work, or AI in general?');
+  ok('near-miss: the closing question of a diagnose is counted', tail.questions === 1 && tail.explicitQuestions === 1 && tail.firstActionable === 0, J(tail));
+}
+
+console.log('\n=== measures: something to act on (F39) ===');
+{
+  const S = M.replyShape;
+  const acts = [
+    "Update the wireless driver from the manufacturer's site.",
+    'Reboot the router and wait two minutes.',
+    'Turn off power saving for the adapter in Device Manager.',
+    'Disable IPv6 on the adapter.',
+    'Reset the router to factory settings.',
+    'Forget the network and join it again.',
+    'Unplug the router for thirty seconds.',
+    'Clear your browser cache.',
+    'Reinstall the app.',
+    'Go into Settings and pick the 5 GHz band.',
+    'Divide both sides by 2.',
+    'Plug x = 3 back into the equation.',
+    'Download the latest firmware.',
+    'Enable WPA3 in the router settings.',
+    'Uninstall the old version first.',
+    'Rename the file to config.yaml.',
+    'Wait ten minutes and try again.',
+    'Keep the laptop plugged in while it updates.',
+    'Follow the prompts in the installer.',
+    'Drag the slider to the right.',
+    'Save the file and rerun the script.',
+    'Find the adapter under Network adapters.',
+    'Connect with an ethernet cable to rule out Wi-Fi.',
+    'Let u = x^2.',
+    'Take the derivative of both sides.',
+    // and the forms the old list already knew, which must still read
+    'Try restarting the router.',
+    'First, open Settings.',
+    'Next, write du = 2x dx, so the integral becomes the integral of e^u du.',
+    'You should restart the router before anything else.',
+    'Use git rebase -i to squash the commits.',
+    'Install updates.',
+    'To solve a quadratic, move everything to one side and factor.',
+    'If it still drops, update the driver.',
+  ];
+  const missed = acts.filter((t) => S(t).firstActionable !== 0);
+  ok(`${acts.length} instructions: each actionable at its first sentence`, missed.length === 0, missed.join(' | '));
+  const nouns = [
+    'List comprehensions are a compact way to build lists in Python.',
+    'Set theory is the study of collections.',
+    'Change is hard for most organisations.',
+    'Test-driven development means writing the test before the code.',
+    'Type systems catch some errors before the program runs.',
+    'Stop words are common words that search engines ignore.',
+    'Measure theory generalises length and area.',
+    'You can think of a monad as a box with rules for chaining.',
+    'Many people say you should never use goto, but it has uses.',
+    'Note-taking apps vary a lot in how they sync.',
+    'Read replicas let a database serve more queries.',
+    'Move semantics avoid copying large objects in C++.',
+    'Start-up costs are high for most hardware companies.',
+    'Check digits catch typing errors in account numbers.',
+    'Compare-and-swap is an atomic instruction.',
+    // near-misses the widened list could newly catch
+    'Let me explain how the cache works.',
+    "Let's look at why the cache goes stale.",
+    'Close, but the cache is the other way round.',
+    'Message queues are a way to decouple services.',
+    'Text editors differ mostly in their plugins.',
+  ];
+  const read = nouns.filter((t) => S(t).firstActionable !== -1);
+  ok(`${nouns.length} explanations whose first word is also a verb: none actionable`, read.length === 0, read.map((t) => `${S(t).firstActionable} ${t}`).join(' | '));
+  const emoji = S('Great question! 🎉 Restart the router and wait a minute.');
+  ok('an emoji before the verb is read past: actionable at the second sentence', emoji.firstActionable === 1, J(emoji));
+  const heading = S('## Short answer\n\nYes, it is safe to delete the cache folder.');
+  ok('near-miss: a heading\'s words are not read as the answer ("## Short answer")', heading.firstActionable === 1 && heading.paragraphsBeforeActionable === 1, J(heading));
+  const late = S('Laptops slow down for many reasons over the years. Background programs pile up, storage fills, and updates add features that need more memory. Heat also plays a part when the fans are dusty. Open Task Manager and turn off the startup apps you do not need.');
+  ok('the late-actionable fixture: actionable at its fourth sentence', late.firstActionable === 3, J(late));
+  // next steps named as such, with the wider verbs
+  for (const t of ['Next, update the driver from the maker\'s site.', 'Then reboot the router and wait.', 'Subtract 3 from both sides, then divide by 2.', 'Yes! That is right 🎉 Now try 3/4 + 1/8.'])
+    ok(`next step named: ${JSON.stringify(t)}`, S(t).nextStep === 'yes', J(S(t)));
+  for (const t of ['The next set of results came out in May.', 'That is what happens at their next turn of the cycle.', 'Routers broadcast on channels that overlap.'])
+    ok(`near-miss, no next step: ${JSON.stringify(t)}`, S(t).nextStep === 'no', J(S(t)));
+}
+
+console.log('\n=== measures: a check they can run (F44) ===');
+{
+  const S = M.replyShape;
+  const checks = [
+    'Run ping 8.8.8.8 to see whether packets are lost.',
+    'Open config.yaml and check whether the port is 8080.',
+    'Check the log at /var/log/syslog to see if the driver reloads.',
+    'Connect your phone to the same network; if it drops too, the router is at fault.',
+    'Try it on another device first: if that works, the problem is the laptop.',
+    'Plug in an ethernet cable and see if the drops stop.',
+    'Check that the import uses a relative path such as ./utils.',
+    'Make sure the cable is plugged into the WAN port.',
+  ];
+  const missed = checks.filter((t) => S(t).checkSuggested !== 'yes');
+  ok(`${checks.length} checks: each read`, missed.length === 0, missed.join(' | '));
+  const not = [
+    'I cannot confirm that the 2019 figure is accurate.',
+    'The test which failed was about rounding.',
+    'Open source is software that anyone can inspect and change.',
+    'Most routers run firmware that the vendor rarely updates.',
+    'A log file is a record that programs write as they run.',
+    'Unit tests verify that each function behaves as written.',
+    'The print statement in Python 2 differs from the function that Python 3 uses.',
+    'Studies confirm that sleep improves memory.',
+    'Check digits are a feature that catches typing errors.',
+    'It is hard to test whether a model generalises.',
+    // near-misses the widened reading could newly catch
+    'I can also see the case for the bigger model if you need more ports.',
+    'Restart the dev server so that it picks up the renamed files.',
+    'Make sure you understand the idea before moving on.',
+  ];
+  const fp = not.filter((t) => S(t).checkSuggested !== 'no');
+  ok(`${not.length} explanations with "that", "which", "see … if" or an impossible check: none read as a check`, fp.length === 0, fp.join(' | '));
+  // a known miss, recorded: an observation with no "if" or "whether" in it
+  ok('(known miss, recorded: "Look at the lights …: a blinking orange light means …" is not read)', S('Look at the lights on the router: a blinking orange light means no internet.').checkSuggested === 'no');
+}
+
+console.log('\n=== measures: code asks nothing, symbols are no sentence, no letters is unreadable (F45, F46, N17) ===');
+{
+  const S = M.replyShape;
+  const closed = S('Use a ternary:\n\n```js\nconst label = count > 1 ? "items" : "item";\nconst ok = ready ? start() : wait();\n```');
+  const cut = S('Use a ternary:\n\n```js\nconst label = count > 1 ? "items" : "item";\nconst ok = ready ? start() : wait();\nconst x = a');
+  ok('a closed fence: no question', closed.questions === 0 && closed.explicitQuestions === 0, J(closed));
+  ok('a fence cut off by the ceiling: no question either, and the record agrees with itself', cut.questions === 0 && cut.explicitQuestions === 0 && cut.wordsBeforeQuestion === -1 && cut.code === true, J(cut));
+  const comment = S('Run this:\n\n```python\n# what if x is None?\nif x is None:\n    return');
+  ok('a "?" in a comment of cut-off code: no question', comment.questions === 0, J(comment));
+  const afterCode = S('Run this:\n\n```python\nprint(2 + 2)\n```\n\nWhich version of Python are you on?');
+  ok('near-miss: a question after the code is still counted', afterCode.questions === 1 && afterCode.explicitQuestions === 1, J(afterCode));
+  const table = S('Here is the comparison.\n\n| Protocol | Reliable |\n|---|---|\n| TCP | yes |\n| UDP | no |');
+  ok('a table: its separator row is no sentence (4, not 5)', table.sentences === 4 && table.paragraphs === 2, J(table));
+  ok('a "---" rule inside a block is no sentence', S('First part of the answer.\n---\nSecond part of the answer.').sentences === 2, J(S('First part of the answer.\n---\nSecond part of the answer.')));
+  ok('"$$" fences of a display formula are no sentences', S('The roots are:\n$$\nx = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}\n$$').sentences === 2, J(S('The roots are:\n$$\nx = \\frac{-b}{2a}\n$$')));
+  const emoji = S('👍');
+  ok('an emoji-only reply: unreadable (-2), not English, no words, estimates unknown', emoji.firstActionable === -2 && emoji.wordsBeforeActionable === -2 && emoji.paragraphsBeforeActionable === -2 && emoji.english === false && emoji.words === 0 && emoji.nextStep === 'unknown', J(emoji));
+  ok('symbols only: the same', S('🙂 🙂 → ✔').firstActionable === -2 && S('🙂 🙂 → ✔').english === false, J(S('🙂 🙂 → ✔')));
+  const fr = S("L'intelligence artificielle progresse rapidement, mais elle ne résout pas encore tous les problèmes des entreprises.");
+  ok('near-miss: French prose stays not English and unreadable', fr.english === false && fr.firstActionable === -2, J(fr));
+  const codeOnly = S('```python\nfor row in rows:\n    print(row)\n```');
+  ok('near-miss: code only stays -2, and keeps its code flag', codeOnly.firstActionable === -2 && codeOnly.code === true && codeOnly.sentences === 0, J(codeOnly));
+  const plain = S('Paris.');
+  ok('near-miss: a one-word answer is English, one sentence', plain.english === true && plain.sentences === 1 && plain.words === 1, J(plain));
+}
+
+console.log('\n=== measures: content-free whatever the reply ===');
+{
+  for (const t of ['## Why does this happen?\n\nThe cache is stale.', 'Update the wireless driver.', '👍', '| a | b |\n|---|---|\n| 1 | 2 |'])
+    ok(`${JSON.stringify(t.slice(0, 30))}: ints, booleans and codes only`, Object.values(M.replyShape(t)).every((v) => typeof v === 'number' || typeof v === 'boolean' || ['yes', 'no', 'unknown'].includes(v)), J(M.replyShape(t)));
+}
+
 console.log(`\nmr-outcome: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

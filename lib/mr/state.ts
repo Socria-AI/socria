@@ -33,10 +33,10 @@
 import { isFactQuestion } from '../cognition/assist';
 import { sentencesOf } from '../core4/questions';
 import { assertDecision, checkDecision, checkHistory, checkTaskRegression } from './integrity';
-import { movedOn, observeTurn, observeWords, questionsAsContent, turnsOf, writingForOthers, type TurnView } from './ifr';
+import { movedOn, observeTurn, observeWords, questionsAsContent, reactionAt, turnsOf, writingForOthers, type TurnView } from './ifr';
 import { evaluateOutcome, regulationCause } from './outcome';
 import { standingKey } from './adaptation';
-import { compose, decide, interventionIdFor, noneDecision, RULE_CONTROLS, RULES, ruleFamily, type PolicyNow, type RuleFamily } from './policy';
+import { compose, decide, interventionIdFor, noneDecision, RECENT_TURNS, RULE_CONTROLS, RULES, ruleFamily, type PolicyNow, type RuleFamily } from './policy';
 import { STRATEGIES, type StrategyParams } from './config';
 import type {
   Fact,
@@ -47,6 +47,7 @@ import type {
   MRTurnInput,
   Observation,
   OutcomeVector,
+  Reaction,
   StrategyState,
   TypedControls,
 } from './types';
@@ -63,6 +64,12 @@ export interface FoldInput {
   carryAcross: boolean;
   /** the engine's verdicts on their claims at earlier turns, by user-turn index */
   verdictsByTurn: Readonly<Record<number, readonly { status: string }[]>>;
+  /**
+   * A measure fault the tests inject (MR_TEST_FAULT=measure, never in
+   * production; lib/mr/index.ts regulateTurn): the reaction measure throws,
+   * to prove a failed measure costs the measure and nothing else.
+   */
+  measureFault?: boolean;
 }
 
 export interface FoldOutput {
@@ -299,6 +306,10 @@ export function foldConversation(f: FoldInput): FoldOutput {
       verdictsByTurn: f.verdictsByTurn,
       params,
       length: input.context.length,
+      // what is on their screen is known only now: an earlier turn replayed from the transcript cannot know it
+      material: isNow ? input.context.material : undefined,
+      // …and so is an attachment on their newest message (a content-free marker; the readers decide what it means)
+      attached: isNow ? input.context.attached : undefined,
     });
     if (lastIndex - at < KEEP_OBSERVED_TURNS) kept.push(...obs);
     carryIn(at);
@@ -367,6 +378,11 @@ export function foldConversation(f: FoldInput): FoldOutput {
     const now: PolicyNow | null = isNow
       ? { assist: input.acs.assist, core: input.acs.core, maxReply: input.context.maxReply }
       : null;
+    // What was issued in the last few turns, whatever became of it (precision only: policy.ts RuleContext.recent).
+    const recent =
+      params.precision === true
+        ? new Set(records.filter((r) => !r.decision.carried && r.decision.issuedAtTurn < at && at - r.decision.issuedAtTurn <= RECENT_TURNS).map((r) => r.decision.trigger))
+        : undefined;
     settle(
       at,
       decide({
@@ -381,6 +397,7 @@ export function foldConversation(f: FoldInput): FoldOutput {
         carryAcross: f.carryAcross,
         now,
         lastMrStrategyChange,
+        ...(recent ? { recent } : {}),
       })
     );
     // expiries, revocations and new decisions can all move the strategy
@@ -439,6 +456,18 @@ export function foldConversation(f: FoldInput): FoldOutput {
   if (nowObs.some((o) => o.strength === 'weak')) uncertainty.add('ambiguous_signal');
   if (deliberation) uncertainty.add(`deliberate:${deliberation}`);
 
+  // How their newest message met the reply before it: a measure, recorded under any policy and read by nothing that
+  // regulates. A measure that fails costs the measure (react left out), never the turn's regulation.
+  let react: Reaction | null = null;
+  if (turns[last].prevReply !== null) {
+    try {
+      if (f.measureFault) throw new Error('mr test fault: measure');
+      react = reactionAt(turns, last, { params, verdicts: input.context.accuracy.theirs, verdictsByTurn: f.verdictsByTurn, length: input.context.length }, nowObs);
+    } catch {
+      react = null;
+    }
+  }
+
   const state: MRState = {
     version: MR_STATE_VERSION,
     policyVersion,
@@ -454,6 +483,7 @@ export function foldConversation(f: FoldInput): FoldOutput {
     frozenUntilTurn: frozenUntil,
     integrity: findings,
     ...(resetTurn !== null ? { resetTurn } : {}),
+    ...(react ? { react } : {}),
   };
   return { state, current, wouldBe, fresh, turns, deliberation, findings };
 }
@@ -532,11 +562,21 @@ function goalsOf(input: MRTurnInput, obs: readonly Observation[], turn: number, 
   return out;
 }
 
+/**
+ * Decisions from their words that are reports, not ways they want to be
+ * helped: "No, I meant on my Mac", "I know that already", "I'm stuck". Each
+ * holds for the turn it was said. Filed as a preference, a correction's "no
+ * question this turn" would read as a standing wish for no questions, and
+ * could then be carried or judged as one (integrity.ts goal_drift).
+ */
+const NOT_A_PREFERENCE: ReadonlySet<string> = new Set(['ifr.explicit.corrected', 'mr.explicit.knows_that', 'mr.explicit.stuck', 'ifr.explicit.stuck']);
+
 /** Their stated preferences in force, as codes — only from their own words (or carried, with consent). */
 export function preferencesOf(active: readonly InterventionRecord[], carried: readonly Fact[]): Fact[] {
   const out: Fact[] = [];
   for (const r of active) {
     const d = r.decision;
+    if (NOT_A_PREFERENCE.has(d.trigger)) continue;
     if (!d.trigger.includes('.explicit.') && d.loop !== 'longitudinal') continue;
     const key = prefKey(d);
     if (!key) continue;

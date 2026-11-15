@@ -267,7 +267,7 @@ console.log('\n=== the reviewers\' findings, held down ===');
   ok('  a comparison the runtime reads as "execution" is NOT routine', study.decision.action !== 'execute', study.trace);
   // an experiment runs under the policy it registered
   const pinned = run([U('just tell me the answer')], { condition: { ...FULL, source: 'experiment', experimentId: 'x', policyVersion: MR.MR_POLICY_VERSION } });
-  ok('an experiment\'s registered policy version is the one decisions carry', pinned.decision.policyVersion === MR.MR_POLICY_VERSION && /pv=mr-2026\.10\.1/.test(pinned.trace));
+  ok('an experiment\'s registered policy version is the one decisions carry', pinned.decision.policyVersion === MR.MR_POLICY_VERSION && new RegExp('pv=' + MR.MR_POLICY_VERSION.replace(/\./g, '\\.')).test(pinned.trace));
   // carried in from another conversation: carried, at turn 0 too
   const carried = run([U('Hello again, new topic: what is a bond yield?')], { carried: [{ key: 'questions:0', value: 'fewer_questions', provenance: 'explicit', turn: 0, refs: [], confidence: 0.9, expiresAfterTurn: null }] });
   ok('a standing preference carried in is marked carried, even on the first turn', carried.decision.carried === true && /;carried;/.test(carried.trace) && carried.gate.hardNoQuestions, carried.trace);

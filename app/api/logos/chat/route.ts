@@ -51,7 +51,7 @@ import { sentencesOf, deleteSentences } from '@/lib/core4/questions';
 import { readSignals } from '@/lib/core4/signals';
 import { chooseAssist, renderAssist, assistTrace, sanitizeDigest, constructAsk } from '@/lib/cognition/assist';
 import { readDisplayRequest } from '@/lib/objects/display-request';
-import { styleBlock } from '@/lib/logos-style';
+import { sanitizeStyle, styleBlock } from '@/lib/logos-style';
 import { conversationStyleBlock } from '@/lib/conversation-style';
 import {
   hasJourneyContent,
@@ -138,9 +138,9 @@ import { GUEST_COOKIE, GUEST_LIMIT, guestMay } from '@/lib/guest-pass';
 import { TRIAL_ENDED_COOKIE, guestAfterTrial } from '@/lib/trial';
 import { GUEST_TURNS, GUEST_TURNS_LIMIT, guestTurnsUsed } from '@/lib/guest-limits';
 // METACOGNITIVE REGULATION (docs/MR.md): on unless LOGOS_MR=off (or shadow).
-import { afterReply, emptyReplyFallback, regulateTurn, replyGate, type MRRegulation } from '@/lib/mr';
+import { afterReply, emptyReplyFallback, measureReply, regulateTurn, replyGate, replyMeasuresCode, type MRRegulation } from '@/lib/mr';
 import { fitControlsToForms } from '@/lib/mr/execute';
-import { deliberationOn, mrMode, storeOn } from '@/lib/mr/config';
+import { deliberationOn, mrMode, paramsFor, storeOn } from '@/lib/mr/config';
 import { deliberate } from '@/lib/mr/deliberate';
 import { resolveCondition } from '@/lib/mr/experiment';
 import { standingFacts } from '@/lib/mr/adaptation';
@@ -157,6 +157,90 @@ import { SPOKEN_TURN } from '@/lib/voice/speech';
 
 /** The turn asked for code, JSON, a schema or a config: a fenced json block in the reply is then theirs (lib/inline-ui.ts InlineContext.code). */
 const CODE_ASKED = /\b(?:json|yaml|toml|schema|config(?:uration)?\s+file|payload|api\s+response|code|snippet|script|regex|sql|function|class|endpoint)\b/i;
+
+// ── what their written instructions ask of MR (lib/mr/types.ts MRTurnInput.context.style) ──
+//
+// Their standing instructions (body.style, shown to the model as "HOW THEY'VE ASKED YOU TO WORK WITH THEM") are
+// read here as two booleans and nothing else: no word of them reaches MR. MR reads the booleans only under a
+// policy with params.precision, and only to take its own narrowing back (lib/mr/execute.ts constrain): never to add
+// a question or room past what ACS and the route allow.
+
+/**
+ * A closing question, a quiz or a check of their understanding: "Always end every reply with one short question
+ * that checks my understanding", "end on a question", "ask me questions as we go", "quiz me", "test my
+ * understanding", "make sure I understood", "Socratic".
+ */
+const STYLE_QUESTIONS =
+  /\b(?:end|close|finish|wrap up)\b[^.!?\n]{0,40}?\b(?:with|on)\b[^.!?\n]{0,30}?\bquestions?\b|\bask(?:s|ing)? me\b[^.!?\n]{0,30}?\bquestions?\b|\bquiz(?:zing)? me\b|\btest (?:me|my (?:understanding|knowledge))\b|\bcheck(?:s|ing)? (?:my understanding|(?:that|if|whether) i (?:understand|understood|follow|got it))\b|\bmake sure i (?:understand|understood|follow|got it)\b|\b(?:a|one) (?:short |quick |follow[- ]up |comprehension |check(?:ing)? )?question (?:at the end|to (?:check|test|see)|after (?:each|every))\b|\bfollow[- ]up questions?\b|\bsocratic\b|\bkeep (?:asking|quizzing|testing) me\b/i;
+/**
+ * Thorough, detailed or long answers: "I like thorough, detailed answers with examples", "go into depth", "in as
+ * much detail as you can", "explain things fully", "don't be brief".
+ */
+const STYLE_LENGTH =
+  /\b(?:thorough|detailed|in-depth|in depth|long|lengthy|longer|comprehensive|exhaustive|extensive|full|deep)\b[^.!?\n]{0,25}?\b(?:answers?|repl(?:y|ies)|responses?|explanations?|breakdowns?)\b|\b(?:go|going) (?:into|in) (?:depth|detail)\b|\bin (?:great |full |as much |more |lots of )?detail\b|\bexplain (?:things |everything |it )?(?:thoroughly|fully|in full)\b|\bthe more detail the better\b|\bi like (?:detail|depth)\b/i;
+/** Said as a negation and meaning more: "don't be brief", "don't hold back", "don't keep it short". */
+const STYLE_LENGTH_NOT_SHORT = /\b(?:don'?t|do not|never)\s+(?:hold back|be (?:brief|short|terse)|keep (?:it|things|answers|replies|them) short)\b/i;
+/**
+ * A refusal or a dislike just before what is asked, in the same run of words (at most four words away, never across a
+ * comma): "don't end with a question", "no long answers", "never quiz me", "not too detailed", "I don't need long
+ * explanations", "I don't want you to ask me questions", "I hate it when you ask me questions", "I hate long
+ * answers", "I can't stand long answers". Not "don't hesitate to ask me questions", "I don't mind if you quiz me",
+ * and not a refusal of something else before a comma ("Keep it casual, not formal, and always end with a question").
+ */
+const STYLE_REFUSED = /\b(?:don'?t|do not|never|no|not|stop|avoid|without|hate|dislike|can'?t stand|cannot stand|tired of|sick of)\b(?!\s+(?:hesitate|mind)\b)(?:\s+[\w'’]+){0,4}\s*$/i;
+
+/**
+ * Their written instructions as MR's two booleans, or null when they ask for neither. Read clause by clause (a stop,
+ * a semicolon, a line, "but"); a clause counts only when no refusal stands just before what it asks, so "Don't end
+ * with a question" and "No long answers, please" count for nothing, while "Keep it casual, not formal, and always
+ * end with a question" counts. Near-misses that stay out: "keep answers short", "never end on a question", "I don't
+ * need long explanations", "never quiz me", "I don't want you to ask me questions", "I hate it when you ask me
+ * questions, just explain", "I hate long answers", "I can't stand long answers", "a question now and then is fine"
+ * (no closing question asked for).
+ */
+function styleAsks(raw: unknown): { questions: boolean; length: boolean } | null {
+  const text = sanitizeStyle(raw);
+  if (!text) return null;
+  const asks = (re: RegExp) =>
+    text.split(/[.!?;\n]+|,?\s+but\s+/i).some((clause) => {
+      const m = re.exec(clause);
+      return !!m && !STYLE_REFUSED.test(clause.slice(0, m.index));
+    });
+  const questions = asks(STYLE_QUESTIONS);
+  const length = STYLE_LENGTH_NOT_SHORT.test(text) || asks(STYLE_LENGTH);
+  return questions || length ? { questions, length } : null;
+}
+
+/**
+ * MR's final move, where the rest of the turn's plan must not undo it — under a policy with params.precision and in
+ * the full arm only (anywhere else this is null and the turn is planned exactly as before):
+ *   'unseen'     a diagnose because what they point at, or the work they are stuck on, is not in the conversation
+ *                (request.missing_referent, stuck.unseen): MR's line says how to go about it in general, asks for
+ *                the one thing it needs and ends there, so nothing is planned about the missing thing — no shape,
+ *                no inline element, no explanation moves (a worked example of an equation that is not there);
+ *   'next_step'  one concrete next step and a stop: the explanation plan loses what walks past it (a complete worked
+ *                example, a transfer sentence or problem) and the "smaller steps" line that says the step again.
+ */
+function mrMoveOf(r: MRRegulation | null): 'unseen' | 'next_step' | null {
+  if (!r?.enforced || r.condition.arm !== 'full' || paramsFor(r.state.policyVersion).precision !== true) return null;
+  const strategy = r.decision.controls?.strategy;
+  const evidence = (r.decision.evidenceRefs ?? []).map((e) => e.code);
+  if (strategy === 'diagnose' && (evidence.includes('request.missing_referent') || evidence.includes('stuck.unseen'))) return 'unseen';
+  if (strategy === 'next_step') return 'next_step';
+  return null;
+}
+
+/** The explanation plan with what MR's move rules out taken away (mrMoveOf); a plan for any other turn is returned as it is. */
+function underMrMove(plan: ExplainPlan, move: 'unseen' | 'next_step' | null): ExplainPlan {
+  if (move === 'unseen') return { ...plan, strategies: [], forms: [], question: null, fill: { ...plan.fill, transfer: false, support: 'normal' } };
+  if (move === 'next_step') {
+    const strategies = plan.strategies.filter((s) => s !== 'worked' && s !== 'transfer');
+    // the elements those two carry their work in (lib/runtime/explain.ts FORMS: worked → steps, transfer → check), unless a move that stays carries one too
+    const forms = plan.forms.filter((k) => !((k === 'steps' && plan.strategies.includes('worked')) || (k === 'check' && plan.strategies.includes('transfer') && !strategies.includes('interleave'))));
+    return { ...plan, strategies, forms, question: plan.question === 'transfer' ? null : plan.question, fill: { ...plan.fill, transfer: false, support: 'normal' } };
+  }
+  return plan;
+}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -937,6 +1021,33 @@ export const POST = withMeter(async function POST(req: NextRequest) {
         // to read: MR's own pre-reset adjustment can hold one more turn, until
         // the read works — not every adjustment ended for anyone who ever reset.)
         const resetTurn = resetAt !== null && mrMayStore ? resetTurnOf(mrPrior.rows, resetAt, userTurnNow) : null;
+        // Their newest message carries an attachment (a screenshot, a photo, a note, a document), as the
+        // route sanitises it: MR is given only that it does, never what it is. MR's transcript is the
+        // messages' text alone, so without this the attachment would be invisible to it.
+        const mrAttached = sanitizeAttachments((last as { attachments?: unknown }).attachments).length > 0;
+        // …or their message before it did (a photo of the exercise, Socria's question, then "I'm stuck"): the
+        // work is in the conversation, though not in the text MR reads.
+        const prevUser = [...usable.slice(0, -1)].reverse().find((m: { role?: string }) => m?.role === 'user') as { attachments?: unknown } | undefined;
+        const mrAttachedBefore = !!prevUser && sanitizeAttachments(prevUser.attachments).length > 0;
+        // Something on their screen besides the transcript: a project, documents, a focus, a picture,
+        // a board, something in hand, a course, their Mind Graph, or what they attached to this message
+        // or the one before it. Only this turn's request carries it, so it is MR input for the newest turn
+        // alone (a reading that needs nothing to be shown stays silent without it). It changes nothing in
+        // the prompt or the cap by itself.
+        const mrMaterial =
+          mrAttached ||
+          mrAttachedBefore ||
+          !!cleanId(body?.projectId) ||
+          (Array.isArray(body?.docs) && body.docs.length > 0) ||
+          !!body?.docFocus ||
+          !!body?.focus ||
+          !!body?.viz ||
+          !!body?.vizState ||
+          (sanitizeSpace(body?.objects)?.objs.length ?? 0) > 0 ||
+          !!body?.inHand ||
+          !!body?.course ||
+          body?.mind === true;
+        const mrStyle = styleAsks(body?.style);
         const mrInput = {
           conversationKey: mrKey,
           messages: usable.map((m: { role: 'user' | 'assistant'; content: string }) => ({ role: m.role, content: m.content })),
@@ -954,6 +1065,11 @@ export const POST = withMeter(async function POST(req: NextRequest) {
               math: accuracy.reasons.includes('math'),
               theirs: accuracy.theirs.map((v) => ({ status: v.status })),
             },
+            material: mrMaterial,
+            attached: mrAttached,
+            // what their written instructions ask of MR's narrowing, as two booleans (styleAsks): read under a
+            // precision policy only, and only to take MR's own narrowing back
+            ...(mrStyle ? { style: mrStyle } : {}),
           },
           condition,
           ...(carried ? { carried, carriedIn: carriedInOf(mrPrior.rows, resetAt) } : {}),
@@ -1001,6 +1117,9 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       }
     }
     const assist = mrRun?.enforced ? mrRun.assist : assistAcs;
+    // MR's final move, where the rest of the plan must not undo it (mrMoveOf): a precision policy's full arm only, so
+    // under any other policy, arm or MR off this is null and the turn is planned exactly as before
+    const mrMove = mrMoveOf(mrRun);
     // the engagement reading closed this turn's question budget itself (allocation.ts `engaged`): on its own
     // inference, so it may not be what leaves a reply empty (below, after the gate)
     const engageClosed = !!allocation?.engagement && allocation.engagement.cap === 0 && assistAcs.reasons.some((r) => r.startsWith('engage:'));
@@ -1043,7 +1162,10 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       if (!claim.ok) writeUpRefused = { used: claim.used, limit: claim.limit, ...(claim.unavailable ? { unavailable: true } : {}) };
     }
     const placed = writeUpRefused ? { ...planned, place: undefined, reasons: [...planned.reasons, 'documents-spent'] } : planned;
-    const presented = inlineOn ? placed : { ...placed, forms: [] };
+    const offered = inlineOn ? placed : { ...placed, forms: [] };
+    // …and with what they point at not in the conversation, nothing is planned about it: no shape, no element (MR's
+    // line asks for the one thing it needs and ends there)
+    const presented = mrMove === 'unseen' ? { ...offered, forms: [], shape: undefined, strong: undefined, reasons: [...offered.reasons, 'mr:unseen'] } : offered;
     // THE ADAPTIVE EXPLANATION ENGINE (lib/runtime/explain.ts): how to make it understood — which of the twenty
     // strategies fit this turn, read in code from what they asked, what they know, how complex it is and how the last
     // reply landed; folded into the presentation (its elements) and the turn's context (a few lines, often none).
@@ -1096,6 +1218,8 @@ export const POST = withMeter(async function POST(req: NextRequest) {
           course: coursePack ? courseLean(coursePack, String(last.content ?? '')) : null,
           now: Date.now(),
         });
+        // …with what MR's final move rules out taken away (mrMoveOf, underMrMove): the plan as it was on any other turn
+        explain = underMrMove(explain, mrMove);
       } catch (e) {
         console.error('[explain] planning failed; this turn runs without it', e instanceof Error ? e.name : 'error');
         explain = null;
@@ -1315,8 +1439,8 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       // …and what shape it may take: the inline elements on offer, if any
       renderPresentation(presentation, { verifyOutLoud: !!mrRun?.block && /VERIFY OUT LOUD/.test(mrRun.block), leaveOpen }) +
       // …and how to make it understood (lib/runtime/explain.ts): read against the shape above, so nothing is said
-      // twice — nothing for a direct answer, a few lines filled with this turn's facts otherwise
-      renderTurnGuidance(explain, presentation, { said: { retrieval: assist.retrieval, selfExplain: assist.selfExplain } }) +
+      // twice — none for a direct answer or what is not here yet (mrMoveOf), a few lines of this turn's facts otherwise
+      (mrMove === 'unseen' ? '' : renderTurnGuidance(explain, presentation, { said: { retrieval: assist.retrieval, selfExplain: assist.selfExplain } })) +
       // …and the course it is in, when one is (lib/teaching/use.ts)
       courseBlock +
       // What may be asserted on what (epistemic.ts) — then, last, what was computed.
@@ -1739,9 +1863,19 @@ export const POST = withMeter(async function POST(req: NextRequest) {
             try {
               const measured = reply.trim() ? afterReply(mrRun, contentAsText(reply), mrDropped) : [];
               if (mrFallback) measured.push({ code: 'unsupported_claim', severity: 'info', turn: mrRun.state.turn, detail: 'empty_after_filters:fixed_line', action: 'drop_sentence' });
-              const finished = { ...mrRun, integrity: [...mrRun.integrity, ...measured] };
+              // The shape of the reply as sent (lib/mr/index.ts measureReply): counts and codes, in every
+              // arm MR runs in and under any policy pin, so versions are compared on one yardstick.
+              // Measurement only: nothing regulates on it, and a failure here costs the measure, never
+              // the row or the log.
+              let replyMeasures: ReturnType<typeof measureReply> = null;
+              try {
+                replyMeasures = reply.trim() ? measureReply(mrRun, contentAsText(reply), { fallback: !!mrFallback }) : null;
+              } catch (e) {
+                console.error('[mr] reply measures failed', e instanceof Error ? e.name : 'error');
+              }
+              const finished = { ...mrRun, integrity: [...mrRun.integrity, ...measured], ...(replyMeasures ? { reply: replyMeasures } : {}) };
               console.info(
-                `[mr] ${finished.trace};dq=${mrDropped.questions};dc=${mrDropped.claims}${mrDropped.offersRestored ? `;or=${mrDropped.offersRestored}` : ''}${mrMayStore ? '' : `;store=0:${mrNotStored.join('+') || 'off'}`}`
+                `[mr] ${finished.trace};dq=${mrDropped.questions};dc=${mrDropped.claims}${mrDropped.offersRestored ? `;or=${mrDropped.offersRestored}` : ''}${mrMayStore ? '' : `;store=0:${mrNotStored.join('+') || 'off'}`}${replyMeasures ? `;rm=${replyMeasuresCode(replyMeasures)}` : ''}`
               );
               if (mrMayStore) {
                 // a conversation kept to itself keeps its preferences to itself: nothing it says is carried elsewhere

@@ -559,6 +559,24 @@ console.log('\n=== what changed the reply, and what did not (honesty F5) ===');
   ok('  taken out on its own turn but enforced on a later one: it did change replies', MR.summarize([...turn3(emptied, false), ...later], NOW + 2000)[0].applied === true);
   const laterOff = MR.rowsForTurn({ ...turnResult({ turn: 4, decision: { ...original, carried: true }, interventions: [{ decision: original, status: 'active' }], outcomes: [], integrity: [] }), enforced: false }, ctx({ now: NOW + 1000 }));
   ok('  …not when that later turn changed nothing either', MR.summarize([...turn3(emptied, false), ...laterOff], NOW + 2000)[0].applied === false);
+  // Their written instructions gave ACS's question back (mr-2026.11.1, `user_instruction:questionBudget.style`): that
+  // control is taken out as surely as `layer:control` (integration review, the ledger's "emptied" test). The row is
+  // the decision as made (the controls it asked for), with what this turn took out of it.
+  const madeAs = (made, d) => MR.rowsForTurn(turnResult({ decision: d, interventions: [{ decision: made, status: 'active' }], outcomes: [], integrity: [] }), ctx());
+  const stepped = decision({ id: '88888888888888888888', action: 'next_step', trigger: 'mr.explicit.stuck', extra: { controls: { strategy: 'next_step', questionBudget: { max: 0, enforcement: 'tail' } } } });
+  const styled = madeAs(stepped, { ...stepped, controls: {}, constrainedBy: ['acs:strategy', 'user_instruction:questionBudget.style'] });
+  const styledRow = styled.find((x) => x.kind === 'decision');
+  ok('every control taken out, one by their written instructions (…:questionBudget.style): recorded, not applied', styledRow?.record.controls?.strategy === 'next_step' && MR.summarize(styled, NOW)[0].applied === false, J({ row: styledRow?.record.controls, s: MR.summarize(styled, NOW)[0] }));
+  const windowed = decision({ id: '77777777777777777777', action: 'fewer_questions', trigger: 'ifr.observed.redundant_question', extra: { controls: { questionBudget: { max: 0, enforcement: 'tail' }, questionWindow: { max: 1, turns: 3 } } } });
+  ok('  …and the question window with it (…:questionWindow.style)', MR.summarize(madeAs(windowed, { ...windowed, controls: {}, constrainedBy: ['user_instruction:questionBudget.style', 'user_instruction:questionWindow.style'] }), NOW)[0].applied === false);
+  ok('  the next step kept, only the question given back: it still changed the reply', MR.summarize(madeAs(stepped, { ...stepped, controls: { strategy: 'next_step' }, constrainedBy: ['user_instruction:questionBudget.style'] }), NOW)[0].applied === true);
+  const keptAs = [
+    [{ questionBudget: { max: 0, enforcement: 'hard' } }, 'user_instruction:questionBudget.hard'],
+    [{ strategy: 'next_step' }, 'app_policy:guard:strategy.keeps_answer'],
+    [{ strategy: 'worked_example' }, 'app_policy:withhold:strategy.analogous'],
+    [{ questionWindow: { max: 1, turns: 3 } }, 'app_policy:guard:questionWindow.hint'],
+  ];
+  ok('  a control kept in another form is not taken out (.hard at the tail, .keeps_answer, .analogous, .hint)', keptAs.every(([controls, code]) => MR.summarize(madeAs({ ...stepped, controls }, { ...stepped, controls, constrainedBy: [code] }), NOW)[0].applied === true));
   const ifrOff = { ...original, uncertainty: ['not_enforced'] };
   const offRows = MR.rowsForTurn({ ...turnResult({ decision: ifrOff, interventions: [{ decision: ifrOff, status: 'active' }], outcomes: [], integrity: [] }), enforced: true }, ctx());
   ok('a decision the condition computed but does not enforce (IFR off): not applied', MR.summarize(offRows, NOW)[0].applied === false);

@@ -76,6 +76,10 @@ id and the policy version.
   every threshold MR acts on, frozen per version. A decision carries the
   version it was made under. `LOGOS_MR_POLICY=<version>` pins an earlier one.
 - **State and ledger shape** (`MR_STATE_VERSION`).
+- **Measure shape** (`MEASURE_VERSION`, the `mv` in every `reply` and
+  `react` record): what each reply and reaction measure counts. Measures run
+  under every policy pin, so a pinned arm and the current one are measured
+  the same way.
 - **Research event shape** (`RESEARCH_EVENT_VERSION`, `lib/mr/research.ts`).
 - **Experiment id** on every exposure row of an enrolled participant.
 - The persona and runtime versions already in `X-Socria-Runtime`
@@ -126,6 +130,23 @@ analyst, for one study, through `lib/mr/research.ts`:
 - Exposure events carry `enforced` and `modelDeliberated`; they never carry
   `local`, which on its own would reveal that a conversation touched a
   sensitive subject.
+- Since mr-2026.11.1, exposure events also carry the reply measures
+  (`reply.*`: counts, booleans and the codes `yes`/`no`/`unknown` — words,
+  sentences, paragraphs, questions put to them, how the reply opened, how
+  far in the first actionable sentence sat, repeated sentences and
+  questions) and the reaction measures (`react.*`: how their next message
+  met the reply — answered, corrected, stuck, said they knew it, asked for
+  shorter or longer, a new topic, an attempt and its verdict). Each field's
+  provenance is in `MEASURE_PROVENANCE` (re-exported by `research.ts`):
+  observed, explicit (their words), estimate (an English sentence-shape
+  reading; `−2` or `unknown` where it cannot be read) or hypothesis. **Not
+  exported:** the two hypothesis fields (`react.alreadyGiven`,
+  `react.relevance`), and `reply.content` — a boolean (the turn asked for
+  questions or writing as the content) that is kept in the ledger but whose
+  name would read, in a data dictionary, as their text. Nothing in these
+  measures is an outcome claim: `react.saidUnderstood` is what they said,
+  never what they can do, and estimates should not be analysed as
+  observations.
 - No message text exists anywhere MR writes, so none can be exported.
 
 ## 5. What a study still needs (not built, on purpose)
@@ -183,7 +204,7 @@ Fill before any data is looked at; do not move a threshold afterwards
 | Claim | e.g. "IFR reduces unnecessary questions without reducing task success." |
 | Arms | `full` vs `full_no_ifr` (and `baseline`, `prompt_reflection` for the architecture claim) |
 | Unit and assignment | consented participants, `mr-pilot-2027s`, `armFor` |
-| Primary measure | e.g. unnecessary questions per conversation (ledger `outcome` friction: `questionsAsked` counts every question put to them except a closing offer; recorded in every arm, as would-be outcomes outside the full arm) |
+| Primary measure | e.g. unnecessary questions per conversation, named `unwanted_questions` (ledger `outcome` friction: `questionsAsked` counts every question put to them except a closing offer; recorded in every arm, as would-be outcomes outside the full arm). A raw count of questions (`questions_asked`, `question_count`, `questions_total`) is an engagement proxy and `promotionVerdict` refuses it as a primary (`primary_is_engagement_proxy`): fewer questions in total would reward a policy that never asks, even where one question was the right move. It is still reported among the friction effects (`FRICTION_METRICS`). |
 | Guardrails | task completion, user-control compliance — non-inferior within a stated margin (`lib/mr/adaptation.ts` `PROMOTION_CRITERIA`) |
 | Independent outcome | the study's post-test, not the product's measures |
 | Sample size | from a power calculation on the primary measure; `promotionVerdict` refuses fewer than 200 per arm |

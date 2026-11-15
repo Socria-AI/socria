@@ -17,6 +17,12 @@
 //     after a warm-up and with no arm always first;
 //   • a run with no useful reply counts the turns it played, and a value from
 //     one scenario is printed without an interval;
+//   • the precision scenarios tell the full arm from baseline: a correction
+//     and a redundant question (on its second turn, inside the window) are
+//     answered with no question where baseline asks; a stuck turn with nothing
+//     shown and a missing referent get one useful question where baseline
+//     gives generic advice; the same words with the error attached draw no
+//     intervention; a complete solution gets no question and no step;
 //   • the ledger it wrote holds no text;
 //   • every report says SIMULATION and lists what it does not measure.
 
@@ -86,6 +92,64 @@ console.log('\n=== the full arm ===');
   console.log(`  (baseline quiz questions per turn: ${baseQuiz.join(', ')} — ACS's streak rule ends the quiz's questions)`);
   ok('an ambiguous "ok": no intervention in any arm', runs.filter((x) => x.scenario === 'ambiguous').every((x) => x.metrics.noInterventionWhenAmbiguous === 1));
   ok('an unsupported "you\'ve improved" never reaches the person in the full arm', by('full', 'compliant', 'improvement-claims').turns.every((t) => t.control === true));
+}
+
+console.log('\n=== the precision scenarios (mr-2026.11.1) ===');
+{
+  // an open question: the key point and one question about what they meant, not an essay
+  for (const profile of ['compliant', 'question_prone']) {
+    const f = by('full', profile, 'open-question');
+    ok(`${profile}: an open question, full arm: the first reply asks exactly one question, and is useful`, f.turns[0].questions === 1 && f.turns[0].useful === true && f.metrics.oneQuestionWhenWanted === 1, JSON.stringify(f.turns[0]));
+  }
+  const fc = by('full', 'compliant', 'open-question'), bc = by('baseline', 'compliant', 'open-question');
+  ok('compliant: …and it is shorter than baseline\'s first reply (the essay)', fc.metrics.firstReplyWords < bc.metrics.firstReplyWords, `${fc.metrics.firstReplyWords} vs ${bc.metrics.firstReplyWords}`);
+  // (question-prone baseline opens with the bare diagnostic question, which is shorter still but not useful: the
+  // simulator does not read the route's "EXPLAIN —" move line, so it is never told to explain)
+  const fq = by('full', 'question_prone', 'open-question'), bq = by('baseline', 'question_prone', 'open-question');
+  ok('question_prone: …where baseline\'s first reply was not useful', bq.turns[0].useful !== true, JSON.stringify({ full: fq.turns[0], baseline: bq.turns[0] }));
+  ok('a clear question: no intervention in any arm', runs.filter((x) => x.scenario === 'clear-explain').length > 0 && runs.filter((x) => x.scenario === 'clear-explain').every((x) => x.metrics.noInterventionWhenClear === 1), JSON.stringify(runs.filter((x) => x.scenario === 'clear-explain').map((x) => `${x.profile}/${x.arm}:${x.metrics.noInterventionWhenClear}`)));
+  const st = by('full', 'compliant', 'stuck-next-step');
+  ok('stuck on the next step (full, compliant): the first reply is useful and asks nothing', st.turns[0].useful === true && st.turns[0].questions === 0, JSON.stringify(st.turns[0]));
+  for (const s of ['corrected', 'still-failing']) {
+    const x = by('full', 'compliant', s);
+    ok(`${s} (full, compliant): the first reply is useful`, x.turns[0].useful === true, JSON.stringify(x.turns[0]));
+  }
+  ok('the new metrics are reported per arm, each on its own row', ['wordsPerReply', 'firstReplyWords', 'oneQuestionWhenWanted', 'noInterventionWhenClear'].every((m) => new RegExp(`\\| ${m} \\|`).test(report)));
+}
+
+console.log('\n=== the precision scenarios tell MR on from MR off (review N16, N25, N26) ===');
+{
+  // corrected: "useful" alone passed in every arm (the simulator says the answer whatever the prompt). What only the
+  // full arm does is take the question away and keep to their correction.
+  for (const profile of ['compliant', 'question_prone']) {
+    const f = by('full', profile, 'corrected').turns[0], b = by('baseline', profile, 'corrected').turns[0];
+    ok(`corrected (${profile}): full asks nothing and keeps to their correction (control true)`, f.questions === 0 && f.control === true, JSON.stringify(f));
+    ok(`  …where baseline asks (or does not keep to it): the two arms differ`, b.questions >= 1 || b.control === false, JSON.stringify(b));
+  }
+  // redundant: turn 0 is the same in every arm (ACS asks nothing after one asking reply). Its second turn, inside the
+  // 3-turn window, is where ACS would ask again: the full arm asks nothing there, baseline does.
+  for (const profile of ['compliant', 'question_prone']) {
+    const f = by('full', profile, 'redundant'), b = by('baseline', profile, 'redundant');
+    ok(`redundant (${profile}): two turns played in both arms`, f.turns.length === 2 && b.turns.length === 2, `${f.turns.length} ${b.turns.length}`);
+    ok(`  turn 1, inside the window: full asks nothing, baseline asks`, f.turns[1]?.questions === 0 && b.turns[1]?.questions >= 1, JSON.stringify({ full: f.turns[1], baseline: b.turns[1] }));
+    ok(`  the window is MR's: full_no_ifr, without the redundant-question reading, asks there too`, by('full_no_ifr', profile, 'redundant').turns[1]?.questions >= 1, JSON.stringify(by('full_no_ifr', profile, 'redundant').turns[1]));
+  }
+  // the three diagnose families the simulator now reads (sim-model DIAGNOSE_LINE): a stuck turn with nothing shown,
+  // and a missing referent, each answered with one plain question in the full arm
+  for (const s of ['stuck-unseen', 'missing-referent']) {
+    const f = by('full', 'compliant', s), b = by('baseline', 'compliant', s);
+    ok(`${s} (compliant): full asks exactly one question and it is the useful one (diagnose)`, f.turns[0].action === 'diagnose' && f.turns[0].questions === 1 && f.turns[0].useful === true && f.metrics.oneQuestionWhenWanted === 1, JSON.stringify(f.turns[0]));
+    ok(`  …where baseline gives generic advice instead (not useful)`, b.turns[0].useful !== true && b.metrics.oneQuestionWhenWanted === 0, JSON.stringify(b.turns[0]));
+    ok(`  …and the full reply is the shorter one`, f.metrics.firstReplyWords < b.metrics.firstReplyWords, `${f.metrics.firstReplyWords} vs ${b.metrics.firstReplyWords}`);
+  }
+  // the same words with the error attached: something is on their screen, and MR does nothing in any arm
+  const att = runs.filter((x) => x.scenario === 'missing-referent-attached');
+  ok('missing-referent with the error attached: no intervention in any arm', att.length > 0 && att.every((x) => x.metrics.noInterventionWhenClear === 1 && x.turns.every((t) => !t.action || t.action === 'none')), JSON.stringify(att.map((x) => `${x.profile}/${x.arm}:${x.turns[0].action}`)));
+  ok('  and the full arm (compliant) answers the attached error', by('full', 'compliant', 'missing-referent-attached').turns[0].useful === true, JSON.stringify(by('full', 'compliant', 'missing-referent-attached').turns[0]));
+  // complete solutions: the reply solved it, they say thanks — no question and no step added (N25)
+  const cs = by('full', 'compliant', 'complete-solution').turns[0];
+  ok('complete solution (full, compliant): turn 0 asks nothing and adds no step', cs.questions === 0 && cs.useful === true && (!cs.action || cs.action === 'none'), JSON.stringify(cs));
+  ok('  MR adds nothing on it in any arm or profile', runs.filter((x) => x.scenario === 'complete-solution').every((x) => x.turns.every((t) => !t.action || t.action === 'none')), JSON.stringify(runs.filter((x) => x.scenario === 'complete-solution').map((x) => `${x.profile}/${x.arm}:${x.turns[0].action}`)));
 }
 
 console.log('\n=== cost ===');

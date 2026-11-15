@@ -78,7 +78,25 @@ export interface RuleContext {
   carryAcross: boolean;
   /** only at the newest turn: what ACS decided, and the route's ceiling */
   now: PolicyNow | null;
+  /**
+   * The triggers of the adjustments in force at this turn, less any their
+   * words end at it: a way of helping they set earlier ("just tell me", a
+   * quiz) that a reading of MR's must not replace.
+   */
+  inForce: ReadonlySet<string>;
+  /**
+   * The triggers of the decisions issued in the last RECENT_TURNS turns
+   * before this one, whatever became of them (lib/mr/state.ts). Filled only
+   * under a policy with params.precision; empty otherwise, and read only by
+   * precision rules: a move made a turn or two ago that is not to be made
+   * again straight away ("still stuck" twice is not two worked examples).
+   * (Read defensively: a context built by hand without it reads as none.)
+   */
+  recent: ReadonlySet<string>;
 }
+
+/** How far back RuleContext.recent looks, in user turns. */
+export const RECENT_TURNS = 4;
 
 export interface PolicyNow {
   assist: AssistDecision;
@@ -102,6 +120,15 @@ interface Rule {
   plan: EvaluationPlan;
   /** optional extra condition */
   when?: (c: RuleContext) => boolean;
+  /**
+   * Controls the rule means nothing without. When an earlier rule this turn
+   * has already set one of them, or the dwell rule took it out, the rule
+   * issues nothing at all (note `partial:<id>`): a diagnostic question budget
+   * left standing without the diagnose strategy would be a bare question.
+   */
+  atomic?: readonly ControlKey[];
+  /** uncertainty codes every decision of this rule carries (what the reading rests on, beyond the transcript) */
+  uncertain?: readonly string[];
 }
 
 const has = (c: RuleContext, code: ObservationCode) => c.obs.some((o) => o.code === code);
@@ -110,6 +137,48 @@ const openEnded = (c: RuleContext): Scope => ({ kind: c.standing && !c.bounded &
 const momentary = (c: RuleContext): Scope => (c.standing ? openEnded(c) : { kind: 'turns', turns: c.params.momentaryTurns });
 const forTurns = (n: number): Scope => ({ kind: 'turns', turns: n });
 const plan = (primary: EvaluationPlan['primary'], expect: string[], window = 1): EvaluationPlan => ({ primary, expect, window });
+
+/** The precision rules are mr-2026.11.1's: under an earlier pin none of them can fire, so the pin is a full rollback. */
+const precise = (c: RuleContext) => c.params.precision === true;
+/**
+ * Their own instruction this turn about how to help. Every precision rule
+ * stands aside for it: a reading of MR's never competes with what they asked
+ * for in so many words.
+ */
+const INSTRUCTED: readonly ObservationCode[] = [
+  'explicit.direct_answer',
+  'explicit.show_steps',
+  'explicit.quiz',
+  'explicit.own_try',
+  'explicit.edit_only',
+  'explicit.rewrite',
+  'explicit.wants_questions',
+  'explicit.longer',
+  'explicit.simpler',
+  'explicit.revoke',
+  'explicit.end_practice',
+];
+const instructed = (c: RuleContext) => INSTRUCTED.some((x) => has(c, x));
+/**
+ * Ways of helping they set at an earlier turn and still in force: "just tell
+ * me", "show me the steps", a quiz, their own try, edits only. The stuck and
+ * open-request rules would change the strategy, so they do not run over one.
+ */
+const HELD: readonly string[] = ['ifr.explicit.direct_answer', 'ifr.explicit.show_steps', 'mr.explicit.quiz', 'mr.explicit.own_try', 'mr.explicit.edit_only'];
+const held = (c: RuleContext) => HELD.some((id) => c.inForce.has(id));
+/** Their "I'm stuck" as the reader placed it: the work in the conversation or not (stuck.shown, stuck.unseen), and theirs or not (stuck.own_work). */
+const stuckRef = (c: RuleContext, ref: string) => c.obs.some((o) => o.code === 'explicit.stuck' && o.refs.some((r) => r.code === ref));
+/**
+ * Their "I'm stuck" came with a refusal of help in the same message ("no
+ * hints, just let me think", "don't give me the next step, I'll figure it
+ * out", "I don't want help yet": the reader's stuck.declines). Every stuck
+ * rule stands aside: a next step, a locating question or a worked example
+ * would run over what they said. The same when the message asks for the
+ * solution itself ("I'm stuck. Walk me through the rest.": the reader's
+ * stuck.wants_answer): one step would hand over less than they asked for, and
+ * ACS's help stands.
+ */
+const declines = (c: RuleContext) => stuckRef(c, 'stuck.declines') || stuckRef(c, 'stuck.wants_answer');
 
 /**
  * The rule table, in priority order (a later rule never overrides an earlier
@@ -257,6 +326,43 @@ export const RULES: readonly Rule[] = [
     onRevoke: ['explicit.revoke', 'explicit.wants_questions', 'explicit.rewrite'],
     plan: plan('taskCompletion', ['edits_only']),
   },
+  {
+    id: 'ifr.explicit.corrected',
+    family: 'ifr',
+    // "No, I meant on my Mac": the reply answered a question they did not ask.
+    // The answer to the one they did ask comes first, and asking them again
+    // what they meant would make them say it a third time. A report of what
+    // they meant, not a way they want to be helped from now on, so it is never
+    // filed as a preference (lib/mr/state.ts NOT_A_PREFERENCE) and lasts the turn.
+    on: ['explicit.corrected'],
+    action: 'direct',
+    target: ['acs', 'behavior'],
+    may: ['answerFirst', 'questionBudget'],
+    controls: () => ({ answerFirst: true, questionBudget: { max: 0, enforcement: 'tail' } }),
+    scope: () => ({ kind: 'turn' }),
+    onRevoke: ['explicit.revoke', 'explicit.wants_questions', 'explicit.quiz'],
+    plan: plan('friction', ['answer_first', 'questions=0'], 1),
+    // a quiz running keeps its question: a correction inside it is part of the quiz
+    when: (c) => precise(c) && !instructed(c) && !c.inForce.has('mr.explicit.quiz'),
+  },
+  {
+    id: 'mr.explicit.knows_that',
+    family: 'mr',
+    // "I know what recursion is, I want to know when to avoid it": start at
+    // what is new to them. Less scaffolding only, with no ceiling — what is
+    // new may still take room — and never on a turn they also said they were
+    // lost. A report, not a preference (NOT_A_PREFERENCE).
+    on: ['explicit.knows_that'],
+    action: 'less_scaffolding',
+    target: ['acs', 'behavior'],
+    may: ['scaffolding'],
+    controls: () => ({ scaffolding: 'less' }),
+    scope: () => ({ kind: 'turn' }),
+    onRevoke: ['explicit.longer', 'explicit.simpler', 'explicit.confused', 'explicit.revoke'],
+    // less_background has no structural test (like progress): their words decide, or nothing does
+    plan: plan('friction', ['less_background'], 1),
+    when: (c) => precise(c) && !instructed(c) && !has(c, 'explicit.confused'),
+  },
   // ── what the transcript shows (moderate evidence, expiring) ────────
   {
     id: 'ifr.observed.unproductive_questions',
@@ -271,6 +377,25 @@ export const RULES: readonly Rule[] = [
     scope: (c) => forTurns(c.params.observedTurns),
     onRevoke: ['explicit.wants_questions', 'explicit.quiz', 'explicit.revoke'],
     plan: plan('friction', ['questions=0', 'progress'], 2),
+  },
+  {
+    id: 'ifr.observed.redundant_question',
+    family: 'ifr',
+    // Socria asked for something they had already said ("I already told you,
+    // Windows 11"), or asked the same question a reply or two after asking it.
+    // Answer from what they HAVE said, and hold the questions back for a few
+    // turns. When unproductive_questions fires on the same turn it has set
+    // every one of these controls already, and this rule issues nothing.
+    on: ['observed.redundant_question', 'observed.repeated_question'],
+    action: 'fewer_questions',
+    target: ['acs', 'behavior'],
+    may: ['questionBudget', 'questionWindow', 'answerFirst'],
+    controls: (c) => ({ questionBudget: { max: 0, enforcement: 'tail' }, questionWindow: { max: 1, turns: c.params.observedTurns }, answerFirst: true }),
+    scope: (c) => forTurns(c.params.observedTurns),
+    // a question about something else starts afresh: what was already said was said about the old one
+    onRevoke: ['explicit.wants_questions', 'explicit.quiz', 'explicit.revoke', 'observed.new_topic'],
+    plan: plan('friction', ['questions=0', 'answer_first'], 2),
+    when: (c) => precise(c) && !instructed(c),
   },
   {
     id: 'ifr.observed.repeated_confusion',
@@ -301,6 +426,32 @@ export const RULES: readonly Rule[] = [
     plan: plan('independentPerformance', ['worked_example'], 2),
   },
   {
+    id: 'mr.observed.repeated_stuck',
+    family: 'mr',
+    // Stuck again within two turns of saying so: one next step (or one
+    // locating question) was not enough. Show one fully worked example — of
+    // an analogous problem where the answer is being kept with them — then
+    // hand theirs back. Without the strategy it is nothing, so it is atomic.
+    // Once a stuck episode: not again while one it issued is among the last
+    // RECENT_TURNS turns' decisions (the same example twice is not a new
+    // move), and never over a way of helping they set earlier (their own
+    // try, "just tell me", "show me the steps", a quiz, edits only) or a
+    // refusal of help in the same message. On a turn it cannot act (that, or
+    // the dwell rule), the explicit stuck rules below give their move.
+    on: ['observed.repeated_stuck'],
+    action: 'worked_example',
+    target: ['acs', 'behavior'],
+    may: ['strategy', 'scaffolding', 'questionBudget'],
+    controls: () => ({ strategy: 'worked_example', scaffolding: 'more', questionBudget: { max: 0, enforcement: 'tail' } }),
+    atomic: ['strategy'],
+    scope: (c) => forTurns(c.params.workedExampleTurns),
+    onRevoke: ['explicit.revoke', 'explicit.quiz'],
+    plan: plan('taskCompletion', ['worked_example'], 2),
+    // (a worked example needs the work: after an unseen stuck it would be one of a problem nobody has seen, so the
+    // explicit rule's locating question is given instead)
+    when: (c) => precise(c) && !stuckRef(c, 'stuck.unseen') && !instructed(c) && !held(c) && !declines(c) && !c.recent?.has('mr.observed.repeated_stuck'),
+  },
+  {
     id: 'ifr.observed.repeated_request',
     family: 'ifr',
     on: ['observed.repeated_request'],
@@ -314,6 +465,24 @@ export const RULES: readonly Rule[] = [
     plan: plan('friction', ['answer_first', 'no_repeat_request']),
   },
   {
+    id: 'ifr.observed.late_answer',
+    family: 'ifr',
+    // "ok but so what should I do?" after a long reply: the point was in
+    // there somewhere, or was not, and they had to ask for it. Lead with it,
+    // and keep this reply short. The evidence is their re-ask after a reply
+    // of longReplyWords or more, never an estimate of where the answer sat.
+    // A same-turn repeated_request already leads with the answer.
+    on: ['observed.late_answer'],
+    action: 'direct',
+    target: ['behavior', 'orchestration'],
+    may: ['answerFirst', 'verbosity'],
+    controls: (c) => ({ answerFirst: true, verbosity: { ceilingTokens: Math.min(c.params.shorterCeiling, c.now?.maxReply ?? c.params.shorterCeiling) } }),
+    scope: () => ({ kind: 'turn' }),
+    onRevoke: ['explicit.longer', 'explicit.revoke'],
+    plan: plan('friction', ['answer_first', 'shorter'], 1),
+    when: (c) => precise(c) && !instructed(c) && !has(c, 'observed.repeated_request'),
+  },
+  {
     id: 'ifr.observed.verbose_replies',
     family: 'ifr',
     on: ['observed.verbose_replies'],
@@ -324,6 +493,54 @@ export const RULES: readonly Rule[] = [
     scope: (c) => forTurns(c.params.observedTurns),
     onRevoke: ['explicit.longer', 'explicit.revoke'],
     plan: plan('friction', ['shorter'], 2),
+  },
+  {
+    id: 'ifr.observed.repeated_background',
+    family: 'ifr',
+    // Socria's last reply said again, nearly word for word, sentences from
+    // its recent replies: the background is being repeated, not the
+    // conversation advanced. Shorter for this turn — a reading about the
+    // replies before it, not about what they ask next, so it is not carried
+    // onto a request for a full piece (and a request of that kind this turn
+    // takes the ceiling back: lib/mr/execute.ts constrain) — and not while
+    // they are lost or stuck, when going over it again may be what they need.
+    on: ['observed.repeated_background'],
+    action: 'shorter',
+    target: ['behavior', 'orchestration'],
+    may: ['verbosity'],
+    controls: (c) => ({ verbosity: { ceilingTokens: Math.min(c.params.shorterCeiling, c.now?.maxReply ?? c.params.shorterCeiling) } }),
+    scope: () => ({ kind: 'turn' }),
+    onRevoke: ['explicit.longer', 'explicit.direct_answer', 'explicit.show_steps', 'explicit.revoke', 'observed.new_topic'],
+    plan: plan('friction', ['shorter'], 2),
+    when: (c) =>
+      precise(c) &&
+      !instructed(c) &&
+      !(['explicit.confused', 'explicit.stuck', 'observed.repeated_confusion', 'observed.failed_attempts', 'observed.repeated_stuck'] as const).some((x) => has(c, x)),
+  },
+  {
+    id: 'mr.explicit.stuck',
+    family: 'mr',
+    // "I set u = x^2 but now I'm stuck on the next step": their work is on
+    // the table and it is theirs. One concrete next step from where they are,
+    // and no question back — they have shown where they are. When the work is
+    // shown but is Socria's to do (a task they described), no rule fires and
+    // ACS's help stands. A report, not a preference (NOT_A_PREFERENCE).
+    on: ['explicit.stuck'],
+    action: 'next_step',
+    target: ['acs', 'behavior'],
+    may: ['strategy', 'questionBudget'],
+    controls: () => ({ strategy: 'next_step', questionBudget: { max: 0, enforcement: 'tail' } }),
+    atomic: ['strategy'],
+    scope: () => ({ kind: 'turn' }),
+    onRevoke: ['explicit.direct_answer', 'explicit.show_steps', 'explicit.revoke'],
+    plan: plan('taskCompletion', ['questions=0'], 1),
+    // Stuck again is the worked example's (mr.observed.repeated_stuck) when it
+    // acts this turn: it comes earlier in the table and claims the strategy,
+    // and this rule, atomic, then issues nothing. When it cannot act (once a
+    // stuck episode, or the dwell rule) the next step is given, never ACS's
+    // question. A way of helping they set stands, and a refusal of help said
+    // with it is theirs.
+    when: (c) => precise(c) && stuckRef(c, 'stuck.shown') && stuckRef(c, 'stuck.own_work') && !instructed(c) && !held(c) && !declines(c),
   },
   {
     id: 'ifr.observed.routine_task',
@@ -340,6 +557,81 @@ export const RULES: readonly Rule[] = [
     onRevoke: [],
     plan: plan('taskCompletion', ['executed', 'questions=0']),
     when: (c) => !!c.now && makesItAnExercise(c.now.assist),
+  },
+  {
+    id: 'mr.observed.fix_failed',
+    family: 'mr',
+    // Two reports running that a suggested fix still fails: a third fix on
+    // the same assumption is likely to fail too. Name the assumption and give
+    // them a check they can run first. Whether the reply offered one is an
+    // estimate kept in the measures; check_suggested has no structural test.
+    on: ['observed.fix_failed'],
+    action: 'check_first',
+    target: ['epistemic', 'behavior'],
+    may: ['verification'],
+    controls: () => ({ verification: 'suggest' }),
+    scope: () => ({ kind: 'turn' }),
+    onRevoke: [],
+    plan: plan('taskCompletion', ['check_suggested'], 1),
+    when: (c) => precise(c) && !instructed(c),
+  },
+  // ── one question let through: always after every rule that takes
+  // questions to none. A rule earlier in the table claims a control first,
+  // so a rule allowing one question placed before a rule allowing none would
+  // keep the later rule's "none" out of the decision. Placed here, a
+  // same-turn "none" (a correction, a stop, questions that were not helping)
+  // has already claimed the budget: the diagnose strategy stands without its
+  // question, and its line, rendered from the final budget, asks nothing.
+  // A same-turn strategy claim (or the dwell rule) leaves it nothing to do,
+  // and it issues nothing (atomic).
+  {
+    id: 'ifr.explicit.stuck',
+    family: 'ifr',
+    // "I'm stuck" with nothing of the work in the conversation: one pointer
+    // that helps with most blocks of this kind, then the one question that
+    // would show where they are — within ACS's own question budget, never
+    // above it. A stop in force lowers that to none, and the line says to
+    // assume instead. A report, not a preference (NOT_A_PREFERENCE).
+    on: ['explicit.stuck'],
+    action: 'diagnose',
+    target: ['acs', 'behavior'],
+    may: ['strategy', 'questionBudget'],
+    controls: () => ({ strategy: 'diagnose', questionBudget: { max: 1, enforcement: 'tail' } }),
+    atomic: ['strategy'],
+    scope: () => ({ kind: 'turn' }),
+    onRevoke: ['explicit.direct_answer', 'explicit.show_steps', 'explicit.stop_questions', 'explicit.revoke'],
+    plan: plan('friction', ['answer_first', 'questions<=1'], 1),
+    // (stuck again: as for mr.explicit.stuck, the worked example when it acts, this move when it cannot)
+    when: (c) => precise(c) && stuckRef(c, 'stuck.unseen') && !instructed(c) && !held(c) && !declines(c),
+  },
+  {
+    id: 'ifr.observed.open_request',
+    family: 'ifr',
+    // "Why is AI not solving problems?" as a first message (or a new topic):
+    // short, open, and one thing they have not said decides the answer. Lead
+    // with the point that holds whichever way they mean it, then at most the
+    // one question ACS already allows; for the vague-outcome kind, keep it
+    // short. An estimate turned into an observation, like routine_task — so
+    // its decision says the goal was read, not stated, and lasts one turn. The
+    // reader already excludes their instructions, practice, fact questions,
+    // tender or venting messages and a detailed setting. A missing referent
+    // ("How do I fix this?" with nothing shown) carries no ceiling.
+    on: ['observed.open_request'],
+    action: 'diagnose',
+    target: ['acs', 'behavior', 'orchestration'],
+    may: ['strategy', 'questionBudget', 'verbosity'],
+    controls: (c) => {
+      const vague = c.obs.some((o) => o.code === 'observed.open_request' && o.refs.some((r) => r.code === 'request.vague_outcome'));
+      const cap = c.params.openRequestCeiling ?? c.params.shorterCeiling;
+      return { strategy: 'diagnose', questionBudget: { max: 1, enforcement: 'tail' }, ...(vague ? { verbosity: { ceilingTokens: Math.min(cap, c.now?.maxReply ?? cap) } } : {}) };
+    },
+    atomic: ['strategy'],
+    uncertain: ['goal_reading_inferred'],
+    scope: () => ({ kind: 'turn' }),
+    onRevoke: ['explicit.longer', 'explicit.direct_answer', 'explicit.show_steps', 'explicit.revoke'],
+    plan: plan('friction', ['answer_first', 'questions<=1'], 1),
+    // reads nothing of c.now, so the fold re-derives it at earlier turns and its outcome is judged
+    when: (c) => precise(c) && !held(c),
   },
 ];
 
@@ -390,6 +682,8 @@ export interface PolicyInput {
   now: PolicyNow | null;
   /** the last strategy change MR made itself, for the dwell rule */
   lastMrStrategyChange: number | null;
+  /** the triggers issued in the last RECENT_TURNS turns (precision only; RuleContext.recent): absent is none */
+  recent?: ReadonlySet<string>;
 }
 
 export interface PolicyOutput {
@@ -409,15 +703,6 @@ export function lowersQuestions(d: MRDecision): boolean {
 }
 
 export function decide(i: PolicyInput): PolicyOutput {
-  const ctx: RuleContext = {
-    turn: i.turn,
-    obs: i.observations,
-    params: i.params,
-    standing: i.observations.some((o) => o.code === 'explicit.standing'),
-    bounded: i.observations.some((o) => o.code === 'explicit.standing' && o.refs.some((r) => r.code === 'horizon.conversation')),
-    carryAcross: i.carryAcross,
-    now: i.now,
-  };
   const notes: string[] = [];
   const codes = new Set(i.observations.map((o) => o.code));
 
@@ -438,6 +723,19 @@ export function decide(i: PolicyInput): PolicyOutput {
     const hit = r.decision.expiration.onRevoke.find((c) => codes.has(c) && !(conflict && halves.has(c)) && !(c === 'explicit.revoke' && questionsOnly && !lowersQuestions(r.decision)));
     if (hit) revoked.push({ id: r.decision.interventionId, reason: `revoke:${hit === 'explicit.revoke' && asked ? 'explicit.wants_questions' : hit}` });
   }
+
+  // Built after the revocations, so what their words end at this turn is no longer in force for the rules below.
+  const ctx: RuleContext = {
+    turn: i.turn,
+    obs: i.observations,
+    params: i.params,
+    standing: i.observations.some((o) => o.code === 'explicit.standing'),
+    bounded: i.observations.some((o) => o.code === 'explicit.standing' && o.refs.some((r) => r.code === 'horizon.conversation')),
+    carryAcross: i.carryAcross,
+    now: i.now,
+    inForce: new Set(i.active.filter((r) => !revoked.some((x) => x.id === r.decision.interventionId)).map((r) => r.decision.trigger)),
+    recent: i.recent ?? new Set<string>(),
+  };
 
   const decisions: MRDecision[] = [];
   // Controls taken at this turn: by any rule (what the full condition would
@@ -475,6 +773,11 @@ export function decide(i: PolicyInput): PolicyOutput {
     }
     // A control an earlier (higher-priority) rule already set this turn is not set twice.
     for (const k of Object.keys(controls) as ControlKey[]) if (claimed.has(k)) delete (controls as Record<string, unknown>)[k];
+    // ...and a rule that means nothing without a control it lost (claimed above, or held by the dwell rule) issues nothing
+    if (rule.atomic?.some((k) => !(k in controls))) {
+      notes.push(`partial:${rule.id}`);
+      continue;
+    }
     if (!Object.keys(controls).length) continue;
     // The same rule already in force (and not being revoked) is carried, not re-issued — unless their words repeat it.
     const already = i.active.find(
@@ -498,7 +801,7 @@ export function decide(i: PolicyInput): PolicyOutput {
       scope,
       expiration: { afterTurn: expiryOf(scope, i.turn), onRevoke: [...rule.onRevoke] },
       confidence: Math.min(...usable.map((o) => o.confidence)),
-      uncertainty: observedOnly ? ['inferred_from_transcript'] : [],
+      uncertainty: [...(observedOnly ? ['inferred_from_transcript'] : []), ...(rule.uncertain ?? [])],
       evaluationPlan: rule.plan,
       rollback: { revertTo: 'acs_default', when: ['outcome:revert', 'integrity:revert', 'integrity:freeze', ...rule.onRevoke.map((c) => `revoke:${c}`)] },
       loop: 'fast',
@@ -594,7 +897,8 @@ export function compose(active: readonly MRDecision[], turn: number, policyVersi
     if (c.questionWindow && !controls.questionWindow) controls.questionWindow = { ...c.questionWindow };
     if (c.verbosity) controls.verbosity = { ceilingTokens: Math.min(c.verbosity.ceilingTokens, controls.verbosity?.ceilingTokens ?? Infinity) };
     if (c.simplify) controls.simplify = true;
-    if (c.verification) controls.verification = c.verification;
+    // their own "check it" is never replaced by MR's suggested check
+    if (c.verification) controls.verification = controls.verification === 'explicit' ? 'explicit' : c.verification;
     if (c.answerFirst) controls.answerFirst = true;
     if (c.noRevealAnswers) controls.noRevealAnswers = true;
     if (c.scaffolding) controls.scaffolding = c.scaffolding;
