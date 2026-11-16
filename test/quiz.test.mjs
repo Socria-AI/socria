@@ -41,7 +41,7 @@ writeFileSync(
     `export * from ${lib('lib/quiz/style.ts')};`,
     `export * from ${lib('lib/quiz/mastery.ts')};`,
     `export * from ${lib('lib/quiz/seal.ts')};`,
-    `export { candidatesFrom, shapeQuiz, jsonIn, quizPrompt, rng, sourcesFrom, formatNumber } from ${lib('lib/quiz/generate.ts')};`,
+    `export { candidatesFrom, shapeQuiz, jsonIn, quizPrompt, rng, sourcesFrom, formatNumber, salvageQuiz, normaliseItem, partsOf, mergeParts, citeOf, PART_SIZE } from ${lib('lib/quiz/generate.ts')};`,
     `export * as OBJ from ${lib('lib/objects/index.ts')};`,
     `export { create, apply, sanitizeSpace, currentOf } from ${lib('lib/objects/core.ts')};`,
     `export { sanitizeQuiz, currentQuestion, questionDone, mayAdvance } from ${lib('lib/objects/display-quiz.ts')};`,
@@ -339,6 +339,82 @@ console.log('\n=== how this professor asks, and on what basis ===');
   const types = M.planTypes(10, observed, { formats: null }, false);
   ok('the course\'s own mix plans the formats (7 of 10 multiple choice)', types.filter((t) => t === 'single').length === 7, J(types));
   ok('a format asked for is honoured', M.planTypes(5, observed, { formats: ['truefalse'] }, false).every((t) => t === 'truefalse'));
+}
+
+console.log('\n=== a quiz is made every time: what a model actually writes is read ===');
+{
+  // the other ordinary ways of writing the same question
+  const messy = {
+    quiz: {
+      title: 'Cells',
+      questions: [
+        { type: 'multiple_choice', question: 'Which organelle makes most of the ATP in a cell?', options: ['Ribosome', 'Mitochondrion', 'Golgi body', 'Lysosome'], correct: 'B', why: 'Aerobic respiration happens in the mitochondria.' },
+        { type: 'MCQ', stem: 'Which molecule carries amino acids to the ribosome?', options: [{ label: 'mRNA' }, { label: 'tRNA' }, { label: 'DNA' }, { label: 'rRNA' }], answer: 'tRNA', explanation: 'Transfer RNA brings each amino acid to the ribosome.' },
+        { type: 'true_false', question: 'Plant cells have a cell wall.', options: [{ text: 'True', correct: true }, { text: 'False' }], rationale: 'Plant cells have a cellulose wall outside the membrane.' },
+        { type: 'Numerical', question: 'A cell divides every 20 minutes. How many cells are there after one hour, starting from one?', answer: '8', explanation: 'Three divisions double it three times: 2 x 2 x 2 = 8.' },
+        { type: 'short answer', question: 'What is the name of the process by which plants make glucose from light?', answer: 'photosynthesis', explanation: 'Photosynthesis turns light energy into chemical energy in glucose.' },
+        { question: 'Which of these is found in both plant and animal cells?', options: ['Chloroplast', 'Cell wall', 'Nucleus', 'Large central vacuole'], correct_answer: 'Nucleus', explanation: 'Both have a nucleus; the others are plant features.' },
+        { type: 'select_all', question: 'Which of these are made of protein?', options: [{ text: 'Enzymes', is_correct: true }, { text: 'Antibodies', isCorrect: true }, { text: 'Cellulose' }, { text: 'Starch' }], explanation: 'Enzymes and antibodies are proteins; cellulose and starch are carbohydrates.' },
+        // a bare number naming the right option is a guess (from 0 or from 1?) — never taken as a key
+        { type: 'single', question: 'Which gas do plants take in for photosynthesis?', options: ['Oxygen', 'Carbon dioxide', 'Nitrogen', 'Hydrogen'], correct: 1, explanation: 'Plants take in carbon dioxide and give out oxygen.' },
+      ],
+    },
+  };
+  const { title, candidates } = M.candidatesFrom(messy);
+  ok('the title from a nested quiz object', title === 'Cells', title);
+  const byStem = (w) => candidates.find((c) => c.q.stem.includes(w));
+  const mito = byStem('ATP');
+  ok('"multiple_choice", options as strings, the right one named by its letter', mito?.q.type === 'single' && mito.q.options.length === 4 && J(mito.key.correct) === J(['o1']) && /mitochondria/.test(mito.key.why), J(mito?.key));
+  const trna = byStem('amino acids');
+  ok('"MCQ", options with "label", the right one named by its words', trna?.q.type === 'single' && J(trna.key.correct) === J(['o1']), J(trna?.key));
+  const wall = byStem('cell wall.');
+  ok('"true_false" with the answer in its options', wall?.q.type === 'truefalse' && J(wall.key.correct) === J(['true']) && /cellulose/.test(wall.key.why), J(wall?.key));
+  const div = byStem('20 minutes');
+  ok('"Numerical" with the answer a bare string number', div?.q.type === 'numeric' && div.key.value === 8, J(div?.key));
+  const ps = byStem('glucose from light');
+  ok('"short answer" with the answer a phrase: accepted, and the model answer', ps?.q.type === 'short' && J(ps.key.accept) === J(['photosynthesis']) && ps.key.model === 'photosynthesis', J(ps?.key));
+  const nuc = byStem('both plant and animal');
+  ok('no type at all: read from its shape (options, one right)', nuc?.q.type === 'single' && J(nuc.key.correct) === J(['o2']), J(nuc?.key));
+  const prot = byStem('made of protein');
+  ok('"select_all" with "is_correct" and "isCorrect"', prot?.q.type === 'multi' && J(prot.key.correct) === J(['o0', 'o1']), J(prot?.key));
+  const co2 = byStem('photosynthesis?');
+  ok('a bare number naming the right option is not taken as a key (it would be a guess)', co2 && (co2.key.correct ?? []).length === 0, J(co2?.key));
+  const shaped = M.shapeQuiz('zmess', title, candidates, [], { count: 8, strictSources: false, avoidHashes: [], avoidStems: [] });
+  ok('seven of the eight make a quiz; the guessed key is refused for its answer key', shaped.main === 7 && shaped.rejected['answer-key'] === 1, `${shaped.main} ${J(shaped.rejected)}`);
+
+  // cut off at the token limit: every question that arrived whole is kept
+  const whole = J({ title: 'Cut off', questions: [messy.quiz.questions[0], messy.quiz.questions[1]] });
+  const cut = whole.slice(0, -2) + ', {"type": "single", "question": "Which org';
+  const salvaged = M.salvageQuiz(cut);
+  ok('a reply cut off mid-question: the whole questions before it are read', salvaged?.questions.length === 2 && salvaged.title === 'Cut off', J(salvaged));
+  ok('  braces inside a question\'s words do not mislead it', M.salvageQuiz('{"questions":[{"question":"In {x | x > 2}, is 3 in it?","type":"truefalse","answer":true,"why":"Three is greater than two."},{"question":"cut')?.questions.length === 1);
+  ok('  nothing to read: null', M.salvageQuiz('{"title": "x", "note"') === null && M.salvageQuiz('') === null);
+
+  // citations as a model may write them
+  ok('citations read in their other forms', M.citeOf('[1:p3.12]') === '1:p3.12' && M.citeOf('1 : P3.12') === '1:p3.12' && M.citeOf('doc 2, p10.4') === '2:p10.4' && M.citeOf('p3.12') === 'p3.12' && M.citeOf('page 3') === '');
+
+  // written in parts at the same time
+  const p8 = M.partsOf(['single', 'single', 'single', 'single', 'single', 'numeric', 'short', 'truefalse'], 'practice');
+  ok('eight questions: two parts of four, the variants shared between them', p8.length === 2 && p8.every((p) => p.plan.length === 4) && p8.reduce((a, p) => a + p.variants, 0) === 4, J(p8));
+  const p10 = M.partsOf(Array(10).fill('single'), 'exam');
+  ok('ten in an exam simulation: three parts, no variants', p10.length === 3 && p10.reduce((a, p) => a + p.plan.length, 0) === 10 && p10.every((p) => p.variants === 0), J(p10));
+  ok('twenty-five: at most five calls at once', M.partsOf(Array(25).fill('single'), 'practice').length === 5);
+  const merged = M.mergeParts([
+    { title: 'A', candidates: [{ q: { stem: 'one' }, cites: [] }, { q: { stem: 'one again' }, cites: [], variantOfIndex: 0 }] },
+    { title: 'B', candidates: [{ q: { stem: 'two' }, cites: [] }, { q: { stem: 'two again' }, cites: [], variantOfIndex: 0 }] },
+  ]);
+  ok('parts merged: each variant still points at its own original', merged.title === 'A' && merged.candidates[3].variantOfIndex === 2 && merged.candidates[1].variantOfIndex === 0, J(merged.candidates.map((c) => c.variantOfIndex)));
+}
+
+console.log('\n=== asked for in the ordinary ways ===');
+{
+  const yes = ['quiz me on photosynthesis', 'quizz me on the cold war', 'I want to be quizzed on chapter 3', 'test my knowledge of supply and demand', 'ask me some questions about mitosis', 'can I have a quiz on cells', "let's do a quiz", 'make me a 10 question quiz', 'another quiz please', 'pop quiz!', 'give me some practice questions on derivatives', 'can I get tested on this', "I'd like a quick quiz on enzymes"];
+  const no = ['what is on the quiz on friday?', 'how do quizzes work?', 'the quiz yesterday was hard, explain question 3', 'I have a test tomorrow on enzymes', 'why did I miss question 4?', 'help me study for my quiz', 'my teacher gave us a 10 question quiz', 'what is a unit test in programming'];
+  const missed = yes.filter((s) => !M.asksForQuiz(s));
+  const wrong = no.filter((s) => M.asksForQuiz(s));
+  ok(`every ordinary way of asking is read as asking (${yes.length})`, !missed.length, missed.join(' | '));
+  ok(`and a question about a quiz is not (${no.length})`, !wrong.length, wrong.join(' | '));
+  ok('"quiz me on this", "what we covered": the conversation, not a topic named', M.readScope('quiz me on this').topics.length === 0 && M.readScope('Quiz me on what this conversation has covered').topics.length === 0 && J(M.readScope('quiz me on the cold war').topics) === J(['cold war']));
 }
 
 console.log(`\nquiz: ${pass} passed, ${fail} failed`);

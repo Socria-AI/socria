@@ -43,10 +43,20 @@ review, and there was no structured history for a later "why did I miss question
 ## 2. The flow
 
 1. **The request.**
-   - `send` recognises a request to be quizzed (`asksForQuiz`). It is not used for a question *about* a quiz.
+   - `send` recognises a request to be quizzed (`asksForQuiz`), in the ordinary ways of asking: "quiz me on…",
+     "I want to be quizzed", "test my knowledge of…", "ask me some questions about…", "can I have a quiz on…",
+     "let's do a quiz", "practice questions on…", "a 10-question quiz", and the common misspelling "quizz me". It
+     is not used for a question *about* a quiz ("what's on the quiz on Friday?").
+   - **From the Everything view.** Once a conversation has a reply, its board offers a **Quiz me on this** card
+     (on the zoomed board, a tile with **Start the quiz**). Pressing it is the same as asking in words, on what
+     the conversation has been about. The card steps aside while a quiz is being taken.
    - The student's message stays in the conversation, marked `via: 'quiz'`.
    - Nothing goes to the chat reply. MR reads that message as "a quiz was made as an artifact", so the chat does
      not also start quizzing in words, and the review afterwards can be explained.
+   - **Nothing to quiz on.** "Quiz me" with no topic, no material, no course and nothing yet in the conversation
+     gets one question ("What would you like the quiz to be on?"), and the next message is the topic, rather
+     than a quiz on a subject picked at random. "Quiz me on this" or "on what we covered" means the conversation
+     itself, whose subject goes with the request.
 2. **Context**, in the browser, where the materials live:
    - **The course.** It is chosen by `courseFor`:
      - the course linked to the conversation;
@@ -62,14 +72,36 @@ review, and there was no structured history for a later "why did I miss question
      are fine.
    - **What else is sent:** the course pack (codes, terms and concepts, never passages), the learning ledger, and
      the stems already asked on this scope. None of these is sent on a shared conversation.
-3. **Generation** (server):
-   - one model call (`askJson`);
-   - every question checked (§5);
-   - options shuffled, with the right answer spread evenly across positions;
-   - keys sealed for this student (§6).
-   - If too few questions hold up, it says so rather than padding the quiz.
+3. **Generation** (server), made to work every time:
+   - **In parts at the same time** (`partsOf`): an 8-question quiz is two calls of four questions (and their
+     variants) running together, at most five calls however long the quiz. Each call is short, so it finishes
+     whole and inside the route's 60 seconds. Each has its own time limit, and a part that fails costs only its
+     own questions. Each part is told which concepts the others cover.
+   - **Cut-off replies are still read** (`salvageQuiz`). If a reply stops at its token limit, every question that
+     arrived whole is kept.
+   - **What a model actually writes is read** (`normaliseItem`):
+     - the other names for fields ("question", "why", "rationale") and for types ("multiple_choice",
+       "true_false", "short_answer", "select_all");
+     - options as plain strings;
+     - the right option named by its letter or its own words;
+     - a true/false answer given in its options;
+     - a bare number or phrase as the answer;
+     - citations written as "[1:p3.12]", "doc 1, p3.12" or "p3.12".
+
+     A bare number naming the right option is never taken: whether it counts from 0 or 1 would be a guess, and a
+     wrong key is worse than none.
+   - **One more part for what is missing.** When a part failed, or questions did not pass their checks, one more
+     call writes the shortfall while there is time. It is told what is already asked, so nothing repeats.
+   - Every question is checked (§5).
+   - Options are shuffled, with the right answer spread evenly across positions.
+   - Keys are sealed for this student (§6).
+   - If, after all that, too few questions hold up, it says so rather than padding the quiz.
+   - **The browser tries once more** on a failure that is not about the request: the server or the network
+     failing, a time-out, or a gateway's error page. Never on an answer about the request (missing material, too
+     few held up, too many requests). Each failure is then said plainly.
 4. **The artifact.**
-   - A `quiz` display is added to the conversation's map, drawn in the Everything view (a live card) and the
+   - A `quiz` display is added to the conversation's map, drawn in the Everything view (a live card, in the turn
+     it was made in, so a phone shows it under its note, and its review under the score once finished) and the
      expanded workspace (Artifacts).
    - It is one object, so the two views can never disagree, and a page reload restores it exactly. The history
      replays deterministically.
@@ -313,10 +345,11 @@ students. None has been run.
 
 | Suite | What it holds |
 |---|---|
-| `test/quiz.test.mjs` (95) | grading for every type, including equivalent forms and confirmed, plausible or insufficient mistakes; request reading; every check; even answer positions; sealing and signing; adaptation; the display's operations, permissions and replay; the review and facts; mastery states; style basis |
-| `test/quiz-route.test.mjs` (30) | through the real routes: a quiz made from passages with no answer in the clear; observed against inferred style from a real course pack; missing sources refused; grading by mode; keys refused for another account or question; the chat told the quiz's facts; MR not taking up a quiz contract for a request the quiz took |
+| `test/quiz.test.mjs` (116) | grading for every type, including equivalent forms and confirmed, plausible or insufficient mistakes; request reading, in the ordinary ways of asking and not for a question about a quiz; every check; even answer positions; sealing and signing; adaptation; the display's operations, permissions and replay; the review and facts; mastery states; style basis; what a model actually writes read into the shape asked for (and a guessed key refused); a cut-off reply salvaged; parts planned and merged |
+| `test/quiz-route.test.mjs` (39) | through the real routes: a quiz made from passages with no answer in the clear; observed against inferred style from a real course pack; missing sources refused; grading by mode; keys refused for another account or question; the chat told the quiz's facts; MR not taking up a quiz contract for a request the quiz took; written in two parts at once; a failed part made up by one more; a cut-off reply used; loose model output making a full quiz whose keys grade right; every call failing answered with a 502 |
 | `test/quiz-eval.test.mjs` (11) | the evaluation above |
 | `scripts/verify-quiz.mjs` | in Chromium: the whole flow, the exam simulation, two views as one object, phone, dark, reduced motion, no keys in the page, requests carrying only sealed keys |
+| full app, in Chromium (not committed; run during the fix) | asked for in words through a failed first attempt; taken in the Everything view; a phone by touch, start to review; "quiz me" with nothing to go on; the Everything view's Quiz me card |
 
 ---
 

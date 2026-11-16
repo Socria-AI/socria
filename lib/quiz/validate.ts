@@ -217,9 +217,11 @@ export function checkCandidate(c: Candidate, ctx: CheckContext): Rejection | nul
     }
   }
 
-  // sources: a citation must be to a passage the material holds; in a confined quiz, every question cites one
+  // sources: a citation must be to a passage the material holds (a made-up one means the question is not from it);
+  // in a confined quiz, every question cites one. With no material at all, there is nothing to cite and nothing
+  // to check a citation against, so one is simply not shown
   const cited = c.cites.filter((k) => ctx.knownBlocks.has(k));
-  if (c.cites.length && !cited.length) return 'ungrounded';
+  if (ctx.knownBlocks.size && c.cites.length && !cited.length) return 'ungrounded';
   if (ctx.strictSources && !cited.length) return 'ungrounded';
 
   // copied wording: a stem that shares several five-word runs with a past question is not a new question

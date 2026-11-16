@@ -258,5 +258,69 @@ console.log('\n=== the conversation answers from the quiz itself ===');
   ok('a request the quiz took does not hold answers back in the chat afterwards (MR\'s quiz contract only for a quiz asked in words)', !/quiz/i.test(taken.mr) && /quiz/i.test(typed.mr), `taken=${taken.mr} typed=${typed.mr}`);
 }
 
+console.log('\n=== made every time: in parts, through failures, from what a model actually writes ===');
+{
+  // ten distinct questions, each fit to ask, in the plain shape asked for
+  const BANK = [
+    ['Which organelle makes most of a cell\'s ATP?', ['Mitochondrion', 'Ribosome', 'Golgi body', 'Lysosome']],
+    ['What does an enzyme do to the activation energy of a reaction?', ['Lowers it', 'Raises it', 'Leaves it unchanged', 'Reverses it']],
+    ['Which blood vessels carry blood away from the heart?', ['Arteries', 'Veins', 'Capillaries', 'Lymph ducts']],
+    ['In which part of the plant cell does photosynthesis take place?', ['Chloroplast', 'Nucleus', 'Vacuole', 'Cell wall']],
+    ['Which base pairs with adenine in DNA?', ['Thymine', 'Cytosine', 'Guanine', 'Uracil']],
+    ['What kind of cell division produces gametes?', ['Meiosis', 'Mitosis', 'Binary fission', 'Budding']],
+    ['Which gas is released as a by-product of photosynthesis?', ['Oxygen', 'Carbon dioxide', 'Nitrogen', 'Methane']],
+    ['Where in the body is bile produced?', ['Liver', 'Pancreas', 'Stomach', 'Gall bladder']],
+    ['Which molecule carries the genetic code from the nucleus to the ribosome?', ['Messenger RNA', 'Transfer RNA', 'ATP', 'Glucose']],
+    ['What is the main function of red blood cells?', ['Carrying oxygen', 'Fighting infection', 'Clotting blood', 'Making antibodies']],
+  ];
+  const q = (i) => ({ concept: `concept ${i}`, topic: 'Biology', type: 'single', stem: BANK[i][0], options: BANK[i][1].map((t, k) => ({ text: t, ...(k === 0 ? { correct: true } : { trap: { tag: `trap-${k}`, note: 'May be mixing up two related ideas.' } }) })), explanation: `${BANK[i][1][0]} is right: that is the established answer here.` });
+  const set = (from, n) => ({ title: 'Biology', questions: Array.from({ length: n }, (_, k) => q(from + k)) });
+
+  // eight questions: two parts written at the same time
+  globalThis.__logosScript = [set(0, 4), set(4, 4)];
+  globalThis.__logosCalls = [];
+  let r = await post(make, '/api/logos/quiz', { sessionId: 'conv_parts', request: 'Quiz me on cell biology' });
+  ok('eight questions written as two parts at the same time; all eight held up', r.status === 200 && r.json.count === 8 && globalThis.__logosCalls.length === 2, `${r.status} ${r.json?.count} calls=${globalThis.__logosCalls.length}`);
+  ok('  each part told it is one of two, and asked for four', globalThis.__logosCalls.every((c) => /part \d of 2/.test(c.messages[1].content) && /Write 4 questions/.test(c.messages[1].content)));
+  ok('  each call is short: a few thousand tokens at most', globalThis.__logosCalls.every((c) => (c.max_tokens ?? c.max_completion_tokens) <= 6000), J(globalThis.__logosCalls.map((c) => Object.keys(c))));
+
+  // one part fails: the other's questions, and one more part for what is missing
+  globalThis.__logosScript = [new Error('upstream reset'), set(0, 4), set(4, 4)];
+  globalThis.__logosCalls = [];
+  r = await post(make, '/api/logos/quiz', { sessionId: 'conv_fail1', request: 'Quiz me on cell biology' });
+  ok('a part that fails: the quiz is still made, with one more part for what was missing', r.status === 200 && r.json.count === 8 && globalThis.__logosCalls.length === 3, `${r.status} ${r.json?.count} calls=${globalThis.__logosCalls.length}`);
+  ok('  the extra part is told what is already asked, so nothing repeats', /Already asked/.test(globalThis.__logosCalls[2].messages[1].content) && globalThis.__logosCalls[2].messages[1].content.includes(BANK[0][0]));
+
+  // a reply cut off at its token limit: the questions that arrived whole are used
+  const cut = J(set(0, 4)).slice(0, -2) + ', {"type": "single", "stem": "Which of these is cut o';
+  globalThis.__logosScript = [cut];
+  globalThis.__logosCalls = [];
+  r = await post(make, '/api/logos/quiz', { sessionId: 'conv_cut', request: 'Quiz me on cell biology, 4 questions' });
+  ok('a reply cut off mid-question: the four whole ones make the quiz', r.status === 200 && r.json.count === 4, `${r.status} ${J(r.json).slice(0, 200)}`);
+
+  // what a model actually writes: other names, options as strings, the right one by letter or words
+  const loose = (from, n) => ({
+    quiz: {
+      title: 'Biology',
+      questions: Array.from({ length: n }, (_, k) => ({ type: 'multiple_choice', question: BANK[from + k][0], options: BANK[from + k][1], correct: k % 2 ? 'A' : BANK[from + k][1][0], why: `${BANK[from + k][1][0]} is right: that is the established answer here.` })),
+    },
+  });
+  globalThis.__logosScript = [loose(0, 4), loose(4, 4)];
+  globalThis.__logosCalls = [];
+  r = await post(make, '/api/logos/quiz', { sessionId: 'conv_loose', request: 'test my knowledge of cell biology' });
+  ok('a model that writes "multiple_choice", "question", string options and "correct": "A": a full quiz', r.status === 200 && r.json.count === 8, `${r.status} ${J(r.json?.rejected)}`);
+  // and the right answers were kept: grading the first question with its right option says so
+  const first = r.json.questions[0];
+  const right = BANK.find((b) => b[0] === first.stem)[1][0];
+  const g = await post(grade, '/api/logos/quiz/grade', { action: 'grade', quiz: r.json.quiz, sessionId: 'conv_loose', items: [{ qid: first.id, sealed: first.sealed, attempt: 0, answer: first.options.find((o) => o.text === right).id }] });
+  ok('  and the key is the right one: its right option is graded right', g.status === 200 && g.json.results[first.id]?.graded?.grade === 'right', J(g.json).slice(0, 200));
+
+  // nothing answers at all: said, quickly, never a hang
+  globalThis.__logosScript = [new Error('down'), new Error('down'), new Error('down')];
+  globalThis.__logosCalls = [];
+  r = await post(make, '/api/logos/quiz', { sessionId: 'conv_down', request: 'Quiz me on cell biology' });
+  ok('every call failing: a 502 the page says plainly (and tries once more)', r.status === 502 && typeof r.json?.error === 'string', `${r.status} ${J(r.json)}`);
+}
+
 console.log(`\nquiz-route: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

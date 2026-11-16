@@ -9,26 +9,40 @@ import { LOGOS_MODEL } from '@/lib/logos';
 import { chooseAuxModel, firstAccepted, type Tier } from '@/lib/model-router';
 import type { Asked } from './study-ask';
 
-export async function askJson(asked: Asked, opts: { model?: string; maxTokens: number; tier: Tier }): Promise<unknown | null> {
+export async function askJson(
+  asked: Asked,
+  opts: {
+    model?: string;
+    maxTokens: number;
+    tier: Tier;
+    /** when what came back is not whole JSON (cut off at the token limit), what can still be read from it */
+    salvage?: (text: string) => unknown;
+    /** give up on a call that takes longer than this, so a route answers inside its time limit */
+    timeoutMs?: number;
+  }
+): Promise<unknown | null> {
   const openai = tracked(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), 'logos/study');
   // by tier (lib/model-router.ts); LOGOS_ROUTER=off: the configured model, as before
   const routed = chooseAuxModel(opts.tier, 'standard', process.env, opts.model || process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL);
   const call = (model: string) =>
-    openai.chat.completions.create({
-      model,
-      temperature: 0,
-      max_tokens: opts.maxTokens,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: asked.system },
-        { role: 'user', content: asked.user },
-      ],
-    });
+    openai.chat.completions.create(
+      {
+        model,
+        temperature: 0,
+        max_tokens: opts.maxTokens,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: asked.system },
+          { role: 'user', content: asked.user },
+        ],
+      },
+      opts.timeoutMs ? { timeout: opts.timeoutMs, maxRetries: 0 } : undefined
+    );
   const { result: completion } = await firstAccepted(routed.ladder, call);
   const text = completion.choices?.[0]?.message?.content;
   try {
     return text ? JSON.parse(text) : null;
   } catch {
-    return null;
+    return text && opts.salvage ? opts.salvage(text) : null;
   }
 }

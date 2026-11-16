@@ -195,7 +195,7 @@ import { firstTryRight, outcomeOf } from '@/lib/quiz/adapt';
 import { docNamed, listed, readyNote } from '@/lib/quiz/context';
 import { ledgerTopic, noteQuizAnswer, noteQuizReview } from '@/lib/quiz/mastery';
 import { reviewOf } from '@/lib/quiz/review';
-import { asksForQuiz, readScope } from '@/lib/quiz/scope';
+import { asksForQuiz, namesSubject, readScope } from '@/lib/quiz/scope';
 import type { QuizMode } from '@/lib/quiz/types';
 import { LiveGuide } from '@/components/logos5/LiveGuide';
 import { keepAsTurn } from '@/lib/guide/session';
@@ -3891,7 +3891,7 @@ export function LogosApp({
   // this browser: the learning ledger, the note when it ends, a deeper look at a mistake, the next quiz.
   const quizBusyRef = useRef(false);
   /** a quiz request waiting for the student to say which course it is for */
-  const quizAskRef = useRef<{ sid: string; request: string } | null>(null);
+  const quizAskRef = useRef<{ sid: string; request: string; ask: 'course' | 'topic' } | null>(null);
 
   /** A conversation others read: no ledger, no course profile (how this person learns is theirs). */
   const quizShared = (sid: string) => (roomRef.current.active && sharedIdsRef.current.has(sid)) || !!togetherRef.current?.active || foreignIdsRef.current.has(sid);
@@ -3924,7 +3924,9 @@ export function LogosApp({
     opts: { reason?: 'request' | 'weak-spots' | 'another' | 'retest'; parent?: string; focus?: string[]; mode?: QuizMode; count?: number; difficulty?: 'harder' | 'easier' | 'mixed'; course?: CourseProfile | null } = {}
   ): Promise<void> {
     const sid = activeIdRef.current;
-    if (!sid || quizBusyRef.current) return;
+    if (!sid) return;
+    // one at a time: a second request while one is being made is answered, not dropped without a word
+    if (quizBusyRef.current) return quizSay(sid, newMsgId(), 'A quiz is already being made — it will be here in a moment.');
     const scope = readScope(request);
     const shared = quizShared(sid);
     // WHICH COURSE: the one linked to this conversation, its documents' or its words' — and when it could be either
@@ -3935,7 +3937,7 @@ export function LogosApp({
     let hit = named;
     if (!hit && opts.course === undefined && linked !== 'off' && profiles.length === 1) hit = { profile: profiles[0], why: 'topic' as const };
     if (!hit && opts.course === undefined && linked !== 'off' && profiles.length > 1 && !letters.size) {
-      quizAskRef.current = { sid, request };
+      quizAskRef.current = { sid, request, ask: 'course' };
       quizSay(sid, newMsgId(), `Which course is this quiz for — ${listed(profiles.slice(0, 4).map((p) => profileLabel(p)))}?`);
       return;
     }
@@ -3962,40 +3964,77 @@ export function LogosApp({
         }
       }
     }
+    // NOTHING TO QUIZ ON: no topic said, no material, no course, and nothing yet in the conversation — one short
+    // question rather than questions on a subject picked at random; the next message is the topic
+    const recent = (sessionsRef.current.find((x) => x.id === sid)?.messages ?? []).filter((m) => m.role === 'user' && typeof m.content === 'string' && m.via !== 'quiz' && !asksForQuiz(m.content)).slice(-3).map((m) => m.content).join(' ').slice(0, 200);
+    if (!scope.topics.length && !namesSubject(request) && !docs.length && !hit && !opts.focus?.length && !opts.parent && !recent && !scope.forAssessment) {
+      quizAskRef.current = { sid, request, ask: 'topic' };
+      quizSay(sid, newMsgId(), 'What would you like the quiz to be on? Name a topic, or add your notes or slides here.');
+      return;
+    }
     const parentQuiz = opts.parent ? quizzesHere().find((x) => x.obj.id === opts.parent)?.s ?? null : null;
     const avoidStems = quizzesHere().flatMap(({ s }) => s.asked.map((id) => s.pool.find((q) => q.id === id)?.stem ?? '')).filter(Boolean).slice(-60);
-    const recent = (sessionsRef.current.find((x) => x.id === sid)?.messages ?? []).filter((m) => m.role === 'user' && typeof m.content === 'string' && !asksForQuiz(m.content)).slice(-3).map((m) => m.content).join(' ').slice(0, 200);
     const noteId = newMsgId();
     quizSay(sid, noteId, opts.reason === 'weak-spots' ? 'Making a practice on what you missed…' : `Making your quiz${hit ? ` from your ${profileLabel(hit.profile)} materials` : docs.length ? ' from your files' : ''}…`);
     quizBusyRef.current = true;
+    const payload = JSON.stringify({
+      sessionId: sid,
+      request,
+      docs: docs.slice(0, 8),
+      kinds,
+      ...(hit ? { course: packOf(hit.profile, hit.why), courseName: hit.profile.course || profileLabel(hit.profile), instructor: hit.profile.instructor ?? null } : {}),
+      ...(shared ? {} : { ledger: readLedger() }),
+      avoidStems,
+      missing,
+      ...(recent ? { topicHint: recent } : {}),
+      ...(opts.reason ? { reason: opts.reason } : {}),
+      ...(opts.focus?.length ? { focus: opts.focus } : {}),
+      ...(opts.mode ? { mode: opts.mode } : {}),
+      ...(opts.count ? { count: opts.count } : {}),
+      ...(opts.difficulty ? { difficulty: opts.difficulty } : {}),
+    });
     try {
-      const r = await fetch('/api/logos/quiz', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: sid,
-          request,
-          docs: docs.slice(0, 8),
-          kinds,
-          ...(hit ? { course: packOf(hit.profile, hit.why), courseName: hit.profile.course || profileLabel(hit.profile), instructor: hit.profile.instructor ?? null } : {}),
-          ...(shared ? {} : { ledger: readLedger() }),
-          avoidStems,
-          missing,
-          ...(recent ? { topicHint: recent } : {}),
-          ...(opts.reason ? { reason: opts.reason } : {}),
-          ...(opts.focus?.length ? { focus: opts.focus } : {}),
-          ...(opts.mode ? { mode: opts.mode } : {}),
-          ...(opts.count ? { count: opts.count } : {}),
-          ...(opts.difficulty ? { difficulty: opts.difficulty } : {}),
-        }),
-      });
-      const j = await r.json().catch(() => null);
-      if (r.status === 409 && j?.error === 'missing-sources') {
+      // ONCE MORE ON A FAILURE THAT IS NOT THE REQUEST'S: the server or the network failing, a time-out, an answer
+      // that is not JSON (a gateway's error page). Never on an answer about the request itself (missing material,
+      // too few questions held up, too many requests, not allowed).
+      let r: Response | null = null;
+      let j: any = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), 70_000);
+        try {
+          r = await fetch('/api/logos/quiz', { method: 'POST', headers: { 'content-type': 'application/json', ...keyHeaders() }, body: payload, signal: ctl.signal });
+          j = await r.json().catch(() => null);
+        } catch {
+          r = null;
+          j = null;
+        } finally {
+          clearTimeout(timer);
+        }
+        const retryable = !r || r.status >= 500 || (r.ok && !j?.quiz);
+        if (!retryable) break;
+        if (attempt === 0) quizSay(sid, noteId, 'Still making your quiz…');
+      }
+      if (r && r.status === 409 && j?.error === 'missing-sources') {
         quizSay(sid, noteId, `I couldn't find ${listed((j.missing as string[]).map((n) => `“${n}”`))} in your materials, so I haven't made questions from general knowledge instead. Add the file here, or ask again and say general questions are fine.`);
         return;
       }
-      if (!r.ok || !j?.quiz) {
-        quizSay(sid, noteId, j?.error === 'too-few' ? "I couldn't write questions I could stand behind from that material — the ones I wrote didn't pass the checks. Try a narrower topic, or add notes or slides on it." : r.status === 429 ? 'Too many requests just now — try again in a moment.' : 'The quiz could not be made just now — try again in a moment.');
+      if (!r || !r.ok || !j?.quiz) {
+        quizSay(
+          sid,
+          noteId,
+          !r
+            ? "The quiz couldn't be made — the connection dropped. Ask again when you're back online."
+            : j?.error === 'too-few'
+              ? "I couldn't write questions I could stand behind from that material — the ones I wrote didn't pass the checks. Try a narrower topic, or add notes or slides on it."
+              : r.status === 429
+                ? 'Too many requests just now — try again in a moment.'
+                : r.status === 401 || r.status === 403
+                  ? 'Quizzes need you to be signed in, or the access code entered.'
+                  : typeof j?.error === 'string' && r.status < 500
+                    ? j.error
+                    : 'The quiz could not be made just now — ask again in a moment.'
+        );
         return;
       }
       const state = {
@@ -4037,6 +4076,52 @@ export function LogosApp({
     } finally {
       quizBusyRef.current = false;
     }
+  }
+
+  /**
+   * The turn a quiz was made in: its request and the note that says it is ready. On a phone the Everything view shows
+   * what was made in the turn that is open, so a quiz with no turn was never shown there at all.
+   */
+  function quizTurnOf(objId: string, turns: readonly { index: number; askedAt?: number; replyAt?: number }[], msgs: readonly Msg[]): number | null {
+    const o = objOf(spaceOf(mapRef.current), objId);
+    const st = o ? (currentOf(o) as QuizState | undefined) : undefined;
+    const made = st?.made;
+    if (typeof made !== 'number') return turns.length ? turns[turns.length - 1].index : null;
+    // once finished, the quiz goes with its note ("You scored 6/8 …"), so its review is under what says it
+    const noted = st?.quiz ? msgs.findIndex((m) => m.id === `qz${st.quiz}`.slice(0, 24)) : -1;
+    let at = noted;
+    if (at < 0)
+      msgs.forEach((m, i) => {
+        if (typeof m.at === 'number' && m.at <= made) at = i;
+      });
+    let turn: number | null = null;
+    for (const t of turns) {
+      const from = t.askedAt ?? t.replyAt;
+      if (from !== undefined && from <= at) turn = t.index;
+    }
+    return turn ?? (turns.length ? turns[turns.length - 1].index : null);
+  }
+
+  /** Can a quiz be started from the board here: a conversation of their own with something in it, no quiz in hand. */
+  function mayQuizFromBoard(msgs: readonly Msg[]): boolean {
+    const sid = activeIdRef.current;
+    if (!sid || togetherReadOnly || (roomRef.current.active && sharedIdsRef.current.has(sid))) return false;
+    if (!msgs.some((m) => m.role === 'assistant' && typeof m.content === 'string' && m.content.trim())) return false;
+    return !quizzesHere().some(({ s }) => s.phase === 'taking');
+  }
+
+  /**
+   * "Quiz me" pressed on the board (the Everything view): the same as asking for it in words — the request is in the
+   * conversation, marked as one the quiz took — on what this conversation has been about.
+   */
+  function quizFromBoard() {
+    const sid = activeIdRef.current;
+    if (!sid) return;
+    const request = 'Quiz me on what this conversation has covered';
+    setError(null);
+    postTurn({ id: newMsgId(), at: Date.now(), role: 'user', content: request, via: 'quiz' }, true);
+    track('quiz_follow_up', { trigger: 'board' });
+    void startQuiz(request);
   }
 
   /** What a quiz shows, written into the learning ledger once per question (the quiz says which it has noted). */
@@ -5207,7 +5292,17 @@ export function LogosApp({
     // words. And a course question asked back ("which course is this for?") is answered by naming one.
     if (!atts.length && !objTurn.lastStep && !groupNow() && !(roomRef.current.active && sharedIdsRef.current.has(activeIdRef.current ?? ''))) {
       const waiting = quizAskRef.current && quizAskRef.current.sid === activeIdRef.current ? quizAskRef.current : null;
-      const chosen = waiting ? courseNamed(content) : null;
+      const chosen = waiting?.ask === 'course' ? courseNamed(content) : null;
+      // the topic, named after "what would you like the quiz to be on?": a short answer that is not a question of its own
+      if (waiting?.ask === 'topic' && !asksForQuiz(content) && content.trim().length <= 160 && !/\?\s*$/.test(content.trim())) {
+        quizAskRef.current = null;
+        setError(null);
+        clearBox();
+        setReplyTo(null);
+        postTurn({ id: newMsgId(), at: Date.now(), role: 'user', content: said0, via: 'quiz' }, true);
+        void startQuiz(`${waiting.request.replace(/[.!\s]+$/, '')} on ${content.trim().replace(/^(on|about)\s+/i, '').replace(/[.!]+$/, '')}`);
+        return;
+      }
       if (waiting && chosen) {
         quizAskRef.current = null;
         setError(null);
@@ -10361,7 +10456,7 @@ export function LogosApp({
             tone: practice || quiz ? 'practice' : 'artifact',
             kicker: quiz ? 'Quiz' : practice ? 'Practice' : `Artifact · ${a.kind}`,
             title: a.title,
-            turn: null,
+            turn: quiz ? quizTurnOf(a.key.slice(2), turns, messages) : null,
             preview: null,
             note: quiz ? 'Answer here, or open it large' : practice ? 'Questions to try' : `${a.kind} · open it beside the board to use it`,
             ...(quiz ? { live: a.render(), onEdit: () => (showArtifact(a.key), setBoardBeside('artifacts')) } : {}),
@@ -10369,6 +10464,20 @@ export function LogosApp({
               showArtifact(a.key);
               setBoardBeside('artifacts');
             },
+          });
+        }
+        // QUIZ ME, FROM THE BOARD: a quiz on this conversation, one press — it arrives here, live, as the card above
+        if (mayQuizFromBoard(messages)) {
+          cards.push({
+            key: 'q:start',
+            lane: 'practice',
+            tone: 'practice',
+            kicker: 'Quiz',
+            title: quizzesHere().length ? 'Another quiz on this' : 'Quiz me on this',
+            turn: turns.length ? turns[turns.length - 1].index : null,
+            preview: null,
+            note: 'Questions on this conversation, one at a time, marked as you go',
+            onOpen: quizFromBoard,
           });
         }
         // what was brought and written — beside the turn it came with — read large beside the board
@@ -10871,19 +10980,21 @@ export function LogosApp({
           if (a.key.startsWith('d:') && kept.has(a.key.slice(2))) continue;
           if (a.key === 'w:doc' && isEmptyDoc(writeDoc)) continue;
           const practice = a.key.startsWith('p:');
+          // a quiz is practice, taken where it is: pressed, it opens large and live in place
+          const quiz = a.key.startsWith('d:') && objOf(spaceOf(map), a.key.slice(2))?.kind === 'quiz';
           cards.push({
             key: `a:${a.key}`,
-            lane: practice ? 'practice' : 'made',
-            tone: practice ? 'practice' : 'artifact',
-            kicker: practice ? 'Practice' : `Artifact · ${a.kind}`,
+            lane: practice || quiz ? 'practice' : 'made',
+            tone: practice || quiz ? 'practice' : 'artifact',
+            kicker: quiz ? 'Quiz' : practice ? 'Practice' : `Artifact · ${a.kind}`,
             title: a.title,
-            turn: null,
+            turn: quiz ? quizTurnOf(a.key.slice(2), turns, messages) : null,
             preview: (
               <div className="lcv-art">
                 <span className="lcv-art-g" aria-hidden="true">
-                  {practice ? '✓' : a.kind === 'Writing' ? '¶' : '◇'}
+                  {practice || quiz ? '✓' : a.kind === 'Writing' ? '¶' : '◇'}
                 </span>
-                <span>{practice ? 'Questions to try' : `${a.kind} — open it here to use it`}</span>
+                <span>{quiz ? 'A quiz — open it here to take it' : practice ? 'Questions to try' : `${a.kind} — open it here to use it`}</span>
               </div>
             ),
             full: () => a.render(),
@@ -10892,6 +11003,35 @@ export function LogosApp({
               showArtifact(a.key);
               openFull('artifacts');
             },
+          });
+        }
+        // QUIZ ME, FROM THE BOARD: one press starts a quiz on this conversation
+        if (mayQuizFromBoard(messages)) {
+          cards.push({
+            key: 'q:start',
+            lane: 'practice',
+            tone: 'practice',
+            kicker: 'Quiz',
+            title: quizzesHere().length ? 'Another quiz on this' : 'Quiz me on this',
+            turn: turns.length ? turns[turns.length - 1].index : null,
+            preview: (
+              <div className="lcv-art">
+                <span className="lcv-art-g" aria-hidden="true">
+                  ✓
+                </span>
+                <span>Questions on this conversation, one at a time</span>
+                <button
+                  type="button"
+                  className="lcv-act is-primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    quizFromBoard();
+                  }}
+                >
+                  Start the quiz
+                </button>
+              </div>
+            ),
           });
         }
         // what was read and written: files brought, notes and write-ups — beside the turn they came with

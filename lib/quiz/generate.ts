@@ -46,10 +46,52 @@ export interface GenerateInput {
   reason?: 'weak-spots' | 'another' | 'request';
   /** quantitative material (numbers in it, or a quantitative course): numerical questions fit */
   quantitative: boolean;
+  /** the types to write, in order (one part of a quiz written in parts); otherwise planned from count and style */
+  plan?: QuestionType[];
+  /** how many variants to write after them; otherwise variantsFor(count, mode) */
+  variants?: number;
+  /** one part of a quiz written in parts at the same time: which part, and the concepts each part aims at */
+  part?: { index: number; of: number; aim: string[]; others: string[] };
 }
 
 /** How many variants (held-back retest questions) to ask for: the concepts that matter most, not every one. */
 export const variantsFor = (count: number, mode: QuizScope['mode']) => (mode === 'exam' ? 0 : Math.min(6, Math.ceil(count / 2)));
+
+/** Questions per part when a quiz is written in parts at the same time: small enough to finish quickly and whole. */
+export const PART_SIZE = 4;
+
+/**
+ * A quiz written in parts at the same time (app/api/logos/quiz/route.ts): each part a few questions and their
+ * variants, so every call is short, finishes inside the time limit, and a part that fails costs only its own.
+ */
+export function partsOf(types: readonly QuestionType[], mode: QuizScope['mode']): { plan: QuestionType[]; variants: number }[] {
+  const n = types.length;
+  if (!n) return [];
+  // at most five calls at once, however long the quiz
+  const parts = Math.min(5, Math.ceil(n / PART_SIZE));
+  const size = Math.ceil(n / parts);
+  const out: { plan: QuestionType[]; variants: number }[] = [];
+  let left = variantsFor(n, mode);
+  for (let i = 0; i < n; i += size) {
+    const plan = types.slice(i, i + size);
+    const v = Math.min(left, Math.ceil(variantsFor(n, mode) * (plan.length / n)));
+    left -= v;
+    out.push({ plan, variants: v });
+  }
+  return out;
+}
+
+/** The parts' candidates as one list: each part's "variant_of" moved to where its questions now stand. */
+export function mergeParts(parts: { title: string; candidates: Candidate[] }[]): { title: string; candidates: Candidate[] } {
+  const candidates: Candidate[] = [];
+  let title = '';
+  for (const p of parts) {
+    const base = candidates.length;
+    if (!title && p.title) title = p.title;
+    for (const c of p.candidates) candidates.push(c.variantOfIndex === undefined ? c : { ...c, variantOfIndex: c.variantOfIndex + base });
+  }
+  return { title, candidates };
+}
 
 const TYPE_SAID: Record<QuestionType, string> = {
   single: 'single (one right option of 4)',
@@ -62,8 +104,8 @@ const TYPE_SAID: Record<QuestionType, string> = {
 
 /** The brief for the question writer: system and user text. */
 export function quizPrompt(input: GenerateInput): { system: string; user: string; shown: number } {
-  const types = planTypes(input.count, input.style, input.scope, input.quantitative);
-  const variants = variantsFor(input.count, input.scope.mode);
+  const types = input.plan?.length ? input.plan : planTypes(input.count, input.style, input.scope, input.quantitative);
+  const variants = input.variants ?? variantsFor(input.count, input.scope.mode);
   const mat = materialFor(input.docs, 26_000);
   const grounded = input.docs.length > 0;
   const strict = input.scope.strictSources;
@@ -116,7 +158,14 @@ export function quizPrompt(input: GenerateInput): { system: string; user: string
   if (input.scope.exclude.length) lines.push(`Leave out: ${input.scope.exclude.join('; ')}.`);
   if (input.scope.difficulty) lines.push(`Difficulty: ${input.scope.difficulty === 'mixed' ? 'a mix of 1, 2 and 3' : input.scope.difficulty === 'harder' ? 'mostly 3, some 2' : 'mostly 1, some 2'}.`);
   lines.push('');
-  lines.push(`Write ${input.count} questions, in this order of types: ${types.map((t) => TYPE_SAID[t]).join('; ')}.`);
+  lines.push(`Write ${types.length} questions, in this order of types: ${types.map((t) => TYPE_SAID[t]).join('; ')}.`);
+  if (input.part && input.part.of > 1) {
+    lines.push(
+      `This is part ${input.part.index + 1} of ${input.part.of} of one quiz; the other parts are being written at the same time.` +
+        (input.part.aim.length ? ` This part covers: ${input.part.aim.join('; ')}.` : ' Choose concepts the other parts are unlikely to choose: a different aspect of the subject in each question.') +
+        (input.part.others.length ? ` The other parts cover: ${input.part.others.join('; ')} — do not ask about those.` : '')
+    );
+  }
   if (variants) lines.push(`Then write ${variants} more: variants ("variant_of") of the earlier questions on the concepts that matter most below — held back to retest after a miss.`);
   if (input.reason === 'weak-spots') lines.push('This is targeted practice on what the student missed: aim every question at the concepts below, with new situations — never the questions they already saw.');
   if (input.reason === 'another') lines.push('This is another quiz on the same scope: cover it again with new questions, a little harder on what they got right.');
@@ -195,10 +244,174 @@ function figureOf(v: unknown): QuizFigure | undefined {
 }
 
 /** Read the model's questions into candidates (unchecked). */
+/**
+ * What can still be read from JSON cut off at the token limit: the title, and every question object in the list
+ * that arrived whole. A string-aware scan, so braces inside a question's words do not mislead it.
+ */
+export function salvageQuiz(text: string): { title: string; questions: unknown[] } | null {
+  if (typeof text !== 'string') return null;
+  const title = text.match(/"title"\s*:\s*"((?:[^"\\]|\\.)*)"/)?.[1] ?? '';
+  const at = text.search(/"(questions|items)"\s*:\s*\[/);
+  if (at < 0) return null;
+  const questions: unknown[] = [];
+  let i = text.indexOf('[', at) + 1;
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  for (; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (ch === '\\') i++;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0 && start >= 0) {
+        try {
+          questions.push(JSON.parse(text.slice(start, i + 1)));
+        } catch {
+          // a malformed one is skipped; the rest may be whole
+        }
+        start = -1;
+      }
+    } else if (ch === ']' && depth === 0) break;
+  }
+  return questions.length ? { title: title.replace(/\\"/g, '"'), questions } : null;
+}
+
+const TYPE_WORDS: Record<string, QuestionType> = {
+  single: 'single', mcq: 'single', mc: 'single', multiplechoice: 'single', choice: 'single', singlechoice: 'single', singleanswer: 'single', singleselect: 'single',
+  multi: 'multi', multiple: 'multi', multipleselect: 'multi', multiselect: 'multi', selectall: 'multi', selectallthatapply: 'multi', checkbox: 'multi', checkboxes: 'multi', multipleanswer: 'multi', multipleresponse: 'multi', chooseall: 'multi',
+  truefalse: 'truefalse', tf: 'truefalse', boolean: 'truefalse', trueorfalse: 'truefalse',
+  numeric: 'numeric', number: 'numeric', numerical: 'numeric', calculation: 'numeric', calc: 'numeric', numericanswer: 'numeric',
+  expression: 'expression', formula: 'expression', symbolic: 'expression', algebraic: 'expression',
+  short: 'short', shortanswer: 'short', freeresponse: 'short', open: 'short', openended: 'short', text: 'short', written: 'short', fillin: 'short', fillintheblank: 'short', fillblank: 'short', cloze: 'short',
+};
+
+/** A citation as a model may write it ("[1:p3.12]", "1 : P3.12", "doc 1, p3.12", "p3.12"): the passage key, or the bare block when no file is named. */
+export function citeOf(v: unknown): string {
+  const s = textOf(v).trim();
+  const both = s.match(/(\d{1,2})\D{0,8}?(p\d{1,4}\.\d{1,5})/i);
+  if (both) return `${Number(both[1])}:${both[2].toLowerCase()}`;
+  const bare = s.match(/^[[(\s]*(p\d{1,4}\.\d{1,5})[\])\s]*$/i);
+  return bare ? bare[1].toLowerCase() : '';
+}
+
+const firstOf = (...vs: unknown[]) => vs.find((v) => v !== undefined && v !== null && v !== '');
+const textOf = (v: unknown): string => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '');
+const truthy = (v: unknown) => v === true || v === 'true' || v === 1;
+
+/** Which option a marker names: a letter ("B", "(b)", "b)") or the option's own words; never a bare number (0- or 1-based is a guess, and a wrong key is worse than none). */
+function optionNamed(marker: unknown, texts: string[]): number {
+  const s = textOf(marker).trim();
+  if (!s) return -1;
+  const letter = s.match(/^\(?([a-f])[).:]?$/i);
+  if (letter) {
+    const i = letter[1].toLowerCase().charCodeAt(0) - 97;
+    return i < texts.length ? i : -1;
+  }
+  const norm = (x: string) => x.toLowerCase().replace(/^\(?[a-f][).:]\s+/i, '').replace(/[^a-z0-9.%$-]+/g, ' ').trim();
+  const want = norm(s);
+  const hit = texts.findIndex((t) => norm(t) === want);
+  return hit;
+}
+
+/**
+ * One question as a model may write it, put into the shape asked for: the ordinary other names for its fields and
+ * types, options as plain strings, the right option named by letter or by its words, a true/false answer in its
+ * options, a bare number or phrase as the answer. Nothing is guessed that could make a key wrong.
+ */
+export function normaliseItem(raw: unknown): Record<string, any> | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const it: Record<string, any> = { ...(raw as Record<string, any>) };
+  it.stem = firstOf(it.stem, it.question, it.prompt, it.q, typeof it.text === 'string' && !it.options ? it.text : undefined);
+  it.explanation = firstOf(it.explanation, it.why, it.rationale, it.reason, it.feedback, it.answer && typeof it.answer === 'object' ? it.answer.explanation : undefined);
+  it.cue = firstOf(it.cue, it.hint);
+  it.sources = firstOf(it.sources, it.citations, it.cites);
+  if (Array.isArray(it.sources)) it.sources = it.sources.map(citeOf).filter(Boolean);
+  if (typeof it.variant_of === 'string' && /^\d+$/.test(it.variant_of)) it.variant_of = Number(it.variant_of);
+  if (it.variant_of === undefined && Number.isInteger(it.variantOf)) it.variant_of = it.variantOf;
+  const d = textOf(it.difficulty).toLowerCase();
+  if (d) it.difficulty = d === 'easy' || d === 'low' ? 1 : d === 'medium' || d === 'moderate' ? 2 : d === 'hard' || d === 'high' || d === 'difficult' ? 3 : it.difficulty;
+  const dm = textOf(it.demand).toLowerCase();
+  if (dm) it.demand = /recall|remember|knowledge|define/.test(dm) ? 'recall' : /transfer|analy|evaluat|synthes|creat/.test(dm) ? 'transfer' : /appl/.test(dm) ? 'application' : it.demand;
+
+  // options: strings or objects, the right one flagged in any of the ordinary ways
+  if (Array.isArray(it.options)) {
+    it.options = it.options.map((op: any) =>
+      typeof op === 'string' || typeof op === 'number'
+        ? { text: String(op) }
+        : op && typeof op === 'object'
+          ? { ...op, text: textOf(firstOf(op.text, op.label, op.option, op.content, typeof op.value === 'string' ? op.value : undefined)), correct: truthy(op.correct) || truthy(op.is_correct) || truthy(op.isCorrect) || truthy(op.right) }
+          : { text: '' }
+    );
+  }
+  const ans = it.answer;
+  const markers = [it.correct, it.correct_option, it.correctOption, it.correct_answer, it.correctAnswer, it.correct_options, it.correctOptions, ans && typeof ans === 'object' && !Array.isArray(ans) ? firstOf(ans.correct, ans.option, ans.options, typeof ans.value === 'string' ? ans.value : undefined) : ans];
+
+  // the type, named or read from the shape
+  const tw = textOf(it.type).toLowerCase().replace(/[^a-z]/g, '');
+  let type: QuestionType | undefined = TYPE_WORDS[tw];
+  const opts: { text: string; correct?: boolean }[] | undefined = it.options;
+  const looksTF = !!opts && opts.length === 2 && opts.every((o) => /^(true|false)$/i.test(o.text.trim()));
+  if (!type) {
+    if (looksTF || typeof ans === 'boolean' || (ans && typeof ans === 'object' && typeof ans.value === 'boolean')) type = 'truefalse';
+    else if (opts && opts.length >= 3) type = opts.filter((o) => o.correct).length >= 2 ? 'multi' : 'single';
+    else if (typeof ans === 'number' || (ans && typeof ans === 'object' && typeof ans.value === 'number')) type = 'numeric';
+    else if (ans && typeof ans === 'object' && typeof ans.expr === 'string') type = 'expression';
+    else if (typeof ans === 'string' || (ans && typeof ans === 'object' && (ans.model || ans.accept))) type = 'short';
+  }
+  if (type === 'single' && looksTF) type = 'truefalse';
+  if (!type) return null;
+  it.type = type;
+
+  if ((type === 'single' || type === 'multi') && opts && !opts.some((o) => o.correct)) {
+    const texts = opts.map((o) => o.text);
+    for (const m of markers) {
+      const list = Array.isArray(m) ? m : [m];
+      const hits = list.map((x) => optionNamed(x, texts)).filter((i) => i >= 0);
+      if (hits.length && (type === 'multi' || hits.length === 1) && hits.length === list.length) {
+        hits.forEach((i) => (opts[i].correct = true));
+        break;
+      }
+    }
+  }
+  if (type === 'truefalse') {
+    let v: unknown = ans && typeof ans === 'object' && !Array.isArray(ans) ? firstOf(ans.value, ans.true, ans.correct) : ans;
+    if (v === undefined || v === null) v = it.correct;
+    if (v === undefined && looksTF) v = opts!.find((o) => o.correct)?.text;
+    if (typeof v === 'string' && /^(true|false)$/i.test(v.trim())) v = /^true$/i.test(v.trim());
+    if (typeof v === 'boolean') it.answer = { value: v };
+  }
+  if (type === 'numeric') {
+    const a = ans && typeof ans === 'object' && !Array.isArray(ans) ? { ...ans } : { value: ans };
+    if (typeof a.value === 'string' && a.value.trim() && Number.isFinite(Number(a.value.replace(/[,$\s]/g, '')))) a.value = Number(a.value.replace(/[,$\s]/g, ''));
+    a.unit = firstOf(a.unit, it.unit);
+    a.tolerance = firstOf(a.tolerance, it.tolerance);
+    a.calc = firstOf(a.calc, it.calc, it.calculation);
+    it.answer = a;
+  }
+  if (type === 'short') {
+    const a = ans && typeof ans === 'object' && !Array.isArray(ans) ? { ...ans } : typeof ans === 'string' ? { accept: [ans], model: ans } : {};
+    a.model = firstOf(a.model, it.model_answer, it.modelAnswer, it.sample_answer, Array.isArray(a.accept) ? a.accept[0] : undefined);
+    if (!(Array.isArray(a.accept) && a.accept.length) && !(Array.isArray(a.terms) && a.terms.length) && typeof a.model === 'string') a.accept = [a.model];
+    it.answer = a;
+  }
+  return it;
+}
+
 export function candidatesFrom(raw: unknown): { title: string; candidates: Candidate[] } {
   const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
-  const list = Array.isArray(o.questions) ? o.questions.slice(0, QUIZ_LIMITS.pool) : [];
+  const nested = o.quiz && typeof o.quiz === 'object' ? (o.quiz as Record<string, unknown>) : null;
+  const found = Array.isArray(raw) ? raw : Array.isArray(o.questions) ? o.questions : Array.isArray(o.items) ? o.items : nested && Array.isArray(nested.questions) ? nested.questions : [];
+  const list = found.slice(0, QUIZ_LIMITS.pool).map(normaliseItem);
   const candidates: Candidate[] = [];
+  if (!o.title && nested?.title) o.title = nested.title;
   list.forEach((item: any, index: number) => {
     if (!item || typeof item !== 'object') return;
     const type = (QUESTION_TYPES as readonly string[]).includes(item.type) ? (item.type as QuestionType) : null;
@@ -258,7 +471,7 @@ export function candidatesFrom(raw: unknown): { title: string; candidates: Candi
       const model = str(answer.model, 300);
       if (model) key.model = model;
     }
-    const cites = Array.isArray(item.sources) ? item.sources.map((s: unknown) => str(s, 16)).filter((s: string) => parseKey(s)).slice(0, QUIZ_LIMITS.sources) : [];
+    const cites = Array.isArray(item.sources) ? item.sources.map((s: unknown) => str(s, 16)).filter((s: string) => parseKey(s) || BARE_BLOCK.test(s)).slice(0, QUIZ_LIMITS.sources) : [];
     const figure = figureOf(item.figure);
     const fromFigure =
       item.from_figure && Array.isArray(item.from_figure.meet) && item.from_figure.meet.length === 2 && (item.from_figure.axis === 'x' || item.from_figure.axis === 'y')
@@ -293,6 +506,7 @@ export function rng(seedText: string): () => number {
 }
 
 const LETTERS = 'abcdef';
+const BARE_BLOCK = /^p\d{1,4}\.\d{1,5}$/;
 
 /** The right answer as the student should read it. */
 function answerTextOf(c: Candidate, options: { id: string; text: string }[] | undefined): string {
@@ -331,6 +545,15 @@ export function shapeQuiz(quizId: string, title: string, candidates: Candidate[]
   const rejected: Partial<Record<Rejection, number>> = {};
   const asked: string[] = [...ctx.avoidStems];
   const keptIndex = new Map<number, Candidate>();
+  // a block named without its file is the passage that has it, when exactly one does
+  const byBlock = new Map<string, string[]>();
+  for (const k of known) {
+    const b = k.slice(k.indexOf(':') + 1);
+    byBlock.set(b, [...(byBlock.get(b) ?? []), k]);
+  }
+  candidates = candidates.map((c) =>
+    c.cites.some((k) => BARE_BLOCK.test(k)) ? { ...c, cites: c.cites.map((k) => (BARE_BLOCK.test(k) ? (byBlock.get(k)?.length === 1 ? byBlock.get(k)![0] : k) : k)) } : c
+  );
   candidates.forEach((c, i) => {
     const why = checkCandidate(c, { knownBlocks: known, strictSources: ctx.strictSources, avoid: ctx.avoidHashes, asked });
     if (why) {

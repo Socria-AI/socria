@@ -47,12 +47,39 @@ export function asksForQuiz(text: string): boolean {
   if (!t || t.length > 600) return false;
   // a question about quizzes, not a request for one ("how do quizzes work", "what's on the quiz")
   if (/^(how|what|why|when|where|who)\b[^?]*\b(quiz|test)\w*\b[^?]*\?$/.test(t) && !/\b(quiz|test) me\b/.test(t)) return false;
-  if (/\b(quiz|test|drill|examine) (me|myself|us)\b/.test(t)) return true;
+  if (/\b(quiz|quizz|test|drill|examine) (me|myself|us)\b/.test(t)) return true;
+  // "I want to be quizzed", "can I get tested on this"
+  if (/\b(be|get|getting) (quizzed|quizzes|tested)\b/.test(t)) return true;
+  // "test my knowledge of…", "check my understanding with a quiz"
+  if (/\btest (my|our) (knowledge|understanding|memory|recall)\b/.test(t)) return true;
+  // "ask me some questions about…", "ask me 5 questions on…"
+  if (/\bask me (some |a few |a couple of |\d+ |[a-z]+ )?(more )?(questions|qs)\b/.test(t)) return true;
+  // "can I have a quiz on cells", "I'd like a quiz", "let's do a quiz", "another quiz", "a pop quiz", "quiz time"
+  if (/\b(a|an|another|one more|some|\d+|[a-z]+-question) (short |quick |pop |little |practice |mock |timed |hard |harder |easy |easier |new )*(quiz|quizzes)\b/.test(t) && /\b(can|could|would|i want|i'd like|i would like|i need|let'?s|lets|give|make|do|start|time for|how about|please|another|one more)\b/.test(t)) return true;
+  if (/\b(pop quiz|quiz time)\b/.test(t)) return true;
+  // "make me a 10 question quiz", "a ten-question test please"
+  if (/\b(\d+|[a-z]+)[- ]questions? (quiz|test|practice test|mock exam)\b/.test(t) && /\b(can|could|would|i want|i'd like|i would like|i need|let'?s|lets|give|make|create|generate|write|set|do|start|please)\b/.test(t)) return true;
+  // "practice questions on…", "some practice problems", "give me questions to practise"
+  if (/\b(practi[sc]e|review|revision|sample|test|exam|quiz) (questions|problems|qs)\b/.test(t) && /\b(can|could|would|i want|i'd like|i would like|i need|let'?s|give|make|some|more|please|any)\b/.test(t)) return true;
   if (/\b(give|make|create|generate|build|set|write) (me |us )?(a |an |some |another |\d+ |[a-z]+ )?(short |quick |practice |mock |timed |hard |harder |easy |easier )*(quiz|test|practice (test|exam|questions?)|mock exam|exam simulation|questions to practi[sc]e)\b/.test(t)) return true;
   if (/\b(practi[sc]e|mock) (exam|test|quiz)\b/.test(t) && /\b(start|begin|let'?s|can we|could we|i want|i'd like|give|do)\b/.test(t)) return true;
   if (/\bexam simulation\b|\bsimulate (the|my|an) (exam|test|midterm|final)\b/.test(t)) return true;
   if (/^(quiz|test) (on|about|over|for)\b/.test(t)) return true;
   return false;
+}
+
+const ASKING_WORDS = new Set(
+  ('quiz quizz quizzes quizzed test tests tested testing me us myself please can could would you i i\'d id like want need lets let\'s do give make create generate build set write ' +
+    'a an the some another one more new quick short pop little practice mock timed hard harder easy easier mixed question questions problems qs ' +
+    'my our knowledge understanding memory recall on about of over around covering for with to and in it this that be get getting ask check ' +
+    'again now time start begin round session up yourself here what we covered talked so far conversation chat everything all ' +
+    'has have been discussed gone went learned learnt today exam exams midterm midterms final finals assessment upcoming tomorrow next week class course').split(/\s+/)
+);
+
+/** Does the request name a subject at all ("quiz me on enzymes", "quiz me for biology"), beyond the asking itself? */
+export function namesSubject(text: string): boolean {
+  const words = (text || '').toLowerCase().replace(/[^a-z0-9' -]+/g, ' ').split(/\s+/).filter(Boolean);
+  return words.some((w) => w.length >= 3 && !/^\d+$/.test(w) && !ASKING_WORDS.has(w));
 }
 
 /** Read what a quiz request asks for. */
@@ -122,12 +149,15 @@ export function readScope(text: string): QuizScope {
   // ── topics, and what to leave out ──
   const ex = [...t.matchAll(/\b(?:not|except|excluding|skip|leave out|no questions (?:on|about))\s+(?:on |about |the )?([a-z][a-z0-9 '&-]{2,40}?)(?=[,.;!?]|$| and | but | or )/g)].map((m) => m[1].trim());
   scope.exclude = [...new Set(ex)].filter((x) => !/^(sure|too|very|yet|now|explanations?|feedback|answers?)$/.test(x)).slice(0, 4);
-  const on = t.match(/\b(?:on|about|covering|over|around|focus(?:ing|ed)? on)\s+(?!me\b|my exam\b|the exam\b|an? (?:exam|test|quiz)\b)([a-z][a-z0-9 ,'&/-]{2,90}?)(?=[.;!?]|$| for | from | using | in exam| with | but | except | not | without | one at a time)/);
+  const on = t.match(/\b(?:on|about|covering|over|around|of|focus(?:ing|ed)? on)\s+(?!me\b|my exam\b|the exam\b|an? (?:exam|test|quiz)\b)([a-z][a-z0-9 ,'&/-]{2,90}?)(?=[.;!?]|$| for | from | using | in exam| with | but | except | not | without | one at a time)/);
   if (on) {
     scope.topics = on[1]
       .split(/,| and | & /)
       .map((x) => x.trim().replace(/^(the|my) /, ''))
       .filter((x) => x.length >= 3 && !/^(\d+ )?(questions?|problems?|a time)$/.test(x) && !scope.sourcesNamed.some((s) => s.includes(x)))
+      // "this", "what we covered", "this conversation": the conversation itself, not a topic by name — the
+      // conversation's own subject goes with the request instead (the route's topic hint)
+      .filter((x) => !/^(this|that|it|these|those|this one|all (of )?(this|that|it)|everything|the above|the (conversation|chat|lesson|last (reply|answer|part))|(this|our) (conversation|chat|topic|lesson|session)|what (we|you|i|this conversation|this chat)( have|'ve)? (talked about|covered|discussed|been (talking )?about|gone over|learned|learnt)( so far| today| here)?|what (this conversation|this chat|we) (has |have )?covered( so far)?)$/.test(x))
       .slice(0, 5);
   }
 
