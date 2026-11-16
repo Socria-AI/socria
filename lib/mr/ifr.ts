@@ -36,14 +36,33 @@
 // ("these two sentences", "my essay is about 200 words"), directness ("just
 // give me a sec"), ownWork ("let me know"), and frustration ("come on over").
 //
+// WHAT mr-2026.11.1 ADDS, read only under a policy with params.precision
+// (an earlier pin reads exactly what it read before). Their words: stuck
+// (STUCK, and "still stuck" after an earlier one; put aside beside feelings,
+// grief, life logistics, a way out already found, a joke; read with what the
+// topic shows of the work, what is on their screen, and whether they refused
+// help), a correction of how the question was read or of what was assumed
+// (CORRECTED, CORRECTED_SETUP), background they already know or were told
+// again (KNOWS_THAT), brevity in words the earlier reader missed (BREVITY).
+// Counts: a question that asked for something already said (ALREADY_SAID
+// after an asking reply), the same question asked again, stuck twice
+// running, a re-ask for the point after a long reply (REASKS), sentences
+// repeated from recent replies, a fix reported failing twice (STILL_FAILS).
+// One estimate turned observation, as routine_task is: an open request
+// (OPEN_REQUEST, MISSING_REFERENT). And a new topic, which only ever ends an
+// adjustment. Each pattern's near-misses and known misses are beside it.
+//
 // Pure. Deterministic. No model, no network, no clock.
 
+import { isFactQuestion, offersWork } from '../cognition/assist';
 import { speech, readSignals } from '../core4/signals';
-import { interrogatives, questionLoad } from '../core4/questions';
+import { interrogatives, isPolarQuestion, sentencesOf } from '../core4/questions';
 import type { ExplicitSignals, ReplyLength } from '../core4/types';
+import { tenderText } from '../runtime/asks';
+import { looksMathematical } from '../runtime/state';
 import type { StrategyParams } from './config';
-import { REVOKE_SCOPE, wordCount } from './outcome';
-import { OBSERVATION_CODES, type EvidenceRef, type Observation, type ObservationCode, type Provenance, type Strength, type TranscriptMessage } from './types';
+import { attemptStatedIn, questionsPutTo, REVOKE_SCOPE, revealsAnswer, wordCount } from './outcome';
+import { MEASURE_VERSION, OBSERVATION_CODES, type EvidenceRef, type Observation, type ObservationCode, type Provenance, type Reaction, type Strength, type TranscriptMessage } from './types';
 
 /** readSignals reads at most this much of a message, as the replay does (lib/runtime/replay.ts READ_CHARS). */
 export const IFR_READ_CHARS = 6000;
@@ -95,6 +114,9 @@ export function turnsOf(messages: readonly TranscriptMessage[], newest?: Explici
 //
 // Applied to speech(text): code, quotes and attachments are gone. Each is
 // exported so tests and docs/MR.md can cite the exact rule.
+
+/** An apostrophe as people type it, straight or curly ("I'm", "I’m"): the patterns mr-2026.11.1 adds write every one this way. */
+const AP = "['’]";
 
 /**
  * The negation that can stand before a request and turn it round: "don't",
@@ -229,6 +251,15 @@ const DEFERS_NEXT = /^(?:but |though )?(?:not (?:now|yet|today|tonight|right now
  * `edge`, the clause is cut only where that pattern says.
  */
 export function addressed(re: RegExp, text: string, opts: { notAsked?: boolean; forOthers?: RegExp; edge?: RegExp; hedged?: boolean; noDefer?: boolean } = {}): boolean {
+  return addressedAt(re, text, opts) !== null;
+}
+
+/**
+ * addressed(), and where: the first match that counts, or null. The stuck
+ * reader needs the place, to read what comes after their words ("I'm stuck…
+ * but I figured it out").
+ */
+function addressedAt(re: RegExp, text: string, opts: { notAsked?: boolean; forOthers?: RegExp; edge?: RegExp; hedged?: boolean; noDefer?: boolean } = {}): RegExpExecArray | null {
   const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
   let m: RegExpExecArray | null;
   while ((m = g.exec(text))) {
@@ -250,9 +281,9 @@ export function addressed(re: RegExp, text: string, opts: { notAsked?: boolean; 
     if (!opts.noDefer && (DEFERRED.test(upto) || DEFERS_NEXT.test(next))) continue;
     if (opts.notAsked && mark === '?' && !ASKS_AS_REQUEST.test(lead + m[0])) continue;
     if (opts.forOthers && opts.forOthers.test(text.slice(end, end + 120).split(/[.!?;\n]/)[0])) continue;
-    return true;
+    return m;
   }
-  return false;
+  return null;
 }
 
 /** What follows words that are named rather than said: "… is my manager's favourite phrase", "… means" — never a question's "… is it". */
@@ -848,8 +879,16 @@ const QUESTIONS_AS_CONTENT = new RegExp(
 );
 
 export function questionsAsContent(text: string): boolean {
-  return saidPlainly(QUESTIONS_AS_CONTENT, speech(String(text ?? '').slice(0, IFR_READ_CHARS)));
+  return questionsAsContentSaid(speech(String(text ?? '').slice(0, IFR_READ_CHARS)));
 }
+/** questionsAsContent on what they said (speech of the read slice, as Own.sp holds it). */
+function questionsAsContentSaid(sp: string): boolean {
+  return saidPlainly(QUESTIONS_AS_CONTENT, sp);
+}
+/** Earlier messages, newest first, as speech read only when needed (at most three: a draft and its revisions). */
+type SaidLater = readonly (() => string)[];
+const saidLater = (previous?: readonly string[] | string | null): SaidLater =>
+  (Array.isArray(previous) ? previous : previous ? [previous] : []).slice(0, 3).map((p) => () => speech(String(p).slice(0, IFR_READ_CHARS)));
 
 /**
  * Asking to change a draft just asked for, and nothing else: "make it
@@ -866,15 +905,17 @@ const DRAFT_REVISION =
  * Never a request for code (CODE_WORK).
  */
 export function writingForOthers(text: string, previous?: readonly string[] | string | null): boolean {
-  const sp = speech(String(text ?? '').slice(0, IFR_READ_CHARS));
+  return writingForOthersSaid(speech(String(text ?? '').slice(0, IFR_READ_CHARS)), saidLater(previous));
+}
+/** writingForOthers on what they said, the earlier messages read only if it is a revision (the same reading). */
+function writingForOthersSaid(sp: string, earlier: SaidLater): boolean {
   if (CODE_WORK.test(sp)) return false;
   if (DRAFT_FOR_OTHERS.test(sp)) return true;
   const isRevision = (x: string) => DRAFT_REVISION.test(x.trim()) && x.length < 300 && !/\?/.test(x);
   if (!isRevision(sp)) return false;
-  const earlier = Array.isArray(previous) ? previous : previous ? [previous] : [];
   // back through the revisions to the request they revise (three at most)
-  for (const p of earlier.slice(0, 3)) {
-    const q = speech(String(p).slice(0, IFR_READ_CHARS));
+  for (const said of earlier) {
+    const q = said();
     if (!CODE_WORK.test(q) && DRAFT_FOR_OTHERS.test(q)) return true;
     if (!isRevision(q)) return false;
   }
@@ -900,9 +941,12 @@ const WRITING_REQUEST = new RegExp(
  */
 const REWORK_REQUEST = /\b(?:proofread|re-?write|rephrase|reword|edit|polish|tidy(?: up)?|translate|correct|improve|soften|make)\b[^.?!]{0,40}?\b(?:this|that|these|the following|my|his|her|their)\b(?:\s+[a-z-]+){0,3}\s+(?:sound|read|more|less|warmer|kinder|clearer|better|into|in|for|to)\b|\b(?:proofread|translate|edit|polish|tidy up|rephrase|reword)\b(?:\s+(?:this|that|it|the following|my|into \w+))?\s*:/i;
 export function writingAsked(text: string, previous?: readonly string[] | string | null): boolean {
-  if (writingForOthers(text, previous)) return true;
   const raw = String(text ?? '').slice(0, IFR_READ_CHARS);
-  const sp = speech(raw);
+  return writingAskedSaid(speech(raw), raw, saidLater(previous));
+}
+/** writingAsked on what they said and the read slice of their text (the same reading). */
+function writingAskedSaid(sp: string, raw: string, earlier: SaidLater): boolean {
+  if (writingForOthersSaid(sp, earlier)) return true;
   if (CODE_WORK.test(sp)) return false;
   return WRITING_REQUEST.test(sp) || REWORK_REQUEST.test(sp) || REWORK_REQUEST.test(raw);
 }
@@ -950,19 +994,1062 @@ const NEW_PROBLEM = /^\W*(?:(?:ok(?:ay)?|now|next|and|so)[\s,.!:]+)*(?:(?:a |ano
 const HINT_ASKED = /\b(?:hint|clue|nudge|tip|first step|where (?:do|should) i start|how do i (?:start|begin))\b/i;
 
 export function movedOn(from: string, now: string, prev: string | null = null): boolean {
-  const n = speech(String(now ?? '').slice(0, IFR_READ_CHARS)).trim();
+  return movedOnSaid(speech(String(from ?? '').slice(0, IFR_READ_CHARS)), speech(String(now ?? '').slice(0, IFR_READ_CHARS)).trim(), prev);
+}
+/**
+ * movedOn on what they said: speech of each message, as Own.sp holds it, and
+ * the earlier one's topicWords when they are known (Own.topic) — so newTopicAt
+ * reads no message twice. The same reading as movedOn.
+ */
+function movedOnSaid(fromSp: string, n: string, prev: string | null, fromTopic?: Set<string>, nowTopic?: Set<string>, nowWords?: number): boolean {
   const asks = /\?/.test(n) || NEW_PROBLEM.test(n) || /^\s*(?:(?:ok(?:ay)?|now|so|and|great|thanks|please|just|can you|could you)[\s,.!]+)*(?:tell|explain|write|summari[sz]e|list|translate|describe|give|show|help|what|how|why|which|who|when|where)\b/i.test(n);
   if (!asks || HINT_ASKED.test(n)) return false;
   // a short attempt at their problem ("is it 2x cos x?", "x = 3?") is not moving on
-  if (wordCount(n) <= 8 && /[=+*/^<>≤≥√∫∑π]|\b\d+\s*[a-z]\b|\b[a-z]\s*=/.test(n) && !NEW_PROBLEM.test(n)) return false;
-  const words = (x: string) => new Set([...tokensOf(x)].filter((w) => /[a-z]{3,}/.test(w) && !/^(?:what|how|why|which|when|where|who|tell|explain|give|show|help|please|now|answer|question|first|try|let)$/.test(w)));
+  const words = nowWords ?? wordCount(n);
+  if (words <= 8 && /[=+*/^<>≤≥√∫∑π]|\b\d+\s*[a-z]\b|\b[a-z]\s*=/.test(n) && !NEW_PROBLEM.test(n)) return false;
   // the problem — and, for a short question back, what Socria last said about it ("Which rule applies?" → "The product rule?")
-  const shortBack = /\?\s*$/.test(n) && wordCount(n) <= 5;
-  const a = words(speech(String(from ?? '').slice(0, IFR_READ_CHARS)) + (shortBack ? ' ' + String(prev ?? '').slice(-IFR_READ_CHARS) : ''));
-  const b = words(n);
+  const shortBack = /\?\s*$/.test(n) && words <= 5;
+  const a = shortBack && prev ? topicWords(fromSp + ' ' + String(prev).slice(-IFR_READ_CHARS)) : (fromTopic ?? topicWords(fromSp));
+  const b = nowTopic ?? topicWords(n);
   if (b.size < 1) return false;
   for (const w of b) if (a.has(w)) return false;
   return true;
+}
+
+/**
+ * The words that say what a message is about: its content words of three
+ * letters or more, less the question words and request verbs every question
+ * shares. (movedOn's own reading; newTopicAt reads stems: topicStemsOf.)
+ */
+function topicWords(x: string): Set<string> {
+  return new Set([...tokensOf(x)].filter((w) => /[a-z]{3,}/.test(w) && !/^(?:what|how|why|which|when|where|who|tell|explain|give|show|help|please|now|answer|question|first|try|let)$/.test(w)));
+}
+
+// ── stuck, corrected, already known: what mr-2026.11.1 reads ─────────
+//
+// THE PRECISION READERS. Each is gated on the policy (StrategyParams
+// .precision): under an earlier version none of them is read and MR does what
+// it did before, observation for observation. Their words are read as every
+// explicit code is — addressed to Socria, in their own clause, never inside
+// a quote or reported speech — and a report ("I'm stuck", "No, I meant X",
+// "I know that") is never a preference: it is about this turn.
+
+/** The explicit codes read outside readExplicit, so no reading of an earlier version (short, a quiz taken back, weak.short_reply) can change. */
+type PreciseCode = 'explicit.stuck' | 'explicit.corrected' | 'explicit.knows_that';
+
+const STUCK_ADV = String.raw`(?:\s+(?:still|completely|totally|really|so|kind of|kinda|a bit|a little|just|pretty|properly))*`;
+const STUCK_FOR = String.raw`(?:\s+(?:all day|all week|again|for (?:hours|days|ages|a while|an hour|a week|so long)|since (?:yesterday|this morning|last week)))?`;
+/** The pieces of work a stuck can be on ("this step", "my essay intro", "the second part"). */
+const STUCK_NOUN = String.raw`(?:step|part|bit|one|line|question|problem|exercise|proof|bug|error|equation|function|derivation|derivative|integral|substitution|factori[sz]ation|calculation|formula|essay|intro(?:duction)?|conclusion|paragraph|thesis|sentence|assignment|task|homework|worksheet|code|script|program|algorithm|loop|query|section)s?`;
+/** The verbs of working a piece of work through: "I'm stuck on how to factor this", "trying to solve this". */
+const STUCK_VERB = String.raw`(?:start|begin|proceed|continue|go on|solve|factor|factori[sz]e|simplify|integrate|differentiate|rearrange|expand|substitute|prove|derive|calculate|compute|evaluate|balance|convert|answer|approach|tackle|finish|fix|debug|structure|write|set up)`;
+/** …and its -ing form after "on" or "at": "I'm stuck at simplifying", "stuck on factoring the quadratic". */
+const STUCK_GERUND = String.raw`(?:simplifying|factoring|factori[sz]ing|integrating|differentiating|solving|rearranging|expanding|substituting|proving|deriving|calculating|computing|evaluating|balancing|converting|debugging|writing)`;
+/** A part by its number or its letter: "step 3", "part b", "question 3b", "q2a". */
+const STUCK_PART = String.raw`(?:step|part|question|problem|exercise|number|q)\s*(?:\d+[a-h]?|[a-h])\b`;
+/** An equation or an inequality named as the work: "stuck on 3x + 7 = 22", "stuck solving x^2 - 4 = 0" (a digit in it). */
+const STUCK_MATH = String.raw`(?=[^.?!\n]{0,60}\d)[a-z0-9(][a-z0-9()^*/+.√ -]{0,30}?\s*[=<>≤≥]\s*[a-z0-9(-][a-z0-9()^*/+.√ -]{0,30}?`;
+const STUCK_ON = String.raw`(?:it|this|that|this one|(?:this|that|the|my|our)\s+(?:[\w-]+\s+){0,3}?${STUCK_NOUN}|the (?:next|last|first|second|third|final) (?:step|part|bit|one|line|question|problem)|${STUCK_PART}|where to (?:go|start|begin)|what to do(?: next)?|how to ${STUCK_VERB}(?:\s+(?:the|this|my|it|that|these|them|this one)(?:\s+[\w-]+){0,2})?|how to do (?:it|this|that|this one|the (?:next|rest|last|first) (?:step|part|bit|one))|${STUCK_GERUND}(?:\s+(?:it|this|that|these|them|the|this|my)(?:\s+[\w-]+){0,2}|\s+${STUCK_MATH})?|${STUCK_MATH})`;
+/** "With" takes a piece of work only: "stuck with this essay", never "stuck with it" (a contract, a car) or "stuck with this laptop". */
+const STUCK_WITH = String.raw`(?:(?:this|that|the|my|our)\s+(?:[\w-]+\s+)?${STUCK_NOUN}|${STUCK_PART})`;
+/** Which part of what: "step 3 of the proof", "the second part of the question", "the bit where you divide". */
+const STUCK_OF = String.raw`(?:\s+(?:of|in|from|for) (?:the|this|my|our|that|your) (?:[\w-]+\s+){0,2}?[\w-]+|\s+where (?:you|i|we|it) [\w-]+(?:\s+[\w-]+){0,3})?`;
+/**
+ * Stuck, in their own words, now: "I'm stuck", "I'm stuck here", "I'm still
+ * stuck on step 3 of the proof", "I've been stuck on this part all day",
+ * "Stuck on part b", "I don't know where to start", "I'm not sure how to
+ * continue", "I have no idea what to do", "I can't figure it out", "I don't
+ * know how to solve this", "I've hit a wall", "I've hit a wall with this
+ * proof", "I don't know where to start with this essay", "I'm stuck on how to
+ * factor this", "I'm stuck again on the substitution", "I'm stuck on the
+ * integration by parts part", "I'm stuck at simplifying", "I'm stuck trying
+ * to solve this", "No idea how to do this", "I can't work out how to do
+ * this", "I can't get past step 2" ("help I'm stuck": stuckWordsOf reads the
+ * plea past). On a piece of work only: never a
+ * place, a vehicle, a thing or an idea ("I'm stuck in traffic", "the door is
+ * stuck", "I'm stuck on the problem of evil", "I'm stuck on why the sky is
+ * blue", "I'm stuck with this laptop"), never somebody else ("she's stuck on
+ * step 3"), never past or habitual ("I was stuck yesterday", "I got stuck",
+ * "I get stuck at part two"), and never a failure that does not say stuck ("it
+ * still did not work"). "idk" and a short reply stay what they were (an
+ * answer that moved nothing, a weak reading). What the rest of the message
+ * says can still put it aside (stuckWordsOf): feelings, grief, life, a way out
+ * already found, a joke, a translation, the people around them. Not "I'm
+ * stuck on how to tell my parents", "I'm stuck on how to do my taxes", "I'm
+ * stuck trying to get home", "I can't get past the bouncer", "I've hit a wall
+ * with my landlord". Known misses: "I'm feeling stuck…", "still lost" (left
+ * to explicit.confused), "I got stuck on step 3" (read as the past), "I can't
+ * figure it out on my own" (the clause goes on), "Stuck." alone, "I give up"
+ * (their request for the answer), "I've been staring at this for an hour",
+ * "What do I do next?".
+ */
+export const STUCK = new RegExp(
+  [
+    String.raw`\b(?:i${AP}?m|i am|im|i${AP}ve been|i have been|i${AP}m getting|i am getting)${STUCK_ADV}\s+stuck${STUCK_FOR}(?:(?:\s+(?:right here|here|at this point))?${CLAUSE_END}|\s+(?:(?:on|at)\s+${STUCK_ON}|with\s+${STUCK_WITH}|${STUCK_GERUND}\s+(?:it|this|that|this one|${STUCK_MATH})|trying to (?:solve|do|figure out|work out|prove|factor|simplify|integrate|differentiate|finish|answer|fix|debug) (?:it|this|that|this one|${STUCK_MATH}))${STUCK_OF}${STUCK_FOR}${CLAUSE_END})`,
+    // opening the message, with no subject: "Stuck on step 3", "Stuck on this one"
+    String.raw`^\W*stuck\s+(?:on|at)\s+${STUCK_ON}${STUCK_OF}${STUCK_FOR}${CLAUSE_END}`,
+    String.raw`\bi(?:\s+(?:really|honestly|just|still))*\s+(?:don${AP}?t|do not|can${AP}?t|cannot)\s+(?:know|see|figure out|work out|tell)\s+(?:where|how)\s+to\s+(?:start|begin|go from here|proceed|continue|go on)(?:\s+(?:with|on)\s+(?:${STUCK_WITH}|it|this|that|this one))?${CLAUSE_END}`,
+    // "I can't work out how to do this", "I don't see how to solve it"
+    String.raw`\bi(?:\s+(?:really|honestly|just|still))*\s+(?:don${AP}?t|do not|can${AP}?t|cannot)\s+(?:see|figure out|work out|tell)\s+how\s+to\s+(?:do|solve|approach|tackle|answer|finish|prove|factor|simplify)\s+(?:it|this|that|this one)${CLAUSE_END}`,
+    String.raw`\bi(?:\s+(?:really|honestly|just|still))*\s+(?:don${AP}?t|do not)\s+know what to do(?:\s+(?:next|now|from here|here|with (?:it|this|that)))?${CLAUSE_END}`,
+    // with its subject, so addressed() sees nothing before it: "I'm not sure how to start", "I have no idea where to start"
+    String.raw`\b(?:(?:i${AP}?m|i am|im)\s+|i have\s+|i(?:${AP}ve| have) got\s+)?(?:(?:really|honestly|just|still|totally|completely)\s+)?(?:no idea|no clue|not sure)\s+(?:(?:where|how)\s+to\s+(?:start|begin|go from here|proceed|continue|go on)(?:\s+(?:with|on)\s+(?:${STUCK_WITH}|it|this|that|this one))?|how to (?:do|solve|approach|tackle|answer|finish|prove|factor|simplify) (?:it|this|that|this one)|what to do(?:\s+(?:next|now|from here))?)${CLAUSE_END}`,
+    String.raw`\bi${AP}?(?:ve| have) hit a wall(?:\s+(?:with|on)\s+(?:${STUCK_WITH}|it|this|that|this one))?${CLAUSE_END}`,
+    // "I can't get past step 2", "I can't get past this part"
+    String.raw`\bi(?:\s+(?:really|honestly|just|still))*\s+(?:can${AP}?t|cannot|can not)\s+get past\s+(?:${STUCK_PART}|(?:this|that|the next|the first|the second|the last) (?:step|part|bit|one|line|question))${CLAUSE_END}`,
+    String.raw`\bi(?:\s+(?:really|honestly|just|still))*\s+(?:can${AP}?t|cannot|can not)\s+figure\s+(?:it|this|that|this one)\s+out${CLAUSE_END}`,
+    String.raw`\bi(?:\s+(?:really|honestly|just|still))*\s+(?:can${AP}?t|cannot|can not|don${AP}?t know how to|do not know how to)\s+(?:figure out|work out|solve|do|approach)\s+(?:it|this|that|this one|what to do(?:\s+next)?|the next (?:step|part|bit|one)|the rest)${CLAUSE_END}`,
+  ].join('|'),
+  'i'
+);
+/**
+ * Stuck again, opening a clause: "still stuck", "nope, still stuck", "Tried
+ * that, still stuck", "Still stuck here", "Hmm, still stuck at the same spot",
+ * "stuck again". Read only in an episode of a stuck they said (stuckAgainAt),
+ * or after a reply with a task on the table (stuckStillAt): alone it could be
+ * anything ("still stuck in traffic" is not even this).
+ */
+export const STILL_STUCK = new RegExp(String.raw`^\W*(?:(?:no|nope|hmm+|ugh+|sorry|ok(?:ay)?|yeah|well|and|but|so|(?:i )?tried (?:that|it|this|both|everything)(?: too| already| again)?|did (?:that|it)|done that)[\s,.!]+)*(?:(?:i${AP}?m|i am|im)\s+)?(?:still\s+stuck|stuck\s+again)(?:\s+(?:right here|here|at this point))?(?:\s+(?:on|at|with)\s+(?:the same (?:step|part|bit|one|problem|line|thing|spot|point|place)|${STUCK_ON}))?${CLAUSE_END}`, 'i');
+/** STILL_STUCK at the start of any clause of the message, not only the first: "Thanks. Still stuck though." */
+const STILL_STUCK_ANYWHERE = new RegExp(String.raw`(?:^|[.!?;,:\n]\s*|\s[—–-]\s*)` + STILL_STUCK.source.slice(1), 'gi');
+
+/**
+ * Feelings and grief beside the stuck words: "I'm so stuck. I can't stop
+ * crying", "Honestly I'm stuck, I feel worthless", "my marriage is falling
+ * apart and I'm stuck", "I failed my exam and I don't know what to do". What
+ * is stuck there is not a piece of work, and a next step or a locating
+ * question would answer a feeling with a task. (Their tenderness and
+ * readSignals' vent, sensitive and safety are read too: stuckWordsOf.) Life
+ * itself and despair count: "I feel stuck in life", "I don't know what to do
+ * anymore". Never "dead end", "panic" alone (a kernel panic), "it doesn't work
+ * anymore"; "my program died" is a known miss of the other kind.
+ */
+const STUCK_AFFECT = new RegExp(
+  String.raw`\b(?:cry|cries|crying|cried|in tears|worthless|hopeless|pointless|meaningless|hate (?:everything|myself|my life|it all)|exhausted|burn(?:ed|t) out|burnout|fall(?:ing|en)? apart|died|dying|death|dead(?! end)|passed away|funeral|grief|griev\w*|divorc\w*|dumped|break ?up|broke up|marriage|hospital|depress\w*|anxious|anxiety|panic attacks?|panicking|lonely|loneliness|suicid\w*|self[- ]harm|overwhelm\w*|can${AP}?t (?:get out of bed|cope|sleep|breathe|go on|take (?:it|this) any ?more)|nothing (?:will|is going to) (?:ever )?change|emotionally|in a rut|in life|what to do any ?more|(?:can${AP}?t|cannot) (?:do|handle) (?:this|it) any ?more|evict\w*|homeless|fail(?:ed|ing) (?:my|the|this) (?:exam|test|class|course|module|year|interview))\b`,
+  'i'
+);
+/** Life logistics: a trip, a home, a job — "I'm stuck, my flight got cancelled", "my car is in the shop", "my landlord…". */
+const STUCK_LIFE = new RegExp(
+  String.raw`\b(?:flights?|airport|stranded|in traffic|traffic jam|snowed in|elevator|in the shop|car (?:is|was|broke|won${AP}?t)|flu|covid|fever|landlord|lease|tenancy|visa|mortgage|commute|stuck (?:at|in) (?:home|work|the office)|my (?:job|boss))\b`,
+  'i'
+);
+/**
+ * The people and the life around a stuck among other words (stuckWordsOf
+ * 'bare'): "I don't know what to do. I think my friend is angry with me", "I'm
+ * stuck, my sister won't talk to me", "I feel stuck and I don't know what to
+ * do", "I don't know what to do, should I take the job in Berlin or stay?".
+ * With no work named beside it, what is stuck there is a life, not a
+ * piece of work, whatever task the window holds. A stuck with the work named
+ * ("I'm stuck on step 3, my dad couldn't help either") is read.
+ */
+const STUCK_PEOPLE = new RegExp(
+  String.raw`\b(?:my|our) (?:friends?|best friend|partner|boyfriend|girlfriend|bf|gf|wife|husband|ex|family|mum|mom|dad|mother|father|parents?|sister|brother|son|daughter|kids?|children|roommate|flatmate|relationship|crush|neighbou?rs?|boss|manager|colleagues?|co-?workers?|life|career|future)\b|\b(?:angry|mad|upset|annoyed|cross) (?:with|at) me\b|\bignoring me\b|\bwith my life\b|\bfeel(?:s|ing)? (?:so |really |kind of |kinda |a bit )?stuck\b|\b(?:take|took|accept|turn down|quit|leave|got) (?:the|a|my|this|that|an) (?:job|offer|position|role)\b|\bjob offer\b|\bor stay\b|\bmove (?:abroad|out|house|cities|countries)\b`,
+  'i'
+);
+/** "help I'm stuck", "Help me, I'm stuck": a plea before the stuck words, which no lead-in reads ("help" alone is not one). */
+const HELP_LEAD = /^\W*help(?:\s+(?:me|pls|please))?[\s,!.:—–-]+(?=(?:i|i['’]m|im|i am)\b)/i;
+/** After the stuck words, a way out already found: "…but I figured it out", "…All good now.", "…that step made it click", "…I got it!". */
+const STUCK_RESOLVED = new RegExp(
+  String.raw`\b(?:(?:figured|worked|sorted|puzzled) (?:it|this|that) out|got it(?=\s*(?:[.!,;:)]|$|\b(?:now|thanks|thank you|lol|haha|after all)\b))|(?:solved|fixed|cracked|nailed) (?:it|this|that)|made it click|(?:it|that|everything) clicked|all good|works now|working now|i (?:see|get|understand) (?:it )?now|never ?mind|nvm|no longer stuck|not stuck any ?more|unstuck)\b`,
+  'i'
+);
+/** …or taken back: "lol jk", "Kidding!", "just joking". */
+const STUCK_RETRACTED = /\b(?:jk|j\/k|just kidding|kidding|joking|just joking)\b/i;
+/** The words asked about, not said: "Translate to Spanish: I am stuck", "How do you say I'm stuck in French?" */
+const STUCK_QUOTED = new RegExp(
+  String.raw`\btranslat(?:e|ion|ing)\b|\bhow (?:do|would|can|should) (?:you|i|we|one) say\b|\bsay\b[^.?!]{0,40}\bin (?:english|spanish|french|german|italian|portuguese|japanese|chinese|mandarin|korean|arabic|russian|hindi|dutch|latin|greek)\b|\bwhat(?:${AP}s| is) (?:the )?(?:word|phrase|idiom|expression) for\b`,
+  'i'
+);
+/**
+ * A piece of work named in the message, so a stuck among other words is
+ * about it: "the next step", "question 3", "my essay", "a hint". (Not "the
+ * line at the bank": a line is one of code or of working.)
+ */
+const STUCK_WORK = new RegExp(
+  String.raw`\b(?:problems?|steps?|code|errors?|equations?|essays?|homework|exercises?|questions?|proofs?|assignments?|functions?|bugs?|tasks?|scripts?|paragraphs?|parts?|formula[es]?|formulas|integrals?|derivatives?|substitutions?|calculations?|thesis|sentences?|algorithms?|loops?|queries|query|hints?|clues?|nudge|worksheets?|programs?|line \d+|(?:this|that|the|which|next|first|last) line(?! (?:at|for|of people)\b))\b`,
+  'i'
+);
+/** A plea for help beside the stuck words adds nothing to them: "can you help?", "any hints?", "what now?". */
+const STUCK_PLEA = new RegExp(
+  String.raw`\b(?:(?:can|could|would|will) you (?:please )?(?:help(?: me)?(?: (?:out|with (?:it|this|that)))?|give me (?:a |some |another )?(?:hint|clue|nudge|tip|pointer)s?)|please help(?: me)?|help(?: me)?(?: please)?|any (?:ideas|tips|hints?|help|clues?)|what (?:should|do|can) i do(?: now| next)?|what now|now what)\b`,
+  'gi'
+);
+/** Words around the stuck words that say nothing of their own. */
+const STUCK_FILLER = new Set('i ok okay so and but then now also actually please pls just hey hi hello yes yeah yep well hmm um uh oh honestly really lol ugh help thanks thank you sorry man dude guys again a the this it bit kinda'.split(' '));
+/**
+ * Their own task, in so many words: their homework, a class, an assignment,
+ * something they have to do. What makes the work on the table theirs (and so
+ * a next step, not Socria doing it): "for my CS class", "This is for my
+ * physics homework", "I have to write an essay on it".
+ */
+const THEIR_TASK = new RegExp(
+  String.raw`\b(?:homework|assignment|coursework|worksheet|problem set|practi[cs]e (?:problem|question)s?|exam|revision|my (?:class|course|module|lesson|teacher|professor|tutor|lecturer)|for (?:my|a|the|our) (?:[\w-]+ )?(?:class|course|module|lesson|exam|test|quiz|lab)|i (?:have|need|got|am supposed) to (?:write|do|solve|finish|submit|answer|learn|prove|find|calculate|work out|balance|translate)|i${AP}?m (?:learning|studying|practi[cs]ing|revising))\b`,
+  'i'
+);
+/** The work pointed at as theirs, when it is on their screen: "I'm stuck on this problem" with a photo of it. */
+const POINTS_AT_WORK = new RegExp(String.raw`\b(?:this|these|my)\s+(?:[\w-]+\s+)?${STUCK_NOUN}\b`, 'i');
+/** A problem set by the reply itself: "Try this one: integrate x^2 e^x dx.", "What do you get when you plug in u = 12?" */
+const TRY_THIS = new RegExp(String.raw`\b(?:try (?:this|these|it|one)|your turn|here(?:${AP}s| is) (?:one|a problem|an exercise|a question)|have a go)\b`, 'i');
+/** The verbs of a task the reply asks them to do: "Can you balance it?", "What do you get when you rearrange for h?" */
+const TASK_VERB = /\b(?:balance|calculate|compute|evaluate|work out|rearrange|plug in|substitute|factor|expand|translate|rewrite|conjugate|label|convert)\b/i;
+/** Where a refusal can stand on its own: what may follow it in its clause ("no hints please", "let me think for a minute", "let me have another go first"). */
+const DECLINE_END = String.raw`(?:\s+(?:please|pls|yet|for now|for a (?:minute|moment|second|sec|bit|while)|thanks|thank you|first|myself|on my own|again|a bit (?:longer|more)|about it|it through))*(?=\s*(?:[.,;:!)]|$|\b(?:just|i|i${AP}m|i${AP}ll|i${AP}d|let|and|but|so|i want|thanks|please)\b))`;
+/**
+ * A refusal of help beside the stuck words: "No hints, just let me think",
+ * "but no hints please", "don't give me the next step, I'll figure it out",
+ * "I don't want help yet", "I'd like to keep trying on my own", "just let me
+ * vent", "let me have another go first". The reading keeps explicit.stuck and
+ * adds the ref stuck.declines, on which every stuck rule stands aside
+ * (lib/mr/policy.ts): a next step, a locating question or a worked example
+ * would run over what they said. ("Don't tell me the answer" is also their
+ * own try, read by readExplicit.) A refusal is said, not reported: "no hints"
+ * opens its clause and closes it (DECLINE_END), and "let me think" ends its
+ * clause — so not "I have no clue where to start", "No clue where to begin",
+ * "the textbook is no help", "my notes give no hints on this step", "I found
+ * no answers online", "there are no solutions in the back of the book", "Let
+ * me try to explain what I did: …" or "let me think out loud: …", each an
+ * ordinary stuck report.
+ */
+export const STUCK_DECLINES = new RegExp(
+  [
+    String.raw`(?:^|[.!?;,:\n—–]\s*|\s(?:but|and|so|just|please)\s+)(?:(?:but|and|so|just|please|ok(?:ay)?)\s+)*(?:no|without|not any|zero) (?:hints?|help|spoilers?|clues|answers?|solutions?)${DECLINE_END}`,
+    String.raw`\b(?:don${AP}?t|do not) (?:give|tell|show|hand) me (?:anything|the (?:next step|answer|solution|steps?)|a hint|hints|any (?:hints?|help|clues?))\b`,
+    String.raw`\blet me (?:think|try|keep trying|work (?:it|this) out|figure(?: (?:it|this))?(?: out)?|have (?:a|another) go)${DECLINE_END}`,
+    String.raw`\bi${AP}?(?:ll| will) (?:figure|work) (?:it|this) out\b`,
+    String.raw`\bi (?:don${AP}?t|do not) (?:want|need) (?:any |your )?(?:help|hints?|clues?|spoilers?|the answer)${DECLINE_END}`,
+    String.raw`\bi${AP}?d (?:like|rather|prefer) to (?:keep trying|try (?:again|myself|on my own)|figure (?:it|this) out|work (?:it|this) out)\b`,
+    String.raw`\b(?:keep trying|try) on my own\b`,
+    String.raw`\b(?:let me|need to|want to) vent\b`,
+  ].join('|'),
+  'i'
+);
+
+/**
+ * The solution asked for beside the stuck words: "I got 3x = 15 but I'm stuck.
+ * Walk me through the rest.", "Can you solve it for me?", "Give me the full
+ * solution please.", "Show me the whole solution.", "Can you do the rest?",
+ * "Show me how to do it all the way through.", "Tell me what x is.", "What is
+ * x?". The reading keeps explicit.stuck and adds the ref stuck.wants_answer,
+ * on which every stuck rule stands aside (lib/mr/policy.ts): one step, a
+ * locating question or a worked example would hand over less than they asked
+ * for. A request, not a report: "I don't know how to solve this" and "I'm stuck
+ * on how to do the rest" ask for nothing (the verb opens a sentence or follows
+ * a request frame: "can you", "could you", "please", "just").
+ */
+export const STUCK_WANTS_ANSWER = new RegExp(
+  [
+    String.raw`\b(?:walk|talk|take|run) me through (?:it|this|that|the (?:rest|whole (?:thing|problem|solution|working)|solution|steps|working))\b`,
+    String.raw`(?:^|[.!?;:\n]\s*|\b(?:can|could|would|will) you (?:please |just )?|\bplease\s+|\bjust\s+)(?:solve|finish|do|complete|work out|answer) (?:it|this|that|the rest|the whole (?:thing|problem|question)|this one|that one|the problem|the question)(?: for me)?(?: please)?(?=\s*(?:[?.!,]|$|\b(?:for me|please|all the way)\b))`,
+    String.raw`(?:^|[.!?;:\n]\s*|\b(?:can|could|would|will) you (?:please |just )?|\bplease\s+|\bjust\s+)work (?:it|this|that) out(?: for me)?\b`,
+    String.raw`\b(?:give|show|tell|send) me (?:the )?(?:full|whole|complete|entire|final|worked) (?:solution|working|workings|answer|thing|method)\b`,
+    String.raw`\bshow me how to (?:do|solve|finish) (?:it|this|that)(?: all the way(?: through)?| to the end| from start to finish)\b`,
+    String.raw`\bexplain the (?:whole|full|complete|entire) (?:solution|thing|working|method)\b`,
+    String.raw`\btell me (?:what (?:x|y|z|the answer|the result) is|the answer)\b`,
+    String.raw`(?:^|[.!?;:\n]\s*)(?:so\s+)?what(?:${AP}s| is) (?:x|y|z|the (?:answer|solution|result))\s*\?`,
+  ].join('|'),
+  'i'
+);
+
+/**
+ * A stop on questions in words readExplicit's stop does not read, read only
+ * under params.precision (readWords) as explicit.stop_questions: "No follow-up
+ * questions please.", "Stop questioning me.", "Stop with the questions.",
+ * "Stop asking me follow-up questions.", "Please stop ending every reply with
+ * a question.", "Don't ask me any more questions." Said to Socria (addressed),
+ * and "no questions" opens and closes its clause — so not "There were no
+ * questions on the exam", "no questions about the budget came up", "stop
+ * asking me so many questions at once" (fewer, not none), or "my teacher said
+ * no questions in class".
+ */
+export const NO_QUESTIONS_SAID = new RegExp(
+  [
+    String.raw`(?:^|[.!?;,:\n—–]\s*|\s(?:but|and|so|just|please)\s+)(?:(?:but|and|so|just|please|ok(?:ay)?)\s+)*(?:no|without) (?:more |further |follow[- ]?up |extra |other )?questions(?:\s+(?:please|pls|thanks|thank you|this time|for now))*(?=\s*(?:[.,;:!)]|$|\b(?:just|i|and|but|thanks|please)\b))`,
+    String.raw`\bstop (?:questioning|quizzing|interrogating) me\b`,
+    String.raw`\bstop with (?:the|all the|your) questions\b`,
+    String.raw`\bstop asking (?:me )?(?:any |more |the |your )?(?:follow[- ]?up |further |extra )questions\b`,
+    String.raw`\bstop (?:ending|finishing|closing) (?:every|each|all|your) (?:reply|replies|answer|answers|message|messages|response|responses) (?:with|on) (?:a )?questions?\b`,
+    String.raw`\b(?:don${AP}?t|do not) (?:ask|give) me (?:any )?(?:more |further |follow[- ]?up )questions\b`,
+  ].join('|'),
+  'i'
+);
+
+/**
+ * Brevity asked of Socria in words SHORTER_REPLIES and SHORTER do not read,
+ * read only under params.precision (readWords): "Be brief. What is TCP?",
+ * "please be concise", "Please keep all your answers short from now on".
+ * Addressed, and never beside their own writing named ("help me be concise in
+ * my cover letter"). Not "I want to be brief", "how do I be concise in
+ * interviews?", "be short with him".
+ */
+const BREVITY = new RegExp(
+  String.raw`\bbe (?:brief|concise|succinct|terse|short)\b(?! (?:with|in|when|about|of|for)\b)|\bkeep (?:all |all of )?your (?:answers?|replies|responses|messages?|explanations?)(?: (?:a (?:lot|bit|little)|much|way))? (?:short|shorter|brief|briefer|concise)\b`,
+  'i'
+);
+
+/**
+ * What can open a correction, at the start of the message or of a sentence:
+ * "no", "sorry", "thanks, but", "ok but", "close, but", "not that one", "not
+ * quite", "wrong one", "oops", "my bad", "that's not it". Never after a dash
+ * or a comma inside a sentence: "quiz me — no, I meant just tell me" takes
+ * back their own words, not Socria's reading.
+ */
+const CORRECTION_LEAD = String.raw`(?:no|nope|nah|sorry|oh|ah|wait|actually|hmm+|well|ok(?:ay)?|but|thanks|thank you|right|close|not (?:that|this|quite)(?: one)?|wrong one|oops|uh+|um+|my bad|that${AP}?s not (?:it|helpful|right|quite (?:it|right)|what i (?:wanted|needed)))`;
+const CORRECTION_START = String.raw`(?:^|[.!?\n]\s*)\W*(?:${CORRECTION_LEAD}[\s,.!:—–-]+)*`;
+/** …and at the start of the message only, for the present "I mean" (in a later sentence it is as often "I think": "Thanks. I mean the second one is clearer"). */
+const CORRECTION_OPENS = String.raw`^\W*(?:${CORRECTION_LEAD}[\s,.!:—–-]+)*`;
+/** After "I mean": agreement and filler ("I mean yeah that makes sense", "i mean thats fair", "I mean sure, why not", "I mean both work"). */
+const MEAN_FILLER = String.raw`(?:\s*[,—–-]|\s+(?:it|that|like|really|come on|yeah|yes|yep|sure|ok(?:ay)?|honestly|i guess|i suppose|you${AP}?re right|thats|both|these|either|well|whatever|kind of|kinda|sort of|basically|seriously|literally|obviously|of course|why not|fair|true|right|exactly|same|no offen[cs]e|thanks|thank you|its|this is|what if|you could|you can|we could|we can|maybe|perhaps|in a way)\b)`;
+/** A verdict on the reply after "I mean": "I mean the explanation was good though", "I mean the first one was clearer", "…is the one I like best". */
+const MEAN_VERDICT = String.raw`(?![^.!?]{0,60}\b(?:better|best|great|good|clearer|nicer|easier|helpful|perfect|love|loved|like|liked|cool|interesting)\b)`;
+/** After "I meant": what corrects nothing ("I meant to ask earlier", "I meant it", "I meant every word", "I meant that as a compliment"). */
+const MEANT_NOT = String.raw`(?:to (?:ask|say|tell|mention|write|type|add)|it|that(?!\s+one)|every word|what i said|well|no offen[cs]e|no harm|it${AP}?s fine|nothing|as a (?:compliment|joke))\b`;
+/** Praise after "not what I meant": "Not what I meant but honestly this is better" approves the reply. */
+const APPROVES_AFTER = String.raw`(?![^.!?]{0,40}\b(?:better|great|perfect|love|helpful|works|fine|good)\b)`;
+/**
+ * Their correction of how the question was read, after a reply: "No, I meant
+ * on my Mac", "Thanks, but I meant the Leibniz one", "Not that, I meant…",
+ * "Sorry, I should have been clearer. I meant Leibniz", "I meant Python, not
+ * Java", "that's not what I meant", "That's not what I'm asking", "I didn't
+ * mean that", "you misunderstood my question", "Sorry, I was asking about the
+ * API", "I'm asking about Leibniz, not Haskell"; a question re-asked because
+ * the reply missed it ("You didn't answer my question", "That doesn't answer
+ * my question", "No, I asked how to export them", "My question was how…");
+ * and a corrected assumption (CORRECTED_SETUP). It opens their message or a
+ * sentence: "I meant to ask earlier", "no, I mean it's fine", "I mean, it
+ * works but it is slow", "I mean yeah that makes sense", "I meant that as a
+ * compliment", "No offence meant" and "Not what I meant but honestly this is
+ * better" are not corrections (MEAN_FILLER, MEANT_NOT, CORRECTED_NOT keep the
+ * rest out). Never read on a first message. Known misses: "I was asking about
+ * the Leibniz monad" (no lead and no "not X"), "But how do I export them?".
+ */
+export const CORRECTED = new RegExp(
+  [
+    String.raw`${CORRECTION_START}i meant(?!\s+${MEANT_NOT})\b`,
+    String.raw`${CORRECTION_OPENS}i mean(?!${MEAN_FILLER})${MEAN_VERDICT}\b`,
+    String.raw`\b(?:that${AP}?s not what (?:i (?:meant|asked|was asking|am asking)|i${AP}?m asking)|not what (?:i (?:meant|asked(?: for)?|was asking(?: about| for)?|am asking(?: about| for)?)|i${AP}?m asking(?: about| for)?)|(?:that${AP}?s|that is|that was|this is) not (?:my|the) question|that (?:isn${AP}?t|wasn${AP}?t) (?:my|the) question|i (?:didn${AP}?t|did not) mean (?:that|it)(?!\s+(?:as|to|in a|personally|badly|literally|any (?:harm|offen[cs]e)))|i (?:didn${AP}?t|did not) ask (?:about|for) (?:that|this)|you misunderstood(?: me| my question| the question)?|you(?:${AP}ve| have)? misread (?:me|my question|the question)|you(?:${AP}re| are) misunderstanding)\b${APPROVES_AFTER}`,
+    String.raw`^\W*(?:no|nope|nah|sorry|actually|oh|wait)[\s,.!:—–-]+(?:i was|i${AP}m|i am) (?:asking|talking) about\b`,
+    String.raw`${CORRECTION_START}(?:i was|i${AP}?m|i am) (?:asking|talking) about [^.?!]{1,60},? not\s+\S`,
+    String.raw`\bi meant [^.?!]{1,60},? not\b`,
+    // the reply missed the question
+    String.raw`\byou (?:still |really |just )?(?:didn${AP}?t|did not|haven${AP}?t|have not|never) (?:actually |really )?answer(?:ed)? (?:my|the) question\b`,
+    String.raw`\b(?:that|this|it) (?:still )?(?:doesn${AP}?t|does not|didn${AP}?t|did not) (?:actually |really )?answer (?:my|the) question\b`,
+    String.raw`^\W*(?:(?:no|nope|but|sorry|actually|well|ok(?:ay)?|wait)[\s,.!:—–-]+)*i asked (?:you )?(?:how|what|why|about|for|if|whether|which|where|when|who)\b(?![^.!?]{0,60}\b(?:(?:my|his|her|their) (?:teacher|professor|tutor|boss|friend|mum|mom|dad|parents|doctor|manager|lecturer|colleague)|yesterday|last (?:week|time|year|night)|in class|at school|at work)\b)(?![^.!?]{0,80}\b(?:they|he|she|someone|somebody|nobody|the (?:bank|shop|store|seller|landlord|staff|company|support|agent|clerk))\s+(?:\w+\s+)?(?:said|says|told|replied|answered|refused|ignored|wouldn${AP}?t|couldn${AP}?t|didn${AP}?t|won${AP}?t|can${AP}?t)\b)`,
+    String.raw`${CORRECTION_START}my (?:actual |original |real )?question (?:was|is) (?:about|how|what|why|whether|if|which|where|when|who|for|regarding|really|actually|simply|just)\b`,
+  ].join('|'),
+  'i'
+);
+/** "I mean it", "I meant it as a joke", "I meant every word", "I meant 'carpe diem' as my motto", "no offence": the words of a correction that correct nothing, anywhere in the message. */
+export const CORRECTED_NOT = new RegExp(String.raw`\bi mean(?:t)? (?:it|that)(?: (?:as a joke|literally|seriously|sincerely))?[.!]?\s*$|\bi meant (?:it|that|every word|what i said)\b(?!\s+one\b)|\bas (?:a|an|my|our) (?:compliment|joke|motto|nickname|example|metaphor|tribute|quote|slogan|tagline|title|name)\b|\bi meant to (?:ask|say|tell|mention)\b|\bno offen[cs]e\b`, 'i');
+/** What a corrected assumption cannot be about: "No, I have a question", "No, I'm on it", "Actually I have no idea". */
+const SETUP_OBJECT = String.raw`(?!(?:(?:a|an|the|my)\s+)?(?:question|questions|idea|clue|problem|doubt|feeling|time|minute|moment|sec(?:ond)?|appointment|meeting|class|exam|test|follow|bit|lot|few|no|any|one|another|nothing|something|to|been|already|never|not|it|this|that|them|you|board|track|holiday|vacation|break|leave|call|fire|my way|the way|same|latest|newest|done|seen|got|gotten|given|taken|made|had|read|heard|gone|found|bought|met|known|thought|said|told|written|begun|kept|lost|won|sent|spent|built|caught|taught|felt|held|brought|paid|sold|watched|[\w-]{3,}ed)\b)(?:(?:a|an|the|my)\s+)?[\w.+#-]+(?:\s+[\w.+#-]+){0,2}`;
+/** The state of a fix said with "I have", not a setup: "No, I have the latest driver installed", "Nope, I have tried that already". */
+const SETUP_FIX_STATE = String.raw`(?![^.!?]{0,40}\b(?:installed|updated|upgraded|latest|newest|up to date|already|tried|checked|restarted|rebooted|enabled|disabled|turned (?:on|off))\b)`;
+/** A device, a system or a language, as "No, it's a Mac" names one. */
+const SETUP_THING = String.raw`(?:mac(?:book)?(?: (?:air|pro))?|imac|mac ?os|os x|windows(?: \d+)?|linux|ubuntu|debian|fedora|chromebook|chrome ?os|iphone|ipad|android(?: phone)?|pc|python|javascript|typescript|java|c\+\+|c#|ruby|rust|golang|php|swift|kotlin|excel|google sheets|google docs)`;
+/** What the word after "not" cannot be in a correction's "X, not Y": "not sure", "not that it matters", "not just the laptop", "not too long". */
+const NOT_WORD = String.raw`(?!(?:sure|that|this|just|only|really|too|very|so|much|quite|certain|exactly|even|yet|necessarily|always|all|everything|anything|everyone|for|to|because|if|in|on|at|with|your|you|me|now|again|anymore|any ?more|working|getting|having|seeing|good|bad|great|ideal|helpful|happy|ready|done|finished|bothered|worried|fussed|important|relevant|urgent|cool|okay|ok|fine|possible|wrong|right|same|one|first|last|next|second|third|only|best|worst|biggest|least|most)\b)`;
+const NOT_CONTRAST = String.raw`${NOT_WORD}(?:(?:a|an|the|my)\s+${NOT_WORD})?`;
+/**
+ * The contrast that makes it a correction: "no", "nope", "actually", "wait",
+ * and owning the gap: "Sorry, I should have said, I'm on a Mac", "I should
+ * have mentioned I use Linux".
+ */
+const CONTRAST_LEAD = String.raw`(?:no|nope|nah|actually|sorry|oh|wait|but|hmm+|um+|well|i should(?: have|${AP}ve) (?:said|mentioned|specified|clarified|been clearer)(?: (?:that|earlier|before))?)`;
+/**
+ * A corrected assumption, after a reply: "No, I'm on a Mac", "Actually I use
+ * Linux", "That's for Windows. I have a Mac.", "I'm using macOS, not Windows",
+ * "This is JavaScript, not Python", "No, it's a Mac", "I'm not on Windows, I
+ * use a Mac", "I don't use Windows, I have a MacBook". A contrast opens it, or
+ * it ends in "not X" with a thing for X (NOT_CONTRAST). Not "No, I'm good",
+ * "No, I have a question", "No, I'm on it", "This is great, not too long"
+ * (praise: CORRECTED_PRAISE), "I use a VPN, not sure if that matters", "I use
+ * Chrome, not that it matters", "I have the same problem on my phone, not just
+ * the laptop", "Nope, I have tried that already" or "No, I have the latest
+ * driver installed" (the state of a fix: SETUP_FIX_STATE), "That's for later.
+ * I have another question." Borderline, read: "I have Windows 11, not 10".
+ */
+const SETUP_AT_START = [
+    String.raw`^\W*(?:${CONTRAST_LEAD}[\s,.!:—–-]+)+(?:i${AP}?m|i am|im) (?:on|using|running|in|with)\s+${SETUP_OBJECT}${CLAUSE_END}`,
+    String.raw`^\W*(?:${CONTRAST_LEAD}[\s,.!:—–-]+)+i (?:use|have|run|own|work (?:on|with|in))\s+${SETUP_FIX_STATE}${SETUP_OBJECT}${CLAUSE_END}`,
+    String.raw`^\W*(?:(?:but|no|nope)[\s,.!:—–-]+)?(?:that|this|it)${AP}?s? (?:only |just |meant )?(?:for|about) (?!(?:later|now|another time|next time|tomorrow|today|you|me|fun|real)\b)[^.?!]{1,30}[.!,;]\s*(?:but\s+)?(?:i${AP}?m|i am|im|i)\s+(?:on|using|use|have|run|running|own)\s+${SETUP_OBJECT}`,
+    // "No, it's a Mac", "Wrong OS, it's a Mac"
+    String.raw`^\W*(?:(?:no|nope|actually|wrong (?:os|one|platform|system|device|version|language))[\s,.!:—–-]+)+(?:it${AP}?s|it is|this is|that${AP}?s) (?:a |an |on (?:a |an )?)?${SETUP_THING}${CLAUSE_END}`,
+    // "I'm not on Windows, I use a Mac", "I don't use Windows, I have a MacBook"
+    String.raw`^\W*(?:i${AP}?m not|i am not|im not) (?:on|using|running) [^.?!,;]{1,30}[,;.]\s*(?:i${AP}?m|i am|im|i) (?:on|using|use|have|run|running|own)\s+${SETUP_OBJECT}`,
+    String.raw`^\W*i (?:don${AP}?t|do not) (?:use|have|run|own) [^.?!,;]{1,30}[,;.]\s*(?:i${AP}?m|i am|im|i) (?:on|using|use|have|run|running|own)\s+${SETUP_OBJECT}`,
+];
+export const CORRECTED_SETUP = new RegExp(
+  [
+    ...SETUP_AT_START,
+    String.raw`(?:^|[.!?\n]\s*)\W*(?:${CONTRAST_LEAD}[\s,.!:—–-]+)*(?:i${AP}?m|i am|im|i) (?:using|on|running|use|run|have) (?!(?:it|this|that|them|my way|the way|board|track|the same)\b)[^.?!,]{1,30},? not\s+${NOT_CONTRAST}[\w.+#-]+`,
+    String.raw`^\W*(?:(?:but|no|nope|actually)[\s,.!:—–-]+)?(?:this|that|it) (?:is|was|${AP}s) (?:in |for |about )?[^.?!,]{1,30},? not\s+(?:in |for |about )?${NOT_CONTRAST}[\w.+#-]+(?:\s+[\w.+#-]+)?${CLAUSE_END}`,
+  ].join('|'),
+  'i'
+);
+/** CORRECTED_SETUP's cheap superset (readPrecise): its other alternatives all need "not" ("…, not Windows"). */
+const SETUP_START = new RegExp(SETUP_AT_START.join('|'), 'i');
+const setupPossible = (sp: string): boolean => /\bnot\s/i.test(sp) || SETUP_START.test(sp);
+/** Praise in the same first sentence turns a "this is X, not Y" into a verdict on the reply. */
+const CORRECTED_PRAISE = /\b(?:great|good|fun|nice|perfect|helpful|better|clear|easy|useful|amazing|awesome|brilliant|interesting|cool|fine|correct|right|wrong|true)\b/i;
+
+/**
+ * The end of their word that the reply said it again: the clause closes there,
+ * and not on a question ("You already covered this? I missed it") or with more
+ * of what was said ("You already said that range starts at zero, right?",
+ * "You already told me that would happen, and it did!").
+ */
+const SAID_AGAIN_END = String.raw`(?=\s*(?:[.,;!)]|$|\b(?:already|before|twice|earlier|again|though|but|and|lol|tbh|honestly|man|dude)\b))`;
+/** Where "I know that" can open: their message or a sentence, after "yes", "thanks", "got it", "right, but". */
+const KNOW_LEAD = String.raw`(?:(?:yes|yeah|yep|ok(?:ay)?|right|sure|um+|well|thanks|thank you|got it|cool|but|great|fine|sorry|honestly|actually|i mean)[\s,.!—–-]+)*`;
+const KNOW_START = String.raw`(?:^|[.!?\n]\s*)\W*${KNOW_LEAD}`;
+/** CLAUSE_END without "now" and "still": "I know that now" is what the reply taught them, not background they had. Not "thanks to you" either. */
+const KNOW_END = String.raw`(?=\s*(?:[.,;:!?)]|$|\b(?:either|at all|already|sorry|lol|tbh|honestly|but|and|though|please|thanks(?! to\b)|thank you|so|too|well)\b))`;
+/**
+ * The background is known to them, after a reply that explained it: "I know
+ * that already", "I know what recursion is, I want to know when to avoid it",
+ * "I know how loops work", "I know about loops", "I know that part", "Thanks,
+ * I know that", "I understand that part", "I get that", "I'm familiar with
+ * loops", "I'm not new to this", "I've done this before", "Yes, I'm aware.",
+ * "we covered this", "We went over this", "skip the basics", "Skip the
+ * explanation", "No need to explain", "I don't need the background", "I'm not
+ * a beginner" — and their word that the reply said it again: "You already
+ * said that", "You're repeating yourself", "You keep saying the same thing",
+ * "Stop repeating yourself". Not "I know you're busy", "I know, right?", "I
+ * know that you said X", "I know that feeling", "I don't know that", "I know
+ * a guy who does this", "I don't think we covered this", "I know that now",
+ * nor a check or a story of what was said (SAID_AGAIN_END: "You already said
+ * that range starts at zero, right?", "You already covered this? I missed
+ * it", "You already told me that would happen, and it did!"), "Stop repeating
+ * the list, I mean in my code, it prints twice", a complaint taken back
+ * ("…Just kidding, it helps"), nor beside words that say they still need it
+ * (KNOWS_UNSURE: "…but I forgot", "…go over it again slowly", "…I still don't
+ * get the Calvin cycle", "…but please explain it once more"), and never after
+ * a reply that only asked (there was no background to know).
+ */
+export const KNOWS_THAT = new RegExp(
+  [
+    String.raw`${KNOW_START}i (?:already |do )?know (?:that|this|all (?:that|this)|the (?:basics|theory|concept|background|definition|idea)|(?:that|this) (?:part|bit|one)|what (?:a |an |the )?[\w-]+(?: [\w-]+)? (?:is|are|does|means)|how (?:a |an |the )?(?:it|this|that|they|[\w-]+(?: [\w-]+)?) works?|about (?:it|this|that|[\w-]+(?: [\w-]+)?))(?:\s+already)?${KNOW_END}`,
+    String.raw`${KNOW_START}i(?:${AP}m| am) (?:already |well |fully )?aware${KNOW_END}`,
+    String.raw`${KNOW_START}i (?:already )?(?:understand|get) (?:that|this)(?: (?:part|bit|one))?(?:\s+already)?${KNOW_END}`,
+    String.raw`${KNOW_START}i(?:${AP}m| am) (?:already |quite |very |pretty |really )?familiar with\b`,
+    String.raw`${KNOW_START}i(?:${AP}m| am) not new to (?:this|it|that|[\w-]+)${KNOW_END}`,
+    String.raw`\bi(?:${AP}m| am) not a beginner\b`,
+    String.raw`${KNOW_START}i(?:${AP}ve| have) (?:already )?(?:done|learned|learnt|studied|covered) (?:this|that|it|these|those) (?:before|already|a lot|many times|plenty of times)${KNOW_END}`,
+    String.raw`\bwe (?:already |just )?(?:covered|went over|did|discussed|talked about|learned|learnt) (?:that|this|it)(?:\s+(?:already|before|earlier|yesterday|in class|at school|in (?:the )?(?:lecture|lesson|course)|last (?:week|time|lesson|class)))?${KNOW_END}`,
+    String.raw`\b(?:skip|spare me|no need for|drop) the (?:basics|background|intro(?:duction)?|history|definitions?|theory|explanation|preamble|lecture)\b`,
+    String.raw`\b(?:no need to|you (?:don${AP}?t|do not) (?:need|have) to) explain\b`,
+    String.raw`\bi (?:don${AP}?t|do not) need (?:the|a|an|any) (?:background|basics|intro(?:duction)?|explanation|history|theory|definitions?|primer|refresher)\b`,
+    // their word that the reply said it again
+    String.raw`\byou(?:${AP}ve| have)? already (?:said|explained|told me|covered|mentioned|went over) (?:that|this|it)${SAID_AGAIN_END}`,
+    String.raw`\byou(?:${AP}ve| have)? (?:said|explained|told me|covered|mentioned) (?:that|this|it) (?:already|before|twice)${SAID_AGAIN_END}`,
+    String.raw`\byou(?:${AP}re| are) repeating yourself\b`,
+    String.raw`\byou keep (?:repeating|saying) (?:yourself|the same(?: thing)?|that|it)${SAID_AGAIN_END}`,
+    String.raw`\bstop repeating(?: yourself| the same(?: thing)?| that| it)?(?=\s*(?:[.,;:!?)]|$|\b(?:please|already|man|dude|lol|and|but|so|just)\b))`,
+  ].join('|'),
+  'i'
+);
+/** Beside "I know that", the words that say they still need it: "…but I forgot", "…go over it again slowly", "…I still don't get the Calvin cycle", "…but please explain it once more". */
+const KNOWS_UNSURE = new RegExp(
+  String.raw`\b(?:(?:don${AP}?t|do not|didn${AP}?t|did not|can${AP}?t|cannot) (?:really |quite |fully )?(?:get|understand|follow|remember|recall)|still (?:don${AP}?t|do not|not) (?:get|understand|sure|clear)|confus(?:ed|ing)|i${AP}?m lost|forg[eo]t(?:ten)?|again|go over|slow(?:ly|er)|refresh(?:er)?|remind me|recap|once more|one more time|but (?:please |can you |could you |would you )?(?:explain|go through|walk me through|run (?:me )?through|cover) (?:it|that|this))\b`,
+  'i'
+);
+
+/**
+ * They had already said it, after a reply that asked: "I already told you,
+ * Windows 11", "I told you", "I told you already", "I said that already",
+ * "I literally just said that", "like I said, it's for my team", "you already
+ * asked me that", "You've already asked me that", "You keep asking me the
+ * same thing", "I already answered that question", "I've already answered
+ * that", "See above", "Read my first message" — and the answer itself after
+ * "I said" in a short message (ALREADY_SAID_IT: "I said Windows 11"). Not "I
+ * already tried restarting it", "I already know Python", "as I said in my
+ * essay…", "I already told you this in the session yesterday", "I don't know,
+ * I already said I don't know" (the clause goes on: a learner's, not a
+ * complaint about the question), a bare "I said, …" (a story: "I said, look,
+ * I need time"), or the plain answer to Socria's own "Have you mentioned it
+ * to HR?" (observeTurn: ASKED_IF_DONE).
+ */
+export const ALREADY_SAID = new RegExp(
+  [
+    String.raw`\bi (?:(?:already|just|literally|clearly|even)\s+)+(?:told you|said|mentioned|answered|gave you)(?: (?:that|this|it|that question|this question|your question))?(?:\s+(?:already|before|earlier|above|twice))?${CLAUSE_END}`,
+    String.raw`\bi told you(?:\s+(?:already|before|earlier|twice))?${CLAUSE_END}`,
+    String.raw`\bi (?:said|mentioned|answered) (?:that|this|it|that question|this question|your question)(?:\s+(?:already|before|earlier|twice))?${CLAUSE_END}`,
+    String.raw`\bi said (?:already|before|earlier|twice)${CLAUSE_END}`,
+    String.raw`\b(?:like|as) i (?:already |just )?(?:said|told you|mentioned)(?=\s*(?:[,.!:;—–-]|$|\b(?:before|earlier|above)\b))`,
+    String.raw`\byou(?:${AP}ve| have)? (?:already |just )?asked (?:me )?(?:that|this|the same(?: thing| question)?)(?: (?:already|before|twice))?${CLAUSE_END}`,
+    String.raw`\byou keep asking (?:me )?(?:that|this|the same(?: thing| question)?)\b`,
+    String.raw`\bi${AP}?(?:ve| have) already (?:said|told you|answered) (?:that|this)${CLAUSE_END}`,
+    String.raw`\b(?:read|see) (?:my|what i wrote) (?:above|earlier|last message)\b`,
+    String.raw`\b(?:see|read|check|look) (?:above|up there|my (?:first|last|previous|earlier|original) (?:message|reply|answer|post))\b`,
+  ].join('|'),
+  'i'
+);
+/** The answer itself after "I said" / "I told you", as the whole message: "I said Windows 11", "I already told you Windows 11". Not "I said no", "I told you about my sister". */
+export const ALREADY_SAID_IT = new RegExp(
+  String.raw`^\W*(?:(?:ugh+|no|but|well|ok(?:ay)?|dude|again|sorry|um+|hmm+)[\s,.!]+)*i (?:(?:already|just|literally|clearly)\s+)*(?:said|told you)\s+(?!(?:i|that i|it|you|he|she|they|we|to|so|yes|no|nope|ok|okay|nothing|something|this|that|about|if|when|because|what|how|why|which|who|where|the same)\b)[\w.+#-]+(?:\s+[\w.+#-]+){0,2}\s*[.!]*$`,
+  'i'
+);
+/** Socria's own question asked whether they had done that very thing ("Have you mentioned it to HR?", "Did you tell your partner…?"): "I already mentioned it" answers it. */
+const ASKED_IF_DONE = /\b(?:have|has|had|did) you (?:already |ever |yet |actually |even )?(?:mention|answer|tell|told|say|said|ask|asked|repl(?:y|ied)|respond(?:ed)?|raise|raised|bring|brought|talk|talked|spoke|speak)\w*/i;
+/** Their words that they had already said it: ALREADY_SAID addressed, or the answer itself after "I said" (ALREADY_SAID_IT). */
+function saidAlready(sp: string): boolean {
+  return !!sp && (addressed(ALREADY_SAID, sp, { hedged: true, noDefer: true }) || ALREADY_SAID_IT.test(sp));
+}
+
+const REASK_LEAD = String.raw`^\W*(?:(?:ok(?:ay)?|right|sure|hmm+|um+|yes|yeah|thanks|cool|i see|got it)[\s,.!]+)*(?:(?:but|so|and)\s+)*`;
+/**
+ * Their first sentence asks again for the point: "ok but so what should I
+ * do?", "So what's the bottom line?", "which one?", "So which one is it?",
+ * "So which one should I pick?", "Which one then?", "So which is better?", "What's the short
+ * answer?", "Bottom line?", "So is it yes or no?", "So should I learn Python
+ * or not?", "What would you recommend?", "So what's the verdict?", "And the
+ * answer is?", "You didn't answer my question.", "You still didn't answer my
+ * question", "That didn't answer my question", "Can you just answer the
+ * question?". Read only after a long reply (observeTurn): the evidence is
+ * their re-ask and the reply's length, never where the answer sat in it. Not
+ * "how do I fix my bike chain?" (a new request), "About 50k. What should I do
+ * first?" (an answer first), "that doesn't answer it, I need one for video
+ * editing", "Which one is best for video editing?", "Which one is it, the
+ * red or the blue?" or "What would you recommend for a beginner?" (more said,
+ * a new request). "How do I do it?"
+ * is REASKS_HOW's.
+ */
+export const REASKS = new RegExp(
+  REASK_LEAD +
+    String.raw`(?:what${AP}?s (?:the|your) (?:bottom line|short version|short answer|takeaway|actual answer|verdict|recommendation|final answer)` +
+    String.raw`|(?:the )?(?:bottom line|short answer|short version|verdict|tl;?dr)\s*\?` +
+    String.raw`|what should i (?:actually )?do(?: then| now| next)?(?=\s*[?.!]|$)` +
+    String.raw`|what do i (?:actually )?(?:do|need to do)(?: then| now| next)?(?=\s*[?.!]|$)` +
+    String.raw`|what (?:would|do) you (?:recommend|suggest)(?: then)?(?=\s*[?.!]|$)` +
+    String.raw`|(?:in )?short\s*\?` +
+    String.raw`|(?:is it )?yes or no\s*\?` +
+    String.raw`|should i (?:[\w-]+ ){1,5}or not\s*\?` +
+    String.raw`|(?:the )?answer is\s*\?` +
+    String.raw`|which(?: one(?: is it)?| is (?:it|better))?(?:\s+(?:should|do|would) (?:i|you) (?:pick|choose|start with|go with|recommend|use|learn|get|buy))?(?:\s+then)?\s*\?` +
+    String.raw`|you (?:still |really |even |just )?(?:didn${AP}?t|did not|haven${AP}?t|have not) (?:actually |really )?answer(?:ed)? (?:my|the) question` +
+    String.raw`|that (?:still )?(?:doesn${AP}?t|does not|didn${AP}?t|did not) (?:actually |really )?answer (?:my|the) question` +
+    String.raw`|(?:can|could|would|will) you (?:please )?(?:just )?answer (?:my|the) question)`,
+  'i'
+);
+/**
+ * "How do I do it?", "ok how do I fix it?", "Sure, how do I start it?": a
+ * re-ask only when the message the long reply answered asked how, or what to
+ * do (HOW_ASKED). After a what-is or a why ("What is a Roth IRA?", "Why does
+ * my car click?") it is the next request, and the steps it needs are not a
+ * point that was lost.
+ */
+export const REASKS_HOW = new RegExp(REASK_LEAD + String.raw`how do i (?:actually )?(?:do|fix|start|use|solve) (?:it|this|that)(?=\s*[?.!]|$)`, 'i');
+const HOW_ASKED = new RegExp(String.raw`\bhow (?:do|can|could|should|would) (?:i|we|you|one)\b|\bhow to\b|\bwhat (?:should|do|can|could) (?:i|we) do\b|\bwhat${AP}?s the (?:best )?way to\b|\b(?:the )?steps? to\b`, 'i');
+
+/**
+ * The same material asked for again in another form: bullet points, a list,
+ * a table, simpler, shorter, bold, reworded, compared ("Can you put that in
+ * bullet points?", "explain it more simply", "make that shorter", "bold the
+ * key terms", "compare them in a table", "Could you put it in a table?",
+ * "make me a quick checklist", "list them"). The reply to it says the same
+ * sentences on purpose (repeated_background stands down). A list, a table,
+ * a chart or an outline counts only as the form asked for (in, into or as
+ * one; make or give one; list or tabulate them), never as a thing named:
+ * "What about my orders table?", "How do I sort a list in Python?", "What
+ * format should the dates be in?" are new questions, and background said
+ * again in answer to them is read (integration review).
+ */
+const REFORMAT_ASKED = new RegExp(
+  String.raw`\b(?:bullet(?:ed)?(?: points?| list)?|bullets` +
+    String.raw`|(?:as|in|into|to) (?:an? )?(?!(?:my|your|our|their|his|her|its|the|this|that) )(?:[\w-]+ )?(?:list|table|chart|checklist|outline|grid)s?` +
+    String.raw`|(?:make|give|draw|create|put together) (?:me |us )?(?:an? )?(?:[\w-]+ )?(?:list|table|chart|checklist|outline)s?` +
+    String.raw`|(?:list|tabulate|outline) (?:them|these|those|it|that|this|the (?:main |key )?(?:points|steps|ideas|differences|options))` +
+    String.raw`|tabulate|simpl(?:er|ify|ified|y)|plain(?:er)? (?:english|words|language)|shorter|shorten|condense|bold|highlight` +
+    String.raw`|reformat|format (?:it|that|this|them|these|those)|rephrase|reword|rewrite|restate` +
+    String.raw`|compare (?:it|that|this|them|these|those|the two)|comparison (?:table|chart)|side by side|eli5|like i['’]?m (?:five|5|a child|a kid))\b`,
+  'i'
+);
+
+/** A recap or a repeat asked for: the message a reply answered asked to hear it again, so repeating is what was wanted. */
+export const ASKED_AGAIN = /\b(?:repeat|again|summari[sz]e|recap|remind me|go over (?:it|that|this)|one more time|say that)\b/i;
+
+/** What can stand before a failure report in its clause: "nope", "sadly", "tried it", "I did that", "even after a restart". */
+const FAIL_LEAD = String.raw`^\W*(?:(?:no|nope|nah|hmm+|ugh+|argh+|sadly|unfortunately|alas|ok(?:ay)?|well|so|but|and|yeah|yes|yep|sorry|still|also|though|tried (?:it|that|this|both|everything|again)|did (?:that|it)|done that|i (?:tried|did)(?: (?:it|that|this|both|everything|all (?:of )?that|those|them))?(?: again)?|even (?:after|with) (?:that|this|it|a restart|restarting))[\s,.!:;—–-]+)*`;
+/** Whose failure: the thing being fixed ("it", "this", "the error"), or nobody named — never "the old branch", "the linter", "my phone". */
+const FAIL_SUBJECT = String.raw`(?:(?:it|this|that|this one|everything|the (?:problem|error|issue|bug|crash|message|warning|same (?:thing|error|problem|issue)))(?:${AP}?s|\s+is|\s+was)?\s+)?`;
+const FAIL_BASE = String.raw`(?:work|load|run|start|compile|build|connect|open|boot|turn on|launch|install|sync|print|respond|go through)`;
+const FAIL_ING = String.raw`(?:working|loading|running|starting|compiling|building|connecting|opening|booting|turning on|launching|installing|syncing|printing|responding|going through|helping)`;
+/** …and not asked or going on: "Still there?" asks after them, "Still nothing from the landlord" is news of something else. */
+const FAIL_END_NOT_ASKED = String.raw`(?=\s*(?:[.,;:!)]|$|\b(?:either|at all|again|unfortunately|sadly|for me|though|but|and|tbh|lol|sorry)\b))`;
+/** What still happens: "still not loading", "still drops", "still won't boot", "still the same", "still no luck", "still getting a 404". */
+const FAIL_STILL = String.raw`(?:not ${FAIL_ING}|not (?:fixed|resolved|solved|sorted)|(?:does|did|do)(?:n${AP}?t| not) (?:${FAIL_BASE}|help|fix (?:it|anything|the (?:problem|issue|error))|change anything|do anything|solve (?:it|anything|the (?:problem|issue)))|(?:is|are|was|were)(?:n${AP}?t| not) ${FAIL_ING}|(?:wo(?:n${AP}?t|uld not)|will not|ca(?:n${AP}?t|nnot)) ${FAIL_BASE}|fail(?:s|ing|ed)?|crash(?:es|ing|ed)?|freez(?:es|ing)|froze|hang(?:s|ing)|drop(?:s|ping|ped)?(?: out)?|disconnect(?:s|ing|ed)?|happen(?:s|ing)|broken|slow|(?:there|nothing)${FAIL_END_NOT_ASKED}|the same(?: (?:error|problem|issue|result|thing|message))?|no (?:luck|change|difference|good|internet|connection|signal|sound|picture|display|wifi)|erroring(?: out)?|errors?(?: out)?|(?:giving|throwing|showing) (?:me )?(?:the |an |that )?(?:same )?(?:error|exception|message)|getting (?:a |an |the |that )?(?:same )?(?:\d{3}|error|exception|message|warning|crash|timeout|blue screen)|having (?:the|this|that) (?:same )?(?:issue|problem|error))`;
+/** The end of a short failure report: "Didn't work.", "didn't help either", "Same error again". */
+const FAIL_END = String.raw`(?=\s*(?:[.,;:!?)]|$|\b(?:either|at all|still|again|unfortunately|sadly|for me|though|but|and|tbh|lol|sorry|anymore|any more|this time)\b))`;
+/**
+ * A suggested fix still fails, said at the start of a clause in their first
+ * two sentences: "It's still not working", "still isn't working", "Still
+ * drops.", "still no luck", "It still won't turn on", "Still having the
+ * issue", "The problem is still there", "Didn't work.", "Nope, didn't work",
+ * "Tried it, didn't work", "That didn't solve it", "Didn't change anything",
+ * "Same error", "Still the same", "No change", "It made no difference",
+ * "Nothing changed", "It keeps happening", "It crashed again". Not a failure
+ * turned round ("no errors", "zero errors", "does not crash anymore",
+ * "nothing is broken", "Still no errors"), not somebody else's ("the old
+ * branch still fails", "the linter still errors", "my phone still crashes
+ * the app"), not "I still don't get it" (confusion, not a failed fix),
+ * "Every time I run the script it crashes" (no "still"), or "that still
+ * doesn't make sense to me", not a question or news of something else
+ * ("Still there?", "Still nothing from the landlord about the deposit", "It
+ * keeps happening to my friends too, is it common?", "The same thing, but for
+ * a desktop: does that work?": FAIL_END_NOT_ASKED, FAIL_VARIANT_ASKED) — and
+ * nothing at all when either of their first two sentences says it worked
+ * (FIX_WORKED). Known miss: a named subject ("the wifi still drops").
+ */
+export const STILL_FAILS = new RegExp(
+  [
+    String.raw`${FAIL_LEAD}${FAIL_SUBJECT}still\s+(?:(?:so|really|very|super|pretty|kind of|kinda|way too|too)\s+)?${FAIL_STILL}\b`,
+    String.raw`${FAIL_LEAD}(?:(?:it${AP}?s|it is|still)\s+)?not ${FAIL_ING}${FAIL_END}`,
+    String.raw`${FAIL_LEAD}(?:(?:that|it|this|which|nothing)\s+)?(?:still\s+)?(?:did|does)(?:n${AP}?t| not)\s+(?:work|help|fix (?:it|anything|the (?:problem|issue|error))|solve (?:it|anything|the (?:problem|issue))|do (?:it|anything|the trick)|change anything|make (?:a|any) difference)${FAIL_END}`,
+    String.raw`${FAIL_LEAD}(?:(?:it${AP}?s|it is|i${AP}?m getting|i get|getting|it${AP}?s (?:doing|giving|showing)(?: me)?|it is (?:doing|giving|showing)(?: me)?)\s+)?(?:the\s+)?same (?:error|thing|problem|issue|result|message|crash|behaviou?r)(?:\s+(?:again|as before|here))?${FAIL_END}`,
+    String.raw`${FAIL_LEAD}(?:(?:there${AP}?s|there is)\s+)?no (?:change|difference|luck|improvement)${FAIL_END}`,
+    String.raw`${FAIL_LEAD}(?:(?:it|that|this)\s+)?(?:made|makes) no difference${FAIL_END}`,
+    String.raw`${FAIL_LEAD}nothing (?:changed|happened|worked|helped|has changed)${FAIL_END}`,
+    String.raw`${FAIL_LEAD}(?:it|this|that|the (?:problem|error|issue|crash|bug))\s+(?:still\s+)?keeps (?:happening|crashing|failing|dropping(?: out)?|disconnecting|freezing|coming back|showing up)${FAIL_END}`,
+    String.raw`${FAIL_LEAD}(?:(?:it|this|that)\s+)?(?:fail(?:ed|s)|crash(?:ed|es)|dropped|froze|disconnected|broke|happened|errored(?: out)?) again\b`,
+  ].join('|'),
+  'i'
+);
+/** The same thing asked of something else, in a question: "The same thing, but for a desktop: does that work?", "Same for my other PC?". */
+const FAIL_VARIANT_ASKED = /\bsame(?: (?:thing|one|question|steps?))?[\s,]*(?:but\s+)?(?:for|on|with|in) (?:a|an|my|the|other|another|this|that|your)\b[^?]*\?/i;
+/** It worked, in one of their first two sentences: "it works now", "that fixed it", "no errors", "does not crash anymore", "all good". Not "none of it worked". */
+const FIX_WORKED = new RegExp(
+  String.raw`\b(?:(?<!\bof )(?:it|that|this)(?: works| worked| is working|${AP}?s working| did it| did the trick| fixed it| solved it)|works now|working now|works (?:fine|perfectly|great)|worked (?:now|perfectly|fine|great|like a charm)|fixed it|solved it|(?:it${AP}?s|it is|that${AP}?s|all) (?:fixed|sorted|solved|resolved)|all good|did the trick|got it (?:working|running|to work)|no (?:more )?errors?|zero errors|not (?:crashing|failing|freezing|dropping|disconnecting) (?:anymore|any more)|(?:does(?:n${AP}?t| not)|won${AP}?t|didn${AP}?t|did not) (?:crash|fail|freeze|drop|disconnect|error)(?: out)? (?:anymore|any more|this time)|nothing (?:is |was |${AP}s )?broken|(?:all )?(?:the )?tests? pass(?:es|ed)?|problem solved)\b`,
+  'i'
+);
+/** Where a sentence breaks into the clauses a failure report can open. */
+const FAIL_CLAUSE = /[,;:]\s*|\s+[—–]\s*|\s+-\s+|\s+(?=\b(?:but|and|though)\b)/i;
+/**
+ * The first `n` sentences of a text, read from its opening: when the first
+ * 2,000 characters hold more than `n` sentences, those are the text's own
+ * first `n` (the boundary after the last of them lies inside the slice);
+ * otherwise the whole text is split. The same sentences, without splitting
+ * a long paste to read its first two.
+ */
+function firstSentences(text: string, n: number): string[] {
+  if (text.length > 2000) {
+    const head = sentencesOf(text.slice(0, 2000));
+    if (head.length > n) return head.slice(0, n);
+  }
+  return sentencesOf(text).slice(0, n);
+}
+
+/** Their first two sentences report that the fix still fails (STILL_FAILS), and neither says it worked (FIX_WORKED). */
+export function stillFails(sp: string): boolean {
+  const first = firstSentences(sp, 2);
+  if (first.some((s) => FIX_WORKED.test(s))) return false;
+  return first.some((s) => !FAIL_VARIANT_ASKED.test(s) && s.split(FAIL_CLAUSE).slice(0, 12).some((c) => STILL_FAILS.test((c ?? '').trim())));
+}
+
+// ── an open request ──────────────────────────────────────────────────
+//
+// OPEN REQUEST IS AN ESTIMATE TURNED OBSERVATION, as routine_task is: a
+// structural reading of their first message (or the first of a new topic),
+// not a count and not their words. Its refs name exactly what was read, its
+// confidence is 0.6, the rule that reads it records the goal reading as
+// uncertain, and it holds one turn. Everything it leads to narrows.
+
+const BROAD = String.raw`(?:generative\s+)?(?:ai|a\.i\.|artificial intelligence|machine learning|llms?|large language models?|chat ?bots?|technology|tech|the internet|social media|software|computers?|robots?|automation|science|scientists|medicine|healthcare|health care|education|schools|universities|the economy|economics|capitalism|politics|politicians|governments?|society|humanity|people|humans|companies|businesses|corporations|startups|the industry|innovation|research|researchers|experts|management|leadership|the media|engineers|developers|blockchain|crypto(?:currency)?)`;
+/** A noun the broad subject can stand before: "AI tools", "AI models", "tech companies", "software products". */
+const OR_HEAD = String.raw`(?:\s+(?:tools?|models?|systems?|apps?|applications?|products?|companies|firms|platforms?|startups?|chat ?bots?|assistants?|programs?|projects?))?`;
+const OR_SUBJECT = String.raw`(?:the\s+)?${BROAD}${OR_HEAD}`;
+/**
+ * The broad subjects that can stand with no object ("Why isn't AI working?",
+ * "Why aren't schools improving?"): the things and institutions of BROAD,
+ * never people ("Why don't people help?" has its own answer), and never a
+ * thing that is as often their own ("Why isn't the internet working?", "Why
+ * doesn't the medicine work?" are their router and their prescription).
+ */
+const OR_SUBJECT_THING = String.raw`(?:generative\s+)?(?:ai|a\.i\.|artificial intelligence|machine learning|llms?|large language models?|chat ?bots?|technology|tech|social media|automation|science|healthcare|health care|education|schools|universities|the economy|economics|capitalism|politics|governments?|the government|society|companies|businesses|corporations|startups|the industry|innovation|research|management|leadership|the media|blockchain|crypto(?:currency)?)${OR_HEAD}`;
+const OR_AUX_NEG = String.raw`(?:isn${AP}?t|aren${AP}?t|doesn${AP}?t|don${AP}?t|didn${AP}?t|can${AP}?t|cannot|won${AP}?t|hasn${AP}?t|haven${AP}?t|is not|are not|does not|do not|did not|has not|have not)`;
+const OR_NEG = String.raw`(?:not|never|no longer|isn${AP}?t|aren${AP}?t|doesn${AP}?t|don${AP}?t|didn${AP}?t|can${AP}?t|cannot|won${AP}?t|hasn${AP}?t|haven${AP}?t|failing to|fails to|failed to|unable to)`;
+const OR_ADV = String.raw`(?:(?:really|actually|yet|even|ever|properly|still|seem to|seem able to|able to|be able to|managing to)\s+)*`;
+/** The verbs of delivering, the perfect's participles too: "Why hasn't AI solved any problems?", "Why haven't governments done anything?". */
+const OR_VERB = String.raw`(?:solv(?:e|es|ed|ing)|fix(?:es|ed|ing)?|help(?:s|ed|ing)?(?:\s+(?:with|us|people|anyone))?|chang(?:e|es|ed|ing)|improv(?:e|es|ed|ing)|deliver(?:s|ed|ing)?(?:\s+on)?|do(?:es|ing|ne)?|tackl(?:e|es|ed|ing)|address(?:es|ed|ing)?|work(?:s|ed|ing)?\s+on)`;
+/** No "everything": "Why can't computers do everything?" asks about limits, which have a plain answer. */
+const OR_OBJ = String.raw`\s+(?:(?:any|real|actual|big|bigger|hard|complex|important|major|practical|pressing|the|many|much|more|most|our|everyday|meaningful|serious|real[- ]world|world${AP}?s)\s+){0,2}(?:problems|things|anything|stuff|issues|the world|much)(?:\s+(?:useful|meaningful|real|important|of value))?`;
+/** Delivering with no object: "Why isn't AI working?", "Why doesn't AI work?", "Why is AI not helping?", "Why hasn't AI helped anyone?", "Why isn't AI useful?". */
+const OR_INTRANS = String.raw`(?:work(?:s|ed|ing)?|help(?:s|ed|ing)?(?:\s+(?:anyone|people|us))?|improv(?:e|es|ed|ing)|deliver(?:s|ed|ing)?|(?:(?:more|very|that|so|really|actually)\s+)?useful)`;
+/** What may follow the object, and then nothing but closing punctuation: an added clause ("…, no questions", "…, go deep") is not read. */
+const OR_TAIL_WORD = String.raw`(?:yet|already|anymore|any more|today|now|either|at all|for (?:us|people|anyone|everyone|real|businesses|companies|most people)|in (?:real life|practice|the real world|general)|at scale|(?:that )?people care about|that matter)`;
+const OR_END = String.raw`(?:\s+${OR_TAIL_WORD}){0,2}\s*[?.!]*\s*$`;
+const OR_LEADS = String.raw`^\W*(?:(?:so|ok(?:ay)?|hey|hi|hello|quick question|honest question|genuine question|serious question)[\s,:!—–-]+)*`;
+/**
+ * The whole of a short first question that asks why a broad subject is not
+ * delivering, with nothing about their own case in it: "Why is AI not
+ * solving problems?", "Why can't AI do anything useful?", "How come
+ * technology still can't solve real problems?", "Why are AI tools not
+ * solving complex problems in general?", "Why hasn't AI solved any
+ * problems?", "Why isn't AI working?", "Why aren't schools improving?". What
+ * they would count as solved is unsaid, and it decides the answer. Anchored
+ * at the end: after the object only the listed tail words, then closing
+ * punctuation, so "Why is AI not solving problems, no questions" and "…, go
+ * deep" are not read (their added words are theirs to keep). Not "Why is the
+ * sky blue?", "Why don't people vote?", "Why is AI not solving problems in
+ * healthcare?" (a field named), "Why can't computers do everything?" (limits,
+ * with a plain answer), "Why doesn't the chatbot remember things?", "Is AI
+ * overhyped?". The topic list is a documented limit: "Is college worth it?"
+ * is not read, which is a safe miss. A personal outcome question ("Why is my
+ * team not productive?", "How do I fix my sleep?") stays out by decision: it
+ * is their own case, and an answer with its assumptions stated serves it
+ * without MR.
+ */
+export const OPEN_REQUEST = new RegExp(
+  OR_LEADS +
+    String.raw`(?:why|how come)\s+(?:` +
+    String.raw`(?:${OR_AUX_NEG}\s+${OR_SUBJECT}|(?:(?:is|are|do|does|did|has|have)\s+)?${OR_SUBJECT}\s+(?:still\s+)?${OR_NEG})\s+${OR_ADV}${OR_VERB}${OR_OBJ}` +
+    String.raw`|(?:${OR_AUX_NEG}\s+${OR_SUBJECT_THING}|(?:(?:is|are|do|does|did|has|have)\s+)?${OR_SUBJECT_THING}\s+(?:still\s+)?${OR_NEG})\s+${OR_ADV}${OR_INTRANS}` +
+    String.raw`)${OR_END}`,
+  'i'
+);
+/**
+ * Anything that ties a question to their own case — a person, a pointer, a
+ * number, a quote, an attachment. One of these and the request is not open.
+ * (Known miss: the dotted "A.I." trips it.)
+ */
+export const ANCHOR = /\b(?:my|mine|our|ours|i|i['’]?m|i['’]?ve|i['’]?d|we|we['’]?re|this|that|these|those|here|above|below|it)\b|\d|["“”`]|\[attached/i;
+/**
+ * A first message that points at something that is not there: "How do I fix
+ * this?", "Help me fix this bug.", "Solve this equation", "Can you explain
+ * this?", "Why does this happen?", "Why isn't this working?", "Why is it not
+ * working?", "Can you help me with this?", "Can you look at / review /
+ * summarise / proofread this?", "Can you check this?", "Translate this",
+ * "What do you think of this?", "Thoughts on this?", "Can you check my
+ * work?". Read only when the route says nothing is on their screen either
+ * (ObserveContext.material === false). Not "Write a unit test for this function please", "Can you explain
+ * this proof that root 2 is irrational?" (the thing is named in it), "What
+ * does this mean?" (a fact question), "Let's do this!" or "You can do it!"
+ * (CAN_DO_IT), or the thing handed over after it (HANDED_OVER: "Solve this
+ * equation: x squared equals four"). Known miss: the thing said before the
+ * pointer ("Photosynthesis converts light into energy. Can you explain
+ * this?") is still read as missing.
+ */
+export const MISSING_REFERENT = new RegExp(
+  [
+    String.raw`\b(?:fix|solve|debug|explain|answer|understand|approach|start|finish|check|do|look at|review|summari[sz]e|translate|proofread|rewrite|check over|go over)\s+(?:this|it|that|these|them)(?=\s*(?:[?.!,]|$|\b(?:for me|please|properly|correctly|step by step)\b))`,
+    String.raw`\b(?:fix|solve|debug|explain|answer|understand|approach|start|finish|check|with|on)\s+(?:this|that)\s+(?:problem|question|exercise|proof|bug|error|issue|task|assignment|equation|function|code|snippet|one)\b(?!\s+(?:of|about|in|on|with|where|that|which|from|for|is|was)\b)`,
+    String.raw`\bwhat does (?:this|that|it) mean\b`,
+    String.raw`\bwhy (?:does|doesn${AP}?t|did|didn${AP}?t|is|isn${AP}?t|won${AP}?t|will|would|wouldn${AP}?t|can${AP}?t) (?:this|it|that)(?: not)? (?:work(?:s|ing)?|happen(?:s|ing)?|fail(?:s|ing)?|break(?:s|ing)?|crash(?:es|ing)?|compil(?:e|es|ing)|run(?:s|ning)?|load(?:s|ing)?|keep (?:crashing|failing|breaking|happening))\b(?!\s+out\b)`,
+    // with nothing after it: "Can you help me with this?", "Help me with this", "help me out with it please"
+    String.raw`\b(?:help(?: me| us)?(?: out)?|assist(?: me)?)\s+with\s+(?:this|it|that)(?=\s*(?:[?.!,]|$|\b(?:for me|please)\b))`,
+    // their work named, and nothing of it there: "Can you check my work?", "Could you look over my answers?"
+    String.raw`\b(?:check|review|look (?:at|over)|go over|proofread|mark|grade)\s+(?:my|our) (?:work|answers?|solutions?|working|essay|homework|draft)(?=\s*(?:[?.!,]|$|\b(?:for me|please)\b))`,
+    // a view asked of it, as the whole message: "What do you think of this?", "Thoughts on this?"
+    String.raw`^\W*(?:(?:so|ok(?:ay)?|hey|hi)[\s,]+)?(?:what do you think (?:of|about)|(?:any |your )?thoughts on|(?:your )?opinions? on|feedback on|what${AP}?s your (?:take|opinion|view) on) (?:this|it|that)\s*[?.!]*\s*$`,
+  ].join('|'),
+  'i'
+);
+/** A task ACS reads as a fact asked ("translate", "convert"), put to a pointer: "Translate this", "Convert it please". */
+const POINTER_TASK = /^\W*(?:(?:please|pls|can you|could you)\s+)?(?:translate|convert|calculate|compute)\s+(?:this|it|that|these|them)\b/i;
+/** Encouragement, not a pointer: "Let's do this!", "I can do it!", "You can do it!", "We can do this", "Let's start this". */
+const CAN_DO_IT = new RegExp(String.raw`\b(?:let${AP}?s|let us|i can|you can|we can|i${AP}?ll|we${AP}?ll|you${AP}?ll|we got|you got|ready to|time to)\s+(?:do|start|finish|nail|crack|beat)\s+(?:this|it|that)\b`, 'i');
+/** After the pointer, the thing itself: two words or more after a colon, a comma, a dash ("Explain this error — undefined is not a function", "Solve this equation please: x squared…"). */
+const HANDED_OVER = /^\s*(?:(?:please|pls|for me)\s*)?[?!.]*\s*(?:[:,;—–]|-\s)\s*\S+\s+\S+/i;
+/** …or on the next line ("Can you explain this?\nPhotosynthesis converts light…"), read on their raw text (speech joins the lines). */
+const HANDED_OVER_BELOW = /^[^\S\n]*[?!.]*[^\S\n]*\n\s*\S+\s+\S+/;
+/**
+ * A thing of theirs named before the pointer, which the pointer then refers
+ * back to: "My sink is clogged, how do I fix it?", "My knee hurts after
+ * running, why does this happen?", "My Excel formula returns #REF!, why is it
+ * not working?". The question is clear (or the details it needs are a matter
+ * for ACS), so Branch B is silent; "How do I fix this?" with nothing before it
+ * still reads. A known narrowing: "My code doesn't work, can you fix this?",
+ * with the code not pasted, is read as their named code and gets no line.
+ */
+const NAMED_BEFORE = /\b(?:my|our|his|her|their|the|a|an)\s+(?!(?:way|best|turn|time|bad|own)\b)[a-z][\w'’-]*/i;
+/** MISSING_REFERENT, with nothing handed over after it and no encouragement (Branch B of openRequestOf). */
+function pointsAtNothing(sp: string, raw: string): boolean {
+  const m = MISSING_REFERENT.exec(sp);
+  if (!m || CAN_DO_IT.test(sp) || HANDED_OVER.test(sp.slice(m.index + m[0].length))) return false;
+  // a pointer back to what they have just named is no missing referent: "My sink is clogged, how do I fix it?"
+  if (NAMED_BEFORE.test(sp.slice(0, m.index))) return false;
+  const r = MISSING_REFERENT.exec(raw);
+  return !(r && HANDED_OVER_BELOW.test(raw.slice(r.index + r[0].length)));
+}
+
+/**
+ * The precise codes one message carries, read from its words and the reply
+ * before it. Worked out whatever the policy (a measure reads them under any
+ * pin), and never merged into Own.codes: only readWords adds them, and only
+ * under a policy with params.precision. A stuck here is one that stands on
+ * its own words (stuckWordsOf 'said'); one among other words waits for a task
+ * in the window (stuckSaid). A correction and "I know that" are read in the
+ * first TOPIC_READ_CHARS of the message (a long paste's own sentences are not
+ * theirs). The cheap readings first: replyExplained counts the whole reply.
+ */
+function readPrecise(said: string, prevReply: string | null, stuck: StuckWords | null): Set<PreciseCode> {
+  const out = new Set<PreciseCode>();
+  if (!said) return out;
+  if (stuck === 'said') out.add('explicit.stuck');
+  // a correction and "I know that" are read in the opening of what they said (TOPIC_READ_CHARS): in a long paste,
+  // the words of somebody else's text are not theirs to Socria, and reading all of it costs every turn
+  const sp = said.length > TOPIC_READ_CHARS ? said.slice(0, TOPIC_READ_CHARS) : said;
+  const theirs = (re: RegExp) => addressed(re, sp, { hedged: true, noDefer: true });
+  // (praise turns only a "this is X, not Y" into a verdict: a contrast that opens it — "Wrong OS, it's a Mac" — is no praise)
+  if (prevReply !== null && !CORRECTED_NOT.test(sp) && ((CORRECTED_ANY.test(sp) && theirs(CORRECTED)) || (setupPossible(sp) && theirs(CORRECTED_SETUP) && (SETUP_START.test(sp) || !CORRECTED_PRAISE.test(firstSentences(sp, 1)[0] ?? ''))))) out.add('explicit.corrected');
+  // (not taken back: "Can you stop repeating yourself? Just kidding, it helps.")
+  if (prevReply !== null && KNOWS_ANY.test(sp) && !KNOWS_UNSURE.test(sp) && !ASKED_AGAIN.test(sp) && !STUCK_RETRACTED.test(sp) && theirs(KNOWS_THAT) && replyExplained(prevReply)) out.add('explicit.knows_that');
+  return out;
+}
+
+// CHEAP SUPERSETS, tested before the full patterns on what can be a long
+// message (a paste is up to IFR_READ_CHARS): each holds a word or phrase that
+// every alternative of its pattern needs, so a message without one cannot
+// match it, and the reading is the same, only cheaper.
+/** Every alternative of STUCK says one of these: "stuck", "where to", "how to", "what to do", "hit a wall", "get past", "figure", "work out", "solve", "approach", "do it". */
+const STUCK_ANY = /stuck|where to|how to|what to do|hit a wall|get past|figure|work out|solve|approach|\bdo (?:it|this|that|what|the)\b/i;
+/** …of CORRECTED: "mean(t)", "question", "misunderst…", "misread", "ask…", "talking", "not what". */
+const CORRECTED_ANY = /mean|question|misunderst|misread|\bask|talking|not what/i;
+/** …of KNOWS_THAT: "know", "aware", "understand", "get that", "familiar", "new to", "beginner", "done", "learn…", "covered", "went over", "skip", "explain", "said", "repeating" and the rest. */
+const KNOWS_ANY = /know|aware|understand|get (?:that|this)|familiar|new to|beginner|done|learn|studied|covered|went over|\bdid\b|discussed|talked about|skip|spare me|no need|drop the|need (?:the|a|an|any)|explain|said|told me|mentioned|repeating|keep saying/i;
+
+/**
+ * How one message says it is stuck, from its words alone. 'said': the stuck
+ * words stand on their own (nothing else in the message but fillers and a
+ * plea for help, "help" before them too), or a piece of work is named beside
+ * them (STUCK_WORK, a number or an operator, code). 'bare': other words are
+ * there and none of them is about work ("I'm stuck, where is the adapter?"),
+ * so it counts only with a task on the table (stuckSaid, taskInWindow). Null:
+ * no stuck, or one the message puts aside — feelings or grief (their
+ * tenderness, readSignals' vent, sensitive and safety, STUCK_AFFECT), life
+ * logistics (STUCK_LIFE), the people and the life around a bare stuck
+ * (STUCK_PEOPLE: "I don't know what to do. I think my friend is angry with
+ * me"), a way out found after it (STUCK_RESOLVED), a joke (STUCK_RETRACTED),
+ * or the words asked about rather than said (STUCK_QUOTED).
+ */
+type StuckWords = 'said' | 'bare';
+function stuckWordsOf(said: string, t: TurnView, words: number): StuckWords | null {
+  if (!said || !STUCK_ANY.test(said)) return null;
+  // ("help I'm stuck": the plea is read past, as STUCK_PLEA reads one after the words)
+  let sp = said.replace(HELP_LEAD, '');
+  let m = addressedAt(STUCK, sp, { hedged: true, noDefer: true });
+  // a stuck on a line of its own after pasted lines (unfenced code): speech joins the lines, so read the last ones alone
+  if (!m && t.text.includes('\n')) {
+    for (const line of t.text.slice(0, IFR_READ_CHARS).split('\n').slice(-3).reverse()) {
+      const l = speech(line).replace(HELP_LEAD, '');
+      const lm = l && STUCK_ANY.test(l) ? addressedAt(STUCK, l, { hedged: true, noDefer: true }) : null;
+      if (lm) {
+        sp = l;
+        m = lm;
+        break;
+      }
+    }
+  }
+  if (!m || stuckPutAside(sp, t, m.index + m[0].length)) return null;
+  const rest = (sp.slice(0, m.index) + ' ' + sp.slice(m.index + m[0].length)).replace(STUCK_PLEA, ' ');
+  const left = rest.toLowerCase().split(/[^\p{L}\p{N}'’]+/u).filter((w) => w && !STUCK_FILLER.has(w.replace(/['’]/g, '')));
+  if (words <= 4 || left.length <= 2) return 'said';
+  if (STUCK_WORK.test(sp) || ATTEMPT.test(sp) || /```|`[^`\n]+`/.test(t.text.slice(0, IFR_READ_CHARS))) return 'said';
+  // among other words about the people and the life around them, it is not the work in the window that is stuck
+  return STUCK_PEOPLE.test(sp) ? null : 'bare';
+}
+/** What puts a stuck aside, in the message (feelings, grief, life, a translation) or after the stuck words (resolved, a joke). */
+function stuckPutAside(sp: string, t: TurnView, end: number): boolean {
+  const s = t.signals;
+  if (s.vent || s.sensitive || s.safety || tenderText(sp) || STUCK_AFFECT.test(sp) || STUCK_LIFE.test(sp) || STUCK_QUOTED.test(sp)) return true;
+  const after = sp.slice(end);
+  return STUCK_RESOLVED.test(after) || STUCK_RETRACTED.test(after);
+}
+/** "Still stuck" opening a clause, not put aside (the contextual reading's words; stuckAgainAt adds the context). */
+function stillStuckOf(sp: string, t: TurnView): boolean {
+  // (every STILL_STUCK says "stuck")
+  if (!sp || !/stuck/i.test(sp)) return false;
+  const g = new RegExp(STILL_STUCK_ANYWHERE.source, 'gi');
+  let m: RegExpExecArray | null;
+  while ((m = g.exec(sp))) {
+    if (!stuckPutAside(sp, t, m.index + m[0].length)) return true;
+    if (m[0].length === 0) g.lastIndex++;
+  }
+  return false;
+}
+
+/** How much of a message newTopicAt reads for what it is about: its opening (a long paste is still about what it opens with). The reply to it is read to IFR_READ_CHARS. */
+const TOPIC_READ_CHARS = 1500;
+/** Any broad subject, as one word: to newTopicAt "AI", "technology" and "companies" are one topic (BROAD). */
+const BROAD_ANY = new RegExp(String.raw`\b${BROAD}\b`, 'gi');
+/** Words that say what is asked of the reply, not what it is about ("mean", "example", "safe", "long", "first"). */
+const TOPIC_GENERIC = new Set(
+  'what how why which when where who whose tell explain give show help please now answer question questions first try let mean means meaning meant example examples detail details detailed more most less again sense idea ideas thought thoughts advice tip tips suggestion suggestions opinion thing things stuff way ways kind sort type bit lot lots anything something everything nothing someone anyone everyone use used using work works working make made making take takes taking get gets getting got put need needs want wants like know think see look say said mention mentioned add include send ask call handle deal happen happens happened happening real really actually still even also just much many very good better best bad okay fine sure safe long short simple simpler simply easy hard whole entire full different same other another new next last thanks thank great cool nice yes yeah sorry quick quickly instead else then there here today tomorrow'.split(' ')
+);
+/** TOPIC_GENERIC stemmed, so "makes" and "happening" are generic too (filled in after stemOf). */
+const GENERIC_STEMS = new Set<string>();
+/** A word without its ending, so "wavelength" meets "wavelengths" and "solving" meets "solve". */
+function stemOf(w: string): string {
+  let s = w;
+  if (s.length > 4 && s.endsWith('ies')) s = s.slice(0, -3) + 'y';
+  else if (s.length > 5 && s.endsWith('ing')) s = s.slice(0, -3);
+  else if (s.length > 4 && s.endsWith('ed')) s = s.slice(0, -2);
+  else if (s.length > 4 && /(?:ss|sh|ch|x|z)es$/.test(s)) s = s.slice(0, -2);
+  else if (s.length > 3 && s.endsWith('s') && !/(?:ss|us|is)$/.test(s)) s = s.slice(0, -1);
+  if (s.length > 3 && /([b-df-hj-np-tv-z])\1$/.test(s) && !/(?:ll|ss|zz|ff)$/.test(s)) s = s.slice(0, -1);
+  if (s.length > 3 && s.endsWith('e')) s = s.slice(0, -1);
+  return s;
+}
+for (const w of TOPIC_GENERIC) GENERIC_STEMS.add(stemOf(w));
+/**
+ * What a message is about, for newTopicAt: its content words of three letters
+ * or more, stemmed, less the words every follow-up shares (TOPIC_GENERIC),
+ * with every broad subject one word ("AI" is kept although it has two
+ * letters).
+ */
+function topicStemsOf(x: string): Set<string> {
+  const out = new Set<string>();
+  for (const w of tokensOf(x.replace(BROAD_ANY, ' broadsubject '))) {
+    if (!/[a-z]{3,}/.test(w) || TOPIC_GENERIC.has(w)) continue;
+    const s = stemOf(w);
+    if (!GENERIC_STEMS.has(s)) out.add(s);
+  }
+  return out;
+}
+/** A follow-up that points back at the reply: "Can you give an example?", "Is that safe to do?", "What if I have no admin rights?", "How long does it take?". */
+const REFERS_BACK = new RegExp(String.raw`\b(?:it|its|it${AP}s|that|this|those|these|them|there|then|too|the same|more|another|example|again|else|instead|also|what if|how long|is it safe)\b`, 'i');
+/** …or carries the thread on by how it opens: "and on my other PC?", "what else can I try?", "what about the fan noise?", "is it the same on a Mac?", "can you redo it…". */
+const SAME_THREAD = /^\W*(?:(?:ok(?:ay)?|so|well|hmm+|right|thanks|thank you|great|cool|oh|ah)[\s,.!]+)*(?:and|what else|what about|how about|is (?:it|that|this) the same|(?:can|could|would) you redo|redo|same (?:for|with|on|goes))\b/i;
+/** A new topic said in so many words, opening the message: "Unrelated, but…", "Totally separate thing -", "Different question:", "On another note,". */
+const NEW_TOPIC_SAID = /^\W*(?:(?:ok(?:ay)?|so|thanks|thank you|great|cool|right|also|oh|and)[\s,.!]+)*(?:unrelated|(?:a |on a )?(?:totally |completely |slightly |quick )?(?:different|separate|new|unrelated|other) (?:question|thing|topic|subject|note)|off[- ]topic|on (?:a|an)(?: \w+)? (?:different|other|unrelated|separate) note|on another note|changing the subject|change of (?:subject|topic)|random question)\b/i;
+/** The sentences of a message that ask (or the whole message when none does): "Thanks, that helps. Unrelated: how do I…?" asks only in the second. */
+function askingPart(sp: string): string {
+  const asks = sentencesOf(sp).filter((s) => /\?/.test(s));
+  return asks.length ? asks.join(' ') : sp;
+}
+
+// One reading per TurnView, as OWN: new_topic, openRequestOf, the stuck window and the measure all ask it of the
+// same turn. Kept with the message before it, so a view read inside another conversation is read again.
+const NEW_TOPIC = new WeakMap<TurnView, { prev: TurnView; at: boolean }>();
+
+/**
+ * Their message at turns[k] asks about something else: movedOn from their
+ * previous message, it neither points back at the reply (REFERS_BACK: "Can
+ * you give an example?", "Is that safe to do?", "Does that work on a Mac
+ * too?", "What if I have no admin rights?") nor carries the thread on by how
+ * it opens (SAME_THREAD: "and on my other PC?", "what else can I try?"), and
+ * at least two of its topic words (topicStemsOf, stemmed, a broad subject one
+ * word) and none of the others are in neither their previous message nor the
+ * whole reply to it (nor inside a word of them, five letters or more: "error"
+ * in "TypeError"): one shared topic word keeps it on the thread ("Could my
+ * microwave be causing the interference?", "Would a mesh system fix the
+ * drops?" after a reply about wifi interference and drops; "Can malware slow
+ * down Task Manager?" after one about Task Manager) — unless the message
+ * says it is another topic ("Unrelated, but…", "Totally separate thing -":
+ * NEW_TOPIC_SAID). So
+ * "What does wavelength mean?" after a reply about wavelengths, "Thanks! What
+ * should I bake first?" after one about a starter, and "Why can't AI do
+ * anything useful?" after their own AI chatbot are not new topics; an answer
+ * that reuses the reply's words ("In my own work, support tickets") is not,
+ * and nor is a stuck (the work in hand), a hint asked for, a short attempt,
+ * or the first turn. "how do I convert 5 miles to km", a reply, then "Why is
+ * AI not solving problems?" is. The message is read at its opening
+ * (TOPIC_READ_CHARS), the reply to IFR_READ_CHARS. Read once per turn and
+ * shared (new_topic, openRequestOf, the stuck window, the measure
+ * react.newTopic).
+ */
+export function newTopicAt(turns: readonly TurnView[], k: number): boolean {
+  if (k <= 0 || !turns[k]) return false;
+  const hit = NEW_TOPIC.get(turns[k]);
+  if (hit && hit.prev === turns[k - 1]) return hit.at;
+  const at = readNewTopic(turns, k);
+  NEW_TOPIC.set(turns[k], { prev: turns[k - 1], at });
+  return at;
+}
+function readNewTopic(turns: readonly TurnView[], k: number): boolean {
+  const me = own(turns[k]);
+  const before = own(turns[k - 1]);
+  // "I'm stuck, any thoughts on how to move on?" is about the work in hand, whatever its words
+  if (me.stuck !== null || me.stillStuck) return false;
+  const sp = me.sp;
+  // said so: "Unrelated, but what is a good laptop for video editing?" shares "laptop" with the wifi thread and is still new
+  if (NEW_TOPIC_SAID.test(sp)) return !REFERS_BACK.test(askingPart(sp.slice(0, TOPIC_READ_CHARS)).replace(NEW_TOPIC_SAID, ''));
+  if (!movedOnSaid(before.sp, me.sp, null, before.topic, me.topic, me.words)) return false;
+  const asking = askingPart(sp.slice(0, TOPIC_READ_CHARS));
+  if (SAME_THREAD.test(sp) || SAME_THREAD.test(asking) || REFERS_BACK.test(asking)) return false;
+  const known = [before.replyStems, before.stems];
+  // a word of five letters or more inside a known one, or the other way round, is known: "error" in "TypeError"
+  const inside = (w: string) => w.length >= 5 && known.some((ks) => [...ks].some((x) => x.length >= 5 && (x.includes(w) || w.includes(x))));
+  // two words of its own and none of the thread's: one shared word ("Could my microwave be causing the
+  // interference?" after a reply about interference) keeps it on the thread
+  let novel = 0;
+  for (const w of me.stems) {
+    if (known.some((ks) => ks.has(w)) || inside(w)) return false;
+    novel++;
+  }
+  return novel >= 2;
+}
+
+/**
+ * Branch A after the first turn: everything they said before is short chit-chat
+ * ("hi", "hello there", "stop asking me questions"): 5 words or fewer, with
+ * nothing of their own case in it (ANCHOR). Once they have told Socria
+ * anything, a later "Why can't AI do anything useful?" may be about it.
+ */
+function onlyChitChatBefore(turns: readonly TurnView[], k: number): boolean {
+  for (let j = 0; j < k; j++) {
+    const o = own(turns[j]);
+    if (o.words > 5 || ANCHOR.test(o.sp)) return false;
+  }
+  return true;
+}
+
+/**
+ * What makes turns[k] an open request, as ref codes, or null. Only a first
+ * message or the first of a new topic, only under a policy with
+ * params.precision, and never when they asked for anything in so many words,
+ * are practising, asked a fact or offered their own work, wrote about
+ * themselves or someone close, asked to be heard, set the length to
+ * detailed, or attached something.
+ *
+ * Branch A, the vague outcome: a short single sentence of the OPEN_REQUEST
+ * kind with no ANCHOR in it, their own work not offered, and nothing on their
+ * screen (material true is a document or a photo that may say what they
+ * mean; unknown, as in a replay, is read as before). After the first turn it
+ * needs a new topic and nothing but chit-chat before it (onlyChitChatBefore):
+ * once they have said anything of their own, it may be what they mean.
+ * Branch B, the missing referent: a short first message that points at
+ * something (MISSING_REFERENT, with nothing handed over after it:
+ * pointsAtNothing) when the route says nothing else is on their screen — live
+ * only, since a replay cannot know what was on the screen then. offersWork
+ * is not read there: with nothing on their screen, nothing can have been
+ * offered ("Can you check this?").
+ *
+ * Known miss, by design: "What's wrong with education?" — every "what's" or
+ * "what is" opener is a fact question to ACS (lib/cognition/assist.ts
+ * isFactQuestion), and a fact question is never read as open.
+ */
+export function openRequestOf(turns: readonly TurnView[], k: number, ctx: ObserveContext, me: Own, codes: ReadonlySet<ExplicitCode>): string[] | null {
+  const t = turns[k];
+  const p = ctx.params;
+  if (!t || !p.precision || ctx.length === 'detailed' || codes.size > 0) return null;
+  const vagueMax = p.openRequestWords ?? 12;
+  const referentMax = p.referentWords ?? 10;
+  // (neither branch reads a message outside these lengths: the cheap test first)
+  if (me.words < 2 || me.words > Math.max(vagueMax, referentMax)) return null;
+  if (practiceSince(turns, k) >= 0) return null;
+  // a fact asked is never open; "Translate this" with nothing to translate is a pointer, not a fact (Branch B)
+  const fact = isFactQuestion(t.text);
+  if (fact && !POINTER_TASK.test(me.sp)) return null;
+  const s = t.signals;
+  if (s.safety || s.sensitive || s.vent || tenderText(t.text)) return null;
+  if (s.directness !== 'none' || s.answersOnly || s.recommendationRequested) return null;
+  if (me.writing || /\[Attached /.test(t.text)) return null;
+  if (
+    ctx.material !== true &&
+    me.words >= 3 &&
+    me.words <= vagueMax &&
+    me.cappedRawWords - me.words <= 3 &&
+    !fact &&
+    OPEN_REQUEST.test(me.sp) &&
+    !ANCHOR.test(me.sp) &&
+    sentencesOf(me.sp).length === 1 &&
+    !offersWork(t.text) &&
+    (k === 0 || (onlyChitChatBefore(turns, k) && newTopicAt(turns, k)))
+  )
+    return [IFR_REF_CODES.requestOpen, k === 0 ? IFR_REF_CODES.requestFirst : IFR_REF_CODES.requestNewTopic, IFR_REF_CODES.broadSubject, IFR_REF_CODES.vagueOutcome];
+  if (k === 0 && ctx.material === false && me.words <= referentMax && me.cappedRawWords - me.words <= 2 && !/\d/.test(me.sp) && pointsAtNothing(me.sp, t.text.slice(0, IFR_READ_CHARS)))
+    return [IFR_REF_CODES.requestOpen, IFR_REF_CODES.requestFirst, IFR_REF_CODES.missingReferent, IFR_REF_CODES.nothingShown];
+  return null;
 }
 
 /** A piece of their own writing named: "my essay", "the draft", "this cover letter". */
@@ -1028,6 +2115,10 @@ const EXPLICIT_WEIGHT: Record<ExplicitCode, readonly [Strength, number]> = {
   'explicit.rewrite': ['strong', 0.85],
   'explicit.learning_goal': ['strong', 0.9],
   'explicit.confused': ['strong', 0.9],
+  // Reports, read only under a policy with params.precision (readPrecise): never standing, never a preference.
+  'explicit.stuck': ['strong', 0.85],
+  'explicit.corrected': ['strong', 0.85],
+  'explicit.knows_that': ['strong', 0.8],
   'explicit.revoke': ['strong', 0.9],
   'explicit.end_practice': ['strong', 0.9],
   // SATISFACTION ONLY. "Thanks, that helped" says how the reply felt, not
@@ -1062,6 +2153,8 @@ interface Own {
   words: number;
   /** words in the whole message, pasted material included */
   rawWords: number;
+  /** words in the first IFR_READ_CHARS of the message, pasted material included: what `words` is measured against for a paste */
+  cappedRawWords: number;
   /** explicit codes this message alone carries (revocation-by-asking is added in observeTurn) */
   codes: Set<ExplicitCode>;
   /** an attempt: a digit or an operator */
@@ -1076,6 +2169,22 @@ interface Own {
   writing: boolean;
   /** questionLoad of the reply after it; null when there is none */
   replyLoad: number | null;
+  /** the precise codes (readPrecise) — read whatever the policy, added to the turn's codes only under params.precision */
+  precise: ReadonlySet<PreciseCode>;
+  /** how its words say it is stuck (stuckWordsOf): on their own, among other words (a task in the window decides), or not */
+  stuck: StuckWords | null;
+  /** "still stuck" opening a clause, not put aside (stuckAgainAt adds the earlier stuck it needs) */
+  stillStuck: boolean;
+  /** the explicit questions of the reply after it, as content-word sets of 3 words or more (at most 8) */
+  replyQuestions: readonly Set<string>[];
+  /** the distinct sentences of the reply after it, as content-word sets of 8 words or more (at most 40) */
+  replySentences: readonly Set<string>[];
+  /** what the reply after it was about: topicStemsOf over its first IFR_READ_CHARS (newTopicAt) */
+  replyStems: Set<string>;
+  /** what it is about: topicWords over the first TOPIC_READ_CHARS of sp, movedOn's reading (newTopicAt) */
+  topic: Set<string>;
+  /** what it is about, stemmed: topicStemsOf over the first TOPIC_READ_CHARS of sp (newTopicAt) */
+  stems: Set<string>;
 }
 
 // One reading per TurnView object: observeTurn looks back over earlier turns
@@ -1343,6 +2452,15 @@ const THE_EXERCISE_MATH = /\d\s*[-+*^×÷=<>]\s*[\d(a-z]|[a-z]\s*[\^=]\s*[\w(-]|
 const THE_EXERCISE_WORDS = /\bwhat(?:'s| is) the (?:derivative|integral|limit|value|sum|square root|answer|solution) (?:of|to)\b|\b(?:solve|simplify|factori[sz]e|differentiate|integrate|prove that)\b/i;
 /** (Working with an operator or a variable — "2x + 3 = 11", "x^2" — not a fraction or a part number: "3/4 inch", "12V".) */
 const THE_EXERCISE = { test: (x: string) => THE_EXERCISE_MATH.test(x) || THE_EXERCISE_WORDS.test(x) };
+/** An exercise verb put to a pointer or to nothing ("how to solve this", "I'm stuck trying to simplify it"): it names no exercise. */
+const EXERCISE_POINTER = /\b(?:solve|simplify|factori[sz]e|differentiate|integrate|prove that)\s+(?:this|it|that|them|these|those)(?:\s+one)?\b|\b(?:solve|simplify|factori[sz]e|differentiate|integrate)(?=\s*(?:[?.!,;]|$))/gi;
+/**
+ * An exercise in their words (precision readers of stuck): THE_EXERCISE, but an
+ * exercise verb whose object is "this", "it" or nothing is no exercise shown —
+ * "I don't know how to solve this" with nothing before it is not work on the
+ * table, while "solve 3x + 7 = 22" and "simplify (x^2 - 1)/(x - 1)" are.
+ */
+const exerciseNamed = (x: string): boolean => THE_EXERCISE_MATH.test(x) || THE_EXERCISE_WORDS.test(x.replace(EXERCISE_POINTER, ' '));
 
 /** Where the last match of `re` starts in `text`, or -1. */
 function lastIndexOf(re: RegExp, text: string): number {
@@ -1545,7 +2663,7 @@ function standingIf(codes: Set<ExplicitCode>, s: ExplicitSignals, sp: string): v
 class OwnReading implements Own {
   readonly sp: string;
   readonly codes: Set<ExplicitCode>;
-  private memo: Partial<Record<'words' | 'rawWords' | 'tokens' | 'nums' | 'askMore' | 'writing' | 'replyLoad' | 'attempt' | 'short', unknown>> = {};
+  private memo: Partial<Record<'words' | 'rawWords' | 'cappedRawWords' | 'tokens' | 'nums' | 'askMore' | 'writing' | 'replyLoad' | 'attempt' | 'short' | 'precise' | 'stuck' | 'stillStuck' | 'replyQuestions' | 'replySentences' | 'replyStems' | 'topic' | 'stems' | 'replyAsks', unknown>> = {};
   constructor(private readonly t: TurnView) {
     this.sp = speech(t.text.slice(0, IFR_READ_CHARS));
     this.codes = readExplicit(this.sp, t.signals, t.prevReply !== null, null, true, t.prevReply);
@@ -1559,6 +2677,9 @@ class OwnReading implements Own {
   }
   get rawWords(): number {
     return this.once('rawWords', () => wordCount(this.t.text));
+  }
+  get cappedRawWords(): number {
+    return this.once('cappedRawWords', () => wordCount(this.t.text.slice(0, IFR_READ_CHARS)));
   }
   get attempt(): boolean {
     return this.once('attempt', () => ATTEMPT.test(this.sp));
@@ -1578,8 +2699,43 @@ class OwnReading implements Own {
   get writing(): boolean {
     return this.once('writing', () => WRITING_NAMED.test(this.sp));
   }
+  /** interrogatives of the reply after it, parsed once for the question streak and the repeated question */
+  private get replyAsks(): ReturnType<typeof interrogatives> | null {
+    return this.once('replyAsks', () => (this.t.reply === null ? null : interrogatives(this.t.reply)));
+  }
   get replyLoad(): number | null {
-    return this.once('replyLoad', () => (this.t.reply === null ? null : questionLoad(this.t.reply)));
+    // questionLoad(reply), from the one parse
+    return this.once('replyLoad', () => {
+      const q = this.replyAsks;
+      return q === null ? null : q.explicit.length + q.disguised.length;
+    });
+  }
+  get precise(): ReadonlySet<PreciseCode> {
+    return this.once('precise', () => readPrecise(this.sp, this.t.prevReply, this.stuck));
+  }
+  get stuck(): StuckWords | null {
+    return this.once('stuck', () => stuckWordsOf(this.sp, this.t, this.words));
+  }
+  get stillStuck(): boolean {
+    return this.once('stillStuck', () => stillStuckOf(this.sp, this.t));
+  }
+  get replyQuestions(): readonly Set<string>[] {
+    return this.once('replyQuestions', () => {
+      const q = this.replyAsks;
+      return q === null ? [] : questionSetsOf(q.explicit);
+    });
+  }
+  get replySentences(): readonly Set<string>[] {
+    return this.once('replySentences', () => (this.t.reply === null ? [] : sentenceSets(this.t.reply)));
+  }
+  get topic(): Set<string> {
+    return this.once('topic', () => topicWords(this.sp.slice(0, TOPIC_READ_CHARS)));
+  }
+  get stems(): Set<string> {
+    return this.once('stems', () => topicStemsOf(this.sp.slice(0, TOPIC_READ_CHARS)));
+  }
+  get replyStems(): Set<string> {
+    return this.once('replyStems', () => (this.t.reply === null ? new Set<string>() : topicStemsOf(speech(this.t.reply.slice(0, IFR_READ_CHARS)))));
   }
 }
 
@@ -1602,6 +2758,25 @@ export interface ObserveContext {
   verdictsByTurn?: Readonly<Record<number, readonly { status: string }[]>>;
   params: StrategyParams;
   length?: ReplyLength | null;
+  /**
+   * Something is on their screen besides the transcript (MRTurnInput
+   * .context.material). Set only for the newest turn; undefined is unknown,
+   * and a reading that needs nothing to be shown stays silent then.
+   */
+  material?: boolean;
+  /**
+   * Their newest message carries an attachment (MRTurnInput.context.attached:
+   * a photo, a screenshot, a note, a document). Set only for the newest turn;
+   * undefined is unknown. Read defensively: only `true` counts.
+   */
+  attached?: boolean;
+  /**
+   * The route reads the turn as mathematics (MRTurnInput.context.accuracy
+   * .math). Read only by the measure reactionAt (whether a number in their
+   * message can be an attempt); undefined is unknown, and the transcript is
+   * read instead. Only `true` counts.
+   */
+  math?: boolean;
 }
 
 /** How far back the counted detectors look, in user turns (this one included). */
@@ -1624,6 +2799,49 @@ export const IFR_REF_CODES = {
   /** what an explicit.revoke takes back: the question rules only, or every adjustment (read by lib/mr/outcome.ts) */
   revokeQuestions: REVOKE_SCOPE.questions,
   revokeAll: REVOKE_SCOPE.all,
+  // ── what the precision readers point at (params.precision)
+  /** an explicit.stuck whose work is in the conversation (described or pasted in this topic, set by the reply before, explained in it, or on their screen) */
+  stuckShown: 'stuck.shown',
+  /** an explicit.stuck with nothing of the work in the conversation — live only, when the route says nothing is on their screen either */
+  stuckUnseen: 'stuck.unseen',
+  /** an explicit.stuck on work that is theirs (practice, an exercise, their paste, their stated goal) */
+  stuckOwnWork: 'stuck.own_work',
+  /** an explicit.stuck read from "still stuck" after an earlier one */
+  stuckAgain: 'stuck.again',
+  /** the earlier explicit.stuck an observed.repeated_stuck counts */
+  stuckBefore: 'stuck.before',
+  /** an explicit.stuck that came with a refusal of help ("no hints, let me think"): every stuck rule stands aside */
+  stuckDeclines: 'stuck.declines',
+  /** an explicit.stuck with nothing before it: no earlier message of theirs, and nothing of the work shown */
+  stuckFirst: 'stuck.first',
+  /** an explicit.stuck that came with a request for the solution ("Walk me through the rest"): every stuck rule stands aside */
+  stuckWantsAnswer: 'stuck.wants_answer',
+  /** their "I already told you" after an asking reply */
+  answerRedundant: 'answer.redundant',
+  /** the earlier reply that asked the same question */
+  replyAskedBefore: 'reply.asked_before',
+  /** a reply that repeated sentences of recent replies */
+  replyRepeats: 'reply.repeats',
+  /** an earlier reply it repeated */
+  replyRepeated: 'reply.repeated',
+  /** a reply long enough that a re-ask after it says the point was lost */
+  replyLong: 'reply.long',
+  /** their re-ask for the point */
+  reask: 'request.reask',
+  /** a reply that suggested a fix (one that explained, before a report it still fails) */
+  replySuggested: 'reply.suggested',
+  /** their report that a suggested fix still fails */
+  stillFailing: 'report.still_failing',
+  /** an open request, and what it rests on */
+  requestOpen: 'request.open',
+  requestFirst: 'request.first',
+  requestNewTopic: 'request.new_topic',
+  /** the message before a new topic */
+  requestPrevious: 'request.previous',
+  broadSubject: 'request.broad_subject',
+  vagueOutcome: 'request.vague_outcome',
+  missingReferent: 'request.missing_referent',
+  nothingShown: 'request.nothing_shown',
 } as const;
 
 /** Why an answer to an asking reply did not move anything. */
@@ -1687,15 +2905,180 @@ function repeatOf(turns: readonly TurnView[], k: number): number {
   return -1;
 }
 
+/** Every word of a is in b. */
+function within(a: Set<string>, b: Set<string>): boolean {
+  for (const w of a) if (!b.has(w)) return false;
+  return true;
+}
+/**
+ * Two questions (questionSets) are the same question: alike at the question
+ * similarity, and one holds every word of the other ("Which operating system
+ * are you using?", "…using right now?"). One that swaps a word for another
+ * asks about another item ("…the radius passed in…", "…the value passed
+ * in…"; "…by 4?", "…by 5?"). The measure and the reader share it.
+ */
+function sameQuestion(a: Set<string>, b: Set<string>, sim: number): boolean {
+  return jaccard(a, b) >= sim && (within(a, b) || within(b, a));
+}
+
+/** |a ∩ b| / |a ∪ b|: how far two word sets are the same set. 0 when both are empty. */
+export function jaccard(a: Set<string>, b: Set<string>): number {
+  let both = 0;
+  const [small, big] = a.size <= b.size ? [a, b] : [b, a];
+  for (const w of small) if (big.has(w)) both++;
+  const union = a.size + b.size - both;
+  return union === 0 ? 0 : both / union;
+}
+
+/** How much of a reply the sentence echo reads: its first 2,500 characters (where background said again sits; the measure reads the same). */
+const ECHO_READ_CHARS = 2500;
+/** The first `n` characters of a text, back to the end of its last whole sentence: a sentence cut in two is not read as one. */
+function wholeSentencesUpTo(text: string, n: number): string {
+  if (text.length <= n) return text;
+  const cut = text.slice(0, n);
+  const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('? '), cut.lastIndexOf('! '), cut.lastIndexOf('\n'));
+  return end > 0 ? cut.slice(0, end + 1) : cut;
+}
+const EIGHT_WORDS = /(?:\S+\s+){7}\S/;
+
+/**
+ * A question's content words, single letters and digits kept ("…divide both
+ * sides by 4?" and "…by 5?" are two questions; tokensOf drops them).
+ */
+function questionTokensOf(sp: string): Set<string> {
+  return new Set(
+    sp
+      .toLowerCase()
+      .replace(/['’]/g, '')
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((w) => w.length > 0 && !STOPWORDS.has(w))
+  );
+}
+
+/**
+ * A reply's explicit questions as content-word sets (questionTokensOf), 3
+ * words or more each, at most 8. Offers ("Want me to go on?") and disguised
+ * questions are not here, and nor is a question too short to say what it
+ * asks ("Does that make sense?", "What do you think?"). The reader takes them
+ * from the parse the question streak already made of the reply (Own.replyLoad),
+ * so a reply is parsed for questions once.
+ */
+function questionSets(reply: string): Set<string>[] {
+  return questionSetsOf(interrogatives(reply).explicit);
+}
+function questionSetsOf(explicit: readonly string[]): Set<string>[] {
+  return explicit
+    .map((q) => questionTokensOf(speech(q)))
+    .filter((x) => x.size >= 3)
+    .slice(0, 8);
+}
+
+/**
+ * A reply's distinct sentences as content-word sets, 8 words or more each,
+ * at most 40, from its first 2,500 characters (whole sentences) — code and quotes gone
+ * (speech), and a sentence the reply says twice counted once, so one reply
+ * repeating itself is never two echoes.
+ */
+function sentenceSets(reply: string): Set<string>[] {
+  const out: Set<string>[] = [];
+  const seen = new Set<string>();
+  const said = new Set<string>();
+  for (const x of sentencesOf(speech(wholeSentencesUpTo(reply, ECHO_READ_CHARS)))) {
+    // (fewer than 8 words cannot hold 8 content words, and a sentence said word for word again adds nothing: neither is tokenised)
+    if (said.has(x) || !EIGHT_WORDS.test(x)) continue;
+    said.add(x);
+    const w = tokensOf(x);
+    if (w.size < 8) continue;
+    const key = [...w].sort().join(' ');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(w);
+    if (out.length >= 40) break;
+  }
+  return out;
+}
+
+/**
+ * How much of `reply` says again what the earlier replies said: the distinct
+ * sentences (8 content words or more, from its first 2,500 characters) that
+ * match a sentence of one of them at the echo similarity, and whether one of
+ * its questions (3 content words or more, digits kept) is the same question
+ * as one of theirs (sameQuestion: alike at the question similarity, with no
+ * word swapped for another). At most 3 earlier replies are read. Thresholds default to mr-2026.11.1's; the measure is the
+ * same under any pin.
+ *
+ * THE MEASURE IS RAW. As measureReply and reactionAt's `clarified` read it,
+ * nothing is left out: an earlier reply identical to this one is the most
+ * repetition there is (every distinct sentence and every question of it
+ * counts), and a question asked again word for word is repeatedQuestion true
+ * and clarified 'no'. `skipIdentical` leaves identical earlier replies out,
+ * for a caller that has to treat them as re-sends.
+ *
+ * The regulating readings share the definitions of a sentence, a question,
+ * the similarities and the same question, and are recomputed from the
+ * transcript, never taken from the measure; their windows and exclusions are
+ * their own.
+ * observed.repeated_question compares the last reply with the two before it
+ * (not three), not while they practise, not against a reply to a message that
+ * asked for writing or questions as content, and not against an identical
+ * reply unless it is a short asking reply sent after a different message of
+ * theirs. observed.repeated_background compares it with the three before it,
+ * not when the message it answered asked for a recap or a reformat, not
+ * against writing they asked for, and never against an identical reply. So
+ * the measure can say true where the readings observe nothing: a question
+ * asked again three replies later, a revision they asked for.
+ */
+export function replyEchoes(
+  reply: string,
+  earlier: readonly string[],
+  p: Pick<StrategyParams, 'echoSimilarity' | 'questionEchoSimilarity'> = {},
+  o: { skipIdentical?: boolean } = {}
+): { repeatedSentences: number; repeatedQuestion: boolean } {
+  const before = earlier.slice(0, 3).filter((x) => typeof x === 'string' && !(o.skipIdentical && x.trim() === reply.trim()));
+  if (!before.length) return { repeatedSentences: 0, repeatedQuestion: false };
+  const sim = p.echoSimilarity ?? 0.8;
+  const qsim = p.questionEchoSimilarity ?? 0.6;
+  const theirs = before.map(sentenceSets);
+  let repeatedSentences = 0;
+  for (const x of sentenceSets(reply)) if (theirs.some((ss) => ss.some((y) => jaccard(x, y) >= sim))) repeatedSentences++;
+  const asked = before.map(questionSets);
+  const repeatedQuestion = questionSets(reply).some((x) => asked.some((qs) => qs.some((y) => sameQuestion(x, y, qsim))));
+  return { repeatedSentences, repeatedQuestion };
+}
+
+/** "Yes", "no", "both", "neither": the answer to a yes-or-no question, however short. */
+const POLAR_ANSWER = /^\W*(?:yes|yeah|yep|yup|no|nope|nah|sure|right|correct|exactly|both|neither|either)\b/i;
+/** "ok", "sure", "idk" as the whole message: an acknowledgement, not an answer to a what-or-which question. */
+const FILLER_ANSWER = /^\W*(?:ok(?:ay)?|k|hm+|idk|dunno|sure|fine|cool|yeah|yes)\W*$/i;
+
+/**
+ * Does a short message answer the one question the reply before it asked?
+ * Only when that reply asked exactly one explicit question and nothing
+ * disguised (with more, which one was answered is not known). An attempt
+ * does. A yes-or-no question is answered by a yes or a no, or by any content
+ * word; a what-or-which question by a content word that is not filler or a
+ * request to go on ("chrome", "monday", "work" — not "ok", "sure", "more").
+ */
+export function answersQuestion(prevReply: string, o: Own): boolean {
+  const q = interrogatives(prevReply);
+  if (q.explicit.length !== 1 || q.disguised.length !== 0) return false;
+  if (o.attempt) return true;
+  if (isPolarQuestion(q.explicit[0])) return POLAR_ANSWER.test(o.sp) || o.tokens.size > 0;
+  return o.tokens.size > 0 && !FILLER_ANSWER.test(o.sp) && !SHORT_REQUEST.test(o.sp);
+}
+
 /**
  * Did their answer to an asking reply move anything? An attempt always does
  * (the engine decided it, or it has a digit or an operator in it), and so
  * does asking for questions or a quiz. Otherwise it did not when it asked to
  * be told, asked to stop, said they don't know, said they had already said
  * it, said they were confused, repeated an earlier request, or was 5 words
- * or fewer. KNOWN FALSE POSITIVE: a short factual answer to a diagnostic
- * question ("chrome", "yes") counts as not advancing; it takes two of them
- * in a row, each after an asking reply, before anything is observed.
+ * or fewer. KNOWN FALSE POSITIVE (mr-2026.10.1): a short factual answer to a
+ * diagnostic question ("chrome", "yes") counts as not advancing; it takes two
+ * of them in a row, each after an asking reply, before anything is observed.
+ * Under a policy with params.precision, a short answer to the single question
+ * asked (answersQuestion) advances, and so does their correction of how the
+ * question was read.
  */
 export function answerNoAdvance(turns: readonly TurnView[], u: number, k: number, ctx: ObserveContext): NoAdvance | null {
   const t = turns[u];
@@ -1707,11 +3090,12 @@ export function answerNoAdvance(turns: readonly TurnView[], u: number, k: number
   if (o.codes.has('explicit.wants_questions') || o.codes.has('explicit.quiz') || o.codes.has('explicit.own_try')) return null;
   if (o.codes.has('explicit.direct_answer') || o.codes.has('explicit.show_steps')) return 'direct_request';
   if (o.codes.has('explicit.stop_questions')) return 'stop_request';
+  if (ctx.params.precision && o.precise.has('explicit.corrected')) return null;
   if (s.dontKnow) return 'dont_know';
   if (s.redundancy) return 'redundant';
   if (o.codes.has('explicit.confused')) return 'confused';
   if (repeatOf(turns, u) >= 0) return 'repeat';
-  if (o.words <= 5 && !o.attempt) return 'short';
+  if (o.words <= 5 && !o.attempt) return ctx.params.precision && t.prevReply !== null && answersQuestion(t.prevReply, o) ? null : 'short';
   return null;
 }
 
@@ -1786,8 +3170,14 @@ function practiceSince(turns: readonly TurnView[], k: number): number {
   return at;
 }
 
-/** Their words at turns[k], as observations — the first part of observeTurn, and all the fold reads of turns older than its window. */
-function readWords(turns: readonly TurnView[], k: number, p: StrategyParams): { out: Observation[]; codes: Set<ExplicitCode>; revokedByAsking: boolean } {
+/**
+ * Their words at turns[k], as observations — the first part of observeTurn,
+ * and all the fold reads of turns older than its window. `withPrecise` adds
+ * the precise codes (stuck, corrected, already known): observeTurn passes it
+ * under a policy with params.precision, and observeWords never does, so a
+ * turn older than the window is read exactly as before.
+ */
+function readWords(turns: readonly TurnView[], k: number, p: StrategyParams, withPrecise = false, screen: Pick<ObserveContext, 'material' | 'attached'> = {}): { out: Observation[]; codes: Set<ExplicitCode>; revokedByAsking: boolean } {
   const t = turns[k];
   const me = own(t);
   const out: Observation[] = [];
@@ -1804,6 +3194,24 @@ function readWords(turns: readonly TurnView[], k: number, p: StrategyParams): { 
     codes.add('explicit.shorter');
     standingIf(codes, t.signals, me.sp);
   }
+  // Stuck, corrected, already known — a stuck among other words only with a
+  // task in the window (stuckSaid), and "still stuck", which is stuck only
+  // when they said so one or two turns before (alone it could be anything).
+  let stuckAgain = false;
+  let brief = false;
+  if (withPrecise) {
+    for (const c of me.precise) codes.add(c);
+    if (!codes.has('explicit.stuck') && stuckSaid(turns, k)) codes.add('explicit.stuck');
+    stuckAgain = stuckAgainAt(turns, k);
+    if (stuckAgain || (!codes.has('explicit.stuck') && stuckStillAt(turns, k))) codes.add('explicit.stuck');
+    // brevity asked in words readExplicit does not read ("Be brief.", "please be concise", "Keep all your answers
+    // short from now on"): about Socria's replies, so it holds for the conversation, not for one reply
+    brief = !!me.sp && !codes.has('explicit.shorter') && !codes.has('explicit.longer') && !me.writing && addressed(BREVITY, me.sp);
+    if (brief) codes.add('explicit.shorter');
+    // a stop on questions in words readExplicit does not read ("No follow-up questions please", "Stop questioning me"):
+    // their stop, as "stop asking me questions" is, never beside a request for questions or a quiz
+    if (me.sp && !codes.has('explicit.stop_questions') && !codes.has('explicit.wants_questions') && !codes.has('explicit.quiz') && addressed(NO_QUESTIONS_SAID, me.sp, { hedged: true, noDefer: true })) codes.add('explicit.stop_questions');
+  }
   const stopAt = codes.has('explicit.wants_questions') && !codes.has('explicit.stop_questions') ? stopInForce(turns, k) : -1;
   const revokedByAsking = stopAt >= 0 && !codes.has('explicit.revoke');
   const standing = codes.has('explicit.standing');
@@ -1814,11 +3222,16 @@ function readWords(turns: readonly TurnView[], k: number, p: StrategyParams): { 
     const refs =
       code === 'explicit.revoke'
         ? [userRef(t, code), userRef(t, saidPlainly(REVOKE_ALL, me.sp) ? IFR_REF_CODES.revokeAll : IFR_REF_CODES.revokeQuestions)]
-        : code === 'explicit.shorter' && shorterIsOnce(me.sp, t.prevReply !== null)
+        : code === 'explicit.shorter' && !brief && shorterIsOnce(me.sp, t.prevReply !== null)
           ? [userRef(t, code), userRef(t, IFR_REF_CODES.lengthOnce)]
           : code === 'explicit.standing' && heldHere(me.sp)
             ? [userRef(t, code), userRef(t, IFR_REF_CODES.conversationOnly)]
-            : [userRef(t, code)];
+            : code === 'explicit.stuck'
+              ? stuckRefs(turns, k, p, stuckAgain, screen)
+              : code === 'explicit.knows_that'
+                ? // the reply that explained what they know (none to point at when it opened the conversation)
+                  [userRef(t, code), ...(k > 0 ? [replyRef(turns[k - 1], IFR_REF_CODES.replyExplained)] : [])]
+                : [userRef(t, code)];
     out.push(obs(code, 'explicit', strength, t.index, refs, confidence, st));
   }
   if (revokedByAsking) {
@@ -1826,6 +3239,218 @@ function readWords(turns: readonly TurnView[], k: number, p: StrategyParams): { 
     out.push(obs('explicit.revoke', 'explicit', strength, t.index, [userRef(t, 'explicit.wants_questions'), userRef(turns[stopAt], 'explicit.stop_questions'), userRef(t, IFR_REF_CODES.revokeQuestions)], confidence));
   }
   return { out, codes, revokedByAsking };
+}
+
+/**
+ * The user messages a stuck at turns[k] can rest on, newest first: the
+ * earlier messages of this topic (back to the one that opened it, newTopicAt),
+ * within IFR_LOOKBACK user turns counting this one. None when this message
+ * opens a new topic itself.
+ */
+function topicWindow(turns: readonly TurnView[], k: number): number[] {
+  const out: number[] = [];
+  if (newTopicAt(turns, k)) return out;
+  for (let j = k - 1; j >= Math.max(0, k - IFR_LOOKBACK + 1); j--) {
+    out.push(j);
+    if (newTopicAt(turns, j)) break;
+  }
+  return out;
+}
+
+/** Material pasted in: 15 words or more outside what they said, counted on the same slice as `words` (a long message is not a paste). */
+const pastedIn = (o: Own): boolean => o.cappedRawWords - o.words >= 15;
+
+/**
+ * An earlier message that puts a task on the table: an exercise, a paste, a
+ * description (12 words or more), the work named with something of it
+ * (STUCK_WORK or THEIR_TASK beside a number, an operator, a colon, a quote
+ * or 8 words: "Balance this for my chemistry homework: Fe + O2 -> Fe2O3"), an
+ * assessment or practice signal, their own work offered, or their own work,
+ * learning goal, quiz or try said. Not "Can you help me with my homework?":
+ * the work is named, not shown. (`describes`: the words a description needs;
+ * the message a stuck is in needs more, taskInWindow.)
+ */
+function statesTask(t: TurnView, describes = 12): boolean {
+  const o = own(t);
+  if (o.words >= describes || exerciseNamed(o.sp) || pastedIn(o) || t.signals.assessment || t.signals.practiceIntent || offersWork(t.text)) return true;
+  // (a part or a question named by its number states no task: "I'm stuck on question 4" says where, not what)
+  const unnumbered = o.sp.replace(PART_NUMBER, ' ');
+  if ((STUCK_WORK.test(o.sp) || THEIR_TASK.test(o.sp)) && (ATTEMPT.test(unnumbered) || /:\s*\S/.test(o.sp) || o.words >= 8 || o.cappedRawWords - o.words >= 3)) return true;
+  return o.codes.has('explicit.own_work') || o.codes.has('explicit.learning_goal') || o.codes.has('explicit.quiz') || o.codes.has('explicit.own_try');
+}
+/** A part or question named by its number ("question 4", "part 2b", "step 3", "q7"). */
+const PART_NUMBER = /\b(?:question|part|step|number|no\.?|exercise|problem|task|section|q|ex)\s*\d+[a-z]?\b/gi;
+/** …and one whose task is theirs to do: an exercise, their paste, their homework or class, an assessment or practice signal, their work offered. */
+function taskIsTheirs(t: TurnView): boolean {
+  const o = own(t);
+  return exerciseNamed(o.sp) || pastedIn(o) || THEIR_TASK.test(o.sp) || t.signals.assessment || t.signals.practiceIntent || offersWork(t.text);
+}
+/** A reply that set them a problem: an exercise or a task's verb in it, and a question or a "try this" ("Try this one: integrate x^2 e^x dx.", "Can you balance the oxygen first?"). */
+function replyPosesTask(reply: string | null): boolean {
+  if (reply === null) return false;
+  const sp = speech(reply.slice(-IFR_READ_CHARS));
+  return (THE_EXERCISE.test(sp) || TASK_VERB.test(sp)) && (TRY_THIS.test(sp) || questionsPutTo(reply) > 0);
+}
+/** The reply before shows the work: an exercise in it ("For example: integrate x e^x dx. Pick u = x…"), whether or not it set it to them. */
+function replyShowsWork(reply: string | null): boolean {
+  return reply !== null && THE_EXERCISE.test(speech(reply.slice(-IFR_READ_CHARS)));
+}
+/**
+ * A task on the table at turns[j]: what a stuck among other words needs
+ * (stuckWordsOf 'bare'), and a "still stuck" with no stuck before it. A task
+ * stated in this message or earlier in the topic (statesTask), set by the
+ * reply before, or a reply before that explained or worked an exercise — the
+ * troubleshooting thread ("My laptop wifi keeps dropping", the Device Manager
+ * steps, "I'm stuck, I can't find Device Manager") as much as the homework.
+ * Feelings, grief, life and the people around them are put aside before this
+ * is asked (stuckPutAside, STUCK_PEOPLE).
+ */
+function taskInWindow(turns: readonly TurnView[], j: number): boolean {
+  const prev = turns[j].prevReply;
+  // (the message itself describes a task in 40 words or more: "I'm stuck, I don't know what to do, should I take the job in Berlin or stay?" is not one)
+  return replyPosesTask(prev) || (prev !== null && (replyShowsWork(prev) || replyExplained(prev))) || statesTask(turns[j], 40) || topicWindow(turns, j).some((i) => statesTask(turns[i]));
+}
+
+/**
+ * Their stuck at turns[j]: said on its own words (readPrecise), or among
+ * other words with a task on the table ("I'm stuck, can you go over it?"
+ * after their homework problem — never "I'm stuck, my visa runs out on
+ * Friday" with nothing to work on).
+ */
+function stuckSaid(turns: readonly TurnView[], j: number): boolean {
+  const o = own(turns[j]);
+  return o.precise.has('explicit.stuck') || (o.stuck === 'bare' && taskInWindow(turns, j));
+}
+/**
+ * "Still stuck" at turns[j], after a reply, in the same episode as a stuck
+ * they said: stuck again (ref stuck.again). The episode is read back through
+ * its "still stuck"s to the stuck that opened it, with at most one other turn
+ * between any two of them, so the fourth "still stuck" in a row is read as
+ * the second was; an earlier "still stuck" read as stuck itself (a task on
+ * the table) opens one too.
+ */
+function stuckAgainAt(turns: readonly TurnView[], j: number): boolean {
+  const t = turns[j];
+  if (t.prevReply === null || !own(t).stillStuck || stuckSaid(turns, j)) return false;
+  let gap = 0;
+  for (let i = j - 1; i >= Math.max(0, j - 2 * IFR_LOOKBACK); i--) {
+    if (stuckSaid(turns, i)) return true;
+    if (turns[i].prevReply !== null && own(turns[i]).stillStuck) {
+      if (taskInWindow(turns, i)) return true;
+      gap = 0;
+      continue;
+    }
+    if (++gap >= 2) return false;
+  }
+  return false;
+}
+/**
+ * "Still stuck" at turns[j] with no stuck before it to be again, after a reply
+ * and with a task on the table: "Tried that, still stuck" after their
+ * integral and an explanation of it is their first stuck, in other words. Not
+ * "Still stuck in traffic" (STILL_STUCK reads only the bare words), and
+ * nothing with no task on the table ("Tried that, still stuck" after a
+ * podcast recommendation).
+ */
+function stuckStillAt(turns: readonly TurnView[], j: number): boolean {
+  const t = turns[j];
+  return t.prevReply !== null && own(t).stillStuck && !stuckSaid(turns, j) && !stuckAgainAt(turns, j) && taskInWindow(turns, j);
+}
+/** Any stuck read at turns[j]: said, again, or a first "still stuck". */
+function stuckAt(turns: readonly TurnView[], j: number): boolean {
+  return stuckSaid(turns, j) || stuckAgainAt(turns, j) || stuckStillAt(turns, j);
+}
+
+/**
+ * The work in the conversation at turns[k], from the transcript alone (no
+ * screen): an exercise or a paste here or earlier in the topic, a task
+ * described here or stated in the topic, a problem the reply before set or
+ * worked, or a reply before that explained. stuckRefs adds the screen, and a
+ * "still stuck" the work its episode's first stuck had on the table.
+ */
+function workShownAt(turns: readonly TurnView[], k: number, p: StrategyParams): boolean {
+  const t = turns[k];
+  const me = own(t);
+  const win = topicWindow(turns, k);
+  return (
+    exerciseNamed(me.sp) ||
+    win.some((j) => exerciseNamed(own(turns[j]).sp)) ||
+    pastedIn(me) ||
+    win.some((j) => pastedIn(own(turns[j]))) ||
+    me.words >= (p.stuckShownWords ?? 12) ||
+    replyPosesTask(t.prevReply) ||
+    win.some((j) => statesTask(turns[j])) ||
+    replyShowsWork(t.prevReply) ||
+    (t.prevReply !== null && replyExplained(t.prevReply))
+  );
+}
+
+/**
+ * What an explicit.stuck at turns[k] rests on. SHOWN: the work is in the
+ * conversation — an exercise in this message or one earlier in the topic
+ * (topicWindow), material pasted in either (counted on the read slice), a
+ * task described in this message (stuckShownWords words or more) or stated
+ * earlier in the topic (statesTask), a problem the reply before set them or
+ * worked as an example ("For example: integrate x e^x dx…", set to them or
+ * not), a reply before that explained, or something on their screen (the
+ * route's material, or an attachment on their newest message). UNSEEN: none of that,
+ * read live only and only when the route says nothing is on their screen
+ * (material === false) — an earlier turn replayed, or a caller that does not
+ * know, gets neither, and no stuck rule acts. OWN WORK: the work is theirs —
+ * practice under way, an exercise, a practice or assessment signal, their
+ * homework or class (THEIR_TASK) here or earlier in the topic, their own work
+ * or learning goal said in the window, their paste, a problem the reply set
+ * them, or the work on their screen pointed at as theirs ("this problem").
+ * Shown without own work is Socria's task: no rule reads it, and ACS's help
+ * stands. DECLINES: the same message refuses help (STUCK_DECLINES). FIRST:
+ * nothing precedes it — no earlier message of theirs, and nothing shown.
+ */
+function stuckRefs(turns: readonly TurnView[], k: number, p: StrategyParams, again: boolean, screen: Pick<ObserveContext, 'material' | 'attached'>): EvidenceRef[] {
+  const t = turns[k];
+  const me = own(t);
+  const win = topicWindow(turns, k);
+  const exercise = exerciseNamed(me.sp) || win.some((j) => exerciseNamed(own(turns[j]).sp));
+  const pastedHere = pastedIn(me);
+  const pastedBefore = win.some((j) => pastedIn(own(turns[j])));
+  const posed = replyPosesTask(t.prevReply);
+  const onScreen = screen.material === true || screen.attached === true;
+  // stuck again: the work the episode's first stuck had on the table is still there ("still stuck" after a short reply)
+  let episodeShown = false;
+  if (again)
+    for (let i = k - 1; i >= Math.max(0, k - 2 * IFR_LOOKBACK) && !episodeShown; i--) {
+      if (!stuckAt(turns, i)) continue;
+      episodeShown = workShownAt(turns, i, p);
+      if (stuckSaid(turns, i)) break;
+    }
+  const shown = episodeShown || onScreen || workShownAt(turns, k, p);
+  let stated = false;
+  for (let j = Math.max(0, k - IFR_LOOKBACK + 1); j <= k && !stated; j++) {
+    const c = own(turns[j]).codes;
+    stated = c.has('explicit.own_work') || c.has('explicit.learning_goal');
+  }
+  const ownWork =
+    practiceSince(turns, k) >= 0 ||
+    exercise ||
+    t.signals.practiceIntent ||
+    t.signals.assessment ||
+    stated ||
+    pastedHere ||
+    pastedBefore ||
+    posed ||
+    THEIR_TASK.test(me.sp) ||
+    win.some((j) => taskIsTheirs(turns[j])) ||
+    (onScreen && POINTS_AT_WORK.test(me.sp));
+  const unseen = !shown && screen.material === false;
+  const earlier = turns.slice(0, k).some((x) => own(x).sp.trim() !== '');
+  return [
+    userRef(t, 'explicit.stuck'),
+    ...(shown ? [userRef(t, IFR_REF_CODES.stuckShown)] : unseen ? [userRef(t, IFR_REF_CODES.stuckUnseen)] : []),
+    ...(ownWork ? [userRef(t, IFR_REF_CODES.stuckOwnWork)] : []),
+    ...(again ? [userRef(t, IFR_REF_CODES.stuckAgain)] : []),
+    ...(STUCK_DECLINES.test(me.sp) ? [userRef(t, IFR_REF_CODES.stuckDeclines)] : []),
+    ...(STUCK_WANTS_ANSWER.test(me.sp) ? [userRef(t, IFR_REF_CODES.stuckWantsAnswer)] : []),
+    ...(!earlier && !shown ? [userRef(t, IFR_REF_CODES.stuckFirst)] : []),
+  ];
 }
 
 /**
@@ -1858,6 +3483,39 @@ function quizSince(turns: readonly TurnView[], k: number): number {
   return at;
 }
 
+// One reading per TurnView, kept with the message before it (as NEW_TOPIC): the repeated-question and repeated-
+// background readers ask it of the same earlier turns on every observeTurn call of the fold.
+const CONTENT_ASKED = new WeakMap<TurnView, { prev: TurnView | undefined; at: boolean }>();
+/**
+ * Their message at turns[u] asked for writing or for questions as content, or
+ * named their own writing: the reply to it says its sentences and questions
+ * on purpose, and a later reply that says them again is a revision, not an
+ * echo. (writingAsked reads the three messages before it, for a revision of a
+ * draft asked for there.)
+ */
+function contentAskedAt(turns: readonly TurnView[], u: number): boolean {
+  const t = turns[u];
+  const hit = CONTENT_ASKED.get(t);
+  if (hit && hit.prev === turns[u - 1]) return hit.at;
+  const o = own(t);
+  const at = o.writing || o.codes.has('explicit.edit_only') || o.codes.has('explicit.rewrite') || writingAskedSaid(o.sp, t.text.slice(0, IFR_READ_CHARS), saidBefore(turns, u, 3)) || questionsAsContentSaid(o.sp);
+  CONTENT_ASKED.set(t, { prev: turns[u - 1], at });
+  return at;
+}
+
+/** Their messages before turns[u], newest first, at most n, as what they said (Own.sp): writingAsked's earlier messages. */
+function saidBefore(turns: readonly TurnView[], u: number, n: number): SaidLater {
+  const out: (() => string)[] = [];
+  for (let j = u - 1; j >= Math.max(0, u - n); j--) out.push(() => own(turns[j]).sp);
+  return out;
+}
+
+/** Their first sentence at turns[k] asks again for the point (REASKS), or asks how to do it after a how-to (REASKS_HOW). */
+function reasksAt(turns: readonly TurnView[], k: number): boolean {
+  const first = firstSentences(own(turns[k]).sp, 1)[0] ?? '';
+  return REASKS.test(first) || (k >= 1 && REASKS_HOW.test(first) && HOW_ASKED.test(own(turns[k - 1]).sp));
+}
+
 /**
  * Everything observable at turns[k]: their words, the counts behind it, and
  * the weak readings. Sorted in OBSERVATION_CODES order; each code at most
@@ -1869,7 +3527,7 @@ export function observeTurn(turns: readonly TurnView[], k: number, ctx: ObserveC
   const p = ctx.params;
   const me = own(t);
   // ── their words
-  const { out, codes, revokedByAsking } = readWords(turns, k, p);
+  const { out, codes, revokedByAsking } = readWords(turns, k, p, p.precision === true, { material: ctx.material, attached: ctx.attached });
 
   // ── Socria kept asking: the replies before this turn, newest first.
   // Not while a quiz they asked for runs: its questions ARE the help, and
@@ -1895,6 +3553,38 @@ export function observeTurn(turns: readonly TurnView[], k: number, ctx: ObserveC
     }
   }
 
+  const contentAsked = (u: number) => contentAskedAt(turns, u);
+
+  // ── Socria asked for something they had already said: their words
+  // ("I already told you"), right after a reply that asked.
+  // Not when Socria's own question asked whether they had done that very
+  // thing: "I already mentioned it" answers "Have you mentioned it to HR?".
+  if (p.precision && k >= 1 && !quizzing && (own(turns[k - 1]).replyLoad ?? 0) > 0 && saidAlready(me.sp) && !ASKED_IF_DONE.test(lastQuestionOf(turns[k - 1].reply)))
+    out.push(obs('observed.redundant_question', 'observed', 'moderate', t.index, [replyRef(turns[k - 1], IFR_REF_CODES.replyAsked), userRef(t, IFR_REF_CODES.answerRedundant)], 0.8));
+
+  // ── ...or asked the same question it asked a reply or two before (a
+  // count over Socria's own questions): the same words, or the same words
+  // and more, never a question that swaps a word for another ("What should
+  // happen when the radius passed in is negative?" then "…the value…" asks
+  // about another function; the digits count: "…divide both sides by 4?"
+  // then "…by 5?"). Not while they practise (a quiz, an own try or a learning
+  // goal: the next step of the same exercise asks the same way), not
+  // questions they asked to have written (now, or in the list this one
+  // revises), and not a reply identical to the earlier one unless it is a
+  // short asking reply sent again after a different message of theirs (a real
+  // re-ask, word for word): an identical long reply, or the same reply to
+  // the same message sent again, is a re-send or a fixture.
+  if (p.precision && k >= 2 && !quizzing && practice < 0 && own(turns[k - 1]).replyQuestions.length) {
+    const ask = turns[k - 1];
+    const mine = own(ask).replyQuestions;
+    const sim = p.questionEchoSimilarity ?? 0.6;
+    const reasked = (j: number) => (turns[j].reply ?? '').trim() !== (ask.reply ?? '').trim() || (wordCount(ask.reply ?? '') <= 40 && turns[j].text.trim() !== ask.text.trim());
+    const before = [k - 2, k - 3].find((j) => j >= 0 && reasked(j) && own(turns[j]).replyQuestions.some((b) => mine.some((a) => sameQuestion(a, b, sim))) && !contentAsked(j));
+    // (questions asked for as content now, or in the list this one revises: read only when a question came back)
+    if (before !== undefined && !questionsAsContentSaid(own(ask).sp) && !writingForOthersSaid(own(ask).sp, saidBefore(turns, k - 1, 3)))
+      out.push(obs('observed.repeated_question', 'observed', 'moderate', t.index, [replyRef(ask, IFR_REF_CODES.replyAsked), replyRef(turns[before], IFR_REF_CODES.replyAskedBefore)], 0.75));
+  }
+
   // ── confusion after an explanation, again (this turn one of them)
   if (codes.has('explicit.confused')) {
     const hits: number[] = [];
@@ -1907,6 +3597,16 @@ export function observeTurn(turns: readonly TurnView[], k: number, ctx: ObserveC
       for (const j of hits) refs.push(replyRef(turns[j - 1], IFR_REF_CODES.replyExplained), userRef(turns[j], 'explicit.confused'));
       out.push(obs('observed.repeated_confusion', 'observed', 'moderate', t.index, refs, 0.8));
     }
+  }
+
+  // ── stuck again, within two turns of saying so, with a reply between:
+  // one next step was not enough. (No quiz exclusion: a worked example
+  // inside a quiz is compose's to keep a quiz, as for repeated confusion.)
+  if (p.precision && codes.has('explicit.stuck') && t.prevReply !== null) {
+    // (a stuck they said first; else any stuck read there — "still stuck" again, the fourth in a row)
+    const before = [k - 1, k - 2].find((j) => j >= 0 && stuckSaid(turns, j)) ?? [k - 1, k - 2].find((j) => j >= 0 && stuckAt(turns, j));
+    if (before !== undefined)
+      out.push(obs('observed.repeated_stuck', 'observed', 'moderate', t.index, [userRef(t, 'explicit.stuck'), userRef(turns[before], IFR_REF_CODES.stuckBefore)], 0.8));
   }
 
   // ── the engine's verdicts: this turn, and attempts that keep failing.
@@ -1930,9 +3630,32 @@ export function observeTurn(turns: readonly TurnView[], k: number, ctx: ObserveC
   if (attemptsNow && refuted.length >= p.failedAttempts && refuted[refuted.length - 1] === decided[decided.length - 1])
     out.push(obs('observed.failed_attempts', 'observed', 'strong', t.index, refuted.map((j) => userRef(turns[j], IFR_REF_CODES.refuted)), 0.9));
 
+  // ── a suggested fix still fails, reported twice running, each after a
+  // reply that explained. Their words for the failure and a count of two;
+  // an attempt the engine decided is failed_attempts' to read.
+  if (p.precision && k >= 2 && !quizzing && !now) {
+    const failed = (u: number) => {
+      const r = turns[u].prevReply;
+      const o = own(turns[u]);
+      return r !== null && !o.codes.has('explicit.confused') && stillFails(o.sp) && replyExplained(r);
+    };
+    if (failed(k) && failed(k - 1))
+      out.push(
+        obs('observed.fix_failed', 'observed', 'moderate', t.index, [replyRef(turns[k - 2], IFR_REF_CODES.replySuggested), userRef(turns[k - 1], IFR_REF_CODES.stillFailing), replyRef(turns[k - 1], IFR_REF_CODES.replySuggested), userRef(t, IFR_REF_CODES.stillFailing)], 0.7)
+      );
+  }
+
   // ── the same request again (their previous 3 messages)
   const rep = repeatOf(turns, k);
   if (rep >= 0) out.push(obs('observed.repeated_request', 'observed', 'moderate', t.index, [userRef(t, IFR_REF_CODES.repeat), userRef(turns[rep], IFR_REF_CODES.repeatOf)], 0.7));
+
+  // ── their re-ask for the point, in a short message, after a long reply.
+  // The evidence is their words and the reply's length — never a reading of
+  // where in the reply the answer sat. ("How do I do it?" only after a
+  // how-to: REASKS_HOW. The words first: they are cheaper than counting the
+  // reply.)
+  if (p.precision && k >= 1 && t.prevReply !== null && !quizzing && me.words <= 15 && reasksAt(turns, k) && wordCount(t.prevReply) >= (p.longReplyWords ?? 240))
+    out.push(obs('observed.late_answer', 'observed', 'moderate', t.index, [replyRef(turns[k - 1], IFR_REF_CODES.replyLong), userRef(t, IFR_REF_CODES.reask)], 0.65));
 
   // ── replies far longer than what they answered, three running. Their
   // pasted material counts in what they sent (a long paste earns a long
@@ -1950,6 +3673,34 @@ export function observeTurn(turns: readonly TurnView[], k: number, ctx: ObserveC
     if (verbose) out.push(obs('observed.verbose_replies', 'observed', 'moderate', t.index, js.map((j) => replyRef(turns[j], IFR_REF_CODES.replyVerbose)), 0.65));
   }
 
+  // ── the last reply said again what recent replies had said: distinct
+  // sentences of 8 content words or more, matched at the echo similarity
+  // against the three replies before it. Not when the message it answered
+  // asked for a recap, a repeat, the same material in another form (bullet
+  // points, simpler, a table: REFORMAT_ASKED) or a piece of writing, nor
+  // against a reply that was a piece of writing they asked for (a re-rendered
+  // draft says its sentences again on purpose), and not against an identical
+  // reply (a re-send or a fixture; the measure counts it: replyEchoes).
+  if (p.precision && k >= 2 && ctx.length !== 'detailed' && turns[k - 1].reply !== null) {
+    const ask = turns[k - 1];
+    const need = p.repeatedSentences ?? 2;
+    const sim = p.echoSimilarity ?? 0.8;
+    // (fewer distinct sentences than it takes cannot echo enough: the exclusions are read only when they could)
+    const said = own(ask).replySentences.length < need || ASKED_AGAIN.test(own(ask).sp) || REFORMAT_ASKED.test(own(ask).sp) ? [] : own(ask).replySentences;
+    const mine = said.length >= need && !contentAsked(k - 1) ? said : [];
+    const js = mine.length ? [k - 2, k - 3, k - 4].filter((j) => j >= 0 && turns[j].reply !== null && turns[j].reply!.trim() !== ask.reply!.trim()) : [];
+    const matched = new Set<number>();
+    let n = 0;
+    for (const x of mine) {
+      const j = js.find((j) => own(turns[j]).replySentences.some((y) => jaccard(x, y) >= sim) && !contentAsked(j));
+      if (j === undefined) continue;
+      matched.add(j);
+      if (++n >= need) break;
+    }
+    if (n >= need)
+      out.push(obs('observed.repeated_background', 'observed', 'moderate', t.index, [replyRef(ask, IFR_REF_CODES.replyRepeats), ...js.filter((j) => matched.has(j)).map((j) => replyRef(turns[j], IFR_REF_CODES.replyRepeated))], 0.7));
+  }
+
   // ── what kind of work is on the table
   // ROUTINE TASK IS AN ESTIMATE TURNED OBSERVATION. It is the runtime's
   // reading of the work (TurnState.work, a deterministic classifier over
@@ -1960,6 +3711,10 @@ export function observeTurn(turns: readonly TurnView[], k: number, ctx: ObserveC
   // routine while they are practising or learning, or when the work is theirs.
   if ((ctx.work === 'execution' || ctx.work === 'information') && practice < 0 && !codes.has('explicit.own_work') && !codes.has('explicit.learning_goal') && !codes.has('explicit.quiz') && !codes.has('explicit.own_try'))
     out.push(obs('observed.routine_task', 'observed', 'moderate', t.index, [userRef(t, `work.${ctx.work}`)], 0.7));
+  // OPEN REQUEST: an estimate turned observation too (openRequestOf); its
+  // refs name what was read.
+  const open = openRequestOf(turns, k, ctx, me, codes);
+  if (open) out.push(obs('observed.open_request', 'observed', 'moderate', t.index, open.map((c) => userRef(t, c)), 0.6));
   // WRITING TASK: their words put their own text on the table (an edit-scope
   // request about grammar, spelling or wording; "my essay" with "I'll write
   // it myself"), or they claimed the work and the runtime reads it as
@@ -1975,10 +3730,15 @@ export function observeTurn(turns: readonly TurnView[], k: number, ctx: ObserveC
     const pc = own(turns[practice]).codes;
     out.push(obs('observed.practice', 'observed', 'moderate', t.index, [userRef(turns[practice], pc.has('explicit.quiz') ? 'explicit.quiz' : pc.has('explicit.own_try') ? 'explicit.own_try' : 'explicit.learning_goal')], 0.75));
   }
+  // ── a new topic: it ends adjustments made for the last one, and starts none.
+  if (p.precision && newTopicAt(turns, k))
+    out.push(obs('observed.new_topic', 'observed', 'moderate', t.index, [userRef(t, IFR_REF_CODES.requestNewTopic), userRef(turns[k - 1], IFR_REF_CODES.requestPrevious)], 0.6));
 
   // ── weak: recorded, never acted on alone, never stronger than this.
   // A reply only: the first message of a conversation is not short "back".
-  const shortHere = (j: number) => j >= 0 && turns[j].prevReply !== null && own(turns[j]).short;
+  // Under params.precision, a short report ("I'm stuck", "I meant X", "still
+  // stuck" after an earlier stuck) is their words, not a short reply.
+  const shortHere = (j: number) => j >= 0 && turns[j].prevReply !== null && own(turns[j]).short && !(p.precision && (own(turns[j]).precise.size > 0 || stuckAgainAt(turns, j) || stuckStillAt(turns, j)));
   if (shortHere(k) && !revokedByAsking) {
     out.push(obs('weak.short_reply', 'hypothesis', 'weak', t.index, [userRef(t, IFR_REF_CODES.short)], 0.2));
     if (shortHere(k - 1) && shortHere(k - 2))
@@ -1991,4 +3751,136 @@ export function observeTurn(turns: readonly TurnView[], k: number, ctx: ObserveC
 /** observeTurn at every turn — the State Engine's replay of a conversation. */
 export function observeEveryTurn(turns: readonly TurnView[], ctx: Omit<ObserveContext, 'verdicts' | 'work'> & { workByTurn?: Readonly<Record<number, string | null>> }): Observation[][] {
   return turns.map((t, k) => observeTurn(turns, k, { ...ctx, work: ctx.workByTurn?.[t.index] ?? null }));
+}
+
+// ── measures: how their message met the reply before it ──────────────
+//
+// MEASUREMENT, NOT POLICY. reactionAt describes their newest message
+// against the reply before it, for the exposure row (lib/mr/types.ts
+// Reaction, MEASURE_PROVENANCE). It reads no policy parameter — the
+// precise codes are read under any pin, and the advance test is
+// mr-2026.11.1's whatever the pin — so two versions are compared on one
+// yardstick. Nothing that regulates reads it back. Its intended call site is
+// lib/mr/state.ts foldConversation, for the newest turn only, after the
+// uncertainty block and only when that turn has a reply before it:
+//
+//   const react = turns[last].prevReply !== null
+//     ? reactionAt(turns, last, { params, verdicts: input.context.accuracy.theirs, verdictsByTurn: f.verdictsByTurn, length: input.context.length }, nowObs)
+//     : null;
+//   // ...then `...(react ? { react } : {})` in the MRState it builds.
+
+/**
+ * They SAID they understood, opening their message: "got it", "Got it,
+ * thanks!", "that makes sense now", "Ah, I see.", "That helps, thanks", "That
+ * helps a lot, thank you", "that helps so much". The short forms ("got it", "I
+ * see", "that helps", with "a lot" or "so much") end their clause: not "I see a different error now", "got it
+ * working", "got it to run", "that helps a bit but it still drops", nor
+ * "That helps, but…" (a qualified complaint). Said, not shown: never evidence
+ * that they did.
+ */
+const UNDERSTOOD_SAID = new RegExp(
+  String.raw`^\W*(?:(?:oh|ah|ok(?:ay)?|right|yes|yeah|aha)[\s,!.]+)*(?:(?:(?:that|it) (?:makes|made) sense(?: now)?|makes sense(?: now)?|i (?:get|got|understand|see) (?:it )?now|now i (?:get|see|understand)(?: it)?|that clears it up)\b|(?:got it|i see|that helps(?: (?:a lot|so much|loads|heaps|a ton|tons|massively|a great deal|a bunch|enormously|hugely))?(?![^.!?]*\bbut\b))(?=\s*(?:[,.!;:)]|[—–-]\s|$|\b(?:now|thanks?|thank you|cheers|lol|haha)\b)))`,
+  'i'
+);
+
+/**
+ * answerNoAdvance as mr-2026.11.1 reads it, whatever the policy: a short
+ * answer to the one question asked advances, and so does a correction. A
+ * measure is the same under any pin.
+ */
+function advanceOf(turns: readonly TurnView[], u: number, k: number, ctx: ObserveContext): NoAdvance | null {
+  return answerNoAdvance(turns, u, k, { ...ctx, params: { ...ctx.params, precision: true } });
+}
+
+/** Whether their message at turns[u] answered what the reply before it asked. */
+function answeredAt(turns: readonly TurnView[], u: number, asked: number, na: NoAdvance | null): Reaction['answered'] {
+  if (asked === 0) return 'not_asked';
+  return own(turns[u]).precise.has('explicit.corrected') || na === null ? 'answer' : 'no_advance';
+}
+
+/**
+ * Can their message at turns[k] be an attempt? A maths turn (the route's
+ * reading, ObserveContext.math; a verdict of the engine on it; or the
+ * conversation reads as mathematics: looksMathematical, or working with an
+ * operator in their message), or a reply before it that held the answer back
+ * for them to try (practice, an own try or a quiz in force; a "try this" or a
+ * task set in it). A measure's test: it reads no policy.
+ */
+function attemptPossibleAt(turns: readonly TurnView[], k: number, ctx: ObserveContext): boolean {
+  const t = turns[k];
+  if (ctx.math === true || (ctx.verdicts?.length ?? 0) > 0 || THE_EXERCISE.test(own(t).sp)) return true;
+  if (practiceSince(turns, k) >= 0 || replyPosesTask(t.prevReply) || (t.prevReply !== null && TRY_THIS.test(speech(t.prevReply.slice(-IFR_READ_CHARS))))) return true;
+  return looksMathematical([...turns.slice(0, k + 1).map((x) => x.text.slice(0, IFR_READ_CHARS)), (t.prevReply ?? '').slice(0, IFR_READ_CHARS)]);
+}
+
+/**
+ * How their message at turns[k] met the reply before it, or null when there
+ * was none. Observed and explicit fields are counts and their words;
+ * `alreadyGiven` and `relevance` are hypotheses (never exported for
+ * research, never read by anything that regulates). Nothing here says that
+ * they understood: `saidUnderstood` is what they said.
+ */
+export function reactionAt(turns: readonly TurnView[], k: number, ctx: ObserveContext, nowObs: readonly Observation[]): Reaction | null {
+  const t = turns[k];
+  if (!t || t.prevReply === null) return null;
+  const prev = t.prevReply;
+  const me = own(t);
+  const said = (c: ObservationCode) => nowObs.some((o) => o.code === c);
+  const prevAsked = questionsPutTo(prev);
+  const na = advanceOf(turns, k, k, ctx);
+  const answered = answeredAt(turns, k, prevAsked, na);
+  const corrected = me.precise.has('explicit.corrected');
+  const redundantWords = saidAlready(me.sp);
+  const confused = said('explicit.confused');
+  const repeatRequest = said('observed.repeated_request');
+  const v = ctx.verdicts ?? [];
+  const verified = v.some((x) => x.status === 'verified');
+  const refuted = v.some((x) => x.status === 'refuted');
+  const verdict: Reaction['verdict'] = verified && !refuted ? 'verified' : refuted && !verified ? 'refuted' : 'none';
+  // copying back what the reply gave away is not an independent attempt
+  const given = revealsAnswer(prev) || attemptStatedIn(prev, t.text);
+  // An attempt only where one can be made: a maths turn, or a reply that held the answer back for them to try.
+  // "Windows 11" answering "Which operating system?" and "3.12" answering "Which version of Python?" have digits
+  // in them, and neither is an attempt at anything.
+  const attempt = me.attempt && attemptPossibleAt(turns, k, ctx);
+  const independent: Reaction['independent'] = given ? 'none' : verdict !== 'none' ? verdict : attempt ? 'attempt' : 'none';
+  // the clarification followed through: the reply before last asked, their last message answered it, and the reply since did not ask it again
+  let clarified: Reaction['clarified'] = 'unknown';
+  const before = k >= 1 ? turns[k - 1].prevReply : null;
+  if (before !== null) {
+    const a1 = answeredAt(turns, k - 1, questionsPutTo(before), advanceOf(turns, k - 1, k, ctx));
+    // (raw, as the measure is: the same question asked again word for word did not follow through)
+    if (a1 === 'answer') clarified = !replyEchoes(prev, [before]).repeatedQuestion && !redundantWords && !corrected && !confused && !repeatRequest ? 'yes' : 'no';
+  }
+  // hypotheses: the reply's question asked for what they had already written; its questions were about what they had said
+  const qs = interrogatives(prev).explicit;
+  const lastQ = qs.length ? [...tokensOf(speech(qs[qs.length - 1]))] : [];
+  const inEarlier = (w: string) => turns.slice(0, k).some((x) => own(x).tokens.has(w));
+  const alreadyGiven = lastQ.length >= 2 && lastQ.filter(inEarlier).length >= 0.75 * lastQ.length;
+  const asked = new Set(qs.flatMap((q) => [...tokensOf(speech(q))]));
+  const relevance: Reaction['relevance'] = prevAsked === 0 || k === 0 ? 'none' : [...asked].some((w) => own(turns[k - 1]).tokens.has(w)) ? 'targets' : 'drifts';
+  return {
+    mv: MEASURE_VERSION,
+    prevAsked,
+    answered,
+    // why an answer to a question moved nothing: there is none to explain when the reply asked nothing
+    noAdvance: prevAsked === 0 ? 'none' : (na ?? 'none'),
+    corrected,
+    stuck: stuckAt(turns, k),
+    knewIt: me.precise.has('explicit.knows_that'),
+    redundantWords,
+    confused,
+    saidUnderstood: UNDERSTOOD_SAID.test(firstSentences(me.sp, 1)[0] ?? ''),
+    askedShorter: said('explicit.shorter'),
+    askedLonger: said('explicit.longer'),
+    negative: said('explicit.negative'),
+    repeatRequest,
+    newTopic: newTopicAt(turns, k),
+    attempt,
+    verdict,
+    independent,
+    clarified,
+    alreadyGiven,
+    relevance,
+  };
 }

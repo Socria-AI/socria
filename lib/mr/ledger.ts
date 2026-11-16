@@ -52,6 +52,13 @@
 // (or with their settings unreadable, or shared) leaves only the bare
 // exposure row — the condition, nothing MR would have decided about them.
 //
+// MEASURES RIDE ON THE EXPOSURE ROW. The shape of the reply sent (reply) and
+// how their next message met it (react) are counts, flags and enum codes
+// under closed schemas, recorded in every arm so policies can be compared on
+// one yardstick. They are measurement only: nothing reads them back, and
+// repetition is recomputed from the transcript each turn rather than kept as
+// a hash or a token list here.
+//
 // Pure. node:crypto for the hash, nothing else.
 
 import { createHash } from 'node:crypto';
@@ -68,6 +75,7 @@ import {
   type LedgerRow,
   type MRDecision,
   type MRTurnResult,
+  type ReplyMeasures,
   type Scope,
 } from './types';
 
@@ -126,11 +134,11 @@ const dimension = (value: Shape): Shape =>
 const CONTROLS = obj({
   questionBudget: obj({ max: int, enforcement: oneOf(['hard', 'tail']) }, ['max', 'enforcement']),
   questionWindow: obj({ max: int, turns: int }, ['max', 'turns']),
-  strategy: oneOf(['direct', 'execute', 'worked_example', 'guided', 'preserve_challenge', 'edit_as_asked']),
+  strategy: oneOf(['direct', 'execute', 'worked_example', 'guided', 'preserve_challenge', 'edit_as_asked', 'diagnose', 'next_step']),
   scaffolding: oneOf(['less', 'more']),
   simplify: bool,
   verbosity: obj({ ceilingTokens: int }, ['ceilingTokens']),
-  verification: oneOf(['explicit']),
+  verification: oneOf(['explicit', 'suggest']),
   answerFirst: bool,
   noRevealAnswers: bool,
 });
@@ -172,6 +180,62 @@ const RECORD: Readonly<Record<LedgerKind, Shape>> = {
       local: bool,
       // the first turn of this conversation after their last reset
       resetTurn: int,
+      // the shape of the reply sent this turn (ReplyMeasures): counts, flags and
+      // enum codes, never a word of it, a hash or a token list
+      reply: obj(
+        {
+          mv: int,
+          fallback: bool,
+          content: bool,
+          askWords: int,
+          words: int,
+          sentences: int,
+          paragraphs: int,
+          questions: int,
+          explicitQuestions: int,
+          opensWithQuestion: bool,
+          wordsBeforeQuestion: int,
+          openerSentences: int,
+          steps: int,
+          code: bool,
+          english: bool,
+          repeatedSentences: int,
+          repeatedQuestion: bool,
+          firstActionable: int,
+          wordsBeforeActionable: int,
+          paragraphsBeforeActionable: int,
+          nextStep: oneOf(['yes', 'no', 'unknown']),
+          checkSuggested: oneOf(['yes', 'no', 'unknown']),
+        },
+        ['mv']
+      ),
+      // how their message this turn met the reply before it (Reaction), the same way
+      react: obj(
+        {
+          mv: int,
+          prevAsked: int,
+          answered: oneOf(['answer', 'no_advance', 'not_asked']),
+          noAdvance: oneOf(['direct_request', 'stop_request', 'dont_know', 'redundant', 'confused', 'repeat', 'short', 'none']),
+          corrected: bool,
+          stuck: bool,
+          knewIt: bool,
+          redundantWords: bool,
+          confused: bool,
+          saidUnderstood: bool,
+          askedShorter: bool,
+          askedLonger: bool,
+          negative: bool,
+          repeatRequest: bool,
+          newTopic: bool,
+          attempt: bool,
+          verdict: oneOf(['verified', 'refuted', 'none']),
+          independent: oneOf(['verified', 'refuted', 'attempt', 'none']),
+          clarified: oneOf(['yes', 'no', 'unknown']),
+          alreadyGiven: bool,
+          relevance: oneOf(['targets', 'drifts', 'none']),
+        },
+        ['mv']
+      ),
     },
     ['v', 'arm', 'ifr', 'shadow', 'source']
   ),
@@ -473,9 +537,12 @@ export function decisionsMade(r: Pick<MRTurnResult, 'decision' | 'state'>): MRDe
  * A record that will not sanitize is not written; an integrity row
  * (privacy_boundary, refused:<kind>) says that one was refused.
  * `enforced` is the regulation's own (lib/mr/index.ts MRRegulation); a result
- * without it records nothing about it.
+ * without it records nothing about it. `reply` is the shape of the reply sent
+ * (lib/mr/index.ts measureReply), measured after the stream; it goes on the
+ * exposure row with the reaction the fold read (MRState.react), in every arm,
+ * and neither is kept when MR is off by their choice.
  */
-export function rowsForTurn(r: MRTurnResult & { enforced?: boolean }, ctx: LedgerContext): LedgerRow[] {
+export function rowsForTurn(r: MRTurnResult & { enforced?: boolean; reply?: ReplyMeasures }, ctx: LedgerContext): LedgerRow[] {
   const s = r.state;
   const turn = Number.isInteger(s.turn) && s.turn >= 0 ? s.turn : 0;
   const conv = ctx.conversationKey;
@@ -579,6 +646,8 @@ export function rowsForTurn(r: MRTurnResult & { enforced?: boolean }, ctx: Ledge
       ...(revoked.length ? { revoked } : {}),
       ...(reasserted.length ? { reasserted } : {}),
       ...(constrainedBy.length ? { constrainedBy } : {}),
+      ...(r.reply ? { reply: r.reply } : {}),
+      ...(s.react ? { react: s.react } : {}),
     } satisfies Partial<LedgerExposure>,
     s.policyVersion
   );
@@ -941,10 +1010,12 @@ export function summarize(rows: readonly LedgerRow[], now: number, o: { revokedS
       const own = exposureAt.get(`${r.conversation_id ?? '-'}:${r.turn}:${r.conversation_id === null ? r.created_at : ''}`);
       const ran = own ? own.record.shadow === false && own.record.arm === 'full' : null;
       // every control taken out of it by a higher layer (`layer:control` for each one it set,
-      // or none left): as made, it changed nothing
+      // or none left): as made, it changed nothing. `layer:control.style` is taken out too (their written
+      // instructions gave ACS's question back, mr-2026.11.1); the other suffixes keep the control in another form
+      // (`.hard` at the tail, `.analogous`, `.hint`, `.keeps_answer`) and are not counted
       const by = codesIn(d.constrainedBy);
       const keys = d.controls ? Object.keys(d.controls) : [];
-      const emptied = by.length > 0 && keys.every((k) => by.some((c) => c.endsWith(`:${k}`)));
+      const emptied = by.length > 0 && keys.every((k) => by.some((c) => c.endsWith(`:${k}`) || c.endsWith(`:${k}.style`)));
       const applied = codesIn(d.uncertainty).includes(NOT_ENFORCED)
         ? false
         : own && ran === true && (own.record.enforced === false || emptied)

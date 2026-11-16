@@ -935,7 +935,9 @@
   display: inline-flex;
   gap: 4px;
 }
-.logos-root .l5-dots i {
+/* the typing dots are the indicator's own children: the dot grid shares the class (the space's canvas, the Map board),
+   and `.l5-dots i` turned every italic letter in a reply on it (an equation's x and y) into a pulsing dot */
+.logos-root .l5-dots > i {
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -943,10 +945,10 @@
   opacity: 0.35;
   animation: l5Dot 1.2s ease-in-out infinite;
 }
-.logos-root .l5-dots i:nth-child(2) {
+.logos-root .l5-dots > i:nth-child(2) {
   animation-delay: 0.15s;
 }
-.logos-root .l5-dots i:nth-child(3) {
+.logos-root .l5-dots > i:nth-child(3) {
   animation-delay: 0.3s;
 }
 @keyframes l5Dot {
@@ -961,7 +963,7 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .logos-root .l5-dots i,
+  .logos-root .l5-dots > i,
   .logos-root .l5-caret,
   .logos-root .l5-msg.is-flash .l5-said,
   .logos-root .l5-msg.is-flash .l5-prose {

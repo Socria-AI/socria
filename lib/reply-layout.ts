@@ -923,8 +923,9 @@ export function tidyTail(tail: string): string {
   if (singles.length % 2 === 1) {
     const at = singles[singles.length - 1];
     const after = t.slice(at + 1);
-    // a formula on its way: TeX's marks right after the dollar ("$\frac", "$p^*", "$x_1", "$f(x) =")
-    if (/^\S/.test(after) && /[\\^_{}=]/.test(after)) t = t.slice(0, at).trimEnd();
+    // a formula on its way: TeX's marks after the dollar ("$\frac", "$p^*", "$x_1", "$f(x) ="), or a letter
+    // right after it ("$dv", "$u"), which money never starts with — "$5" is a price until TeX's marks join it
+    if (/^\S/.test(after) && (/^[A-Za-z\\]/.test(after) || /[\\^_{}=]/.test(after))) t = t.slice(0, at).trimEnd();
   }
   // an unpaired bold mark, and an unpaired backtick, are left out until their pair arrives
   if ((t.match(/\*\*/g) ?? []).length % 2 === 1) {

@@ -82,7 +82,7 @@ function sanitizeMessages(raw: unknown): Msg[] {
       // Point & Ask: what the turn was about, as selected when it was sent
       const about = m.role === 'user' ? cleanAboutRef(m.about) : undefined;
       // said rather than typed (Socria Voice): the conversation marks it with a microphone
-      const via = m.role === 'user' && m.via === 'voice' ? 'voice' : undefined;
+      const via = m.role === 'user' && (m.via === 'voice' || m.via === 'quiz') ? m.via : undefined;
       // what they had done with a reply's elements when they wrote it (lib/inline-ui.ts) — shown over their words
       const did = m.role === 'user' ? sanitizeDid(m.did) : undefined;
       // the web pages a reply read, listed under it — addresses and titles, never their text

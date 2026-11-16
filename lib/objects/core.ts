@@ -109,6 +109,12 @@ export interface OpDef<S> {
   check: (state: S, args: Record<string, string | number>, ctx?: { replay?: boolean; by?: 'person' | 'socria' }) => string | null;
   apply: (state: S, args: Record<string, string | number>) => S;
   say: (args: Record<string, string | number>) => string;
+  /**
+   * The same operation again, straight after itself, by the same hand, replaces that step rather than adding one —
+   * for an operation that sets a whole value each time (a kept element's controls as they were left), so a slider
+   * scrubbed thirty times is one step Undo takes back, not thirty that push the real changes out of the history.
+   */
+  coalesce?: boolean;
 }
 
 export interface ObjectKind<S = unknown> {
@@ -119,6 +125,12 @@ export interface ObjectKind<S = unknown> {
   ops: Record<string, OpDef<S>>;
   /** read an operation out of words, if the words plainly are one */
   readOp: (text: string, state: S) => { op: string; args: Record<string, string | number> } | null;
+  /**
+   * Whose words `readOp` hears. Unset: any message, tried against every object of the kind. 'in-hand': only words
+   * said while this object is the one in hand (selected, or open on screen) — for kinds whose readers take common
+   * phrasing ("call it …", "remove the …") that ordinary conversation also uses.
+   */
+  readOpScope?: 'in-hand';
   /** what the computation can say about a step, comparing before and after */
   consequence: (before: S, after: S, step: Pick<Step, 'op' | 'args'>) => string | null;
   /** canonical facts, for the conversation and synthesis — `guarded` withholds what would be the answer */
@@ -299,8 +311,11 @@ export function apply(
     ...(note ? { note } : {}),
     at: who.at ?? Date.now(),
   };
-  let states = [...obj.states.slice(0, obj.at + 1), after];
-  let steps = [...obj.steps.slice(0, obj.at), step];
+  // the same whole-value operation again, by the same hand, at the end of the history: it replaces its last step
+  const prev = obj.at > 0 ? obj.steps[obj.at - 1] : null;
+  const merge = !!def.coalesce && !!prev && prev.op === op && prev.by === who.by && !prev.suggested && !who.suggested && who.at === undefined;
+  let states = merge ? [...obj.states.slice(0, obj.at), after] : [...obj.states.slice(0, obj.at + 1), after];
+  let steps = merge ? [...obj.steps.slice(0, obj.at - 1), step] : [...obj.steps.slice(0, obj.at), step];
   let trimmed = obj.trimmed ?? 0;
   // The description this step belongs to, for a kind whose steps come in
   // descriptions: the steps at the end that share this step's moment.

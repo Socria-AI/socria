@@ -284,6 +284,17 @@ bad('an unknown action', good({ action: 'manipulate' }), 'contract_invalid', 'un
 bad("a 'none' that sets a control", { ...none, controls: { questionBudget: { max: 0, enforcement: 'hard' } } }, 'contract_invalid', 'none_sets_controls');
 bad('a question budget of 2', good({ controls: { questionBudget: { max: 2, enforcement: 'hard' } } }), 'contract_invalid', 'bad_control:questionBudget');
 bad('an unknown strategy', good({ trigger: 'ifr.explicit.direct_answer', controls: { strategy: 'socratic_forever' } }), 'contract_invalid', 'bad_control:strategy');
+// mr-2026.11.1's strategies and its suggested check are valid controls; an unknown one still is not
+ok('the diagnose strategy is a valid control', checkDecision(good({ trigger: 'ifr.explicit.direct_answer', action: 'diagnose', controls: { strategy: 'diagnose' } }), CTX).length === 0, JSON.stringify(checkDecision(good({ trigger: 'ifr.explicit.direct_answer', action: 'diagnose', controls: { strategy: 'diagnose' } }), CTX)));
+ok('the next_step strategy is a valid control', checkDecision(good({ trigger: 'ifr.explicit.direct_answer', action: 'next_step', controls: { strategy: 'next_step' } }), CTX).length === 0);
+{
+  const SUGGEST_CTX = { ...CTX, ruleControls: { ...RC, 'mr.observed.fix_failed': ['verification'] } };
+  const check = (v) => good({ trigger: 'mr.observed.fix_failed', action: 'check_first', controls: { verification: v }, evidenceRefs: [{ turn: 4, role: 'user', code: 'observed.fix_failed' }] });
+  ok("verification 'suggest' (a check they can run) is a valid control", checkDecision(check('suggest'), SUGGEST_CTX).length === 0, JSON.stringify(checkDecision(check('suggest'), SUGGEST_CTX)));
+  ok("…and 'explicit' still is", checkDecision(check('explicit'), SUGGEST_CTX).length === 0);
+  const fs = checkDecision(check('maybe'), SUGGEST_CTX);
+  ok('an unknown verification value is not', fs.some((f) => f.code === 'contract_invalid' && f.detail === 'bad_control:verification'), JSON.stringify(fs));
+}
 bad('a negative ceiling', good({ trigger: 'mr.any', controls: { verbosity: { ceilingTokens: -5 } } }), 'contract_invalid', 'bad_control:verbosity');
 bad('a string where a boolean goes', good({ trigger: 'ifr.explicit.direct_answer', controls: { answerFirst: 'yes' } }), 'contract_invalid', 'bad_control:answerFirst');
 bad('an unknown control', good({ controls: { temperature: 2 } }), 'contract_invalid', 'unknown_control');
@@ -475,6 +486,13 @@ console.log('goal drift');
   ok('raising questions while "stop asking" is in force', drift([pref('questions:0', 3)], asks).some((f) => /no_questions_pref/.test(f.detail)));
   ok('… read off the observation code too', drift([pref('explicit.stop_questions', 3)], asks).length === 1);
   ok('fewer questions under "stop asking" is not drift', drift([pref('questions:0', 3)], mrDecision(5)).length === 0);
+  // mr-2026.11.1: a single next step or a locating question hands over less than "just tell me" asked for
+  const nextStep = mrDecision(5, { action: 'next_step', controls: { strategy: 'next_step', questionBudget: { max: 0, enforcement: 'tail' } } });
+  const ns = drift([pref('strategy:direct', 4)], nextStep);
+  ok('a next step while their "just tell me" is in force: goal_drift direct_pref:next_step', ns.length === 1 && ns[0].code === 'goal_drift' && ns[0].detail === 'direct_pref:next_step', JSON.stringify(ns));
+  ok('… and so is a diagnose', drift([pref('strategy:direct', 4)], mrDecision(5, { action: 'diagnose', controls: { strategy: 'diagnose', questionBudget: { max: 1, enforcement: 'tail' } } })).some((f) => /direct_pref:diagnose/.test(f.detail)));
+  ok('a diagnose under "stop asking", composed to no question (hard): no drift', drift([pref('questions:0', 3)], mrDecision(5, { action: 'diagnose', controls: { strategy: 'diagnose', questionBudget: { max: 0, enforcement: 'hard' } } })).length === 0, JSON.stringify(drift([pref('questions:0', 3)], mrDecision(5, { action: 'diagnose', controls: { strategy: 'diagnose', questionBudget: { max: 0, enforcement: 'hard' } } }))));
+  ok('… but one that would still ask under "stop asking" is', drift([pref('questions:0', 3)], mrDecision(5, { action: 'diagnose', controls: { strategy: 'diagnose', questionBudget: { max: 1, enforcement: 'tail' } } })).some((f) => /no_questions_pref:diagnose/.test(f.detail)));
   ok('taking questions away while "quiz me" is in force', drift([pref('strategy:quiz', 3)], mrDecision(5)).some((f) => /questions_pref:fewer_questions/.test(f.detail)));
   ok('… or while their practice goal is', drift([], mrDecision(5), [pref('goal', 3, { value: 'practice' })]).length === 1);
   ok('a later "stop asking" ends "quiz me"', drift([pref('strategy:quiz', 2), pref('questions:0', 4)], mrDecision(5)).length === 0);

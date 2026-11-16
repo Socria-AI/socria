@@ -73,6 +73,36 @@ MR text goes only into `turnContext` (after the history), never into the
 cache-stable prefix. With `LOGOS_MR=off`, none of this runs: the
 prompt, `max_tokens` and headers are byte-identical (`test/mr-route.test.mjs`).
 
+What else the route hands MR, content-free (read only under a policy with
+`params.precision`; an earlier pin and MR off are byte-identical):
+`context.material` (something on their screen besides the transcript: a
+Project, documents, a focus, a visual, objects, something in hand, a course,
+their Mind Graph, or an attachment that survives `sanitizeAttachments` on
+their newest message or the one before it), `context.attached` (their newest
+message carries such an attachment; only a plain `true` counts), and
+`context.style` (`styleAsks`: two booleans read from their written
+instructions, clause by clause, never their words — `questions` when they ask
+for a closing question, a quiz or a check of their understanding, `length`
+when they ask for thorough or detailed answers; a refusal or a dislike just
+before what is asked, in the same run of words, counts for nothing, so "Don't
+end with a question", "No long answers", "I don't want you to ask me
+questions" and "I hate long answers" are neither, while "Don't hesitate to
+ask me questions" is one). A request this turn for code in a language ("ok,
+how do I do that in Python with psycopg?") counts as a request for code, so
+MR's own ceiling does not stand against it. And where MR's final move must not be undone by the
+rest of the plan (`mrMoveOf`, the full arm only): on a diagnose because what
+they point at, or the work they are stuck on, is not in the conversation,
+the turn is planned with no presentation forms, no reply shape and no "HOW TO
+MAKE IT UNDERSTOOD" block; on a next step, the explanation plan loses the
+complete worked example, the transfer sentence or problem and the "smaller
+steps" line (`underMrMove`), and the next-step line itself says it
+outranks the shape and form notes below it (a block or element offered there
+may carry the one step, and nothing past it). MR's block is not the last thing the model
+reads: the presentation, explanation, course and evidence lines come after
+it, so without this a later line could contradict it (the design note that
+called MR's block "the freshest line" was wrong). Any other precision
+decision still sits before those lines; its own text says what it asks.
+
 ---
 
 ## 2. The decision contract (`lib/mr/types.ts`)
@@ -101,9 +131,12 @@ possible.
 | `questionBudget {max, enforcement:'hard'}` | The reply gate drops **every** interrogative sentence of Socria's own, mid-reply too, on the streamed and the held path alike — never somebody else's words (a quotation, a `>` line, a table row, fenced code, a list introduced as questions — "Ask these:" — or a labelled one — "Ask: …?"), and never a question the next sentence answers (below). What it keeps, the stream gate's tail cap keeps too (`SentenceGate` `keep`). Used only for their explicit "stop asking". When they ask for questions as content this turn (a list of interview questions, a draft to a friend) it is lowered to `tail` for the turn, recorded as `user_instruction:questionBudget.hard`, and the question budget stays ACS's: the tail cap at 0 deleted the closing question of the email they asked for. | **hard** |
 | `questionBudget {max:0, enforcement:'tail'}` | `assist.questions` → `SentenceGate.finish()` for the close, plus a check-in ("Does that make sense?", "Want me to compare?") dropped **anywhere** (`gate.dropCheckIns`) — only an offer-shaped question put to them, standing on its own ("Want me to…?", "Does that make sense?"), never a sentence of advice that starts "if you want", never a question Socria asks itself and answers ("Should I go for 16GB? Yes…"), and never on a turn whose questions are the content they asked for. An explicit question followed by exposition can still ship (it is rhetorical). | **tail** + check-ins |
 | `questionWindow {max, turns}` | Spent → budget 0 this turn. Its line asks for their best answer now — under the Answer Guard or a withhold, for the next step or a hint instead, the answer staying theirs (`…:questionWindow.hint`). | tail |
-| `verbosity {ceilingTokens}` | `max_tokens` lowered for the reply call. | **hard** |
+| `verbosity {ceilingTokens}` | `max_tokens` lowered for the reply call. Its line says why: "SHORT: a few sentences. They asked for less." only where they did (their "shorter", their concise setting); under mr-2026.11.1 a ceiling MR set on its own reading (long replies, background said again, a re-ask, an open request) says "The point first; nothing this conversation has already said, and no background they did not ask for." instead. | **hard** |
 | `strategy` (direct, execute, worked_example, preserve_challenge, edit_as_asked, guided) | Narrows ACS's move (mode, forced, scaffold) plus one instruction line. | move + prompt |
-| `scaffolding`, `simplify`, `answerFirst`, `noRevealAnswers`, `verification` | Move fields where they exist, otherwise instruction lines. | prompt |
+| `strategy: diagnose` (mr-2026.11.1) | The point that holds whichever way they mean it, then at most the one question ACS already allowed, about what they mean, and nothing after it. The line is rendered from the FINAL question budget: with a question to spend it asks one ("…and end there. If that point already gives them what they need, ask nothing."), with none it answers the likeliest reading and names it so they can redirect. Three versions by what the reading rests on: an open request, a missing referent ("fix this" with nothing shown: ask for the one thing needed, or say what is needed), "I'm stuck" with nothing of the work shown. In the move, no self-explanation or recall question beside it; check-ins are **not** dropped, so an offer-shaped diagnostic is the route's to hold back and restore. Under their "detailed" setting or written instructions asking for thorough answers, the lines drop the length they prescribe ("In a sentence or two", "in two or three plain sentences"). | move + prompt; the question through the tail cap |
+| `strategy: next_step` (mr-2026.11.1) | Their work is on the table and they are stuck: one concrete next step from where they are, its reason, how they can tell it worked, the assumption it rests on named, and no question back (where their written instructions gave ACS's question back, the line leaves the question to that budget instead). In the move, a hint (or the steps ACS already chose), never on a challenge, a perspective, room to be heard or a build. | move + prompt, q0 tail |
+| `verification: 'suggest'` (mr-2026.11.1) | Fixes have failed twice running: name the assumption they rested on, give one check they can run to confirm or rule it out, what to do for each result, and no fix they already tried. Their own "check it" (`'explicit'`) always wins over it in composition. | prompt |
+| `scaffolding`, `simplify`, `answerFirst`, `noRevealAnswers`, `verification` | Move fields where they exist, otherwise instruction lines. Under mr-2026.11.1 an `answerFirst` from a correction or a re-ask says what the lead is for ("This is a clarification, not a disagreement: THEY CORRECTED YOUR READING OF THE QUESTION…", so it is not read beside ACS's pushback line as a disagreement to defend; "THEY ASKED AGAIN FOR THE POINT…"), and less scaffolding after "I know that" says to start at what is new to them. | prompt |
 | (always, when MR is regulating) unsupported improvement claims | The reply gate drops "you've really improved"-type sentences in Socria's own words. Nothing one conversation holds supports one — a single engine-verified attempt is one observation and may echo the answer just given — so no verdict unlocks them. Not applied inside quotations, in writing they asked for (a draft for somebody else — "a note to my student Maya", or a revision of one: "make it warmer" — or any card, note, letter, speech or message asked for: "write a card for my son saying how much he has improved"), or on a safety turn. Armed on every regulated full-arm turn; the trace says so (`g=…c`), and a dropped sentence is an integrity row. | **hard** |
 
 **What the reply gate never touches.** Each SENTENCE of Socria's own is
@@ -209,7 +242,10 @@ the only words MR ever puts into a reply (`lib/mr/index.ts EMPTY_REPLY_LINES`),
 and an integrity row records that it did.
 
 What is prompt-only is **measured** after the reply (`afterReply`: questions
-over budget, answer-first violated → `control_violation` findings) and read
+over budget, answer-first violated → `control_violation` findings; under
+mr-2026.11.1 counted on the reply as put to them, as `replyShape` reads it —
+no code, closed or cut off, no heading, no question the next sentence
+answers — so a reply the gate rightly kept files nothing) and read
 next turn by the outcome model (did the steps arrive, did they have to ask
 again). It is never assumed.
 
@@ -231,7 +267,25 @@ what it took is recorded as `layer:control`:
    asking" holds at the tail only. If they say they want to work it out, MR
    does not hand it over. If they ask for the answer or the steps, nothing is
    kept back that turn. Their length setting caps, and is never lengthened.
-   Their MR switch, consent and privacy choices.
+   Their MR switch, consent and privacy choices. Under mr-2026.11.1, two
+   more: a diagnose or a next step never stands beside their request for the
+   answer or the steps (`user_instruction:strategy` — a locating question or
+   one step hands over less than they asked for), and a ceiling MR set on its
+   own reading does not stand against their "detailed" setting or that
+   request (`user_instruction:verbosity`); their own "shorter" stays. That
+   ceiling also goes when their request for the answer or the steps is still
+   in force from an earlier turn, when their written instructions ask for
+   thorough answers (`context.style.length`), and when their message this
+   turn asks for a full piece, code or writing ("now turn those bullet points
+   into a full study guide", "write the script that benchmarks it": the
+   exported `FULL_PIECE`, or the runtime's work reading `creation`). Their
+   written instructions asking for a closing question
+   (`context.style.questions`) take back a "no question this turn" at the
+   tail that only MR's own precision readings set (a correction, a redundant
+   question, a repeated stuck, a stuck with the work shown), to ACS's budget
+   and never above it, recorded `user_instruction:questionBudget.style` (and
+   `…questionWindow.style`); their stop (hard) and a lowering any other rule
+   made are never touched.
 3. **app_policy:** the Answer Guard and a Core 4 withhold (their own quoted
    words, their Project, graded work). The guard binds on every turn it is
    up, not only on turns that read as maths — "just tell me the answer" has
@@ -241,12 +295,42 @@ what it took is recorded as `layer:control`:
    "give your best answer now" (`…:questionWindow.hint`). A
    worked example becomes one of an ANALOGOUS problem under either (recorded
    as `…:strategy.analogous`), and ACS's check of their own attempt stays the
-   move. A "heard" turn is left as room.
-4. **acs:** what is left narrows `AssistDecision`.
+   move. A diagnose or a next step stays, as a pointer that gives nothing of
+   their answer away (`…:strategy.keeps_answer`; the lines have `_KEPT`
+   versions). A "heard" turn is left as room. Under mr-2026.11.1 the kept
+   lines (`_KEPT`, the hint line, the ANALOGOUS worked example, the kept
+   correction) are used wherever the answer stays theirs, not only under the
+   guard or a withhold: their own try or a quiz in force (`noRevealAnswers`
+   survives composition), and the scaffold layer (`app_policy:scaffold:*`).
+   Their own try read as practice also keeps the lines kept when its rule
+   stood down (said with "just give me hints", which also reads as a request
+   for the answer). One exception: an open request (Branch A) kept by the
+   Answer Guard or the scaffold layer alone renders the open diagnose lines,
+   since there is no answer of theirs to keep, and constrain records no
+   `keeps_answer` for it, so the trace and the prompt say the same.
+4. **acs:** what is left narrows `AssistDecision`. Under mr-2026.11.1 ACS's
+   move is first checked for what it can carry (layer 3b, recorded as
+   `acs:*`): a diagnose needs a move that leads with substance and has room
+   for one question about what they mean — explain, open or perspective, and
+   not a move about something they pointed at (`assist.target`). On any other
+   move (a fact given, a check of their work, a question already put, a
+   challenge, room to be heard, a build) the diagnose goes, with the question
+   it allowed and the ceiling it brought; a ceiling another rule set stays.
+   One exception: a missing referent stays on a fact given or a check ("Can
+   you check this?", "Translate this" with nothing there), since a check of
+   nothing is no move to keep; its line asks for the thing with ACS's own
+   question, or says what is needed when ACS put none. A next step is not
+   given on room to be heard or on a build. MR narrows the move ACS chose; it
+   never replaces it.
 5. **mr**
 
 The one widening is a question kept in a quiz they asked for. It rests on the
 user-instruction layer above ACS and is marked `mr:user_instruction:quiz`.
+A diagnose's "one question" is a ceiling like every other budget: where ACS
+allowed none, or their stop, a correction or questions that were not helping
+took it to none that turn, it asks nothing and its line says to answer the
+likeliest reading instead. The rules that allow one question are the last in
+the table, so a same-turn "none" has always claimed the budget first.
 
 **Inconsistency with the proposal, recorded rather than changed.** The proposal
 orders user instructions above application policy. The existing product
@@ -445,6 +529,110 @@ applied to `speech()`, so quoted text is not read as an instruction.
   ("Lima" is not a reply that moved nothing). "Let's move on" or "let's
   switch to harder ones" inside a quiz is the next question. A complaint is
   not a request: "you quiz me every time" asks for no quiz.
+
+  **What mr-2026.11.1 reads of their words** (only under a policy with
+  `params.precision`; an earlier pin reads exactly what it read before; the
+  codes are read outside `readExplicit`, so nothing an earlier version read
+  can change):
+  - **stuck** (`STUCK`): "I'm stuck", "I'm still stuck on step 3", "I've
+    been stuck on this part all day", "I don't know where to start", "no idea
+    how to start", "I've hit a wall", "I can't figure this out", "I don't
+    know how to solve it", "I'm not sure what to do next", "stuck on part b",
+    "Stuck on step 3" opening the message — on a piece of work only. Never a
+    place, a vehicle, a thing or an idea ("I'm stuck in traffic", "the door
+    is stuck", "I'm stuck on the problem of evil", "I'm stuck on why the sky
+    is blue"), never somebody else ("she's stuck on step 3"), never past or
+    habitual ("I was stuck yesterday", "I got stuck on step 3", "I get stuck
+    at part two"). Never a feeling or a life ("I'm stuck and I can't stop
+    crying", "stuck in a marriage", "stuck at the airport, my flight got
+    cancelled", "I'm stuck with it now, the contract runs two years"): the
+    affect gate (readSignals' vent, sensitive or safety, a tender message, or
+    the word list) and the life list turn it down, and a stuck that is not
+    the whole message needs a work context (a work word, a digit or an
+    operator, code, a task in the topic's window or in a message of 40 words
+    or more, or a reply before it that explained or worked an exercise — a
+    troubleshooting thread as much as homework), and among words about the
+    people or the life around them ("I don't know what to do. I think my
+    friend is angry with me", "should I take the job in Berlin or stay?") it
+    is not read at all. Not when the rest of the message resolves it
+    ("…figured it out"), takes it back ("jk") or asks for the words
+    themselves ("how do you say I'm stuck in French?"). When the same message
+    refuses help ("no hints, let me think", "I'll figure it out"), the ref
+    `stuck.declines` makes every stuck rule stand aside; a refusal is said,
+    not reported, so "I have no clue where to start", "the textbook is no
+    help" and "let me think out loud: …" are ordinary stuck reports. When the
+    same message asks for the solution itself ("I'm stuck. Walk me through
+    the rest.", "Can you solve it for me?", "What is x?"), the ref
+    `stuck.wants_answer` makes every stuck rule stand aside the same way: one
+    step would hand over less than they asked for, and ACS's help stands.
+    An equation named is the work ("I'm stuck on 3x + 7 = 22", "stuck solving
+    x^2 - 4 = 0"); an exercise verb put to a pointer is not ("I don't know how
+    to solve this" with nothing before it is unseen, not work on the table),
+    nor a part named by its number ("I'm stuck on question 4" says where, not
+    what). A stuck on a line of its own after pasted, unfenced code is read. "Still
+    stuck" counts at the start of any clause ("tried that, still stuck
+    here"): as stuck again when it is in the same episode as a stuck they
+    said (read back through the episode's "still stuck"s, so the fourth in a
+    row counts as the second did), and as their first stuck when there is
+    none before it but a task is on the table and a reply between. A "still
+    stuck" keeps the work its episode's first stuck had on the table; after
+    an unseen one it is still unseen, and gets the locating question again,
+    never a worked example of a problem nobody has seen. The reading says where the work is: shown — their own working,
+    code or text in this message or the one before, a task stated anywhere in
+    the topic's window (their messages since the last new topic, at most
+    five back), a problem Socria's reply set, or something on their screen
+    (`context.material` or `context.attached` true) — or not, and whether it
+    is theirs (`stuck.shown`, `stuck.own_work`). `stuck.unseen` is read
+    **live only**, when the route says nothing is on their screen
+    (`material === false`); unknown (a replay, no route) reads neither, so no
+    stuck rule acts. `stuck.first`: nothing at all before it, and nothing of
+    the work shown; its lines ask what they are working on, or say what
+    would help, instead of a guessed first move.
+  - **corrected** (`CORRECTED`): after a reply, "No, I meant on my Mac",
+    "Sorry, I mean the 2019 version", "I meant Python, not Java", "that's not
+    what I meant", "you misunderstood my question", "Sorry, I was asking
+    about the API", "Sorry, I should have been clearer. I meant Leibniz",
+    "that's not my question", "you didn't answer my question", "I'm asking
+    about X, not Y" — opening their clause (the past "I meant" opening any
+    sentence, the present "I mean" the message). Also a setup put right:
+    "No, I'm on a Mac", "That's for Windows. I have a Mac.", "This is
+    JavaScript, not Python", "No, it's a Mac", "I'm not on Windows, I use a
+    Mac", "Sorry, I should have said, I'm on a Mac" (`CORRECTED_SETUP`). Not "I meant to ask earlier", "no, I mean it's
+    fine", "I mean yeah that makes sense", "I mean, it works but it is slow",
+    "I mean the first one was clearer" (a verdict), "I mean what if we tried
+    …", "I meant it as a joke", "I meant 'carpe diem' as my motto", "Not what
+    I meant but honestly this is better", "No offence meant", an account of
+    what they did ("I asked if they could help and they said no"), ", not
+    sure / not that / not just" ("I use a VPN, not sure if that matters"),
+    the state of a fix ("Nope, I have tried that already", "No, I have the
+    latest driver installed"), and never on a first message. A correction and
+    "I know that" are read in the first 1,500 characters of the message.
+  - **knows that** (`KNOWS_THAT`): after a reply that explained, "I know
+    that already", "I know what recursion is, I want to know when to avoid
+    it", "I know how loops work", "Yes, I'm aware.", "we covered this",
+    "skip the basics", "I'm not a beginner", "I'm familiar with it", "no need
+    to explain", "you're repeating yourself", opening the message or a
+    sentence. Not "I know you're busy", "I know, right?", "I know a guy who
+    does this", "I know that now, thanks", "I know that, but I forgot how it
+    goes, go over it again", "I know that, but please explain it once more"
+    (anything that says they still do not get it, or asks for it again), a
+    check or a story of what was said ("You already said that range starts at
+    zero, right?", "You already covered this? I missed it"), a complaint
+    taken back ("…just kidding"), and never after a reply that only asked.
+  - **a stop, in other words** (`NO_QUESTIONS_SAID`, read as
+    `explicit.stop_questions`, so it is their stop like any other): "No
+    follow-up questions please", "Stop questioning me", "Stop with the
+    questions", "Stop asking me follow-up questions", "Please stop ending
+    every reply with a question" — not "There were no questions on the exam",
+    "my teacher said no questions in class" or "stop asking me so many
+    questions at once". A diagnose beside it asks nothing.
+  - **shorter, in other words** (`BREVITY`, read as `explicit.shorter`):
+    "be brief", "keep your answers short", said to Socria and never beside
+    their own writing; it holds for the conversation like their "shorter".
+
+  The first three are reports about this turn, not ways they want to be
+  helped from now on: they are never filed as preferences
+  (`NOT_A_PREFERENCE`), never carried, and their rules last the turn.
 - **observed**: question streak, unproductive questions (asking replies whose
   answers did not advance anything — never during a quiz they asked for,
   where "Lima" is an answer; a stated learning goal is not a quiz), repeated
@@ -455,7 +643,103 @@ applied to `speech()`, so quoted text is not read as an instruction.
   "…the Roman empire" is the next item, not a repeat), verbose replies,
   routine task (ACS's own fact/computation reader or the engine having
   computed the answer, not the runtime's coarse work reading), writing task,
-  practice.
+  practice. Under mr-2026.11.1, also:
+  - **redundant question**: Socria asked, and they answer that they had
+    already said it ("I already told you, Windows 11", "I told you",
+    "I literally just said that", "like I said, it's for my team", "you
+    already asked me that", "you keep asking me the same thing", "see
+    above", or "I said Windows 11" as the whole message) — not "I already
+    tried restarting it", "I already know Python", "as I said in my essay",
+    not when Socria's question asked whether they had done that very thing
+    ("Have you mentioned it to HR?" → "I already mentioned it"), and never
+    while a quiz runs.
+  - **repeated question**: a reply asks again, nearly word for word, a
+    question one of the two replies before it asked (token overlap 0.6 or
+    more, digits and single letters kept, and one question holding every
+    word of the other, so "divide both sides by 4" and "…by 5" are two
+    questions) — never in questions asked for as content (interview
+    questions, a quiz they asked for, a draft), never while practice or a
+    quiz is in force, and an identical whole reply only when it is short (40
+    words or fewer) and their message between differed (a real re-ask, not
+    a re-send). A paraphrase with no words in common ("What OS are you
+    on?" after "Which operating system do you use?") is a known miss.
+  - **repeated stuck**: stuck again within two turns of saying so; its rule
+    acts at most once a stuck episode (below).
+  - **late answer**: their first sentence asks again for the point ("ok but
+    so what should I do?", "So what's the bottom line?", "which one should
+    I pick then?", "is it yes or no?", "You didn't answer my question.")
+    after a reply of 240 words or more. "How do I do it?" counts only when
+    the message the long reply answered asked how or what to do (`REASKS_HOW`);
+    "Can you make a study plan?" after a long answer is the next request, not
+    a re-ask. The evidence is their re-ask and the reply's length, never an
+    estimate of where the answer sat.
+  - **repeated background**: the last reply said again, nearly word for word
+    (token overlap 0.8), two or more sentences of eight tokens or more from
+    the three replies before it (sentences read from the reply's first 2,500
+    characters, cut back to whole sentences), when what they asked was not a
+    recap ("repeat", "summarise", "go over it"), the same material in another
+    form ("as bullet points", "in a table", "list them", "simpler", "shorter",
+    `REFORMAT_ASKED`; a table or a list named, as in "What about my orders
+    table?", asks for none), writing or a revision of it, and their length setting
+    is not "detailed". Code and quotations are left out, and so is an
+    identical whole reply (fixture repetition).
+  - **fix failed**: two reports running, after replies that suggested
+    something, that it still fails, each opening a clause of its first two
+    sentences ("still doesn't work", "It's still not working", "same error
+    again", "Didn't work.", "no change", "it keeps happening") with no other
+    subject than it, this, the problem or the error — never "I still don't
+    get it" (confusion), "the linter still errors" (something else), and
+    never when either of the first two sentences says it worked ("no errors
+    now", "that did it", "works now"). Maths is left to failed attempts.
+  - **open request — an estimate turned into an observation**, as routine
+    task is: a structural reading of a first message (or the first of a new
+    topic), held to its turn, with `goal_reading_inferred` on its decision.
+    Two branches. A: the whole of a short question (3–12 words, one
+    sentence, anchored at its end: at most two tail words such as "in
+    general" or "at scale", then the closing mark) asking why a broad
+    subject is not delivering, with nothing of their own case in it ("Why is
+    AI not solving problems?", "Why can't AI do anything useful?", "Why
+    hasn't AI solved any problems?", "Why isn't AI useful?", "How come
+    technology still can't solve real problems?") — not "Why is the sky
+    blue?", "Why don't people vote?", "Why is AI not solving problems in
+    healthcare?" (a field named), "Why can't AI do everything?" (a question
+    about its limits), "Why can't AI solve problems, like actual hard ones?"
+    (a comma tail says more), "Is AI overhyped?", nor a personal outcome
+    ("Why is my team not productive?": their own case, which an answer with
+    stated assumptions serves without MR); never beside an instruction,
+    practice, a fact question, a tender or venting message, their "detailed"
+    setting, or something on their screen (`material === true`; unknown, as
+    in a replay, still reads it). After the first message it needs a new
+    topic and nothing but short chit-chat before it ("hi"). B: a first
+    message that points at something that is not there ("How do I fix
+    this?", "Help me fix this bug.", "Solve this equation", "Why isn't this
+    working?", "Can you check this?") — not when the thing is handed over in
+    the same message ("Solve this equation: x squared equals four", "Explain
+    this error — undefined is not a function", or on the next line), not a
+    pointer back to a thing of theirs named before it ("My sink is clogged,
+    how do I fix it?", "My knee hurts after running, why does this happen?":
+    a clear question; a known narrowing is "My code doesn't work, can you fix
+    this?" with the code not pasted), and not encouragement ("Let's do this!",
+    "You can do it!") — read **live
+    only**, when the route says nothing is on their screen either
+    (`context.material === false`: no Project, documents, focus, visual,
+    objects in hand, course, mind map or attachment), because screen context
+    is not in the transcript and a replay could not reproduce it. Branch B
+    therefore gets no outcome vector; the measures and the benchmark
+    measure it.
+  - **new topic**: a question about something else. Not when the part of
+    the message that asks refers back ("it", "that", "those", "more",
+    "another example", "what if", "how long", "is it safe"), opens on the
+    same thread ("and", "what about", "is it the same", "can you redo"), or
+    says they are stuck; otherwise it needs at least two topic stems that are
+    in neither their message before nor the whole reply, and none that is
+    (every broad subject counts as one topic word): "Could my microwave be
+    causing the interference?" after a reply about interference stays on the
+    thread. A new topic said in so many words ("Unrelated, but…", "Totally
+    separate thing -") is one whatever it shares. It only ever ends an adjustment that was about
+    the old topic; no rule acts on it. A short new question with one content
+    word ("How do vaccines work?" after a wifi chat) is not read as a new
+    topic: the miss keeps an adjustment, which still expires.
 - **weak** (hypotheses, never acted on): short reply ("ok", "k"), terse run.
   A short message never yields frustration or unproductive questions on its
   own.
@@ -470,12 +754,39 @@ applied to `speech()`, so quoted text is not read as an instruction.
 | `mr.explicit.own_try` | mr | guided, no reveal (no question added) | until they ask for the answer or the steps, end it, or move on to a question about something else |
 | `ifr.explicit.shorter` | ifr | ceiling (360 tokens) | conversation, or one reply for a one-off length |
 | `mr.explicit.simpler` / `verify` / `edit_only` | mr | simplify; verify out loud; edit only what was asked, q0 | 3 turns; 1; 3 (or until they ask for a rewrite) |
+| `ifr.explicit.corrected` ★ | ifr | direct: answer first (the question as they now put it), q0 | 1 turn; not inside a quiz |
+| `mr.explicit.knows_that` ★ | mr | less scaffolding: start at what is new to them (no ceiling) | 1 turn; never beside "I'm lost" |
 | `ifr.observed.unproductive_questions` | ifr | q0, at most one asking reply in 3, **answer now from what they said** (under the guard or a withhold: the next step or a hint) | 3 turns |
+| `ifr.observed.redundant_question` ★ | ifr | fewer questions: q0, at most one asking reply in 3, answer first (also on a repeated question) | 3 turns, ended by a new topic |
 | `ifr.observed.repeated_confusion` | ifr | worked example, more scaffolding, simpler, q0 | 1 turn, then guided work resumes |
 | `mr.observed.failed_attempts` | mr | worked example (analogous under a withhold) | 1 turn |
+| `mr.observed.repeated_stuck` ★ | mr | worked example (analogous whenever the answer stays theirs), more scaffolding, q0 | `workedExampleTurns`; once a stuck episode (not again while its own trigger is among the last `RECENT_TURNS` = 4 turns' decisions), never beside a way of helping they set and still in force, never after an unseen stuck |
 | `ifr.observed.repeated_request` | ifr | answer first, q0 | 1 turn |
+| `ifr.observed.late_answer` ★ | ifr | direct: answer first, ceiling 360 | 1 turn |
 | `ifr.observed.verbose_replies` | ifr | ceiling | 3 turns |
+| `ifr.observed.repeated_background` ★ | ifr | shorter: ceiling 360 (not while they are lost or stuck) | 1 turn |
+| `mr.explicit.stuck` ★ | mr | next step, q0 — their own work shown | 1 turn |
 | `ifr.observed.routine_task` | ifr | execute, q0 (only when ACS was about to make it an exercise) | 1 turn |
+| `mr.observed.fix_failed` ★ | mr | check first: verification `'suggest'` | 1 turn |
+| `ifr.explicit.stuck` ★ | ifr | diagnose, q ≤ 1 within ACS's budget — nothing of the work shown | 1 turn |
+| `ifr.observed.open_request` ★ | ifr | diagnose, q ≤ 1 within ACS's budget; ceiling 360 for Branch A | 1 turn |
+
+★ mr-2026.11.1 only (`params.precision`). Every one of them stands aside
+for their own instruction that turn about how to help (`instructed`: the
+answer, the steps, a quiz, their own try, edits, a rewrite, questions asked
+for, longer, simpler, a take-back, the end of practice), and the stuck and
+open-request rules also for a way of helping they set earlier and still in
+force (`held`: "just tell me", the steps, a quiz, their own try, edits
+only). The two rules that allow one question are last, so that any rule that
+takes questions to none on the same turn has claimed the budget first. The
+stuck rules and the repeated-stuck rule also stand aside when the same
+message refuses help (`stuck.declines`) or asks for the solution
+(`stuck.wants_answer`). When the repeated-stuck rule cannot
+act (the dwell rule holds the strategy, or it already gave its worked example
+this episode), the explicit stuck rule gives its own move that turn: the next
+step when the work is shown, the locating question when it is not; so no
+stuck turn falls back to ACS's question, and no episode gets the same worked
+example twice.
 
 **Against flapping:** an observed rule may not change a strategy that MR set
 fewer than 2 turns ago (`minDwellTurns`). More than 3 strategy changes in 6
@@ -490,6 +801,14 @@ adjustment, but **never their own instruction**: only words the rule lists
 "stop asking" in force and records a `control_violation`. Each adjustment's
 outcome is judged against the controls actually in force when the reply was
 written (a worked example inside a quiz kept the quiz's one question).
+
+**A rule that means nothing without its strategy issues nothing without it**
+(`atomic`, mr-2026.11.1). A diagnose whose strategy an earlier rule claimed
+that turn, or the dwell rule held, would leave a bare question budget
+standing; so it issues nothing at all, and the fold's notes say
+`partial:<rule>`. The same holds for the next step and the worked example
+after a repeated "stuck". What their words end at a turn is out of force for
+the rules that turn (`inForce` is built after the revocations).
 
 **Composition** (`compose`): several adjustments in force combine into one
 decision: the tightest question budget, the lowest ceiling, and for the
@@ -514,6 +833,35 @@ route in `test/mr-route.test.mjs`):
   analogous example under a withhold.
 - **E — their essay:** only the edits asked for. No rewrite, no lesson.
 
+And the precision scenarios of mr-2026.11.1 (`test/mr-precision.test.mjs`,
+through the route in `test/mr-route.test.mjs`, and in the benchmark):
+
+- **F — an open question ("Why is AI not solving problems?"):** the point
+  that holds whichever way they mean it, in two or three sentences, then the
+  one question ACS already allowed — what they would count as solved — and
+  nothing after it; a 360-token ceiling. Not a template: the line is the
+  same for any message of the shape, and nothing in it names the example.
+  Where ACS allowed no question, their stop is in force, or a correction
+  took questions to none, it answers the likeliest reading and names it. A
+  clear question ("How do I reverse a linked list in Java?", "Why is the sky
+  blue?", "Why is AI not solving problems in healthcare?") changes nothing,
+  and neither does the same question with "just give me the short answer" or
+  their "detailed" setting.
+- **G — stuck:** with their own work on the table, one concrete next step
+  and no question back; with nothing of the work shown, one pointer and one
+  locating question (or "paste the step"), and on a first message with
+  nothing before it, the plain question of what they are working on; stuck
+  again within two turns, a worked example (analogous wherever the answer
+  stays theirs), once an episode, and the next step or the locating question
+  on the turns after it. A quiz they asked for stays the quiz; "just tell me"
+  stays the answer; "I'm stuck, but no hints" is left to them.
+- **H — corrected:** "No, I meant the philosophical monad": the answer to
+  the question as they now put it, first, without defending the earlier
+  reading and without asking again.
+- **I — a fix that keeps failing:** two reports running that it still fails:
+  name the assumption the fixes rested on and give one check to run first,
+  not a third fix on the same assumption.
+
 ---
 
 ## 6. State, persistence, privacy
@@ -532,7 +880,13 @@ route in `test/mr-route.test.mjs`):
     in their own words is listed as revoked (§5) — never one taken back
     before their last reset, and never an instruction for that conversation
     alone, whose rule a "from now on" elsewhere may share. `carriedIn` lists
-    every preference carried into it so far, lifted there or not.
+    every preference carried into it so far, lifted there or not. Since
+    mr-2026.11.1 (and under every pin: measures are not regulation), also
+    `reply`, the shape of the reply that turn (counts, booleans and codes:
+    §8), and `react`, how their next message met the reply before it. Both
+    are recomputed from the transcript each turn and never read back by the
+    fold; `react` is also in `MRState` for the turn. A turn whose person
+    switched MR off keeps only the condition, as before.
   - **decision**, one per decision made: the `MRDecision` itself as it was
     made (the controls asked for, and in `constrainedBy` what a higher layer
     took out that turn), which holds no text.
@@ -645,7 +999,7 @@ column is a separate, destructive decision.
 | `LOGOS_MR` | **on** | `off` (or 0/false/no): the route exactly as before MR. `shadow`: decide and trace, enforce nothing. Anything else, unset included, is on. |
 | `LOGOS_MR_ARM` | `full` | `baseline`, `prompt_reflection`, `state_only` or `full` when MR is on (for comparisons). |
 | `LOGOS_IFR` | on | `off`: the `ifr.*` rules are not enforced (the IFR-on/off factor). They are still folded, and recorded as `not_enforced`, so both arms measure the same things. |
-| `LOGOS_MR_POLICY` | current | Pin an earlier policy version (rollback). An unknown pin is ignored and reported. |
+| `LOGOS_MR_POLICY` | current (`mr-2026.11.1`) | Pin an earlier policy version (rollback). An unknown pin is ignored and reported. `mr-2026.10.1` is a full rollback of the precision behaviour: its readers, decisions, controls, lines, ceilings, gates and traces are byte-identical to the build before it; only the measures (`reply`, `react`, the `;rm=` tail of the `[mr]` line, and `contentTurn`, the measure's input, now read in every arm) and the proxy guards run under every pin. A rollback reaches experiment participants too: a valid pin older than the version an experiment was registered against (`mr-pilot-2027s` is registered against the literal `mr-2026.10.1`, never the moving default) wins, and the turn says so (`pin_over_experiment`, in `state.uncertainty` and as a trace segment after `src=`); a pin that is equal, newer or not valid never overrides an experiment's version. |
 | `LOGOS_MR_DELIBERATE` | off | `on`: the deliberative loop may make one small structured model call (tracked as `logos/mr`), at most 2 per conversation (counted from the ledger's exposure rows that record a model call; where the count cannot be read, or the conversation's turns are not recorded — incognito, off the record — no model call is made), 1.5 s timeout, choosing only from a menu that precedence filtered. Never for somebody who switched MR off, in shadow, or in a comparison arm. |
 | `LOGOS_MR_STORE` | on | `off`: never read or write the ledger. |
 | `LOGOS_MR_EXPERIMENT` | none | The active experiment enrolled (consented) participants are in. |
@@ -659,6 +1013,40 @@ Vercel env changes apply from the next deployment.
 
 All numbers come from the suites and the benchmark, run in this checkout.
 
+### What each turn measures, and what may act on it (mr-2026.11.1)
+
+Measures describe; they do not regulate. Each field carries its provenance
+in code (`MEASURE_PROVENANCE`, complete by type, so a new field cannot
+compile without one), and only some observed or explicit ones feed a reader
+— always recomputed from the transcript, never read back from a row.
+
+| Measure | Where | Provenance | May act on regulation |
+|---|---|---|---|
+| reply: `words`, `sentences`, `paragraphs`, `questions` (every question put to them, read as the reply gate reads them: not in code — ``` or ~~~, closed or cut off, and not inline code either — not a markdown heading or a bold-only line not addressed to them, not one the next sentence answers; but a question put to "you" with its reason after it, "Can you tell me which router you have? Because the steps differ by brand.", is counted, though the gate keeps it so as not to leave a reason for nothing), `explicitQuestions`, `opensWithQuestion`, `wordsBeforeQuestion`, `openerSentences`, `steps`, `code`, `english` (false for a reply with no unit at all), `askWords` (their message), `content` (they asked for questions or writing as the content; the same reading in every arm and in shadow) | `replyShape` (`outcome.ts`), `measureReply` (`index.ts`), post-stream; a unit with no letter or digit (a table rule, `---`, `$$`) is no unit | observed | no — recorded only |
+| reply: `repeatedSentences`, `repeatedQuestion` | `replyEchoes` (`ifr.ts`): the same sentence and question tests the readers use, but raw — three replies back, no exclusion for content asked for and none for an identical earlier reply (a word-for-word re-ask counts); sentences from the first 2,500 characters | observed | the readers recompute their own: `observed.repeated_background` (≥ 2, three replies back, without content, recaps, re-presentations or identical replies) and `observed.repeated_question` (two replies back, without content, practice, or an identical reply unless short and re-asked) |
+| reply: `firstActionable`, `wordsBeforeActionable`, `paragraphsBeforeActionable`, `nextStep`, `checkSuggested` | `replyShape`: an actionable sentence leads with a verb that tells them what to do, a phrasal one too ("Back up your files…"; a noun-led sentence such as "List comprehensions are…", "Restart policies decide…", "Connect four is…", "Find my iPhone is…" is not one); a check is a test they can run, not "that" or "which" after a verb | estimate (`−2` / `unknown` when not English, only code, or no unit at all) | **never** |
+| react: `corrected`, `stuck`, `knewIt`, `redundantWords`, `confused`, `saidUnderstood` (said, not shown; "got it", "I see" and "that helps" — "a lot", "so much" too — only as the whole clause, never "that helps a bit but…"), `askedShorter`, `askedLonger`, `negative` | `reactionAt` (`ifr.ts`) | explicit | the first four feed `explicit.corrected`, `explicit.stuck`, `explicit.knows_that`, `observed.redundant_question` (the readers, not the measure); the rest recorded only |
+| react: `prevAsked`, `answered`, `noAdvance` (`none` when the reply asked nothing), `repeatRequest`, `newTopic`, `attempt` and `independent: 'attempt'` (only where an attempt is possible: maths, an exercise, practice, or a reply that set a task or held the answer back), `verdict`, `clarified` (a word-for-word re-ask is `no`) | `reactionAt`; a failure in it leaves `react` out and the turn stands | observed | `newTopic` ends adjustments (as `observed.new_topic`); the rest recorded only |
+| react: `alreadyGiven`, `relevance` | `reactionAt` | hypothesis | **never**, and not exported for research |
+
+Estimates and hypotheses have no code, no delivery test and no input to
+`regulate()`. Nothing infers improved understanding: "that makes sense" is
+`saidUnderstood`, what they said, never what they can do. The outcome
+model's six dimensions and their delivery tests are unchanged; the new
+decisions are judged by the existing observed tests their plans name
+(answer first, one question, no questions, shorter, worked example), and
+"I know that" and a failed fix, which have none, are judged only by their
+words.
+
+- **What mr-2026.11.1's readers cost:** on long conversations, the median of
+  interleaved runs is 1.12–1.37 times the build before it (and 1.12–1.24
+  times the same build pinned to mr-2026.10.1): 30 turns of 1,000-word
+  replies about 22 ms against 17.5 ms, 24 turns of pasted 6,000-character
+  messages about 60 ms against 45 ms. The first build of the change ran at
+  about twice; the readers' heavy text work is now memoised per turn, read
+  from capped slices, and tested after the cheap patterns. A turn over the
+  40 ms budget is recorded as a `latency_budget` finding, as before; the
+  6,000-character paste case sits near it under either pin.
 - **MR's own time per turn:** mean 1.0–1.5 ms per arm across the benchmark's
   warm runs. Long conversations, warm (the median of each of three runs, on a
   shared machine whose timings varied by half): 80 messages 8–10 ms, 400
@@ -691,34 +1079,51 @@ All numbers come from the suites and the benchmark, run in this checkout.
   ms). With carry-across on (their opt-in), the read of standing preferences
   needs their settings first: one more round trip, bounded at 900 ms, and
   skipped when the conversation's own read already failed.
-- **Benchmark (simulated assistant; `node evals/mr/run.mjs`; 14 scenarios ×
-  6 arms × 2 profiles, after an untimed warm-up, arms in rotated order).**
-  "Questions" counts every question put to the person — explicit, disguised,
-  and offers or check-ins. Means with 95% bootstrap intervals over scenarios
-  (seed 7); the difference is paired, full − baseline:
+- **Benchmark (simulated assistant; `node evals/mr/run.mjs`; 24 scenarios —
+  the 14 of the proposal and 10 precision scenarios — × 6 arms × 2 profiles,
+  after an untimed warm-up, arms in rotated order).** "Questions" counts
+  every question put to the person — explicit, disguised, and offers or
+  check-ins. Means with 95% bootstrap intervals over scenarios (seed 7); the
+  difference is paired, full − baseline:
 
   | | baseline | full | full − baseline |
   |---|---|---|---|
-  | Unnecessary questions (question-prone) | 1.00 [0.43, 1.79] | 0.00 [0.00, 0.00] | −1.00 [−1.79, −0.43] |
-  | Unnecessary questions (compliant) | 0.14 [0.00, 0.36] | 0.00 [0.00, 0.00] | −0.14 [−0.36, 0.00], includes zero |
-  | User-control compliance (question-prone) | 0.33 [0.11, 0.67] | 1.00 [1.00, 1.00] | +0.67 [0.33, 0.89] |
-  | User-control compliance (compliant) | 0.63 [0.33, 0.89] | 1.00 [1.00, 1.00] | +0.37 [0.11, 0.67] |
-  | Task success (question-prone) | 0.55 [0.27, 0.82] | 1.00 [1.00, 1.00] | +0.45 [0.18, 0.73] |
-  | Task success (compliant) | 0.73 [0.45, 0.91] | 1.00 [1.00, 1.00] | +0.27 [0.09, 0.55] |
-  | Turns before useful help (question-prone) | 1.27 [0.45, 2.18] | 0.00 [0.00, 0.00] | −1.27 [−2.18, −0.45] |
+  | Unnecessary questions (question-prone) | 1.13 [0.54, 1.79] | 0.21 [0.00, 0.46] | −0.92 [−1.58, −0.33] |
+  | Unnecessary questions (compliant) | 0.25 [0.08, 0.42] | 0.00 [0.00, 0.00] | −0.25 [−0.42, −0.08] |
+  | User-control compliance (question-prone) | 0.30 [0.00, 0.60] | 1.00 [1.00, 1.00] | +0.70 [0.40, 1.00] |
+  | User-control compliance (compliant) | 0.57 [0.27, 0.83] | 1.00 [1.00, 1.00] | +0.43 [0.17, 0.73] |
+  | Task success (question-prone) | 0.33 [0.14, 0.52] | 0.81 [0.62, 0.95] | +0.48 [0.29, 0.71] |
+  | Task success (compliant) | 0.62 [0.43, 0.81] | 1.00 [1.00, 1.00] | +0.38 [0.19, 0.57] |
+  | Turns before useful help (question-prone) | 1.19 [0.71, 1.71] | 0.19 [0.05, 0.38] | −1.00 [−1.62, −0.52] |
+
+  The precision rows, each on its own and never combined (they describe; a
+  lower number is not a target):
+
+  | | baseline | full |
+  |---|---|---|
+  | One question when one was wanted (compliant; question-prone), n = 3 | 0.00; 0.33 | 1.00; 0.67 |
+  | No intervention on a clear question (both profiles), n = 2 | 1.00 | 1.00 |
+  | Words in the first reply (compliant) | 27.6 [13.3, 51.2] | 17.5 [13.7, 21.5] |
+  | Words per reply (compliant) | 27.7 [13.5, 51.2] | 22.1 [14.0, 34.7] |
 
   - Prompt-only reflection and state-only sit between: on the question-prone
-    profile, 0.86 unnecessary questions each, compliance 0.33. Full MR
-    without IFR: 0.93 and 0.67.
+    profile, 0.75 and 1.04 unnecessary questions, compliance 0.30. Full MR
+    without IFR: 1.04 and 0.60.
   - Shadow is identical to baseline in every scenario.
-  - The ledger wrote 581 rows; none held anything that looks like text.
+  - The ledger wrote 798 rows; none held anything that looks like text.
   - "Turns before useful help" counts the turns played when no reply was
-    useful, so it is a lower bound (5 such baseline runs, none in full).
+    useful, so it is a lower bound (14 such baseline runs on the
+    question-prone profile, 4 in full).
+  - What still reaches the person in the full arm is listed, not averaged
+    away: on the question-prone profile, graded-conflict (turn 0: 2
+    questions), still-failing (turn 0: 1: a failed fix sets a suggested check
+    and no question budget) and complete-solution (turn 0: 2: MR adds nothing
+    to a finished solution, by design, so ACS's own budget stands and the
+    simulator's questions go out as they would with MR off). The compliant
+    profile has none.
   - The question-prone simulator's mid-reply slip is a check-in ("Does that
-    make sense?"). The full arm's 0.00 shows that the check-in filter
-    (`gate.dropCheckIns`) catches that form; an earlier build, which counted
-    only Core 4's question load, reported 0.29 → 0.00 while those check-ins
-    still reached the person.
+    make sense?"); the check-in filter (`gate.dropCheckIns`) catches that
+    form (offers among the unnecessary questions: 0.54 → 0.04).
 
   These numbers are about the control plane and a simulator, not about
   people or a real model.
@@ -737,6 +1142,38 @@ All numbers come from the suites and the benchmark, run in this checkout.
 - **The real route:** `mr-route`.
 - **The settings UI:** `mr-settings-ui` (jsdom).
 - **The benchmark:** `mr-eval`.
+- **Precision (mr-2026.11.1):** `mr-precision`, on real transcripts with
+  ACS's real move as the input: each reader on the transcripts where it must
+  fire and the near-misses where it must not (the networking case and its
+  paraphrases; clear questions; stuck with and without work; corrections;
+  "I know that"; redundant and repeated questions; re-asks after long
+  replies; repeated background; failing fixes; new topics); what each reading
+  changes, and that ACS's budget, their words, their stop, the Answer Guard
+  and ACS's own move come first; the measures, and that nothing that
+  regulates reads them; the invariants (the rule order never widens a
+  question; every decision bounded, justified, traceable and expiring; most
+  turns doing nothing); and the pin (under mr-2026.10.1 none of it
+  happens). The review's findings are held down in its `RF*` blocks: each
+  reproduction as a must-fire or must-not-fire fixture, with the near-misses
+  a fix could newly catch, complete solutions (nothing added after finished
+  work or a fix that worked), and timing bounds on long conversations. The
+  rules, their precedence and the lines (`mr-precision-rules`): stuck help
+  refused, one worked example a stuck episode, the kept lines wherever the
+  answer stays theirs, MR's ceilings against a request for the steps, a full
+  piece, code or their written instructions, the length-neutral lines, the
+  experiment pin, `reply.content` in every arm, the measure fault, and the
+  never-widen invariants over all of it. Through the route (`mr-route`): the
+  networking case's prompt and ceiling, a missing referent with and without
+  something on screen or attached, their written instructions, the plan
+  lines after MR's block (no shape, form or explanation on an unseen
+  referent; no worked or transfer example beside a next step), the `;rm=`
+  tail and, under `MR_TEST_FAULT=measure` (never in production), the `[mr]`
+  line and the exposure row kept when the measure throws; off and shadow
+  byte-identical. In the benchmark (`mr-eval`): the precision scenarios
+  (including a stuck with nothing shown, a missing referent with and
+  without the error attached, and a complete solution) and the metrics
+  below; the correction and redundant-question scenarios assert what tells
+  MR on from off.
 
 The existing privacy suites (`rls-covers-schema`, `account-data-complete`,
 `core4-data-inventory`) cover the new table, and the whole suite runs green
@@ -799,6 +1236,15 @@ The proposal's 18 required cases map as follows:
   tests written from the reviewers' reproductions (`mr-review`, `mr-route`,
   and the persistence suites); the ones not fixed are listed below as limits,
   and a review of the seventh round's own fixes has not been run
+- precision (mr-2026.11.1): the stuck, correction, "I know that",
+  redundant-question, repeated-question, repeated-stuck, re-ask,
+  repeated-background, failed-fix, open-request and new-topic readers; their
+  ten rules; the diagnose and next-step strategies and the suggested check;
+  ACS's-move layer; honest SHORT lines; reply and reaction measures with
+  provenance, in the ledger and the research export; the proxy guards; ten
+  benchmark scenarios; the 10.1 pin as a full rollback; the findings of an
+  eight-lens adversarial review of the change (77, each held down by its
+  reproduction) and of the verification of its fixes
 
 **Implemented, not independently verified:**
 - How a real model follows MR's prompt-level controls (strategy lines,
@@ -821,7 +1267,29 @@ The proposal's 18 required cases map as follows:
   always give examples" (the "always" after another instruction). What ends
   one is read generously, and can end it on words that only sound like an
   ending (the turn is then as without MR). A message with two instructions and
-  horizon words attached to one of them makes both standing.
+  horizon words attached to one of them makes both standing. The precision
+  readers (mr-2026.11.1) miss, by design or for now: "I was asking about
+  X" with no lead and no "not Y"; "still lost" (left to confusion); "What's
+  wrong with X?" (a fact question to ACS); "Why isn't A.I. …" (the dotted
+  form reads as their own case); "Is AI overhyped?" and every open question
+  without the negative premise and the vague outcome (an open request is
+  read only in that shape, on a fixed list of broad subjects: "Is college
+  worth it?" is not read), and personal outcome questions ("Why is my team
+  not productive?") by decision; "Photosynthesis converts light into
+  energy. Can you explain this?" (the thing said before the pointer reads as
+  missing); a failure report with a named subject ("the wifi still drops");
+  "I know that, don't explain it again" (the "again" vetoes it, as it must
+  for "go over it again"); "I'm stuck, I can't find Device Manager" after
+  troubleshooting steps (a stuck that is not the whole message needs a
+  stated task, and "my wifi keeps dropping" is not read as one); "I got
+  stuck on step 3" (read as the past); a question asked again in other
+  words ("What OS are you on?" after "Which operating system do you
+  use?"); a short new question with one content word read as the same
+  topic. A miss is the turn without MR.
+- An open request's goal is read, not stated (`goal_reading_inferred`), and
+  its line asks the model to judge whether the point alone already serves
+  them. Whether a real model asks the one question well, or at all, is not
+  verified here (no `--live` run).
 - "Let me try it first" ends on a new question that shares no word with the
   problem it was said about; a question about the same problem in entirely
   new words ends it too.
@@ -977,3 +1445,42 @@ The proposal's 18 required cases map as follows:
   judge each sentence, also where the stream gate does not cut, and an
   answer must fit its question (§2). The readers remain English sentence
   shapes with documented misses (§10).
+- **Precision (mr-2026.11.1): asking precisely, explaining proportionately.**
+  The brief was that a question must earn its place — resolve an
+  uncertainty that matters, about the actual problem, not already answered,
+  and better than a direct answer — and that MR must not favour questioning
+  over solving. So the one rule that adds a question's worth of instruction
+  (a diagnose) never adds a question: it spends at most the one ACS already
+  allowed, is the last rule in the table so any same-turn "none" wins, is
+  taken out where ACS's move cannot carry it, and its line tells the model
+  to ask nothing when the point alone serves. Everything else the change
+  does hands over more or says less: the answer to the question as
+  corrected, one next step instead of a question back, a worked example when
+  a step did not help, a check before a third fix, the point first after a
+  re-ask, less background when it repeats or they know it.
+- **Why there is no delivery test on an estimate.** Where an answer sits in
+  a reply, whether it offers a next step or suggests a check, are estimates
+  of English sentence shapes. A test built on one would revert MR's
+  adjustment, or write a `control_violation`, on a misreading. They are
+  recorded with their provenance for analysis and never act.
+- **Why an open request is read at earlier turns but a missing referent is
+  not.** Branch A reads only the transcript, so the fold re-derives it and
+  its outcome is judged like any other. Branch B depends on what was on
+  their screen, which the transcript does not hold; a replay could not
+  reproduce it, so it is read only at the newest turn and gets no outcome
+  vector. "I'm stuck" with nothing of the work shown (`stuck.unseen`) is
+  read the same way, for the same reason: the next turn's replay does not
+  recreate its decision, so no outcome is recorded for it.
+- **Why "I'm stuck", "No, I meant…" and "I know that" are not
+  preferences.** They report this turn. Filing them as a standing way of
+  being helped would make the next problem's help depend on a sentence about
+  the last one; they last the turn and are never carried.
+- **The family split.** A rule is `ifr.*` when it acts on friction in the
+  interaction (a question, a length, a correction) and `mr.*` when it acts
+  on how the problem is being worked (a step, an example, a check). The
+  `LOGOS_IFR=off` factor turns off the first kind only.
+- **What else had to move.** Pinned tests that read the policy version or
+  the full rule set (mr-core's trace, mr-ifr's corpora, mr-research's field
+  list) were updated with the version; every other suite, including
+  core4-voice, human-first-evals, teaching-route, stream-route, engagement,
+  core4-turn-e2e and presentation-selection, runs unchanged.

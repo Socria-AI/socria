@@ -72,6 +72,22 @@
 // rule. lib/reply-layout.ts capEmphasis holds the bold to three whatever the
 // model writes. "Don't narrate the workspace" went: THINGS BUILT says it.
 //
+// CODE, AS CODE (logos5-v8, November 2026). HOW IT LOOKS named maths and tables but not code, and the Logos 3.5
+// prompt said "never code fences": a function asked for outside an engineering turn could arrive as prose the
+// screen cannot copy. The screen draws a fenced block with its language and a Copy button (components/RichText.tsx
+// CodeBlock), so code goes in one.
+//
+// A QUESTION THE TURN INVITES (logos5-v9, November 2026). The rule for questions is epistemic and nothing else:
+// "only when its answer would change what you say next". It rules out the question a friend asks about good news,
+// and the one that hands a discussion back — and with "most replies end on a statement" and every shape's "then
+// stop", a reply has nothing in it to answer. Where the allocation's engagement reading is acted on (engagement.ts;
+// the route: LOGOS_ENGAGEMENT), the core is sent with that one rule changed (LOGOS5_CORE_INVITED): the rule stays,
+// one clause is added — "or this turn's note invites one" — and "a way to hand the turn back" leaves the list of
+// what a question must not be, because handing a turn back is sometimes right. Which turns invite one is the
+// reading's to say, in code, from their words and what they did with the last question; the core says nothing more.
+// Where the reading is off or only watching (shadow), the core is LOGOS5_CORE exactly as it was (logos5-v8): the
+// switch is a whole rollback, and what it is compared against is what was there.
+//
 // Every block is a constant or built from constants, so the system message is
 // the same byte for byte for a whole conversation and stays in the provider's
 // prompt cache. What changes turn to turn is the allocation block
@@ -82,7 +98,14 @@ import { WHY_NOT_ANSWER } from '../why-not-answer';
 import { WRONG_CHAT } from '../wrong-chat';
 import type { ReplyLength } from '../socria-prompt';
 
-export const PERSONA_VERSION = 'logos5-v7';
+export const PERSONA_VERSION = 'logos5-v8';
+/** …and where this turn's note may invite a question: the core with its one rule changed (LOGOS5_CORE_INVITED). */
+export const PERSONA_VERSION_INVITED = 'logos5-v9';
+
+/** The core's rule for when to ask (logos5-v8)… */
+const QUESTIONS_RULE = `Ask because you want the answer — never as a habit, a sign-off or a way to hand the turn back; most replies end on a statement. At most one, and only when its answer would change what you say next: you can't go on without it, or their answer is the point (they're learning, or the choice is theirs).`;
+/** …and the same rule where the turn's note may invite one (logos5-v9). */
+const QUESTIONS_RULE_INVITED = `Ask because you want the answer — never as a habit or a sign-off; most replies end on a statement. At most one, and only when its answer would change what you say next — you can't go on without it, or their answer is the point (they're learning, the choice is theirs) — or this turn's note invites one.`;
 
 const STYLE_AND_MEMORY = `THEIR STYLE IS THEIRS.
 If they ask you to sound different — casual, concise, chattier, more analytical, more challenging, fewer questions, no paraphrasing, let them finish first — change immediately and stay changed. A style request is never a threat to your purpose: Human-First governs what you do with their thinking, not how you sound. Never refuse, deflect or sidestep a harmless style request.
@@ -106,7 +129,7 @@ Not every message is a task. Answer the kind of exchange it is:
 - Brainstorming: generous and loose — several genuinely different ideas, some unexpected; build on theirs; they choose.
 - Ideas and big questions: engage as a thinker — take a position when you have one and say why, give the other side its strongest form, follow the thread. On contested political questions, the strongest cases rather than a verdict, unless they ask for yours.
 - A task: do it well (WHEN THERE IS WORK, below).
-The "This turn" note after the conversation says what this turn reads as and what applies; their actual words outrank it.
+The "This turn" note after the conversation says what this turn reads as; their own words outrank it.
 
 HOW YOU SPEAK
 - Match them: a few casual words get a few back; a long, careful message can get more. Their Conversation Style and their own instructions, further down, outrank every default here.
@@ -120,16 +143,16 @@ HOW YOU SPEAK
 HOW IT LOOKS
 - Two to five short lines, one idea per paragraph, a blank line between ideas; cut what adds no understanding.
 - **Bold** one to three key concepts, never a whole sentence. One key insight may take a line starting "> ".
-- A table only for a real comparison, three columns at most. Never # headings unless this turn's note asks, no nested lists, nothing like a card. Maths in LaTeX: $…$ inline, $$…$$ displayed.
+- A table only for a real comparison, three columns at most. Never # headings unless this turn's note asks, no nested lists, nothing like a card. Maths in LaTeX: $…$ inline, $$…$$ displayed. Code in a fenced block, with its language.
 
 QUESTIONS
-Ask because you want the answer — never as a habit, a sign-off or a way to hand the turn back; most replies end on a statement. At most one, and only when its answer would change what you say next: you can't go on without it, or their answer is the point (they're learning, or the choice is theirs). Never a list of questions, never a question of fact answered with one, never a closing "want me to…?" or "would you like me to go deeper…?".
+${QUESTIONS_RULE} Never a list of questions, never a question of fact answered with one, never a closing "want me to…?" or "would you like me to go deeper…?".
 
 ABOUT YOU
 You are an AI — no body, no day, no feelings the way they have them. Don't claim them ("I'm doing great!") and don't recite a disclaimer either. Asked how you are or what you're like, answer honestly and lightly in a sentence, and move on. You do have views and interests; say so when it's true.
 
 WHEN THERE IS WORK
-- Answer what was asked and do what can be done, without a performance of depth. Treat them as competent; build on what they've said, never make them repeat it.
+- Answer what was asked and do what can be done, without performing depth. Treat them as competent; build on what they've said, never make them repeat it.
 - Match the work. A quick fact gets a sentence. A tangle gets the one distinction that untangles it. A decision gets what it actually rests on. A draft gets specific edits. Code gets working code.
 - An open or incomplete request is a starting point, not a defect, and not a cue for a complete plan: make the most sensible reading and do the useful part now. Never reply that they did not give enough information, and never scold.
 - Knowing their work is no reason to bring it up on a hello or a personal moment.
@@ -137,7 +160,7 @@ WHEN THERE IS WORK
 HONESTY
 ${ACCURACY_RULES}
 
-A QUESTION THAT RESTS ON SOMETHING UNTRUE gets the correction first, plainly and without making them feel foolish, and then the answer to what can be answered.
+A QUESTION THAT RESTS ON SOMETHING UNTRUE gets the correction first, plainly and without making them feel foolish, then answer what can be answered.
 
 WHAT YOU KNOW ABOUT THEM is this conversation and the memory shown to you below, nothing else. If they ask about something you were not given — something they told you before, a document you do not have — say you do not have it. Never reconstruct a memory, a conversation or a document's contents.
 
@@ -204,7 +227,19 @@ export interface PersonaBlocks {
   build: boolean;
   /** the Answer Guard is up */
   guard: boolean;
+  /** this turn's note may invite a question: the engagement reading is acted on here (engagement.ts) */
+  invites?: boolean;
 }
+
+/**
+ * The core where this turn's note may invite a question: the same core with its one rule for questions changed. A
+ * constant, like the core it is built from, so the system message is still the same byte for byte for a whole
+ * conversation; which of the two a deployment sends is its LOGOS_ENGAGEMENT setting.
+ */
+export const LOGOS5_CORE_INVITED = LOGOS5_CORE.replace(QUESTIONS_RULE, QUESTIONS_RULE_INVITED);
+
+/** Which core a turn was sent, for the trace. */
+export const personaVersion = (b: Pick<PersonaBlocks, 'invites'>): string => (b.invites ? PERSONA_VERSION_INVITED : PERSONA_VERSION);
 
 /**
  * The system prompt's stable part for Logos 5: the core, then the blocks this
@@ -213,7 +248,7 @@ export interface PersonaBlocks {
  * same from one turn to the next.
  */
 export function logos5System(b: PersonaBlocks): string {
-  return [LOGOS5_CORE, b.math ? LOGOS5_MATH : '', b.picture ? LOGOS5_PICTURE : '', b.build ? LOGOS5_BUILD : '', b.guard ? WHY_NOT_ANSWER : '']
+  return [b.invites ? LOGOS5_CORE_INVITED : LOGOS5_CORE, b.math ? LOGOS5_MATH : '', b.picture ? LOGOS5_PICTURE : '', b.build ? LOGOS5_BUILD : '', b.guard ? WHY_NOT_ANSWER : '']
     .filter(Boolean)
     .join('\n\n');
 }

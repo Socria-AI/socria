@@ -15,12 +15,12 @@
 //     subjects, each a circle named for its field and its course, a real study
 //     session a disc with its name inside, a quick question a dot, the
 //     person's links and the ideas subjects share as curves with a card that
-//     says why, their stars and notes on it, and a ↩ to where a subject was
-//     before; every Project of theirs is on This week, an empty one too;
-//     Today is exactly what was begun today, local time, and nothing else —
-//     an empty day one quiet invitation (Alex Tran, Logos 5 Comments v2);
-//     This month and All time are a line through time, the oldest on the
-//     left, joined where one followed on; the lenses are at the top, the box
+//     says why, their stars and notes on it; every Project of theirs is on
+//     Week, an empty one too; Today is what was worked on today, local time,
+//     and nothing else — an empty day one quiet invitation, with the way to
+//     the narrowest wider scale that holds something; Month and All Time are
+//     the same map, each conversation where it was on Week (Logos 6: one map
+//     at four scales); the scales are at the top, the box
 //     that searches or starts at the foot — no banner, no legend; and there is
 //     a way to begin when there is nothing yet.
 
@@ -180,12 +180,13 @@ console.log('\n=== the Universal Map ===');
 
   const few = html(h(U.UniverseView, { ...base, conversations: [conv('a', 'Two job offers', { last: 0.1, fresh: true, turns: 3, ask: 'Which would you leave for?' }), conv('b', 'Rent or buy', { last: 0.3, turns: 3 }), conv('c', 'Exam 2', { last: 3, turns: 3 })] }));
   ok('no banner and no motivational line: the canvas is for the nodes', !few.includes('Everything you’ve thought through') && !few.includes('not a list') && !few.includes('l5h-kicker'));
-  ok('today, exactly: the session begun today a disc with its name inside — and nothing else, not one begun earlier and worked on today, nothing folded round it', (few.match(/class="l5b-hub[ "]/g) ?? []).length === 1 && /class="l5b-hub[^"]*"[^>]*data-node="a"/.test(few) && few.includes('Two job offers') && !few.includes('data-node="b"') && !few.includes('data-node="c"') && !few.includes('class="l5b-fold'));
+  // Today is what had activity on this local day (lib/logos5/scales.ts): begun today or earlier, worked on today
+  ok('today, exactly: what was worked on today, each a disc with its name inside — nothing from before today, nothing folded round it', (few.match(/class="l5b-hub[ "]/g) ?? []).length === 2 && /class="l5b-hub[^"]*"[^>]*data-node="a"/.test(few) && /class="l5b-hub[^"]*"[^>]*data-node="b"/.test(few) && few.includes('Two job offers') && !few.includes('data-node="c"') && !few.includes('class="l5b-fold'));
   ok('the header is told how many there are; the box that finds or starts is at the foot, not in it', few.includes('COUNT:3') && few.includes('<header class="test-head">COUNT:3</header>') && /class="l5h-foot"[^]*placeholder="Search or start something new…"/.test(few));
   ok('no legend or colour key at the foot', !few.includes('Hub — a conversation you went deep in') && !few.includes('l5h-legend') && !few.includes('Connects across subjects'));
   ok('no hint strip over the map', !few.includes('l5h-hint') && !few.includes('press one to see it, twice to open it'));
   ok('where to pick up is a press away, and haloed on the map', few.includes('Pick up where you left off') && /l5h-pick-t">Two job offers/.test(few) && few.includes('l5b-halo') && few.includes('where you left off'));
-  ok('four ways to see it, Today first — then This week, This month, All time', /role="radio" aria-checked="true" class="is-on"><span class="l5h-long">Today</.test(few) && few.includes('>This week<') && few.includes('>This month<') && few.includes('>All time<'));
+  ok('four scales of the one map, exactly: Today | Week | Month | All Time — Today first', /role="radio" aria-checked="true" class="is-on"[^>]*><span class="l5h-long">Today</.test(few) && [...few.matchAll(/<span class="l5h-long">([^<]+)</g)].map((m) => m[1]).join('|') === 'Today|Week|Month|All Time' && !few.includes('>Timeline<') && !few.includes('>This week<'));
   ok('today: by the day', few.includes('Today · Wed Oct 21'));
 
   const projects = [{ id: 'P1', name: 'ACCT 2301', color: 'clay', createdAt: 1 }, { id: 'P2', name: 'Job hunt', createdAt: 2 }, { id: 'P3', name: 'Someday', createdAt: 3 }];
@@ -204,9 +205,10 @@ console.log('\n=== the Universal Map ===');
   const map = html(h(U.UniverseView, { ...base, conversations, projects, initial: arranged }));
   ok('this week, by subject: a circle for each — its field and its course', map.includes('Accounting · ACCT 2301') && map.includes('Careers · Job hunt') && /class="l5b-name-t"[^>]*>Money</.test(map));
   ok('  every Project of the person’s is on it, said to be theirs — an empty one waiting to be dragged into', (map.match(/class="l5b-tag">Project</g) ?? []).length === 2 && /class="l5b-fold is-project is-empty"[^>]*aria-label="Someday: a Project with nothing in it yet. Drag a conversation here to file it."/.test(map) && map.includes('Empty — drag one here'));
-  ok('  under the page’s name: the week, how many, and the weeks either side', map.includes('This week · Mon Oct 19 – today · 6 conversations') && map.includes('aria-label="The week before"') && map.includes('aria-label="The week after"'));
-  ok('every conversation of the week drawn, hidden ones left out', (map.match(/class="l5b-(hub|dot)[ "]/g) ?? []).length === 6 && !map.includes('Secret plans') && !map.includes('data-node="k1"'));
-  ok('  by a subject’s name this week, a ↩ to where it was before — found in time', /class="l5b-back" title="Where this subject was before: “Tax questions” — find it in time">↩ Oct 16</.test(map));
+  // Week: the rolling seven days that end today, by activity; a Core chat worked on five days ago is in it
+  ok('  under the page’s name: the seven days and how many — no weeks to step through: it is a scale, not a page', map.includes('Week · Thu Oct 15 – today · 7 conversations') && !map.includes('aria-label="The week before"') && !map.includes('aria-label="The week after"'));
+  ok('every conversation of the seven days drawn, hidden ones left out', (map.match(/class="l5b-(hub|dot)[ "]/g) ?? []).length === 7 && !map.includes('Secret plans') && map.includes('data-node="k1"'));
+  ok('  nothing sends the map off to a timeline any more: no ↩ back in time', !map.includes('l5b-back') && !map.includes('find it in time'));
   ok('a conversation gone deep into is a disc', (map.match(/class="l5b-hub[ "]/g) ?? []).length === 6);
   ok('the header counts every conversation there is', map.includes('COUNT:7'));
   ok('the person’s link across two subjects is a curve, and the card over it says why, in their words', /class="l5b-link is-own is-carded"/.test(map) && /class="l5b-card is-own"[^]*You linked these[^]*same deadline\./.test(map));
@@ -216,21 +218,23 @@ console.log('\n=== the Universal Map ===');
   ok('a question waiting is marked; the place to pick up is haloed', map.includes('a question is waiting for you') && map.includes('l5b-ask') && map.includes('l5b-halo'));
   ok('a conversation says what it is to a screen reader', /aria-label="Two job offers, [^"]*Job hunt/.test(map));
 
+  // ONE MAP AT FOUR SCALES: All Time and Month are the same spatial map as Week, more or less of it lit; a
+  // conversation is in the same place at every scale (the layout is made once, from all of them)
   const all = html(h(U.UniverseView, { ...base, conversations, projects, initial: { ...arranged, mode: 'all' } }));
-  ok('all time is a line through time: every conversation on it, hidden ones left out', (all.match(/data-bead="/g) ?? []).length === 7 && !all.includes('Secret plans') && all.includes('aria-label="Your conversations in order'));
-  ok('  a Project’s that followed on are one thread, named for it', /class="l5t-name"[^>]*>ACCT 2301</.test(all) && /class="l5t-name"[^>]*>Job hunt</.test(all) && (all.match(/class="l5t-line"/g) ?? []).length >= 2);
-  ok('  a Core chat is a ring on it, joined to its subject when it followed on', /class="l5t-bead is-dot is-below is-chat"[^>]*data-bead="k1"/.test(all) && /class="l5t-name"[^>]*>Money</.test(all));
-  ok('  this week and now are marked; the whole history is at the foot', all.includes('>This week</span>') && all.includes('>Now</span>') && all.includes('The whole history'));
-  ok('  nothing to arrange or link on the line: no Select', !all.includes('l5h-tool is-select') && few.includes('l5h-tool is-select'));
   const month = html(h(U.UniverseView, { ...base, conversations, projects, initial: { ...arranged, mode: 'month' } }));
-  ok('this month is the same line, from the first', (month.match(/data-bead="/g) ?? []).length === 7 && month.includes('aria-checked="true" class="is-on"><span class="l5h-long">This month'));
+  const placeOf = (doc, id) => doc.match(new RegExp(`style="left:(-?[\\d.]+)px;top:(-?[\\d.]+)px[^"]*"[^>]*data-node="${id}"`))?.slice(1).join(',') ?? null;
+  ok('all time is the same map, not a timeline: every conversation drawn by subject, hidden ones left out', (all.match(/class="l5b-(hub|dot)[ "]/g) ?? []).length === 7 && !all.includes('Secret plans') && !all.includes('data-bead=') && !all.includes('class="l5t') && /aria-checked="true" class="is-on"[^>]*><span class="l5h-long">All Time</.test(all));
+  ok('  each conversation where it was on Week, and on Month', ['j1', 'a2', 'l1', 'k1'].every((id) => placeOf(map, id) && placeOf(map, id) === placeOf(all, id) && placeOf(all, id) === placeOf(month, id)), ['j1', 'a2', 'l1', 'k1'].map((id) => `${id} ${placeOf(map, id)} ${placeOf(all, id)} ${placeOf(month, id)}`).join(' | '));
+  ok('  the map is the map at every scale: Select is there on All Time too', all.includes('l5h-tool is-select') && few.includes('l5h-tool is-select'));
+  ok('month is the same map as well', (month.match(/class="l5b-(hub|dot)[ "]/g) ?? []).length === 7 && /aria-checked="true" class="is-on"[^>]*><span class="l5h-long">Month</.test(month));
 
-  const today = html(h(U.UniverseView, { ...base, conversations, projects, initial: E }));
-  ok('today with nothing begun today: one quiet invitation, in the middle — no empty chart, no last-day fallback', today.includes('No sessions recorded today. Start a chat to begin a new map node.') && today.includes('l5h-todaynode') && !/data-node="/.test(today) && !today.includes('last worked on') && today.includes('Today · Wed Oct 21'));
+  const quiet = conversations.filter((c) => c.id !== 'a2');
+  const today = html(h(U.UniverseView, { ...base, conversations: quiet, projects, initial: E }));
+  ok('today with nothing worked on today: one quiet invitation — no empty chart, no last-day fallback — and the way to the week', today.includes('No sessions recorded today. Start a chat to begin a new map node.') && today.includes('l5h-todaynode') && !/data-node="/.test(today) && !today.includes('last worked on') && today.includes('Today · Wed Oct 21') && today.includes('Week · 7 conversations →'));
   const todayOne = html(h(U.UniverseView, { ...base, conversations: [...conversations, conv('a3', 'Closing entries', { project: 'P1', fresh: true, last: 0.05, ideas: ['Accrual basis'], turns: 3 })], projects, initial: E }));
-  ok('  begun today: only that one — an earlier one sharing its idea is not drawn beside it', /data-node="a3"/.test(todayOne) && !/data-node="a1"/.test(todayOne) && !todayOne.includes('shares “Accrual basis”'));
-  ok('  and a Project with nothing begun today is not on Today (it is on This week)', !/class="l5b-fold is-project"/.test(todayOne) && /class="l5b-fold is-project is-empty"/.test(map));
-  ok('  on the line, no legend either', !all.includes('Followed on within a week') && !all.includes('l5h-legend'));
+  ok('  worked on today: those, and only those — one from yesterday sharing an idea is not lit beside them', /data-node="a3"/.test(todayOne) && /data-node="a2"/.test(todayOne) && !/data-node="a1"/.test(todayOne));
+  ok('  and a Project with nothing worked on today is not on Today (it is on Week)', !/class="l5b-fold is-project"/.test(todayOne) && /class="l5b-fold is-project is-empty"/.test(map));
+  ok('  no legend at any scale', !all.includes('Followed on within a week') && !all.includes('l5h-legend'));
 
   const noChats = html(h(U.UniverseView, { ...base, conversations, projects, initial: { ...arranged, mode: 'all', display: { ...E.display, chats: false } } }));
   ok('Core chats can be left off it', all.includes('Tax questions') && !noChats.includes('Tax questions'));

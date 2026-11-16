@@ -32,6 +32,13 @@ import { createHmac } from 'node:crypto';
 import { LEDGER_RETENTION_MS } from './ledger';
 import { ACTIONS, ARMS, INTEGRITY_CODES, OBSERVATION_CODES, OUTCOME_DIMENSIONS, type Arm, type LedgerKind, type LedgerRow, type MRSettings } from './types';
 
+/**
+ * Where each exported reply and react measure comes from (observed, said,
+ * estimated), for the data dictionary beside MINIMAL_FIELDS: a study reading
+ * `codes.reply.firstActionable` needs to know it is an estimate.
+ */
+export { MEASURE_PROVENANCE } from './types';
+
 export const RESEARCH_EVENT_VERSION = 1 as const;
 
 export interface ResearchEvent {
@@ -72,7 +79,8 @@ const MAX_ITEMS = 8;
 type Vocabulary = readonly string[] | 'code' | 'number' | 'boolean' | 'pseudonym';
 const PROVENANCE = ['observed', 'explicit', 'estimate', 'hypothesis', 'none'];
 const SOURCES = ['deployment', 'experiment', 'user_off', 'unavailable', 'excluded'];
-const CONTROL_STRATEGIES = ['direct', 'execute', 'worked_example', 'guided', 'preserve_challenge', 'edit_as_asked'];
+const CONTROL_STRATEGIES = ['direct', 'execute', 'worked_example', 'guided', 'preserve_challenge', 'edit_as_asked', 'diagnose', 'next_step'];
+const TRISTATE = ['yes', 'no', 'unknown'];
 
 /** dimension.value, dimension.provenance, dimension.note, dimension.refs.n for each outcome dimension */
 function dimension(name: string, values: readonly string[]): [string, Vocabulary][] {
@@ -109,6 +117,52 @@ const RECORD_FIELDS: Readonly<Record<LedgerKind, ReadonlyMap<string, Vocabulary>
     ['deliberated', 'boolean'],
     ['modelDeliberated', 'boolean'],
     // NOT `local`: that a conversation was kept to itself says it touched a sensitive subject
+    // the shape of the reply sent (ReplyMeasures; provenance in MEASURE_PROVENANCE): counts, flags and codes.
+    // NOT `reply.content`: it is only a flag (they asked for questions or writing as the content), but a
+    // field named `content` in the data dictionary reads as their text to an ethics review, and the
+    // dictionary holds no such name. The ledger row keeps it.
+    ['reply.mv', 'number'],
+    ['reply.fallback', 'boolean'],
+    ['reply.askWords', 'number'],
+    ['reply.words', 'number'],
+    ['reply.sentences', 'number'],
+    ['reply.paragraphs', 'number'],
+    ['reply.questions', 'number'],
+    ['reply.explicitQuestions', 'number'],
+    ['reply.opensWithQuestion', 'boolean'],
+    ['reply.wordsBeforeQuestion', 'number'],
+    ['reply.openerSentences', 'number'],
+    ['reply.steps', 'number'],
+    ['reply.code', 'boolean'],
+    ['reply.english', 'boolean'],
+    ['reply.repeatedSentences', 'number'],
+    ['reply.repeatedQuestion', 'boolean'],
+    ['reply.firstActionable', 'number'],
+    ['reply.wordsBeforeActionable', 'number'],
+    ['reply.paragraphsBeforeActionable', 'number'],
+    ['reply.nextStep', TRISTATE],
+    ['reply.checkSuggested', TRISTATE],
+    // how their next message met it (Reaction). NOT `alreadyGiven` or `relevance`: those are
+    // hypotheses about what a question was for, and a study gets what was observed or said
+    ['react.mv', 'number'],
+    ['react.prevAsked', 'number'],
+    ['react.answered', ['answer', 'no_advance', 'not_asked']],
+    ['react.noAdvance', ['direct_request', 'stop_request', 'dont_know', 'redundant', 'confused', 'repeat', 'short', 'none']],
+    ['react.corrected', 'boolean'],
+    ['react.stuck', 'boolean'],
+    ['react.knewIt', 'boolean'],
+    ['react.redundantWords', 'boolean'],
+    ['react.confused', 'boolean'],
+    ['react.saidUnderstood', 'boolean'],
+    ['react.askedShorter', 'boolean'],
+    ['react.askedLonger', 'boolean'],
+    ['react.negative', 'boolean'],
+    ['react.repeatRequest', 'boolean'],
+    ['react.newTopic', 'boolean'],
+    ['react.attempt', 'boolean'],
+    ['react.verdict', ['verified', 'refuted', 'none']],
+    ['react.independent', ['verified', 'refuted', 'attempt', 'none']],
+    ['react.clarified', TRISTATE],
   ]),
   decision: new Map<string, Vocabulary>([
     ['interventionId', 'pseudonym'],
@@ -128,7 +182,7 @@ const RECORD_FIELDS: Readonly<Record<LedgerKind, ReadonlyMap<string, Vocabulary>
     ['controls.scaffolding', ['less', 'more']],
     ['controls.simplify', 'boolean'],
     ['controls.verbosity.ceilingTokens', 'number'],
-    ['controls.verification', ['explicit']],
+    ['controls.verification', ['explicit', 'suggest']],
     ['controls.answerFirst', 'boolean'],
     ['controls.noRevealAnswers', 'boolean'],
     ['scope.kind', ['turn', 'turns', 'conversation', 'standing']],

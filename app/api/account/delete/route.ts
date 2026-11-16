@@ -81,6 +81,9 @@ const OWNED_TABLES = [
   // SocriaUX (/ux): their design projects — artboards, annotations, the
   // reasoning map, research notes — one jsonb document per project.
   'ux_projects',
+  // SocriaUX v0 (/ux-v0): their design projects, and what their calls cost.
+  'ux_v0_projects',
+  'ux_v0_usage',
 ] as const;
 
 /**
@@ -91,6 +94,8 @@ const OWNED_TABLES = [
  * missing table is forgiven; any other error still stops the deletion.
  */
 const LATE_TABLES = new Set<string>([
+  'ux_v0_projects',
+  'ux_v0_usage',
   'ux_projects',
   'lifecycle_emails',
   'mind_nodes',

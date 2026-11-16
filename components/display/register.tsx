@@ -21,6 +21,7 @@ import { DocumentFigure } from './DocumentFigure';
 import { CustomFigure } from './CustomFigure';
 import { EasyFigure } from './EasyFigure';
 import { KeptFigure } from './KeptFigure';
+import { QuizFigure } from './QuizFigure';
 
 registerFigure('plan', PlanFigure);
 registerFigure('venn', VennFigure);
@@ -45,3 +46,4 @@ registerFigure('custom', CustomFigure);
 registerFigure('easy', EasyFigure);
 // an element kept from the conversation, as it was left
 registerFigure('kept', KeptFigure);
+registerFigure('quiz', QuizFigure);

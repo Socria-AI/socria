@@ -37,7 +37,9 @@ console.log('=== who the guard watches ===');
   ok('nothing at all is not watched', !guardWatches({}));
   ok('the signal from the client is still read strictly', resolveGuard('guard') === 'guard' && resolveGuard('reveal') === 'reveal' && resolveGuard('on') === '');
   const app = readFileSync('components/LogosApp.tsx', 'utf8');
-  ok('the workspace reads the guard from this one rule, practice displays included', /guardWatches\(map, \(map\.objects\?\.objs \?\? \[\]\)\.some\(\(o\) => !!displayMeta\(o\.kind\)\?\.practice\)\)/.test(app));
+  ok('the workspace reads the guard from this one rule, practice displays included', /guardWatches\(map, \(map\.objects\?\.objs \?\? \[\]\)\.some\(\(o\) => !!displayMeta\(o\.kind\)\?\.practice/.test(app));
+  // a quiz is practice while it is being taken; once finished, its review gives every answer, so the guard lifts
+  ok('  a quiz holds the guard only while it is being taken', /o\.kind !== 'quiz' \|\| \(currentOf\(o\) as QuizState \| undefined\)\?\.phase === 'taking'/.test(app));
 }
 
 const frame = (raw, guarded = false) => {

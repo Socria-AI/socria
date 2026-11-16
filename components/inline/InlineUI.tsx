@@ -28,9 +28,9 @@
 import { Component, useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { compileExpr } from '@/lib/logos-math';
 import { linearScale, scaleAt, fmtNum } from '@/lib/objects/display-data';
-import { CLAIM_SAID, decideLeaning, decideTally, graphReadings, HOLDS_SAID, inlinePlainText, meanSaid, pathAsk, SCORE_SAID, WEIGHT_SAID, type BalanceItem, type BalanceSpec, type DiagramSpec, type EquationSpec, type ChartSpec, type CheckPart, type ClaimSpec, type CompareSpec, type GraphFeature, type ConceptsSpec, type DecideSpec, type DraftSpec, type GraphSpec, type InlineSpec, type InlineState, type OptionsSpec, type ParamSpec, type PathsSpec, type PredictSpec, type ReasoningSpec, type SequenceSpec, type SimSpec, type SliderSpec, type StepsSpec } from '@/lib/inline-ui';
+import { type EditSpec, CLAIM_SAID, decideLeaning, decideTally, graphReadings, HOLDS_SAID, inlinePlainText, meanSaid, pathAsk, SCORE_SAID, WEIGHT_SAID, type BalanceItem, type BalanceSpec, type DiagramSpec, type EquationSpec, type ChartSpec, type CheckPart, type ClaimSpec, type CompareSpec, type GraphFeature, type ConceptsSpec, type DecideSpec, type DraftSpec, type GraphSpec, type InlineSpec, type InlineState, type OptionsSpec, type ParamSpec, type PathsSpec, type PredictSpec, type ReasoningSpec, type SequenceSpec, type SimSpec, type SliderSpec, type StepsSpec, areaSaid, vectorSum, type VectorsSpec, type TraceSpec } from '@/lib/inline-ui';
 import { checkTyped, compileOver, compileOverT, curveFeatures, fitWindow, fitWindowAll, fmtPoint, fmtVal, prettyExpr, sampleCurve, samplePath, timeAt, type Feature, type Pt, type Seg } from '@/lib/inline-math';
-import { DIAGRAM_ROLE_SAID, diagramColumns, diagramFigure, linksOf, treeRows } from '@/lib/inline-diagram';
+import { DIAGRAM_ROLE_SAID, diagramColumns, diagramFigure, linksOf, treeRows, mindRows, mindLayout, defaultFolds, REL_SAID } from '@/lib/inline-diagram';
 import { TeX } from '@/components/TeX';
 import { copyText } from '@/lib/copy-text';
 // the one series palette (--ln-c1..6) is declared in the data display's sheet, so a chart here and
@@ -57,6 +57,26 @@ export interface InlineHost {
    * where the conversation cannot be added to.
    */
   onExplore?: (text: string) => void;
+  /**
+   * ONE IDENTITY (Logos 6): a kept element's own version, as it now stands. Once kept, the conversation draws the
+   * artifact — every change made to it in Artifacts or by Socria — not the reply's original, and what is done with it
+   * here (a slider moved) is done to it. Null when the element is not kept, or what was kept is gone: then the reply's
+   * own element is drawn, as before.
+   */
+  resolve?: (n: number) => { spec: InlineSpec; state?: InlineState; edits: number } | null;
+  /** Edit: the element opened in Artifacts with its editor beside it — kept first, when it was not yet */
+  onEdit?: (n: number, spec: InlineSpec) => void;
+  /**
+   * A change Socria made in place (an edit block, lib/artifact-focus.ts): the artifact it changed as it now stands,
+   * whether the change is in it, and whether it can still be undone on its own (it is the latest step). Null when the
+   * artifact is not here (another device, or deleted).
+   */
+  resolveEdit?: (n: number, of: string) => { spec: InlineSpec; state?: InlineState; id: string; made: boolean; applied: boolean; undo: boolean } | null;
+  onUndoEdit?: (n: number, of: string) => void;
+  /** a kept artifact opened in Artifacts */
+  onOpenArtifact?: (id: string) => void;
+  /** what is done to a kept artifact drawn here (a slider moved on the edit card): done to it, in Artifacts too */
+  onArtifactState?: (id: string, s: InlineState) => void;
 }
 
 type RenderInline = (text: string, key: string) => ReactNode;
@@ -73,33 +93,94 @@ export function InlineBlock({ spec, open, n, host, renderInline }: { spec: Inlin
     );
   }
   if (!spec) return null;
-  const state = host?.state?.[String(n)];
+  const own = host?.state?.[String(n)];
+  // kept: the artifact as it now stands is what is drawn (one identity), still marked as kept
+  const linked = own?.artifact && host?.resolve ? host.resolve(n) : null;
+  const shown = linked && linked.spec.type === spec.type ? linked.spec : spec;
+  const state = linked && shown !== spec ? { ...(linked.state ?? {}), artifact: own!.artifact } : own;
   const setState = (s: InlineState) => host?.onState?.(n, s);
-  const el = <InlineSafe spec={spec}>{drawn(spec, n, host, state, setState, renderInline)}</InlineSafe>;
+  const el = <InlineSafe spec={shown}>{drawn(shown, n, host, state, setState, renderInline)}</InlineSafe>;
   // KEEP (lib/objects/display-kept.ts): anything worth coming back to goes into Artifacts as it was left,
   // with the reply it came from. A chart, a comparison and a decision carry their own larger form's button.
   if (!host?.onOpen || !KEEPABLE.has(spec.type)) return el;
   const kept = !!state?.artifact;
+  const edits = linked && shown !== spec ? linked.edits : 0;
   return (
     <div className="ln-keepable">
       {el}
-      <button
-        type="button"
-        className={`ln-keep${kept ? ' is-kept' : ''}`}
-        onClick={() => host.onOpen!(n, spec)}
-        title={kept ? 'Open what you kept, in Artifacts' : 'Keep this in Artifacts, as you left it'}
-      >
-        <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          {kept ? <path d="M3.5 8.5 6.5 11.5 12.5 4.5" /> : <path d="M4 2.5h8v11l-4-2.8-4 2.8z" />}
-        </svg>
-        {kept ? 'Kept — open in Artifacts' : 'Keep'}
-      </button>
+      <span className="ln-keep-row">
+        <button
+          type="button"
+          className={`ln-keep${kept ? ' is-kept' : ''}`}
+          onClick={() => host.onOpen!(n, spec)}
+          title={kept ? 'Open what you kept, in Artifacts' : 'Keep this in Artifacts, as you left it'}
+        >
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            {kept ? <path d="M3.5 8.5 6.5 11.5 12.5 4.5" /> : <path d="M4 2.5h8v11l-4-2.8-4 2.8z" />}
+          </svg>
+          {kept ? 'Kept — open in Artifacts' : 'Keep'}
+        </button>
+        {/* EDIT is the only way into the editor: moving, opening and choosing are using it, here */}
+        {host.onEdit && (
+          <button type="button" className="ln-keep is-edit" onClick={() => host.onEdit!(n, shown)} title="Change it in Artifacts, with its controls beside it">
+            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M10.5 2.5 13.5 5.5 6 13H3v-3z" />
+            </svg>
+            Edit
+          </button>
+        )}
+        {edits > 0 && (
+          <span className="ln-kept-note">
+            {edits === 1 ? 'Changed once since it was kept' : `Changed ${edits} times since it was kept`}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * A CHANGE SOCRIA MADE IN PLACE, shown where it was asked for: what changed (said by the code that checked it), the
+ * artifact as it now stands — the same one the earlier reply and Artifacts draw, so working with it here works with it
+ * there — and the ways on: open it in Artifacts, or undo this change while it is the latest. Never a second copy.
+ */
+export function InlineEdit({ edit, n, host, renderInline }: { edit: EditSpec; n: number; host?: InlineHost; renderInline: RenderInline }) {
+  const r = host?.resolveEdit?.(n, edit.of) ?? null;
+  const said = edit.said.charAt(0).toUpperCase() + edit.said.slice(1);
+  const name = edit.title || 'The artifact';
+  const sub: InlineHost | undefined = r
+    ? { state: r.state ? { [String(n)]: r.state } : {}, live: !!host?.live, ...(host?.onArtifactState ? { onState: (_k: number, st: InlineState) => host.onArtifactState!(r.id, st) } : {}) }
+    : undefined;
+  return (
+    <div className="ln-edited" role="group" aria-label={`${name}, changed: ${edit.said}`}>
+      <p className="ln-edited-head">
+        <span className="ln-kind">Changed in place</span>
+        <span className="ln-edited-name">{name}</span>
+      </p>
+      <p className="ln-edited-said">{said}.</p>
+      {r && sub ? <InlineSafe spec={r.spec}>{drawn(r.spec, n, sub, sub.state?.[String(n)], (st) => sub.onState?.(n, st), renderInline)}</InlineSafe> : null}
+      <span className="ln-keep-row">
+        {r && host?.onOpenArtifact && (
+          <button type="button" className="ln-keep is-kept" onClick={() => host.onOpenArtifact!(r.id)} title="Open it in Artifacts, with its versions">
+            Open in Artifacts
+          </button>
+        )}
+        {r?.undo && host?.onUndoEdit && (
+          <button type="button" className="ln-keep" onClick={() => host.onUndoEdit!(n, edit.of)} title="Back to the version before this change (Redo, in Artifacts, brings it back)">
+            Undo this change
+          </button>
+        )}
+        {r && !r.made && <span className="ln-kept-note">Not made: the artifact had changed in the meantime, and this no longer fits it</span>}
+        {r && r.made && !r.applied && <span className="ln-kept-note">Undone — the version before it is showing</span>}
+        {r && r.applied && !r.undo && <span className="ln-kept-note">Changed again since — its versions are in Artifacts</span>}
+        {!r && <span className="ln-kept-note">The artifact it changed is not on this device</span>}
+      </span>
     </div>
   );
 }
 
 /** Kept with a press of Keep: everything but the ways onward (they are only ever a next message), and the three with larger forms of their own. */
-const KEEPABLE = new Set<InlineSpec['type']>(['graph', 'sim', 'claim', 'check', 'steps', 'slider', 'reasoning', 'concepts', 'sequence', 'draft', 'diagram', 'balance', 'equation']);
+const KEEPABLE = new Set<InlineSpec['type']>(['graph', 'sim', 'claim', 'check', 'steps', 'slider', 'reasoning', 'concepts', 'sequence', 'draft', 'diagram', 'balance', 'equation', 'vectors', 'trace']);
 
 /** An element that could not be drawn, said instead: its words where it stood (nothing, if even they cannot be said). */
 export function InlineFallback({ spec }: { spec: InlineSpec }) {
@@ -172,6 +253,10 @@ function drawn(spec: InlineSpec, n: number, host: InlineHost | undefined, state:
       return <InlineBalance spec={spec} renderInline={renderInline} />;
     case 'equation':
       return <InlineEquation spec={spec} renderInline={renderInline} />;
+    case 'vectors':
+      return <InlineVectors spec={spec} state={state} onState={setState} />;
+    case 'trace':
+      return <InlineTrace spec={spec} state={state} onState={setState} />;
   }
 }
 
@@ -1188,34 +1273,67 @@ function pathOf(pts: readonly Pt[], X: (x: number) => number, Y: (y: number) => 
   return d;
 }
 
-/** The grid and axes of a window, its zero lines drawn where they fall inside it. */
-function Grid({ x0, x1, y0, y1, X, Y, W, H }: { x0: number; x1: number; y0: number; y1: number; X: (x: number) => number; Y: (y: number) => number; W: number; H: number }) {
+/**
+ * The grid and axes of a window. In two parts, so nothing a curve passes over is lost: `lines` (faint horizontal
+ * rules, the zero lines) under the curves, `labels` (ticks on the axes, their numbers, the axes' names) over them,
+ * each number on a paper-coloured outline (inline.css). Horizontal rules only: a vertical grid read as a cage.
+ */
+function Grid({ x0, x1, y0, y1, X, Y, W, H, part = 'lines', xName = true }: { x0: number; x1: number; y0: number; y1: number; X: (x: number) => number; Y: (y: number) => number; W: number; H: number; part?: 'lines' | 'labels'; xName?: boolean }) {
   const xs = linearScale([x0, x1], { want: Math.max(3, Math.round(W / 90)) }).ticks.filter((t) => t > x0 && t < x1);
   const ys = linearScale([y0, y1], { want: Math.max(3, Math.round(H / 60)) }).ticks.filter((t) => t > y0 && t < y1);
+  // where the x-axis (y = 0) and the y-axis (x = 0) fall, when they are in the window
   const ax = y0 <= 0 && 0 <= y1 ? Y(0) : null;
   const ay = x0 <= 0 && 0 <= x1 ? X(0) : null;
+  if (part === 'lines') {
+    return (
+      <g className="ln-axes" aria-hidden="true">
+        {ys.filter((t) => t !== 0).map((t) => (
+          <line key={`y${t}`} x1={0} x2={W} y1={Y(t)} y2={Y(t)} />
+        ))}
+        {ax !== null && <line className="is-axis" x1={0} x2={W} y1={ax} y2={ax} />}
+        {ay !== null && <line className="is-axis" x1={ay} x2={ay} y1={0} y2={H} />}
+      </g>
+    );
+  }
+  // numbers sit on the axes, as on paper; with an axis out of view, along the window's edge
+  const foot = ax === null ? H - 4 : Math.min(H - 4, ax + 15);
+  const yLeft = ay !== null && ay > 30;
   return (
-    <g className="ln-axes" aria-hidden="true">
-      {xs.map((t) => (
-        <line key={`x${t}`} x1={X(t)} x2={X(t)} y1={0} y2={H} />
-      ))}
-      {ys.map((t) => (
-        <line key={`y${t}`} x1={0} x2={W} y1={Y(t)} y2={Y(t)} />
-      ))}
-      {ax !== null && <line className="is-axis" x1={0} x2={W} y1={ax} y2={ax} />}
-      {ay !== null && <line className="is-axis" x1={ay} x2={ay} y1={0} y2={H} />}
-      {xs.filter((t) => t !== 0).map((t) => (
-        <text key={`tx${t}`} x={X(t)} y={Math.min(H - 4, (ax ?? H - 16) + 14)} textAnchor="middle">
+    <g className="ln-axes is-labels" aria-hidden="true">
+      {ax !== null && xs.filter((t) => t !== 0).map((t) => <line key={`tx${t}`} className="is-tick" x1={X(t)} x2={X(t)} y1={ax - 3} y2={ax + 3} />)}
+      {ay !== null && ys.filter((t) => t !== 0).map((t) => <line key={`ty${t}`} className="is-tick" x1={ay - 3} x2={ay + 3} y1={Y(t)} y2={Y(t)} />)}
+      {/* the right end is where curves are named (xName off): numbers keep clear of it */}
+      {xs.filter((t) => t !== 0 && X(t) < W - (xName ? 20 : 48)).map((t) => (
+        <text key={`nx${t}`} x={X(t)} y={foot} textAnchor="middle">
           {fmtVal(t)}
         </text>
       ))}
-      {ys.filter((t) => t !== 0).map((t) => (
-        <text key={`ty${t}`} x={Math.min(W - 4, (ay ?? 0) + 6)} y={Y(t) + 4}>
+      {ys.filter((t) => t !== 0 && Y(t) > 16).map((t) => (
+        <text key={`ny${t}`} x={yLeft ? ay! - 7 : Math.min(W - 4, (ay ?? 0) + 7)} y={Y(t) + 4} textAnchor={yLeft ? 'end' : 'start'}>
           {fmtVal(t)}
         </text>
       ))}
+      {ax !== null && xName && (
+        <text className="is-name" x={W - 2} y={foot} textAnchor="end">
+          x
+        </text>
+      )}
+      {ay !== null && (
+        <text className="is-name" x={ay + 8} y={12}>
+          y
+        </text>
+      )}
     </g>
   );
+}
+
+/** The parameters an expression draws as numbers to drag. */
+function scrubbedIn(segs: Seg[] | null | undefined, out = new Set<string>()): Set<string> {
+  for (const g of segs ?? []) {
+    if (g.k === 'param') out.add(g.v);
+    else if (g.k === 'sup') scrubbedIn(g.s, out);
+  }
+  return out;
 }
 
 // ── a graph to change ────────────────────────────────────────────────
@@ -1259,7 +1377,7 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
   const [x0, x1] = spec.x;
   const f = (x: number, v: Record<string, number> = values) => (c ? c.eval({ ...v, x }) : NaN);
   const curves = useMemo(() => [c, ...others.map((o) => o.c)].filter(Boolean) as Compiled[], [c, others]);
-  const pointYs = (v: Record<string, number>) => (spec.at ?? []).map((n) => (c ? c.eval({ ...v, x: v[n] }) : NaN)).filter(Number.isFinite);
+  const pointYs = (v: Record<string, number>) => [...(spec.at ?? []).map((n) => (c ? c.eval({ ...v, x: v[n] }) : NaN)), ...graphReadings(spec, v).points.map((q) => q.y)].filter(Number.isFinite);
   // the window: as the reply gave it, or around what matters on every curve as it started — widened, never
   // narrowed, when what they change takes it further
   const auto = useMemo(() => (c ? fitWindowAll(curves, [start], x0, x1, pointYs(start)) : ([-10, 10] as [number, number])), [c, curves, start, x0, x1]);
@@ -1319,6 +1437,18 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
     }
     if (readings.tangent) rows.push({ k: `slope at x = ${fmtVal(readings.tangent.x)}`, v: readings.tangent.slope === null ? 'none — a corner' : fmtVal(readings.tangent.slope) });
     for (const ro of readings.readouts) rows.push({ k: ro.label, v: `${fmtVal(ro.value, ro.digits)}${ro.unit ? ` ${ro.unit}` : ''}` });
+    // a hole and the value taken at the same x: the limit and the function's value, side by side
+    for (const q of readings.points) {
+      if (q.open) rows.push({ k: `as x → ${fmtVal(q.x)}`, v: `y → ${fmtVal(q.y)}` });
+      else if (readings.points.some((o) => o.open && o.x === q.x)) rows.push({ k: `at x = ${fmtVal(q.x)}`, v: `y = ${fmtVal(q.y)}` });
+    }
+    if (readings.area) {
+      if (readings.area.sum !== undefined) {
+        rows.push({ k: `${readings.area.n} rectangles`, v: fmtVal(readings.area.sum) });
+        rows.push({ k: 'area', v: fmtVal(readings.area.value) });
+        rows.push({ k: 'off by', v: fmtVal(Math.abs(readings.area.sum - readings.area.value)) });
+      } else rows.push({ k: spec.area?.label || 'shaded area', v: fmtVal(readings.area.value) });
+    }
   }
   const toPlot = (e: React.PointerEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -1355,12 +1485,19 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
     const right = px > W - 90;
     return { px, py, tx: right ? px - 9 : px + 9, ty: k.kind === 'turning' && !k.max ? py + 18 : py - 9, anchor: right ? ('end' as const) : ('start' as const) };
   };
-  /** A curve's name at its right end, where it is inside the window. */
+  /**
+   * A curve's name at its right end, where it is inside the window. Names that would sit on one another are not
+   * stacked (a nudged name lets go of its line): the later one is left off, and the legend still names its curve.
+   */
+  const placedNames: number[] = [];
   const endLabel = (cc: Compiled, text: string, key: string, tone: string) => {
     for (let i = 0; i <= 40; i++) {
       const x = x1 - ((x1 - x0) * i) / 80;
       const y = cc.eval({ ...values, x });
       if (Number.isFinite(y) && y >= y0 && y <= y1) {
+        const at = Math.max(12, Y(y) - 8);
+        if (placedNames.some((p) => Math.abs(p - at) < 16)) return null;
+        placedNames.push(at);
         return (
           <text key={key} className={`ln-curve-name ${tone}`} x={X(x) - 4} y={Math.max(12, Y(y) - 8)} textAnchor="end">
             {text}
@@ -1376,6 +1513,8 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
     return { x1: X(x - L), y1: Y(y - m * L), x2: X(x + L), y2: Y(y + m * L) };
   };
   const shapeParams = spec.params.filter((p) => !positions.has(p.name));
+  // a number drawn in an equation is already a slider there (Scrub): its own slider is for a touch screen
+  const inEquation = scrubbedIn(segs, new Set(others.flatMap((o) => [...scrubbedIn(o.segs)])));
   const ariaParts = [
     `Graph of ${[spec.label ? `${spec.label}, y = ${spec.expr}` : `y = ${spec.expr}`, ...others.map((o) => `${o.label ? `${o.label}, ` : ''}y = ${o.expr}`)].join('; ')}`,
     nowTurn ? `turning point ${fmtPoint(nowTurn)}` : '',
@@ -1383,10 +1522,15 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
     readings.mean && !spec.quiet ? meanSaid(readings.mean) : '',
     readings.tangent && !spec.quiet ? `slope at x = ${fmtVal(readings.tangent.x)}: ${readings.tangent.slope === null ? 'none, a corner' : fmtVal(readings.tangent.slope)}` : '',
     !spec.quiet && readings.crossings.length ? `the curves meet at ${readings.crossings.map(fmtPoint).join(' and ')}` : '',
+    ...readings.points.map((q) => `${q.open ? 'open circle, a hole,' : 'filled point'} at ${fmtPoint(q)}${q.label ? `, ${q.label}` : ''}`),
+    readings.area && !spec.quiet ? areaSaid(readings.area) : readings.area ? `shaded from x = ${fmtVal(readings.area.from)} to x = ${fmtVal(readings.area.to)}` : '',
   ].filter(Boolean);
   return (
     <div className="ln ln-graph" role="group" aria-label={spec.title || 'A graph you can change'}>
-      {spec.title && <p className="ln-title">{spec.title}</p>}
+      <p className="ln-figcap">
+        <span className="ln-kind">Graph</span>
+        {spec.title && <span className="ln-title">{spec.title}</span>}
+      </p>
       <div className="ln-graph-head">
         <div className="ln-eqs">
           <p className="ln-eq">
@@ -1404,7 +1548,6 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
             </p>
           ))}
         </div>
-        {!locked && (positions.size > 0 ? <span className="ln-hint">Drag the points along the curve</span> : shapeParams.length > 0 ? <span className="ln-hint">Drag a number</span> : null)}
       </div>
       {spec.predict && picked === undefined && !skipped && (
         <Predict
@@ -1459,6 +1602,37 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
           <PlotClip id={clip} W={W} H={H} />
           <Grid x0={x0} x1={x1} y0={y0} y1={y1} X={X} Y={Y} W={W} H={H} />
           <g clipPath={`url(#${clip})`}>
+          {readings.area && (() => {
+            const a = readings.area;
+            const base = a.between ? curves[a.between] : null;
+            const floor = (t: number) => (base ? base.eval({ ...values, x: t }) : 0);
+            const clampY = (v: number) => Y(Math.max(y0 - (y1 - y0), Math.min(y1 + (y1 - y0), v)));
+            if (a.sum !== undefined && a.n && spec.area?.rects) {
+              const w = (a.to - a.from) / a.n;
+              const rule = spec.area.rects.rule;
+              return (
+                <g className="ln-rects" aria-hidden="true">
+                  {Array.from({ length: a.n }, (_, i) => {
+                    const r0 = a.from + i * w, r1 = r0 + w;
+                    const h = f(rule === 'left' ? r0 : rule === 'right' ? r1 : (r0 + r1) / 2);
+                    if (!Number.isFinite(h)) return null;
+                    const top = clampY(Math.max(h, 0)), bottom = clampY(Math.min(h, 0));
+                    return <rect key={i} className={h < 0 ? 'is-below' : ''} x={X(r0) + 0.5} y={top} width={Math.max(0.5, X(r1) - X(r0) - 1)} height={Math.max(0, bottom - top)} />;
+                  })}
+                </g>
+              );
+            }
+            const n = 120;
+            const top: string[] = [], bottom: string[] = [];
+            for (let i = 0; i <= n; i++) {
+              const t = a.from + ((a.to - a.from) * i) / n;
+              const yt = f(t), yb = floor(t);
+              if (!Number.isFinite(yt) || !Number.isFinite(yb)) continue;
+              top.push(`${X(t).toFixed(1)},${clampY(yt).toFixed(1)}`);
+              bottom.unshift(`${X(t).toFixed(1)},${clampY(yb).toFixed(1)}`);
+            }
+            return top.length > 1 ? <polygon className="ln-area" points={[...top, ...bottom].join(' ')} aria-hidden="true" /> : null;
+          })()}
           {reshaped && fit && <path className="ln-curve is-ghost" d={pathOf(fit.pts, X, Y, y0, y1)} />}
           {reshaped &&
             others.map((o, i) => {
@@ -1497,6 +1671,8 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
             </g>
           )}
           </g>
+          {/* a curve named at its end already stands by the axis's end: the axis is not named over it */}
+          <Grid x0={x0} x1={x1} y0={y0} y1={y1} X={X} Y={Y} W={W} H={H} part="labels" xName={!spec.label && !others.some((o) => o.label)} />
           {reshaped && !spec.quiet && was.crossings.map((k, i) => (fmtPoint(k) !== fmtPoint(readings.crossings[i] ?? { x: NaN, y: NaN }) ? <circle key={`gx${i}`} className="ln-pt is-ghost" cx={X(k.x)} cy={Y(k.y)} r={4} /> : null))}
           {reshaped && startTurn && nowTurn && (startTurn.x !== nowTurn.x || startTurn.y !== nowTurn.y) && <circle className="ln-pt is-ghost" cx={X(startTurn.x)} cy={Y(startTurn.y)} r={4} />}
           {ordered.map((k, i) => {
@@ -1512,6 +1688,25 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
               </g>
             );
           })}
+          {readings.points.map((q, i) => {
+            if (q.y < y0 || q.y > y1 || q.x < x0 || q.x > x1) return null;
+            const px = X(q.x), py = Y(q.y);
+            const right = px > W - 90;
+            // a filled point and the hole above or below it: their labels go apart, never on each other
+            const other = readings.points.find((o, j) => j !== i && o.x === q.x);
+            const below = other ? q.y < other.y : false;
+            return (
+              <g key={`p${i}`} className={`ln-mark ${q.open ? 'is-open' : 'is-filled'} ${CURVE_TONE[q.curve] ?? ''}`}>
+                <circle cx={px} cy={py} r={q.open ? 4.6 : 4.4} />
+                {/* under the Answer Guard the marks are drawn and their coordinates are not: reading them off is theirs */}
+                {(!spec.quiet || q.label) && (
+                  <text x={right ? px - 9 : px + 9} y={below ? py + 17 : py - 9} textAnchor={right ? 'end' : 'start'}>
+                    {q.label || fmtPoint(q)}
+                  </text>
+                )}
+              </g>
+            );
+          })}
           {(spec.at ?? []).map((n) => {
             const x = values[n];
             const y = f(x);
@@ -1519,7 +1714,8 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
             const p = spec.params.find((q) => q.name === n);
             return (
               <g key={`h${n}`} className={`ln-handle${drag === n ? ' is-drag' : ''}${hot === n ? ' is-hot' : ''}${locked ? ' is-locked' : ''}`} aria-hidden="true">
-                <circle cx={X(x)} cy={Y(y)} r={7} />
+                <circle className="ln-halo" cx={X(x)} cy={Y(y)} r={14} />
+                <circle cx={X(x)} cy={Y(y)} r={6} />
                 <text x={X(x)} y={Y(y) - 12} textAnchor="middle">
                   {p?.label && p.label.length <= 8 ? p.label : n}
                 </text>
@@ -1552,10 +1748,12 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
           ))}
         </p>
       )}
+      {/* (a number that is in no equation — how many rectangles — has its slider, and no hint pointing at the equation) */}
+      {!locked && (positions.size > 0 ? <p className="ln-hint">Drag the points along the curve.</p> : shapeParams.some((q) => inEquation.has(q.name)) ? <p className="ln-hint">Drag a number in the equation.</p> : null)}
       {spec.params.length > 0 && (
         <div className="ln-graph-vars">
           {spec.params.map((p) => (
-            <label key={p.name} className={`ln-var${hot === p.name ? ' is-hot' : ''}`}>
+            <label key={p.name} className={`ln-var${hot === p.name ? ' is-hot' : ''}${!positions.has(p.name) && inEquation.has(p.name) ? ' is-dup' : ''}`}>
               <span className="ln-var-top">
                 <span className="ln-var-k">{p.label}</span>
                 <span className="ln-var-v">{fmtWith(values[p.name] ?? p.value, p.unit)}</span>
@@ -1588,6 +1786,172 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
         </div>
       )}
       {shared && spec.params.length > 0 && <SharedNote what="change" />}
+    </div>
+  );
+}
+
+// ── forces at a point ────────────────────────────────────────────────
+
+/**
+ * Up to five vectors from one point, drawn to one scale, and their sum (dashed) with its size and direction read out;
+ * the sliders change what the vectors are formulas of. Everything drawn is vectorSum's — the same numbers Socria is
+ * told when they ask about it.
+ */
+function InlineVectors({ spec, state, onState }: { spec: VectorsSpec; state?: InlineState; onState: (s: InlineState) => void }) {
+  const start = useMemo(() => Object.fromEntries(spec.params.map((p) => [p.name, p.value])), [spec]);
+  const [values, setValues] = useState<Record<string, number>>(() => ({ ...start, ...(state?.values ?? {}) }));
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+  }, []);
+  const set = (name: string, v: number) => {
+    const next = { ...values, [name]: v };
+    setValues(next);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => onState({ ...state, values: next }), 400);
+  };
+  const sum = useMemo(() => vectorSum(spec, values), [spec, values]);
+  const [ref, width] = useWidth<HTMLDivElement>(420);
+  const W = Math.max(240, Math.min(width, 520));
+  const H = W < 420 ? 220 : 260;
+  const cx = W / 2, cy = H / 2;
+  // one scale for every arrow, so lengths compare honestly; the longest arrow (or the sum) reaches 42% of the shorter side
+  const longest = Math.max(1e-9, ...sum.parts.map((q) => (Number.isFinite(q.mag) ? q.mag : 0)), spec.resultant ? sum.mag : 0);
+  const k = (Math.min(W, H) * 0.42) / longest;
+  const u = spec.unit ? ` ${spec.unit}` : '';
+  const arrow = (x: number, y: number, cls: string, key: string, label?: string) => {
+    const ex = cx + x * k, ey = cy - y * k;
+    const len = Math.hypot(ex - cx, ey - cy);
+    if (len < 1) return null;
+    const ux = (ex - cx) / len, uy = (ey - cy) / len;
+    const head = Math.min(9, len * 0.4);
+    const hx = ex - ux * head, hy = ey - uy * head;
+    const right = ux >= 0;
+    return (
+      <g key={key} className={`ln-vec ${cls}`}>
+        <line x1={cx} y1={cy} x2={hx} y2={hy} />
+        <polygon points={`${ex},${ey} ${hx - uy * head * 0.5},${hy + ux * head * 0.5} ${hx + uy * head * 0.5},${hy - ux * head * 0.5}`} />
+        {label && (
+          <text x={ex + (right ? 6 : -6)} y={ey + (uy > 0 ? 14 : -6)} textAnchor={right ? 'start' : 'end'}>
+            {label}
+          </text>
+        )}
+      </g>
+    );
+  };
+  const aria = [`${spec.title ?? 'Forces'}: ${sum.parts.map((q) => `${q.label} ${fmtVal(q.mag)}${u} at ${fmtVal(q.angle)} degrees`).join('; ')}`, spec.resultant ? `their sum ${fmtVal(sum.mag)}${u} at ${fmtVal(sum.angle)} degrees` : ''].filter(Boolean).join('; ');
+  const balanced = spec.resultant && sum.mag < 1e-6 * Math.max(1, longest);
+  return (
+    <div className="ln ln-vectors" role="group" aria-label={spec.title || 'Forces you can change'}>
+      <p className="ln-figcap">
+        <span className="ln-kind">Forces</span>
+        {spec.title && <span className="ln-title">{spec.title}</span>}
+      </p>
+      <div ref={ref} className="ln-plot">
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img" aria-label={aria}>
+          <line className="ln-vec-axis" x1={8} y1={cy} x2={W - 8} y2={cy} />
+          <line className="ln-vec-axis" x1={cx} y1={8} x2={cx} y2={H - 8} />
+          {sum.parts.map((q, i) => (Number.isFinite(q.x) && Number.isFinite(q.y) ? arrow(q.x, q.y, `is-${i % 3}`, `v${i}`, q.label) : null))}
+          {spec.resultant && !balanced && arrow(sum.x, sum.y, 'is-sum', 'sum', Math.hypot(sum.x, sum.y) * k >= 36 ? 'sum' : undefined)}
+          <rect className="ln-vec-body" x={cx - 9} y={cy - 9} width={18} height={18} rx={3} />
+          {spec.body && (
+            <text className="ln-vec-bodyname" x={cx + 13} y={cy + 22}>
+              {spec.body}
+            </text>
+          )}
+        </svg>
+      </div>
+      <p className="ln-read ln-graph-read" aria-live="polite">
+        {sum.parts.map((q, i) => (
+          <span key={i} className="ln-reading">
+            <span className="ln-k">{q.label}</span>
+            <b>{`${fmtVal(q.mag)}${u} at ${fmtVal(q.angle)}°`}</b>
+          </span>
+        ))}
+        {spec.resultant && (
+          <span className="ln-reading">
+            <span className="ln-k">sum</span>
+            <b>{balanced ? 'zero — they balance' : `${fmtVal(sum.mag)}${u} at ${fmtVal(sum.angle)}°`}</b>
+          </span>
+        )}
+      </p>
+      {spec.params.length > 0 && (
+        <div className="ln-graph-vars">
+          {spec.params.map((p) => (
+            <label key={p.name} className="ln-var">
+              <span className="ln-var-top">
+                <span className="ln-var-k">{p.label}</span>
+                <span className="ln-var-v">{fmtWith(values[p.name] ?? p.value, p.unit)}</span>
+              </span>
+              <input type="range" min={p.min} max={p.max} step={p.step} value={values[p.name] ?? p.value} aria-label={p.label} aria-valuetext={fmtWith(values[p.name] ?? p.value, p.unit)} onChange={(e) => set(p.name, Number(e.target.value))} />
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── an algorithm, step by step ───────────────────────────────────────
+
+/**
+ * The state after each step, one at a time: the cells, the ones being looked at, the ones settled, named pointers
+ * under them, and what the step did. Back and Next (or the arrow keys) move through it; nothing is computed here —
+ * what they see is exactly what was written, so the gate's check of the steps is the check of the picture.
+ */
+function InlineTrace({ spec, state, onState }: { spec: TraceSpec; state?: InlineState; onState: (s: InlineState) => void }) {
+  const last = spec.steps.length - 1;
+  const [at, setAt] = useState(() => Math.min(last, Math.max(0, state?.picked ?? 0)));
+  const go = (i: number) => {
+    const n = Math.min(last, Math.max(0, i));
+    setAt(n);
+    onState({ ...state, picked: n });
+  };
+  const st = spec.steps[at];
+  const width = Math.max(...spec.steps.map((x) => x.cells.length), 1);
+  return (
+    <div
+      className={`ln ln-trace is-${spec.kind}`}
+      role="group"
+      aria-label={spec.title || 'Step through it'}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          go(at + 1);
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          go(at - 1);
+        } else if (e.key === 'Home') go(0);
+        else if (e.key === 'End') go(last);
+      }}
+    >
+      <p className="ln-figcap">
+        <span className="ln-kind">Step by step</span>
+        {spec.title && <span className="ln-title">{spec.title}</span>}
+      </p>
+      <div className="ln-trace-row" style={{ ['--ln-cells' as string]: String(width) }} aria-hidden="true">
+        {st.cells.map((c, i) => (
+          <div key={i} className={`ln-cell${st.mark?.includes(i) ? ' is-mark' : ''}${st.done?.includes(i) ? ' is-done' : ''}`}>
+            <span className="ln-cell-v">{c}</span>
+            <span className="ln-cell-i">{i}</span>
+            <span className="ln-cell-ptr">{(st.pointers ?? []).filter((q) => q.at === i).map((q) => q.name).join(' ')}</span>
+          </div>
+        ))}
+      </div>
+      <p className="ln-trace-note" aria-live="polite">
+        <span className="ln-k">{`Step ${at + 1} of ${spec.steps.length}`}</span> {st.note}
+        <span className="ln-sr">{` The cells: ${st.cells.join(', ')}.${st.mark?.length ? ` Looking at positions ${st.mark.join(' and ')}.` : ''}${st.pointers?.length ? ` ${st.pointers.map((q) => `${q.name} at ${q.at}`).join(', ')}.` : ''}`}</span>
+      </p>
+      <div className="ln-trace-nav">
+        <button type="button" className="ln-btn" onClick={() => go(at - 1)} disabled={at === 0}>
+          Back
+        </button>
+        <input type="range" min={0} max={last} step={1} value={at} aria-label="Step" aria-valuetext={`Step ${at + 1} of ${spec.steps.length}`} onChange={(e) => go(Number(e.target.value))} />
+        <button type="button" className="ln-btn is-next" onClick={() => go(at + 1)} disabled={at === last}>
+          Next
+        </button>
+      </div>
     </div>
   );
 }
@@ -1887,6 +2251,11 @@ function InlineSteps({ spec, state, onState, renderInline }: { spec: StepsSpec; 
  * dashed for an amplifier, filled for the effect — never by colour alone.
  */
 function InlineDiagram({ spec, state, onState, renderInline, onMap }: { spec: DiagramSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline; onMap?: () => void }) {
+  if (spec.view === 'mind') return <InlineMind spec={spec} state={state} onState={onState} renderInline={renderInline} onMap={onMap} />;
+  return <InlineDiagramDrawn spec={spec} state={state} onState={onState} renderInline={renderInline} onMap={onMap} />;
+}
+
+function InlineDiagramDrawn({ spec, state, onState, renderInline, onMap }: { spec: DiagramSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline; onMap?: () => void }) {
   const id = useId();
   const marker = `lnarrow${id.replace(/[^A-Za-z0-9_-]/g, '')}`;
   const [ref, width] = useWidth<HTMLDivElement>(600);
@@ -2008,6 +2377,208 @@ function InlineDiagram({ spec, state, onState, renderInline, onMap }: { spec: Di
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── a mind map ───────────────────────────────────────────────────────
+
+const REL_CLASS: Record<string, string> = { causes: 'is-causes', leads: 'is-leads', needs: 'is-needs', relates: 'is-relates' };
+
+/**
+ * A MIND MAP. The centre and its first branches show at once; deeper parts fold away when the whole would be more
+ * than a glance takes, and open with a press (+n says how many are folded). Pressing a part selects it: its branch
+ * is drawn up, the rest steps back, and what it says — its line, what it belongs to, what hangs from it, the links
+ * across to other branches and what kind each is — opens beneath the map. A search unfolds whatever matches. All of
+ * it by pointer, touch or keyboard; none of it changes the map itself — that is Edit's (the map opened in
+ * Artifacts, where its parts are added, renamed, moved and connected, each change undoable).
+ */
+function InlineMind({ spec, state, onState, renderInline, onMap }: { spec: DiagramSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline; onMap?: () => void }) {
+  const markerId = useId().replace(/[^A-Za-z0-9_-]/g, '');
+  const [ref, width] = useWidth<HTMLDivElement>(640);
+  const rows = useMemo(() => mindRows(spec), [spec]);
+  const parentOf = useMemo(() => new Map(rows.map((r) => [r.id, r.parent])), [rows]);
+  const [folded, setFolded] = useState<Set<string>>(() => defaultFolds(spec));
+  const [query, setQuery] = useState('');
+  const byId = useMemo(() => new Map(spec.nodes.map((nd) => [nd.id, nd])), [spec]);
+  const picked = state?.node && byId.has(state.node) ? state.node : null;
+  const pick = (nid: string | null) => onState({ ...state, node: nid ?? undefined });
+  // what a search finds, and the branches it lives on, unfolded so it can be seen
+  const q = query.trim().toLowerCase();
+  const found = useMemo(() => (q.length >= 2 ? new Set(spec.nodes.filter((n) => n.label.toLowerCase().includes(q) || (n.detail ?? '').toLowerCase().includes(q)).map((n) => n.id)) : null), [q, spec]);
+  const shownFolds = useMemo(() => {
+    if (!found) return folded;
+    const open = new Set(folded);
+    for (const id of found) for (let p = parentOf.get(id); p; p = parentOf.get(p)) open.delete(p);
+    return open;
+  }, [found, folded, parentOf]);
+  const lay = useMemo(() => mindLayout(spec, Math.max(260, width), shownFolds), [spec, width, shownFolds]);
+  if (!lay) return null;
+  // the selected part's branch: the way up to the centre and everything beneath it
+  const branch = new Set<string>();
+  if (picked) {
+    for (let p: string | null | undefined = picked; p; p = parentOf.get(p)) branch.add(p);
+    const down = (id: string) => rows.filter((r) => r.parent === id).forEach((r) => (branch.add(r.id), down(r.id)));
+    down(picked);
+  }
+  const dim = (id: string) => (found ? !found.has(id) : picked ? !branch.has(id) : false);
+  const toggleFold = (id: string) => {
+    const next = new Set(folded);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setFolded(next);
+  };
+  const cur = picked ? byId.get(picked)! : null;
+  const kidsOf = (id: string) => rows.filter((r) => r.parent === id).map((r) => byId.get(r.id)!);
+  const across = picked ? spec.edges.filter((e) => e[2] && (e[0] === picked || e[1] === picked)) : [];
+  const rels = [...new Set(spec.edges.map((e) => e[2]).filter((x): x is NonNullable<typeof x> => !!x))];
+  const name = spec.title || `A map of ${spec.nodes[0].label}`;
+  const folds = lay.boxes.filter((b) => b.hidden > 0).length;
+  return (
+    <div className="ln ln-mind" role="group" aria-label={name}>
+      <p className="ln-figcap">
+        <span className="ln-kind">Map</span>
+        <span className="ln-title">{name}</span>
+      </p>
+      {spec.nodes.length > 8 && (
+        <div className="ln-mind-tools">
+          <input type="search" className="ln-mind-find" placeholder="Find in the map" aria-label="Find in the map" value={query} onChange={(e) => setQuery(e.target.value)} />
+          {found && <span className="ln-mind-count" aria-live="polite">{found.size ? `${found.size} found` : 'Nothing found'}</span>}
+          {!found && (folds > 0 || folded.size > 0) && (
+            <button type="button" className="ln-btn" onClick={() => setFolded(folds > 0 ? new Set() : defaultFolds(spec))}>
+              {folds > 0 ? 'Open all' : 'Fold'}
+            </button>
+          )}
+        </div>
+      )}
+      <div ref={ref} className="ln-plot ln-mind-plot">
+        {/* drawn at its own size, never scaled down: a map wider than the column scrolls inside this box (mindLayout) */}
+        <svg viewBox={`0 0 ${lay.W} ${lay.H}`} width={lay.W} height={lay.H} role="img" aria-label={inlinePlainText(spec)}>
+          <defs>
+            <marker id={`lnm${markerId}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L8,4 L0,8 z" className="ln-mind-head" />
+            </marker>
+          </defs>
+          <g className="ln-mind-branches">
+            {lay.branches.map((b) => (
+              <path key={`${b.from}>${b.to}`} d={b.d} className={`${dim(b.to) ? 'is-dim' : ''}${picked && branch.has(b.to) && branch.has(b.from) ? ' is-on' : ''}`} />
+            ))}
+          </g>
+          <g className="ln-mind-links">
+            {lay.links.map((l) => (
+              <path key={`${l.from}>${l.to}`} d={l.d} className={`${REL_CLASS[l.rel] ?? ''}${picked && (l.from === picked || l.to === picked) ? ' is-on' : picked || found ? ' is-dim' : ''}`} markerEnd={l.rel === 'relates' ? undefined : `url(#lnm${markerId})`} />
+            ))}
+          </g>
+          {lay.boxes.map((b) => {
+            const nd = byId.get(b.id)!;
+            const isOn = picked === b.id;
+            const say = `${nd.label}${b.kids ? `, ${b.kids} part${b.kids === 1 ? '' : 's'}${b.hidden ? ', folded' : ''}` : ''}`;
+            return (
+              <g key={b.id} className={`ln-mind-node is-d${Math.min(b.depth, 3)}${isOn ? ' is-on' : ''}${dim(b.id) ? ' is-dim' : ''}${found?.has(b.id) ? ' is-found' : ''}`}>
+                <g
+                  role="button"
+                  tabIndex={0}
+                  aria-label={say}
+                  aria-pressed={isOn}
+                  onClick={() => pick(isOn ? null : b.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      pick(isOn ? null : b.id);
+                    }
+                  }}
+                >
+                  <rect x={b.cx - b.w / 2} y={b.cy - b.h / 2} width={b.w} height={b.h} rx={b.depth === 0 ? b.h / 2 : 9} />
+                  <text x={b.cx} y={b.cy - ((b.lines.length - 1) * 16) / 2 + 4.5} textAnchor="middle">
+                    {b.lines.map((ln, i) => (
+                      <tspan key={i} x={b.cx} dy={i ? 16 : 0}>
+                        {ln}
+                      </tspan>
+                    ))}
+                  </text>
+                </g>
+                {b.kids > 0 && b.depth > 0 && (
+                  <g
+                    className="ln-mind-fold"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={b.hidden ? `Open ${nd.label}: ${b.hidden} more` : `Fold ${nd.label}`}
+                    onClick={() => toggleFold(b.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleFold(b.id);
+                      }
+                    }}
+                  >
+                    <circle cx={b.cx + (b.side * b.w) / 2 + b.side * 11} cy={b.cy} r={b.hidden ? 10 : 7.5} />
+                    <text x={b.cx + (b.side * b.w) / 2 + b.side * 11} y={b.cy + 3.6} textAnchor="middle">
+                      {b.hidden ? `+${b.hidden}` : '−'}
+                    </text>
+                  </g>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      {rels.length > 0 && (
+        <p className="ln-mind-legend" aria-label="What the links across the branches mean">
+          {rels.map((r) => (
+            <span key={r} className={`ln-mind-key ${REL_CLASS[r] ?? ''}`}>
+              <svg width="22" height="8" aria-hidden="true">
+                <line x1="1" y1="4" x2="21" y2="4" />
+              </svg>
+              {REL_SAID[r]}
+            </span>
+          ))}
+        </p>
+      )}
+      {cur ? (
+        <div className="ln-mind-panel" aria-live="polite">
+          <p className="ln-mind-panel-head">{cur.label}</p>
+          {cur.detail && <p className="ln-mind-panel-detail">{renderInline(cur.detail, `md-${cur.id}`)}</p>}
+          <p className="ln-mind-panel-rel">
+            {parentOf.get(cur.id) && (
+              <span>
+                Part of <button type="button" className="ln-link" onClick={() => pick(parentOf.get(cur.id)!)}>{byId.get(parentOf.get(cur.id)!)!.label}</button>
+              </span>
+            )}
+            {kidsOf(cur.id).length > 0 && (
+              <span>
+                {' '}Holds{' '}
+                {kidsOf(cur.id).map((k, i) => (
+                  <span key={k.id}>
+                    {i ? ', ' : ''}
+                    <button type="button" className="ln-link" onClick={() => pick(k.id)}>{k.label}</button>
+                  </span>
+                ))}
+              </span>
+            )}
+          </p>
+          {across.length > 0 && (
+            <ul className="ln-mind-panel-links">
+              {across.map((e) => {
+                const out = e[0] === cur.id;
+                const other = byId.get(out ? e[1] : e[0])!;
+                return (
+                  <li key={`${e[0]}>${e[1]}`}>
+                    {out ? `${REL_SAID[e[2]!]} ` : `${other.label} ${REL_SAID[e[2]!]} this — `}
+                    <button type="button" className="ln-link" onClick={() => pick(other.id)}>{out ? other.label : 'show it'}</button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      ) : (
+        <p className="ln-hint">{folds ? 'Press a part to see what it holds; + opens what is folded.' : 'Press a part to see what it holds.'}</p>
+      )}
+      {onMap && (
+        <p className="ln-mind-more">
+          <button type="button" className="ln-btn" onClick={onMap}>Edit the map</button>
+        </p>
+      )}
     </div>
   );
 }

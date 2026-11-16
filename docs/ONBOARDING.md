@@ -36,8 +36,8 @@ WHAT CHANGED, ONCE, FOR WHOEVER USED SOCRIA BEFORE THE MAP
   killed    "We killed the chatbot. Socria is a map of your thinking now."
             — every conversation they had is on it, counted; nothing was lost
   map       "Your map, not a list." — subjects as circles, conversations as
-            discs, a link they made as a dashed line; the lenses: Today and
-            This week as a map, This month and All time as a line through time
+            discs, a link they made as a dashed line; the scales: Today,
+            Week, Month and All Time, each the same map, more or less of it
   box       "Everything starts in one box." — ask, or drop notes in and they
             are sorted onto the map; Projects are on it too
 ```
@@ -143,8 +143,8 @@ Told once, to the people it changed for, and to nobody else.
   map.
 - **What.** Three beats, each a sentence and a drawing that does what the
   sentence says: a chat folding bubble by bubble into the map; the map read,
-  the lens walking Today → This week → This month → All time and the map
-  becoming a line through time; the box typed into, a file dropped in, sent,
+  the scale walking Today → Week → Month → All Time over the one map, which
+  stays where it is; the box typed into, a file dropped in, sent,
   and landing on the map sorted into topics. Skip (or Esc) at any point —
   either way it is never shown again, on any device. Arrow keys step; focus
   comes in with it. Every drawing rests at the end of its story without motion.

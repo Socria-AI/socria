@@ -113,7 +113,7 @@ const kinds = (pieces) => pieces.map((p) => (p.kind === 'block' ? (p.lead ? 'lea
 console.log('\n=== the ask: what comes first, and what a reply is not ===');
 {
   const core = I.LOGOS5_CORE;
-  ok('the persona says it changed: logos5-v7', I.PERSONA_VERSION === 'logos5-v7');
+  ok('the persona says it changed: logos5-v8', I.PERSONA_VERSION === 'logos5-v8');
   // The core says the rule in a line each; the detail of an open request and
   // of going deeper travels in that turn's own shape note (presentation.ts
   // SHAPES, pinned below), so the cached core stays inside its budget.

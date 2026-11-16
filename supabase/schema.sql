@@ -1060,6 +1060,64 @@ create table if not exists ux_projects (
 
 create index if not exists ux_projects_user_updated_idx on ux_projects (user_id, updated_at desc);
 
+-- ── SocriaUX v0 (/ux-v0): design projects and what they cost ─────────
+--
+-- ux_v0_projects: one row per project — the whole document (intent,
+-- discovery, moodboard references, brief, generated specs, reasoning cards)
+-- as jsonb, normalised by lib/ux-v0/types.ts normalizeProject before it is
+-- written. The browser keeps the first copy (IndexedDB); this one follows a
+-- signed-in designer between devices. Imported originals are not here: they
+-- are in the private files bucket (lib/file-originals-store.ts).
+create table if not exists ux_v0_projects (
+  user_id text not null,
+  id text not null,
+  name text not null default '',
+  doc jsonb not null,
+  created_at bigint not null,
+  updated_at bigint not null,
+  primary key (user_id, id)
+);
+
+create index if not exists ux_v0_projects_user_updated_idx on ux_v0_projects (user_id, updated_at desc);
+
+-- ux_v0_usage: every SocriaUX v0 model call's tokens and price, summed per
+-- person, project and UTC day (lib/ux-v0/usage-server.ts). The daily caps
+-- read it; bump_ux_v0_usage adds to it in one statement.
+create table if not exists ux_v0_usage (
+  user_id text not null,
+  project_id text not null,
+  day text not null,
+  calls integer not null default 0,
+  generations integer not null default 0,
+  input_tokens bigint not null default 0,
+  output_tokens bigint not null default 0,
+  cost_usd numeric(14, 6) not null default 0,
+  updated_at bigint not null,
+  primary key (user_id, project_id, day)
+);
+
+create index if not exists ux_v0_usage_user_day_idx on ux_v0_usage (user_id, day);
+
+create or replace function bump_ux_v0_usage(
+  p_user text, p_project text, p_day text, p_calls integer, p_generations integer,
+  p_input bigint, p_output bigint, p_cost numeric, p_at bigint
+) returns void
+language plpgsql
+as $$
+begin
+  insert into ux_v0_usage (user_id, project_id, day, calls, generations, input_tokens, output_tokens, cost_usd, updated_at)
+  values (p_user, p_project, p_day, p_calls, p_generations, p_input, p_output, p_cost, p_at)
+  on conflict (user_id, project_id, day)
+  do update set
+    calls = ux_v0_usage.calls + p_calls,
+    generations = ux_v0_usage.generations + p_generations,
+    input_tokens = ux_v0_usage.input_tokens + p_input,
+    output_tokens = ux_v0_usage.output_tokens + p_output,
+    cost_usd = ux_v0_usage.cost_usd + p_cost,
+    updated_at = p_at;
+end;
+$$;
+
 -- ── Socria events: RSVP and attendance ─────────────────────────────────
 --
 -- events: one row per event, edited by Socria admins. A date is shown on the

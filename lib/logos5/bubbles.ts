@@ -90,6 +90,17 @@ export interface BubbleIn {
    * map changes.
    */
   memories?: readonly BubbleMemoryIn[];
+  /**
+   * THE UNIVERSAL MAP'S SCALE (lib/logos5/scales.ts): which of `tiles` are on the map now. Where everything is
+   * never depends on it — every position is laid out from all of `tiles`, so Today, Week, Month and All Time
+   * are one map, more or less of it lit. What it decides: which links are drawn (both ends on the map), which
+   * memories hang (from something on the map), which link gets the card, each subject's REGION (the part of its
+   * circle round what is on the map, growing to the whole circle as the scale widens), what the view is fitted
+   * to, and where the big + goes. Absent: everything is on the map.
+   */
+  visible?: ReadonlySet<string>;
+  /** with `visible`: count the folded rows (empty Projects, subjects folded away) and "+ New project" in what the view is fitted to (default true) */
+  foldedInBounds?: boolean;
 }
 
 /** A memory as the map places it: its words, and the conversations it came from, in order. */
@@ -186,6 +197,12 @@ export interface BubbleCluster {
   suggested: string[];
   /** what is drawn in it */
   ids: string[];
+  /**
+   * Open, with a scale (BubbleIn.visible): the part of its circle round what is on the map now — a circle inside
+   * its own, round its conversations at this scale with room to spare, the whole circle when all are on the map;
+   * null when none of it is. Its name goes on this circle's upper left.
+   */
+  region?: { x: number; y: number; r: number; label: Box; shown: number } | null;
 }
 
 export interface BubbleCard extends Box {
@@ -569,6 +586,8 @@ const DOT_ANGLES = Array.from({ length: 24 }, (_, i) => -135 + i * 15);
  * the other sessions and from the way the rest of the map lies (`away`).
  */
 function layOut(members: readonly Member[], now: number, narrow: boolean, away: readonly number[], by: SizeBy = 'ideas'): Local {
+  // a conversation's tile by its id, once: looked up in every placement below (a linear find there made a busy subject cubic)
+  const tileAt = new Map(members.map((m) => [m.tile.id, m.tile]));
   const hubsIn = members.filter((m) => m.hub);
   const dotsIn = members.filter((m) => !m.hub);
   // the halo first, then the day's, then the newest
@@ -576,6 +595,30 @@ function layOut(members: readonly Member[], now: number, narrow: boolean, away: 
   const hubs: BubbleHub[] = [];
   const joins: [string, string][] = [];
   const room = (h: BubbleHub) => h.r + (h.halo ? HALO : 0);
+  // the sessions placed so far, in a grid: a new one is tested only against those near enough to touch it (the same
+  // answer as testing every one; a subject of hundreds of sessions was quadratic in it)
+  const CELL = 240;
+  const grid = new Map<string, BubbleHub[]>();
+  let maxRoom = 0;
+  const cellOf = (x: number, y: number) => `${Math.floor(x / CELL)},${Math.floor(y / CELL)}`;
+  const putHub = (h: BubbleHub) => {
+    const k = cellOf(h.x, h.y);
+    const cell = grid.get(k);
+    if (cell) cell.push(h);
+    else grid.set(k, [h]);
+    maxRoom = Math.max(maxRoom, room(h));
+  };
+  const crowds = (p: Pt, r: number) => {
+    const n = Math.ceil((maxRoom + r + HUB_GAP) / CELL);
+    const cx = Math.floor(p.x / CELL);
+    const cy = Math.floor(p.y / CELL);
+    for (let i = -n; i <= n; i++)
+      for (let j = -n; j <= n; j++) {
+        const cell = grid.get(`${cx + i},${cy + j}`);
+        if (cell) for (const h of cell) if (dist(h, p) < room(h) + r + HUB_GAP - 0.5) return true;
+      }
+    return false;
+  };
   hubsIn.forEach((m, i) => {
     const r = hubRadius(m.tile, { narrow, focus: m.focus, halo: m.halo, by, now });
     const { font, lines } = typeOf(r);
@@ -585,8 +628,8 @@ function layOut(members: readonly Member[], now: number, narrow: boolean, away: 
     if (i > 0) {
       // beside the one closest to it in time, as near the first as there is room
       const parent = hubs.reduce((best, h) => {
-        const t = members.find((x) => x.tile.id === h.id)!.tile;
-        const bt = members.find((x) => x.tile.id === best.id)!.tile;
+        const t = tileAt.get(h.id)!;
+        const bt = tileAt.get(best.id)!;
         return Math.abs(t.started - m.tile.started) < Math.abs(bt.started - m.tile.started) ? h : best;
       }, hubs[0]);
       let at: Pt | null = null;
@@ -595,7 +638,7 @@ function layOut(members: readonly Member[], now: number, narrow: boolean, away: 
         for (const deg of HUB_ANGLES) {
           const d = room(parent) + r + HUB_GAP + ring * 34;
           const p = { x: round(parent.x + Math.cos(rad(deg)) * d), y: round(parent.y + Math.sin(rad(deg)) * d) };
-          if (hubs.some((h) => dist(h, p) < room(h) + r + HUB_GAP - 0.5)) continue;
+          if (crowds(p, r)) continue;
           const cost = Math.hypot(p.x, p.y);
           if (!best || cost < best.cost - 0.5) best = { p, cost };
         }
@@ -606,6 +649,7 @@ function layOut(members: readonly Member[], now: number, narrow: boolean, away: 
       joins.push([parent.id, hub.id]);
     }
     hubs.push(hub);
+    putHub(hub);
   });
 
   // the quick questions, newest first, each from the session nearest it in time
@@ -624,10 +668,10 @@ function layOut(members: readonly Member[], now: number, narrow: boolean, away: 
     const h = w1 > maxW ? DOT_LINE * 2 : DOT_LINE;
     let anchor: BubbleHub | null = null;
     for (const hb of hubs) {
-      const t = members.find((x) => x.tile.id === hb.id)!.tile;
+      const t = tileAt.get(hb.id)!;
       if (!anchor) anchor = hb;
       else {
-        const at = members.find((x) => x.tile.id === anchor!.id)!.tile;
+        const at = tileAt.get(anchor!.id)!;
         if (Math.abs(t.at - m.tile.at) < Math.abs(at.at - m.tile.at)) anchor = hb;
       }
     }
@@ -641,7 +685,9 @@ function layOut(members: readonly Member[], now: number, narrow: boolean, away: 
     ];
     // away from all of that; on a wide screen the diagonals, as drawn; on a phone over and under, to keep it narrow
     const pref = (deg: number) => Math.min(70, blocked.length ? Math.min(...blocked.map((b) => apart(deg, b))) : 70) + (narrow ? 26 * Math.abs(Math.sin(rad(deg))) : 10 * Math.abs(Math.sin(rad(2 * deg))));
-    const ways = [...DOT_ANGLES].sort((a, b) => pref(b) - pref(a));
+    // each way scored once, then sorted by its score (the same order: the sort is stable, the scores the same)
+    const score = new Map(DOT_ANGLES.map((deg) => [deg, pref(deg)]));
+    const ways = [...DOT_ANGLES].sort((a, b) => score.get(b)! - score.get(a)!);
     const place = (deg: number, spoke: number) => {
       const p = { x: round(from.x + Math.cos(rad(deg)) * (base + spoke)), y: round(from.y + Math.sin(rad(deg)) * (base + spoke)) };
       const cos = Math.cos(rad(deg));
@@ -870,7 +916,24 @@ function order(groups: Group[]): Group[] {
 // ── the whole map ────────────────────────────────────────────────────
 
 /** Today or This week, drawn as subjects. */
-export function bubbleLayout(input: BubbleIn): BubbleLayout {
+/**
+ * WHERE EVERYTHING IS: every session, quick question, subject circle, folded row and "+ New project" — what never
+ * depends on the scale, the link chosen for the card, or the memories. The expensive part of the layout (each
+ * subject packed, then the subjects packed together), so the Universal Map computes it once and keeps it across
+ * every change of scale (components/logos5/UniverseBubbles.tsx); bubbleLayout lays the rest over it.
+ */
+export interface BubblePlaces {
+  hubs: BubbleHub[];
+  dots: BubbleDot[];
+  clusters: BubbleCluster[];
+  joins: [string, string][];
+  spokes: [string, string][];
+  make: Box | null;
+  placed: Map<string, { x: number; y: number; r: number; g: string; hub: boolean }>;
+  today?: { when: TodayPlan['when']; day: number };
+}
+
+export function bubblePlaces(input: BubbleIn): BubblePlaces {
   const narrow = !!input.narrow;
   const { groups, today } = groupsOf(input);
   const open = groups.filter((g) => !g.folded && g.members.length);
@@ -991,6 +1054,29 @@ export function bubbleLayout(input: BubbleIn): BubbleLayout {
   for (const h of hubs) placed.set(h.id, { x: h.x, y: h.y, r: h.r + (h.halo ? HALO : 0), g: h.g, hub: true });
   for (const d of dots) placed.set(d.id, { x: d.x, y: d.y, r: d.r, g: d.g, hub: false });
 
+  return { hubs, dots, clusters, joins, spokes, make, placed, ...(today ? { today } : {}) };
+}
+
+export function bubbleLayout(input: BubbleIn, places?: BubblePlaces): BubbleLayout {
+  const narrow = !!input.narrow;
+  const P = places ?? bubblePlaces(input);
+  const { hubs, dots, joins, spokes, make, placed, today } = P;
+  // the circles are given their region at this scale: copies, so what was placed is never changed
+  const clusters = P.clusters.map((c) => ({ ...c }));
+
+  // ── the scale: what is on the map now (everything, without one); positions above never depend on it ──
+  const vis = input.visible ?? null;
+  const on = (id: string) => !vis || vis.has(id);
+  // (a quick question's words are close-up detail: its region is round its dot, with room)
+  if (vis) for (const c of clusters) if (!c.folded) c.region = regionOf(c, [...hubs.filter((h) => h.g === c.key && on(h.id)), ...dots.filter((d) => d.g === c.key && on(d.id)).map((d) => ({ x: d.x, y: d.y, r: d.r + 10 }))], narrow);
+  /** what the card, the memories, the bounds and the + are placed round: what is on the map */
+  const litHubs = vis ? hubs.filter((h) => on(h.id)) : hubs;
+  const litDots = vis ? dots.filter((d) => on(d.id)) : dots;
+  const litPlaced = vis ? new Map([...placed].filter(([id]) => on(id))) : placed;
+  const litClusters = vis ? clusters.filter((c) => c.folded || c.region) : clusters;
+  /** an open circle as it stands at this scale: its region (with a scale), or itself */
+  const circleOf = (c: BubbleCluster) => (c.region ? { x: c.region.x, y: c.region.y, r: c.region.r } : { x: c.x, y: c.y, r: c.r });
+
   // ── what joins two subjects ──
   const tileOf = new Map(input.tiles.map((t) => [t.id, t]));
   const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
@@ -999,7 +1085,7 @@ export function bubbleLayout(input: BubbleIn): BubbleLayout {
   for (const l of input.links) {
     const p = placed.get(l.a);
     const q = placed.get(l.b);
-    if (!p || !q || l.a === l.b || done.has(pairKey(l.a, l.b))) continue;
+    if (!p || !q || l.a === l.b || !on(l.a) || !on(l.b) || done.has(pairKey(l.a, l.b))) continue;
     done.add(pairKey(l.a, l.b));
     own.push({ key: `own:${l.id}`, a: l.a, b: l.b, kind: 'own', own: l.id, label: l.label, idea: null, across: p.g !== q.g, ...curve(p, q, narrow) });
   }
@@ -1007,7 +1093,7 @@ export function bubbleLayout(input: BubbleIn): BubbleLayout {
   const joined = new Set(own.filter((l) => l.across).map((l) => pairKey(placed.get(l.a)!.g, placed.get(l.b)!.g)));
   const ideaLinks: BubbleLink[] = [];
   for (const idea of input.ideaLinks === false ? [] : input.ideas) {
-    const here = idea.members.filter((id) => placed.has(id));
+    const here = idea.members.filter((id) => placed.has(id) && on(id));
     let best: { a: string; b: string; score: number } | null = null;
     for (let i = 0; i < here.length; i++)
       for (let j = i + 1; j < here.length; j++) {
@@ -1027,10 +1113,11 @@ export function bubbleLayout(input: BubbleIn): BubbleLayout {
   const links = [...own, ...ideaLinks.slice(0, Math.max(0, LINKS_MAX - own.length))];
 
   // ── what Socria remembers: which link's card says it, and what each of the rest hangs from ──
-  const remembered = input.memories?.length ? planMemories(input.memories, placed, links, tileOf) : null;
+  const memIn = vis && input.memories ? input.memories.map((m) => ({ ...m, from: m.from.filter(on) })).filter((m) => m.from.length) : input.memories;
+  const remembered = memIn?.length ? planMemories(memIn, litPlaced, links, tileOf) : null;
 
   // ── the card over the one that matters most, its curve rising to meet it ──
-  const card = cardOver(links, { hubs, dots, clusters, placed, tileOf, homes: input.homes, now: input.now, narrow, haloId: hubs.find((h) => h.halo)?.id ?? null, chosen: input.cardFor ?? null, onLink: remembered?.onLink });
+  const card = cardOver(links, { hubs: litHubs, dots: litDots, clusters: vis ? litClusters.map((c) => (c.region ? { ...c, ...circleOf(c) } : c)) : clusters, placed: litPlaced, tileOf, homes: input.homes, now: input.now, narrow, haloId: litHubs.find((h) => h.halo)?.id ?? null, chosen: input.cardFor ?? null, onLink: remembered?.onLink });
   if (card) {
     const l = links.find((x) => x.key === card.link)!;
     const p = placed.get(l.a)!;
@@ -1040,36 +1127,73 @@ export function bubbleLayout(input: BubbleIn): BubbleLayout {
     Object.assign(l, curveThrough(p, q, card.rise ?? (stacked ? { x: card.x + card.w / 2, y: card.y + card.h / 2 } : { x: card.x + card.w / 2, y: card.y + card.h - 6 })));
   }
 
+  const withFolded = !vis || input.foldedInBounds !== false;
   let bounds = boxAround([
-    ...clusters.map((c) => (c.folded ? foldedBox(c) : { x: c.x - c.r, y: c.y - c.r, w: 2 * c.r, h: 2 * c.r })),
+    ...litClusters.filter((c) => withFolded || !c.folded).map((c) => (c.folded ? foldedBox(c) : (({ x, y, r }) => ({ x: x - r, y: y - r, w: 2 * r, h: 2 * r }))(circleOf(c)))),
     ...(card ? [card] : []),
-    ...(make ? [make] : []),
+    ...(make && withFolded ? [make] : []),
   ]);
   // placed last, round everything already drawn — inside the room the map already takes where they fit, so it is fitted to the screen as it was
-  const memories = remembered ? placeMemories(remembered.hang, { hubs, dots, clusters, placed, links, spokes, joins, card, make, area: bounds, narrow }) : [];
+  const memories = remembered ? placeMemories(remembered.hang, { hubs: litHubs, dots: litDots, clusters: vis ? litClusters.map((c) => (c.region ? { ...c, ...circleOf(c) } : c)) : clusters, placed: litPlaced, links, spokes, joins, card, make, area: bounds, narrow }) : [];
   const inside = (b: Box) => b.x >= bounds.x && b.y >= bounds.y && b.x + b.w <= bounds.x + bounds.w && b.y + b.h <= bounds.y + bounds.h;
   if (memories.some((m) => !inside(m.box))) bounds = boxAround([bounds, ...memories.map((m) => m.box)]);
   // the big + last, in the free room nearest the middle of the subjects drawn open, clear of everything above
   let start: BubbleStart | null = null;
   if (input.start) {
-    const opened = clusters.filter((c) => !c.folded);
+    const opened = litClusters.filter((c) => !c.folded);
     start = startSpot({
-      circles: [...opened.map((c) => ({ x: c.x, y: c.y, r: c.r })), ...hubs.map((h) => ({ x: h.x, y: h.y, r: h.r + (h.halo ? HALO : 0) }))],
+      circles: [...opened.map(circleOf), ...litHubs.map((h) => ({ x: h.x, y: h.y, r: h.r + (h.halo ? HALO : 0) }))],
       boxes: [
-        ...opened.map((c) => c.label),
-        ...clusters.filter((c) => c.folded).map((c) => foldedBox(c)),
-        ...dots.map((d) => d.label),
+        ...opened.map((c) => c.region?.label ?? c.label),
+        ...litClusters.filter((c) => c.folded && withFolded).map((c) => foldedBox(c)),
+        ...litDots.map((d) => d.label),
         ...(card ? [card] : []),
         ...(make ? [make] : []),
         ...memories.map((m) => m.box),
       ],
       curves: links,
-      around: opened.length ? boxAround(opened.map((c) => ({ x: c.x - c.r, y: c.y - c.r, w: 2 * c.r, h: 2 * c.r }))) : bounds,
+      around: opened.length ? boxAround(opened.map((c) => (({ x, y, r }) => ({ x: x - r, y: y - r, w: 2 * r, h: 2 * r }))(circleOf(c)))) : bounds,
       narrow,
     });
     bounds = boxAround([...(clusters.length || card || make || memories.length ? [bounds] : []), { x: start.x - start.r, y: start.y - start.r, w: 2 * start.r, h: 2 * start.r }, start.label]);
   }
   return { lens: input.lens, hubs, dots, clusters, joins, spokes, links, card, make, start, memories, byId: placed, bounds, focus: bounds, ...(today ? { today } : {}) };
+}
+
+/** The room a subject's region keeps round its conversations, beyond their own discs. */
+export const REGION_PAD = { wide: 34, narrow: 24 } as const;
+
+/**
+ * A subject's region at a scale: the circle round what of it is on the map (each session's disc, each quick
+ * question's dot and words), with room to spare, kept inside the subject's own circle — and the whole circle
+ * once it is nearly all there, so the last step to All Time does not shrink anything. Null when none of it is.
+ */
+export function regionOf(c: Pick<BubbleCluster, 'x' | 'y' | 'r' | 'label' | 'ids'>, lit: readonly ({ x: number; y: number; r: number } & { label?: Box })[], narrow = false): BubbleCluster['region'] {
+  if (!lit.length) return null;
+  const pad = narrow ? REGION_PAD.narrow : REGION_PAD.wide;
+  // the box round them (a quick question's words count), and the circle round that box's middle
+  const parts = lit.flatMap((m) => [{ x: m.x - m.r, y: m.y - m.r, w: 2 * m.r, h: 2 * m.r }, ...(m.label ? [m.label] : [])]);
+  const b = boxAround(parts);
+  let x = b.x + b.w / 2;
+  let y = b.y + b.h / 2;
+  let r = 0;
+  for (const p of parts) for (const [px, py] of [[p.x, p.y], [p.x + p.w, p.y], [p.x, p.y + p.h], [p.x + p.w, p.y + p.h]]) r = Math.max(r, Math.hypot(px - x, py - y));
+  r += pad;
+  const full = lit.length >= c.ids.length || r >= c.r * 0.86;
+  if (full) return { x: c.x, y: c.y, r: c.r, label: c.label, shown: lit.length };
+  // inside its own circle: drawn back towards the middle by however much it would stand out
+  const d = Math.hypot(x - c.x, y - c.y);
+  if (d + r > c.r && d > 0) {
+    const move = Math.min(d, d + r - c.r);
+    x -= ((x - c.x) / d) * move;
+    y -= ((y - c.y) / d) * move;
+  }
+  r = Math.min(r, c.r);
+  x = round(x);
+  y = round(y);
+  r = round(r);
+  // its name on its upper left, as the whole circle's is
+  return { x, y, r, label: { x: round(x - 0.86 * r), y: round(y - 0.855 * r - NAME_H / 2), w: c.label.w, h: c.label.h }, shown: lit.length };
 }
 
 /** A folded one's room: its name and the dots under it — or, empty, the words that say so. */
@@ -1313,7 +1437,12 @@ function placeMemories(
         if (h === A.id && o.placed.has(d)) blocked.push(deg(A, o.placed.get(d)!));
         if (d === A.id && o.placed.has(h)) blocked.push(deg(A, o.placed.get(h)!));
       }
-      for (const [a, b] of o.joins) if (a === A.id || b === A.id) blocked.push(deg(A, o.placed.get(a === A.id ? b : a)!));
+      // only what is drawn at this scale: o.placed is what is lit, the joins are all of them (at Today, Week or
+      // Month a session can be joined to one not drawn, which has no place to turn from)
+      for (const [a, b] of o.joins) {
+        const other = a === A.id ? b : b === A.id ? a : null;
+        if (other && o.placed.has(other)) blocked.push(deg(A, o.placed.get(other)!));
+      }
       for (const l of o.links) if (l.a === A.id || l.b === A.id) blocked.push(deg(A, l.c));
       const pref = (a: number) => Math.min(70, blocked.length ? Math.min(...blocked.map((b) => apart(a, b))) : 70);
       for (const d of rings)

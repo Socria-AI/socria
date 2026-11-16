@@ -22,6 +22,14 @@
 //   • the review's route findings: drafts and quotations untouched, never an
 //     empty turn, the held path's opener, a safety turn left alone, the guard,
 //     the off-record rule over the whole conversation, rooms, unknown sharing;
+//   • the precision review's route fixes: an attachment on their message (or
+//     the one before) is something on their screen; their written
+//     instructions reach MR as two booleans and take its own narrowing back;
+//     nothing planned after MR's line undoes it (no shape or worked example
+//     for a thing that is not in the conversation, no transfer line after one
+//     next step); MR's own ceiling never caps code they asked for; a measure
+//     that throws costs the measure, never the [mr] line or the row; and
+//     under the mr-2026.10.1 pin each of these turns is exactly MR off's;
 //   • MR's own time on a turn, as traced, stays inside its budget.
 
 import { build } from 'esbuild';
@@ -649,6 +657,275 @@ console.log('\n=== the response-selection review, second round, through the rout
   ok('"walk me through replacing a bike chain": the practical shape and its steps', /a practical question with an answer/.test(chain.system) && /the steps in order, in the sequence below/.test(chain.system), chain.system.slice(-1500));
   const trip = await turn({ sessionId: 'conv_r2_t', messages: [U('what should I see in Tokyo in 4 days?')] }, { env: on });
   ok('"what should I see in Tokyo in 4 days?": the days in order, and the move is not "a sentence or two"', /the days in order — Day 1, Day 2/.test(trip.system) && !/in a sentence or two/.test(move(trip.system)), `${move(trip.system)}`);
+}
+
+console.log('\n=== precision (mr-2026.11.1) through the route ===');
+{
+  db.tables.mr_ledger = [];
+  db.tables.user_profiles = [];
+  db.tables.conversations = [];
+  const on = { LOGOS_MR: 'on' };
+  const Q = 'Why is AI not solving problems?';
+  const SENTENCES = [
+    'Artificial intelligence systems are trained on large collections of examples drawn from many sources.',
+    'Their performance depends on how closely new situations resemble the data they were trained on.',
+    'Many organisations adopt these tools without first deciding which outcome they want to improve.',
+    'Integration with older software often takes longer than building the model in the first place.',
+    'Regulation, liability and trust slow adoption in fields such as medicine, finance and law.',
+    'Benchmarks reward narrow tasks, while real work mixes many tasks with unclear goals.',
+    'Costs for computing, storage and skilled staff remain high for smaller companies.',
+    'Public expectations rose faster than the technology matured, which made progress look slow.',
+    'Some of the biggest gains so far are invisible, inside search, logistics and translation.',
+    'History suggests that general purpose technologies take decades to reshape how work is done.',
+  ];
+  const ESSAY600 = Array.from({ length: 6 }, (_, i) => SENTENCES.map((s) => s.replace(/\.$/, ` in case ${i + 1}.`)).join(' ')).join('\n\n');
+  const RT1_REPLY = `${ESSAY600}\n\nDo you mean in your own work? Is it a particular field you have in mind? Would a few examples help?`;
+  const qOf = (h) => /;q=(\d)/.exec(h ?? '')?.[1];
+
+  // RT1: the networking case
+  const off = await turn({ sessionId: 'conv_p_net', messages: [U(Q)] }, { env: { LOGOS_MR: 'off' }, reply: RT1_REPLY });
+  const sh = await turn({ sessionId: 'conv_p_net', messages: [U(Q)] }, { env: { LOGOS_MR: 'shadow' }, reply: RT1_REPLY });
+  ok('RT1 shadow: the prompt and the ceiling are exactly off\'s', promptOf(sh.streamed) === promptOf(off.streamed) && capOf(sh.streamed) === capOf(off.streamed), `${capOf(sh.streamed)} ${capOf(off.streamed)}`);
+  db.tables.mr_ledger = [];
+  const r = await turn({ sessionId: 'conv_p_net', messages: [U(Q)] }, { env: on, reply: RT1_REPLY });
+  ok('RT1 on: a diagnose from the open-request reading, one question, a 360 ceiling', /;a=diagnose;/.test(r.mr ?? '') && /;t=ifr\.observed\.open_request;/.test(r.mr ?? '') && /c=q1t,s:diagnose,v360/.test(r.mr ?? ''), r.mr);
+  ok('  ACS\'s question budget stands: q=1, as with MR off', /;q=1;/.test(r.assist ?? '') && qOf(r.assist) === qOf(off.assist), `${r.assist} | ${off.assist}`);
+  ok('  the system prompt carries the diagnose line', r.system.includes('ONE THING THEY HAVE NOT SAID DECIDES THE ANSWER'), r.system.slice(-900));
+  ok('  the ceiling is lower than off\'s', capOf(r.streamed) < capOf(off.streamed), `${capOf(r.streamed)} vs ${capOf(off.streamed)}`);
+  ok('  at most one question reaches them', (r.received.match(/\?/g) ?? []).length <= 1, r.received.slice(-300));
+  ok('  the [mr] line ends with the reply measures', r.log.some((l) => /;dq=\d+;dc=\d+.*;rm=w\d+p\d+q\d+a-?\d+r\d+$/.test(l)), r.log.join(' | '));
+  await new Promise((done) => setTimeout(done, 60));
+  const e0 = ledger().find((x) => x.conversation_id === 'conv_p_net' && x.kind === 'exposure' && x.turn === 0);
+  const scalar = (o) => Object.values(o ?? {}).every((v) => typeof v === 'number' || typeof v === 'boolean' || /^[a-z_]+$/.test(v));
+  ok('  the turn-0 exposure row carries the reply measures (ints, booleans, codes), and no reaction', e0 && e0.record.reply?.mv === 1 && scalar(e0.record.reply) && !('react' in e0.record), J(e0?.record));
+  await turn({ sessionId: 'conv_p_net', messages: [U(Q), A(RT1_REPLY), U('In my own work: support tickets.')] }, { env: on, reply: 'Then start with a few hundred labelled tickets.' });
+  await new Promise((done) => setTimeout(done, 60));
+  const e1 = ledger().find((x) => x.conversation_id === 'conv_p_net' && x.kind === 'exposure' && x.turn === 1);
+  ok('  turn 1\'s exposure row carries the reaction', e1 && typeof e1.record.react?.answered === 'string' && e1.record.react.mv === 1, J(e1?.record));
+  const pin = await turn({ sessionId: 'conv_p_net_pin', messages: [U(Q)] }, { env: { ...on, LOGOS_MR_POLICY: 'mr-2026.10.1' }, reply: RT1_REPLY });
+  ok('RT1 pinned to mr-2026.10.1: a=none', /;a=none;/.test(pin.mr ?? '') && /pv=mr-2026\.10\.1/.test(pin.mr ?? '') && capOf(pin.streamed) === capOf(off.streamed), pin.mr);
+
+  // RT2: a clear question: nothing changes, whatever the stream's pieces
+  const SKY = 'Sunlight scatters off air molecules, and blue light scatters most, so the sky looks blue.';
+  for (const chunk of [1, 7, 64]) {
+    globalThis.__logosChunk = chunk;
+    try {
+      const o = await turn({ sessionId: 'conv_p_sky', messages: [U('Why is the sky blue?')] }, { env: { LOGOS_MR: 'off' }, reply: SKY });
+      const n = await turn({ sessionId: 'conv_p_sky', messages: [U('Why is the sky blue?')] }, { env: on, reply: SKY });
+      ok(`RT2 "Why is the sky blue?" (pieces of ${chunk}): nothing enforced; prompt, ceiling and reply as with MR off`, /;enf=0;/.test(n.mr ?? '') && promptOf(n.streamed) === promptOf(o.streamed) && capOf(n.streamed) === capOf(o.streamed) && n.received === o.received, `${n.mr}`);
+    } finally {
+      delete globalThis.__logosChunk;
+    }
+  }
+
+  // RT3: the arms
+  db.tables.mr_ledger = [];
+  const bOff = await turn({ sessionId: 'conv_p_arm', messages: [U(Q)] }, { env: { LOGOS_MR: 'off' }, reply: RT1_REPLY });
+  const base = await turn({ sessionId: 'conv_p_arm', messages: [U(Q)] }, { env: { ...on, LOGOS_MR_ARM: 'baseline' }, reply: RT1_REPLY });
+  ok('RT3 baseline: the prompt and the ceiling are exactly off\'s', /;arm=baseline;/.test(base.mr ?? '') && promptOf(base.streamed) === promptOf(bOff.streamed) && capOf(base.streamed) === capOf(bOff.streamed), base.mr);
+  await new Promise((done) => setTimeout(done, 60));
+  const eb = ledger().find((x) => x.conversation_id === 'conv_p_arm' && x.kind === 'exposure');
+  ok('  …and its exposure row still carries the reply measures', eb && eb.record.arm === 'baseline' && eb.record.reply?.mv === 1, J(eb?.record));
+  db.tables.mr_ledger = [];
+  db.tables.user_profiles = [{ user_id: 'user_mr', mr: { version: 1, enabled: false, carryAcross: false, research: null, resetAt: null } }];
+  await turn({ sessionId: 'conv_p_off', messages: [U(Q), A(RT1_REPLY), U('In my own work: support tickets.')] }, { env: on, reply: 'Then start with a few hundred labelled tickets.' });
+  await new Promise((done) => setTimeout(done, 60));
+  const eu = ledger().filter((x) => x.conversation_id === 'conv_p_off');
+  ok('  their own "off": the exposure row keeps the condition only, no measures', eu.length === 1 && eu[0].kind === 'exposure' && eu[0].record.source === 'user_off' && !('reply' in eu[0].record) && !('react' in eu[0].record), J(eu.map((x) => x.record)));
+  db.tables.user_profiles = [];
+
+  // RT4: a correction
+  const WINDOWS = 'On Windows, open Settings, then System, then Storage, and turn on Storage Sense. It clears temporary files and old downloads automatically, and you can run it now from the same page.';
+  const c = await turn({ sessionId: 'conv_p_mac', messages: [U('How do I free up disk space?'), A(WINDOWS), U('No, I meant on my Mac')] }, { env: on });
+  ok('RT4 "No, I meant on my Mac": no question, and the correction line', /;q=0;/.test(c.assist ?? '') && c.system.includes('THEY CORRECTED YOUR READING') && c.system.includes('QUESTIONS: none this turn'), `${c.assist} ${c.mr}`);
+
+  // RT5: stuck, with their work on the table
+  const APPROACH = 'Substitution works by spotting a function and its derivative sitting together inside the integral. Here the inner function is x squared, and its derivative, 2x, sits right beside the exponential, so changing the variable turns the whole thing into the integral of e to a single variable, which you already know how to integrate.';
+  const s = await turn({ sessionId: 'conv_p_stuck', messages: [U('I want to learn substitution: integrate 2x e^(x^2) dx'), A(APPROACH), U("I set u = x^2 but now I'm stuck on the next step")] }, { env: on });
+  ok('RT5 stuck on the next step: a next step, no question', /;a=next_step;/.test(s.mr ?? '') && /;q=0;/.test(s.assist ?? ''), `${s.mr} | ${s.assist}`);
+
+  // RT6: what they point at is not in the conversation — live, and only with nothing on screen
+  const m = await turn({ sessionId: 'conv_p_ref', messages: [U('How do I fix this?')] }, { env: on });
+  ok('RT6 "How do I fix this?" with nothing on screen: a diagnose', /;a=diagnose;/.test(m.mr ?? ''), m.mr);
+  const DOC = { id: 'd1', name: 'notes.md', kind: 'doc' };
+  const f = await turn({ sessionId: 'conv_p_ref_f', messages: [U('How do I fix this?')], docFocus: { doc: 'd1', block: 'b1' } }, { env: on });
+  ok('  …with a passage in focus: none', /;a=none;/.test(f.mr ?? ''), f.mr);
+  const d = await turn({ sessionId: 'conv_p_ref_d', messages: [U('How do I fix this?')], docs: [DOC] }, { env: on });
+  ok('  …with documents sent: none', /;a=none;/.test(d.mr ?? ''), d.mr);
+  db.tables.mr_ledger = [];
+}
+
+console.log('\n=== precision review fixes through the route (D.1–D.4, C.14) ===');
+{
+  db.tables.mr_ledger = [];
+  db.tables.user_profiles = [];
+  db.tables.conversations = [];
+  const on = { LOGOS_MR: 'on' };
+  const off = { LOGOS_MR: 'off' };
+  const pin10 = { LOGOS_MR: 'on', LOGOS_MR_POLICY: 'mr-2026.10.1' };
+  const Q = 'Why is AI not solving problems?';
+  const IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const shot = (reading) => ({ kind: 'image', name: 'screen.png', thumb: IMG, reading });
+  const note = (text) => ({ kind: 'note', name: 'log.txt', text });
+  const withAtt = (content, attachments) => ({ role: 'user', content, attachments });
+  const NOT_THERE = /NOT IN THE CONVERSATION/;
+  /** what the system prompt says after MR's block ("=== Adjusted for this conversation"), where the shape, the forms and the explanation moves are */
+  const afterMr = (sys) => sys.slice(Math.max(0, sys.indexOf('Adjusted for this conversation')));
+  const qOf = (h) => /;q=(\d)/.exec(h ?? '')?.[1];
+
+  // D.1 — an attachment on their message is something on their screen (N10, N18, N20, N5)
+  const fixShot = await turn({ sessionId: 'conv_k2_att1', messages: [withAtt('How do I fix this?', [shot('A screenshot of a Python traceback: TypeError: unsupported operand type(s) for +: int and str, on line 12 of app.py.')])] }, { env: on });
+  ok('D.1 "How do I fix this?" with a screenshot attached: a=none, and no "not in the conversation" line', /;a=none;/.test(fixShot.mr ?? '') && !NOT_THERE.test(fixShot.system), `${fixShot.mr}`);
+  const fixBare = await turn({ sessionId: 'conv_k2_att0', messages: [U('How do I fix this?')] }, { env: on });
+  ok('  near-miss: the same words with nothing attached still diagnose (WHAT THEY POINT AT IS NOT IN THE CONVERSATION)', /;a=diagnose;/.test(fixBare.mr ?? '') && /WHAT THEY POINT AT IS NOT IN THE CONVERSATION/.test(fixBare.system), fixBare.mr);
+  const fixEmpty = await turn({ sessionId: 'conv_k2_att2', messages: [withAtt('How do I fix this?', [{ kind: 'image', name: 'x.png' }, { kind: 'video', name: 'clip.mp4' }])] }, { env: on });
+  ok('  near-miss: an attachment the route sanitises away (no reading, no picture; an unknown kind) is nothing on screen', /;a=diagnose;/.test(fixEmpty.mr ?? ''), fixEmpty.mr);
+  for (const [label, content, att] of [
+    ['a log pasted as a note, "Help me debug this error."', 'Help me debug this error.', note('Traceback (most recent call last): File app.py line 12 in main TypeError unsupported operand type for + int and str')],
+    ['a homework photo, "Solve this equation"', 'Solve this equation', shot('A photo of handwritten homework: 3x - 7 = 11.')],
+  ]) {
+    const r = await turn({ sessionId: 'conv_k2_att3', messages: [withAtt(content, [att])] }, { env: on });
+    ok(`  ${label}: a=none`, /;a=none;/.test(r.mr ?? '') && !NOT_THERE.test(r.system), r.mr);
+  }
+  const stuckShot = await turn({ sessionId: 'conv_k2_att4', messages: [withAtt("I'm stuck", [shot('A photo of an exercise: integrate x^2 e^x dx, with integration by parts started.')])] }, { env: on });
+  ok('D.1 "I\'m stuck" with a photo of the exercise: never "THE WORK IS NOT IN THE CONVERSATION"', stuckShot.status === 200 && !/THE WORK IS NOT IN THE CONVERSATION/.test(stuckShot.system), `${stuckShot.mr} | ${(/THEY ARE STUCK[^\n]*/.exec(stuckShot.system) ?? [''])[0]}`);
+  const stuckBare = await turn({ sessionId: 'conv_k2_att5', messages: [U("I'm stuck")] }, { env: on });
+  ok('  near-miss: "I\'m stuck" with nothing at all asks what they are working on (THE WORK IS NOT IN THE CONVERSATION)', /THE WORK IS NOT IN THE CONVERSATION/.test(stuckBare.system), stuckBare.mr);
+  const stuckAfter = await turn({ sessionId: 'conv_k2_att6', messages: [withAtt('Can you help me with this one?', [shot('A photo of an exercise: a train leaves at 3 pm at 60 km/h; when does a second train at 90 km/h catch it?')]), A('Sure. What have you tried so far?'), U("I'm stuck")] }, { env: on });
+  ok('  the photo on their message before, then Socria\'s question, then "I\'m stuck": not "THE WORK IS NOT IN THE CONVERSATION"', !/THE WORK IS NOT IN THE CONVERSATION/.test(stuckAfter.system), stuckAfter.mr);
+  const DOC = { id: 'd1', name: 'pilots.md', kind: 'doc' };
+  const netOff = await turn({ sessionId: 'conv_k2_net', messages: [U(Q)], docs: [DOC] }, { env: off });
+  const netDocs = await turn({ sessionId: 'conv_k2_net', messages: [U(Q)], docs: [DOC] }, { env: on });
+  ok('D.1 the networking question with documents sent: a=none, and max_tokens as with MR off', /;a=none;/.test(netDocs.mr ?? '') && capOf(netDocs.streamed) === capOf(netOff.streamed) && !/ONE THING THEY HAVE NOT SAID/.test(netDocs.system), `${netDocs.mr} ${capOf(netDocs.streamed)} vs ${capOf(netOff.streamed)}`);
+  const netNoteOff = await turn({ sessionId: 'conv_k2_net2', messages: [withAtt(Q, [note('Why our AI pilots stalled. Ticket triage stalled because the labels were inconsistent. Invoice matching stalled because the finance system could not export line items.')])] }, { env: off });
+  const netNote = await turn({ sessionId: 'conv_k2_net2', messages: [withAtt(Q, [note('Why our AI pilots stalled. Ticket triage stalled because the labels were inconsistent. Invoice matching stalled because the finance system could not export line items.')])] }, { env: on });
+  ok('  …and with a note about it attached to the message: a=none, max_tokens as with MR off', /;a=none;/.test(netNote.mr ?? '') && capOf(netNote.streamed) === capOf(netNoteOff.streamed), `${netNote.mr} ${capOf(netNote.streamed)} vs ${capOf(netNoteOff.streamed)}`);
+  const netBare = await turn({ sessionId: 'conv_k2_net3', messages: [U(Q)] }, { env: on });
+  ok('  near-miss: the networking question with nothing on screen still diagnoses, under a lower ceiling', /;a=diagnose;/.test(netBare.mr ?? '') && capOf(netBare.streamed) < capOf(netOff.streamed), `${netBare.mr} ${capOf(netBare.streamed)}`);
+  const pinShot = await turn({ sessionId: 'conv_k2_att7', messages: [withAtt('How do I fix this?', [shot('A screenshot of an error.')])] }, { env: pin10 });
+  const offShot = await turn({ sessionId: 'conv_k2_att7', messages: [withAtt('How do I fix this?', [shot('A screenshot of an error.')])] }, { env: off });
+  ok('  under the mr-2026.10.1 pin, an attachment changes nothing: a=none, the prompt and ceiling as with MR off', /;a=none;/.test(pinShot.mr ?? '') && promptOf(pinShot.streamed) === promptOf(offShot.streamed) && capOf(pinShot.streamed) === capOf(offShot.streamed), pinShot.mr);
+
+  // D.2 — their written instructions, as two booleans (N1)
+  const APPROACH = 'Substitution works by spotting a function and its derivative sitting together inside the integral. Here the inner function is x squared, and its derivative, 2x, sits right beside the exponential, so changing the variable turns the whole thing into the integral of e to a single variable, which you already know how to integrate.';
+  const STUCK_WORK = [U('I want to learn substitution: integrate 2x e^(x^2) dx'), A(APPROACH), U("I set u = x^2 but now I'm stuck on the next step")];
+  const REPLY_STUCK = 'Now that u = x^2, you have du = 2x dx, so the 2x dx in the integral is exactly du. What does the integral become in terms of u?';
+  const STYLE_Q = 'Always end every reply with one short question that checks my understanding.';
+  const askOff = await turn({ sessionId: 'conv_k2_sq', messages: STUCK_WORK, style: STYLE_Q }, { env: off, reply: REPLY_STUCK });
+  const ask = await turn({ sessionId: 'conv_k2_sq', messages: STUCK_WORK, style: STYLE_Q }, { env: on, reply: REPLY_STUCK });
+  ok('D.2 stuck with work + "Always end every reply with one short question…": still a next step, and ACS\'s q=1 stands', /;a=next_step;/.test(ask.mr ?? '') && qOf(ask.assist) === '1' && qOf(askOff.assist) === '1', `${ask.mr} | ${ask.assist}`);
+  ok('  the question they asked for ships, as with MR off', /What does the integral become in terms of u\?/.test(ask.received) && /What does the integral become in terms of u\?/.test(askOff.received), ask.received);
+  ok('  and the prompt does not say "no question back" or "QUESTIONS: none"', !/no question back/.test(ask.system) && !/QUESTIONS: none this turn/.test(ask.system) && /THEY ARE STUCK WITH WORK ON THE TABLE/.test(ask.system), afterMr(ask.system).slice(0, 600));
+  ok('  the trace records what took the "no question" back, content-free', /user_instruction:questionBudget\.style/.test(ask.mr ?? '') && !/understanding/.test(ask.mr ?? ''), ask.mr);
+  const noStyle = await turn({ sessionId: 'conv_k2_sq0', messages: STUCK_WORK }, { env: on, reply: REPLY_STUCK });
+  ok('  near-miss: without the instruction, q=0 and the closing question is taken out', qOf(noStyle.assist) === '0' && !/What does the integral become/.test(noStyle.received), `${noStyle.assist} ${noStyle.received}`);
+  for (const style of ["Don't end with a question.", 'Never quiz me, just explain.', 'Keep it casual, and keep answers short.']) {
+    const r = await turn({ sessionId: 'conv_k2_sq1', messages: STUCK_WORK, style }, { env: on, reply: REPLY_STUCK });
+    ok(`  near-miss: ${JSON.stringify(style)} asks for no closing question: q=0 as without it`, qOf(r.assist) === '0' && !/What does the integral become/.test(r.received), `${r.mr} | ${r.assist}`);
+  }
+  const WINDOWS = 'On Windows, open Settings, then System, then Storage, and turn on Storage Sense. It clears temporary files and old downloads automatically, and you can run it now from the same page.';
+  const REPLY_MAC = 'On a Mac, open Apple menu > System Settings > General > Storage and use the recommendations there. Does that match what you see?';
+  const MAC = [U('How do I free up disk space?'), A(WINDOWS), U('No, I meant on my Mac')];
+  const macOff = await turn({ sessionId: 'conv_k2_sqm', messages: MAC, style: STYLE_Q }, { env: off, reply: REPLY_MAC });
+  const mac = await turn({ sessionId: 'conv_k2_sqm', messages: MAC, style: STYLE_Q }, { env: on, reply: REPLY_MAC });
+  ok('  a correction + the same instruction: still the correction line, ACS\'s q stands, and the closing question ships as with MR off', mac.system.includes('THEY CORRECTED YOUR READING') && qOf(mac.assist) === qOf(macOff.assist) && /Does that match what you see\?/.test(mac.received) === /Does that match what you see\?/.test(macOff.received), `${mac.mr} | ${mac.assist} | ${mac.received.slice(-120)}`);
+  const casual = await turn({ sessionId: 'conv_k2_sq2', messages: STUCK_WORK, style: 'Keep it casual, not formal, and always end with a quick question to check I follow.' }, { env: on, reply: REPLY_STUCK });
+  ok('  a refusal elsewhere in the sentence ("not formal") does not cancel "always end with a quick question"', qOf(casual.assist) === '1', `${casual.mr} | ${casual.assist}`);
+  const askPin = await turn({ sessionId: 'conv_k2_sq3', messages: STUCK_WORK, style: STYLE_Q }, { env: pin10, reply: REPLY_STUCK });
+  ok('  under the mr-2026.10.1 pin: a=none, prompt and ceiling as with MR off', /;a=none;/.test(askPin.mr ?? '') && promptOf(askPin.streamed) === promptOf(askOff.streamed) && capOf(askPin.streamed) === capOf(askOff.streamed), askPin.mr);
+  const STYLE_LONG = 'I like thorough, detailed answers with examples.';
+  const longOff = await turn({ sessionId: 'conv_k2_sl', messages: [U(Q)], style: STYLE_LONG }, { env: off });
+  const long = await turn({ sessionId: 'conv_k2_sl', messages: [U(Q)], style: STYLE_LONG }, { env: on });
+  ok('D.2 the networking question + "I like thorough, detailed answers…": max_tokens as with MR off, and no SHORT line', capOf(long.streamed) === capOf(longOff.streamed) && !/^SHORT: a few sentences/m.test(long.system), `${long.mr} ${capOf(long.streamed)} vs ${capOf(longOff.streamed)}`);
+  ok('  …and ACS\'s question budget is untouched (never more than with MR off)', Number(qOf(long.assist)) <= Number(qOf(longOff.assist)), `${long.assist} | ${longOff.assist}`);
+  const short = await turn({ sessionId: 'conv_k2_sl2', messages: [U(Q)], style: 'Keep answers short and plain.' }, { env: on });
+  ok('  near-miss: "Keep answers short and plain." asks for no length: MR\'s ceiling stays', capOf(short.streamed) < capOf(longOff.streamed), `${short.mr} ${capOf(short.streamed)}`);
+  const notLong = await turn({ sessionId: 'conv_k2_sl3', messages: [U(Q)], style: "I don't need long explanations." }, { env: on });
+  ok('  near-miss: "I don\'t need long explanations." is a refusal: MR\'s ceiling stays', capOf(notLong.streamed) < capOf(longOff.streamed), `${notLong.mr} ${capOf(notLong.streamed)}`);
+  // (residual N1: a refusal said as a dislike or a wish, more than two words before what it refuses)
+  for (const style of ["I don't want you to ask me questions.", 'I hate it when you ask me questions, just explain.']) {
+    const r = await turn({ sessionId: 'conv_k2_sq4', messages: STUCK_WORK, style }, { env: on, reply: REPLY_STUCK });
+    ok(`  near-miss: ${JSON.stringify(style)} asks for no question: q=0 as without it, and the closing question is taken out`, qOf(r.assist) === '0' && !/questionBudget\.style/.test(r.mr ?? '') && !/What does the integral become/.test(r.received), `${r.mr} | ${r.assist}`);
+  }
+  const noHesitate = await turn({ sessionId: 'conv_k2_sq5', messages: STUCK_WORK, style: "Don't hesitate to ask me questions to check I follow." }, { env: on, reply: REPLY_STUCK });
+  ok('  "Don\'t hesitate to ask me questions to check I follow." still asks for them: q=1 as with MR off', qOf(noHesitate.assist) === '1' && /user_instruction:questionBudget\.style/.test(noHesitate.mr ?? ''), `${noHesitate.mr} | ${noHesitate.assist}`);
+  for (const style of ['I hate long answers.', "I can't stand long answers."]) {
+    const r = await turn({ sessionId: 'conv_k2_sl4', messages: [U(Q)], style }, { env: on });
+    ok(`  near-miss: ${JSON.stringify(style)} asks for no length: MR's ceiling stays`, capOf(r.streamed) < capOf(longOff.streamed) && !/user_instruction:verbosity/.test(r.mr ?? ''), `${r.mr} ${capOf(r.streamed)}`);
+  }
+  // (residual N4: code asked for in a language, after background said twice, read as information by the runtime)
+  const PB1 = 'Database queries slow down when the table has no index on the columns you filter by, so the engine has to read every row to find the matches.';
+  const PB2 = 'As the table grows, that full scan grows with it, which is why a query that was instant last year now takes seconds.';
+  const PG = [U('Why are my Postgres queries getting slow?'), A(`${PB1} ${PB2} Most of the rest is tuning.`), U('What about my orders table?'), A(`${PB1} ${PB2} For orders, the usual filter is customer_id plus a date range.`), U('ok, how do I do that in Python with psycopg?')];
+  const pgOff = await turn({ sessionId: 'conv_k2_pg', messages: PG }, { env: off });
+  const pgOn = await turn({ sessionId: 'conv_k2_pg', messages: PG }, { env: on });
+  ok('D.4 "ok, how do I do that in Python with psycopg?" after background said twice: max_tokens as with MR off, and no SHORT line', capOf(pgOn.streamed) === capOf(pgOff.streamed) && !/^SHORT: a few sentences/m.test(pgOn.system), `${pgOn.mr} ${capOf(pgOn.streamed)} vs ${capOf(pgOff.streamed)}`);
+
+  // D.3 — nothing placed after MR's line plans what its line rules out (N2, N3)
+  const SHAPE_LINES = /THE SHAPE OF THIS REPLY|THE FORM THAT FITS|INLINE, IF IT HELPS|HOW TO MAKE IT UNDERSTOOD|Work one complete example|use it unless|Before you stop/;
+  const planned = (sys) => sys.split('\n').filter((l) => SHAPE_LINES.test(l));
+  for (const words of ['How do I fix this?', 'Solve this equation']) {
+    const r = await turn({ sessionId: 'conv_k2_ref', messages: [U(words)] }, { env: on });
+    const o = await turn({ sessionId: 'conv_k2_ref', messages: [U(words)] }, { env: off });
+    ok(`D.3 ${JSON.stringify(words)} with nothing on screen: the missing-referent line, and no shape, element or explanation move after it`, /;a=diagnose;/.test(r.mr ?? '') && /WHAT THEY POINT AT IS NOT IN THE CONVERSATION/.test(r.system) && !SHAPE_LINES.test(afterMr(r.system)), afterMr(r.system).slice(0, 900));
+    ok(`  …and its ceiling is never above MR off's`, capOf(r.streamed) <= capOf(o.streamed), `${capOf(r.streamed)} vs ${capOf(o.streamed)}`);
+    ok(`  (MR off plans a shape, an element or an explanation move on it: the test tells the two apart)`, planned(o.system).length > 0, o.system.slice(-900));
+    const p = await turn({ sessionId: 'conv_k2_ref', messages: [U(words)] }, { env: pin10 });
+    ok(`  under the mr-2026.10.1 pin: a=none, and the prompt exactly as with MR off`, /;a=none;/.test(p.mr ?? '') && promptOf(p.streamed) === promptOf(o.streamed) && capOf(p.streamed) === capOf(o.streamed), p.mr);
+  }
+  const unseen = await turn({ sessionId: 'conv_k2_unseen', messages: [U("I'm stuck")] }, { env: on });
+  ok('D.3 "I\'m stuck" with nothing before it: the stuck line, and no shape, element or explanation move after it', /THE WORK IS NOT IN THE CONVERSATION/.test(unseen.system) && !SHAPE_LINES.test(afterMr(unseen.system)), afterMr(unseen.system).slice(0, 900));
+  const nsOff = await turn({ sessionId: 'conv_k2_ns', messages: STUCK_WORK }, { env: off });
+  const ns = await turn({ sessionId: 'conv_k2_ns', messages: STUCK_WORK }, { env: on });
+  ok('D.3 stuck with work: the next-step line, and no transfer line, no worked example, no second "smaller steps" after it', /;a=next_step;/.test(ns.mr ?? '') && /THEY ARE STUCK WITH WORK ON THE TABLE/.test(ns.system) && !/Before you stop|Work one complete example|Smaller steps than usual|End with one problem like it/.test(afterMr(ns.system)), afterMr(ns.system).slice(0, 1400));
+  ok('  (MR off plans the transfer line on the same turn: the test tells the two apart)', /Before you stop/.test(nsOff.system), nsOff.system.slice(-1200));
+  ok('  the explanation still names the kind of problem and gives only the next step', /give only the next single step/.test(afterMr(ns.system)) || /Give only the next step/.test(afterMr(ns.system)), afterMr(ns.system).slice(0, 1400));
+  const ns10 = await turn({ sessionId: 'conv_k2_ns', messages: STUCK_WORK }, { env: pin10 });
+  ok('  under the mr-2026.10.1 pin: a=none, the prompt exactly as with MR off', /;a=none;/.test(ns10.mr ?? '') && promptOf(ns10.streamed) === promptOf(nsOff.streamed), ns10.mr);
+  const sky = await turn({ sessionId: 'conv_k2_sky', messages: [U('Why is the sky blue?')] }, { env: on });
+  const skyOff = await turn({ sessionId: 'conv_k2_sky', messages: [U('Why is the sky blue?')] }, { env: off });
+  ok('  near-miss: a clear question plans exactly as with MR off', promptOf(sky.streamed) === promptOf(skyOff.streamed) && capOf(sky.streamed) === capOf(skyOff.streamed), sky.mr);
+  const shadowRef = await turn({ sessionId: 'conv_k2_ref', messages: [U('How do I fix this?')] }, { env: { LOGOS_MR: 'shadow' } });
+  const offRef = await turn({ sessionId: 'conv_k2_ref', messages: [U('How do I fix this?')] }, { env: off });
+  ok('  near-miss: shadow decides the diagnose and plans exactly as with MR off', /;a=diagnose;/.test(shadowRef.mr ?? '') && promptOf(shadowRef.streamed) === promptOf(offRef.streamed) && capOf(shadowRef.streamed) === capOf(offRef.streamed), shadowRef.mr);
+  for (const arm of ['baseline', 'prompt_reflection', 'state_only']) {
+    const a = await turn({ sessionId: 'conv_k2_ref', messages: [U('How do I fix this?')] }, { env: { LOGOS_MR: 'on', LOGOS_MR_ARM: arm } });
+    ok(`  near-miss: the ${arm} arm plans the shape and the explanation exactly as MR off does (only the full arm reads MR's move)`, J(planned(a.system)) === J(planned(offRef.system)) && capOf(a.streamed) === capOf(offRef.streamed), `${a.mr} ${J(planned(a.system))}`);
+  }
+
+  // D.4 — a ceiling of MR's own does not cap the code they asked for (N4). The review's transcript first (the
+  // Postgres one: the readers no longer read its second question as asking for the same thing again, so nothing
+  // acts on it), then one where repeated_background does act and the backstop takes its ceiling out.
+  const B1 = 'Database queries slow down when the table has no index on the columns you filter by, so the engine has to read every row to find the matches.';
+  const B2 = 'As the table grows, that full scan grows with it, which is why a query that was instant last year now takes seconds.';
+  const BG = [U('Why are my Postgres queries getting slow?'), A(`${B1} ${B2} Most of the rest is tuning.`), U('What about my orders table?'), A(`${B1} ${B2} For orders, the usual filter is customer_id plus a date range.`)];
+  const codeOff = await turn({ sessionId: 'conv_k2_bg', messages: [...BG, U('Write the Python script that adds the index and benchmarks the query before and after.')] }, { env: off });
+  const code = await turn({ sessionId: 'conv_k2_bg', messages: [...BG, U('Write the Python script that adds the index and benchmarks the query before and after.')] }, { env: on });
+  ok('D.4 the script they asked for after two repeated backgrounds: max_tokens as with MR off, and no SHORT line', capOf(code.streamed) === capOf(codeOff.streamed) && !/^SHORT: a few sentences/m.test(code.system), `${code.mr} ${capOf(code.streamed)} vs ${capOf(codeOff.streamed)}`);
+  const S1 = 'Most enterprise AI projects stall because the training data sits scattered across separate systems that were never designed to share records.';
+  const S2 = 'Integrating the model with existing workflows and approval chains usually takes far longer than building the model itself, so budgets run dry first.';
+  const BG2 = [U('Why do AI projects fail?'), A(`${S1} ${S2} Most of the rest is change management.`), U('What about our support tickets?'), A(`${S1} ${S2} For tickets, start by labelling a few hundred past cases.`)];
+  const labelOff = await turn({ sessionId: 'conv_k2_bg2', messages: [...BG2, U('Write the Python script that labels the tickets.')] }, { env: off });
+  const label = await turn({ sessionId: 'conv_k2_bg2', messages: [...BG2, U('Write the Python script that labels the tickets.')] }, { env: on });
+  ok('  repeated background, then "Write the Python script…": the rule acts, its ceiling is taken out (their request), max_tokens as with MR off', /;t=ifr\.observed\.repeated_background;/.test(label.mr ?? '') && /con=[^;]*user_instruction:verbosity/.test(label.mr ?? '') && capOf(label.streamed) === capOf(labelOff.streamed) && !/^SHORT: a few sentences/m.test(label.system), `${label.mr} ${capOf(label.streamed)} vs ${capOf(labelOff.streamed)}`);
+  const howLongOff = await turn({ sessionId: 'conv_k2_bg3', messages: [...BG2, U('how long would that take?')] }, { env: off });
+  const howLong = await turn({ sessionId: 'conv_k2_bg3', messages: [...BG2, U('how long would that take?')] }, { env: on });
+  ok('  near-miss: a short follow-up after the same two replies keeps the repeated-background ceiling', /;t=ifr\.observed\.repeated_background;/.test(howLong.mr ?? '') && capOf(howLong.streamed) < capOf(howLongOff.streamed), `${howLong.mr} ${capOf(howLong.streamed)} vs ${capOf(howLongOff.streamed)}`);
+
+  // C.14 — a measure that throws costs the measure, never the log line or the row (F50)
+  db.tables.mr_ledger = [];
+  const fault = await turn({ sessionId: 'conv_k2_fault', messages: [U(Q)] }, { env: { ...on, MR_TEST_FAULT: 'measure' }, reply: 'In short, AI does well on narrow problems with clear goals. Do you mean in your own work, or AI in general?' });
+  ok('C.14 MR_TEST_FAULT=measure: the turn still answers and MR still regulates (the diagnose is traced)', fault.status === 200 && fault.received.trim().length > 0 && /;a=diagnose;/.test(fault.mr ?? ''), fault.mr);
+  ok('  the [mr] line is still logged, without ";rm="', fault.log.some((l) => l.startsWith('[mr] ')) && fault.log.filter((l) => l.startsWith('[mr] ')).every((l) => !/;rm=/.test(l)), fault.log.join(' | '));
+  await new Promise((done) => setTimeout(done, 60));
+  const row = ledger().find((x) => x.conversation_id === 'conv_k2_fault' && x.kind === 'exposure');
+  ok('  the exposure row is still written, without the reply measures', !!row && !('reply' in row.record) && row.record.arm === 'full', J(row?.record));
+  db.tables.mr_ledger = [];
+  const fine = await turn({ sessionId: 'conv_k2_fault2', messages: [U(Q)] }, { env: on, reply: 'In short, AI does well on narrow problems with clear goals. Do you mean in your own work, or AI in general?' });
+  await new Promise((done) => setTimeout(done, 60));
+  const fineRow = ledger().find((x) => x.conversation_id === 'conv_k2_fault2' && x.kind === 'exposure');
+  ok('  near-miss: without the fault the same turn logs ";rm=" and the row carries the measures', fine.log.some((l) => /;rm=w\d+/.test(l)) && fineRow?.record.reply?.mv === 1, `${fine.log.join(' | ')} ${J(fineRow?.record)}`);
+  db.tables.mr_ledger = [];
 }
 
 console.log('\n=== MR\'s own time ===');

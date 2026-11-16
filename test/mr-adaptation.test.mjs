@@ -22,6 +22,7 @@ import {
   MAX_REVOKED_STANDING,
   MAX_FORGOTTEN,
   FORGOTTEN_TTL_MS,
+  METRIC_DIRECTION,
 } from './.tmp/mr-under-test.mjs';
 
 let pass = 0, fail = 0;
@@ -265,6 +266,33 @@ rejects('the primary measured on too few', report({}, { friction: ci(0.2, 0.03, 
 rejects('satisfaction as the primary, however large', report({ primary: 'satisfaction' }, { satisfaction: ci(0.99, 0.001) }, { satisfaction: ci(0.1, 0.001) }), 'primary_is_satisfaction');
 for (const p of ['user_satisfaction', 'csat', 'thumbs_up_rate', 'helpfulness_rating', 'nps']) rejects(`"${p}" as the primary`, report({ primary: p }), 'primary_is_satisfaction');
 rejects('a primary with no known direction', report({ primary: 'engagement_minutes' }, { engagement_minutes: ci(9, 1) }, { engagement_minutes: ci(5, 1) }), 'primary_direction_unknown');
+// an engagement proxy as the primary is refused whatever its direction: more words, a question answered and a longer
+// session are what a system tuned for engagement would raise (mr-2026.11.1's length and question measures included)
+rejects('words per reply as the primary', report({ primary: 'words_per_reply' }, { words_per_reply: ci(80, 5) }, { words_per_reply: ci(200, 5) }), 'primary_is_engagement_proxy');
+rejects('one question when wanted as the primary', report({ primary: 'one_question_when_wanted' }, { one_question_when_wanted: ci(0.9, 0.02) }, { one_question_when_wanted: ci(0.4, 0.02) }), 'primary_is_engagement_proxy');
+{
+  const v = promotionVerdict(report({ primary: 'engagement_minutes' }, { engagement_minutes: ci(9, 1) }, { engagement_minutes: ci(5, 1) }));
+  ok('engagement minutes: no known direction, and an engagement proxy', v.promote === false && v.reasons.includes('primary_direction_unknown') && v.reasons.includes('primary_is_engagement_proxy'), JSON.stringify(v));
+}
+ok('friction as the primary is not a proxy', !promotionVerdict(report()).reasons.includes('primary_is_engagement_proxy'));
+// Review fix C.6 / D.16 (F42, N24): the guard changes a verdict. A raw question count has a known direction
+// (METRIC_DIRECTION: lower), so nothing else in the chain refuses it; the same report, the same numbers, with
+// unwanted_questions (the questions they did not need) as the primary promotes, and with questions_asked does not.
+{
+  const qs = { questions_asked: ci(0.4, 0.05), unwanted_questions: ci(0.4, 0.05) };
+  const base = { questions_asked: ci(1.2, 0.05), unwanted_questions: ci(1.2, 0.05) };
+  const wanted = promotionVerdict(report({ primary: 'unwanted_questions' }, qs, base));
+  ok('the same numbers with unwanted_questions as the primary → promote:true (all criteria met)', wanted.promote === true && eq(wanted.reasons, ['all_criteria_met']), JSON.stringify(wanted));
+  const asked = promotionVerdict(report({ primary: 'questions_asked' }, qs, base));
+  ok('…with questions_asked as the primary → promote:false, and only for being an engagement proxy (its direction is known)', asked.promote === false && eq(asked.reasons, ['primary_is_engagement_proxy']) && !asked.reasons.includes('primary_direction_unknown'), JSON.stringify(asked));
+  for (const p of ['question_count', 'questions_total'])
+    rejects(`"${p}" as the primary`, report({ primary: p }, { [p]: ci(0.4, 0.05) }, { [p]: ci(1.2, 0.05) }), 'primary_is_engagement_proxy');
+  // near-misses the wider pattern must leave alone: retention is the learning outcome, not how long anybody stayed
+  const ret = promotionVerdict(report({ primary: 'retention' }, { retention: ci(0.7, 0.03) }, { retention: ci(0.5, 0.03) }));
+  ok('near-miss: retention (the learning outcome) is not a proxy, and promotes on its own merits', ret.promote === true && !ret.reasons.includes('primary_is_engagement_proxy'), JSON.stringify(ret));
+  ok('near-miss: unwanted_questions is not a proxy', !wanted.reasons.includes('primary_is_engagement_proxy'));
+  ok('questions_asked is still a known-direction friction measure (reported, never the primary)', METRIC_DIRECTION.questions_asked === 'lower');
+}
 rejects('a primary interval that includes no effect', report({}, { friction: ci(0.33, 0.03) }), 'primary_ci_includes_no_effect');
 rejects('a primary that got worse', report({}, { friction: ci(0.5, 0.03) }), 'primary_not_better');
 rejects('a primary not measured', report({ primary: 'repeat_requests' }), 'primary_not_measured');

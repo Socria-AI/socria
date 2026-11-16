@@ -112,6 +112,31 @@ export interface StrategyParams {
   latencyBudgetMs: number;
   /** model-assisted deliberations allowed per conversation */
   deliberationsPerConversation: number;
+  // ── precision (optional: absent in every version before mr-2026.11.1, which reads as off)
+  /**
+   * The readers, rules and lines mr-2026.11.1 adds: stuck, corrected,
+   * already known, already said, the same question again, a re-ask after a
+   * long reply, repeated background, fixes that keep failing, an open request
+   * and a new topic. Absent or false, MR reads and does exactly what the
+   * version before it did — pinning that version is a full rollback.
+   */
+  precision?: boolean;
+  /** an open request of the vague-outcome kind: the reply ceiling, in tokens (room for two or three sentences and one question, twice over) */
+  openRequestCeiling?: number;
+  /** an open request of the vague-outcome kind is at most this many words (people who give context write more) */
+  openRequestWords?: number;
+  /** a first message that points at something not shown is at most this many words */
+  referentWords?: number;
+  /** "I'm stuck" in a message of this many words or more has the task described in it */
+  stuckShownWords?: number;
+  /** a reply of this many words or more is long enough that a re-ask after it says the point was lost */
+  longReplyWords?: number;
+  /** distinct sentences repeated from recent replies before the background counts as repeated */
+  repeatedSentences?: number;
+  /** two sentences (of 8 content words or more) are the same sentence at this Jaccard similarity or above */
+  echoSimilarity?: number;
+  /** two questions (of 3 content words or more) are the same question at this Jaccard similarity or above */
+  questionEchoSimilarity?: number;
 }
 
 export const STRATEGIES: Readonly<Record<string, Readonly<StrategyParams>>> = Object.freeze({
@@ -134,6 +159,36 @@ export const STRATEGIES: Readonly<Record<string, Readonly<StrategyParams>>> = Ob
     window: 24,
     latencyBudgetMs: 40,
     deliberationsPerConversation: 2,
+  }),
+  // mr-2026.10.1 unchanged, plus the precision readers and rules (docs/MR.md §7).
+  'mr-2026.11.1': Object.freeze({
+    unproductiveStreak: 2,
+    confusionRepeats: 2,
+    failedAttempts: 2,
+    momentaryTurns: 2,
+    observedTurns: 3,
+    workedExampleTurns: 1,
+    minDwellTurns: 2,
+    maxChanges: 3,
+    oscillationWindow: 6,
+    maxActiveShare: 0.75,
+    excessiveWindow: 8,
+    freezeTurns: 3,
+    shorterCeiling: 360,
+    verboseRatio: 12,
+    verboseWords: 260,
+    window: 24,
+    latencyBudgetMs: 40,
+    deliberationsPerConversation: 2,
+    precision: true,
+    openRequestCeiling: 360,
+    openRequestWords: 12,
+    referentWords: 10,
+    stuckShownWords: 12,
+    longReplyWords: 240,
+    repeatedSentences: 2,
+    echoSimilarity: 0.8,
+    questionEchoSimilarity: 0.6,
   }),
 });
 

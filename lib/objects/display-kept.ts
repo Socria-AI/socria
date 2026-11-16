@@ -21,6 +21,7 @@
 import { register, type Part, type ViewDecl } from './core';
 import { cleanText, displayKind, headOps, op, registerDisplay, type DisplayHead, type DisplayMeta } from './display-base';
 import { inlineFrom, inlineNow, inlinePlainText, sanitizeInlineSpec, sanitizeInlineStateOne, type InlineSpec, type InlineState } from '../inline-ui';
+import { applyEdits, changeSaid, readEdit, sanitizeEdits, specChanges } from '../artifact-edit';
 
 export interface KeptFrom {
   /** the line of thinking it was kept from */
@@ -84,28 +85,90 @@ type S = KeptState;
 export const KEPT_OPS = {
   ...headOps<S>(views, sanitizeKept),
   // what was done with it in Artifacts: the element's own state, as the conversation keeps it
-  state: op<S>(
+  // using it (a slider moved, a part opened) sets the controls whole: a run of it is one step (core.ts coalesce)
+  state: {
+    ...op<S>(
+      'Change',
+      (_s, a) => {
+        try {
+          return sanitizeInlineStateOne(JSON.parse(String(a.state ?? ''))) || a.state === '{}' ? null : 'Nothing to keep.';
+        } catch {
+          return 'Nothing to keep.';
+        }
+      },
+      (s, a) => {
+        let ui: InlineState | null = null;
+        try {
+          ui = sanitizeInlineStateOne(JSON.parse(String(a.state ?? '')));
+        } catch {
+          ui = null;
+        }
+        const { ui: _old, ...rest } = s;
+        return sanitizeKept(ui ? { ...rest, ui } : rest) ?? s;
+      },
+      () => 'changed it'
+    ),
+    coalesce: true,
+  },
+  // CHANGED, NOT REMADE (lib/artifact-edit.ts): edits at paths inside the element — a curve added, a node renamed,
+  // the window moved — checked whole by the element's own validator. Proposed by the person's words, the editor's
+  // controls or Socria's reply; applied the same way, as a step that Undo takes back.
+  edit: op<S>(
     'Change',
-    (_s, a) => {
-      try {
-        return sanitizeInlineStateOne(JSON.parse(String(a.state ?? ''))) || a.state === '{}' ? null : 'Nothing to keep.';
-      } catch {
-        return 'Nothing to keep.';
-      }
+    (s, a) => {
+      const ops = sanitizeEdits(a.ops);
+      if (!ops) return 'Those changes were not well formed.';
+      const r = applyEdits(s.spec, ops);
+      return r.ok ? null : r.why;
     },
     (s, a) => {
-      let ui: InlineState | null = null;
-      try {
-        ui = sanitizeInlineStateOne(JSON.parse(String(a.state ?? '')));
-      } catch {
-        ui = null;
-      }
-      const { ui: _old, ...rest } = s;
-      return sanitizeKept(ui ? { ...rest, ui } : rest) ?? s;
+      const ops = sanitizeEdits(a.ops);
+      const r = ops ? applyEdits(s.spec, ops) : null;
+      return r?.ok ? sanitizeKept({ ...s, spec: r.spec, title: retitled(s, r.spec) }) ?? s : s;
     },
-    () => 'changed it'
+    (a) => cleanText(a.said, 240) || 'changed it'
+  ),
+  // the editor's whole new version, when it is easier to send than the edits that make it: the same checks
+  spec: op<S>(
+    'Edit',
+    (s, a) => {
+      let next: InlineSpec | null = null;
+      try {
+        next = sanitizeInlineSpec(JSON.parse(String(a.spec ?? '')));
+      } catch {
+        next = null;
+      }
+      if (!next) return 'That would not be a valid element — nothing was changed.';
+      if (next.type !== s.spec.type) return 'An edit keeps what kind of thing it is.';
+      return specChanges(s.spec, next).length ? null : 'That changes nothing.';
+    },
+    (s, a) => {
+      let next: InlineSpec | null = null;
+      try {
+        next = sanitizeInlineSpec(JSON.parse(String(a.spec ?? '')));
+      } catch {
+        next = null;
+      }
+      return next && next.type === s.spec.type ? sanitizeKept({ ...s, spec: next, title: retitled(s, next) }) ?? s : s;
+    },
+    (a) => cleanText(a.said, 240) || 'edited it'
   ),
 };
+
+/** A title given in the element follows it; a name the person gave the kept element stays theirs. */
+function retitled(s: KeptState, next: InlineSpec): string {
+  const before = 'title' in s.spec && typeof s.spec.title === 'string' ? s.spec.title : '';
+  const after = 'title' in next && typeof next.title === 'string' ? next.title : '';
+  return before !== after && (s.title === before || s.title === keptName(s.spec)) ? cleanText(after, 80) || keptName(next) : s.title;
+}
+
+/** An edit the words plainly ask for, on this element (lib/artifact-edit.ts readEdit), with what it would change said. */
+export function readKeptEdit(text: string, s: KeptState): { op: string; args: Record<string, string | number> } | null {
+  const ops = readEdit(text, s.spec);
+  if (!ops) return null;
+  const r = applyEdits(s.spec, ops);
+  return r.ok ? { op: 'edit', args: { ops: JSON.stringify(ops), said: changeSaid(r.changes) } } : null;
+}
 
 /** The kept element in words: what the reply model reads, what is copied. */
 export function keptText(s: KeptState): string {
@@ -118,7 +181,10 @@ export const KEPT = displayKind<S>({
   label: 'Kept',
   sanitize: sanitizeKept,
   ops: KEPT_OPS,
-  readOp: () => null,
+  // "call it …", "remove …", "X causes Y" are also things people say about other things: heard only while the
+  // element is in hand (open in Artifacts, or in its editor, which reads its own box directly)
+  readOp: (text, s) => readKeptEdit(text, s),
+  readOpScope: 'in-hand',
   facts: (s) => [
     `${s.title}: ${inlineFrom(s.spec)} the person kept from the conversation${s.from.said ? ` (from the reply that began “${s.from.said}”)` : ''}, kept as they left it.`,
     keptText(s),
@@ -126,9 +192,9 @@ export const KEPT = displayKind<S>({
   text: (s) => keptText(s),
   parts: (): Part[] => [],
   views,
-  // what changes is what was done with it: small, and kept a few steps back
-  maxStates: 8,
-  argLimits: { count: 4, length: 1600 },
+  // what was done with it, and every change to it — enough versions to go back through
+  maxStates: 30,
+  argLimits: { count: 4, length: 6000 },
   size: (_s, mode) => (mode === 'card' ? { w: 300, h: 170 } : mode === 'trail' ? { w: 200, h: 110 } : { w: 720, h: 640 }),
   shape: (s) => `${keptName(s.spec)} · kept from the conversation`,
 });

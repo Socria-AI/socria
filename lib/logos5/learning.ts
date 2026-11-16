@@ -149,3 +149,13 @@ export function clearLedger(): void {
     // nothing kept, nothing to clear
   }
 }
+
+/**
+ * Change the ledger through one function (lib/quiz/mastery.ts: what a quiz answer shows): read, changed, written
+ * back, in this browser only — the same store, gates and Forget as every other note in it.
+ */
+export function updateLedger(change: (ledger: LedgerEntry[]) => LedgerEntry[], now: number = Date.now()): LedgerEntry[] {
+  const next = change(readLedger(now));
+  writeLedger(next);
+  return next;
+}

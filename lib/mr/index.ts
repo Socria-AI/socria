@@ -12,7 +12,9 @@
 //                                 prompt lines
 //   MEASURE                       afterReply (below), on the reply actually
 //                                 sent; the outcome of this turn's decision is
-//                                 read next turn, from their reply
+//                                 read next turn, from their reply. The reply's
+//                                 shape (measureReply) is recorded in every
+//                                 arm and never read back by regulation
 //   LEARN                         nothing automatic: the ledger feeds offline
 //                                 evaluation (evals/mr) and a human promotion
 //                                 decision (adaptation.ts)
@@ -37,17 +39,19 @@
 
 import { planTurn } from '../accuracy/accuracy';
 import { interrogatives, questionLoad, sentencesOf } from '../core4/questions';
+import { speech } from '../core4/signals';
 import { looksMathematical } from '../runtime/state';
 import { paramsFor, policyPinInvalid, policyVersion, STRATEGIES } from './config';
 import { execute } from './execute';
 import { REFLECTION_BLOCK, stateBlock } from './experiment';
-import { questionsAsContent, writingAsked, writingForOthers, type TurnView } from './ifr';
+import { IFR_READ_CHARS, questionsAsContent, replyEchoes, writingAsked, writingForOthers, type TurnView } from './ifr';
 import { checkLatency, unsupportedClaim } from './integrity';
-import { questionsPutTo } from './outcome';
+import { putToThem, questionsPutTo, replyShape, wordCount } from './outcome';
 import { noneDecision } from './policy';
 import { emptyState, foldConversation } from './state';
 import type { AssistDecision } from '../cognition/assist';
-import type { GateControls, IntegrityFinding, MRDecision, MRState, MRTurnInput, MRTurnResult, TranscriptMessage } from './types';
+import { MEASURE_VERSION } from './types';
+import type { GateControls, IntegrityFinding, MRDecision, MRState, MRTurnInput, MRTurnResult, Observation, ReplyMeasures, TranscriptMessage } from './types';
 
 export interface MRRegulation extends MRTurnResult {
   /** a reason for the deliberative loop to look at this turn, or null */
@@ -56,7 +60,10 @@ export interface MRRegulation extends MRTurnResult {
   fresh: MRDecision[];
   /** what reached the reply: false in shadow, and for everything but the decision in a non-full arm */
   enforced: boolean;
-  /** questions are the content they asked for this turn (lib/mr/ifr.ts questionsAsContent, writingForOthers): not counted as put to them */
+  /**
+   * Questions are the content they asked for this turn (lib/mr/ifr.ts questionsAsContent, writingForOthers): not
+   * counted as put to them. Read in every arm and in shadow (contentTurnOf), so reply.content is one yardstick.
+   */
   contentTurn?: boolean;
   /** the folded turns (in memory only — they hold text, and are never logged or stored) */
   turns: TurnView[];
@@ -109,7 +116,7 @@ export function traceOf(r: Pick<MRRegulation, 'condition' | 'decision' | 'enforc
     c.scaffolding ? `sc:${c.scaffolding}` : '',
     c.simplify ? 'simple' : '',
     c.verbosity ? `v${c.verbosity.ceilingTokens}` : '',
-    c.verification ? 'verify' : '',
+    c.verification ? (c.verification === 'suggest' ? 'check' : 'verify') : '',
     c.answerFirst ? 'first' : '',
     c.noRevealAnswers ? 'noreveal' : '',
   ].filter(Boolean);
@@ -119,6 +126,8 @@ export function traceOf(r: Pick<MRRegulation, 'condition' | 'decision' | 'enforc
     `arm=${r.condition.arm}`,
     `ifr=${r.condition.ifr ? 1 : 0}`,
     `src=${r.condition.source}`,
+    // a deployment's rollback pin ran over an experiment's newer registered policy (regulateTurn)
+    ...(r.state.uncertainty.includes(PIN_OVER_EXPERIMENT) ? [PIN_OVER_EXPERIMENT] : []),
     `enf=${r.enforced ? 1 : 0}`,
     // the reply filters armed: h = every question out (their "stop asking"), k = check-ins out anywhere, c = unsupported claims out
     ...(r.gate.hardNoQuestions || r.gate.dropUnsupportedClaims || r.gate.dropCheckIns
@@ -141,23 +150,113 @@ export function traceOf(r: Pick<MRRegulation, 'condition' | 'decision' | 'enforc
     .slice(0, 400);
 }
 
+/** Their words at the newest turn, as IFR confirmed them (the explicit.* codes the fold kept). */
+function saidAt(state: MRState): Set<Observation['code']> {
+  return new Set(state.observations.filter((o) => o.turn === state.turn && o.code.startsWith('explicit.')).map((o) => o.code));
+}
+
+/** contentTurnOf, with what it rests on: the earlier messages (newest first) and whether the writing is for somebody else. */
+function contentOf(turns: readonly TurnView[], said: ReadonlySet<string>): { previous: string[]; forOthers: boolean; contentTurn: boolean } {
+  const newest = turns[turns.length - 1];
+  // the earlier messages, newest first, for a revision of a draft ("make it warmer")
+  const previous = turns.slice(Math.max(0, turns.length - 4), -1).map((x) => x.text).reverse();
+  const forOthers = !!newest && writingForOthers(newest.text, previous);
+  // questions are what they asked for (a list, a draft to somebody): not questions put to them
+  const contentTurn = !!newest && (forOthers || (questionsAsContent(newest.text) && !said.has('explicit.wants_questions') && !said.has('explicit.quiz')));
+  return { previous, forOthers, contentTurn };
+}
+
+/**
+ * Their newest message asks for questions as content (a list for an interview,
+ * questions to ask a doctor) or for writing addressed to somebody else (a
+ * draft to a friend): the questions in the reply are not put to them. Pure, and
+ * the same in every arm and in shadow: the full arm's precedence reads it
+ * (execute questionsAsContent), and measureReply records it as reply.content
+ * whatever the arm, so the arms are counted on one yardstick.
+ */
+export function contentTurnOf(turns: readonly TurnView[], said: ReadonlySet<string>): boolean {
+  return contentOf(turns, said).contentTurn;
+}
+
+/**
+ * Their message asks for a full piece of writing or code, or for more of one —
+ * "a full study guide", "a complete, detailed explanation", "an in-depth
+ * report", "step-by-step instructions", "write the Python script that…",
+ * "draft the email to my landlord", "expand the section on immune memory",
+ * "ok, how do I do that in Python with psycopg?" (code in a language) —
+ * read on their own words (code, quotes and attachments gone), at most
+ * IFR_READ_CHARS of it. Under a policy with params.precision a ceiling MR set
+ * on its own reading does not stand against it (lib/mr/execute.ts constrain);
+ * nothing else reads it. Near-misses that stay out: refused in the same
+ * clause ("I don't need a full report"), "expand (x + 1)^2" and "expand the
+ * brackets" (an operation, not a length), "the full moon", "a complete
+ * beginner", "make sure the letter is short" (no piece asked for), "How do I
+ * say hello in French?", "How do I learn Python?" (no code asked for in it).
+ */
+const FULL_ADJ = String.raw`(?:full|complete|whole|entire|detailed|in-depth|in depth|thorough|comprehensive|exhaustive|extended|long|step-by-step|step by step)`;
+const PIECE = String.raw`(?:study guide|guide|essay|report|explanation|breakdown|walk-?through|write-?up|summary|overview|plan|version|draft|tutorial|lesson|article|document|outline|script|program|code|solution|proof|analysis|review|instructions|notes|answer)`;
+const MADE = String.raw`(?:study guide|essay|report|script|function|program|class|module|query|app|e-?mail|letter|cover letter|article|story|speech|proposal|guide|tutorial|document|code|poem|blog post)`;
+/** A language or a library, as code is asked in one: "in Python", "with psycopg", "using pandas". */
+const CODE_IN = String.raw`(?:python|javascript|js|typescript|java|c\+\+|c#|golang|go|rust|ruby|php|sql|postgres(?:ql)?|mysql|sqlite|bash|shell|powershell|swift|kotlin|scala|perl|matlab|vba|pandas|numpy|react|node(?:\.js)?|django|flask|psycopg2?|sqlalchemy)`;
+export const FULL_PIECE = new RegExp(
+  [
+    String.raw`\b${FULL_ADJ}(?:[\s,]+(?:and\s+)?[\w-]+){0,2}?[\s,]+${PIECE}s?\b`,
+    String.raw`\b(?:write|draft|compose|create|generate|produce|build|put together|turn (?:this|that|these|those|it|them)(?: \w+)? into)\b[^.?!\n]{0,60}?\b${MADE}s?\b`,
+    String.raw`\b(?:expand(?:\s+(?:on|upon))?|elaborate(?:\s+on)?|flesh out|build out|go (?:deeper|into (?:more |much more |a lot more )?(?:detail|depth)))\b(?!\s+(?:the\s+)?(?:brackets?|parenthes[ie]s|expression|product|binomial|polynomial|terms?)\b)(?!\s*[(\[\d])`,
+    // code asked for in a language or a library: "ok, how do I do that in Python with psycopg?", "show me the code in Go"
+    String.raw`\b(?:how (?:do|can|would|should|could) (?:i|we|you)|show me|can you show me|what(?:'s| is) the code|give me (?:the |some |an? )?(?:code|example|snippet))\b[^.?!\n]{0,60}?\b(?:in|with|using) ${CODE_IN}\b`,
+  ].join('|'),
+  'i'
+);
+/** A refusal in the same clause, just before the request ("I don't need a full report", "no need to expand"). */
+const REFUSED_BEFORE = /\b(?:don'?t|do not|didn'?t|did not|no need|not|never|without|no)\b[^.?!;:,]*$/i;
+/** FULL_PIECE anywhere in their own words, unless refused in the same clause just before it. */
+export function fullPieceAsked(text: string): boolean {
+  const sp = speech(String(text ?? '').slice(0, IFR_READ_CHARS));
+  if (!sp) return false;
+  const g = new RegExp(FULL_PIECE.source, 'gi');
+  let m: RegExpExecArray | null;
+  while ((m = g.exec(sp))) {
+    if (!REFUSED_BEFORE.test(sp.slice(Math.max(0, m.index - 40), m.index))) return true;
+    if (m[0].length === 0) g.lastIndex++;
+  }
+  return false;
+}
+
 /** What the full arm enforces of a decision this turn (execute, plus the reply filters). The deliberative loop enforces through the same path. */
 export function enforceDecision(
   r: { state: MRState; turns: readonly TurnView[] },
   input: MRTurnInput,
   d: MRDecision
 ): { decision: MRDecision; assist: AssistDecision; block: string; ceiling: number | null; gate: GateControls; enforced: boolean; contentTurn: boolean } {
-  const turn = r.state.turn;
   const newest = r.turns[r.turns.length - 1];
   // their words this turn, as IFR confirmed them
-  const said = new Set(r.state.observations.filter((o) => o.turn === turn && o.code.startsWith('explicit.')).map((o) => o.code));
-  // the earlier messages, newest first, for a revision of a draft ("make it warmer")
-  const previous = r.turns.slice(Math.max(0, r.turns.length - 4), -1).map((x) => x.text).reverse();
-  const forOthers = !!newest && writingForOthers(newest.text, previous);
+  const said = saidAt(r.state);
+  const { previous, forOthers, contentTurn } = contentOf(r.turns, said);
   // any writing asked for ("a card for my son saying how much he has improved"): a claim in it is the writing's own
   const drafting = forOthers || (!!newest && writingAsked(newest.text, previous));
-  // questions are what they asked for (a list, a draft to somebody): not questions put to them
-  const contentTurn = !!newest && (forOthers || (questionsAsContent(newest.text) && !said.has('explicit.wants_questions') && !said.has('explicit.quiz')));
+  // Under a policy with precision, execute is told which rules the decision in force came from (every member of a
+  // composition, as the fold holds them) and what it rests on: precedence then takes MR's own ceilings out under their
+  // setting, ACS's move can take a diagnose out, and a line can say why it is there. Their written instructions (as
+  // two booleans) and a request this turn for a full piece, code or writing go with them. Under any other policy
+  // nothing is passed, and execute compiles exactly as it did.
+  let precise: { triggers: string[]; evidence: string[]; style?: { questions?: boolean; length?: boolean }; fullPiece: boolean; ownTry: boolean } | null = null;
+  if (paramsFor(r.state.policyVersion).precision === true) {
+    const ids = new Set(d.composedOf ?? [d.interventionId]);
+    const triggers = [...new Set(r.state.interventions.filter((x) => x.status === 'active' && ids.has(x.decision.interventionId)).map((x) => x.decision.trigger))];
+    if (!triggers.length) triggers.push(d.trigger);
+    const style = input.context.style;
+    precise = {
+      triggers,
+      evidence: d.evidenceRefs.map((e) => e.code),
+      ...(style ? { style: { questions: style.questions === true, length: style.length === true } } : {}),
+      // (making something — the runtime's own reading, 'creation' — is a request for the piece too)
+      fullPiece: (!!newest && fullPieceAsked(newest.text)) || String(input.turnState?.work) === 'creation',
+      // their own try or their quiz read as practice this turn, whether or not its rule is in force (an own try said
+      // with "just give me hints" also reads as a request for the answer, and the two rules stand each other down)
+      ownTry: r.state.observations.some((o) => o.turn === r.state.turn && o.code === 'observed.practice' && o.refs.some((x) => x.code === 'explicit.own_try' || x.code === 'explicit.quiz')),
+    };
+  }
   const ex = execute({
     decision: d,
     acs: input.acs.assist,
@@ -171,6 +270,7 @@ export function enforceDecision(
     maxReply: input.context.maxReply,
     recentAsking: recentAskingOf(r.turns),
     scaffold: input.acs.split?.reasoning === 'scaffold',
+    ...(precise ?? {}),
   });
   // The integrity monitor's claim filter runs on every regulated turn,
   // whether or not an adjustment is in force (a claim that they improved
@@ -181,6 +281,23 @@ export function enforceDecision(
   // the filter was armed (g=…c), and a sentence it drops is an integrity row
   // (afterReply).
   return { decision: ex.decision, assist: ex.assist, block: ex.block, ceiling: ex.ceiling, gate: { ...ex.gate, dropUnsupportedClaims: !ex.safety && !drafting }, enforced: ex.enforced, contentTurn };
+}
+
+/** The note (state.uncertainty, and the trace) when a deployment's rollback pin ran over an experiment's newer registered policy. */
+export const PIN_OVER_EXPERIMENT = 'pin_over_experiment';
+
+/**
+ * Is policy version `a` older than `b`? Compared on the numbers of
+ * 'mr-YYYY.MM.N'; a version not of that form is never older (and so never
+ * overrides anything).
+ */
+export function policyOlder(a: string, b: string): boolean {
+  const parse = (v: string) => /^mr-(\d{4})\.(\d{1,2})\.(\d+)$/.exec(v)?.slice(1).map(Number) ?? null;
+  const x = parse(a);
+  const y = parse(b);
+  if (!x || !y) return false;
+  for (let k = 0; k < 3; k++) if (x[k] !== y[k]) return x[k] < y[k];
+  return false;
 }
 
 /** Sources under which MR keeps nothing about them and decides nothing: their own "off", unreadable settings, a shared conversation. */
@@ -194,9 +311,17 @@ export function regulateTurn(input: MRTurnInput): MRRegulation {
   // A fault the route tests inject to prove an MR failure is the route without
   // MR. Never honoured in production.
   if (env.MR_TEST_FAULT === 'throw' && env.NODE_ENV !== 'production') throw new Error('mr test fault');
+  // ...and one that makes the measures fail (the reaction here, measureReply after the reply), to prove a failed
+  // measure costs the measure and nothing else. Never honoured in production either.
+  const measureFault = env.MR_TEST_FAULT === 'measure' && env.NODE_ENV !== 'production';
   const condition = input.condition;
-  // an experiment's arms run under the policy it registered; otherwise the deployment's (or its pin)
-  const pv = condition.policyVersion && STRATEGIES[condition.policyVersion] ? condition.policyVersion : policyVersion(env);
+  // An experiment's arms run under the policy it registered; otherwise the deployment's (or its pin). A valid
+  // deployment pin OLDER than the experiment's version wins over it, and says so (pin_over_experiment): a rollback
+  // must reach everybody, participants included. A pin that is not older never overrides what an experiment registered.
+  const registered = condition.policyVersion && STRATEGIES[condition.policyVersion] ? condition.policyVersion : null;
+  const pin = (env.LOGOS_MR_POLICY ?? '').trim();
+  const pinOverExperiment = !!registered && !!pin && !!STRATEGIES[pin] && policyOlder(pin, registered);
+  const pv = pinOverExperiment ? pin : (registered ?? policyVersion(env));
   const params = paramsFor(pv);
   const pinFinding: IntegrityFinding[] = policyPinInvalid(env)
     ? [{ code: 'unauthorized_policy', severity: 'warn', turn: 0, detail: 'pin_unknown_version', action: 'none' }]
@@ -239,7 +364,9 @@ export function regulateTurn(input: MRTurnInput): MRRegulation {
     ifr: condition.arm === 'full' ? condition.ifr : true,
     carryAcross: Array.isArray(input.carried),
     verdictsByTurn: verdictsFor(input.messages),
+    ...(measureFault ? { measureFault } : {}),
   });
+  if (pinOverExperiment) fold.state.uncertainty.push(PIN_OVER_EXPERIMENT);
   const turn = fold.state.turn;
   const enforce = !condition.shadow;
 
@@ -249,7 +376,8 @@ export function regulateTurn(input: MRTurnInput): MRRegulation {
   let gate: GateControls = { ...NO_GATE };
   let decision = fold.current;
   let enforced = false;
-  let contentTurn = false;
+  // the same in every arm (the full arm's precedence reads the same reading): measureReply's reply.content
+  const contentTurn = contentTurnOf(fold.turns, saidAt(fold.state));
 
   if (condition.arm === 'full') {
     const ex = enforceDecision({ state: fold.state, turns: fold.turns }, input, fold.current);
@@ -261,7 +389,6 @@ export function regulateTurn(input: MRTurnInput): MRRegulation {
       gate = ex.gate;
       enforced = ex.enforced;
     }
-    contentTurn = ex.contentTurn;
   } else if (condition.arm === 'prompt_reflection') {
     if (enforce) {
       block = `\n\n${REFLECTION_BLOCK.trim()}\n`;
@@ -308,7 +435,12 @@ export function regulateTurn(input: MRTurnInput): MRRegulation {
  * only asked for. Content-free findings; nothing about the reply is kept.
  * Under a decision that took questions away, EVERY interrogative counts — a
  * mid-reply "Does that make sense?" is a question put to them, and the tail
- * cap cannot catch it; otherwise the count is ACS's (offers excluded).
+ * cap cannot catch it; otherwise the count is ACS's (offers excluded). Under a
+ * policy with params.precision the questions are counted on the reply as put to
+ * them, as replyShape reads it (lib/mr/outcome.ts putToThem): a "?" in code —
+ * a fenced block closed or cut off by the ceiling — a markdown heading and a
+ * question the next sentence answers ask nothing of them, and the gate keeps
+ * the last two rightly. Under any other policy the count is what it was.
  */
 export function afterReply(r: MRRegulation, reply: string, dropped: { questions: number; claims: number; offersRestored?: number }): IntegrityFinding[] {
   const out: IntegrityFinding[] = [];
@@ -318,19 +450,55 @@ export function afterReply(r: MRRegulation, reply: string, dropped: { questions:
   if (!r.enforced) return out;
   const c = r.decision.controls;
   const noneWanted = c.questionBudget?.max === 0;
-  const asked = noneWanted ? questionsPutTo(reply) : questionLoad(reply);
+  const precise = paramsFor(r.state.policyVersion).precision === true;
+  const counted = precise ? putToThem(reply) : reply;
+  const asked = noneWanted ? questionsPutTo(counted) : questionLoad(counted);
   const budget = r.assist.questions;
   // the questions they asked for as content are not questions put to them
   if (asked > budget && !r.contentTurn) {
     out.push({ code: 'control_violation', severity: 'warn', turn, detail: `questions:${asked}>${budget}`, action: 'none' });
   }
-  if ((c.answerFirst || c.strategy === 'direct') && reply.trim()) {
-    const first = sentencesOf(reply).find((x) => x.trim());
+  // (a diagnose leads with the point too: its one question comes after it)
+  if ((c.answerFirst || c.strategy === 'direct' || c.strategy === 'diagnose') && reply.trim()) {
+    // (under precision, on the reply as put to them: a heading "## Why does this happen?" opens with no question to them)
+    const first = sentencesOf(precise ? counted : reply).find((x) => x.trim());
     if (first && /\?\s*$/.test(first.trim())) out.push({ code: 'control_violation', severity: 'warn', turn, detail: 'answer_first:opened_with_question', action: 'none' });
   }
   if (dropped.questions > 0 && r.gate.hardNoQuestions) out.push({ code: 'control_violation', severity: 'info', turn, detail: `questions_removed:${dropped.questions}`, action: 'drop_sentence' });
   if ((dropped.offersRestored ?? 0) > 0) out.push({ code: 'control_violation', severity: 'info', turn, detail: `offers_restored:${dropped.offersRestored}`, action: 'none' });
   return out;
+}
+
+/**
+ * The shape of the reply as sent (lib/mr/types.ts ReplyMeasures): measurement,
+ * not policy. Unlike afterReply it is taken in every arm, in shadow, and
+ * whether or not anything was enforced, under any policy pin, so arms and
+ * policy versions are compared on one yardstick. Nothing that regulates reads
+ * it back: the readings it shares a definition with (a question asked again,
+ * sentences repeated) are recomputed from the transcript as observation codes.
+ * Ints, booleans and enum codes only.
+ *
+ * Null where MR keeps nothing about them (their "off", unreadable settings, a
+ * shared conversation: no turns were folded) and for an empty reply; only
+ * `fallback` when the route's fixed line went out instead of a reply.
+ */
+export function measureReply(r: MRRegulation, reply: string, o: { fallback?: boolean; env?: Record<string, string | undefined> } = {}): ReplyMeasures | null {
+  // The measure fault the route tests inject (MR_TEST_FAULT=measure, never in production): the route's own guard must
+  // keep the [mr] line and the exposure row when this throws.
+  const env = o.env ?? (typeof process !== 'undefined' ? (process.env as Record<string, string | undefined>) : {});
+  if (env.MR_TEST_FAULT === 'measure' && env.NODE_ENV !== 'production') throw new Error('mr test fault: measure');
+  if (r.turns.length === 0 || !reply.trim()) return null;
+  if (o.fallback) return { mv: MEASURE_VERSION, fallback: true };
+  const last = r.turns.length - 1;
+  const newest = r.turns[last];
+  // the replies before this one, newest first: the one their message answered, and the two before it
+  const earlier = [newest.prevReply, r.turns[last - 1]?.prevReply, r.turns[last - 2]?.prevReply].filter((x): x is string => typeof x === 'string');
+  return { mv: MEASURE_VERSION, content: !!r.contentTurn, askWords: wordCount(speech(newest.text)), ...replyShape(reply), ...replyEchoes(reply, earlier) };
+}
+
+/** The measures as a short code for the [mr] log line (;rm=…): words, paragraphs, questions, first actionable unit, repeated sentences. */
+export function replyMeasuresCode(m: ReplyMeasures): string {
+  return m.fallback ? 'fallback' : `w${m.words}p${m.paragraphs}q${m.questions}a${m.firstActionable}r${m.repeatedSentences}`;
 }
 
 /** What MR's reply filters did to one reply: counted, never logged. */

@@ -33,6 +33,7 @@ import {
   kindOf,
   makeDisplay,
   keptFrom,
+  type KeptState,
   localDay,
   mergeSpaces,
   objOf,
@@ -123,7 +124,7 @@ import { saveTemplate, templateChoice, templateOf, templatePayload } from '@/lib
 import { useTemplates } from '@/components/logos5/useTemplates';
 import { MADE_OFFER, madeAsked, madeListed, madeOffer, mapArtifacts, pictureRepeatsDisplay, plotArtifact, readMade, writeMade, type MadeKey, type MadeRecord } from '@/lib/logos5/artifacts';
 import { cleanTitle } from '@/lib/session-rail';
-import { artifactFromSpec, describeInline, inlineFrom, sanitizeInlineState, sanitizeInlineStateOne, specsIn, type DidItem, type InlineSpec, type InlineState } from '@/lib/inline-ui';
+import { artifactFromSpec, describeInline, editsIn, inlineFrom, sanitizeInlineState, sanitizeInlineStateOne, specsIn, type DidItem, type InlineSpec, type InlineState } from '@/lib/inline-ui';
 import { buildStarters, PENDING_TYPES } from '@/lib/starters';
 import { billingError, billingLine } from '@/lib/billing-message';
 import { ContextPanel } from '@/components/ContextPanel';
@@ -157,6 +158,8 @@ import { DOCK_SIDES, Workspace, type DockSide } from '@/components/workspace/Wor
 import { InspectorPanel, ModelPanel, ParamsPanel, TracePanel } from '@/components/workspace/panels';
 import { ScenePanel } from '@/components/scene3d/ScenePanel';
 import { DisplayPanel } from '@/components/display/DisplayPanel';
+import { requestEdit } from '@/components/display/KeptFigure';
+import { landEdit } from '@/lib/artifact-focus';
 import { DocsContext, type DocsApi } from '@/components/display/docs-context';
 import { AUTO_PAGES, docNow, loadDocs, onDoc, pagesToRead, putDoc, putOriginal, readFileAsDoc, readPages as readDocPages } from '@/lib/docs/client';
 import { endActivity, setActivity } from '@/lib/activity';
@@ -186,7 +189,14 @@ import { describeFocus, type Focus } from '@/lib/workspace/focus';
 import { LOGOS4 } from '@/lib/logos4/flags';
 import { MAP_EVERY_TURN } from '@/lib/logos5/flags';
 import { L5Layout, L5TopBar, L5Working } from '@/components/logos5/L5Views';
-import { noteLearningTurn, readLedger, replyFailed, threadNoteFrom } from '@/lib/logos5/learning';
+import { noteLearningTurn, readLedger, replyFailed, threadNoteFrom, updateLedger } from '@/lib/logos5/learning';
+import { questionDone, reviewInputOf, type QuizState } from '@/lib/objects/display-quiz';
+import { firstTryRight, outcomeOf } from '@/lib/quiz/adapt';
+import { docNamed, listed, readyNote } from '@/lib/quiz/context';
+import { ledgerTopic, noteQuizAnswer, noteQuizReview } from '@/lib/quiz/mastery';
+import { reviewOf } from '@/lib/quiz/review';
+import { asksForQuiz, namesSubject, readScope } from '@/lib/quiz/scope';
+import type { QuizMode } from '@/lib/quiz/types';
 import { LiveGuide } from '@/components/logos5/LiveGuide';
 import { keepAsTurn } from '@/lib/guide/session';
 import type { GuidePlan } from '@/lib/guide/overlay';
@@ -1124,7 +1134,8 @@ export function LogosApp({
   // The Answer Guard is one shared state: on only while LEARNING math and the
   // person hasn't chosen to reveal this session's solution. Every surface reads
   // the same signal, so Chat can't hide an answer that the map or board leaks.
-  const guard: GuardSignal = guardWatches(map, (map.objects?.objs ?? []).some((o) => !!displayMeta(o.kind)?.practice))
+  // (a quiz guards only while it is being taken: once finished, its review is there to be explained)
+  const guard: GuardSignal = guardWatches(map, (map.objects?.objs ?? []).some((o) => !!displayMeta(o.kind)?.practice && (o.kind !== 'quiz' || (currentOf(o) as QuizState | undefined)?.phase === 'taking')))
     ? revealedIds.has(activeId ?? '')
       ? 'reveal'
       : 'guard'
@@ -3871,6 +3882,356 @@ export function LogosApp({
     else patchSession(sid, (x) => ({ ...x, messages: [...x.messages, said] }));
   }
 
+  // ── QUIZZES (lib/quiz, lib/objects/display-quiz.ts) ──────────────────────────────────
+  //
+  // "Quiz me for my microeconomics exam": the course and its materials found on this device (lib/teaching,
+  // lib/docs), the professor's style and what they have missed sent with the request, a quiz made by the server
+  // with every key sealed (app/api/logos/quiz), opened as an artifact in the conversation. The quiz tells the
+  // conversation what happened in it on every turn (its facts); it asks the conversation here for what lives in
+  // this browser: the learning ledger, the note when it ends, a deeper look at a mistake, the next quiz.
+  const quizBusyRef = useRef(false);
+  /** a quiz request waiting for the student to say which course it is for */
+  const quizAskRef = useRef<{ sid: string; request: string; ask: 'course' | 'topic' } | null>(null);
+
+  /** A conversation others read: no ledger, no course profile (how this person learns is theirs). */
+  const quizShared = (sid: string) => (roomRef.current.active && sharedIdsRef.current.has(sid)) || !!togetherRef.current?.active || foreignIdsRef.current.has(sid);
+
+  /** Say something into the conversation as Socria — or change what was said, by id (a "making your quiz…" that becomes its note). */
+  function quizSay(sid: string, id: string, content: string) {
+    patchSession(sid, (x) =>
+      x.messages.some((m) => m.id === id)
+        ? { ...x, messages: x.messages.map((m) => (m.id === id ? { ...m, content } : m)) }
+        : { ...x, messages: [...x.messages, { id, at: Date.now(), role: 'assistant' as const, content }] }
+    );
+  }
+
+  /** The quizzes in this conversation, newest last. */
+  const quizzesHere = (): { obj: ThoughtObject; s: QuizState }[] =>
+    spaceOf(mapRef.current)
+      .objs.filter((o) => o.kind === 'quiz')
+      .map((o) => ({ obj: o, s: currentOf(o) as QuizState }))
+      .filter((x) => !!x.s);
+
+  /** A course a reply names ("ECO 304K", "the Smith one", "micro"), for a quiz that asked which course. */
+  function courseNamed(text: string): CourseProfile | null {
+    const t = text.toLowerCase();
+    const hits = coursesRef.current.filter((p) => [p.course, p.title, p.instructor, profileLabel(p)].some((w) => !!w && w.length >= 3 && t.includes(w.toLowerCase())));
+    return hits.length === 1 ? hits[0] : null;
+  }
+
+  async function startQuiz(
+    request: string,
+    opts: { reason?: 'request' | 'weak-spots' | 'another' | 'retest'; parent?: string; focus?: string[]; mode?: QuizMode; count?: number; difficulty?: 'harder' | 'easier' | 'mixed'; course?: CourseProfile | null } = {}
+  ): Promise<void> {
+    const sid = activeIdRef.current;
+    if (!sid) return;
+    // one at a time: a second request while one is being made is answered, not dropped without a word
+    if (quizBusyRef.current) return quizSay(sid, newMsgId(), 'A quiz is already being made — it will be here in a moment.');
+    const scope = readScope(request);
+    const shared = quizShared(sid);
+    // WHICH COURSE: the one linked to this conversation, its documents' or its words' — and when it could be either
+    // of two, one short question rather than a guess
+    const profiles = shared ? [] : coursesRef.current;
+    const linked = readLinks()[sid] ?? null;
+    const named = opts.course !== undefined ? (opts.course ? { profile: opts.course, why: 'linked' as const } : null) : courseFor(profiles, { linked, docs: [...letters.keys()], text: request });
+    let hit = named;
+    if (!hit && opts.course === undefined && linked !== 'off' && profiles.length === 1) hit = { profile: profiles[0], why: 'topic' as const };
+    if (!hit && opts.course === undefined && linked !== 'off' && profiles.length > 1 && !letters.size) {
+      quizAskRef.current = { sid, request, ask: 'course' };
+      quizSay(sid, newMsgId(), `Which course is this quiz for — ${listed(profiles.slice(0, 4).map((p) => profileLabel(p)))}?`);
+      return;
+    }
+    // WHAT FROM: the documents in this conversation first, then the course's teaching materials (never its past
+    // exams or quizzes: those shape the style, and their questions are not copied)
+    const convDocs = docRefs.map((r) => r.doc);
+    const kinds: Record<string, string> = {};
+    let courseDocs: SourceDoc[] = [];
+    if (hit) {
+      const usable = hit.profile.digests.filter((d) => d.material.kind !== 'exam' && d.material.kind !== 'quiz');
+      usable.forEach((d) => (kinds[d.material.doc] = d.material.kind));
+      courseDocs = await loadDocs(usable.map((d) => d.material.doc)).catch(() => []);
+    }
+    let docs = [...convDocs, ...courseDocs.filter((d) => !convDocs.some((c) => c.id === d.id))];
+    const missing: string[] = [];
+    if (scope.sourcesNamed.length) {
+      const matched = docs.filter((d) => scope.sourcesNamed.some((n) => docNamed(n, d, kinds[d.id])));
+      if (matched.length) docs = matched;
+      else {
+        missing.push(`I couldn't find ${listed(scope.sourcesNamed.map((n) => `“${n}”`))} in your materials${hit ? ` for ${profileLabel(hit.profile)}` : ''}.`);
+        if (scope.strictSources && !scope.allowGeneral) {
+          quizSay(sid, newMsgId(), `${missing[0]} I haven't made questions from general knowledge instead — add the file here, or ask again and say general questions are fine.`);
+          return;
+        }
+      }
+    }
+    // NOTHING TO QUIZ ON: no topic said, no material, no course, and nothing yet in the conversation — one short
+    // question rather than questions on a subject picked at random; the next message is the topic
+    const recent = (sessionsRef.current.find((x) => x.id === sid)?.messages ?? []).filter((m) => m.role === 'user' && typeof m.content === 'string' && m.via !== 'quiz' && !asksForQuiz(m.content)).slice(-3).map((m) => m.content).join(' ').slice(0, 200);
+    if (!scope.topics.length && !namesSubject(request) && !docs.length && !hit && !opts.focus?.length && !opts.parent && !recent && !scope.forAssessment) {
+      quizAskRef.current = { sid, request, ask: 'topic' };
+      quizSay(sid, newMsgId(), 'What would you like the quiz to be on? Name a topic, or add your notes or slides here.');
+      return;
+    }
+    const parentQuiz = opts.parent ? quizzesHere().find((x) => x.obj.id === opts.parent)?.s ?? null : null;
+    const avoidStems = quizzesHere().flatMap(({ s }) => s.asked.map((id) => s.pool.find((q) => q.id === id)?.stem ?? '')).filter(Boolean).slice(-60);
+    const noteId = newMsgId();
+    quizSay(sid, noteId, opts.reason === 'weak-spots' ? 'Making a practice on what you missed…' : `Making your quiz${hit ? ` from your ${profileLabel(hit.profile)} materials` : docs.length ? ' from your files' : ''}…`);
+    quizBusyRef.current = true;
+    const payload = JSON.stringify({
+      sessionId: sid,
+      request,
+      docs: docs.slice(0, 8),
+      kinds,
+      ...(hit ? { course: packOf(hit.profile, hit.why), courseName: hit.profile.course || profileLabel(hit.profile), instructor: hit.profile.instructor ?? null } : {}),
+      ...(shared ? {} : { ledger: readLedger() }),
+      avoidStems,
+      missing,
+      ...(recent ? { topicHint: recent } : {}),
+      ...(opts.reason ? { reason: opts.reason } : {}),
+      ...(opts.focus?.length ? { focus: opts.focus } : {}),
+      ...(opts.mode ? { mode: opts.mode } : {}),
+      ...(opts.count ? { count: opts.count } : {}),
+      ...(opts.difficulty ? { difficulty: opts.difficulty } : {}),
+    });
+    try {
+      // ONCE MORE ON A FAILURE THAT IS NOT THE REQUEST'S: the server or the network failing, a time-out, an answer
+      // that is not JSON (a gateway's error page). Never on an answer about the request itself (missing material,
+      // too few questions held up, too many requests, not allowed).
+      let r: Response | null = null;
+      let j: any = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), 70_000);
+        try {
+          r = await fetch('/api/logos/quiz', { method: 'POST', headers: { 'content-type': 'application/json', ...keyHeaders() }, body: payload, signal: ctl.signal });
+          j = await r.json().catch(() => null);
+        } catch {
+          r = null;
+          j = null;
+        } finally {
+          clearTimeout(timer);
+        }
+        const retryable = !r || r.status >= 500 || (r.ok && !j?.quiz);
+        if (!retryable) break;
+        if (attempt === 0) quizSay(sid, noteId, 'Still making your quiz…');
+      }
+      if (r && r.status === 409 && j?.error === 'missing-sources') {
+        quizSay(sid, noteId, `I couldn't find ${listed((j.missing as string[]).map((n) => `“${n}”`))} in your materials, so I haven't made questions from general knowledge instead. Add the file here, or ask again and say general questions are fine.`);
+        return;
+      }
+      if (!r || !r.ok || !j?.quiz) {
+        quizSay(
+          sid,
+          noteId,
+          !r
+            ? "The quiz couldn't be made — the connection dropped. Ask again when you're back online."
+            : j?.error === 'too-few'
+              ? "I couldn't write questions I could stand behind from that material — the ones I wrote didn't pass the checks. Try a narrower topic, or add notes or slides on it."
+              : r.status === 429
+                ? 'Too many requests just now — try again in a moment.'
+                : r.status === 401 || r.status === 403
+                  ? 'Quizzes need you to be signed in, or the access code entered.'
+                  : typeof j?.error === 'string' && r.status < 500
+                    ? j.error
+                    : 'The quiz could not be made just now — ask again in a moment.'
+        );
+        return;
+      }
+      const state = {
+        quiz: j.quiz,
+        title: j.title,
+        view: 'quiz',
+        mode: j.mode,
+        count: j.count,
+        difficulty: j.difficulty ?? null,
+        pool: j.questions,
+        asked: [],
+        records: {},
+        phase: 'taking',
+        basis: j.basis,
+        links: opts.parent && parentQuiz ? { parent: parentQuiz.quiz, reason: opts.reason ?? 'another' } : { reason: 'request' },
+        priority: j.priority ?? {},
+        made: Date.now(),
+        looked: [],
+        children: [],
+      };
+      let space = spaceOf(mapRef.current);
+      const made = makeDisplay(space, 'quiz', state, 'socria');
+      if (!made.ok) return quizSay(sid, noteId, made.says);
+      space = made.space;
+      if (opts.parent) {
+        const linkedBack = applyObjectOp(space, opts.parent, 'follow', { id: j.quiz }, { by: 'person' });
+        if (linkedBack.ok) space = linkedBack.space;
+      }
+      if (!commitObjects(space, objOf(space, made.obj.id))) return quizSay(sid, noteId, 'The quiz is ready, but this plan has used its artifacts for the month.');
+      setDisplayToOpen(made.obj.id);
+      track('quiz_created', { count: j.count, scope: j.mode, trigger: opts.reason ?? 'request' });
+      quizSay(
+        sid,
+        noteId,
+        readyNote({ count: j.count, title: j.title, mode: j.mode, sources: (j.basis?.sources ?? []).map((x: { title: string }) => x.title), grounding: j.basis?.grounding ?? 'general', style: j.basis?.style?.basis ?? 'unknown', course: j.basis?.course ?? null, missing, reason: opts.reason })
+      );
+    } catch {
+      quizSay(sid, noteId, 'The quiz could not be made — you seem to be offline. Try again when you are back.');
+    } finally {
+      quizBusyRef.current = false;
+    }
+  }
+
+  /**
+   * The turn a quiz was made in: its request and the note that says it is ready. On a phone the Everything view shows
+   * what was made in the turn that is open, so a quiz with no turn was never shown there at all.
+   */
+  function quizTurnOf(objId: string, turns: readonly { index: number; askedAt?: number; replyAt?: number }[], msgs: readonly Msg[]): number | null {
+    const o = objOf(spaceOf(mapRef.current), objId);
+    const st = o ? (currentOf(o) as QuizState | undefined) : undefined;
+    const made = st?.made;
+    if (typeof made !== 'number') return turns.length ? turns[turns.length - 1].index : null;
+    // once finished, the quiz goes with its note ("You scored 6/8 …"), so its review is under what says it
+    const noted = st?.quiz ? msgs.findIndex((m) => m.id === `qz${st.quiz}`.slice(0, 24)) : -1;
+    let at = noted;
+    if (at < 0)
+      msgs.forEach((m, i) => {
+        if (typeof m.at === 'number' && m.at <= made) at = i;
+      });
+    let turn: number | null = null;
+    for (const t of turns) {
+      const from = t.askedAt ?? t.replyAt;
+      if (from !== undefined && from <= at) turn = t.index;
+    }
+    return turn ?? (turns.length ? turns[turns.length - 1].index : null);
+  }
+
+  /** Can a quiz be started from the board here: a conversation of their own with something in it, no quiz in hand. */
+  function mayQuizFromBoard(msgs: readonly Msg[]): boolean {
+    const sid = activeIdRef.current;
+    if (!sid || togetherReadOnly || (roomRef.current.active && sharedIdsRef.current.has(sid))) return false;
+    if (!msgs.some((m) => m.role === 'assistant' && typeof m.content === 'string' && m.content.trim())) return false;
+    return !quizzesHere().some(({ s }) => s.phase === 'taking');
+  }
+
+  /**
+   * "Quiz me" pressed on the board (the Everything view): the same as asking for it in words — the request is in the
+   * conversation, marked as one the quiz took — on what this conversation has been about.
+   */
+  function quizFromBoard() {
+    const sid = activeIdRef.current;
+    if (!sid) return;
+    const request = 'Quiz me on what this conversation has covered';
+    setError(null);
+    postTurn({ id: newMsgId(), at: Date.now(), role: 'user', content: request, via: 'quiz' }, true);
+    track('quiz_follow_up', { trigger: 'board' });
+    void startQuiz(request);
+  }
+
+  /** What a quiz shows, written into the learning ledger once per question (the quiz says which it has noted). */
+  function noteQuizLedger(obj: string, s: QuizState) {
+    const sid = activeIdRef.current;
+    if (!sid || quizShared(sid)) return;
+    const KEY = 'socria.quiz.noted.v1';
+    let noted: string[] = [];
+    try {
+      noted = JSON.parse(localStorage.getItem(KEY) || '[]');
+    } catch {
+      noted = [];
+    }
+    const fresh: string[] = [];
+    updateLedger((ledger) => {
+      let next = ledger;
+      for (const id of s.asked) {
+        const key = `${s.quiz}:${id}`;
+        const rec = s.records[id];
+        const q = s.pool.find((x) => x.id === id);
+        if (!q || !rec || noted.includes(key)) continue;
+        // a question counts once it is over: right, out of tries, revealed — or, in an exam, graded at the end
+        const right = outcomeOf(rec);
+        if (right === null || !questionDone(s, rec) || (s.mode === 'exam' && s.phase !== 'review')) continue;
+        const firstMiss = rec.attempts.find((a) => a.graded && a.graded.grade !== 'right' && a.graded.grade !== 'close')?.graded?.mistake;
+        next = noteQuizAnswer(next, {
+          concept: q.concept,
+          right,
+          firstTry: firstTryRight(rec),
+          difficulty: q.difficulty,
+          demand: q.demand,
+          helped: rec.revealed || rec.attempts.some((a) => a.helped),
+          retest: !!q.variantOf || s.links.reason === 'weak-spots' || s.links.reason === 'retest',
+          ...(firstMiss && firstMiss.evidence !== 'insufficient' ? { tag: firstMiss.tag } : {}),
+          at: rec.attempts[rec.attempts.length - 1]?.graded?.at || Date.now(),
+        });
+        fresh.push(key);
+      }
+      return next;
+    });
+    if (fresh.length) {
+      try {
+        localStorage.setItem(KEY, JSON.stringify([...noted, ...fresh].slice(-600)));
+      } catch {
+        // a full store: the worst is a question noted twice later
+      }
+    }
+  }
+
+  /** What a quiz asks of the conversation around it (components/objects/figures.ts WorkspaceAction 'quiz'). */
+  function quizAction(a: Extract<WorkspaceAction, { type: 'quiz' }>): WorkspaceResult {
+    const sid = activeIdRef.current;
+    const o = objOf(spaceOf(mapRef.current), a.obj);
+    const s = o ? (currentOf(o) as QuizState) : null;
+    if (!sid || !o || !s) return { ok: false, why: 'That quiz is not here.' };
+    const n = a.q ? s.asked.indexOf(a.q) + 1 : 0;
+    const q = a.q ? s.pool.find((x) => x.id === a.q) : undefined;
+    const r = reviewOf(reviewInputOf(s));
+    switch (a.action) {
+      case 'graded':
+        noteQuizLedger(o.id, s);
+        return { ok: true };
+      case 'finished': {
+        noteQuizLedger(o.id, s);
+        // the conversation hears how it went, once: the score, what the misses share, where to go
+        const id = `qz${s.quiz}`.slice(0, 24);
+        const said = sessionsRef.current.find((x) => x.id === sid)?.messages.some((m) => m.id === id);
+        if (!said && s.phase === 'review') {
+          quizSay(sid, id, r.note);
+          track('quiz_completed', { count: r.total ? Math.round((r.right / r.total) * 100) : 0, scope: s.mode });
+        }
+        return { ok: true };
+      }
+      case 'deep-dive': {
+        if (!q || !n) return { ok: false, why: 'That question is not in the quiz.' };
+        if (!quizShared(sid)) updateLedger((ledger) => noteQuizReview(ledger, q.concept));
+        track('quiz_deep_dive', { trigger: a.how ?? 'reasoning' });
+        if (a.how === 'similar') {
+          void startQuiz(`A few questions like question ${n} of "${s.title}", on ${q.topic.toLowerCase()}`, { reason: 'retest', parent: o.id, focus: [ledgerTopic(q.concept)], count: 3, mode: 'practice' });
+          return { ok: true };
+        }
+        // the question in focus for this one turn, so the reply has its record (display-quiz.ts partFacts) and
+        // the words say which question, so the reply has it even where a focus is not sent
+        const before = focusRef.current;
+        focusRef.current = { kind: 'part', obj: o.id, part: q.id };
+        void send(a.how === 'concept' ? `Help me review the idea behind question ${n} (${q.topic}).` : `Help me understand why my answer to question ${n} (${q.topic}) wasn't right.`);
+        focusRef.current = before;
+        return { ok: true };
+      }
+      case 'practice': {
+        const missed = r.missed.map((it) => ledgerTopic(it.q.concept)).filter((c, i, all) => all.indexOf(c) === i);
+        if (!missed.length) return { ok: false, why: 'Nothing was missed.' };
+        track('quiz_follow_up', { trigger: 'weak-spots' });
+        void startQuiz(`Practise my weak spots from "${s.title}": ${listed(r.topics.map((t) => t.topic.toLowerCase()))}`, { reason: 'weak-spots', parent: o.id, focus: missed, count: Math.min(6, Math.max(3, missed.length * 2)), mode: 'practice' });
+        return { ok: true };
+      }
+      case 'another':
+        track('quiz_follow_up', { trigger: 'another' });
+        void startQuiz(`Another quiz on ${s.title}`, { reason: 'another', parent: o.id, mode: s.mode, count: s.count, focus: s.basis.targets.map((t) => t.concept).slice(0, 4), ...(r.perfect ? { difficulty: 'harder' as const } : {}) });
+        return { ok: true };
+      case 'return':
+        // back to the conversation, the quiz and its review kept as they are
+        if (oneViewRef.current) setBoardBeside(null);
+        setScreen((sc) => choose('chat', sc));
+        focusComposer();
+        return { ok: true };
+    }
+    return { ok: false };
+  }
+
   /** Passages of their documents that bear on `query`, keyed as the conversation cites them (A3.12). */
   function passagesFor(query: string, max = 8): { key: string; doc: string; block: string; text: string; name: string }[] {
     if (!docRefs.length || !query.trim()) return [];
@@ -4399,7 +4760,7 @@ export function LogosApp({
     let touched: ThoughtObject | null = null;
     // a message that brings an object in is not also an operation on it
     if (space === space0) {
-      const read = readOperation(space, content, objSelRef.current?.obj);
+      const read = readOperation(space, content, objSelRef.current?.obj ?? keptInHand());
       if (read) {
         const r = applyObjectOp(space, read.id, read.op, read.args, { by: 'person' });
         if (r.ok) {
@@ -4502,6 +4863,7 @@ export function LogosApp({
       return { ok: false, why: 'You can look at this line of thinking, but not change it.' };
     }
     let space = spaceOf(mapRef.current);
+    if (a.type === 'quiz') return quizAction(a);
     if (a.type === 'make') {
       const made = makeDisplay(space, a.kind, a.state, a.origin === 'source' ? 'source' : 'person');
       if (!made.ok) return { ok: false, why: made.says };
@@ -4924,6 +5286,42 @@ export function LogosApp({
       }
     }
 
+    // A QUIZ (lib/quiz): "quiz me for my exam", "10 questions, exam conditions" — made as an artifact in the
+    // conversation from their own materials, never as a stream of questions in the chat. The request stays in the
+    // conversation, marked as one the quiz took (via 'quiz'), so the reply engine does not also start quizzing in
+    // words. And a course question asked back ("which course is this for?") is answered by naming one.
+    if (!atts.length && !objTurn.lastStep && !groupNow() && !(roomRef.current.active && sharedIdsRef.current.has(activeIdRef.current ?? ''))) {
+      const waiting = quizAskRef.current && quizAskRef.current.sid === activeIdRef.current ? quizAskRef.current : null;
+      const chosen = waiting?.ask === 'course' ? courseNamed(content) : null;
+      // the topic, named after "what would you like the quiz to be on?": a short answer that is not a question of its own
+      if (waiting?.ask === 'topic' && !asksForQuiz(content) && content.trim().length <= 160 && !/\?\s*$/.test(content.trim())) {
+        quizAskRef.current = null;
+        setError(null);
+        clearBox();
+        setReplyTo(null);
+        postTurn({ id: newMsgId(), at: Date.now(), role: 'user', content: said0, via: 'quiz' }, true);
+        void startQuiz(`${waiting.request.replace(/[.!\s]+$/, '')} on ${content.trim().replace(/^(on|about)\s+/i, '').replace(/[.!]+$/, '')}`);
+        return;
+      }
+      if (waiting && chosen) {
+        quizAskRef.current = null;
+        setError(null);
+        clearBox();
+        setReplyTo(null);
+        postTurn({ id: newMsgId(), at: Date.now(), role: 'user', content: said0, via: 'quiz' }, true);
+        void startQuiz(waiting.request, { course: chosen });
+        return;
+      }
+      if (asksForQuiz(content)) {
+        quizAskRef.current = null;
+        setError(null);
+        clearBox();
+        setReplyTo(null);
+        postTurn({ id: newMsgId(), at: Date.now(), role: 'user', content: said0, ...(replying ? { replyTo: replying } : {}), via: 'quiz' }, true);
+        void startQuiz(content);
+        return;
+      }
+    }
     // WHAT AM I MISSING? (Logos 6): words that plainly ask to have their own reasoning tested go to the challenge
     // engine and come back as a card (lib/challenge/challenge-intent.ts, which errs toward not firing — a miss
     // goes to Socria as it always did). Alone only: a shared room keeps its own conversation.
@@ -5215,6 +5613,11 @@ export function LogosApp({
           // Re-sanitised on the server, where every step is RE-COMPUTED from
           // the state before it — so what the reply is told was computed was.
           ...(mapRef.current?.objects ? { objects: mapRef.current.objects } : {}),
+          // the kept artifact open in Artifacts: what "change it" means, when it is said (lib/artifact-focus.ts)
+          ...(() => {
+            const h = keptInHand();
+            return h ? { inHand: h } : {};
+          })(),
           // what they told onboarding they mostly think about (an id, or nothing)
           ...(readRole() ? { role: readRole() } : {}),
           ...(readName() ? { name: readName() } : {}),
@@ -5384,6 +5787,8 @@ export function LogosApp({
       // is read back from there when that line is opened (switchSession);
       // appended here, it was drawn into the other line's Logic Map.
       if (sid === activeIdRef.current) chronRef.current = [...chronRef.current, reply];
+      // a change Socria made to an artifact in place: applied now, as its step (lib/artifact-focus.ts)
+      if (sid === activeIdRef.current) applySocriaEdits(reply);
       if (u && u.entries.length) recurrenceSaidRef.current.add(sid);
       // A thought completed. The proactive check runs from an effect rather
       // than here, so it sees the map this turn produced instead of the one
@@ -5857,6 +6262,13 @@ export function LogosApp({
   const showing = (v: Viewport) => screenRef.current.view === v || screenRef.current.beside === v;
   /** the writing is on screen and open to edit in words */
   const writingOnScreen = () => artShownRef.current === 'w:doc' && showing('artifacts') && !!writeRef.current;
+  /** The kept element open in Artifacts, on screen — the one typed words about "it" are heard against (lib/objects/display-kept.ts). */
+  const keptInHand = (): string | null => {
+    const key = artShownRef.current;
+    if (!key?.startsWith('d:') || !showing('artifacts')) return null;
+    const o = objOf(spaceOf(mapRef.current), key.slice(2));
+    return o?.kind === 'kept' ? o.id : null;
+  };
   /** what is over the line of thinking, where "go back" means back into it */
   const overNow = (): 'home' | 'memory' | null => (l5Mind ? 'memory' : l5Home || !activeIdRef.current ? 'home' : null);
   function commandContext(): CommandContext {
@@ -6261,7 +6673,7 @@ export function LogosApp({
     const mapRemoves = mc && 'edits' in mc ? mc.edits.flatMap((e) => (e.op === 'remove' ? [map.nodes.find((n) => n.id === e.id)?.label ?? ''] : [])).filter(Boolean) : null;
     const dc = writingOnScreen() ? readDocCommand(text) : null;
     const docDelete = dc ? docDeleteOf(writeDocRef.current, dc, { that: docThatRef.current }) : null;
-    const op = readOperation(spaceOf(map), text, objSelRef.current?.obj);
+    const op = readOperation(spaceOf(map), text, objSelRef.current?.obj ?? keptInHand());
     const o = op ? objOf(spaceOf(map), op.id) : null;
     const objectRemove = op && o && /remove|delete|clear|drop|erase|reset|untick/i.test(op.op) ? kindOf(o.kind)?.ops[op.op]?.say(op.args) ?? null : null;
     return riskOf(text, { mapRemoves, docDelete, objectRemove });
@@ -6829,10 +7241,91 @@ export function LogosApp({
   // does with one is theirs and is kept with that message; nothing here calls
   // a model — a tapped choice is simply what they say next.
 
+  /**
+   * ONE IDENTITY (Logos 6): the kept artifact a reply's element became, as it now stands — what the conversation
+   * draws in its place, so a change made in Artifacts or by Socria shows where it was first drawn too. Null when the
+   * element was never kept, or what was kept is gone (the reply's own element is drawn, as before).
+   */
+  function resolveInline(msg: Msg, n: number): { spec: InlineSpec; state?: InlineState; edits: number } | null {
+    const id = msg.ui?.[String(n)]?.artifact;
+    const o = id ? objOf(spaceOf(map), id) : null;
+    if (!o || o.kind !== 'kept') return null;
+    const st = currentOf(o) as KeptState;
+    return { spec: st.spec, ...(st.ui ? { state: st.ui } : {}), edits: o.steps.slice(0, o.at).filter((x) => x.op !== 'state').length };
+  }
+
+  /**
+   * SOCRIA'S CHANGES, MADE IN PLACE (Logos 6, lib/artifact-focus.ts). Each canonical edit block in a reply that landed
+   * is applied to the artifact it names as Socria's step — Undo takes it back, Versions lists it, and the conversation
+   * and Artifacts show the one artifact changed. A reply's element that was not kept yet is kept first (so the change
+   * has an artifact to be made to), linked to where it was drawn. Applied once: the step carries the block's key.
+   * Checked whole again here (the kind's own check), so a change that no longer holds — the artifact moved on since —
+   * changes nothing.
+   */
+  function applySocriaEdits(reply: Msg) {
+    if (!workspaceOn || !reply.id || togetherReadOnly) return;
+    const found = editsIn(reply.content);
+    for (const { n, edit } of found) {
+      const here = sessionsRef.current.find((x) => x.id === activeIdRef.current)?.messages ?? [];
+      const r = landEdit(spaceOf(mapRef.current), edit, `${reply.id}#${n}`, (id) => (here.find((x) => x.id === id) as { id: string; content: string; ui?: Record<string, InlineState> } | undefined) ?? null, {
+        session: activeIdRef.current ?? undefined,
+        said: replyOpening,
+      });
+      if ('skip' in r) continue;
+      if (!commitObjects(r.space, objOf(r.space, r.id))) continue;
+      const linkTo = r.link ? here.find((x) => x.id === r.link!.msg) : null;
+      if (linkTo && r.link) keepInline(linkTo, r.link.n, { artifact: r.id });
+    }
+  }
+
+  /**
+   * The edit card under a reply that changed an artifact: the artifact as it now stands, whether the change is in it,
+   * and whether it can still be undone on its own (it is the latest step).
+   */
+  function resolveEdit(msg: Msg, n: number, of: string): { spec: InlineSpec; state?: InlineState; id: string; made: boolean; applied: boolean; undo: boolean } | null {
+    const space = spaceOf(map);
+    let id: string | null = objOf(space, of)?.kind === 'kept' ? of : null;
+    if (!id) {
+      const m = /^([\w-]{1,64}):(\d{1,2})$/.exec(of);
+      const there = m ? messages.find((x) => x.id === m[1]) : null;
+      id = there?.ui?.[m![2]]?.artifact ?? null;
+    }
+    const o = id ? objOf(space, id) : null;
+    if (!o || o.kind !== 'kept') return null;
+    const st = currentOf(o) as KeptState;
+    const at = o.steps.findIndex((x) => x.args.from === `${msg.id}#${n}`);
+    return { spec: st.spec, ...(st.ui ? { state: st.ui } : {}), id: o.id, made: at >= 0, applied: at >= 0 && at < o.at, undo: at >= 0 && at === o.at - 1 && !togetherReadOnly };
+  }
+
+  /** Undo under an edit card: the artifact back to the version before Socria's change — a seek, so Redo brings it back. */
+  function undoEdit(msg: Msg, n: number, of: string) {
+    const r = resolveEdit(msg, n, of);
+    if (!r?.undo) return;
+    const o = objOf(spaceOf(mapRef.current), r.id);
+    const at = o ? o.steps.findIndex((x) => x.args.from === `${msg.id}#${n}`) : -1;
+    if (o && at >= 0) onObject({ type: 'seek', obj: o.id, at });
+  }
+
+  /** What is done to a kept artifact where the conversation draws it — a slider moved — done to the artifact (op "state"). */
+  function keptArtifactState(id: string, s: InlineState) {
+    const { artifact: _drop, ...rest } = s;
+    void _drop;
+    onObject({ type: 'op', obj: id, op: 'state', args: { state: JSON.stringify(rest) } });
+  }
+
+  /** EDIT, pressed under a reply's element: kept first if it was not, then opened in Artifacts with its editor open. */
+  function editInline(msg: Msg, n: number, spec: InlineSpec) {
+    openInline(msg, n, spec, { edit: true });
+  }
+
   /** What was done with one of a reply's inline elements, merged into what is kept with that message. */
   function keepInline(msg: Msg, n: number, s: InlineState) {
     if (!msg.id) return;
     const key = String(n);
+    // kept: what is done with it here is done to the artifact — one identity, so Artifacts shows it too
+    const linkedId = msg.ui?.[key]?.artifact;
+    const linked = linkedId && !('artifact' in s && Object.keys(s).length === 1) ? objOf(spaceOf(mapRef.current), linkedId) : null;
+    if (linked?.kind === 'kept') return keptArtifactState(linked.id, s);
     const swap: { from?: Msg; to?: Msg } = {};
     patchActive((sn) => ({
       ...sn,
@@ -6986,11 +7479,14 @@ export function LogosApp({
     showObject(made.obj.id);
   }
 
-  function openInline(msg: Msg, n: number, spec: InlineSpec) {
+  function openInline(msg: Msg, n: number, spec: InlineSpec, how?: { edit?: boolean }) {
     if (!workspaceOn) return;
     const space = spaceOf(mapRef.current);
     const had = msg.ui?.[String(n)]?.artifact;
-    if (had && objOf(space, had)) return showObject(had);
+    if (had && objOf(space, had)) {
+      if (how?.edit) requestEdit(had);
+      return showObject(had);
+    }
     if (togetherRef.current?.active && togetherRef.current.role !== 'owner' && togetherRef.current.role !== 'editor') {
       setError('You can look at this line of thinking, but not change it.');
       return;
@@ -7005,6 +7501,7 @@ export function LogosApp({
     if (!made.ok) return setError(made.says);
     if (!commitObjects(made.space, objOf(made.space, made.obj.id))) return;
     keepInline(msg, n, { artifact: made.obj.id });
+    if (how?.edit) requestEdit(made.obj.id);
     showObject(made.obj.id);
   }
 
@@ -8030,6 +8527,10 @@ export function LogosApp({
             ask={askExperience}
             onPrompt={(text) => draftToComposer(text)}
             onDraft={(text) => draftToComposer(text)}
+            // a change the editor's own reading cannot make goes to Socria as a turn — the element is open in
+            // Artifacts, so it is the one in hand the turn is read against (keptInHand)
+            onSend={(text) => void send(text)}
+            session={activeId ?? undefined}
           />
         );
       }
@@ -9662,8 +10163,20 @@ export function LogosApp({
         onHoverNodes={setHoverNodes}
         onShowNodes={showNodes}
         onOpenObject={showObject}
+        // one identity holds for everyone who can see the line of thinking: a reader sees the kept artifact as it now
+        // stands too (resolving only reads); changing it is for those who may
+        {...(m.role === 'assistant' && m.id ? { onResolveInline: resolveInline, onResolveEdit: resolveEdit } : {})}
         {...(m.role === 'assistant' && m.id && !togetherReadOnly
-          ? { onInline: keepInline, onOpenInline: openInline, onMapInline: mapInline, ...(solo && !busy ? { onExplore: chooseInline } : {}), ...(latest && solo && !busy ? { onChoose: chooseInline } : {}) }
+          ? {
+              onInline: keepInline,
+              onOpenInline: openInline,
+              onMapInline: mapInline,
+              onUndoEdit: undoEdit,
+              onArtifactState: keptArtifactState,
+              ...(workspaceOn ? { onEditInline: editInline } : {}),
+              ...(solo && !busy ? { onExplore: chooseInline } : {}),
+              ...(latest && solo && !busy ? { onChoose: chooseInline } : {}),
+            }
           : {})}
         writeUp={writeUp}
         onOpenContent={openContent}
@@ -9902,12 +10415,27 @@ export function LogosApp({
             kicker: el.lane === 'practice' ? 'Practice' : `Artifact · ${noun}`,
             title: el.title,
             turn: el.turn,
-            preview: <InlineBlock spec={el.spec} open={false} n={el.n} host={{ state, live: false }} renderInline={(t, k) => <RichInline text={t} math keyBase={`bd-${el.key}-${k}`} />} />,
+            preview: <InlineBlock spec={el.spec} open={false} n={el.n} host={{ state, live: false, resolve: (n: number) => resolveInline(msg, n) }} renderInline={(t, k) => <RichInline text={t} math keyBase={`bd-${el.key}-${k}`} />} />,
+            // USED IN PLACE (Logos 6, the Everything view): the element itself, at full size and live — as it now stands
+            // when it was kept (one identity) — and what is done with it kept as it is in the conversation
+            live: (
+              <InlineBlock
+                spec={el.spec}
+                open={false}
+                n={el.n}
+                host={{ state, live: true, resolve: (n: number) => resolveInline(msg, n), ...(!togetherReadOnly ? { onState: (n: number, st: InlineState) => keepInline(msg, n, st) } : {}) }}
+                renderInline={(t, k) => <RichInline text={t} math keyBase={`bdl-${el.key}-${k}`} />}
+              />
+            ),
             ...(said ? { note: said } : {}),
             ...(workspaceOn && !togetherReadOnly
               ? {
                   onOpen: () => {
                     openInline(msg, el.n, el.spec);
+                    setBoardBeside('artifacts');
+                  },
+                  onEdit: () => {
+                    editInline(msg, el.n, el.spec);
                     setBoardBeside('artifacts');
                   },
                 }
@@ -9919,19 +10447,37 @@ export function LogosApp({
           if (a.key.startsWith('d:') && kept.has(a.key.slice(2))) continue;
           if (a.key === 'w:doc' && isEmptyDoc(writeDoc)) continue;
           const practice = a.key.startsWith('p:');
+          // A QUIZ IS TAKEN WHERE IT IS (lib/objects/display-quiz.ts): the card holds the quiz itself, live — the same
+          // object Artifacts draws, so the two never disagree — and Expand opens it large to take it there
+          const quiz = a.key.startsWith('d:') && objOf(spaceOf(map), a.key.slice(2))?.kind === 'quiz';
           cards.push({
             key: `a:${a.key}`,
-            lane: practice ? 'practice' : 'made',
-            tone: practice ? 'practice' : 'artifact',
-            kicker: practice ? 'Practice' : `Artifact · ${a.kind}`,
+            lane: practice || quiz ? 'practice' : 'made',
+            tone: practice || quiz ? 'practice' : 'artifact',
+            kicker: quiz ? 'Quiz' : practice ? 'Practice' : `Artifact · ${a.kind}`,
             title: a.title,
-            turn: null,
+            turn: quiz ? quizTurnOf(a.key.slice(2), turns, messages) : null,
             preview: null,
-            note: practice ? 'Questions to try' : `${a.kind} · open it beside the board to use it`,
+            note: quiz ? 'Answer here, or open it large' : practice ? 'Questions to try' : `${a.kind} · open it beside the board to use it`,
+            ...(quiz ? { live: a.render(), onEdit: () => (showArtifact(a.key), setBoardBeside('artifacts')) } : {}),
             onOpen: () => {
               showArtifact(a.key);
               setBoardBeside('artifacts');
             },
+          });
+        }
+        // QUIZ ME, FROM THE BOARD: a quiz on this conversation, one press — it arrives here, live, as the card above
+        if (mayQuizFromBoard(messages)) {
+          cards.push({
+            key: 'q:start',
+            lane: 'practice',
+            tone: 'practice',
+            kicker: 'Quiz',
+            title: quizzesHere().length ? 'Another quiz on this' : 'Quiz me on this',
+            turn: turns.length ? turns[turns.length - 1].index : null,
+            preview: null,
+            note: 'Questions on this conversation, one at a time, marked as you go',
+            onOpen: quizFromBoard,
           });
         }
         // what was brought and written — beside the turn it came with — read large beside the board
@@ -10069,6 +10615,8 @@ export function LogosApp({
               title: c.title ?? '',
               turn: c.turn,
               preview: c.preview ?? undefined,
+              ...(c.live ? { live: c.live } : {}),
+              ...(c.onEdit ? { onEdit: c.onEdit } : {}),
               ...(c.note ? { note: c.note } : {}),
               ...(c.onOpen ? { onOpen: c.onOpen } : {}),
             }));
@@ -10089,7 +10637,7 @@ export function LogosApp({
               lit={litBy(ot, byMsg)}
               picked={focus?.kind === 'node' ? focus.id : null}
               composer={l5Dock}
-              openHero={heroCard ? { node: heroCard.preview, ...(heroCard.onOpen ? { onOpen: heroCard.onOpen } : {}) } : null}
+              openHero={heroCard ? { node: heroCard.live ?? heroCard.preview, ...(heroCard.live ? { live: true } : {}), ...(heroCard.onOpen ? { onOpen: heroCard.onOpen } : {}), ...(heroCard.onEdit ? { onEdit: heroCard.onEdit } : {}) } : null}
               onIdea={(id) => {
                 // the newest turn's idea is where the space rests; any other opens with the turn it came from, and is asked about
                 if (id === auto && !chosen) return;
@@ -10399,7 +10947,8 @@ export function LogosApp({
               host={{
                 state,
                 live,
-                ...(live && !togetherReadOnly ? { onState: (n: number, st: InlineState) => keepInline(msg, n, st), onOpen: (n: number, spec: InlineSpec) => openInline(msg, n, spec), onMap: (n: number, spec: InlineSpec) => mapInline(msg, n, spec) } : {}),
+                resolve: (n: number) => resolveInline(msg, n),
+                ...(live && !togetherReadOnly ? { onState: (n: number, st: InlineState) => keepInline(msg, n, st), onOpen: (n: number, spec: InlineSpec) => openInline(msg, n, spec), onMap: (n: number, spec: InlineSpec) => mapInline(msg, n, spec), ...(workspaceOn ? { onEdit: (n: number, spec: InlineSpec) => editInline(msg, n, spec) } : {}) } : {}),
               }}
               renderInline={(t, k) => <RichInline text={t} math keyBase={`cv-${el.key}-${k}`} />}
             />
@@ -10431,19 +10980,21 @@ export function LogosApp({
           if (a.key.startsWith('d:') && kept.has(a.key.slice(2))) continue;
           if (a.key === 'w:doc' && isEmptyDoc(writeDoc)) continue;
           const practice = a.key.startsWith('p:');
+          // a quiz is practice, taken where it is: pressed, it opens large and live in place
+          const quiz = a.key.startsWith('d:') && objOf(spaceOf(map), a.key.slice(2))?.kind === 'quiz';
           cards.push({
             key: `a:${a.key}`,
-            lane: practice ? 'practice' : 'made',
-            tone: practice ? 'practice' : 'artifact',
-            kicker: practice ? 'Practice' : `Artifact · ${a.kind}`,
+            lane: practice || quiz ? 'practice' : 'made',
+            tone: practice || quiz ? 'practice' : 'artifact',
+            kicker: quiz ? 'Quiz' : practice ? 'Practice' : `Artifact · ${a.kind}`,
             title: a.title,
-            turn: null,
+            turn: quiz ? quizTurnOf(a.key.slice(2), turns, messages) : null,
             preview: (
               <div className="lcv-art">
                 <span className="lcv-art-g" aria-hidden="true">
-                  {practice ? '✓' : a.kind === 'Writing' ? '¶' : '◇'}
+                  {practice || quiz ? '✓' : a.kind === 'Writing' ? '¶' : '◇'}
                 </span>
-                <span>{practice ? 'Questions to try' : `${a.kind} — open it here to use it`}</span>
+                <span>{quiz ? 'A quiz — open it here to take it' : practice ? 'Questions to try' : `${a.kind} — open it here to use it`}</span>
               </div>
             ),
             full: () => a.render(),
@@ -10452,6 +11003,35 @@ export function LogosApp({
               showArtifact(a.key);
               openFull('artifacts');
             },
+          });
+        }
+        // QUIZ ME, FROM THE BOARD: one press starts a quiz on this conversation
+        if (mayQuizFromBoard(messages)) {
+          cards.push({
+            key: 'q:start',
+            lane: 'practice',
+            tone: 'practice',
+            kicker: 'Quiz',
+            title: quizzesHere().length ? 'Another quiz on this' : 'Quiz me on this',
+            turn: turns.length ? turns[turns.length - 1].index : null,
+            preview: (
+              <div className="lcv-art">
+                <span className="lcv-art-g" aria-hidden="true">
+                  ✓
+                </span>
+                <span>Questions on this conversation, one at a time</span>
+                <button
+                  type="button"
+                  className="lcv-act is-primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    quizFromBoard();
+                  }}
+                >
+                  Start the quiz
+                </button>
+              </div>
+            ),
           });
         }
         // what was read and written: files brought, notes and write-ups — beside the turn they came with

@@ -1,0 +1,440 @@
+/* components/brand/socria-brand.css — the Socria brandbook (Version 1, November 2026), as code.
+ *
+ * Tried first on SocriaUX (/ux and /ux-v0) only, everything scoped under `.sb`, so the rest of the
+ * product keeps the Logos system until the brand is adopted. What the brandbook asks, in short:
+ *
+ *   colour    each colour has one job, never mood. Paper is the ground, ink every word, moss the
+ *             person (deep moss #354620 for moss text and the one filled control), apricot the
+ *             question, lake the evidence, burgundy what Socria adds. Cobalt, plum and ochre are
+ *             accents and never lead. Text is ink or paper.
+ *   type      two faces. Old Standard TT is Socria's voice (wordmark, headlines, its questions),
+ *             18px and up, no bold, italic for the one stressed word. Geist is the person, the
+ *             interface and the record: body 15, your words 500, labels 600 13, evidence 500 12
+ *             tabular. Titles tracked −1.5%. Sentence case; headlines end with a full stop.
+ *   form      surfaces, not outlines: a card's kind lives in its glyph and its tint. Pills for every
+ *             control, no boxed buttons, no capitals. Segmented, not underlined: the chosen tab sits
+ *             on paper. Only what floats casts a shadow, soft and low. Solid colour only for what
+ *             needs the person. Flat colour; no gradients, glows, blur or grain.
+ *   kinds     circle idea (moss), arch question (apricot), quarter file (lake), diamond objection
+ *             (cobalt), square made (burgundy).
+ *   motion    hover and press 120ms, open and close 200ms, cards rearrange 320ms; ease out, no bounce.
+ */
+
+.sb {
+  /* the palette */
+  --sb-paper: #faf9f6;
+  --sb-ink: #20201b;
+  --sb-moss: #354620;
+  --sb-moss-rgb: 53, 70, 32;
+  --sb-moss-hover: #2a381a;
+  --sb-moss-tone: #5e7633;
+  --sb-burgundy: #7b2633;
+  --sb-apricot: #f0a35e;
+  --sb-peach: #f2b38c;
+  --sb-lake: #3f7c85;
+  --sb-cobalt: #1c3faa;
+  --sb-plum: #6e2f52;
+  --sb-ochre: #d19a2a;
+
+  /* ink at the strengths text may take (each still reads at 4.5:1 or more on paper and on white) */
+  --sb-ink-70: rgba(32, 32, 27, 0.78);
+  --sb-ink-60: rgba(32, 32, 27, 0.68);
+  --sb-ink-45: rgba(32, 32, 27, 0.66);
+  --sb-ink-25: rgba(32, 32, 27, 0.32);
+
+  /* surfaces: white cards on paper, a quiet well for pills and segmented tracks, hairlines where a rule is needed */
+  --sb-surface: #ffffff;
+  --sb-well: #edece6;
+  --sb-well-hover: #e3e2db;
+  --sb-rule: rgba(32, 32, 27, 0.1);
+  --sb-rule-2: rgba(32, 32, 27, 0.18);
+
+  /* kind tints: the card's kind in its surface */
+  --sb-tint-idea: #e7ebdc;
+  --sb-tint-file: #e0eaeb;
+  --sb-tint-objection: #e3e7f4;
+  --sb-tint-made: #f3e4e4;
+  --sb-tint-question: #fbe6d2;
+
+  /* only what floats casts a shadow: soft and low */
+  --sb-float: 0 10px 28px -14px rgba(32, 32, 27, 0.32), 0 2px 6px -3px rgba(32, 32, 27, 0.1);
+  --sb-r-card: 16px;
+  --sb-r-field: 12px;
+
+  --sb-voice: var(--font-old-standard), 'Old Standard TT', Georgia, serif;
+  --sb-ui: var(--font-geist), system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --sb-fast: 120ms;
+  --sb-open: 200ms;
+  --sb-move: 320ms;
+  --sb-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  font-family: var(--sb-ui);
+  font-size: 15px;
+  color: var(--sb-ink);
+  background-color: var(--sb-paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+.sb ::selection {
+  background: var(--sb-tint-idea);
+}
+.sb :focus-visible {
+  outline: 2px solid var(--sb-moss);
+  outline-offset: 2px;
+}
+
+/* ── type roles ──────────────────────────────────────────────────── */
+
+.sb .sb-voice {
+  font-family: var(--sb-voice);
+  font-weight: 400;
+}
+.sb .sb-display {
+  font-family: var(--sb-voice);
+  font-weight: 400;
+  font-size: 49px;
+  line-height: 1.04;
+  letter-spacing: -0.015em;
+}
+.sb .sb-title {
+  font-family: var(--sb-voice);
+  font-weight: 400;
+  font-size: 19px;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+.sb .sb-question {
+  font-family: var(--sb-voice);
+  font-weight: 400;
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+.sb .sb-words {
+  font-weight: 500;
+}
+.sb .sb-label {
+  font-family: var(--sb-ui);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--sb-ink);
+}
+.sb .sb-evidence {
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── controls: pills for every control ───────────────────────────── */
+
+.sb .sb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sb-well);
+  color: var(--sb-ink);
+  font: inherit;
+  font-family: var(--sb-ui);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--sb-fast) var(--sb-ease), color var(--sb-fast) var(--sb-ease);
+}
+.sb .sb-btn:hover:not(:disabled) {
+  background: var(--sb-well-hover);
+}
+.sb .sb-btn.is-primary {
+  background: var(--sb-moss);
+  color: var(--sb-paper);
+}
+.sb .sb-btn.is-primary:hover:not(:disabled) {
+  background: var(--sb-moss-hover);
+}
+.sb .sb-btn.is-sm {
+  min-height: 30px;
+  padding: 0 13px;
+  font-size: 13px;
+}
+.sb .sb-btn.is-danger.is-solid {
+  background: var(--sb-burgundy);
+  color: var(--sb-paper);
+}
+.sb .sb-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* a word that acts: for actions that sit inside text or on a card (Keep, Replace, Dismiss) */
+.sb .sb-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sb-ink-70);
+  font: inherit;
+  font-family: var(--sb-ui);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color var(--sb-fast) var(--sb-ease);
+}
+.sb .sb-link.is-meta {
+  font-size: 13px;
+}
+.sb .sb-link:hover:not(:disabled) {
+  color: var(--sb-ink);
+}
+.sb .sb-link.is-strong {
+  color: var(--sb-ink);
+  font-weight: 600;
+}
+.sb .sb-link.is-go {
+  color: var(--sb-moss);
+  font-weight: 600;
+}
+.sb .sb-link:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.sb .sb-ar {
+  transition: transform var(--sb-fast) var(--sb-ease);
+}
+.sb .sb-link:hover .sb-ar {
+  transform: translateX(2px);
+}
+
+/* ── segmented, not underlined: the chosen one sits on paper ─────── */
+
+.sb .sb-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--sb-well);
+}
+.sb .sb-seg-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sb-ink-70);
+  font: inherit;
+  font-family: var(--sb-ui);
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--sb-fast) var(--sb-ease), color var(--sb-fast) var(--sb-ease);
+}
+.sb .sb-seg-item:hover:not(:disabled) {
+  color: var(--sb-ink);
+}
+.sb .sb-seg-item.is-on,
+.sb .sb-seg-item[aria-checked='true'],
+.sb .sb-seg-item[aria-current='step'],
+.sb .sb-seg-item[aria-selected='true'] {
+  background: var(--sb-paper);
+  color: var(--sb-ink);
+  box-shadow: 0 0 0 1px var(--sb-rule);
+}
+.sb .sb-seg-item:disabled {
+  color: var(--sb-ink-25);
+  cursor: default;
+}
+
+/* ── surfaces, not outlines ──────────────────────────────────────── */
+
+.sb .sb-card {
+  border-radius: var(--sb-r-card);
+  background: var(--sb-surface);
+  padding: 16px 18px;
+}
+.sb .sb-card.is-idea {
+  background: var(--sb-tint-idea);
+}
+.sb .sb-card.is-file {
+  background: var(--sb-tint-file);
+}
+.sb .sb-card.is-objection {
+  background: var(--sb-tint-objection);
+}
+.sb .sb-card.is-made {
+  background: var(--sb-tint-made);
+}
+/* solid colour only for what needs the person: the question waiting on them */
+.sb .sb-card.is-question {
+  background: var(--sb-apricot);
+  color: var(--sb-ink);
+}
+.sb .sb-floating {
+  box-shadow: var(--sb-float);
+}
+
+/* the kind glyphs */
+.sb .sb-glyph {
+  display: inline-block;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  background: var(--sb-moss-tone);
+  border-radius: 50%;
+}
+.sb .sb-glyph.is-question {
+  width: 12px;
+  height: 6px;
+  border-radius: 12px 12px 0 0;
+  background: var(--sb-apricot);
+}
+.sb .sb-card.is-question .sb-glyph.is-question {
+  background: var(--sb-ink);
+}
+.sb .sb-glyph.is-file {
+  width: 9px;
+  height: 9px;
+  border-radius: 9px 0 0 0;
+  background: var(--sb-lake);
+}
+.sb .sb-glyph.is-objection {
+  width: 8px;
+  height: 8px;
+  border-radius: 0;
+  background: var(--sb-cobalt);
+  transform: rotate(45deg);
+}
+.sb .sb-glyph.is-made {
+  width: 8px;
+  height: 8px;
+  border-radius: 0;
+  background: var(--sb-burgundy);
+}
+
+/* ── fields and the composer ─────────────────────────────────────── */
+
+.sb .sb-field {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 14px;
+  border: 0;
+  border-radius: var(--sb-r-field);
+  background: var(--sb-surface);
+  box-shadow: inset 0 0 0 1px var(--sb-rule-2);
+  color: var(--sb-ink);
+  font: inherit;
+  font-family: var(--sb-ui);
+  font-size: 15px;
+  font-weight: 500;
+  transition: box-shadow var(--sb-fast) var(--sb-ease);
+}
+.sb .sb-field::placeholder {
+  color: var(--sb-ink-60);
+  font-weight: 400;
+  opacity: 1;
+}
+.sb .sb-field:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--sb-moss);
+}
+
+/* the composer floats: a white surface with the context line, the person's words and one filled pill */
+.sb .sb-compose {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px 12px 18px;
+  border-radius: 22px;
+  background: var(--sb-surface);
+  box-shadow: var(--sb-float);
+}
+.sb .sb-compose-guide {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 22px;
+  font-size: 13px;
+  color: var(--sb-ink-70);
+}
+.sb .sb-compose-line {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+.sb .sb-compose-line :is(textarea, input) {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  resize: none;
+  color: var(--sb-ink);
+  font-family: var(--sb-ui);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.45;
+  outline: none;
+}
+.sb .sb-compose-line textarea::placeholder {
+  color: var(--sb-ink-60);
+  font-weight: 400;
+  opacity: 1;
+}
+.sb .sb-compose-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 18px;
+  font-size: 12.5px;
+  color: var(--sb-ink-60);
+}
+.sb .sb-compose-foot > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+.sb .sb-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sb-moss-tone);
+}
+
+/* a row in a list: a hairline between, no boxes */
+.sb .sb-row {
+  border-top: 1px solid var(--sb-rule);
+}
+.sb .sb-row:first-child {
+  border-top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sb *,
+  .sb *::before,
+  .sb *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

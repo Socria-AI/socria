@@ -325,7 +325,7 @@ export function UXWorkspace({ initial, signedIn, onExit }: { initial: UXProject;
   const stageIndex = STAGES.indexOf(project.stage);
 
   return (
-    <div className={`uxr lg-tokens${railOpen ? ' rail-open' : ''}${panelOpen ? ' panel-open' : ''}`}>
+    <div className={`uxr sb lg-tokens${railOpen ? ' rail-open' : ''}${panelOpen ? ' panel-open' : ''}`}>
       <header className="uxh">
         <div className="uxh-left">
           <button type="button" className="uxh-home" onClick={onExit} aria-label="All projects">

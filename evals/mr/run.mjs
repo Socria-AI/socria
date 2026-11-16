@@ -28,8 +28,12 @@
 // REPORTED, per arm, with bootstrap intervals over scenarios: task success,
 // unnecessary questions, turns before useful help, user-control compliance,
 // strategy changes, interventions per turn, reverts, integrity findings,
-// model calls per turn, route and MR latency; plus what the ledger wrote and
-// whether it held any text. Written to <out>/summary.json and <out>/report.md.
+// model calls per turn, route and MR latency, words per reply and in the
+// first reply, one useful question where one was wanted, and no intervention
+// on a clear question; plus what the ledger wrote and whether it held any
+// text. Written to <out>/summary.json and <out>/report.md. Each is its own
+// vector: none is summed into a score, and reply length is reported, never
+// aimed at.
 //
 // HOW IT COUNTS, where a softer rule would flatter MR:
 //   • a question is EVERY interrogative sentence the person is handed —
@@ -108,7 +112,7 @@ await build({
   logLevel: 'error',
 });
 await build({
-  stdin: { contents: `export { interrogatives, sentencesOf } from './lib/core4/questions';`, resolveDir: REPO, sourcefile: 'q.ts', loader: 'ts' },
+  stdin: { contents: `export { interrogatives, sentencesOf } from './lib/core4/questions';\nexport { wordCount } from './lib/mr/outcome';`, resolveDir: REPO, sourcefile: 'q.ts', loader: 'ts' },
   bundle: true,
   format: 'esm',
   platform: 'node',
@@ -116,7 +120,7 @@ await build({
   tsconfig: join(REPO, 'tsconfig.json'),
   logLevel: 'error',
 });
-const { interrogatives, sentencesOf } = await import(pathToFileURL(join(OUT, '.build', 'q.mjs')).href);
+const { interrogatives, sentencesOf, wordCount } = await import(pathToFileURL(join(OUT, '.build', 'q.mjs')).href);
 const { db } = await import(pathToFileURL(FAKE_DB).href);
 
 // Every interrogative sentence a reply hands the person. Core 4's questionLoad
@@ -180,7 +184,8 @@ async function play(s, arm, profile, prefix = '') {
   let say = s.opening[0];
   const turns = [];
   for (let k = 0; k < MAX_TURNS && say; k++) {
-    messages.push({ role: 'user', content: say });
+    // a scenario's attachments go on its opening message, as the app sends them (a screenshot, a pasted note)
+    messages.push({ role: 'user', content: say, ...(k === 0 && s.attachments ? { attachments: s.attachments } : {}) });
     const r = await post({ sessionId, messages }, arm.env);
     const reply = r.text;
     const q = asked(reply);
@@ -190,6 +195,8 @@ async function play(s, arm, profile, prefix = '') {
       questions: q.questions,
       offers: q.offers,
       marks: q.marks,
+      // the reply's length as MR's measures count it (lib/mr/outcome.ts wordCount)
+      words: wordCount(reply),
       useful: s.useful(reply, k),
       unwanted: s.unwanted(k),
       control: s.control(reply, k),
@@ -233,6 +240,14 @@ function metricsOf(s, turns) {
     routeMs: median(turns.map((t) => t.routeMs)),
     mrMs: turns.some((t) => Number.isFinite(t.mrMs)) ? median(turns.filter((t) => Number.isFinite(t.mrMs)).map((t) => t.mrMs)) : null,
     noInterventionWhenAmbiguous: s.expectNoIntervention ? (turns.every((t) => !t.action || t.action === 'none') ? 1 : 0) : null,
+    // Length, described and never a target: a shorter reply is not a better one in itself.
+    wordsPerReply: turns.reduce((n, t) => n + t.words, 0) / turns.length,
+    firstReplyWords: turns[0]?.words ?? null,
+    // Where one question was the right move (what they meant, what they are working on, the thing they point at that
+    // is not in the conversation): the first reply asked exactly one and was useful.
+    oneQuestionWhenWanted: s.wantsOneQuestion ? (turns[0]?.questions === 1 && turns[0]?.useful === true ? 1 : 0) : null,
+    // A clear question: MR did nothing on any turn.
+    noInterventionWhenClear: s.expectNoInterventionClear ? (turns.every((t) => !t.action || t.action === 'none') ? 1 : 0) : null,
     turns: turns.length,
   };
 }
@@ -252,6 +267,10 @@ const METRICS = [
   'routeMs',
   'mrMs',
   'noInterventionWhenAmbiguous',
+  'wordsPerReply',
+  'firstReplyWords',
+  'oneQuestionWhenWanted',
+  'noInterventionWhenClear',
 ];
 
 const only = typeof args.only === 'string' ? args.only : null;
@@ -342,6 +361,7 @@ const lines = [
   '',
   '- **Questions** count every interrogative sentence the person is handed: explicit, disguised ("ask yourself whether…"), and offers or check-ins ("Does that make sense?", "Want me to compare?", "Let me know if…"). `unnecessaryOffers` is the offers and check-ins among the unnecessary questions.',
   '- **turnsBeforeUseful:** a run in which no reply was useful counts the turns it actually played, so it is a lower bound. Those runs are counted under each table.',
+  '- **wordsPerReply** and **firstReplyWords** describe length; they are not a target, and fewer words is not better in itself. **oneQuestionWhenWanted** is 1 when the first reply of a scenario that needed one question (what they meant, what they are working on, or the thing they point at that is not in the conversation) asked exactly one and was useful; **noInterventionWhenClear** is 1 when MR did nothing on any turn of a clear question. Each is its own row with its own interval, never combined with another.',
   `- **Timing:** ${LIVE ? 'no warm-up (live); ' : `an untimed warm-up pass of ${warmup.runs} runs came first (its first run took ${warmup.coldStart?.routeMs?.toFixed(1) ?? '—'} ms through the route, and MR's first call ${warmup.coldStart?.mrMs ?? '—'} ms: start-up cost, in no table); `}each scenario runs its arms in a rotated order. routeMs is the whole route with the simulator and the fake database. mrMs is MR's own time.`,
   '',
 ];

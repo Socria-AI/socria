@@ -1,17 +1,21 @@
 'use client';
 // components/logos5/Universe.tsx — the Universal Map, Logos 5's home.
 //
-// Every past conversation, on one map. How much of it, chosen at the top
-// right: Today (exactly what was begun today, local time) and This week are
-// drawn as subjects —
-// each a dashed circle, a real study session a disc in its colour, a quick
-// question a dot on a spoke from its session, and what joins two subjects a
-// dashed curve with a card that says why (lib/logos5/bubbles.ts; nothing has
-// to be filed for that, lib/logos5/subjects.ts reads what each is about) —
-// and This month and All time are a line through time, the oldest on the
-// left and the newest on the right (lib/logos5/timeline.ts), where something
-// half-remembered is found by scrolling back. lib/logos5/arrange.ts keeps how
-// the person arranged it. It is where Logos 5 opens, and where everything
+// Every past conversation, on ONE map. How much of it, chosen at the top right:
+// Today, Week, Month or All Time (lib/logos5/scales.ts) — temporal scales of
+// the same map, never four maps. The whole of it is laid out once, from every
+// conversation (lib/logos5/bubbles.ts): each subject a circle, a real study
+// session a disc in its colour, a quick question a dot on a spoke from its
+// session, and what joins two subjects a dashed curve with a card that says
+// why (nothing has to be filed for that, lib/logos5/subjects.ts reads what
+// each is about). A scale only says which conversations are lit: a wider one
+// lights more of the same universe, each subject's region growing round what
+// came, and the camera glides out to take it in; nothing already there moves.
+// Seen from far away the map draws the shape of what they know; close up,
+// every word (lib/logos5/mapLod.ts). "Find on your map" (components/logos5/
+// MapFind.tsx) finds a conversation from months ago — widening the scale if it
+// has to — and goes there; Back returns. lib/logos5/arrange.ts keeps how the
+// person arranged it. It is where Logos 5 opens, and where everything
 // begins: one box at the foot finds, starts, or takes files to be sorted —
 // dropped on it, or anywhere on the map. Pressing a conversation opens its
 // card; pressing again, or Continue, opens it.
@@ -24,21 +28,22 @@
 // conversation's card says what it taught Socria, and a reading still waiting
 // can be confirmed or corrected there, through the store's own route.
 //
-// The pieces: UniverseBubbles.tsx (the map), UniverseTime.tsx (the line),
-// UniverseParts.tsx (the card, the box, the menus).
+// The pieces: UniverseBubbles.tsx (the map), MapFind.tsx (finding, and the way
+// back), UniverseParts.tsx (the card, the box, the menus).
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { resumeOf, sharedIdeas, tileMatch, tilesOf, type ProjectIn, type Tile, type UniverseIn } from '@/lib/logos5/universe';
-import { dayName, dayStart, homesOf, todayOf, weekStart } from '@/lib/logos5/spatial';
-import { TODAY_EMPTY, dayBounds } from '@/lib/logos5/views';
-import { monthStart } from '@/lib/logos5/timeline';
+import { dayName, dayStart, homesOf } from '@/lib/logos5/spatial';
+import { TODAY_EMPTY } from '@/lib/logos5/views';
+import { covers, idsInScale, scaleCounts, scaleFrom, scaleOf, widerWithMore, SCALE_SAID, SCALES } from '@/lib/logos5/scales';
+import { recentOf, searchMap, type MapFound } from '@/lib/logos5/mapSearch';
 import { OTHER } from '@/lib/logos5/subjects';
 import * as A from '@/lib/logos5/arrange';
 import { mapMemoriesOf, mapProvenance, type MemoryIn, type ProvIn } from '@/lib/logos5/memoryAtlas';
 import { logosPersistPolicy } from '@/lib/mind/logos-turn';
 import { useArrangement } from './useArrangement';
-import { BubbleMap, type BubbleActs, type MapMemoryLayer } from './UniverseBubbles';
-import { TimeView } from './UniverseTime';
+import { BubbleMap, type BubbleActs, type MapMemoryLayer, type MapNav } from './UniverseBubbles';
+import { BackPill, MapFind } from './MapFind';
 import type { Attachment } from '@/lib/logos-attachments';
 import type { Intent } from '@/lib/logos5/study';
 import { ActionBar, FindOrStart, Glyph, HiddenTray, PreviewCard, StarMark, StartDisc, ViewMenu, kindLine, shortDate, type Found, type Taught } from './UniverseParts';
@@ -62,17 +67,7 @@ interface Step {
   files: Filing[];
 }
 
-/** How much of it is shown; short on a phone. Today and This week are a map, the other two a line through time. */
-const LENS_SAID: Record<A.HomeMode, { long: string; short: string }> = {
-  today: { long: 'Today', short: 'Today' },
-  week: { long: 'This week', short: 'Week' },
-  month: { long: 'This month', short: 'Month' },
-  all: { long: 'All time', short: 'All' },
-};
-
-const DAY = 86_400_000;
-/** In order (This month, All time) rather than a map. */
-const inTime = (m: A.HomeMode) => m === 'month' || m === 'all';
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** what the page's own words and the box at the foot cover of the map, wide and on a phone */
 const TOP = { wide: 150, narrow: 140 } as const;
 const FOOT = { wide: 92, narrow: 78 } as const;
@@ -209,57 +204,29 @@ export function UniverseView({
   const starredSet = useMemo(() => new Set(arr.starred), [arr.starred]);
   /** on the map at all: not hidden, and not a Core chat when those are put away */
   const visible = useMemo(() => tiles.filter((t) => !hidden.has(t.id) && (arr.display.chats || t.kind !== 'core')), [tiles, hidden, arr.display.chats]);
-  const homes = useMemo(() => homesOf(visible, projects, arr), [visible, projects, arr]);
+  // only what decides a subject (the person's own choices and order): a change of scale, sort or display keeps the
+  // same homes, so the map's placement (components/logos5/UniverseBubbles.tsx bubblePlaces) is not worked out again
+  const placing = useMemo(() => ({ subjectOf: arr.subjectOf, groupOrder: arr.groupOrder }), [arr.subjectOf, arr.groupOrder]);
+  const homes = useMemo(() => homesOf(visible, projects, placing), [visible, projects, placing]);
   /** where every conversation would be, hidden ones too: for naming what a search finds */
-  const allHomes = useMemo(() => homesOf(tiles, projects, arr), [tiles, projects, arr]);
+  const allHomes = useMemo(() => homesOf(tiles, projects, placing), [tiles, projects, placing]);
   const only = useMemo(() => (arr.projects ? new Set(arr.projects) : null), [arr.projects]);
   const shown = useMemo(() => (only ? visible.filter((t) => only.has(homes.of.get(t.id)?.key ?? OTHER)) : visible), [visible, only, homes]);
   const shownHomes = useMemo(() => (only ? { ...homes, list: homes.list.filter((h) => only.has(h.key)) } : homes), [homes, only]);
-  // ── how much of it: a week (this one, or one chosen from the line), this month, or all of it ──
-  /** the week shown as a map, when it is not this one — chosen from the line; not kept */
-  const [weekAt, setWeekAt] = useState<number | null>(null);
-  const weekFrom = weekStart(weekAt ?? now);
-  const weekTo = weekStart(weekFrom + 8 * DAY);
-  const scoped = useMemo(() => {
-    // this week: what was worked on in it; a week before: what was begun in it, as the line shows it
-    if (lens === 'week') return shown.filter((t) => (weekAt === null ? t.at >= weekFrom || t.started >= weekFrom : t.started >= weekFrom && t.started < weekTo));
-    if (lens === 'month') return shown.filter((t) => t.started >= monthStart(now));
-    return shown;
-  }, [lens, shown, weekAt, weekFrom, weekTo, now]);
-  const ideas = useMemo(() => sharedIdeas(lens === 'week' ? scoped : shown), [lens, scoped, shown]);
-  /** on the week's map: by each subject there, the last of that subject before the week */
-  const backOf = useMemo(() => {
-    if (lens !== 'week') return undefined;
-    const inWeek = new Set(scoped.map((t) => t.id));
-    const firstOf = new Map<string, Tile>();
-    for (const t of [...scoped].sort((a, b) => a.started - b.started)) {
-      const key = homes.of.get(t.id)?.key;
-      if (key && key !== OTHER && !firstOf.has(key)) firstOf.set(key, t);
-    }
-    const out = new Map<string, { id: string; at: number }>();
-    for (const [key, t] of firstOf) {
-      let best: Tile | null = null;
-      for (const u of visible) if (!inWeek.has(u.id) && u.started < weekFrom && homes.of.get(u.id)?.key === key && (!best || u.started > best.started)) best = u;
-      if (best) out.set(t.id, { id: best.id, at: best.started });
-    }
-    return out;
-  }, [lens, scoped, homes, visible, weekFrom]);
-  /**
-   * TODAY, EXACTLY (Alex Tran, Logos 5 Comments v2): what was begun on this
-   * calendar day, in the person's own time zone — 00:00:00 to 23:59:59 —
-   * and nothing earlier, however related. No last-day fallback, no ring of
-   * older conversations: an empty day is said as one.
-   */
-  const todayTiles = useMemo(() => {
-    const { start, end } = dayBounds(now);
-    return shown.filter((t) => t.started >= start && t.started <= end);
-  }, [shown, now]);
-  const todayPlan = useMemo(() => (lens === 'today' ? todayOf(todayTiles, shownHomes, ideas, now, arr.links) : null), [lens, todayTiles, shownHomes, ideas, now, arr.links]);
-  /** the folded subjects and Projects opened on the map; let go on another lens */
+  // ── HOW MUCH OF IT (lib/logos5/scales.ts): Today, Week, Month, All Time — one map, more or less of it lit.
+  // By activity in their own time zone; each scale contains the narrower ones. An empty Today is said as one
+  // (no last-day fallback, no ring of older conversations), and a wider scale is never made to look larger
+  // than what it holds. ──
+  const counts = useMemo(() => scaleCounts(shown, now), [shown, now]);
+  const lit = useMemo(() => idsInScale(shown, lens, now), [shown, lens, now]);
+  const scoped = useMemo(() => shown.filter((t) => lit.has(t.id)), [shown, lit]);
+  // the ideas two subjects share, read across the whole map: what joins them never depends on the scale
+  const ideas = useMemo(() => sharedIdeas(shown), [shown]);
+  /** the folded subjects and Projects opened on the map (kept from one scale to the next) */
   const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set());
-  /** go to one on the line — a ↩ on the week's map, "Find it in time" — once per press */
-  const [timeFocus, setTimeFocus] = useState<{ id: string; n: number } | null>(null);
-  const [endKey, setEndKey] = useState(0);
+  /** the camera, moved from here: what was found, and the way back (components/logos5/UniverseBubbles.tsx MapNav) */
+  const navRef = useRef<MapNav | null>(null);
+  const [canBack, setCanBack] = useState(false);
   const homeByKey = useMemo(() => new Map(homes.list.map((h) => [h.key, h])), [homes]);
 
   const [query, setQuery] = useState('');
@@ -267,7 +234,14 @@ export function UniverseView({
   // "/", dimming what does not match and dropping files on the map did nothing. "/" brings the box back; it goes
   // again when it is emptied and left — the + stays where it was put.
   const [findOpen, setFindOpen] = useState(false);
-  const q = query.trim();
+  /** FIND ON YOUR MAP (components/logos5/MapFind.tsx): open, and its words — its own, apart from the box at the foot */
+  const [mapOpen, setMapOpen] = useState(false);
+  /** whether the map is drawn now: where / goes (read by the key handler, set as the page is drawn) */
+  const mapShown = useRef(false);
+  const [mapQuery, setMapQuery] = useState('');
+  // what the map is narrowed to: the header's words, or Find on your map's while it is open (a jump closes the panel and
+  // keeps its words for /, but the map is then whole again)
+  const q = (query || (mapOpen ? mapQuery : '')).trim();
   const matches = useMemo(() => (q ? new Map(tiles.map((t) => [t.id, tileMatch(t, q)])) : null), [tiles, q]);
   const matchOf = useMemo(() => (matches ? (id: string) => matches.get(id) ?? null : null), [matches]);
   const found: Found[] = useMemo(
@@ -281,6 +255,16 @@ export function UniverseView({
     [matches, tiles, hidden, allHomes]
   );
   const resume = useMemo(() => resumeOf(tiles.filter((t) => !hidden.has(t.id))), [tiles, hidden]);
+  // what Find on your map finds — over what is on the map at All Time, so nothing it finds has nowhere to be shown
+  const subjectOf = useCallback((id: string) => {
+    const h = homes.of.get(id);
+    return h ? { key: h.key, name: h.name } : null;
+  }, [homes]);
+  const mapFound = useMemo(() => (mapOpen && mapQuery.trim() ? searchMap({ tiles: shown, subjectOf, now, scale: lens }, mapQuery) : []), [mapOpen, mapQuery, shown, subjectOf, now, lens]);
+  const mapRecent = useMemo(
+    () => (mapOpen ? recentOf(shown, narrow ? 6 : 8).map((t) => ({ id: t.id, title: t.title, at: Math.max(t.at, t.started), where: subjectOf(t.id)?.name ?? null, scale: scaleOf(t, now), inView: lit.has(t.id), ...(t.kind === 'core' ? { chat: true } : {}) })) : []),
+    [mapOpen, shown, narrow, subjectOf, now, lit]
+  );
 
   // ── what Socria remembers: signed in only, and only what the private-filtered feed holds ──
   const [memNodes, setMemNodes] = useState<readonly MemoryIn[] | null>(memoryGiven ?? null);
@@ -399,11 +383,7 @@ export function UniverseView({
   useEffect(() => {
     if (notice) setSaid(notice);
   }, [notice]);
-  // another week is another map, fitted to it; leaving Today folds again what was opened there
-  useEffect(() => setFitKey((k) => k + 1), [weekAt]);
-  useEffect(() => {
-    setOpened((o) => (o.size ? new Set() : o));
-  }, [lens]);
+  // (a folded subject opened stays open from one scale to the next: the map keeps its shape, and nothing moves)
 
   // ── changes, kept, and undone ──
   const commit = useCallback(
@@ -462,26 +442,25 @@ export function UniverseView({
   // ── the lenses ──
   const pickLens = (m: A.HomeMode) => {
     setPreview(null);
-    setWeekAt(null);
-    // pressed again: back to today on the line, the whole of it on a map
-    if (m === lens) return inTime(m) ? setEndKey((k) => k + 1) : setFitKey((k) => k + 1);
-    setSel([]);
+    // pressed again: the whole of what it shows, in view
+    if (m === lens) return navRef.current ? navRef.current.fit() : setFitKey((k) => k + 1);
     prefer((a) => A.setMode(a, m));
   };
-  /** the week a conversation began in, as a map */
-  const seeWeek = (t: Tile) => {
+  /**
+   * GO TO WHAT WAS FOUND: the map widened first, to the narrowest scale that shows it, when the scale it is at
+   * does not — then the camera glides there and lights it (a conversation's card opens). Nothing is found that
+   * the map then refuses to show.
+   */
+  const goTo = (f: Pick<MapFound, 'kind' | 'id' | 'ids' | 'scale' | 'inView'>) => {
     setPreview(null);
-    setSel([]);
-    const w = weekStart(t.started);
-    setWeekAt(w >= weekStart(now) ? null : w);
-    prefer((a) => A.setMode(a, 'week'));
-  };
-  /** where a conversation is in time: All time, brought to it */
-  const findInTime = (id: string) => {
-    setPreview(null);
-    setSel([]);
-    if (lens !== 'all') prefer((a) => A.setMode(a, 'all'));
-    setTimeFocus({ id, n: Date.now() });
+    setFindOpen(false);
+    setQuery('');
+    // the panel closes so the map and the preview have the room; its words are kept, so / brings the same results back
+    setMapOpen(false);
+    // where the camera is now is where Back returns to, whatever a wider scale does to it first
+    navRef.current?.mark();
+    if (!covers(lens, f.scale)) prefer((a) => A.setMode(a, f.scale));
+    requestAnimationFrame(() => (f.kind === 'conversation' ? navRef.current?.focus(f.id) : navRef.current?.focusMany(f.ids)));
   };
 
   /** Filed in a Project — which is then its subject, so any subject it was given by hand is let go. */
@@ -622,7 +601,6 @@ export function UniverseView({
       setSaid('Linked. Its card says what joins them — press “Say what joins them” to write it.');
     },
     onLinkEdit: (id, label) => commit((a) => (label === null ? A.removeLink(a, id) : A.relabelLink(a, id, label))),
-    onBack: (id) => findInTime(id),
   };
 
   // ── keys anywhere on the map: / finds, ⌘Z undoes, Escape lets go ──
@@ -638,10 +616,17 @@ export function UniverseView({
         return;
       }
       if (typing) return;
-      if (e.key === '/' && !e.metaKey && !e.ctrlKey) {
+      if ((e.key === '/' && !e.metaKey && !e.ctrlKey) || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k')) {
         e.preventDefault();
-        setFindOpen(true);
-        requestAnimationFrame(() => findRef.current?.focus());
+        // on the map, Find on your map; with no map drawn (nothing yet, the atlas open), the box at the foot as before
+        if (mapShown.current) setMapOpen(true);
+        else {
+          setFindOpen(true);
+          requestAnimationFrame(() => findRef.current?.focus());
+        }
+      } else if (e.key === 'Backspace' && canBack && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        navRef.current?.back();
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         if (e.shiftKey) redo();
@@ -653,7 +638,7 @@ export function UniverseView({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [linkFrom, preview, sel.length, selectMode, undo, redo]);
+  }, [linkFrom, preview, sel.length, selectMode, undo, redo, canBack]);
 
   // a conversation gone from the map is no longer chosen
   useEffect(() => {
@@ -752,15 +737,10 @@ export function UniverseView({
             setPreview(null);
             setSaid(`“${previewTile.title}” is hidden — View, then Hidden, brings it back.`);
           },
-          // a link is drawn on the map; the line through time draws only what followed on
-          onLink: inTime(lens)
-            ? undefined
-            : () => {
-                setLinkFrom(previewTile.id);
-                setPreview(null);
-              },
-          onWeek: inTime(lens) ? () => seeWeek(previewTile) : undefined,
-          onTime: inTime(lens) ? undefined : () => findInTime(previewTile.id),
+          onLink: () => {
+            setLinkFrom(previewTile.id);
+            setPreview(null);
+          },
           onUnpin: () => commit((a) => A.unpinTiles(a, [previewTile.id]), [], true),
           onMove: onFile && projects?.length ? (pid) => fileTo([previewTile.id], pid) : undefined,
           onNewProject: onFile && onCreateProject && projects ? (name) => void newProjectWith([previewTile.id], name) : undefined,
@@ -893,12 +873,6 @@ export function UniverseView({
   const top = (insets?.top ?? (narrow ? TOP.narrow : TOP.wide)) + (narrow ? 4 : 8);
   const foot = insets?.foot ?? (narrow ? FOOT.narrow : FOOT.wide);
   const plural = (n: number) => `${n} ${n === 1 ? 'conversation' : 'conversations'}`;
-  const stepWeek = (by: -1 | 1) => {
-    setPreview(null);
-    setSel([]);
-    const next = weekStart(by < 0 ? weekFrom - 3 * DAY : weekFrom + 8 * DAY);
-    setWeekAt(next >= weekStart(now) ? null : next);
-  };
   // the questions Socria asked and is still waiting on: the way back in is an answer
   const asked = tiles.filter((t) => t.open && !hidden.has(t.id)).sort((a, b) => b.at - a.at);
   const pickUp =
@@ -942,40 +916,28 @@ export function UniverseView({
       </div>
     ) : null;
   /** under the page's name: which day, or which week (and the weeks either side), or how many */
-  const subline =
-    lens === 'today' ? (
-      <div className="l5h-sub">
-        <span className="l5h-sub-k">{`Today · ${dayName(dayStart(now))}`}</span>
-        {pickUp}
-      </div>
-    ) : lens === 'week' ? (
-      <div className="l5h-sub l5h-weektitle">
-        <button type="button" className="l5h-wt-step" aria-label="The week before" onClick={() => stepWeek(-1)}>
-          ‹
-        </button>
-        <span className="l5h-sub-k">
-          {weekAt === null ? `This week · ${dayName(weekFrom)} – today` : `Week of ${shortDate(weekFrom)} · ${shortDate(weekFrom)} – ${shortDate(weekTo - DAY)}`} · {plural(scoped.length)}
-        </span>
-        <button type="button" className="l5h-wt-step" aria-label="The week after" disabled={weekAt === null} onClick={() => stepWeek(1)}>
-          ›
-        </button>
-        {weekAt !== null && (
-          <button type="button" className="l5h-btn" onClick={() => setWeekAt(null)}>
-            Back to this week
-          </button>
-        )}
-        {pickUp}
-      </div>
-    ) : (
-      <div className="l5h-sub">
-        <span className="l5h-sub-k">{lens === 'month' ? `This month · ${plural(scoped.length)}` : `All time · ${plural(scoped.length)} · oldest on the left`}</span>
-        {pickUp}
-      </div>
-    );
+  const oldest = useMemo(() => shown.reduce((m, t) => Math.min(m, t.started || t.at), Infinity), [shown]);
+  const scaleWords =
+    lens === 'today'
+      ? `Today · ${dayName(dayStart(now))}`
+      : lens === 'week'
+        ? `Week · ${dayName(scaleFrom('week', now))} – today`
+        : lens === 'month'
+          ? `Month · since ${shortDate(scaleFrom('month', now))}`
+          : `All Time${Number.isFinite(oldest) ? ` · since ${MONTHS[new Date(oldest).getMonth()]} ${new Date(oldest).getFullYear()}` : ''}`;
+  const subline = (
+    <div className="l5h-sub">
+      <span className="l5h-sub-k">
+        {scaleWords} · {plural(scoped.length)}
+      </span>
+      {pickUp}
+    </div>
+  );
 
   const isMap = !atlasOn && shown.length > 0;
-  /** a map, not the line: what can be chosen several at once, linked, noted */
-  const isSky = isMap && !inTime(lens);
+  mapShown.current = isMap;
+  /** a map (always, now): what can be chosen several at once, linked, noted */
+  const isSky = isMap;
   const selPinned = sel.some((id) => !!arr.pins[id]);
 
   let body: ReactNode;
@@ -1012,66 +974,35 @@ export function UniverseView({
         </button>
       </div>
     );
-  else if (inTime(lens))
-    body = scoped.length ? (
-      <TimeView
-        key={lens}
-        tiles={scoped}
-        tileById={tileById}
-        homes={homes}
-        now={now}
-        from={lens === 'month' ? monthStart(now) : null}
-        narrow={narrow}
-        activeId={activeId}
-        selected={sel}
-        starred={starredSet}
-        matchOf={matchOf}
-        focus={timeFocus}
-        endKey={endKey}
-        top={top}
-        bottom={foot}
-        acts={{
-          onPreview: mapActs.onPreview,
-          onOpen: openId,
-          onSelect: (ids) => setSel(ids),
-          onStart: startable ? onNew : undefined,
-        }}
-      />
-    ) : (
-      <div className="l5h-empty">
-        {startable && onNew && <EmptyStart onStart={onNew} narrow={narrow} />}
-        <p>Nothing begun this month yet — the rest is all still here, in order.</p>
-        <button type="button" className="l5h-btn" onClick={() => prefer((a) => A.setMode(a, 'all'))}>
-          All time →
-        </button>
-      </div>
-    );
-  else if (lens === 'today' && !todayTiles.length)
+  else if (!scoped.length) {
+    // nothing at this scale: said as it is, with the way to the narrowest wider scale that holds something
+    const wider = widerWithMore(lens, counts);
     body = (
-      <div className="l5h-empty is-today">
-        {startable && onNew && <EmptyStart onStart={onNew} narrow={narrow} bare />}
-        <button type="button" className="l5h-todaynode" onClick={() => (onNew ? onNew() : findRef.current?.focus())}>
-          <span className="l5h-todaynode-dot" aria-hidden="true" />
-          {TODAY_EMPTY}
-        </button>
+      <div className={`l5h-empty${lens === 'today' ? ' is-today' : ''}`}>
+        {startable && onNew && <EmptyStart onStart={onNew} narrow={narrow} bare={lens === 'today'} />}
+        {lens === 'today' ? (
+          <button type="button" className="l5h-todaynode" onClick={() => (onNew ? onNew() : findRef.current?.focus())}>
+            <span className="l5h-todaynode-dot" aria-hidden="true" />
+            {TODAY_EMPTY}
+          </button>
+        ) : (
+          <p>{lens === 'week' ? 'Nothing in the last seven days.' : 'Nothing in the last thirty days.'}</p>
+        )}
+        {wider && (
+          <button type="button" className="l5h-btn" onClick={() => prefer((a) => A.setMode(a, wider))}>
+            {SCALE_SAID[wider].long} · {plural(counts[wider])} →
+          </button>
+        )}
       </div>
     );
-  else if (lens === 'week' && !scoped.length)
-    body = (
-      <div className="l5h-empty">
-        {startable && onNew && weekAt === null && <EmptyStart onStart={onNew} narrow={narrow} />}
-        <p>{weekAt === null ? 'Nothing yet this week.' : 'Nothing was begun that week.'}</p>
-        <button type="button" className="l5h-btn" onClick={() => prefer((a) => A.setMode(a, 'all'))}>
-          All time →
-        </button>
-      </div>
-    );
-  else
+  } else
     body = (
       <BubbleMap
-        key={lens === 'week' ? `week:${weekFrom}` : 'today'}
-        lens={lens === 'week' ? 'week' : 'today'}
-        tiles={lens === 'week' ? scoped : todayTiles}
+        scale={lens}
+        visible={lit}
+        navRef={navRef}
+        onNav={(s) => setCanBack(s.canBack)}
+        tiles={shown}
         tileById={tileById}
         homes={shownHomes}
         ideas={ideas}
@@ -1090,15 +1021,14 @@ export function UniverseView({
         top={top}
         bottom={foot}
         narrow={narrow}
-        all={lens === 'week' ? shown : todayTiles}
+        all={shown}
         opened={opened}
-        backOf={backOf}
         memory={memLayer}
         acts={mapActs}
       />
     );
   /** readings still waiting for the person, among what this map draws */
-  const drawn = lens === 'week' ? scoped : lens === 'today' ? todayTiles : [];
+  const drawn = scoped;
   const waiting = memOn ? memories.filter((m) => m.waiting && m.from.some((id) => drawn.some((t) => t.id === id))).length : 0;
 
   return (
@@ -1107,7 +1037,7 @@ export function UniverseView({
       <div className="l5h-body">
         {contentsEl}
         <div
-          className={`l5h-main lens-${lens}${inTime(lens) ? ' is-time' : ''}${dropping ? ' is-dropping' : ''}`}
+          className={`l5h-main lens-${lens}${dropping ? ' is-dropping' : ''}`}
           ref={mainRef}
           style={{ ['--l5h-foot' as string]: `${foot}px` }}
           onDragEnter={(e) => {
@@ -1129,7 +1059,31 @@ export function UniverseView({
             <div className="l5h-top" ref={topRef}>
               <div className="l5h-title">{subline}</div>
               <div className="l5h-right">
-                <LensSwitch lens={lens} narrow={narrow} onPick={pickLens} />
+                {isMap && (
+                  <div className={`l5h-findmap${mapOpen ? ' is-open' : ''}`}>
+                    <MapFind
+                      open={mapOpen}
+                      onOpenChange={(o) => {
+                        setMapOpen(o);
+                        if (!o) setMapQuery('');
+                      }}
+                      query={mapQuery}
+                      onQuery={setMapQuery}
+                      results={mapFound}
+                      recent={mapRecent}
+                      scale={lens}
+                      now={now}
+                      narrow={narrow}
+                      onGo={goTo}
+                      onOpenChat={(id) => {
+                        setMapOpen(false);
+                        setMapQuery('');
+                        openId(id, 'search');
+                      }}
+                    />
+                  </div>
+                )}
+                <LensSwitch lens={lens} narrow={narrow} counts={counts} onPick={pickLens} />
                 <div className="l5h-tools" role="toolbar" aria-label="The map">
                   {isSky && (
                     <button type="button" className={`l5h-tool is-select${selectMode ? ' is-on' : ''}`} aria-pressed={selectMode} onClick={() => setSelectMode((v) => !v)} title="Choose several: drag across them (or hold Shift and drag)">
@@ -1211,7 +1165,6 @@ export function UniverseView({
           {viewOpen && (
             <ViewMenu
               arr={arr}
-              lens={lens}
               groups={homes.list.map((h) => ({ key: h.key, name: h.name }))}
               hasChats={tiles.some((t) => t.kind === 'core')}
               hiddenCount={arr.hidden.filter((id) => tileById.has(id)).length}
@@ -1267,6 +1220,11 @@ export function UniverseView({
               }}
               onClose={() => setTrayOpen(false)}
             />
+          )}
+          {canBack && isMap && (
+            <div className="l5h-backwrap" style={{ bottom: foot + 14 }}>
+              <BackPill onBack={() => navRef.current?.back()} />
+            </div>
           )}
           {previewEl}
           {sel.length > 1 && (
@@ -1326,7 +1284,7 @@ export function UniverseView({
  * How much of it: Today, This week, This month, All time — set in the
  * serif, the one chosen on a dark pill that slides to it.
  */
-function LensSwitch({ lens, narrow, onPick }: { lens: A.HomeMode; narrow: boolean; onPick: (m: A.HomeMode) => void }) {
+function LensSwitch({ lens, narrow, counts, onPick }: { lens: A.HomeMode; narrow: boolean; counts?: Record<A.HomeMode, number>; onPick: (m: A.HomeMode) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pill, setPill] = useState<{ x: number; w: number } | null>(null);
   const measure = useCallback(() => {
@@ -1344,12 +1302,20 @@ function LensSwitch({ lens, narrow, onPick }: { lens: A.HomeMode; narrow: boolea
     return () => ro?.disconnect();
   }, [measure]);
   return (
-    <div ref={ref} className={`l5h-lens${pill ? ' is-measured' : ''}`} role="radiogroup" aria-label="How much of it">
+    <div ref={ref} className={`l5h-lens${pill ? ' is-measured' : ''}`} role="radiogroup" aria-label="How much of your map: Today, Week, Month or All Time">
       {pill && <span className="l5h-lens-pill" aria-hidden="true" style={{ transform: `translateX(${pill.x}px)`, width: pill.w }} />}
-      {A.MODES.map((m) => (
-        <button key={m} type="button" role="radio" aria-checked={lens === m} className={lens === m ? 'is-on' : ''} onClick={() => onPick(m)}>
-          <span className="l5h-long">{LENS_SAID[m].long}</span>
-          <span className="l5h-short">{LENS_SAID[m].short}</span>
+      {SCALES.map((m) => (
+        <button
+          key={m}
+          type="button"
+          role="radio"
+          aria-checked={lens === m}
+          className={lens === m ? 'is-on' : ''}
+          onClick={() => onPick(m)}
+          title={counts ? `${SCALE_SAID[m].long}: ${counts[m] === 1 ? 'one conversation' : `${counts[m]} conversations`}` : undefined}
+        >
+          <span className="l5h-long">{SCALE_SAID[m].long}</span>
+          <span className="l5h-short">{SCALE_SAID[m].short}</span>
         </button>
       ))}
     </div>

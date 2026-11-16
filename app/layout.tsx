@@ -69,6 +69,33 @@ const stix = localFont({
   adjustFontFallback: 'Times New Roman',
 });
 
+// The Socria brandbook's two faces (Version 1, November 2026), tried first on
+// SocriaUX (/ux, /ux-v0) only: Old Standard TT is Socria's voice (the wordmark,
+// headlines, its questions), Geist is the person, the interface and the record.
+// Not preloaded, so no other page downloads them.
+const oldStandard = localFont({
+  src: [
+    { path: './fonts/OldStandardTT-400.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/OldStandardTT-400-italic.woff2', weight: '400', style: 'italic' },
+  ],
+  variable: '--font-old-standard',
+  display: 'swap',
+  preload: false,
+  adjustFontFallback: 'Times New Roman',
+});
+
+const geist = localFont({
+  src: [
+    { path: './fonts/Geist-400.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/Geist-500.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/Geist-600.woff2', weight: '600', style: 'normal' },
+  ],
+  variable: '--font-geist',
+  display: 'swap',
+  preload: false,
+  adjustFontFallback: 'Arial',
+});
+
 // Search, previews and the rest of how the site introduces itself live in
 // lib/seo.ts. No canonical here: a layout's canonical is inherited by every
 // page that does not set its own, and '/' here once told search engines that
@@ -87,7 +114,7 @@ export default function RootLayout({
   // configuration note, it is an outage.
   if (!clerkConfigured() && !isProduction()) {
     return (
-      <html lang="en" className={`${serif.variable} ${sans.variable} ${hand.variable} ${stix.variable}`}>
+      <html lang="en" className={`${serif.variable} ${sans.variable} ${hand.variable} ${stix.variable} ${oldStandard.variable} ${geist.variable}`}>
         <body className="paper-bg antialiased">
           <SetupNotice env={currentEnv()} />
         </body>
@@ -159,7 +186,7 @@ export default function RootLayout({
         },
       }}
     >
-      <html lang="en" suppressHydrationWarning className={`${serif.variable} ${sans.variable} ${hand.variable} ${stix.variable}`}>
+      <html lang="en" suppressHydrationWarning className={`${serif.variable} ${sans.variable} ${hand.variable} ${stix.variable} ${oldStandard.variable} ${geist.variable}`}>
         <head>
           {/* THE REVEAL CONTRACT, KEPT WITHOUT JAVASCRIPT.
              *

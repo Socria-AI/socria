@@ -42,6 +42,14 @@
 .logos-root .l5-prose.is-reply .socria-lead .socria-em {
   font-size: 1em;
 }
+/* the lead is set large: code and a formula in it keep the size of the reading text around them, not 1.4 × theirs */
+.logos-root .l5-prose.is-reply .socria-lead .socria-code {
+  font-size: 0.66em;
+  vertical-align: 0.12em;
+}
+.logos-root .l5-prose.is-reply .socria-lead .katex {
+  font-size: 1em;
+}
 .logos-root .l5-prose.is-reply .socria-lead:last-child {
   margin-bottom: 0;
 }

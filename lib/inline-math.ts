@@ -594,3 +594,59 @@ export function exprWithValues(expr: string, values0: Readonly<Record<string, nu
   };
   return say(segs);
 }
+
+// ── limits, areas and sums (a graph's points and shaded region) ───────
+
+/**
+ * The value a curve approaches at x from each side, read off the curve at steps that shrink toward x — and the value
+ * at x itself, where there is one. `limit` is set only when both sides settle on the same number: a jump, a pole or a
+ * wild oscillation leaves it undefined, and nothing then claims a limit there.
+ */
+export function limitAt(c: CompiledExpr, values: Readonly<Record<string, number>>, x: number, span: number): { left: number | null; right: number | null; limit: number | null; value: number | null } {
+  const at = (v: number) => c.eval({ ...values, x: v });
+  const side = (dir: -1 | 1): number | null => {
+    const hs = [1e-2, 1e-3, 1e-4, 1e-5].map((h) => h * Math.max(1, Math.abs(span)));
+    const ys = hs.map((h) => at(x + dir * h));
+    if (!ys.every(Number.isFinite)) return null;
+    // settled: the last two readings agree to within a small fraction of the window's scale
+    const scale = Math.max(1, Math.abs(ys[3]));
+    return Math.abs(ys[3] - ys[2]) <= 1e-3 * scale ? ys[3] : null;
+  };
+  const left = side(-1), right = side(1);
+  const v = at(x);
+  const tol = 1e-3 * Math.max(1, Math.abs(left ?? 0), Math.abs(right ?? 0));
+  return { left, right, limit: left !== null && right !== null && Math.abs(left - right) <= tol ? (left + right) / 2 : null, value: Number.isFinite(v) ? v : null };
+}
+
+/** The signed area between a curve and the x-axis (or a second curve) from a to b, by Simpson's rule; null across a break. */
+export function areaBetween(f: (x: number) => number, a: number, b: number, g: (x: number) => number = () => 0, n = 400): number | null {
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a === b) return a === b ? 0 : null;
+  const m = n % 2 ? n + 1 : n;
+  const h = (b - a) / m;
+  let s = 0;
+  for (let i = 0; i <= m; i++) {
+    const x = a + i * h;
+    const y = f(x) - g(x);
+    if (!Number.isFinite(y)) return null;
+    s += y * (i === 0 || i === m ? 1 : i % 2 ? 4 : 2);
+  }
+  return (s * h) / 3;
+}
+
+export type RiemannRule = 'left' | 'right' | 'mid';
+/** n rectangles under f from a to b, each as tall as f at its left end, right end or middle — and their total. */
+export function riemannRects(f: (x: number) => number, a: number, b: number, n: number, rule: RiemannRule): { rects: { x0: number; x1: number; h: number }[]; sum: number } | null {
+  const k = Math.round(n);
+  if (!(k >= 1 && k <= 200) || !Number.isFinite(a) || !Number.isFinite(b) || a === b) return null;
+  const w = (b - a) / k;
+  const rects: { x0: number; x1: number; h: number }[] = [];
+  let sum = 0;
+  for (let i = 0; i < k; i++) {
+    const x0 = a + i * w, x1 = x0 + w;
+    const h = f(rule === 'left' ? x0 : rule === 'right' ? x1 : (x0 + x1) / 2);
+    if (!Number.isFinite(h)) return null;
+    rects.push({ x0, x1, h });
+    sum += h * w;
+  }
+  return { rects, sum };
+}

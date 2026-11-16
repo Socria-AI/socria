@@ -20,6 +20,16 @@
 const steps = (t) => (t.match(/(?:^|\s)(?:\d+[.)]|Step \d+[:.])\s/g) ?? []).length >= 2;
 const asks = (t) => /\?/.test(t);
 const said = (t, s) => t.toLowerCase().includes(s.toLowerCase());
+const qmarks = (t) => (t.match(/\?/g) ?? []).length;
+
+// Earlier replies the precision scenarios start from: each explains or suggests in 40 words or more and asks nothing.
+const WINDOWS = 'On Windows, open Settings, then System, then Storage, and turn on Storage Sense. It clears temporary files and old downloads automatically, and you can run it now from the same page.';
+const APPROACH =
+  'Substitution works by spotting a function sitting inside another one, with its derivative multiplied alongside. In 2x e^(x^2), the inner function is x^2 and its derivative, 2x, is already there as a factor. So let u be the inner function, rewrite every piece of the integral in terms of u, and it turns into an integral you already know how to do.';
+const SUGGEST1 =
+  'Wifi that keeps dropping is often the laptop saving power. Open Device Manager, find your wireless adapter under Network adapters, open its properties, and on the Power Management tab untick the option that lets the computer turn the device off to save power. Then restart the laptop and use it as normal for a while.';
+const SUGGEST2 =
+  'Another common cause is an old network profile. Open Settings, go to Network and Internet, then Wi-Fi, choose Manage known networks, and forget your home network. Join it again with the password, and if the router offers separate 2.4 GHz and 5 GHz names, try the other band for a day.';
 
 export const SCENARIOS = [
   {
@@ -230,5 +240,195 @@ export const SCENARIOS = [
     useful: () => true,
     unwanted: () => false,
     control: (r) => !/really improved/i.test(r),
+  },
+  {
+    // A broad first question that one unsaid thing decides: the key point first, then at most one question.
+    id: 'open-question',
+    domain: 'research',
+    covers: ['open-request'],
+    content: {
+      insight: 'AI is good at narrow problems with clear goals and plenty of examples, and weak where the goal is fuzzy or the data is thin.',
+      diagnostic: 'Do you mean in your own work, or AI in general?',
+      reading: 'Taking this as AI in general.',
+      explanation:
+        'Artificial intelligence has made striking progress in the last decade, yet its effect on everyday life can look smaller than the headlines promise. Part of the gap is expectation: demonstrations show a system at its best, while real deployments meet messy data, shifting goals and people who need to trust a result before they act on it. Organisations also move slowly. A tool that works in a laboratory still has to be connected to old software, approved by managers, checked by lawyers and taught to the staff who will use it, and each of those steps takes months. Then there is measurement. Many valuable tasks have no clear score, so it is hard to show that a model helps, and harder still to justify the cost of building around it. Data is another limit. Models learn from examples, and in many fields the examples are scarce, private or inconsistent, which leaves a system guessing where people most want certainty. Responsibility matters too: when a recommendation affects health, money or safety, someone must answer for a mistake, and that slows adoption in exactly the areas where the stakes are highest. Much of the real benefit is also quiet. Software that drafts a letter, sorts a queue or flags an error saves minutes for millions of people, but that rarely looks like a breakthrough. So the picture is less that the technology is failing and more that turning a capable model into a dependable service is slow, expensive and uneven work, done one organisation at a time.',
+    },
+    opening: ['Why is AI not solving problems?'],
+    next: (reply, k) => (k === 0 ? 'In my own work: support tickets.' : null),
+    useful: (r, k) => (k === 0 ? said(r, 'narrow problems') && qmarks(r) <= 1 : null),
+    unwanted: () => false,
+    control: () => null,
+    wantsOneQuestion: true,
+  },
+  {
+    // A clear question: nothing for MR to do.
+    id: 'clear-explain',
+    domain: 'study',
+    covers: ['clear-question'],
+    content: { explanation: 'Sunlight scatters off air molecules, and blue light scatters most, so the sky looks blue.' },
+    opening: ['Why is the sky blue?'],
+    next: () => null,
+    useful: (r) => said(r, 'scatter'),
+    unwanted: () => false,
+    control: () => null,
+    expectNoInterventionClear: true,
+  },
+  {
+    // Stuck with their own work on the table: one concrete next step, no question back.
+    id: 'stuck-next-step',
+    domain: 'study',
+    covers: ['stuck-with-own-work'],
+    content: {
+      nextStep: 'Next, write du = 2x dx, so the integral becomes the integral of e^u du; you can tell it worked because no x is left.',
+      hint: 'Next, write du = 2x dx, so the integral becomes the integral of e^u du; you can tell it worked because no x is left.',
+    },
+    prior: [
+      ['user', 'I want to learn substitution: integrate 2x e^(x^2) dx'],
+      ['assistant', APPROACH],
+    ],
+    opening: ["I set u = x^2 but now I'm stuck on the next step"],
+    next: () => null,
+    useful: (r) => said(r, 'du = 2x dx'),
+    unwanted: () => true,
+    control: () => null,
+  },
+  {
+    // They corrected the reading of their question: the answer to what they meant, no question.
+    id: 'corrected',
+    domain: 'everyday',
+    covers: ['corrected-reading'],
+    content: { answer: 'On a Mac, open Apple menu > System Settings > General > Storage and use the recommendations there.' },
+    prior: [
+      ['user', 'How do I free up disk space?'],
+      ['assistant', WINDOWS],
+    ],
+    opening: ['No, I meant on my Mac'],
+    next: () => null,
+    useful: (r) => said(r, 'System Settings'),
+    unwanted: () => true,
+    control: (r) => !asks(r),
+  },
+  {
+    // The last question asked for something they had already said.
+    id: 'redundant',
+    domain: 'everyday',
+    covers: ['redundant-question'],
+    content: { answer: 'On Windows 11, open Task Manager with Ctrl+Shift+Esc, sort by CPU and memory, and turn off the startup apps you do not need.' },
+    prior: [
+      ['user', 'my laptop is slow, it runs Windows 11'],
+      ['assistant', 'Which operating system are you on?'],
+    ],
+    opening: ['I already told you, Windows 11'],
+    // a second turn inside the 3-turn window, where ACS would ask again: the window keeps it to no question
+    next: (reply, k) => (k === 0 ? 'ok, and what about the battery draining fast?' : null),
+    useful: (r, k) => (k === 0 ? said(r, 'Task Manager') : null),
+    unwanted: () => true,
+    control: () => null,
+  },
+  {
+    // Two suggested fixes have not worked: a check before another fix.
+    id: 'still-failing',
+    domain: 'everyday',
+    covers: ['failed-fixes'],
+    content: {
+      check: "This assumed the router is fine: connect your phone to the same network for ten minutes; if it drops too, restart the router; if not, update the laptop's wifi driver.",
+      answer: 'Try turning off the wifi adapter in Device Manager, waiting ten seconds and turning it back on.',
+    },
+    prior: [
+      ['user', 'My laptop wifi keeps dropping.'],
+      ['assistant', SUGGEST1],
+      ['user', "still doesn't work"],
+      ['assistant', SUGGEST2],
+    ],
+    opening: ['same error again'],
+    next: () => null,
+    useful: (r) => said(r, 'phone'),
+    unwanted: () => true,
+    control: () => null,
+  },
+  {
+    // "I'm stuck" with nothing before it and nothing on screen: one plain question about what they are working on,
+    // not generic advice for blocks of every kind (review N6, N16).
+    id: 'stuck-unseen',
+    domain: 'study',
+    covers: ['stuck-work-not-shown'],
+    content: {
+      diagnostic: 'What are you working on? Paste the step you are on.',
+      reading: 'Tell me the problem, or paste the step you are on, and I will take it from there.',
+      explanation:
+        'Being stuck is a normal part of working on a hard problem. Try breaking it into smaller parts, re-reading the question slowly, and writing down everything you already know. Often the block is one missing fact or one step that was skipped. Taking a short break and coming back also helps more than people expect.',
+    },
+    opening: ["I'm stuck"],
+    next: () => null,
+    useful: (r) => said(r, 'paste') && qmarks(r) <= 1,
+    unwanted: () => false,
+    control: () => null,
+    wantsOneQuestion: true,
+  },
+  {
+    // "How do I fix this?" with nothing attached and nothing on screen: how it goes in general, then a request for the
+    // one thing needed, not a made-up fix for an error nobody has seen (review N2, N16).
+    id: 'missing-referent',
+    domain: 'everyday',
+    covers: ['missing-referent'],
+    content: {
+      insight: 'Fixing an error starts from its exact message and the line it points to.',
+      diagnostic: 'Can you paste the error message and the code around it?',
+      reading: 'Paste the error message and the code around it, and I can say what to change.',
+      explanation:
+        'Most errors come from a typo, a missing import or a value of the wrong type. Check the spelling of every name, make sure each module is installed, and read the line the error points to. Restarting the program after each change also helps you see which change made the difference.',
+    },
+    opening: ['How do I fix this?'],
+    next: () => null,
+    useful: (r) => said(r, 'paste') && qmarks(r) <= 1,
+    unwanted: () => false,
+    control: () => null,
+    wantsOneQuestion: true,
+  },
+  {
+    // The same words with the error attached as a note: the thing is in the conversation, and MR does nothing
+    // (review N10, N18: an attachment is something on their screen).
+    id: 'missing-referent-attached',
+    domain: 'everyday',
+    covers: ['missing-referent', 'attachment'],
+    content: {
+      insight: 'Fixing an error starts from its exact message and the line it points to.',
+      diagnostic: 'Can you paste the error message and the code around it?',
+      answer: 'Line 12 adds a number to a piece of text: convert the number with str(count) before joining them, or use an f-string.',
+      explanation: 'Line 12 adds a number to a piece of text: convert the number with str(count) before joining them, or use an f-string.',
+    },
+    opening: ['How do I fix this?'],
+    attachments: [{ kind: 'note', name: 'error.txt', text: "Traceback (most recent call last):\n  File \"app.py\", line 12, in main\n    label = 'Total: ' + count\nTypeError: can only concatenate str (not \"int\") to str" }],
+    next: () => null,
+    useful: (r) => said(r, 'str(count)'),
+    // (MR is meant to do nothing here, as on a clear question: any question left is ACS's to price)
+    unwanted: () => false,
+    control: () => null,
+    expectNoInterventionClear: true,
+  },
+  {
+    // Complete solutions: the reply solved it in full and they say thanks. Nothing is left to do, so no question
+    // and no step (review N25: MR must not add one where the work is already complete). The pieces a step, a
+    // check or a question would bring are on hand, so a line that asked for one would show in the reply.
+    id: 'complete-solution',
+    domain: 'study',
+    covers: ['complete-solution'],
+    content: {
+      answer: 'You are welcome.',
+      explanation: 'You are welcome.',
+      nextStep: 'Next, check it by putting x = 4 back into 2x + 3.',
+      check: 'Check it: 2 times 4 plus 3 is 11.',
+      diagnostic: 'Want to try a harder one?',
+      worked: 'Here is a similar one worked through: 3x + 2 = 14, so 3x = 12 and x = 4.',
+    },
+    prior: [
+      ['user', 'Solve 2x + 3 = 11.'],
+      ['assistant', 'Subtract 3 from both sides to get 2x = 8, then divide both sides by 2, so x = 4.'],
+    ],
+    opening: ['Thanks!'],
+    next: () => null,
+    useful: (r) => said(r, 'welcome') && !said(r, 'x = 4 back') && !said(r, 'similar one'),
+    unwanted: () => true,
+    control: () => null,
   },
 ];

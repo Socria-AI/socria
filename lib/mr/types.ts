@@ -26,11 +26,12 @@ import type { AssistDecision } from '../cognition/assist';
 import type { CognitiveSplit, ExplicitSignals, ReplyLength } from '../core4/types';
 import type { CoreView } from '../runtime/allocation';
 import type { TurnState } from '../runtime/state';
+import type { NoAdvance } from './ifr';
 
 // ── versions ─────────────────────────────────────────────────────────
 
 /** The policy every decision is attributed to. Bump on ANY rule or threshold change (lib/mr/config.ts STRATEGIES). */
-export const MR_POLICY_VERSION = 'mr-2026.10.1';
+export const MR_POLICY_VERSION = 'mr-2026.11.1';
 /** The shape of MRState and of a ledger record. */
 export const MR_STATE_VERSION = 1;
 
@@ -109,6 +110,9 @@ export const OBSERVATION_CODES = [
   'explicit.rewrite', // "rewrite it", "add a conclusion", "change my wording" — ends an edit-only scope
   'explicit.learning_goal', // "I want to learn / understand / work it out myself"
   'explicit.confused', // "I still don't get it", "that doesn't make sense"
+  'explicit.stuck', // "I'm stuck on this step", "I don't know where to start" — a report, never a preference
+  'explicit.corrected', // "No, I meant on my Mac" — after a reply: their correction of how the question was read
+  'explicit.knows_that', // "I know that already", "skip the basics" — after a reply that explained
   'explicit.revoke', // "you can ask questions again", "never mind, go back"
   'explicit.end_practice', // "that's enough for today", "let's switch" — the quiz or practice is over
   'explicit.positive', // "thanks, that helped" — satisfaction, never evidence of learning
@@ -119,12 +123,20 @@ export const OBSERVATION_CODES = [
   'observed.question_streak', // Socria's last replies kept asking
   'observed.unproductive_questions', // asked, and their next turn did not advance (no attempt, "idk", repeat)
   'observed.repeated_confusion', // confusion after an explanation, twice or more
+  'observed.repeated_stuck', // stuck again, within two turns of saying so
   'observed.failed_attempts', // engine-refuted attempts, repeatedly
   'observed.repeated_request', // they asked for the same thing again
+  'observed.redundant_question', // Socria asked, and they said they had already said it
+  'observed.repeated_question', // Socria asked nearly the same question it asked a reply or two before
+  'observed.late_answer', // their re-ask for the point ("so what should I do?") after a long reply
   'observed.verbose_replies', // replies far longer than their messages and their length setting
+  'observed.repeated_background', // Socria's last reply repeated sentences from its recent replies
   'observed.routine_task', // a computation, lookup or execution with nothing to learn in it
+  'observed.open_request', // a short, open first request (or new topic) one unsaid thing decides — an estimate turned observation, like routine_task
+  'observed.fix_failed', // two reports running that a suggested fix still fails
   'observed.writing_task', // their own writing is on the table
   'observed.practice', // they are practising (a stated goal or a quiz under way)
+  'observed.new_topic', // a question about something neither their last message nor the reply to it was about (ends adjustments; starts none)
   'observed.verified_correct', // the engine verified their attempt
   'observed.verified_incorrect', // the engine refuted their attempt
   // weak: recorded, never sufficient
@@ -163,6 +175,9 @@ export const ACTIONS = [
   'task_specific', // e.g. edit only what was asked in their writing
   'preserve_challenge', // a quiz: keep the difficulty, never reveal
   'execute', // a routine task: just do it
+  'diagnose', // the point that holds either way first, then at most the one question that decides the rest
+  'next_step', // one concrete next step from where their work is
+  'check_first', // a check they can run before another fix
   'revert', // back to the default behaviour
 ] as const;
 export type Action = (typeof ACTIONS)[number];
@@ -181,13 +196,17 @@ export interface TypedControls {
   /** at most `max` asking replies in the last `turns` replies (spent → budget 0 this turn) */
   questionWindow?: { max: number; turns: number };
   /** how the turn's help is composed — maps onto the ACS move (enforcement: prompt + the move's own budget) */
-  strategy?: 'direct' | 'execute' | 'worked_example' | 'guided' | 'preserve_challenge' | 'edit_as_asked';
+  strategy?: 'direct' | 'execute' | 'worked_example' | 'guided' | 'preserve_challenge' | 'edit_as_asked' | 'diagnose' | 'next_step';
   scaffolding?: 'less' | 'more';
   simplify?: boolean;
   /** a hard ceiling on the reply's tokens (max_tokens), never above the route's own */
   verbosity?: { ceilingTokens: number };
-  /** say what was checked and what was not; the engine's held path where it is maths */
-  verification?: 'explicit';
+  /**
+   * 'explicit': say what was checked and what was not (the engine's held path
+   * where it is maths). 'suggest': give them a check they can run themselves
+   * before another fix is tried.
+   */
+  verification?: 'explicit' | 'suggest';
   /** lead with the thing they asked for */
   answerFirst?: boolean;
   /** a quiz or practice: never give the answer away, keep one question allowed */
@@ -382,6 +401,13 @@ export interface MRState {
   integrity: IntegrityFinding[];
   /** the first user turn after their last reset, in this conversation (MRTurnInput.resetTurn), when there was one */
   resetTurn?: number;
+  /**
+   * How their newest message met the reply before it (lib/mr/ifr.ts
+   * reactionAt): a measure, recomputed from the transcript every turn and
+   * never read back by regulation. Absent on the first turn, and when the
+   * measure failed: a measure never costs the regulation (lib/mr/state.ts).
+   */
+  react?: Reaction;
 }
 
 // ── the fast loop's input and output ─────────────────────────────────
@@ -415,6 +441,28 @@ export interface MRTurnInput {
     accuracy: { check: boolean; computed: boolean; math: boolean; theirs: { status: string }[] };
     /** their attempts at earlier turns as the engine decided them, by user-turn index (optional; the replay's) */
     verdicts?: Record<number, { status: string }[]>;
+    /**
+     * Something is on their screen besides the transcript (a project, a
+     * document, a focus, a board, a course). Only the route knows this, and
+     * only for the newest turn: undefined means unknown, and a reading that
+     * needs to know nothing is shown stays silent then.
+     */
+    material?: boolean;
+    /**
+     * Their newest message carries an attachment (an image, a note, a file).
+     * A content-free marker the route sets for the newest turn only; what is
+     * attached is never passed. Undefined is unknown.
+     */
+    attached?: boolean;
+    /**
+     * What their standing written instructions (the route's body.style) ask
+     * for, as two content-free booleans: questions — a closing question, a
+     * quiz, a check of their understanding; length — thorough, detailed or
+     * long answers. Read only under a policy with params.precision, and only
+     * to take MR's own narrowing back (lib/mr/execute.ts constrain): never to
+     * add a question or room past what ACS and the route allow.
+     */
+    style?: { questions?: boolean; length?: boolean };
   };
   condition: Condition;
   /** standing preferences carried across conversations — only with their consent (lib/mr/adaptation.ts) */
@@ -583,4 +631,131 @@ export interface ExposureRecord {
   ms: number;
   /** the turn ran in a conversation kept to itself: nothing from it crosses into another */
   local?: boolean;
+  /** the shape of the reply sent this turn (MEASURE_PROVENANCE): measured, never read by regulation */
+  reply?: ReplyMeasures;
+  /** how their message this turn met the reply before it: measured, never read by regulation */
+  react?: Reaction;
 }
+
+// ── measures ─────────────────────────────────────────────────────────
+//
+// MEASUREMENT, NOT POLICY. These describe each reply and how the next
+// message met it, so two policy versions can be compared on one yardstick.
+// They are recorded under any policy pin, they are never summed into a score,
+// and nothing that regulates reads them: where a measure and a regulating
+// reading share a definition (a question asked again, sentences repeated,
+// "I already told you"), the reading is recomputed from the transcript as an
+// observation code, never taken from a stored measure. Ints, booleans and
+// enum codes only: no word of anybody's, no hash, no token list.
+
+/** The shape of ReplyMeasures and Reaction. Bump when a field changes meaning. */
+export const MEASURE_VERSION = 1;
+
+/** The shape of one reply Socria sent (lib/mr/outcome.ts replyShape, lib/mr/ifr.ts replyEchoes). */
+export interface ReplyMeasures {
+  mv: number;
+  /** the route's fixed line went out instead of a model reply: nothing below was measured */
+  fallback?: boolean;
+  content?: boolean;
+  askWords?: number;
+  words?: number;
+  sentences?: number;
+  paragraphs?: number;
+  questions?: number;
+  explicitQuestions?: number;
+  opensWithQuestion?: boolean;
+  /** -1 when the reply asks nothing */
+  wordsBeforeQuestion?: number;
+  openerSentences?: number;
+  steps?: number;
+  code?: boolean;
+  english?: boolean;
+  repeatedSentences?: number;
+  repeatedQuestion?: boolean;
+  /** an estimate: -1 none found, -2 not English or only code */
+  firstActionable?: number;
+  wordsBeforeActionable?: number;
+  paragraphsBeforeActionable?: number;
+  nextStep?: 'yes' | 'no' | 'unknown';
+  checkSuggested?: 'yes' | 'no' | 'unknown';
+}
+
+/** How their newest message met the reply before it (lib/mr/ifr.ts reactionAt). */
+export interface Reaction {
+  mv: number;
+  /** questions the reply before put to them */
+  prevAsked: number;
+  answered: 'answer' | 'no_advance' | 'not_asked';
+  noAdvance: NoAdvance | 'none';
+  corrected: boolean;
+  stuck: boolean;
+  knewIt: boolean;
+  redundantWords: boolean;
+  confused: boolean;
+  /** they SAID they understood ("got it, that makes sense now") — said, not shown */
+  saidUnderstood: boolean;
+  askedShorter: boolean;
+  askedLonger: boolean;
+  negative: boolean;
+  repeatRequest: boolean;
+  newTopic: boolean;
+  attempt: boolean;
+  verdict: 'verified' | 'refuted' | 'none';
+  independent: 'verified' | 'refuted' | 'attempt' | 'none';
+  clarified: 'yes' | 'no' | 'unknown';
+  /** a hypothesis: the reply's question asked for something already in the conversation */
+  alreadyGiven: boolean;
+  /** a hypothesis: whether the reply's questions were about what they had said */
+  relevance: 'targets' | 'drifts' | 'none';
+}
+
+/**
+ * Where each measure comes from. Complete by type, so a new field cannot be
+ * added without saying what it rests on. 'estimate' and 'hypothesis' fields
+ * are never read by decide(), regulate() or a capability claim; nothing here
+ * infers that understanding improved.
+ */
+export const MEASURE_PROVENANCE: Readonly<Record<keyof ReplyMeasures | keyof Reaction, Provenance | 'none'>> = Object.freeze({
+  mv: 'none',
+  fallback: 'none',
+  content: 'observed',
+  askWords: 'observed',
+  words: 'observed',
+  sentences: 'observed',
+  paragraphs: 'observed',
+  questions: 'observed',
+  explicitQuestions: 'observed',
+  opensWithQuestion: 'observed',
+  wordsBeforeQuestion: 'observed',
+  openerSentences: 'observed',
+  steps: 'observed',
+  code: 'observed',
+  english: 'observed',
+  repeatedSentences: 'observed',
+  repeatedQuestion: 'observed',
+  firstActionable: 'estimate',
+  wordsBeforeActionable: 'estimate',
+  paragraphsBeforeActionable: 'estimate',
+  nextStep: 'estimate',
+  checkSuggested: 'estimate',
+  prevAsked: 'observed',
+  answered: 'observed',
+  noAdvance: 'observed',
+  corrected: 'explicit',
+  stuck: 'explicit',
+  knewIt: 'explicit',
+  redundantWords: 'explicit',
+  confused: 'explicit',
+  saidUnderstood: 'explicit',
+  askedShorter: 'explicit',
+  askedLonger: 'explicit',
+  negative: 'explicit',
+  repeatRequest: 'observed',
+  newTopic: 'observed',
+  attempt: 'observed',
+  verdict: 'observed',
+  independent: 'observed',
+  clarified: 'observed',
+  alreadyGiven: 'hypothesis',
+  relevance: 'hypothesis',
+});

@@ -245,6 +245,16 @@ export async function GET(req: NextRequest) {
   const uxProjectsErr = missingTable(uxProjectsRaw) ? null : uxProjectsRaw;
   out.designProjects = uxProjects ?? [];
 
+  // SocriaUX v0 (/ux-v0): every project, whole, and what each one's model calls cost, by day.
+  const { data: uxV0Projects, error: uxV0ProjectsRaw } = await db
+    .from('ux_v0_projects').select('id, name, doc, created_at, updated_at').eq('user_id', userId).order('updated_at', { ascending: false });
+  const uxV0ProjectsErr = missingTable(uxV0ProjectsRaw) ? null : uxV0ProjectsRaw;
+  out.designProjectsV0 = uxV0Projects ?? [];
+  const { data: uxV0Usage, error: uxV0UsageRaw } = await db
+    .from('ux_v0_usage').select('project_id, day, calls, generations, input_tokens, output_tokens, cost_usd').eq('user_id', userId).order('day', { ascending: false });
+  const uxV0UsageErr = missingTable(uxV0UsageRaw) ? null : uxV0UsageRaw;
+  out.designUsageV0 = uxV0Usage ?? [];
+
   // Metacognitive Regulation's intervention ledger: which condition each turn
   // ran under, what MR decided, how it went and what its integrity checks
   // caught — as codes, counts and turn indices. Their MR settings are on the
@@ -362,6 +372,8 @@ export async function GET(req: NextRequest) {
     ['friendsYouInvited', youInvitedErr],
     ['captures', capturesErr],
     ['designProjects', uxProjectsErr],
+    ['designProjectsV0', uxV0ProjectsErr],
+    ['designUsageV0', uxV0UsageErr],
     ['mrLedger', mrLedgerErr],
     ['roomSeats', roomSeatsErr],
     ['rooms', roomsErr],

@@ -364,11 +364,11 @@ export function socriaTutorials(o: { capture: boolean; memory: boolean }): Tutor
       ),
       stand: 'Socria opens on the Universal Map. Every line of thinking you have had is on it — the long sessions larger, quick questions small beside them.',
       steps: [
-        <>Choose how much to see, top right: Today, This week, This month or All time.</>,
+        <>Choose how much to see, top right: Today, Week, Month or All Time — the same map, more or less of it.</>,
         <>Press a line of thinking for its card; press again, or Continue, to open it.</>,
         <>Type in the box at the foot to find something — or to start something new.</>,
       ],
-      note: 'This month and All time are drawn as a line through time, the oldest on the left.',
+      note: 'Every conversation keeps its place at every scale. Find on your map (or /) goes to any of them, and Back returns to where you were.',
       demo: HomeDemo,
       try: { label: 'Open the Universal Map', run: 'onHome' },
     },

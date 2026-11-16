@@ -43,7 +43,7 @@
 import { createHash } from 'node:crypto';
 import { preferenceCodeOf, preferenceInForce, type PreferenceCode } from './adaptation';
 import { deploymentArm, experimentId, ifrOn } from './config';
-import { MR_POLICY_VERSION, type Action, type Arm, type Condition, type MRMode, type MRSettings, type MRState, type ObservationCode } from './types';
+import { type Action, type Arm, type Condition, type MRMode, type MRSettings, type MRState, type ObservationCode } from './types';
 
 // ── assignment ───────────────────────────────────────────────────────
 
@@ -90,7 +90,10 @@ export const EXPERIMENTS: Readonly<Record<string, ExperimentSpec>> = Object.free
       { arm: 'full', ifr: true, weight: 1 },
       { arm: 'full', ifr: false, weight: 1 },
     ],
-    policyVersion: MR_POLICY_VERSION,
+    // The literal version it was registered against, never the moving MR_POLICY_VERSION: a newer policy reaches an
+    // experiment only by a deliberate new registration (and a deployment's older rollback pin still reaches its
+    // participants: lib/mr/index.ts regulateTurn, pin_over_experiment).
+    policyVersion: 'mr-2026.10.1',
     description:
       'Pilot of the proposal benchmark: Logos baseline, prompt-only reflection, MR state as context, and full MR with IFR on and off, equal shares, randomized per consented participant. Inactive: awaits IRB approval and the study consent flow.',
     requiresConsent: true,
@@ -218,21 +221,34 @@ const ACTION_PHRASES: Partial<Record<Action, string>> = {
   task_specific: 'Editing only what they asked',
   preserve_challenge: 'Keeping it a quiz',
   execute: 'Just doing the routine part',
+  diagnose: 'The key point first, then at most one question about what they meant',
+  next_step: 'One concrete next step',
+  check_first: 'A quick check before another fix',
 };
 
 const OBSERVATION_LINES: Partial<Record<ObservationCode, string>> = {
   'explicit.confused': 'They said they still do not get it.',
+  'explicit.stuck': 'They said they are stuck.',
+  'explicit.corrected': 'They said what they meant: answer that.',
+  'explicit.knows_that': 'They said they already know the background.',
   'explicit.negative': 'They said the last reply did not help.',
   // their word ("ugh", "come on", "this is annoying"), not a reading of them — and what it is about is not known
   'explicit.frustration': 'They used a word of frustration in their own message (what it was about is not known).',
   'observed.question_streak': 'Your last several replies each asked them something.',
   'observed.unproductive_questions': 'Your recent questions did not move things forward.',
   'observed.repeated_confusion': 'Explanations have not landed more than once: try a different one.',
+  'observed.repeated_stuck': 'One next step was not enough: they are still stuck.',
   'observed.failed_attempts': 'Their recent attempts were checked and were not right.',
   'observed.verified_correct': 'Their last attempt was checked and is right.',
   'observed.repeated_request': 'They have asked for the same thing more than once.',
+  'observed.redundant_question': 'Your last question asked for something they had already said.',
+  'observed.repeated_question': 'You asked the same question again.',
+  'observed.late_answer': 'They asked again for the point of your last reply.',
   'observed.verbose_replies': 'Recent replies have been much longer than anything they asked for.',
+  'observed.repeated_background': 'Recent replies repeated what had already been said.',
   'observed.routine_task': 'This is a routine task, with nothing in it to learn.',
+  'observed.fix_failed': 'The fixes suggested so far have not worked.',
+  // deliberately no line for observed.open_request or observed.new_topic: a line there would nudge this arm to ask
 };
 
 const UNCERTAINTY_LINES: Readonly<Record<string, string>> = Object.freeze({
