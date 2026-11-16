@@ -232,5 +232,38 @@ console.log('\n=== drawn as it should be ===');
   ok('every rule that places a quick question\'s dot places it absolutely', rules.length > 0 && rules.every((m) => /position\s*:\s*absolute/.test(m[2])), rules.map((m) => m[1].trim() + ' { ' + m[2].trim() + ' }').join(' | '));
 }
 
+console.log('\n=== a memory beside a session joined to one not drawn at this scale ===');
+{
+  // The crash seen on dev ("Cannot read properties of undefined (reading 'y')" in the memories' placement):
+  // placeMemories turned away from every session its anchor is joined to, looking each one up among what is lit
+  // at this scale, and at Today, Week or Month the other end of a join need not be lit.
+  for (const narrow of [false, true]) {
+    const convs = makeConversations(160, { now: NOW, seed: 5, projects: FIXTURE_PROJECTS });
+    const tiles = M.tilesOf(convs);
+    const homes = M.homesOf(tiles, FIXTURE_PROJECTS, M.emptyArrangement());
+    const base = { lens: 'week', tiles, all: tiles, homes, ideas: M.sharedIdeas(tiles), links: [], now: NOW, canMake: true, start: true, narrow };
+    const P = M.bubblePlaces(base);
+    let cases = 0;
+    const threw = [];
+    for (const s of M.SCALES) {
+      const visible = M.idsInScale(tiles, s, NOW);
+      // a memory from each lit end of a join whose other end is not lit
+      const memories = P.joins
+        .filter(([a, b]) => visible.has(a) !== visible.has(b))
+        .slice(0, 6)
+        .map(([a, b], i) => ({ id: `m${s}${i}`, text: 'Prefers worked examples before the definition', from: [visible.has(a) ? a : b] }));
+      if (!memories.length) continue;
+      cases += memories.length;
+      try {
+        const L = M.bubbleLayout({ ...base, visible, memories, foldedInBounds: s === 'all' }, P);
+        if (!Array.isArray(L.memories)) threw.push(`${s}: no memories array`);
+      } catch (e) {
+        threw.push(`${s}: ${e.message}`);
+      }
+    }
+    ok(`${narrow ? 'phone' : 'desktop'}: laid out at every scale without failing (${cases} memories beside a join half off the map)`, cases > 0 && !threw.length, threw.join(' | ') || `cases=${cases}`);
+  }
+}
+
 console.log(`\nlogos5-universal-map: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

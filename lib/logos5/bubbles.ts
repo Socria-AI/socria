@@ -1437,7 +1437,12 @@ function placeMemories(
         if (h === A.id && o.placed.has(d)) blocked.push(deg(A, o.placed.get(d)!));
         if (d === A.id && o.placed.has(h)) blocked.push(deg(A, o.placed.get(h)!));
       }
-      for (const [a, b] of o.joins) if (a === A.id || b === A.id) blocked.push(deg(A, o.placed.get(a === A.id ? b : a)!));
+      // only what is drawn at this scale: o.placed is what is lit, the joins are all of them (at Today, Week or
+      // Month a session can be joined to one not drawn, which has no place to turn from)
+      for (const [a, b] of o.joins) {
+        const other = a === A.id ? b : b === A.id ? a : null;
+        if (other && o.placed.has(other)) blocked.push(deg(A, o.placed.get(other)!));
+      }
       for (const l of o.links) if (l.a === A.id || l.b === A.id) blocked.push(deg(A, l.c));
       const pref = (a: number) => Math.min(70, blocked.length ? Math.min(...blocked.map((b) => apart(a, b))) : 70);
       for (const d of rings)
