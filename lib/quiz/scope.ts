@@ -41,30 +41,50 @@ export interface QuizScope {
 
 const WORD_NUM: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, fifteen: 15, twenty: 20, 'a couple of': 2, 'a few': 4 };
 
-/** Is this message a request to be quizzed? (In any of the ordinary ways of asking.) */
+/**
+ * Is this message a request to be quizzed? Only when it ASKS for one: the quiz is the object of a request ("quiz me",
+ * "make me a quiz", "can I have a quiz on…", "let's do a quiz", "I want to be quizzed"). A message that only
+ * MENTIONS a quiz is a message to answer — "I have a quiz tomorrow, can you help me study?", "help with a quiz
+ * question", "I'm going to be tested on this", "I'm stuck on these practice problems" — and making a quiz in its
+ * place was taking their question away (the near-misses are held in test/quiz.test.mjs).
+ */
 export function asksForQuiz(text: string): boolean {
-  const t = (text || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const t = (text || '').toLowerCase().replace(/[’]/g, "'").replace(/\s+/g, ' ').trim();
   if (!t || t.length > 600) return false;
   // a question about quizzes, not a request for one ("how do quizzes work", "what's on the quiz")
   if (/^(how|what|why|when|where|who)\b[^?]*\b(quiz|test)\w*\b[^?]*\?$/.test(t) && !/\b(quiz|test) me\b/.test(t)) return false;
+  // what a request is made of: someone asking for something, then (adjectives) the quiz itself
+  const ASK = "(?:give|make|create|generate|build|write|set|send|run|start|begin|do|take|have|get|want|need)";
+  const POLITE = `(?:(?:can|could|would|will) (?:you|i|we) (?:please )?|please |i(?:'d| would) like (?:to )?|i want (?:to )?|i need (?:to )?|let'?s |lets |time (?:for|to)|how about )`;
+  const DET = '(?:a |an |another |one more |some |a few |a quick |a short |\\d+ |(?:\\d+|[a-z]+)[- ]questions? )';
+  const ADJ = '(?:(?:quick|short|pop|little|practice|mock|timed|hard|harder|easy|easier|new|full|proper|final|\\d+|questions?|[a-z]+[- ]questions?)[ -])*';
+  const THING = '(?:quiz|quizzes|test|practice (?:test|exam|questions?|problems?|quiz)|mock (?:exam|test)|exam simulation|questions to practi[sc]e)';
+  // "quiz me", "test me on…", "drill us", "quizz me"
   if (/\b(quiz|quizz|test|drill|examine) (me|myself|us)\b/.test(t)) return true;
-  // "I want to be quizzed", "can I get tested on this"
-  if (/\b(be|get|getting) (quizzed|quizzes|tested)\b/.test(t)) return true;
-  // "test my knowledge of…", "check my understanding with a quiz"
-  if (/\btest (my|our) (knowledge|understanding|memory|recall)\b/.test(t)) return true;
+  // software tests are not quizzes: "write a test for this function", "add unit tests", a pasted block of code
+  if (/```|\b(?:unit|integration|e2e|end-to-end|regression|load|smoke|snapshot|automated) tests?\b|\btests? (?:for|of|to cover) (?:this|my|the|a|an) (?:function|code|class|method|component|module|api|endpoint|script|app|program|feature|page|hook|route|query)\b|\btest (?:case|suite|file|coverage)s?\b/.test(t)) return false;
+  // "give me a quiz", "make us 10 practice questions", "can you make me a quick quiz", "start a mock exam"
+  if (new RegExp(`\\b${ASK} (?:me |us )?${DET}?${ADJ}${THING}\\b`).test(t) && !/\b(?:have|had|got|get) (?:a |an |my |the )?(?:quiz|test|exam)\b.*\b(?:tomorrow|today|tonight|on (?:mon|tues|wednes|thurs|fri|satur|sun)day|next week|this week|later)\b/.test(t)) {
+    // "i have a quiz…", "i need a test…" said about their week, not asked of Socria
+    if (/^(?:i|we) (?:have|had|got|need) (?:a |an |my |the |another )/.test(t) && !/\b(?:quiz me|test me|give me|make me|for me|(?:make|write|create|give me|set) (?:one|it|that|me one)|can you (?:make|write|create|give)\b)/.test(t)) return false;
+    return true;
+  }
+  // "can I have a quiz on cells", "I'd like a quiz", "let's do a quiz", "how about a quiz", "time for a quiz"
+  if (new RegExp(`${POLITE}(?:${ASK} )?(?:me |us )?${DET}${ADJ}(?:quiz|quizzes|practice quiz|mock exam|practice test)\\b(?! (?:question|answer|result|grade|score|mark)s?\\b)`).test(t)) return true;
+  // "another quiz please", "one more quiz", "pop quiz!", "quiz time" — said as the whole message
+  if (/^(?:another|one more|a|a quick|a new) quiz\b[^?]{0,40}$/.test(t) || /^(?:pop quiz|quiz time)[!. ]*$/.test(t)) return true;
+  // "a ten-question test please", "10 question quiz on cells" — the whole message is the thing asked for
+  if (/^(?:a |an )?(?:\d+|[a-z]+)[- ]questions? (?:quiz|test|practice test)\b[^?]{0,60}$/.test(t)) return true;
+  // "I want to be quizzed", "can I get tested on this", "I'd like to be tested on chapter 3"
+  if (/\b(?:want|like|need|ready|happy) (?:to )?(?:be|get) (?:quizzed|tested)\b|\b(?:can|could) (?:i|we|you) (?:be|get) (?:quizzed|tested)\b/.test(t)) return true;
+  // "test my knowledge of…", "check my understanding with a few questions"
+  if (/\btest (?:my|our) (?:knowledge|understanding|memory|recall)\b/.test(t)) return true;
   // "ask me some questions about…", "ask me 5 questions on…"
-  if (/\bask me (some |a few |a couple of |\d+ |[a-z]+ )?(more )?(questions|qs)\b/.test(t)) return true;
-  // "can I have a quiz on cells", "I'd like a quiz", "let's do a quiz", "another quiz", "a pop quiz", "quiz time"
-  if (/\b(a|an|another|one more|some|\d+|[a-z]+-question) (short |quick |pop |little |practice |mock |timed |hard |harder |easy |easier |new )*(quiz|quizzes)\b/.test(t) && /\b(can|could|would|i want|i'd like|i would like|i need|let'?s|lets|give|make|do|start|time for|how about|please|another|one more)\b/.test(t)) return true;
-  if (/\b(pop quiz|quiz time)\b/.test(t)) return true;
-  // "make me a 10 question quiz", "a ten-question test please"
-  if (/\b(\d+|[a-z]+)[- ]questions? (quiz|test|practice test|mock exam)\b/.test(t) && /\b(can|could|would|i want|i'd like|i would like|i need|let'?s|lets|give|make|create|generate|write|set|do|start|please)\b/.test(t)) return true;
-  // "practice questions on…", "some practice problems", "give me questions to practise"
-  if (/\b(practi[sc]e|review|revision|sample|test|exam|quiz) (questions|problems|qs)\b/.test(t) && /\b(can|could|would|i want|i'd like|i would like|i need|let'?s|give|make|some|more|please|any)\b/.test(t)) return true;
-  if (/\b(give|make|create|generate|build|set|write) (me |us )?(a |an |some |another |\d+ |[a-z]+ )?(short |quick |practice |mock |timed |hard |harder |easy |easier )*(quiz|test|practice (test|exam|questions?)|mock exam|exam simulation|questions to practi[sc]e)\b/.test(t)) return true;
-  if (/\b(practi[sc]e|mock) (exam|test|quiz)\b/.test(t) && /\b(start|begin|let'?s|can we|could we|i want|i'd like|give|do)\b/.test(t)) return true;
-  if (/\bexam simulation\b|\bsimulate (the|my|an) (exam|test|midterm|final)\b/.test(t)) return true;
-  if (/^(quiz|test) (on|about|over|for)\b/.test(t)) return true;
+  if (/\bask me (?:some |a few |a couple of |\d+ |[a-z]+ )?(?:more )?(?:questions|qs)\b/.test(t)) return true;
+  // "exam simulation", "simulate my midterm"
+  if (/\bexam simulation\b|\bsimulate (?:the|my|an) (?:exam|test|midterm|final)\b/.test(t)) return true;
+  // "quiz on cost curves", "test on chapter 3" — as the start of the message
+  if (/^(?:quiz|test) (?:on|about|over)\b/.test(t)) return true;
   return false;
 }
 

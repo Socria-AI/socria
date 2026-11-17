@@ -36,7 +36,7 @@ import { AccessCode } from './AccessCode';
 import { anyModelGated } from '@/lib/socria-model-store';
 import { LOGOS5 } from '@/lib/logos5/flags';
 import { freePlanSentence, onePlanSentence } from '@/lib/entitlements';
-import { dayOfLine, daysLeftLine, dayResetLine, endsAtWords, todayLine, type TrialState } from '@/lib/trial';
+import { dayResetLine, todayLine, type TrialState } from '@/lib/trial';
 import { formatTokens } from '@/lib/sleep';
 import { TestingTools } from './TestingTools';
 import { NameField, RolePicker } from './RolePicker';
@@ -459,10 +459,8 @@ function freeTerms(): string {
 
 /** The masthead's word for an account not on Socria One. */
 function trialTag(t: TrialState | null | undefined): string {
-  if (!t) return 'Trial';
-  if (t.status === 'active') return `Trial · ${dayOfLine(t).toLowerCase()}`;
-  if (t.status === 'ended') return 'Trial ended';
-  return 'Trial';
+  if (t?.status === 'ended') return 'Free access ended';
+  return 'Free';
 }
 
 /**
@@ -470,11 +468,11 @@ function trialTag(t: TrialState | null | undefined): string {
  * not on Socria One: before it begins, while it runs (which day, when it ends, today's tokens), and after.
  */
 function TrialNote({ trial }: { trial: TrialState | null | undefined }) {
-  if (!trial || trial.status === 'eligible') return <p className="note">{freeTerms()} It begins with your first question.</p>;
+  if (!trial || trial.status === 'eligible') return <p className="note">{freeTerms()}</p>;
   if (trial.status === 'ended')
     return (
       <p className="note">
-        {trial.reason === 'claimed' ? 'This email address has already had a Socria trial.' : 'Your seven-day trial has ended.'} New questions, Logic Maps and artifacts need
+        {trial.reason === 'claimed' ? 'This email address has already used Socria’s free access.' : 'Your free access has ended.'} New questions, Logic Maps and artifacts need
         Socria One. Everything you’ve made stays here to open, move and edit.
       </p>
     );
@@ -482,8 +480,7 @@ function TrialNote({ trial }: { trial: TrialState | null | undefined }) {
   return (
     <>
       <p className="note">
-        {dayOfLine(trial)} · {daysLeftLine(trial).toLowerCase()}
-        {trial.endsAt ? `, ending ${endsAtWords(trial.endsAt)}` : ''}. {todayLine(trial.today)}, {dayResetLine(trial.today, now)}.
+        {todayLine(trial.today)}, {dayResetLine(trial.today, now)}.
       </p>
       {/* the numbers, for whoever wants them — never the first thing said */}
       <details className="trial-more">
@@ -492,10 +489,6 @@ function TrialNote({ trial }: { trial: TrialState | null | undefined }) {
           <dt>Today</dt>
           <dd>
             {formatTokens(trial.today.used)} of {formatTokens(trial.today.limit)} tokens
-          </dd>
-          <dt>Whole trial</dt>
-          <dd>
-            {formatTokens(trial.total.used)} of {formatTokens(trial.total.limit)} tokens
           </dd>
           <dt>Counted</dt>
           <dd>Everything Socria reads and writes for you, input and output together. Your own edits are never counted.</dd>
@@ -521,9 +514,9 @@ function Membership({ isOne, plan, onClose, trial }: { isOne: boolean; plan: Pla
                   Socria <span className="em">One</span>
                 </>
               ) : trial?.status === 'ended' ? (
-                'Your trial has ended'
+                'Your free access has ended'
               ) : (
-                'Socria, seven-day trial'
+                'Socria, free'
               )}
             </span>
           </div>

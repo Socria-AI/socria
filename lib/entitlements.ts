@@ -337,7 +337,7 @@ export function allowanceLabel(counter: Counter, plan: Plan = 'free'): string {
 }
 
 /** The headline at any free limit — the same sentence wherever one is met. */
-export const LIMIT_HEADLINE = 'Your trial has reached its end.';
+export const LIMIT_HEADLINE = 'Your free access has ended.';
 export const LIMIT_OFFER = 'Keep going with Socria One.';
 
 const REACHED: Record<Counter, string> = {
@@ -383,8 +383,8 @@ export function comparisonRows(): { id: string; label: string; free: string; one
   const yes = (plan: Plan, f: Feature) => (PLANS[plan].features[f] ? 'Included' : 'Not included');
   const t = trialNumbers();
   return [
-    { id: 'ai', label: 'Conversations, Logic Maps and artifacts', free: `${t.days} days · ${t.daily} tokens a day`, one: 'Unlimited (fair use)' },
-    { id: 'after', label: 'After the trial', free: 'Everything you made stays open', one: 'Keep going' },
+    { id: 'ai', label: 'Conversations, Logic Maps and artifacts', free: `${t.daily} tokens a day`, one: 'Unlimited (fair use)' },
+    { id: 'after', label: 'Everything you make', free: 'Stays yours', one: 'Stays yours' },
     { id: 'voice', label: 'Socria Voice', free: yes('free', 'voice'), one: yes('one', 'voice') },
     { id: 'share', label: 'Sharing a chat', free: yes('free', 'share'), one: yes('one', 'share') },
     { id: 'experiments', label: 'Experiments (hands, AR Mode, big screen)', free: yes('free', 'experiments'), one: yes('one', 'experiments') },
@@ -404,7 +404,8 @@ function trialNumbers(): { days: number; daily: string; total: string } {
  */
 export function freePlanSentence(): string {
   const t = trialNumbers();
-  return `a ${t.days}-day trial: ${t.daily} tokens a day, up to ${t.total} in all`;
+  // the plan's length and total are not said in the product (the trial is internal): only the day's tokens
+  return `${t.daily} free tokens a day`;
 }
 
 /** What each premium-only feature is called in a sentence. */
@@ -422,5 +423,5 @@ export const FEATURE_NAME: Record<Feature, string> = {
 export function onePlanSentence(): string {
   const only = [...FEATURES.filter((f) => PLANS.one.features[f] && !PLANS.free.features[f]).map((f) => FEATURE_NAME[f]), 'the Celestial and Socria One themes'];
   const list = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
-  return `Unlimited conversations, Logic Maps and artifacts after the trial, with ${list(only)}`;
+  return `Unlimited conversations, Logic Maps and artifacts, with ${list(only)}`;
 }

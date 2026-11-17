@@ -20,11 +20,11 @@ import { DAY_RESET_WORDS, TRIAL } from '@/lib/trial';
 import { docPage } from '../registry';
 
 const page = docPage('socria-one')!;
-/** The trial's numbers as the page says them: "20,000", "140,000". */
+/** The free plan's numbers as the page says them: "20,000". */
 const tokens = (n: number) => n.toLocaleString('en-GB');
 const sections = [
-  { id: 'plans', heading: 'The trial and the plan' },
-  { id: 'trial', heading: 'What the trial holds' },
+  { id: 'plans', heading: 'Free and the plan' },
+  { id: 'trial', heading: 'What free holds' },
   { id: 'asking', heading: 'When Socria asks' },
   { id: 'never', heading: 'What is never gated' },
   { id: 'codes', heading: 'No codes, no free months' },
@@ -34,11 +34,11 @@ const sections = [
 export function SocriaOne() {
   return (
     <Article page={page} sections={sections}>
-      <H2 id="plans">The trial and the plan</H2>
+      <H2 id="plans">Free and the plan</H2>
       <p>
         Socria has one paid plan, <strong>Socria One, {priceWithPeriod()}</strong>,
-        and one way to try it first: every account starts with{' '}
-        {freePlanSentence()}. There is no free tier. Socria One is{' '}
+        and every account starts with{' '}
+        {freePlanSentence()}. Socria One is{' '}
         {onePlanSentence().replace(/^U/, 'u')} — and a Socria that
         carries what it learns about how you reason from each conversation
         into the next. Socria Voice, sharing your own conversations (a chat or
@@ -53,8 +53,8 @@ export function SocriaOne() {
         can do inside a single line of thinking. Every{' '}
         <Link href="/docs/depth-personality">reply length</Link>, Logic Maps
         with unbounded branching and every lens, Research, Write and its
-        notes, and grounding in your own material are in the trial too, at
-        full strength. The trial is the product for seven days, not a
+        notes, and grounding in your own material are free too, at
+        full strength. Free is the product, not a
         cut-down version of it: nobody subscribes to more of something they
         have only watched be mediocre.
       </p>
@@ -62,7 +62,7 @@ export function SocriaOne() {
         Inside a line of thinking, one more thing differs: the size of a
         document. Anything up to{' '}
         {megabytes(PLANS.free.uploadBytes)} travels
-        straight to our server and is read there, in the trial or on Socria
+        straight to our server and is read there, free or on Socria
         One. Socria One
         carries larger documents, up to {megabytes(PLANS.one.uploadBytes)},
         through private storage instead, and deletes each one the moment it
@@ -76,30 +76,20 @@ export function SocriaOne() {
         flow to navigate.
       </p>
 
-      <H2 id="trial">What the trial holds</H2>
+      <H2 id="trial">What free holds</H2>
       <p>
-        The trial is {freePlanSentence()}. Its seven days begin with the
-        first request that does real work for you — a reply, a Logic Map, an
-        artifact or a reading — never at sign-up, and they are seven days of
-        24 hours. A day runs from 00:00 to 24:00 UTC, and a day&rsquo;s limit
-        is the smaller of {tokens(TRIAL.daily)} and what the trial has left,
-        so a trial that begins late in a UTC day still ends at{' '}
-        {tokens(TRIAL.total)}.
+        Free is {tokens(TRIAL.daily)} tokens a day. A day runs from 00:00 to
+        24:00 UTC.
       </p>
       <p>
         Tokens count what Socria reads afresh for you and everything it
         writes, together. Our own upkeep is never counted: a
         conversation&rsquo;s title, the memory kept about you, our checks on a
         draft, and an attempt that failed. When a day&rsquo;s tokens are used,
-        Socria rests until {DAY_RESET_WORDS}. When the seven days are over,
-        or all {tokens(TRIAL.total)} tokens are used, every new AI request
-        needs Socria One.
+        Socria rests until {DAY_RESET_WORDS}.
       </p>
       <p>
-        One trial is for one person, as far as is reasonable and private: a
-        keyed hash of the account&rsquo;s verified email address is kept,
-        never the address, so a new account on the same address starts with
-        its trial already used. The trial and Socria One, side by side:
+        Free and Socria One, side by side:
       </p>
       <DemoLimitsTable />
       <p className="d-after-table">
@@ -113,7 +103,7 @@ export function SocriaOne() {
       </p>
       <Callout tag="Boundary, not wall">
         <p>
-          Reaching a trial day&rsquo;s limit, or the end of the trial, pauses
+          Reaching a day&rsquo;s free tokens, or the end of free access, pauses
           only what is <em>new</em> — a new question, a new map, a new
           artifact. It never hides, deletes, or locks anything you already
           thought: every map you built stays on screen, stays interactive, and
@@ -137,7 +127,7 @@ export function SocriaOne() {
       </p>
       <Defs>
         <Def term="You reached a boundary">
-          You used a trial day&rsquo;s tokens, reached the end of the trial,
+          You used a day&rsquo;s free tokens, reached the end of free access,
           or pressed Voice or Share, and what you tried stopped. The
           prompt names what stopped and how to carry on. These appear
           immediately and are not rationed by the rules below — a button that
@@ -159,7 +149,7 @@ export function SocriaOne() {
         fortnight the second, then two months, then six. Saying no is taken as
         an answer. Closing the first kind costs nothing — it is a
         &ldquo;not now&rdquo; to what you were doing, not a verdict on the
-        subscription — so ordinary use during the trial never silences an
+        subscription — so ordinary free use never silences an
         explanation you might want later.
       </p>
       <Callout tag="Where it stays quiet regardless">
@@ -184,7 +174,7 @@ export function SocriaOne() {
 
       <H2 id="never">What is never gated</H2>
       <p>
-        Two capabilities are never charged for — in the trial, after it, or
+        Two capabilities are never charged for — free or
         on Socria One — because charging for them would make the product
         dishonest:
       </p>
@@ -238,7 +228,7 @@ export function SocriaOne() {
         <li>
           <strong>Nothing entitles by accident.</strong> Abandoned checkouts,
           expired subscriptions and unknown states all resolve to no
-          subscription: the trial, if the account has one left; otherwise
+          subscription: free access, if the account has it; otherwise
           everything it made stays open, and new AI requests wait for Socria
           One.
         </li>

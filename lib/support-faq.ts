@@ -72,7 +72,7 @@ export const TOPICS: FaqTopic[] = [
         q: 'Do I need an account to use it?',
         a: [
           `Not to begin. Signed out, you get a short preview: one line of thinking and its map, up to ${GUEST_TURNS} messages, kept in this browser rather than saved anywhere.`,
-          'To go further, sign up. A new account starts with a seven-day trial, and the line you began comes with you.',
+          'To go further, sign up. A new account is free, with 20,000 tokens a day, and the line you began comes with you.',
         ],
       },
       {
@@ -85,9 +85,9 @@ export const TOPICS: FaqTopic[] = [
       {
         q: 'What do I get without paying?',
         a: [
-          `Every account starts with ${freePlanSentence()}. The seven days begin with your first request to Socria, not when you sign up. Tokens count what Socria reads and writes for you, together; a day’s tokens start again at ${DAY_RESET_WORDS}.`,
-          'The trial is the whole of Logos 5: every lens, every depth, Logic Maps, artifacts and Write. Socria Voice and sharing your own conversations are part of Socria One, as are the experiments and the Celestial and Socria One themes; joining a conversation somebody shares with you is free.',
-          'When the seven days are over, new questions, Logic Maps and artifacts need Socria One. Nothing is taken away: every conversation, map and artifact stays open, and you can still move, write, rename, export and delete by hand.',
+          `Every account starts with ${freePlanSentence()}. Tokens count what Socria reads and writes for you, together; a day’s tokens start again at ${DAY_RESET_WORDS}.`,
+          'Free is the whole of Logos 5: every lens, every depth, Logic Maps, artifacts and Write. Socria Voice and sharing your own conversations are part of Socria One, as are the experiments and the Celestial and Socria One themes; joining a conversation somebody shares with you is free.',
+          'Nothing you make is taken away: every conversation, map and artifact stays open, and you can always move, write, rename, export and delete by hand.',
         ],
       },
       {
@@ -138,7 +138,7 @@ export const TOPICS: FaqTopic[] = [
       {
         q: 'What does Socria One add?',
         a: [
-          `${onePlanSentence()}. There is no daily limit and no end date — Socria One does not count tokens. Socria carries more of how you reason between conversations (${PLANS.one.memoryEntries} things, against ${PLANS.free.memoryEntries} in the trial), reads documents up to ${megabytes(PLANS.one.uploadBytes)} rather than ${megabytes(PLANS.free.uploadBytes)}, and shares whole Projects as well as chats. ${priceLabel()} a month.`,
+          `${onePlanSentence()}. There is no daily limit and no end date — Socria One does not count tokens. Socria carries more of how you reason between conversations (${PLANS.one.memoryEntries} things, against ${PLANS.free.memoryEntries} on a free account), reads documents up to ${megabytes(PLANS.one.uploadBytes)} rather than ${megabytes(PLANS.free.uploadBytes)}, and shares whole Projects as well as chats. ${priceLabel()} a month.`,
           '<a href="/one">See the full comparison</a>.',
         ],
       },
@@ -158,7 +158,7 @@ export const TOPICS: FaqTopic[] = [
       {
         q: 'Is there a student or team price?',
         a: [
-          `No. Socria One is ${priceWithPeriod()} for everyone, and every account starts with a seven-day trial. (The UT Arlington student month has ended.)`,
+          `No. Socria One is ${priceWithPeriod()} for everyone, and every account starts free, with 20,000 tokens a day. (The UT Arlington student month has ended.)`,
           'There is no team price yet. When there is, it will be on the Socria One page — not buried in a sales call.',
         ],
       },
@@ -197,10 +197,10 @@ export const TOPICS: FaqTopic[] = [
     t: 'Logos and the map',
     qs: [
       {
-        q: 'Logos says I’ve used today’s trial tokens, or that my trial has ended.',
+        q: 'Logos says I’ve used today’s free tokens, or that my free access has ended.',
         a: [
-          `Each day of the trial holds ${TRIAL.daily.toLocaleString('en-GB')} tokens, and the whole trial ${TRIAL.total.toLocaleString('en-GB')}. When a day’s tokens are used, Socria rests until ${DAY_RESET_WORDS}; what you have stays open and stays yours — your conversations, your maps and everything in Artifacts.`,
-          `The trial ends after ${TRIAL.days} days, or sooner if all ${TRIAL.total.toLocaleString('en-GB')} tokens are used. After that, new questions, Logic Maps and artifacts need Socria One, which has no daily limit. A Logic Map keeps every node it has, and everything you made can still be opened, moved and edited by hand.`,
+          `Free accounts get ${TRIAL.daily.toLocaleString('en-GB')} tokens a day. When a day’s tokens are used, Socria rests until ${DAY_RESET_WORDS}; what you have stays open and stays yours — your conversations, your maps and everything in Artifacts.`,
+          `If your free access has ended, new questions, Logic Maps and artifacts need Socria One, which has no daily limit. A Logic Map keeps every node it has, and everything you made can still be opened, moved and edited by hand.`,
         ],
       },
       {

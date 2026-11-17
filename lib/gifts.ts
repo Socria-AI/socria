@@ -153,7 +153,7 @@ export function noteAllowed(kind: GiftNoteKind, lastAt: number | null, now: numb
 export const GIFT_NOTES: Record<GiftNoteKind, { title: string; body: string; action: string; dismiss: string }> = {
   deep: {
     title: 'Socria One’s deepest model, on us',
-    body: 'That question needed more thought, so this answer came from the model Socria One members get. Now and then, a trial gets one.',
+    body: 'That question needed more thought, so this answer came from the model Socria One members get. Now and then, a free account gets one.',
     action: 'See Socria One',
     dismiss: 'Got it',
   },

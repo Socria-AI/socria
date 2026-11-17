@@ -69,8 +69,7 @@ export function Overview() {
         centerpiece of{' '}
         <Link href="/docs/socria-one">Socria One</Link>, the{' '}
         {priceWithPeriod()} plan. Every account begins with {freePlanSentence()} —
-        the whole of Logos 5, not a cut-down version. After seven days new AI
-        requests need Socria One, and everything made in the trial stays open.
+        the whole of Logos 5, not a cut-down version.
         What Socria One adds is no daily limit, Socria Voice, sharing, the
         experiments and two themes, never a better version of any one of them.
       </p>
@@ -104,11 +103,11 @@ export function Overview() {
           tell Socria it read you wrong. Neither is ever gated.
         </li>
         <li>
-          <strong>Nothing held hostage.</strong> Reaching the end of a trial
-          day, or of the trial itself, pauses only new AI requests; it never
+          <strong>Nothing held hostage.</strong> Reaching the end of a
+          day&rsquo;s free tokens pauses only new AI requests; it never
           hides, deletes, or locks what you have already thought. Your
           existing maps stay visible and interactive, the conversations you
-          have begun stay open and editable by hand, and a trial day&rsquo;s
+          have begun stay open and editable by hand, and a day&rsquo;s free
           tokens come back at 00:00 UTC.
         </li>
       </ul>

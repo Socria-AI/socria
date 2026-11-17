@@ -43,13 +43,15 @@ review, and there was no structured history for a later "why did I miss question
 ## 2. The flow
 
 1. **The request.**
-   - `send` recognises a request to be quizzed (`asksForQuiz`), in the ordinary ways of asking: "quiz me on…",
-     "I want to be quizzed", "test my knowledge of…", "ask me some questions about…", "can I have a quiz on…",
-     "let's do a quiz", "practice questions on…", "a 10-question quiz", and the common misspelling "quizz me". It
-     is not used for a question *about* a quiz ("what's on the quiz on Friday?").
-   - **From the Everything view.** Once a conversation has a reply, its board offers a **Quiz me on this** card
-     (on the zoomed board, a tile with **Start the quiz**). Pressing it is the same as asking in words, on what
-     the conversation has been about. The card steps aside while a quiz is being taken.
+   - `send` recognises a request to be quizzed (`asksForQuiz`), and only a request: the quiz has to be what is
+     asked for. "Quiz me on…", "make me a quiz", "can I have a quiz on…", "let's do a quiz", "I want to be
+     quizzed", "test my knowledge of…", "ask me some questions about…", "a 10-question quiz", "quizz me".
+   - **A quiz mentioned is not a quiz asked for.** "I have a quiz tomorrow, can you help me study?", "help with a
+     quiz question", "I'm going to be tested on this", "I'm stuck on these practice problems", "can you check my
+     quiz answers" and software tests ("write a test for this function") are messages to answer, and go to the
+     chat as before. (Until November 2026 a looser reading made quizzes in place of answers to messages like
+     these; the near-misses are held in `test/quiz.test.mjs`.)
+   - Quizzes appear only when asked for. Nothing on the board offers one unprompted.
    - The student's message stays in the conversation, marked `via: 'quiz'`.
    - Nothing goes to the chat reply. MR reads that message as "a quiz was made as an artifact", so the chat does
      not also start quizzing in words, and the review afterwards can be explained.
@@ -349,7 +351,7 @@ students. None has been run.
 | `test/quiz-route.test.mjs` (39) | through the real routes: a quiz made from passages with no answer in the clear; observed against inferred style from a real course pack; missing sources refused; grading by mode; keys refused for another account or question; the chat told the quiz's facts; MR not taking up a quiz contract for a request the quiz took; written in two parts at once; a failed part made up by one more; a cut-off reply used; loose model output making a full quiz whose keys grade right; every call failing answered with a 502 |
 | `test/quiz-eval.test.mjs` (11) | the evaluation above |
 | `scripts/verify-quiz.mjs` | in Chromium: the whole flow, the exam simulation, two views as one object, phone, dark, reduced motion, no keys in the page, requests carrying only sealed keys |
-| full app, in Chromium (not committed; run during the fix) | asked for in words through a failed first attempt; taken in the Everything view; a phone by touch, start to review; "quiz me" with nothing to go on; the Everything view's Quiz me card |
+| full app, in Chromium (not committed; run during the fix) | asked for in words through a failed first attempt; taken in the Everything view; a phone by touch, start to review; "quiz me" with nothing to go on |
 
 ---
 

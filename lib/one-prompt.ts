@@ -154,10 +154,10 @@ export interface TriggerSpec {
 export const WELCOME_BACK: readonly { title: string; body: string; nudge: string }[] = [
   {
     title: 'Pick it back up',
-    nudge: 'Socria One keeps Socria answering after the trial, and carries what it learns into the next.',
+    nudge: 'Socria One keeps Socria answering without a daily limit, and carries what it learns into the next.',
     body:
       'Every conversation you have started is here to pick back up. ' +
-      'Socria One keeps Socria answering after the trial, and carries what it ' +
+      'Socria One keeps Socria answering without a daily limit, and carries what it ' +
       'learns about how you reason from each one into the next.',
   },
   {
@@ -170,18 +170,18 @@ export const WELCOME_BACK: readonly { title: string; body: string; nudge: string
   },
   {
     title: 'Where this goes next',
-    nudge: 'Long work is where Socria earns its place. Socria One keeps going after the trial, without a daily limit.',
+    nudge: 'Long work is where Socria earns its place. Socria One keeps going without a daily limit.',
     body:
       'Long work is where this product earns its place — a decision that runs ' +
       'for weeks, a question you keep returning to. Socria One is the version ' +
-      'that keeps going after the seven days, without a daily limit.',
+      'that keeps going without a daily limit.',
   },
   {
     title: 'Everything you have made stays yours',
-    nudge: 'Everything you make stays open after the trial. Socria One adds no daily limit, Voice, sharing and the experiments.',
+    nudge: 'Everything you make stays open. Socria One adds no daily limit, Voice, sharing and the experiments.',
     body:
       'Nothing you make is taken back: every conversation, map and artifact ' +
-      'stays open after the trial, to open, move and edit. Socria One keeps ' +
+      'stays open, to open, move and edit. Socria One keeps ' +
       'Socria answering, with Socria Voice, sharing and the experiments.',
   },
 ];
@@ -412,7 +412,7 @@ export const TRIGGERS: Record<TriggerReason, TriggerSpec> = {
     // people to ignore it.
     body:
       'You have been coming back to think here. Socria One keeps Socria answering ' +
-      'after the trial, and carries what it learns about how you reason ' +
+      'without a daily limit, and carries what it learns about how you reason ' +
       'from each one into the next.',
   },
 

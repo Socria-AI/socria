@@ -23,7 +23,7 @@ export function StudentsBody() {
           </div>
           <p className="lede">
             Socria One is no longer offered free. You can still try Socria right now with no account, and a new
-            account has {freePlanSentence()}. After that, Socria One is {priceWithPeriod()}.
+            account has {freePlanSentence()}. Socria One, without a daily limit, is {priceWithPeriod()}.
           </p>
           <div className="stack" style={{ gap: '12px' }}>
             {/* Where every public "Start a conversation" goes (components/site/chrome.tsx START),

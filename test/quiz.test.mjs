@@ -408,12 +408,20 @@ console.log('\n=== a quiz is made every time: what a model actually writes is re
 
 console.log('\n=== asked for in the ordinary ways ===');
 {
-  const yes = ['quiz me on photosynthesis', 'quizz me on the cold war', 'I want to be quizzed on chapter 3', 'test my knowledge of supply and demand', 'ask me some questions about mitosis', 'can I have a quiz on cells', "let's do a quiz", 'make me a 10 question quiz', 'another quiz please', 'pop quiz!', 'give me some practice questions on derivatives', 'can I get tested on this', "I'd like a quick quiz on enzymes"];
-  const no = ['what is on the quiz on friday?', 'how do quizzes work?', 'the quiz yesterday was hard, explain question 3', 'I have a test tomorrow on enzymes', 'why did I miss question 4?', 'help me study for my quiz', 'my teacher gave us a 10 question quiz', 'what is a unit test in programming'];
+  const yes = ['quiz me on photosynthesis', 'quizz me on the cold war', 'I want to be quizzed on chapter 3', 'test my knowledge of supply and demand', 'ask me some questions about mitosis', 'can I have a quiz on cells', "let's do a quiz", 'make me a 10 question quiz', 'another quiz please', 'pop quiz!', 'give me some practice questions on derivatives', 'can I get tested on this', "I'd like a quick quiz on enzymes", 'a ten-question test please', 'I need a practice test for my midterm, can you make one', 'how about a quiz on this'];
+  const no = [
+    'what is on the quiz on friday?', 'how do quizzes work?', 'the quiz yesterday was hard, explain question 3', 'I have a test tomorrow on enzymes', 'why did I miss question 4?', 'help me study for my quiz', 'my teacher gave us a 10 question quiz', 'what is a unit test in programming',
+    // a quiz MENTIONED is a message to answer — these made quizzes in place of the answer until November 2026
+    'I have a quiz tomorrow, can you help me study?', 'Can you help with a quiz question about enzymes?', "I'm going to be tested on this tomorrow", "I'm stuck on these practice problems, can you explain number 3?",
+    'can you help me with the 10 question test I have?', 'I want help with my practice exam answers', 'I had a pop quiz today and failed it', 'I need to study for a quiz on Friday', 'do you think a quiz would help?',
+    'we have a mock exam next week, what should I revise?', 'can you grade my practice test?',
+    // software tests are not quizzes
+    'write a test for this function', 'add unit tests please', 'give me a test suite for this',
+  ];
   const missed = yes.filter((s) => !M.asksForQuiz(s));
   const wrong = no.filter((s) => M.asksForQuiz(s));
   ok(`every ordinary way of asking is read as asking (${yes.length})`, !missed.length, missed.join(' | '));
-  ok(`and a question about a quiz is not (${no.length})`, !wrong.length, wrong.join(' | '));
+  ok(`and a message that only mentions a quiz is not (${no.length})`, !wrong.length, wrong.join(' | '));
   ok('"quiz me on this", "what we covered": the conversation, not a topic named', M.readScope('quiz me on this').topics.length === 0 && M.readScope('Quiz me on what this conversation has covered').topics.length === 0 && J(M.readScope('quiz me on the cold war').topics) === J(['cold war']));
 }
 
