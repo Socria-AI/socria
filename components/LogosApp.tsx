@@ -230,6 +230,7 @@ import { broughtBy, contentOf, isWriteUp, writeUpId, writeUpParts } from '@/lib/
 import { OPENING, SPLIT_NAMES, VIEW_LABELS, afterSend, besideSide, chatSideFor, chatVisible, choose, dock, fit, onMade, readBesideShare, readChatSide, screenForRequest, writeBesideShare, writeChatSide, type ModelTool, type Screen, type Side as ChatSide, type Viewport } from '@/lib/logos5/views';
 import { acceptTitle } from '@/lib/logos5/title';
 import { needsMap, routeTurn, tableInReply, turnsSince, type TurnRoute } from '@/lib/runtime/orchestrate';
+import { ideasWanted } from '@/lib/runtime/ideas-wanted';
 import type { Hit, IndexDoc } from '@/lib/runtime/representation';
 import { effectSaid, linksOf, turnEffect } from '@/lib/logos5/linking';
 import { L5Message, L5Pending, type L5Effect } from './logos5/L5Message';
@@ -885,6 +886,10 @@ export function LogosApp({
     [sessions, activeId]
   );
   const messages = active?.messages ?? [];
+  // MIND MAPS WHEN THEY HELP (lib/runtime/ideas-wanted.ts): the ideas are spread across the Everything view when the
+  // person asked for them, the subject has a shape, or they are thinking something through; otherwise they are folded,
+  // a press away, and what was said and made fills the view
+  const ideasOn = useMemo(() => ideasWanted(messages.filter((m) => m.role === 'user').map((m) => (typeof m.content === 'string' ? m.content : ''))).show, [messages]);
   const map = active?.map ?? EMPTY_MAP;
 
   // ── DOCUMENTS (lib/docs) ──────────────────────────────────────────
@@ -10594,6 +10599,7 @@ export function LogosApp({
               key={activeId ?? 'space'}
               ideas={sIdeas}
               edges={map.edges}
+              ideasFolded={!ideasOn}
               brought={sBrought}
               made={sMade}
               turns={turns}
@@ -10657,7 +10663,7 @@ export function LogosApp({
             reading={sheetAt}
             cards={cards}
             map={
-              ideas.length
+              ideas.length && ideasOn
                 ? {
                     ideas,
                     // a drawing names the column by what it is of (Logos 5, lib/logos5/drawing.ts)
@@ -10882,8 +10888,8 @@ export function LogosApp({
           focusComposer();
         };
         const cards: CanvasCard[] = [];
-        // the ideas, beside the first turn that drew them
-        if (map.nodes.length) {
+        // the ideas, beside the first turn that drew them — when they help (ideasOn); otherwise the Logic Map is a press away
+        if (map.nodes.length && ideasOn) {
           const mapEl = <MapPreview nodes={map.nodes.map((n) => ({ id: n.id, type: n.type, label: n.label }))} edges={map.edges} />;
           cards.push({
             key: 'map',

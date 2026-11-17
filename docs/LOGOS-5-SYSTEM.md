@@ -768,6 +768,23 @@ still grow a little under the pointer: on a mark a few pixels across, growing is
 2px lift would not be seen. Live guidance keeps its looping demonstrations, because they show a movement to make. The
 SocriaUX workspace (/ux) keeps its own prompts. `test/popups-brand.test.mjs` holds the rest.
 
+### 8.16 Mind maps when they help
+
+The Everything view had spread every line of thinking's ideas across the space, including conversations that are only answers: a definite integral worked, a graph drawn, a bug fixed. Those ideas were a mind map nobody had asked for, and they pushed the reply and what it made off the screen. Now the ideas are drawn when they help (`lib/runtime/ideas-wanted.ts`):
+
+- **Asked for.** A mind map, a concept map, "map it out", the big picture, how the parts fit together.
+- **Needed.** A subject whose shape is worth seeing, such as causes or a structure (the route's `draw`).
+- **Exploring.** The person is thinking something through: weighing a decision, asking what if, brainstorming, arguing a case, researching.
+
+One such turn is enough, and the conversation stays one of ideas. Otherwise the ideas are folded:
+
+- The space shows what was said, brought and made.
+- The row's **Ideas** keeps its count, drawn dashed. Pressing it puts the ideas back on the space.
+- The board's Logic Map column and the zoomed-out canvas's Logic Map card are left out in the same way.
+- The Logic Map is still drawn in the background, so search, the Universal Map and the rewards challenge are unchanged. It stays a press away.
+
+Tested in `test/ideas-wanted.test.mjs`: 24 messages read as they should be, plus whole conversations. `test/logos5-space.test.mjs` covers how the space draws the fold.
+
 ## 9. The Logic Map draws almost anything
 
 The Logic Map was a picture of the person's reasoning and nothing else: its

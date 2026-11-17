@@ -24,6 +24,8 @@
 .logos-root .ls-kd:hover { color: var(--c-ink); }
 .logos-root .ls-kd.is-on { color: var(--c-ink); box-shadow: inset 0 -2px 0 var(--c-moss); }
 .logos-root .ls-kd:focus-visible { outline: 2px solid var(--c-moss); outline-offset: -2px; }
+/* the ideas folded off the space (a conversation of answers): their count says there is more, a press away */
+.logos-root .ls-kd.is-folded .ls-c { border: 1px dashed var(--c-ink-30, currentColor); border-radius: 999px; padding: 0 6px; }
 .logos-root .ls-c { font-size: 12.5px; color: var(--c-ink-45); font-variant-numeric: tabular-nums; }
 .logos-root .ls-sp { flex: 1; }
 .logos-root .ls-arr { align-self: center; font-size: 12.5px; color: var(--c-ink-45); white-space: nowrap; }

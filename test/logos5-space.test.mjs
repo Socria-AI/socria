@@ -138,6 +138,19 @@ ok('  the bubble is signed by name, not the mark: Socria in italic moss serif', 
 ok('  lit ideas from the open turn', /ls-idea is-idea is-lit/.test(wide));
 ok('  the question framed first, in its own column', /class="ls-col is-frame"[\s\S]*Your question/.test(wide));
 ok('the chatbox at the foot, with no "Answering" line over it', /class="ls-chat"/.test(wide) && /class="the-chatbox"/.test(wide) && !/ls-answering/.test(wide) && !/Answer below/.test(wide));
+{
+  // MIND MAPS WHEN THEY HELP (lib/runtime/ideas-wanted.ts): a conversation of answers keeps its ideas off the space
+  const folded = html(h(S.L5Space, props({ ideasFolded: true })));
+  ok('folded: no idea is drawn on the space, and no line between ideas', !/class="ls-idea/.test(folded) && !/class="ls-open"/.test(folded), folded.slice(0, 200));
+  ok('  what was said, brought and made still is: the reply, the file, the artifact', /class="reply"/.test(folded) && /class="ls-file"/.test(folded) && /class="ls-made"/.test(folded));
+  ok('  the ideas are a press away: "Ideas" keeps its count, marked folded, saying what it does', /class="ls-kd is-folded"[^>]*title="Show the ideas on the space"[^>]*>[\s\S]*?Ideas<span class="ls-c">6<\/span>/.test(folded), (folded.match(/<button[^>]*data-kind="ideas"[\s\S]*?<\/button>/) || [''])[0]);
+  ok('  unfolded, the space is as it was', html(h(S.L5Space, props({ ideasFolded: false }))) === wide);
+  ok('  a conversation with no ideas yet has nothing to fold', !/is-folded/.test(html(h(S.L5Space, props({ ideasFolded: true, ideas: [], edges: [] })))));
+  const css = read('components/logos5/space.css');
+  ok('  the folded count drawn dashed', /\.ls-kd\.is-folded \.ls-c \{[^}]*dashed/.test(css));
+  const app = read('components/LogosApp.tsx');
+  ok('the app folds them on the space, the board and the zoomed-out canvas alike', /ideasFolded=\{!ideasOn\}/.test(app) && /ideas\.length && ideasOn/.test(app) && /map\.nodes\.length && ideasOn/.test(app) && /ideasWanted\(messages\.filter\(\(m\) => m\.role === 'user'\)/.test(app));
+}
 ok('  what the open turn made is drawn large in the open idea; the bubble then keeps to words', (() => { const x = html(h(S.L5Space, props({ openHero: { node: h('div', { className: 'hero-thing' }) } }))); return /class="ls-hero"[\s\S]*?class="hero-thing"/.test(x) && /class="ls-bub has-tail has-hero[^"]*"/.test(x); })());
 ok('  no hint text in the row; no words on the lines', !/ls-arr/.test(wide) && !/class="ls-lw/.test(wide));
 ok('the conversation as a page, a press away', /Read as a conversation/.test(wide));
