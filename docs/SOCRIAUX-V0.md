@@ -229,6 +229,9 @@ Everything passes between client, routes and model as these shapes, each with a 
   *Accept:* undo restores the exact earlier HTML.
   *Verified:* Undo and redo, and earlier versions viewable from Versions. Undo restores the exact earlier page (acceptance pass).
 
+- [x] **5.14 Art direction** (added after v0; `docs/SOCRIAUX-ART-DIRECTION.md`). Between the brief and the design: three directions in different visual languages, drawn as specimens, which the designer can take, change, lock or leave to SocriaUX. The renderer is driven by the chosen direction's look, a planner gives the page its rhythm, and every generation is measured at 1280 and 390 px and revised in at most two rounds.
+  *Verified:* unit, route and browser tests, the section check across all twelve languages, and the benchmark of nine briefs described in that document.
+
 ## Phase 6 — Quality assurance
 
 - [x] **6.1** Imports: each type, hostile HTML, malformed HTML, broken resources, oversize and empty files.

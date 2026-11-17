@@ -5,7 +5,8 @@
 // composer asks SocriaUX to change it in words. The palette shows the contrast
 // each role will have on the page; the typefaces are chosen from the same list
 // the generator uses, set live. Approving locks the version a design is
-// generated from.
+// generated from, and leads to the art direction — or straight to a design,
+// in the direction SocriaUX chooses.
 
 import { useEffect, useMemo } from 'react';
 import { contrastRatio } from '@/lib/ux/audit';
@@ -23,7 +24,10 @@ interface Props {
   busy: string | null;
   hasDesign: boolean;
   onChange: (b: DesignBrief) => void;
+  /** approve and choose the art direction */
   onApprove: () => void;
+  /** approve and generate at once, in the direction SocriaUX chooses (or the one already chosen) */
+  onSkip: () => void;
   onBack: () => void;
 }
 
@@ -37,7 +41,7 @@ function Field({ label, value, onChange, rows = 2, hint }: { label: string; valu
   );
 }
 
-export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onChange, onApprove, onBack }: Props) {
+export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onChange, onApprove, onSkip, onBack }: Props) {
   const set = <K extends keyof DesignBrief>(k: K, v: DesignBrief[K]) => onChange({ ...brief, [k]: v });
   const href = useMemo(() => fontStylesheet([brief.typography.display, brief.typography.body]), [brief.typography.display, brief.typography.body]);
   useEffect(() => {
@@ -130,7 +134,7 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
                 ))}
               </select>
               <select className="v0-select" value={brief.typography.body} onChange={(e) => set('typography', { ...brief.typography, body: e.target.value })} aria-label="Body face">
-                {FONTS.filter((f) => f.axes && f.axes !== 'ital@0;1').map((f) => (
+                {FONTS.filter((f) => !f.displayOnly && f.kind !== 'mono').map((f) => (
                   <option key={f.name}>{f.name}</option>
                 ))}
               </select>
@@ -181,9 +185,25 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
       </div>
 
       <footer className="v0-brief-foot">
-        <button type="button" className="sb-btn is-primary" onClick={onApprove} disabled={!!busy}>
-          {busy ? busy : approved && hasDesign ? 'Generate again from this brief' : 'Approve and generate'}
-        </button>
+        {approved && hasDesign ? (
+          <>
+            <button type="button" className="sb-btn is-primary" onClick={onSkip} disabled={!!busy}>
+              {busy ? busy : 'Generate again from this brief'}
+            </button>
+            <button type="button" className="sb-link" onClick={onApprove} disabled={!!busy}>
+              Choose a different direction
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="sb-btn is-primary" onClick={onApprove} disabled={!!busy}>
+              {busy ? busy : 'Approve and choose a direction'}
+            </button>
+            <button type="button" className="sb-link" onClick={onSkip} disabled={!!busy}>
+              Approve and let SocriaUX choose
+            </button>
+          </>
+        )}
         <button type="button" className="sb-link" onClick={onBack}>
           Back to the moodboard
         </button>

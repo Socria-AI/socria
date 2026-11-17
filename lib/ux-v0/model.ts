@@ -39,6 +39,7 @@ export const MAX_TOKENS: Record<CallKind, number> = {
   direction: 800,
   brief: 1600,
   'refine-brief': 1600,
+  'art-direction': 1800,
   generate: 5200,
   refine: 2200,
   critique: 1400,

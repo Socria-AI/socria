@@ -311,7 +311,7 @@ await part('create details', async () => {
   await page.waitForTimeout(400);
   check('“Refine” in words sends the brief, with the direct edit, for a patch', rb?.action === 'refine' && /warmer/.test(rb?.instruction || '') && /remote workers/.test(JSON.stringify(rb?.brief || rb?.current || {})), JSON.stringify({ action: rb?.action, instruction: rb?.instruction }));
   await page.waitForTimeout(800);
-  await page.getByRole('button', { name: 'Approve and generate' }).click();
+  await page.getByRole('button', { name: 'Approve and let SocriaUX choose' }).click();
   await page.waitForSelector('iframe.v0-frame', { timeout: 15000 });
   await page.waitForTimeout(2500);
   const fr = () => page.frames().find((f) => f.url() === 'about:srcdoc');

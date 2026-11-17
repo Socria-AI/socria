@@ -15,9 +15,10 @@
 //             designer decides; a change of direction is offered as a new
 //             generation rather than squeezed into a patch.
 
+import { designFromDirection, directionBrief, LOCK_LABEL, planLayout, type ArtDirection, type LockGroup } from './direction';
 import { normQ, readQueries } from './discovery';
 import { fontMenu } from './fonts';
-import { libraryMenu, normalizePatch, normalizeSpec, specDigest, type DesignSpec, type Patch } from './spec';
+import { BUTTONS, CONTAINERS, GRIDS, LABELS, libraryMenu, MOTIFS, normalizePatch, normalizeSpec, specDigest, TONES, type DesignSpec, type Patch } from './spec';
 import {
   normalizeBrief,
   obj,
@@ -120,21 +121,36 @@ export interface GenerateInput {
   direction: string;
 }
 
-export function generateSystem(brief: DesignBrief): string {
-  return `You are SocriaUX's design generator. Turn the approved brief into a design specification that a renderer draws. You do not write HTML: you choose tokens and sections from the library below and write their content.
+/** What generated pages do by habit, and this one must not do unless the direction asks for it. */
+const NOT_GENERIC = `Avoid the generic generated page:
+- No stock phrases: never "unlock", "elevate", "empower", "seamless", "transform your", "welcome to", "your journey", "discover the power", "cutting-edge", "next-level", "world-class", "revolutionise", "game-changer", "supercharge", "leverage".
+- Headlines say something only this brand could say: a particular, a number, a place, a promise. Short. One may emphasise a single word by wrapping it in *asterisks*.
+- Do not open every section with an eyebrow label; use one only where it adds information (a date, a place, a category), at most on half the sections.
+- Not a three-icon card grid by default: use features only for genuinely parallel points, and the variant the direction prefers.
+- Vary the structure: no two neighbouring sections of the same kind; not the stock order hero → features → pricing → questions → call to action unless this brief needs exactly that.`;
 
+export function generateSystem(brief: DesignBrief, dir: ArtDirection | null = null): string {
+  const tokens = dir
+    ? '- Tokens and the look are already decided by the approved art direction below: do not write "tokens".'
+    : "- Tokens: colors {background, surface, text, muted, accent, accentText, line} from the brief's palette roles; fonts {display, body} from the brief's typography; scale compact|comfortable|spacious; radius none|soft|round; style editorial|minimal|bold|warm|technical; imageTreatment natural|muted|warm|mono — all chosen to express the brief's personality and visual direction.";
+  return `You are SocriaUX's design generator. Turn the approved brief into a design specification that a renderer draws. You do not write HTML: you choose sections from the library below and write their content${dir ? '' : ', and choose tokens'}.
+${dir ? `
+${directionBrief(dir, brief.pageType)}
+` : ''}
 THE LIBRARY (only these kinds, variants and fields; * marks required):
 ${libraryMenu(brief.pageType)}
 
 Rules:
-- Tokens: colors {background, surface, text, muted, accent, accentText, line} from the brief's palette roles; fonts {display, body} from the brief's typography; scale compact|comfortable|spacious; radius none|soft|round; style editorial|minimal|bold|warm|technical; imageTreatment natural|muted|warm|mono — all chosen to express the brief's personality and visual direction.
+${tokens}
 - Structure: ${brief.pageType === 'website' ? 'a nav first, a footer last; 5–9 sections between them, in the order a visitor needs them; one primary action, repeated at most twice.' : 'an app-nav first (tabbar for mobile, sidebar or topbar for web), then an app-header, then the content the screen exists for.'}
-- Copy: real, specific to this brief, in the brand's voice. Never lorem ipsum. Headlines short and concrete. Facts you were not given — prices, addresses, dates, numbers, opening hours, people's names — are written as [bracketed placeholders] (e.g. "[Opening hours]", "[£ price]"); never invent them. A testimonial without a real source uses "[Customer name]".
+- Copy: real, specific to this brief, in ${dir ? 'the voice the direction describes' : "the brand's voice"}. Never lorem ipsum. Headlines short and concrete. Facts you were not given — prices, addresses, dates, numbers, opening hours, people's names — are written as [bracketed placeholders] (e.g. "[Opening hours]", "[£ price]"); never invent them. A testimonial without a real source uses "[Customer name]".
 - Images: only the moodboard ids listed below, in "images" on the sections that take them; prefer landscape for wide slots and portrait for tall ones. If there are none, choose variants that need no image.
 - Every section has a short unique id (lowercase, hyphenated), a kind, a variant, content and images.
 
+${NOT_GENERIC}
+
 ${VOICE}
-Respond with ONE JSON object: {"title": "...", "pageType": "${brief.pageType}", "platform": "${brief.platform}", "tokens": {...}, "sections": [{"id": "...", "kind": "...", "variant": "...", "content": {...}, "images": ["..."]}]}`;
+Respond with ONE JSON object: {"title": "...", "pageType": "${brief.pageType}", "platform": "${brief.platform}", ${dir ? '' : '"tokens": {...}, '}"sections": [{"id": "...", "kind": "...", "variant": "...", "content": {...}, "images": ["..."]}]}`;
 }
 
 export function generateUser(input: GenerateInput): string {
@@ -147,8 +163,18 @@ export function generateUser(input: GenerateInput): string {
     .join('\n\n');
 }
 
-export function parseGenerate(raw: unknown, brief: DesignBrief, moodboard: Moodboard, version: number, reason: string): DesignSpec | null {
+/**
+ * The model's answer as a spec. With an approved art direction, the tokens and
+ * the look are the direction's (whatever the model wrote), and the page is
+ * planned for rhythm (direction.ts planLayout).
+ */
+export function parseGenerate(raw: unknown, brief: DesignBrief, moodboard: Moodboard, version: number, reason: string, dir: ArtDirection | null = null): DesignSpec | null {
   const r = obj(raw);
+  if (dir) {
+    const { tokens, look } = designFromDirection(dir);
+    const spec = normalizeSpec({ ...r, tokens, look, pageType: brief.pageType, platform: brief.platform, version, reason, createdAt: Date.now() }, moodboard);
+    return spec ? planLayout(spec) : null;
+  }
   const pal = Object.fromEntries(brief.palette.map((p) => [p.role, p.hex]));
   const t = obj(r.tokens);
   const colors = obj(t.colors);
@@ -178,6 +204,8 @@ export interface RefineInput {
   comment: string;
   /** the designer has seen SocriaUX's concern and wants the change anyway */
   force: boolean;
+  /** what the designer locked in the art direction */
+  locks?: readonly LockGroup[];
 }
 
 export function refineSystem(): string {
@@ -185,6 +213,8 @@ export function refineSystem(): string {
 
 Patch operations (the "op"):
 - "tokens": change design tokens — {"tokens": {"colors": {...}, "fonts": {...}, "scale"|"radius"|"style"|"imageTreatment": ...}} (fonts only from: ${fontMenu()}).
+- "look": change how the page is composed — {"look": {any of: "ratio" (type scale 1.15–1.7), "weight" (100–900), "case" sentence|upper, "emphasis" italic|accent|underline|highlight|none, "label" ${LABELS.join('|')}, "grid" ${GRIDS.join('|')}, "align" left|center, "width" narrow|standard|wide, "containers" ${CONTAINERS.join('|')}, "rules" none|hairline|heavy, "buttons" ${BUTTONS.join('|')}, "motifs" [${MOTIFS.join(', ')}]}}.
+- "tone": set the ground one section sits on, or its spacing — {"sectionId", "tone": ${TONES.join('|')}, "pad": s|m|l}.
 - "content": change fields of one section — {"sectionId", "content": {only the fields that change}}.
 - "variant": switch one section's variant — {"sectionId", "variant"}.
 - "images": change which moodboard images one section uses — {"sectionId", "images": [ids]}.
@@ -211,6 +241,7 @@ export function refineUser(input: RefineInput): string {
     `THE DESIGN NOW:\n${specDigest(input.spec)}`,
     `MOODBOARD IMAGES AVAILABLE:\n${keptRefs(input.moodboard)}`,
     where,
+    input.locks?.length ? `LOCKED IN THE ART DIRECTION (the designer decided these): ${input.locks.map((g) => LOCK_LABEL[g]).join(', ')}. If the comment asks to change one, make the patch but say in "challenge" that it changes a locked decision.` : '',
     `THE COMMENT: “${input.comment}”`,
     `force: ${input.force}`,
   ]

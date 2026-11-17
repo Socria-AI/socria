@@ -1,10 +1,17 @@
 // app/api/ux-v0/generate/route.ts
-// POST { brief, moodboard, direction?, version } → { spec, placeholders }
+// POST { brief, moodboard, artDirection?, direction?, version } → { spec, artDirection, placeholders }
 //
 // The approved brief becomes a DesignSpec (lib/ux-v0/design.ts, spec.ts): tokens
 // and sections from the library, real copy, moodboard images only. The client
 // renders it (lib/ux-v0/render.ts) — the model never writes HTML. One call per
 // generation; generations have their own daily cap.
+//
+// The page follows an art direction (lib/ux-v0/direction.ts): the one the
+// designer approved, or — when they left it to SocriaUX — the engine's most
+// faithful reading of the brief. Its tokens and look are applied in code,
+// whatever the model writes; the model chooses sections, variants and copy
+// that serve it. A new direction in words revises the approved one and keeps
+// every group the designer locked.
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
@@ -16,6 +23,7 @@ import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
 import { withMeter } from '@/lib/token-meter';
 import { askJson } from '@/lib/ux-v0/ask';
 import { generateSystem, generateUser, parseGenerate } from '@/lib/ux-v0/design';
+import { autoDirection, normalizeDirection, reviseDirection } from '@/lib/ux-v0/direction';
 import { pingUse } from '@/lib/ux-v0/images-server';
 import { MAX_TOKENS, socriauxLadder } from '@/lib/ux-v0/model';
 import { bad, failed, noModel, projectIdOf, readBody, signInFirst } from '@/lib/ux-v0/route-kit';
@@ -41,6 +49,9 @@ export const POST = withMeter(async function POST(req: NextRequest) {
   const brief = normalizeBrief(body?.brief, kept);
   if (!body || !brief) return bad('An approved brief is needed to generate a design.');
   const direction = typeof body.direction === 'string' ? body.direction.trim().slice(0, 400) : '';
+  const approved = body.artDirection ? normalizeDirection(body.artDirection) : null;
+  // the approved direction; revised in words when the designer asked for a new one; else SocriaUX's own choice
+  const art = approved ? (direction ? reviseDirection(approved, brief, direction) : approved) : direction ? autoDirection(brief, direction) : autoDirection(brief);
   const version = Number.isFinite(body.version) ? Math.max(1, Math.round(body.version)) : 1;
   const projectId = projectIdOf(body.projectId);
 
@@ -55,19 +66,19 @@ export const POST = withMeter(async function POST(req: NextRequest) {
   const openai = tracked(new OpenAI({ apiKey }), 'ux-v0/generate');
   try {
     const asked = await askJson(openai, socriauxLadder(), {
-      system: generateSystem(brief),
+      system: generateSystem(brief, art),
       user: generateUser({ brief, moodboard, direction }),
       maxTokens: MAX_TOKENS.generate,
       temperature: 0.6,
       label: 'generate',
     });
-    const spec = parseGenerate(asked.json, brief, moodboard, version, direction ? `Generated again: ${direction}` : 'Generated from the approved brief');
+    const spec = parseGenerate(asked.json, brief, moodboard, version, direction ? `Generated again: ${direction}` : `Generated in the “${art.name}” direction`, art);
     await recordUsage(userId, projectId, 'generate', asked.usage);
     if (!spec) return NextResponse.json({ error: 'The model’s design did not hold together. Nothing changed; try again.', usage: asked.usage }, { status: 502 });
     // Unsplash asks to be told when a photo is used in a design
     const used = new Set(spec.sections.flatMap((s) => s.images));
     await Promise.all(moodboard.refs.filter((r) => used.has(r.id)).map((r) => pingUse(r)));
-    return NextResponse.json({ spec, placeholders: placeholdersIn(spec), usage: asked.usage });
+    return NextResponse.json({ spec, artDirection: art, placeholders: placeholdersIn(spec), usage: asked.usage });
   } catch (e) {
     // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure
     const resting = sleepAnswer(e);

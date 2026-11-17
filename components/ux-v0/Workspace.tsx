@@ -3,7 +3,11 @@
 //
 // The design is the workspace. In Create: what you want to make → a question
 // at a time over a growing moodboard → a brief you edit and approve → a
-// generated design you inspect, question and change. In Critique: a file you
+// generated design you inspect, question and change — with an art-direction
+// step between the brief and the design (three visual languages to take,
+// change, lock or leave to SocriaUX), and every generation drawn offscreen at
+// desktop and phone widths, measured, and revised in at most two rounds
+// before it is shown (the Checks tab says what was found). In Critique: a file you
 // bring → the design on the canvas → an element or an area selected → a
 // comment → a reasoning card attached to it. The rail holds what supports the
 // design (cards, the selection, the brief, the history); the composer at the
@@ -12,6 +16,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { INSPECTOR_SOURCE } from '@/lib/ux-v0/inspector';
 import { renderDesign } from '@/lib/ux-v0/render';
+import { LOCK_LABEL, briefKey, languageOf, normalizeDirection, proposeDirections, type ArtDirection, type LockGroup } from '@/lib/ux-v0/direction';
+import { MAX_REVISION_ROUNDS, evaluateDesign, fixesFor, type Evaluation, type Finding } from '@/lib/ux-v0/evaluate';
 import { buildSandboxDoc, makeNonce } from '@/lib/ux-v0/sandbox';
 import { applyPatch, normalizeSpec, placeholdersIn, specDigest, type DesignSpec, type Patch } from '@/lib/ux-v0/spec';
 import { getArtifact, putArtifact } from '@/lib/ux-v0/store';
@@ -43,6 +49,8 @@ import { interleave, searchOpenverse } from '@/lib/ux-v0/image-search';
 import { post } from './api';
 import { BriefDoc } from './BriefDoc';
 import { CardsRail } from './Cards';
+import { DirectionBoard } from './DirectionBoard';
+import { measurePage } from './measure';
 import { Composer, type ComposeMode } from './Composer';
 import { QuestionBand, QuestionsRail } from './Discovery';
 import { checkFile, fetchOriginal, imageSize, keepOriginal } from './files';
@@ -52,8 +60,17 @@ import { Moodboard } from './Moodboard';
 import { Stage, type SelectMode, type StageHandle } from './Stage';
 import { SAVE_WORDS, useV0Project } from './useV0Project';
 
-type View = 'intent' | 'import' | 'discovery' | 'brief' | 'design';
-type Rail = 'questions' | 'reasoning' | 'selection' | 'history' | 'file';
+type View = 'intent' | 'import' | 'discovery' | 'brief' | 'direction' | 'design';
+type Rail = 'questions' | 'reasoning' | 'selection' | 'checks' | 'history' | 'file';
+
+/** What the last look at the drawn design found, and what it fixed on its own. */
+interface Checks {
+  running: boolean;
+  ev: Evaluation | null;
+  fixed: string[];
+  /** the version it was about */
+  version: number;
+}
 
 interface Notice {
   text: string;
@@ -76,7 +93,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const imported = art?.type === 'imported' ? art : null;
 
   const [view, setView] = useState<View>(() =>
-    initial.mode === 'critique' ? (initial.artifact ? 'design' : 'import') : currentSpec(initial) ? 'design' : initial.brief.doc ? 'brief' : initial.intent ? 'discovery' : 'intent'
+    initial.mode === 'critique' ? (initial.artifact ? 'design' : 'import') : currentSpec(initial) ? 'design' : initial.direction.options.length && initial.brief.approved ? 'direction' : initial.brief.doc ? 'brief' : initial.intent ? 'discovery' : 'intent'
   );
   const [rail, setRail] = useState<Rail>(() => (initial.mode === 'create' && !currentSpec(initial) ? 'questions' : 'reasoning'));
   const [selection, setSelection] = useState<SelectionContext | null>(null);
@@ -94,6 +111,8 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [fileGone, setFileGone] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [checks, setChecks] = useState<Checks | null>(null);
+  const [dirNote, setDirNote] = useState('');
   const stage = useRef<StageHandle>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const nonce = useMemo(() => makeNonce(), []);
@@ -339,25 +358,133 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     }
   };
 
-  // ── generating and changing the design ──────────────────────────────
-  const generate = async (dir = '') => {
+  // ── art direction ───────────────────────────────────────────────────
+  // The engine proposes at once, here, for nothing; when signed in, SocriaUX then writes each
+  // direction's concept and voice for this brand. Edits lock what they touch.
+  const directionAsk = (p: DesignProject, again: boolean) => {
+    const st = p.direction;
+    const base = st.options.find((o) => o.locks.length) ?? (st.chosen && st.chosen.locks.length ? st.chosen : null);
+    const round = again ? st.round + 1 : st.round;
+    const seen = again ? [...new Set([...st.seen, ...st.options.map((o) => o.language)])] : st.seen;
+    return { brief: p.brief.doc!, notes: st.notes, avoid: st.avoid, base, round, seen };
+  };
+
+  const proposeDirectionsFor = async (again: boolean) => {
     const p = current.current;
     if (!p.brief.doc) return;
-    setBusy('Designing from the brief…');
+    const ask = directionAsk(p, again);
+    const options = proposeDirections(ask);
+    update((p2) => ({ ...p2, direction: { ...p2.direction, options, round: ask.round, seen: [...new Set([...ask.seen, ...options.map((o) => o.language)])].slice(-24), forBrief: briefKey(p.brief.doc!) } }));
+    setDirNote('Writing each direction for this brand…');
+    const r = await post<{ options: ArtDirection[]; usage: Usage }>('/api/ux-v0/direct', { projectId: p.id, ...ask, base: ask.base });
+    if (!r.ok) return setDirNote(r.signIn ? 'Drawn by SocriaUX’s direction engine. Sign in for concepts written for this brand.' : 'Drawn by SocriaUX’s direction engine; the written concepts could not be fetched just now.');
+    setDirNote('');
+    // a direction the designer has already changed stays theirs
+    update((p2) => ({
+      ...p2,
+      direction: {
+        ...p2.direction,
+        options: p2.direction.options.map((o, i) => {
+          const written = normalizeDirection(r.data.options?.[i]);
+          return o.source === 'person' || !written || written.language !== o.language ? o : { ...written, id: o.id, locks: o.locks };
+        }),
+      },
+      usage: addUsage(p2.usage, r.data.usage),
+    }));
+  };
+
+  const openDirection = () => {
+    const p = current.current;
+    if (!p.brief.doc) return;
+    update((p2) => ({ ...p2, brief: { ...p2.brief, approved: true } }));
+    setView('direction');
+    // none yet, or made for a brief that has since changed
+    if (!p.direction.options.length || p.direction.forBrief !== briefKey(p.brief.doc)) proposeDirectionsFor(false);
+  };
+
+  const editDirection = (id: string, next: ArtDirection, group: LockGroup) =>
+    update((p) => ({ ...p, direction: { ...p.direction, options: p.direction.options.map((o) => (o.id === id ? { ...next, locks: [...new Set([...o.locks, group])], source: 'person' } : o)) } }));
+
+  const lockDirection = (id: string, group: LockGroup, on: boolean) =>
+    update((p) => ({ ...p, direction: { ...p.direction, options: p.direction.options.map((o) => (o.id === id ? { ...o, locks: on ? [...new Set([...o.locks, group])] : o.locks.filter((g) => g !== group) } : o)) } }));
+
+  const approveDirection = (d: ArtDirection) => {
+    update((p) => ({ ...p, direction: { ...p.direction, chosen: d, approved: true } }));
+    generate('', d);
+  };
+
+  // ── looking at what was drawn ───────────────────────────────────────
+  // Drawn offscreen at 1280 and 390 px, measured, read. With `autofix`, the fixes that need no
+  // words are applied — at most two rounds, never to what the designer locked or fixed — before
+  // anyone sees the page. Otherwise the findings are only reported.
+  const inspect = async (from: DesignSpec, autofix: boolean): Promise<{ spec: DesignSpec; fixed: string[]; ev: Evaluation }> => {
+    const locks = current.current.direction.chosen?.locks ?? [];
+    const measureAt = async (s: DesignSpec) => {
+      const html = renderDesign(s, current.current.moodboard.refs).html;
+      const [desktop, phone] = await Promise.all([measurePage(html, 1280, 900, nonce), measurePage(html, 390, 844, nonce)]);
+      return evaluateDesign(s, { desktop, phone }, locks);
+    };
+    let spec = from;
+    const fixed: string[] = [];
+    let ev = await measureAt(spec);
+    for (let round = 0; autofix && round < MAX_REVISION_ROUNDS; round++) {
+      const fixes = fixesFor(ev);
+      if (!fixes.length) break;
+      for (const f of fixes) {
+        const res = applyPatch(spec, f.patch, current.current.moodboard);
+        if (res.ok) (spec = res.spec), fixed.push(f.patch.summary);
+      }
+      ev = await measureAt(spec);
+    }
+    return { spec, fixed, ev };
+  };
+
+  /** Check the design as it stands, and say what was found (nothing is changed). */
+  const runChecks = async (from: DesignSpec) => {
+    setChecks((c) => ({ running: true, ev: c?.ev ?? null, fixed: [], version: from.version }));
+    const r = await inspect(from, false);
+    setChecks({ running: false, ev: r.ev, fixed: [], version: from.version });
+  };
+
+  // ── generating and changing the design ──────────────────────────────
+  const generate = async (dir = '', art: ArtDirection | null = null) => {
+    const p = current.current;
+    if (!p.brief.doc) return;
+    const approved = art ?? (p.direction.approved ? p.direction.chosen : null);
+    setBusy(approved ? `Designing in the “${approved.name}” direction…` : 'Designing from the brief…');
     const version = (p.specs[p.specs.length - 1]?.version ?? 0) + 1;
-    const r = await post<{ spec: DesignSpec; placeholders: string[]; usage: Usage }>('/api/ux-v0/generate', { projectId: p.id, brief: p.brief.doc, moodboard: p.moodboard, direction: dir, version });
+    const r = await post<{ spec: DesignSpec; artDirection?: ArtDirection; placeholders: string[]; usage: Usage }>('/api/ux-v0/generate', { projectId: p.id, brief: p.brief.doc, moodboard: p.moodboard, direction: dir, artDirection: approved, version });
     setBusy(null);
     if (!r.ok) return failed(r);
     const fresh = normalizeSpec(r.data.spec, current.current.moodboard);
     if (!fresh) return say('The design that came back did not hold together. Nothing changed; try again.', 'error');
+    // before it is shown: drawn at desktop and phone widths, measured, and fixed where no words are needed
+    setBusy('Checking it at desktop and phone widths…');
+    setChecks({ running: true, ev: null, fixed: [], version: fresh.version });
+    const checked = await inspect(fresh, true);
+    setBusy(null);
+    const kept: DesignSpec | null = checked.fixed.length
+      ? { ...checked.spec, version: fresh.version + 1, reason: `Checked at desktop and phone: ${checked.fixed.length} fix${checked.fixed.length === 1 ? '' : 'es'}`, createdAt: Date.now() }
+      : null;
+    setChecks({ running: false, ev: checked.ev, fixed: checked.fixed, version: (kept ?? fresh).version });
     update((p2) => {
-      const specs = [...p2.specs, fresh].slice(-30);
-      return { ...p2, specs, specIndex: specs.length - 1, artifact: { type: 'generated', createdAt: Date.now() }, brief: { ...p2.brief, approved: true }, usage: addUsage(p2.usage, r.data.usage) };
+      const specs = [...p2.specs, fresh, ...(kept ? [kept] : [])].slice(-30);
+      const used = r.data.artDirection ?? null;
+      return {
+        ...p2,
+        specs,
+        specIndex: specs.length - 1,
+        artifact: { type: 'generated', createdAt: Date.now() },
+        brief: { ...p2.brief, approved: true },
+        // the direction the design follows, as the server applied it (revised in words, locks kept)
+        direction: used ? { ...p2.direction, chosen: { ...used, locks: approved?.locks ?? used.locks }, approved: true } : p2.direction,
+        usage: addUsage(p2.usage, r.data.usage),
+      };
     });
     setSelection(null);
     setActiveCard(null);
     setView('design');
-    setRail('reasoning');
+    setRail('checks');
     setMode('element');
     setComposeMode('change');
     const ph = r.data.placeholders;
@@ -373,10 +500,13 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       if (!res.ok) return say(`That change could not be applied: ${res.error}`, 'error');
       update((p2) => {
         const specs = [...p2.specs.slice(0, p2.specIndex + 1), res.spec].slice(-30);
-        return { ...p2, specs, specIndex: specs.length - 1 };
+        // what the designer changes in the look becomes the direction's: a later generation keeps it
+        const chosen = p2.direction.chosen && (patch.op === 'tokens' || patch.op === 'look') ? { ...p2.direction.chosen, tokens: res.spec.tokens, look: res.spec.look, source: 'person' as const } : p2.direction.chosen;
+        return { ...p2, specs, specIndex: specs.length - 1, direction: { ...p2.direction, chosen } };
       });
       setSelection(null);
       say(`Changed: ${label || patch.summary || patch.op}.`, 'info', { acts: [{ label: 'Undo', run: () => stepVersion(-1) }] });
+      runChecks(res.spec);
     },
     [current, update, say] // eslint-disable-line react-hooks/exhaustive-deps
   );
@@ -386,7 +516,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const s = currentSpec(p);
     if (!s) return;
     setBusy('Working out the change…');
-    const r = await post<{ understood: string; challenge: string; question: string; regenerate: string; patch: Patch; applies: boolean; error: string; usage: Usage }>('/api/ux-v0/refine', {
+    const r = await post<{ understood: string; challenge: string; question: string; regenerate: string; patch: Patch; applies: boolean; locked?: LockGroup[]; error: string; usage: Usage }>('/api/ux-v0/refine', {
       projectId: p.id,
       brief: p.brief.doc,
       spec: s,
@@ -394,6 +524,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       selection,
       comment,
       force: false,
+      locks: p.direction.chosen?.locks ?? [],
     });
     setBusy(null);
     if (!r.ok) return failed(r);
@@ -658,6 +789,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       ? [
           { id: 'discovery', label: 'Discovery', ok: !!project.intent },
           { id: 'brief', label: 'Brief', ok: !!project.brief.doc },
+          { id: 'direction', label: 'Direction', ok: !!project.brief.doc && (project.brief.approved || project.direction.options.length > 0) },
           { id: 'design', label: 'Design', ok: !!spec },
         ]
       : [];
@@ -667,6 +799,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
           { id: 'questions', label: 'Questions' },
           ...(spec ? [{ id: 'reasoning' as Rail, label: `Cards${project.cards.length ? ` ${project.cards.filter((c) => c.state !== 'dismissed').length}` : ''}` }] : []),
           ...(spec ? [{ id: 'selection' as Rail, label: 'Selection' }] : []),
+          ...(spec ? [{ id: 'checks' as Rail, label: checks?.running ? 'Checking…' : 'Checks' }] : []),
           ...(spec ? [{ id: 'history' as Rail, label: 'Versions' }] : []),
         ]
       : [
@@ -865,8 +998,30 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                 busy={busy}
                 hasDesign={!!spec}
                 onChange={(b) => update((p) => ({ ...p, brief: { ...p.brief, doc: b, approved: false } }))}
-                onApprove={() => generate()}
+                onApprove={openDirection}
+                onSkip={() => {
+                  update((p) => ({ ...p, brief: { ...p.brief, approved: true } }));
+                  generate();
+                }}
                 onBack={() => setView('discovery')}
+              />
+            )}
+
+            {view === 'direction' && project.brief.doc && (
+              <DirectionBoard
+                state={project.direction}
+                brief={project.brief.doc}
+                name={project.name}
+                refs={project.moodboard.refs}
+                busy={busy}
+                note={dirNote}
+                onNotes={(notes, avoid) => update((p) => ({ ...p, direction: { ...p.direction, notes: notes.slice(0, 1200), avoid: avoid.slice(0, 400) } }))}
+                onAsk={() => proposeDirectionsFor(true)}
+                onEdit={editDirection}
+                onLock={lockDirection}
+                onApprove={approveDirection}
+                onAuto={() => project.direction.options[0] && approveDirection(project.direction.options[0])}
+                onBack={() => setView('brief')}
               />
             )}
 
@@ -1011,6 +1166,97 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                     : undefined
                 }
               />
+            )}
+            {rail === 'checks' && spec && (
+              <div className="v0-rail-body">
+                {project.direction.chosen && (
+                  <section className="v0-cellset">
+                    <span className="sb-label">The direction it follows</span>
+                    <p className="v0-cell-title">{project.direction.chosen.name}</p>
+                    <p className="v0-body">{project.direction.chosen.concept}</p>
+                    <p className="v0-quiet">
+                      {languageOf(project.direction.chosen.language)?.name ?? 'Its own'} · {spec.tokens.fonts.display} and {spec.tokens.fonts.body}
+                      {project.direction.chosen.locks.length ? ` · kept: ${project.direction.chosen.locks.map((g) => LOCK_LABEL[g].toLowerCase()).join(', ')}` : ''}
+                    </p>
+                    <button type="button" className="sb-link is-meta is-strong" onClick={() => setView('direction')}>
+                      Choose a different direction
+                    </button>
+                  </section>
+                )}
+                <section className="v0-cellset">
+                  <span className="sb-label">Drawn at desktop and phone widths</span>
+                  {!checks || (checks.running && !checks.ev) ? (
+                    <p className="v0-quiet" role="status">{checks?.running ? 'Measuring the page at 1280 and 390 px…' : 'Not checked yet.'}</p>
+                  ) : (
+                    <>
+                      <div className="v0-scores">
+                        <span>
+                          <b>{checks.ev?.quality ?? '–'}</b> works
+                        </span>
+                        <span>
+                          <b>{checks.ev?.distinctiveness ?? '–'}</b> its own
+                        </span>
+                      </div>
+                      <p className="v0-quiet" role="status">
+                        {checks.running ? 'Measuring again…' : checks.ev?.summary}
+                      </p>
+                      {!checks.running && checks.version !== spec.version && <p className="v0-quiet">These checks are for version {checks.version}; this is version {spec.version}.</p>}
+                    </>
+                  )}
+                  {checks && checks.fixed.length > 0 && (
+                    <>
+                      <span className="sb-label v0-sub">Fixed without asking</span>
+                      <ul className="v0-plain">
+                        {checks.fixed.map((f, i) => (
+                          <li key={i}>{f}</li>
+                        ))}
+                      </ul>
+                      <p className="v0-quiet">Kept as its own version: Undo shows the design before.</p>
+                    </>
+                  )}
+                </section>
+                {checks?.ev && checks.ev.findings.length > 0 && (
+                  <section className="v0-cellset">
+                    <span className="sb-label">What it found</span>
+                    <ul className="v0-findings">
+                      {checks.ev.findings.slice(0, 12).map((f: Finding) => (
+                        <li key={f.id} className={`is-${f.severity}`}>
+                          <span className="v0-finding-k">{f.severity === 'high' ? 'Must fix' : f.severity === 'medium' ? 'Should fix' : 'Worth a look'} · {f.viewport}</span>
+                          <span className="v0-body">{f.message}</span>
+                          {f.blocked && <span className="v0-quiet">{f.blocked}</span>}
+                          <span className="v0-finding-acts">
+                            {f.fix && (
+                              <button type="button" className="sb-link is-meta is-strong" onClick={() => applyLocal(f.fix!, f.fix!.summary)}>
+                                Fix it
+                              </button>
+                            )}
+                            {f.ask && (
+                              <button type="button" className="sb-link is-meta" onClick={() => refine(f.ask!)} disabled={!!busy}>
+                                Ask SocriaUX to fix it
+                              </button>
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                {checks?.ev && checks.ev.signals.length > 0 && (
+                  <section className="v0-cellset">
+                    <span className="sb-label">What could make it look generic</span>
+                    <ul className="v0-plain">
+                      {checks.ev.signals.map((x, i) => (
+                        <li key={i}>{x.reason}</li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                <section className="v0-cellset">
+                  <button type="button" className="sb-link is-meta" onClick={() => runChecks(spec)} disabled={!!checks?.running}>
+                    Check again
+                  </button>
+                </section>
+              </div>
             )}
             {rail === 'history' && (
               <div className="v0-rail-body">

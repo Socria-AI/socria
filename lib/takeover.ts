@@ -144,6 +144,7 @@ const THINKING_API = [
   '/api/ux-v0/critique',
   '/api/ux-v0/discover',
   '/api/ux-v0/brief',
+  '/api/ux-v0/direct',
   '/api/ux-v0/generate',
   '/api/ux-v0/refine',
   '/api/ux-v0/images',
