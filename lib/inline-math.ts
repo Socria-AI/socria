@@ -650,3 +650,60 @@ export function riemannRects(f: (x: number) => number, a: number, b: number, n: 
   }
   return { rects, sum };
 }
+
+/**
+ * An area to the axis, in pieces of one sign: cut where the curve crosses zero (found by bisection, so a crossing that
+ * falls exactly on a sample is still found), each piece's value by Simpson's rule — exact for a cubic, and the value
+ * a person would write as a fraction comes out as one (signedValue, below).
+ */
+export function signedPieces(f: (x: number) => number, a: number, b: number): { a: number; b: number; v: number }[] {
+  if (!(b > a)) return [];
+  const N = 240;
+  const cuts = [a];
+  let lastX = a;
+  let lastSign = Math.sign(f(a));
+  for (let i = 1; i <= N; i++) {
+    const x = a + ((b - a) * i) / N;
+    const y = f(x);
+    if (!Number.isFinite(y)) continue;
+    const sg = Math.sign(y);
+    if (sg !== 0) {
+      if (lastSign !== 0 && sg !== lastSign) {
+        let lo = lastX, hi = x;
+        for (let k = 0; k < 60; k++) {
+          const m = (lo + hi) / 2;
+          if (Math.sign(f(m)) === lastSign) lo = m;
+          else hi = m;
+        }
+        cuts.push((lo + hi) / 2);
+      }
+      lastSign = sg;
+      lastX = x;
+    }
+  }
+  cuts.push(b);
+  const simpson = (l: number, r: number) => {
+    const m = 200;
+    const h = (r - l) / m;
+    let sum = f(l) + f(r);
+    for (let k = 1; k < m; k++) sum += f(l + k * h) * (k % 2 ? 4 : 2);
+    return (sum * h) / 3;
+  };
+  return cuts
+    .slice(1)
+    .map((r, i) => ({ a: cuts[i], b: r, v: simpson(cuts[i], r) }))
+    .filter((q) => q.b - q.a > 1e-9 && Number.isFinite(q.v) && Math.abs(q.v) > 1e-9);
+}
+
+/** A signed value as a person would write it: a simple fraction when it is one (−4/3), else two places. */
+export function signedValue(v: number): string {
+  if (!Number.isFinite(v)) return '';
+  const sign = v < 0 ? '−' : '+';
+  const a = Math.abs(v);
+  if (a < 5e-7) return '0';
+  for (let d = 1; d <= 12; d++) {
+    const n = Math.round(a * d);
+    if (n > 0 && Math.abs(a * d - n) < 1e-6 * Math.max(1, d)) return d === 1 ? `${sign}${n}` : `${sign}${n}/${d}`;
+  }
+  return `${sign}${a.toFixed(2)}`;
+}

@@ -124,6 +124,9 @@ function KindGlyph({ k }: { k: SpaceKind }) {
   );
 }
 
+const NO_IDEAS: SpaceIdea[] = [];
+const NO_EDGES: IdeaEdgeLite[] = [];
+
 interface Drawn {
   d: string;
   word: string;
@@ -135,8 +138,8 @@ interface Drawn {
 }
 
 export function L5Space({
-  ideas,
-  edges,
+  ideas: allIdeas,
+  edges: allEdges,
   brought,
   made,
   turns,
@@ -158,6 +161,7 @@ export function L5Space({
   follow = false,
   spaceId = null,
   empty = null,
+  ideasFolded = false,
 }: {
   ideas: SpaceIdea[];
   edges: IdeaEdgeLite[];
@@ -196,8 +200,17 @@ export function L5Space({
   empty?: ReactNode;
   /** the conversation, so where its cards were put is kept for it (on this device) */
   spaceId?: string | null;
+  /**
+   * The ideas are kept off the space until "Ideas" is pressed: a conversation of answers, not of ideas
+   * (lib/runtime/ideas-wanted.ts). What was said and what was made fill it; the ideas are a press away.
+   */
+  ideasFolded?: boolean;
 }) {
   const [kind, setKind] = useState<SpaceKind>('all');
+  // MIND MAPS WHEN THEY HELP: folded, the ideas (and the lines between them) are drawn only while "Ideas" is chosen
+  const folded = ideasFolded && kind !== 'ideas' && allIdeas.length > 0;
+  const ideas = folded ? NO_IDEAS : allIdeas;
+  const edges = folded ? NO_EDGES : allEdges;
   // THE THREAD (Revision VI): every one of Socria's replies, opened from the bubble; a reply hovered lights what it made
   const [threadOn, setThreadOn] = useState(false);
   const [hoverTurn, setHoverTurn] = useState<number | null>(null);
@@ -1162,7 +1175,7 @@ export function L5Space({
 
   const counts: Record<SpaceKind, string> = {
     all: String(ideas.length + brought.length + made.length),
-    ideas: String(ideas.length),
+    ideas: String(allIdeas.length),
     brought: String(brought.length),
     made: String(made.length),
     words: `${turns.length} ${turns.length === 1 ? 'turn' : 'turns'}`,
@@ -1171,7 +1184,15 @@ export function L5Space({
     <nav className="ls-kinds" aria-label="Bring forward">
       {/* a kind with nothing in it is not offered ("Files 0" brought nothing forward); the one chosen always stays */}
       {(['all', 'ideas', 'brought', 'made', 'words'] as SpaceKind[]).filter((k) => k === 'all' || k === kind || (k === 'words' ? turns.length > 0 : Number(counts[k]) > 0)).map((k) => (
-        <button key={k} type="button" data-kind={k} className={`ls-kd${kind === k ? ' is-on' : ''}`} aria-pressed={kind === k} onClick={() => setKind(k)}>
+        <button
+          key={k}
+          type="button"
+          data-kind={k}
+          className={`ls-kd${kind === k ? ' is-on' : ''}${k === 'ideas' && folded ? ' is-folded' : ''}`}
+          aria-pressed={kind === k}
+          {...(k === 'ideas' && folded ? { title: 'Show the ideas on the space' } : {})}
+          onClick={() => setKind(k)}
+        >
           {!narrow && <KindGlyph k={k} />}
           {KIND_NAMES[k]}
           {k !== 'all' && <span className="ls-c">{narrow && k === 'words' ? turns.length : counts[k]}</span>}

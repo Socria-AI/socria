@@ -77,6 +77,8 @@ export interface L5Effect {
 
 export interface L5MessageProps {
   m: LogosMsg;
+  /** the reply whose graph this one's numbers point at (lib/inline-ui.ts markScopes); its own id when absent */
+  markScope?: string;
   side: Side;
   who: string;
   group: boolean;
@@ -285,6 +287,8 @@ export function L5Message(p: L5MessageProps) {
     () =>
       m.role === 'assistant'
         ? {
+            // the reply's elements share a scope: what one points at lights in the others (components/inline/marks.ts)
+            ...(p.markScope || m.id ? { scope: p.markScope || m.id } : {}),
             state: sanitizeInlineState(m.ui),
             onState: onInline ? (n, s) => onInline(m, n, s) : undefined,
             onChoose: latest ? onChoose : undefined,
@@ -300,7 +304,7 @@ export function L5Message(p: L5MessageProps) {
             live: !!latest,
           }
         : undefined,
-    [m, onInline, onChoose, onExplore, onOpenInline, onMapInline, onResolveInline, onEditInline, onResolveEdit, onUndoEdit, onOpenObject, onArtifactState, latest]
+    [m, p.markScope, onInline, onChoose, onExplore, onOpenInline, onMapInline, onResolveInline, onEditInline, onResolveEdit, onUndoEdit, onOpenObject, onArtifactState, latest]
   );
 
   return (

@@ -53,3 +53,5 @@ export { readOperation } from '@/lib/objects';
 export * from '@/lib/artifact-focus';
 // an artifact looked over before it is shown (lib/artifact-qa.ts)
 export * from '@/lib/artifact-qa';
+// mind maps when they help: whether a line of thinking's ideas are spread across the Everything view
+export { ideasWanted, ideasWhyOf } from '@/lib/runtime/ideas-wanted';

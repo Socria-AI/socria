@@ -2481,6 +2481,93 @@ html[data-theme="night"] .logos-root .ln:is(.ln-graph, .ln-sim, .ln-chart, .ln-v
 }
 .logos-root .ln-graph .ln-rects rect.is-below { fill-opacity: 0.12; }
 
+/* ── A signed area, and what the words point at (November 2026) ────────────────────────────────────────────
+   An area to the axis that crosses it is two colours: below the axis (counted negative) in --ln-neg, above in the
+   function's green, each piece's value computed and set in the middle of it. Socria's highlights are numbered
+   badges in the order the reply gives them (blue, red, green, ochre: the graph palette), each also a chip under the
+   picture; the working's lines carry the same numbers. Pointing at any of them — hover, focus or press — lights it
+   in every element of the reply (components/inline/marks.ts); the rest step back. */
+.logos-root .ln-graph .ln-area.is-below { fill: var(--ln-neg, #b0482f); fill-opacity: 0.2; }
+.logos-root .ln-graph .ln-area.is-above { fill: var(--ln-g1); fill-opacity: 0.22; }
+.logos-root .ln-graph .ln-area-v {
+  font-family: var(--l5-serif, Georgia, serif);
+  font-size: 15px;
+  paint-order: stroke;
+  stroke: var(--l5-surface, var(--lg-paper, #fbfaf6));
+  stroke-width: 3.5px;
+  stroke-linejoin: round;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.logos-root .ln-graph .ln-area-v.is-below { fill: var(--ln-neg, #b0482f); }
+.logos-root .ln-graph .ln-area-v.is-above { fill: var(--ln-g1); }
+.logos-root .ln :is(.ln-hl, .ln-hl-chip, .ln-lines > li.has-mark) { --hl: var(--ln-g2); }
+.logos-root .ln :is(.ln-hl, .ln-hl-chip, .ln-lines > li.has-mark).is-n2 { --hl: var(--ln-neg, #b0482f); }
+.logos-root .ln :is(.ln-hl, .ln-hl-chip, .ln-lines > li.has-mark).is-n3 { --hl: var(--ln-g1); }
+.logos-root .ln :is(.ln-hl, .ln-hl-chip, .ln-lines > li.has-mark).is-n4 { --hl: var(--ln-g3); }
+.logos-root .ln-graph .ln-hl { transition: opacity 0.2s; }
+.logos-root .ln-graph .ln-hl.is-dim { opacity: 0.38; }
+.logos-root .ln-graph .ln-hl-ring { fill: none; stroke: var(--hl); stroke-width: 1.6; stroke-dasharray: 3 3; transition: r 0.2s, stroke-width 0.2s; }
+.logos-root .ln-graph .ln-hl.is-lit .ln-hl-ring { stroke-width: 2.4; stroke-dasharray: none; }
+.logos-root .ln-graph .ln-hl-span { fill: none; stroke: var(--hl); stroke-width: 0; stroke-linecap: round; stroke-linejoin: round; opacity: 0.5; transition: stroke-width 0.2s; }
+.logos-root .ln-graph .ln-hl.is-lit .ln-hl-span { stroke-width: 8; }
+.logos-root .ln-graph .ln-hl-badge { cursor: pointer; }
+.logos-root .ln-graph .ln-hl-badge circle { fill: var(--hl); stroke: var(--l5-surface, var(--lg-paper, #fbfaf6)); stroke-width: 2; transition: r 0.2s; }
+.logos-root .ln-graph .ln-hl.is-lit .ln-hl-badge circle { r: 11; }
+.logos-root .ln-graph .ln-hl-badge text { fill: #fff; font-size: 11px; font-weight: 700; pointer-events: none; }
+.logos-root .ln .ln-hl-list { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 10px 0 2px; }
+.logos-root .ln .ln-hl-k { font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 600; color: var(--ln-ink-60); }
+.logos-root .ln .ln-hl-list ol { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.logos-root .ln .ln-hl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 4px 12px 4px 4px;
+  border: 1px solid var(--ln-hair);
+  border-radius: 999px;
+  background: var(--l5-surface, var(--lg-paper, #fbfaf6));
+  color: var(--ln-ink);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.logos-root .ln .ln-hl-chip:hover,
+.logos-root .ln .ln-hl-chip.is-lit { border-color: var(--hl); box-shadow: 0 0 0 3px color-mix(in srgb, var(--hl) 16%, transparent); }
+.logos-root .ln :is(.ln-hl-n, .ln-step-mark) {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--hl);
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.logos-root .ln :is(.ln-hl-chip, .ln-step-mark):focus-visible { outline: 2px solid var(--ln-primary); outline-offset: 2px; }
+.logos-root .ln .ln-lines > li.has-mark {
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  padding-left: 6px;
+  padding-right: 6px;
+  border-radius: 8px;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+.logos-root .ln .ln-lines > li.has-mark > .ln-why-said { grid-column: 2 / -1; }
+.logos-root .ln .ln-step-mark { cursor: pointer; align-self: center; }
+.logos-root .ln .ln-lines > li.has-mark.is-lit { background: color-mix(in srgb, var(--hl) 9%, transparent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--hl) 24%, transparent); }
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .ln :is(.ln-hl, .ln-hl-ring, .ln-hl-span, .ln-hl-badge circle, .ln-hl-chip, .ln-lines > li.has-mark) { transition: none; }
+}
+
 /* ── Forces at a point ─────────────────────────────────────────────────────────────────────────────────────
    Arrows from one body, one scale for all of them: the graph palette in turn, the sum dashed in ink. Labels in ink
    with a paper outline. The axes are hairlines, there for direction only. */

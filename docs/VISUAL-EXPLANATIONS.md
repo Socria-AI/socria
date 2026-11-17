@@ -123,3 +123,46 @@ The live mode saves blind pairs for readers. None has been read, so no claim is 
 - **Some brief items are not separate elements.** Circuits, state machines and system architecture are drawn with the existing diagram views (flow, cycle, tree), not as new kinds. Argument maps and concept networks remain the claim and concept elements and the Logic Map.
 - **A trace is only as right as its steps.** It shows exactly what the reply wrote. The format asks the model to work every step out first, but the states are not re-executed.
 - **Rendering failures are contained, not prevented.** A component that throws is caught by `InlineSafe`, and the element is said in words instead.
+
+## 8. Graphs that point
+
+A graph used to be a picture beside the words. Now the words point at the picture, so each picture is there for a reason a student can see.
+
+**Signed area.** An area to the axis that crosses it is cut where it crosses. Each piece is drawn in its own colour: below the axis in red, above it in green. When both signs are present, each piece shows its value. The values are computed (`signedPieces` and `signedValue` in `lib/inline-math.ts`: bisection for the crossing, Simpson's rule for each piece), and a value a person would write as a fraction is written as one (−4/3, +27/8). The reply never writes them. Under the Answer Guard, the colours stay and the values go.
+
+**Highlights.** A graph may carry up to four `highlights`, numbered in order:
+
+| | Specification | Drawn |
+|---|---|---|
+| A point on the curve | `{"x": 2, "label": "crosses the axis: split here"}` | a dashed ring and a numbered badge |
+| A stretch of the curve | `{"from": 0, "to": 2, "label": "below the axis: counts as negative"}` | the stretch traced over, and a badge |
+
+- `x`, `from` and `to` may be numbers or formulas in the parameters, so a highlight moves with a slider.
+- A highlight outside the window, back to front or without words is dropped.
+- `say`/`text` and `callouts` are read as `label` and `highlights`.
+- Badges are placed clear of each other, of the other highlights' rings and of the area's values.
+- Under the graph, "On the graph" lists each highlight as a button.
+- The graph said in words ends "Pointed at: 1. …; 2. …", so a follow-up question is answered from what was shown.
+
+The prompt teaches this with the graph's format (`GRAPH_POINTING` in `lib/runtime/presentation.ts`):
+- refer to the highlights in the prose as ①, ②, ③;
+- never write the area's values;
+- a highlight is only for something the words explain, never decoration.
+
+**Steps that point.** A line of worked steps may carry `"mark": n` (1 to 4): the highlight on the graph that the line is about. The line gets a numbered button, "Show n on the graph".
+
+**Lit together.** Hovering or focusing a badge, a chip or a step's number lights that number everywhere it appears and dims the rest. Pressing pins it until it is pressed again. This works in the conversation and across the separate cards of the Everything view. The elements of a reply share a scope (`components/inline/marks.ts`). A later reply without its own pointing graph shares the scope of the latest one before it (`markScopes` in `lib/inline-ui.ts`), so steps asked for afterwards still light the earlier graph.
+
+**When a graph is offered.** Signed area is asked about in calculus words that need no formula in sight: "signed area", "definite integral", "area below the axis", and "net area"/"total area" beside a calculus word. Each of these now gets the area graph, including "net area versus total area". A house's net or total area does not.
+
+**Tested.** `test/graph-pointing.test.mjs`, 46 checks:
+- the pieces and their values;
+- the sanitiser's keeps and drops;
+- the steps' marks;
+- the drawing, including the chips, the step buttons and the Answer Guard;
+- the shared scope;
+- the planner's choices and the prompt.
+
+In the browser, against the real app with the Everything view open: hovering chip 3 lights the step lines marked 3. Pressing step 1's number lights highlight 1, which stays lit when the pointer leaves. Moving b to 4 changes the values to −4/3 and +27/8, the area being clipped at the window's edge of 3.5.
+
+**Limits.** A highlight is only as apt as the reply that wrote it. The positions are checked against the window, not against the reply's meaning. Four is the most a graph carries.

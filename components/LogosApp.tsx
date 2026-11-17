@@ -124,7 +124,7 @@ import { saveTemplate, templateChoice, templateOf, templatePayload } from '@/lib
 import { useTemplates } from '@/components/logos5/useTemplates';
 import { MADE_OFFER, madeAsked, madeListed, madeOffer, mapArtifacts, pictureRepeatsDisplay, plotArtifact, readMade, writeMade, type MadeKey, type MadeRecord } from '@/lib/logos5/artifacts';
 import { cleanTitle } from '@/lib/session-rail';
-import { artifactFromSpec, describeInline, editsIn, inlineFrom, sanitizeInlineState, sanitizeInlineStateOne, specsIn, type DidItem, type InlineSpec, type InlineState } from '@/lib/inline-ui';
+import { artifactFromSpec, describeInline, editsIn, inlineFrom, markScopes, sanitizeInlineState, sanitizeInlineStateOne, specsIn, type DidItem, type InlineSpec, type InlineState } from '@/lib/inline-ui';
 import { buildStarters, PENDING_TYPES } from '@/lib/starters';
 import { billingError, billingLine } from '@/lib/billing-message';
 import { ContextPanel } from '@/components/ContextPanel';
@@ -230,6 +230,7 @@ import { broughtBy, contentOf, isWriteUp, writeUpId, writeUpParts } from '@/lib/
 import { OPENING, SPLIT_NAMES, VIEW_LABELS, afterSend, besideSide, chatSideFor, chatVisible, choose, dock, fit, onMade, readBesideShare, readChatSide, screenForRequest, writeBesideShare, writeChatSide, type ModelTool, type Screen, type Side as ChatSide, type Viewport } from '@/lib/logos5/views';
 import { acceptTitle } from '@/lib/logos5/title';
 import { needsMap, routeTurn, tableInReply, turnsSince, type TurnRoute } from '@/lib/runtime/orchestrate';
+import { ideasWanted } from '@/lib/runtime/ideas-wanted';
 import type { Hit, IndexDoc } from '@/lib/runtime/representation';
 import { effectSaid, linksOf, turnEffect } from '@/lib/logos5/linking';
 import { L5Message, L5Pending, type L5Effect } from './logos5/L5Message';
@@ -885,6 +886,10 @@ export function LogosApp({
     [sessions, activeId]
   );
   const messages = active?.messages ?? [];
+  // MIND MAPS WHEN THEY HELP (lib/runtime/ideas-wanted.ts): the ideas are spread across the Everything view when the
+  // person asked for them, the subject has a shape, or they are thinking something through; otherwise they are folded,
+  // a press away, and what was said and made fills the view
+  const ideasOn = useMemo(() => ideasWanted(messages.filter((m) => m.role === 'user').map((m) => (typeof m.content === 'string' ? m.content : ''))).show, [messages]);
   const map = active?.map ?? EMPTY_MAP;
 
   // ── DOCUMENTS (lib/docs) ──────────────────────────────────────────
@@ -10104,6 +10109,7 @@ export function LogosApp({
       <Fragment key={m.id ?? i}>
       <L5Message
         m={m}
+        markScope={m.id ? markScopes(messages).get(m.id) : undefined}
         side={side}
         who={shownWho(m)}
         group={groupView}
@@ -10384,6 +10390,8 @@ export function LogosApp({
           if (!msg) continue;
           if (el.kept) kept.add(el.kept);
           const state = sanitizeInlineState(msg.ui);
+          // what this reply's elements point at is lit across their cards (components/inline/marks.ts)
+          const scope = (msg.id && markScopes(messages).get(msg.id)) || msg.id;
           const noun = ELEMENT_NOUN[el.spec.type] ?? 'Element';
           const said = describeInline(el.spec, state?.[el.n]);
           cards.push({
@@ -10393,7 +10401,7 @@ export function LogosApp({
             kicker: el.lane === 'practice' ? 'Practice' : `Artifact · ${noun}`,
             title: el.title,
             turn: el.turn,
-            preview: <InlineBlock spec={el.spec} open={false} n={el.n} host={{ state, live: false, resolve: (n: number) => resolveInline(msg, n) }} renderInline={(t, k) => <RichInline text={t} math keyBase={`bd-${el.key}-${k}`} />} />,
+            preview: <InlineBlock spec={el.spec} open={false} n={el.n} host={{ state, live: false, resolve: (n: number) => resolveInline(msg, n), scope }} renderInline={(t, k) => <RichInline text={t} math keyBase={`bd-${el.key}-${k}`} />} />,
             // USED IN PLACE (Logos 6, the Everything view): the element itself, at full size and live — as it now stands
             // when it was kept (one identity) — and what is done with it kept as it is in the conversation
             live: (
@@ -10401,7 +10409,7 @@ export function LogosApp({
                 spec={el.spec}
                 open={false}
                 n={el.n}
-                host={{ state, live: true, resolve: (n: number) => resolveInline(msg, n), ...(!togetherReadOnly ? { onState: (n: number, st: InlineState) => keepInline(msg, n, st) } : {}) }}
+                host={{ state, live: true, resolve: (n: number) => resolveInline(msg, n), ...(!togetherReadOnly ? { onState: (n: number, st: InlineState) => keepInline(msg, n, st) } : {}), scope }}
                 renderInline={(t, k) => <RichInline text={t} math keyBase={`bdl-${el.key}-${k}`} />}
               />
             ),
@@ -10591,6 +10599,7 @@ export function LogosApp({
               key={activeId ?? 'space'}
               ideas={sIdeas}
               edges={map.edges}
+              ideasFolded={!ideasOn}
               brought={sBrought}
               made={sMade}
               turns={turns}
@@ -10654,7 +10663,7 @@ export function LogosApp({
             reading={sheetAt}
             cards={cards}
             map={
-              ideas.length
+              ideas.length && ideasOn
                 ? {
                     ideas,
                     // a drawing names the column by what it is of (Logos 5, lib/logos5/drawing.ts)
@@ -10879,8 +10888,8 @@ export function LogosApp({
           focusComposer();
         };
         const cards: CanvasCard[] = [];
-        // the ideas, beside the first turn that drew them
-        if (map.nodes.length) {
+        // the ideas, beside the first turn that drew them — when they help (ideasOn); otherwise the Logic Map is a press away
+        if (map.nodes.length && ideasOn) {
           const mapEl = <MapPreview nodes={map.nodes.map((n) => ({ id: n.id, type: n.type, label: n.label }))} edges={map.edges} />;
           cards.push({
             key: 'map',
@@ -10902,6 +10911,8 @@ export function LogosApp({
           if (!msg) continue;
           if (el.kept) kept.add(el.kept);
           const state = sanitizeInlineState(msg.ui);
+          // what this reply's elements point at is lit across their cards (components/inline/marks.ts)
+          const scope = (msg.id && markScopes(messages).get(msg.id)) || msg.id;
           const noun = ELEMENT_NOUN[el.spec.type] ?? 'Element';
           const draw = (live: boolean) => (
             <InlineBlock
@@ -10909,6 +10920,7 @@ export function LogosApp({
               open={false}
               n={el.n}
               host={{
+                scope,
                 state,
                 live,
                 resolve: (n: number) => resolveInline(msg, n),
