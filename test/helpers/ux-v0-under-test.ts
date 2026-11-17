@@ -1,4 +1,4 @@
-// SocriaUX v0 (/ux-v0): shapes, fonts, the spec and its patches, the renderer,
+// SocriaUX v0 (/ux-v0): shapes, fonts, the spec and its patches, art direction, the renderer,
 // the sandbox, the inspector's source, selections and their facts, the
 // critique gate, discovery, the brief and design prompts, the model's
 // configuration, the switch and the image providers — one bundle, for
@@ -18,3 +18,8 @@ export * from '@/lib/ux-v0/switch';
 export { providerOrder, searchImages, pingUse } from '@/lib/ux-v0/images-server';
 export { costOf } from '@/lib/model-router';
 export * from '@/lib/ux-v0/image-search';
+// art direction: the visual languages and the engine, colour arithmetic, the rendered-page audit and its evaluation
+export * from '@/lib/ux-v0/direction';
+export * from '@/lib/ux-v0/color';
+export * from '@/lib/ux-v0/evaluate';
+export { AUDIT_SOURCE } from '@/lib/ux-v0/audit-source';

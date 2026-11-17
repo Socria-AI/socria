@@ -13,7 +13,10 @@
 // exist inside the frame. It uses nothing newer than ES2015 browsers support.
 // String.raw keeps every backslash as written.
 
-export const INSPECTOR_SOURCE = String.raw`(function () {
+import { AUDIT_SOURCE } from './audit-source';
+
+// The audit (lib/ux-v0/audit-source.ts) rides along: asked with { type: 'audit' }, it measures the page as laid out.
+export const INSPECTOR_SOURCE = AUDIT_SOURCE + '\n' + String.raw`(function () {
   'use strict';
   if (window.__uxv0Inspector) return;
   window.__uxv0Inspector = true;
@@ -238,6 +241,10 @@ export const INSPECTOR_SOURCE = String.raw`(function () {
       P({ type: 'select', id: m.id, element: el ? capture(el, false) : null });
     } else if (m.type === 'measure') {
       report(true);
+    } else if (m.type === 'audit') {
+      var result = null;
+      try { result = window.__uxv0Audit ? window.__uxv0Audit() : null; } catch (err) { result = null; }
+      P({ type: 'audit', id: m.id, result: result });
     }
   });
   function ready() { var s = size(); lastH = s.height; P({ type: 'ready', width: s.width, height: s.height, outline: outline() }); }

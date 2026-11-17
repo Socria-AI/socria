@@ -118,6 +118,7 @@ const thinking = [
   'ux-v0/critique',
   'ux-v0/discover',
   'ux-v0/brief',
+  'ux-v0/direct',
   'ux-v0/generate',
   'ux-v0/refine',
   'ux-v0/images',

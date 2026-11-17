@@ -312,7 +312,7 @@ await part('create acceptance', async () => {
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForSelector('.v0-brief', { timeout: 10000 });
   check('a direct edit to the brief survives a reload', (await aud().inputValue()).includes('remote workers'), await aud().inputValue());
-  await page.getByRole('button', { name: 'Approve and generate' }).click();
+  await page.getByRole('button', { name: 'Approve and let SocriaUX choose' }).click();
   await page.waitForSelector('iframe.v0-frame', { timeout: 15000 });
   await page.waitForTimeout(2500);
   check('the approved brief is the one generation uses', /remote workers/.test(calls.generate.at(-1)?.brief?.audience || ''), calls.generate.at(-1)?.brief?.audience);
@@ -326,11 +326,13 @@ await part('create acceptance', async () => {
   await page.mouse.move(ib.x + ib.width * 0.8, top + 220, { steps: 8 });
   await page.mouse.up();
   await page.waitForSelector('.v0-sel.is-region', { timeout: 5000 });
+  await page.screenshot({ path: S + 'acc-area-generated.png' });
   check('area selection works on a generated design, as on an import', /Area \d+ × \d+ · \d+ element/.test(await label()), await label());
   await page.keyboard.press('Escape');
   await page.getByRole('radio', { name: 'Element' }).click();
   // an exact undo
-  const bodyHtml = async () => frameEl().evaluate(() => document.body.innerHTML);
+  // the page as drawn; Chromium may leave an empty style="" on form controls it has looked at, which is not ours
+  const bodyHtml = async () => (await frameEl().evaluate(() => document.body.innerHTML)).replace(/ style=""/g, '');
   const original = await bodyHtml();
   await page.frameLocator('iframe.v0-frame').locator('h1').click();
   await page.waitForSelector('.v0-sel', { timeout: 5000 });
@@ -342,7 +344,8 @@ await part('create acceptance', async () => {
   await page.getByRole('button', { name: 'Undo', exact: true }).first().click();
   await page.waitForTimeout(1500);
   const undone = await bodyHtml();
-  check('undo restores the exact earlier page', changed !== original && undone === original, `${original.length} → ${changed.length} → ${undone.length} chars`);
+  const at = [...original].findIndex((ch, i) => ch !== undone[i]);
+  check('undo restores the exact earlier page', changed !== original && undone === original, `${original.length} → ${changed.length} → ${undone.length} chars; first difference: …${original.slice(at - 80, at + 60)}… vs …${undone.slice(at - 80, at + 60)}…`);
 });
 
 out('\nSUMMARY ' + results.filter((r) => r[0] === 'PASS').length + ' passed, ' + results.filter((r) => r[0] === 'FAIL').length + ' failed');

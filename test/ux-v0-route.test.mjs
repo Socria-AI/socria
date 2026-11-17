@@ -33,7 +33,7 @@ const swap = {
     b.onResolve({ filter: /^next\/(server|headers)$/ }, (a) => ({ path: `${a.path}.js`, external: true }));
   },
 };
-const ROUTES = ['critique', 'discover', 'brief', 'generate', 'refine', 'images', 'projects'];
+const ROUTES = ['critique', 'discover', 'brief', 'direct', 'generate', 'refine', 'images', 'projects'];
 await Promise.all(
   ROUTES.map((r) =>
     build({
@@ -112,7 +112,7 @@ const REASONING = {
 };
 
 console.log('\n=== nobody signed out reaches a model or a library ===');
-for (const r of ['critique', 'discover', 'brief', 'generate', 'refine', 'images']) {
+for (const r of ['critique', 'discover', 'brief', 'direct', 'generate', 'refine', 'images']) {
   const out = await post(r, { comment: 'x', intent: 'y', selection: elementSel }, null, [REASONING]);
   ok(`${r}: refused, told to sign in, nothing asked`, out.status === 401 && out.json?.signIn === true && out.calls.length === 0, J(out));
 }
@@ -180,6 +180,8 @@ console.log('\n=== discovery, the brief, generation, change ===');
   ]);
   ok('a design is generated as a spec', g.status === 200 && g.json.spec.sections.length === 3 && g.json.spec.tokens.colors.accent === '#6b3e1f', J(g.json).slice(0, 300));
   ok('placeholders are reported', J(g.json.placeholders) === J(['[Opening hours]']));
+  ok('left to SocriaUX, the design still follows an art direction: the faithful reading, named in the response', g.json.artDirection?.language && g.json.spec.look.language === g.json.artDirection.language && g.json.spec.look.language !== 'classic', J(g.json.artDirection?.language));
+  ok('…and the generator was told it', J(g.calls[0].messages).includes('THE APPROVED ART DIRECTION'));
   ok('a generation is counted as one', bumps.at(-1)?.p_generations === 1);
   const junk = await post('generate', { projectId: 'uxv0_c', brief: b.json.brief, moodboard, version: 2 }, A, [{ sections: [{ kind: 'nonsense' }] }]);
   ok('a design that does not hold together is refused, nothing kept', junk.status === 502);
@@ -198,6 +200,43 @@ console.log('\n=== discovery, the brief, generation, change ===');
   const newDir = await post('refine', { projectId: 'uxv0_c', spec, moodboard, comment: 'Make it feel like a night-time bar instead' }, A, [{ understood: 'A different direction', regenerate: 'A late-evening bar: low light, deep reds, a cocktail list first.', patch: { op: 'none' } }]);
   ok('a new direction is not forced into a patch: it is offered as a regeneration', newDir.status === 200 && newDir.json.regenerate.includes('late-evening') && newDir.json.applies === false, J(newDir.json).slice(0, 240));
   ok('a patch that does not fit says why', bad.json.applies === false && /not in the design/.test(bad.json.error));
+}
+
+console.log('\n=== art direction ===');
+{
+  const brief = { objective: 'Fill weekday mornings at a coffee bar.', audience: 'Commuters', personality: ['warm', 'honest'], visualDirection: 'Handmade, morning light', palette: [{ hex: '#f6f1e9', role: 'background' }, { hex: '#2a2420', role: 'text' }, { hex: '#6b3e1f', role: 'accent' }, { hex: '#ffffff', role: 'accent-text' }], typography: { display: 'Fraunces', body: 'Inter' }, pageType: 'website' };
+  const d = await post('direct', { projectId: 'uxv0_d', brief, notes: '', avoid: '' }, B, [
+    { directions: [{ candidate: 1, name: 'Long table mornings', concept: 'A printed card for a room that slows you down.', rationale: ['Warm and honest, like the brief'], voice: 'Plain and particular.', fonts: { display: 'Young Serif', body: 'Comic Sans' } }, { candidate: 2, name: 'Loud roast' }, { candidate: 3, name: 'Third way' }] },
+  ]);
+  ok('three directions come back, written for this brand', d.status === 200 && d.json.options.length === 3 && d.json.options[0].name === 'Long table mornings' && d.json.options[0].source === 'model', J(d.json).slice(0, 300));
+  ok('…each a different visual language', new Set(d.json.options.map((o) => o.language)).size === 3);
+  ok('…a face from the list is taken; one off it never is', d.json.options[0].tokens.fonts.display === 'Young Serif' && d.json.options[0].tokens.fonts.body !== 'Comic Sans');
+  ok('…one small call, recorded as art direction, with the candidates and the catalogue in it', d.calls.length === 1 && bumps.at(-1)?.p_project === 'uxv0_d' && J(d.calls[0].messages).includes('THE CANDIDATES') && J(d.calls[0].messages).includes('broadsheet'));
+  const base = { ...d.json.options[1], locks: ['palette', 'type'] };
+  const again = await post('direct', { projectId: 'uxv0_d', brief, notes: 'more like a newspaper', round: 1, seen: d.json.options.map((o) => o.language), base }, B, [{ directions: [{ candidate: 1, fonts: { display: 'Anton', body: 'Inter' } }] }]);
+  ok('asked again, what the designer locked stays: colours and type', again.status === 200 && again.json.options.every((o) => J(o.tokens.colors) === J(base.tokens.colors) && J(o.tokens.fonts) === J(base.tokens.fonts)), J(again.json.options.map((o) => o.tokens.fonts)));
+  ok('…the model was told what is locked, and the notes', J(again.calls[0].messages).includes('LOCKED BY THE DESIGNER') && J(again.calls[0].messages).includes('more like a newspaper'));
+  const broken = await post('direct', { projectId: 'uxv0_d', brief }, B, [new Error('upstream down')]);
+  ok('a model failure is a calm 502 (the browser keeps the engine’s three)', broken.status === 502);
+  ok('no brief, no call', (await post('direct', { notes: 'x' }, B, [])).status === 400);
+
+  const moodboard = { refs: [] };
+  const chosen = { ...d.json.options[2], locks: ['palette'] };
+  const sections = [{ id: 'nav', kind: 'nav', content: { brand: 'Halcyon', links: ['Menu'] } }, { id: 'hero', kind: 'hero', variant: 'centered', content: { title: 'Coffee, slowly', primary: 'Book' } }, { id: 'f', kind: 'footer', content: { brand: 'Halcyon' } }];
+  const g = await post('generate', { projectId: 'uxv0_d', brief, moodboard, version: 1, artDirection: chosen }, B, [{ title: 'Halcyon', tokens: { colors: { accent: '#ff00ff' }, fonts: { display: 'Inter' } }, sections }]);
+  ok('the design follows the approved direction’s colours, type and look, whatever the model wrote', g.status === 200 && J(g.json.spec.tokens.colors) === J(chosen.tokens.colors) && J(g.json.spec.tokens.fonts) === J(chosen.tokens.fonts) && g.json.spec.look.language === chosen.language, J(g.json.spec.tokens.fonts));
+  ok('…the generator was given its concept and told not to write tokens', J(g.calls[0].messages).includes(chosen.concept.slice(0, 30)) && J(g.calls[0].messages).includes('do not write'));
+  const g2 = await post('generate', { projectId: 'uxv0_d', brief, moodboard, version: 2, artDirection: chosen, direction: 'darker, like an evening bar' }, B, [{ title: 'Halcyon', sections }]);
+  ok('a new direction in words revises the approved one and keeps its locks', g2.status === 200 && J(g2.json.spec.tokens.colors) === J(chosen.tokens.colors) && J(g2.json.artDirection.locks) === J(['palette']), J(g2.json.artDirection?.language));
+
+  const spec = g.json.spec;
+  const locked = await post('refine', { projectId: 'uxv0_d', spec, moodboard, comment: 'Make the accent pink', locks: ['palette'] }, B, [{ understood: 'Pink accent', patch: { op: 'tokens', tokens: { colors: { accent: '#ff3399' } }, summary: 'Pink' } }]);
+  ok('a change to a locked decision is never made silently: SocriaUX asks first', locked.status === 200 && /locked/.test(locked.json.challenge) && J(locked.json.locked) === J(['palette']) && locked.json.applies, J(locked.json));
+  ok('…and the model was told what is locked', J(locked.calls[0].messages).includes('LOCKED IN THE ART DIRECTION'));
+  const forced = await post('refine', { projectId: 'uxv0_d', spec, moodboard, comment: 'Make the accent pink', locks: ['palette'], force: true }, B, [{ understood: 'Pink accent', patch: { op: 'tokens', tokens: { colors: { accent: '#ff3399' } }, summary: 'Pink' } }]);
+  ok('…once the designer says yes, it is made', forced.json.challenge === '' && forced.json.applies);
+  const free = await post('refine', { projectId: 'uxv0_d', spec, moodboard, comment: 'Use heavier rules', locks: ['palette'] }, B, [{ understood: 'Heavier rules', patch: { op: 'look', look: { rules: 'heavy' }, summary: 'Heavy rules' } }]);
+  ok('a change to what is not locked goes straight through, as a look patch', free.json.challenge === '' && free.json.applies && free.json.patch.op === 'look');
 }
 
 console.log('\n=== moodboard images ===');

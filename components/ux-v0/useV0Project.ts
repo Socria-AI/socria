@@ -2,7 +2,7 @@
 // components/ux-v0/useV0Project.ts — one open SocriaUX v0 project: its state and its saves.
 //
 // Every change goes to the browser first (lib/ux-v0/store.ts), a moment after
-// it is made; a signed-in designer's project then goes to /api/ux-v0/projects
+// it is made (and at once when the page is left); a signed-in designer's project then goes to /api/ux-v0/projects
 // a little later, without its crops. A failed sync never loses work — the
 // browser copy is already written — it only changes what the header says.
 
@@ -39,19 +39,44 @@ export function useV0Project(initial: DesignProject, signedIn: boolean) {
     });
   }, []);
 
+  // A save waits for a pause (300 ms), but never longer than 1.5 s after the first unsaved change:
+  // a stream of small updates must not keep pushing the save back. Leaving or hiding the page
+  // writes at once, so a reload straight after a change keeps it.
   const first = useRef(true);
+  const dirtySince = useRef<number | null>(null);
   useEffect(() => {
     if (first.current) {
       first.current = false;
       return;
     }
     setSave('saving');
+    const now = Date.now();
+    if (dirtySince.current === null) dirtySince.current = now;
+    const wait = Math.max(0, Math.min(300, 1500 - (now - dirtySince.current)));
     const t = window.setTimeout(async () => {
-      const r = await putProject(project);
+      dirtySince.current = null;
+      const r = await putProject(ref.current);
       setSave(r.ok ? (signedIn ? 'saving' : 'device') : r.reason === 'quota' ? 'quota' : 'unkept');
-    }, 300);
+    }, wait);
     return () => window.clearTimeout(t);
   }, [project, signedIn]);
+
+  useEffect(() => {
+    const flush = () => {
+      if (dirtySince.current === null) return;
+      dirtySince.current = null;
+      void putProject(ref.current);
+    };
+    const hidden = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', hidden);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', hidden);
+    };
+  }, []);
 
   useEffect(() => {
     if (!signedIn) return;

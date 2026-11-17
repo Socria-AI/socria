@@ -15,7 +15,7 @@
 // the page.
 
 import { contrastRatio } from '../ux/audit';
-import { bodyFont, displayFont } from './fonts';
+import { bodyFont, displayFont, knownFont } from './fonts';
 import type { Moodboard, PageType, Platform } from './types';
 
 // ── fields ───────────────────────────────────────────────────────────
@@ -54,17 +54,17 @@ const APP: readonly PageType[] = ['app-screen'];
 export const LIBRARY: readonly KindDef[] = [
   { kind: 'nav', label: 'Navigation', pages: WEB, variants: ['inline', 'centered', 'minimal'], images: [0, 0], note: 'top bar: brand, up to 6 links, optional button',
     fields: { brand: T(40, true), links: TS(24, 0, 6), cta: T(30) } },
-  { kind: 'hero', label: 'Hero', pages: WEB, variants: ['split', 'centered', 'full-bleed', 'editorial'], images: [0, 1], note: 'the opening statement; full-bleed and split want an image',
+  { kind: 'hero', label: 'Hero', pages: WEB, variants: ['split', 'centered', 'full-bleed', 'editorial', 'statement', 'poster'], images: [0, 1], note: 'the opening statement; full-bleed and split want an image; statement is type alone, very large; poster is huge type with an image set against it',
     fields: { eyebrow: T(48), title: T(120, true), subtitle: T(320), primary: T(30), secondary: T(30), note: T(140) } },
-  { kind: 'features', label: 'Features', pages: BOTH, variants: ['grid', 'list', 'numbered'], images: [0, 0], note: '2–8 points, each a title and a sentence, optional icon',
+  { kind: 'features', label: 'Features', pages: BOTH, variants: ['grid', 'list', 'numbered', 'index', 'columns'], images: [0, 0], note: '2–8 points, each a title and a sentence, optional icon; index is a ruled table of contents, columns is text set in ruled columns',
     fields: { eyebrow: T(48), title: T(110), intro: T(320), items: { t: 'list', n: [2, 8], req: true, item: { title: T(60, true), text: T(240), icon: { t: 'enum', values: ICONS } } } } },
   { kind: 'split', label: 'Image and text', pages: WEB, variants: ['image-left', 'image-right'], images: [0, 1], note: 'a story beside one image',
     fields: { eyebrow: T(48), title: T(110, true), text: T(600), bullets: TS(110, 0, 6), cta: T(30) } },
   { kind: 'gallery', label: 'Gallery', pages: WEB, variants: ['grid', 'mosaic', 'strip'], images: [2, 8], note: '2–8 moodboard images',
     fields: { eyebrow: T(48), title: T(110), caption: T(220) } },
-  { kind: 'quote', label: 'Quote', pages: WEB, variants: ['large', 'with-portrait'], images: [0, 1], note: 'one testimonial or statement',
+  { kind: 'quote', label: 'Quote', pages: WEB, variants: ['large', 'with-portrait', 'pull'], images: [0, 1], note: 'one testimonial or statement; pull is a large left-set pull quote',
     fields: { quote: T(420, true), author: T(60, true), role: T(90) } },
-  { kind: 'stats', label: 'Figures', pages: WEB, variants: ['row', 'band'], images: [0, 0], note: '2–6 figures; unknown figures are [bracketed placeholders]',
+  { kind: 'stats', label: 'Figures', pages: WEB, variants: ['row', 'band', 'giant'], images: [0, 0], note: '2–6 figures; giant sets them as huge numerals; unknown figures are [bracketed placeholders]',
     fields: { title: T(110), items: { t: 'list', n: [2, 6], req: true, item: { value: T(18, true), label: T(70, true) } } } },
   { kind: 'logos', label: 'Names', pages: WEB, variants: ['row'], images: [0, 0], note: 'partner or press names, set as words',
     fields: { title: T(80), names: TS(32, 3, 8, true) } },
@@ -74,11 +74,11 @@ export const LIBRARY: readonly KindDef[] = [
     fields: { eyebrow: T(48), title: T(110), intro: T(300), groups: { t: 'list', n: [1, 6], req: true, item: { title: T(60), items: { t: 'list', n: [1, 12], req: true, item: { name: T(70, true), meta: T(70), price: T(18), text: T(220) } } } } } },
   { kind: 'faq', label: 'Questions', pages: WEB, variants: ['accordion', 'two-column'], images: [0, 0], note: '2–10 questions and answers',
     fields: { title: T(110), items: { t: 'list', n: [2, 10], req: true, item: { q: T(150, true), a: T(520, true) } } } },
-  { kind: 'cta', label: 'Call to action', pages: WEB, variants: ['band', 'centered', 'image'], images: [0, 1], note: 'one decisive invitation',
+  { kind: 'cta', label: 'Call to action', pages: WEB, variants: ['band', 'centered', 'image', 'statement'], images: [0, 1], note: 'one decisive invitation; statement is a very large headline with no box',
     fields: { title: T(120, true), text: T(280), primary: T(30, true), secondary: T(30) } },
   { kind: 'form', label: 'Form', pages: BOTH, variants: ['stacked', 'split'], images: [0, 0], note: 'every field has a visible label',
     fields: { title: T(110, true), intro: T(320), fields: { t: 'list', n: [1, 10], req: true, item: { label: T(48, true), type: { t: 'enum', values: ['text', 'email', 'tel', 'textarea', 'select', 'checkbox', 'date', 'number'] }, placeholder: T(60), options: TS(40, 0, 8), required: { t: 'bool' } } }, submit: T(30, true), note: T(180) } },
-  { kind: 'text', label: 'Text', pages: BOTH, variants: ['narrow', 'two-column'], images: [0, 0], note: 'an about or story block',
+  { kind: 'text', label: 'Text', pages: BOTH, variants: ['narrow', 'two-column', 'lead'], images: [0, 0], note: 'an about or story block; lead sets the first paragraph large',
     fields: { eyebrow: T(48), title: T(120), paragraphs: TS(900, 1, 6, true) } },
   { kind: 'footer', label: 'Footer', pages: WEB, variants: ['simple', 'columns'], images: [0, 0], note: 'brand, columns of links, legal line',
     fields: { brand: T(40, true), tagline: T(160), columns: { t: 'list', n: [0, 4], item: { title: T(30), links: TS(30, 1, 6, true) } }, legal: T(180) } },
@@ -116,13 +116,13 @@ export interface DesignTokens {
   scale: 'compact' | 'comfortable' | 'spacious';
   radius: 'none' | 'soft' | 'round';
   style: 'editorial' | 'minimal' | 'bold' | 'warm' | 'technical';
-  imageTreatment: 'natural' | 'muted' | 'warm' | 'mono';
+  imageTreatment: (typeof TREATMENTS)[number];
 }
 
 export const SCALES = ['compact', 'comfortable', 'spacious'] as const;
 export const RADII = ['none', 'soft', 'round'] as const;
 export const STYLES = ['editorial', 'minimal', 'bold', 'warm', 'technical'] as const;
-export const TREATMENTS = ['natural', 'muted', 'warm', 'mono'] as const;
+export const TREATMENTS = ['natural', 'muted', 'warm', 'mono', 'duotone', 'contrast'] as const;
 
 export interface Section {
   id: string;
@@ -131,6 +131,12 @@ export interface Section {
   content: Record<string, any>;
   /** moodboard reference ids */
   images: string[];
+  /** the ground it sits on: the page's own, the alternate, the accent, the second accent, or inverted */
+  tone?: Tone;
+  /** its share of space: small, medium, large */
+  pad?: Pad;
+  /** chosen by the person (a variant or a tone they set): the layout planner leaves it alone */
+  fixed?: boolean;
 }
 
 export interface DesignSpec {
@@ -139,6 +145,8 @@ export interface DesignSpec {
   platform: Platform;
   title: string;
   tokens: DesignTokens;
+  /** the art direction's visual language, as the renderer reads it */
+  look: Look;
   sections: Section[];
   /** what the pipeline changed on its own (a colour darkened for contrast), said plainly */
   notes: string[];
@@ -207,6 +215,125 @@ export function normalizeTokens(v: unknown, notes: string[] = []): DesignTokens 
     radius: pick(r.radius, RADII, 'soft'),
     style: pick(r.style, STYLES, 'editorial'),
     imageTreatment: pick(r.imageTreatment, TREATMENTS, 'natural'),
+  };
+}
+
+// ── the look: how the page is composed, not just coloured ─────────────
+//
+// Tokens say which colours and faces; the look says what the page does with
+// them — the type scale and its case, the grid the sections sit on, whether
+// things are boxed, ruled or open, what a button is, how pictures are framed,
+// and the few motifs that make a page recognisably one thing. An art
+// direction (lib/ux-v0/direction.ts) writes it; the renderer reads nothing
+// else. A spec from before looks existed is drawn with lookFromTokens: the
+// "classic" look, the renderer it was made with.
+
+export const GRIDS = ['stack', 'editorial', 'swiss', 'centered', 'asymmetric', 'poster', 'modular'] as const;
+export const ALIGNS = ['left', 'center'] as const;
+export const WIDTHS = ['narrow', 'standard', 'wide'] as const;
+export const RHYTHMS = ['even', 'dramatic'] as const;
+export const CASES = ['sentence', 'upper'] as const;
+export const TRACKINGS = ['tight', 'normal', 'wide'] as const;
+export const EMPHASES = ['italic', 'accent', 'underline', 'highlight', 'none'] as const;
+export const LABELS = ['caps', 'sentence', 'mono', 'rule', 'quiet'] as const;
+export const CONTAINERS = ['open', 'ruled', 'cards', 'bands', 'framed'] as const;
+export const RULES = ['none', 'hairline', 'heavy'] as const;
+export const BUTTONS = ['solid', 'pill', 'outline', 'underline', 'block', 'offset'] as const;
+export const FRAMES = ['plain', 'inset', 'arch', 'circle', 'offset'] as const;
+export const MOTIFS = ['numbering', 'shapes', 'marquee', 'captions', 'big-numerals', 'pull-quote', 'icons'] as const;
+export const SHAPES = ['circle', 'arch', 'square', 'quarter', 'diamond', 'blob'] as const;
+export const TONES = ['base', 'alt', 'accent', 'accent2', 'invert'] as const;
+export const PADS = ['s', 'm', 'l'] as const;
+
+export type Grid = (typeof GRIDS)[number];
+export type Motif = (typeof MOTIFS)[number];
+export type Shape = (typeof SHAPES)[number];
+export type Tone = (typeof TONES)[number];
+export type Pad = (typeof PADS)[number];
+
+export interface Look {
+  /** the visual language it came from (lib/ux-v0/direction.ts), or "classic" */
+  language: string;
+  /** the modular type scale: each step is this times the one below */
+  ratio: number;
+  /** the display face's weight */
+  weight: number;
+  case: (typeof CASES)[number];
+  tracking: (typeof TRACKINGS)[number];
+  /** how a *word* the copy emphasises is set */
+  emphasis: (typeof EMPHASES)[number];
+  /** how small labels (eyebrows, figure labels) are set */
+  label: (typeof LABELS)[number];
+  /** the mono face labels use when label is "mono" */
+  mono: string;
+  grid: Grid;
+  align: (typeof ALIGNS)[number];
+  width: (typeof WIDTHS)[number];
+  rhythm: (typeof RHYTHMS)[number];
+  containers: (typeof CONTAINERS)[number];
+  rules: (typeof RULES)[number];
+  buttons: (typeof BUTTONS)[number];
+  frame: (typeof FRAMES)[number];
+  motifs: Motif[];
+  shapes: Shape[];
+  /** a second ink, for languages that print in two colours; "" for none */
+  accent2: string;
+}
+
+/** The renderer as it was before looks: what an older spec is drawn with. */
+export function lookFromTokens(tk: DesignTokens): Look {
+  return {
+    language: 'classic',
+    ratio: 1.36,
+    weight: tk.style === 'bold' ? 700 : tk.style === 'minimal' || tk.style === 'technical' ? 500 : 400,
+    case: 'sentence',
+    tracking: 'tight',
+    emphasis: 'accent',
+    label: tk.style === 'technical' ? 'mono' : 'caps',
+    mono: 'IBM Plex Mono',
+    grid: 'stack',
+    align: 'left',
+    width: 'standard',
+    rhythm: 'even',
+    containers: tk.style === 'warm' ? 'bands' : tk.style === 'editorial' ? 'ruled' : 'open',
+    rules: 'hairline',
+    buttons: tk.radius === 'round' ? 'pill' : 'solid',
+    frame: 'plain',
+    motifs: ['icons'],
+    shapes: [],
+    accent2: '',
+  };
+}
+
+const LANG_ID = /^[a-z][a-z0-9-]{1,30}$/;
+
+/** Any value into a look the renderer can draw, filling gaps from `base`. */
+export function normalizeLook(v: unknown, base: Look): Look {
+  const r = o(v);
+  const num = (x: unknown, lo: number, hi: number, d: number) => (typeof x === 'number' && Number.isFinite(x) ? Math.max(lo, Math.min(hi, x)) : d);
+  const list = <T extends string>(x: unknown, allowed: readonly T[], d: T[]): T[] =>
+    Array.isArray(x) ? [...new Set(x.filter((y): y is T => (allowed as readonly string[]).includes(y as string)))].slice(0, allowed.length) : d;
+  const mono = typeof r.mono === 'string' && /mono/i.test(r.mono) && knownFont(r.mono) ? knownFont(r.mono)!.name : base.mono;
+  return {
+    language: typeof r.language === 'string' && LANG_ID.test(r.language) ? r.language : base.language,
+    ratio: Math.round(num(r.ratio, 1.15, 1.7, base.ratio) * 1000) / 1000,
+    weight: Math.round(num(r.weight, 100, 900, base.weight) / 50) * 50,
+    case: pick(r.case, CASES, base.case),
+    tracking: pick(r.tracking, TRACKINGS, base.tracking),
+    emphasis: pick(r.emphasis, EMPHASES, base.emphasis),
+    label: pick(r.label, LABELS, base.label),
+    mono,
+    grid: pick(r.grid, GRIDS, base.grid),
+    align: pick(r.align, ALIGNS, base.align),
+    width: pick(r.width, WIDTHS, base.width),
+    rhythm: pick(r.rhythm, RHYTHMS, base.rhythm),
+    containers: pick(r.containers, CONTAINERS, base.containers),
+    rules: pick(r.rules, RULES, base.rules),
+    buttons: pick(r.buttons, BUTTONS, base.buttons),
+    frame: pick(r.frame, FRAMES, base.frame),
+    motifs: list(r.motifs, MOTIFS, base.motifs),
+    shapes: list(r.shapes, SHAPES, base.shapes),
+    accent2: r.accent2 === '' ? '' : hx(r.accent2, base.accent2 || '') ,
   };
 }
 
@@ -288,7 +415,11 @@ export function normalizeSection(v: unknown, pageType: PageType, imageIds: Reado
     id = `${id}-${n}`;
   }
   taken.add(id);
-  return { id, kind: def.kind, variant, content, images };
+  const sec: Section = { id, kind: def.kind, variant, content, images };
+  if ((TONES as readonly string[]).includes(r.tone)) sec.tone = r.tone as Tone;
+  if ((PADS as readonly string[]).includes(r.pad)) sec.pad = r.pad as Pad;
+  if (r.fixed === true) sec.fixed = true;
+  return sec;
 }
 
 /** The ids a spec's sections may draw on: references on the moodboard that were not rejected. */
@@ -321,6 +452,7 @@ export function normalizeSpec(v: unknown, moodboard?: Moodboard | null): DesignS
     platform: pick(r.platform, ['web', 'mobile'] as const, pageType === 'app-screen' && r.platform === 'mobile' ? 'mobile' : 'web'),
     title: s(r.title, 100) || 'Untitled design',
     tokens,
+    look: r.look && typeof r.look === 'object' ? normalizeLook(r.look, lookFromTokens(tokens)) : lookFromTokens(tokens),
     sections,
     notes: [...new Set(notes)].slice(0, 8),
     reason: s(r.reason, 200),
@@ -330,15 +462,18 @@ export function normalizeSpec(v: unknown, moodboard?: Moodboard | null): DesignS
 
 // ── patches: iteration that touches only what was asked ───────────────
 
-export type PatchOp = 'tokens' | 'content' | 'variant' | 'replace' | 'add' | 'remove' | 'move' | 'images' | 'none';
-export const PATCH_OPS: readonly PatchOp[] = ['tokens', 'content', 'variant', 'replace', 'add', 'remove', 'move', 'images', 'none'];
+export type PatchOp = 'tokens' | 'look' | 'content' | 'variant' | 'tone' | 'replace' | 'add' | 'remove' | 'move' | 'images' | 'none';
+export const PATCH_OPS: readonly PatchOp[] = ['tokens', 'look', 'content', 'variant', 'tone', 'replace', 'add', 'remove', 'move', 'images', 'none'];
 
 export interface Patch {
   op: PatchOp;
   sectionId?: string;
   tokens?: Record<string, any>;
+  look?: Record<string, any>;
   content?: Record<string, any>;
   variant?: string;
+  tone?: string;
+  pad?: string;
   section?: Record<string, any>;
   after?: string | null;
   to?: number;
@@ -354,6 +489,9 @@ export function normalizePatch(v: unknown): Patch {
     op,
     sectionId: typeof r.sectionId === 'string' ? r.sectionId.slice(0, 48) : undefined,
     tokens: r.tokens && typeof r.tokens === 'object' ? o(r.tokens) : undefined,
+    look: r.look && typeof r.look === 'object' ? o(r.look) : undefined,
+    tone: typeof r.tone === 'string' ? r.tone.slice(0, 12) : undefined,
+    pad: typeof r.pad === 'string' ? r.pad.slice(0, 2) : undefined,
     content: r.content && typeof r.content === 'object' ? o(r.content) : undefined,
     variant: typeof r.variant === 'string' ? r.variant.slice(0, 30) : undefined,
     section: r.section && typeof r.section === 'object' ? o(r.section) : undefined,
@@ -375,11 +513,13 @@ export function applyPatch(spec: DesignSpec, patchIn: Patch, moodboard?: Moodboa
   const ids = usableImages(moodboard);
   const idx = p.sectionId ? spec.sections.findIndex((x) => x.id === p.sectionId) : -1;
   const target = idx >= 0 ? spec.sections[idx] : null;
-  const next = (sections: Section[], tokens: DesignTokens = spec.tokens, notes: string[] = spec.notes, touched: string[] = []): PatchResult => ({
+  const next = (sections: Section[], tokens: DesignTokens = spec.tokens, notes: string[] = spec.notes, touched: string[] = [], look: Look = spec.look ?? lookFromTokens(spec.tokens)): PatchResult => ({
     ok: true,
-    spec: { ...spec, sections, tokens, notes, version: spec.version + 1, reason: p.summary || p.op, createdAt: Date.now() },
+    spec: { ...spec, sections, tokens, look, notes, version: spec.version + 1, reason: p.summary || p.op, createdAt: Date.now() },
     touched,
   });
+  // a section the person changed keeps what they chose: the layout planner leaves it alone
+  const held = (sec: Section, from: Section): Section => ({ ...sec, tone: sec.tone ?? from.tone, pad: sec.pad ?? from.pad, fixed: true });
   const needTarget = (): PatchResult | null => (target ? null : { ok: false, error: 'That section is not in the design.' });
 
   switch (p.op) {
@@ -399,6 +539,12 @@ export function applyPatch(spec: DesignSpec, patchIn: Patch, moodboard?: Moodboa
       );
       return next(spec.sections, merged, [...new Set([...spec.notes, ...notes])].slice(-8), []);
     }
+    case 'look': {
+      if (!p.look) return { ok: false, error: 'No look to change.' };
+      const base = spec.look ?? lookFromTokens(spec.tokens);
+      const look = normalizeLook({ ...base, ...p.look }, base);
+      return next(spec.sections, undefined, undefined, [], look);
+    }
     case 'content': {
       const miss = needTarget();
       if (miss) return miss;
@@ -415,6 +561,15 @@ export function applyPatch(spec: DesignSpec, patchIn: Patch, moodboard?: Moodboa
       const sec = normalizeSection({ ...target, variant: p.variant }, spec.pageType, ids, new Set());
       if (!sec) return { ok: false, error: 'That variant does not fit the section.' };
       sec.id = target!.id;
+      return next(spec.sections.map((x, i) => (i === idx ? held(sec, target!) : x)), undefined, undefined, [sec.id]);
+    }
+    case 'tone': {
+      const miss = needTarget();
+      if (miss) return miss;
+      const tone = (TONES as readonly string[]).includes(p.tone ?? '') ? (p.tone as Tone) : undefined;
+      const pad = (PADS as readonly string[]).includes(p.pad ?? '') ? (p.pad as Pad) : undefined;
+      if (!tone && !pad) return { ok: false, error: 'No tone or spacing to change.' };
+      const sec: Section = { ...target!, tone: tone ?? target!.tone, pad: pad ?? target!.pad, fixed: true };
       return next(spec.sections.map((x, i) => (i === idx ? sec : x)), undefined, undefined, [sec.id]);
     }
     case 'images': {
@@ -431,7 +586,7 @@ export function applyPatch(spec: DesignSpec, patchIn: Patch, moodboard?: Moodboa
       const sec = normalizeSection({ ...p.section, id: target!.id }, spec.pageType, ids, new Set());
       if (!sec) return { ok: false, error: 'The new section is not valid.' };
       sec.id = target!.id;
-      return next(spec.sections.map((x, i) => (i === idx ? sec : x)), undefined, undefined, [sec.id]);
+      return next(spec.sections.map((x, i) => (i === idx ? held(sec, target!) : x)), undefined, undefined, [sec.id]);
     }
     case 'add': {
       const taken = new Set(spec.sections.map((x) => x.id));
@@ -498,10 +653,12 @@ export function libraryMenu(pageType: PageType): string {
 export function specDigest(spec: DesignSpec): string {
   const t = spec.tokens;
   const head = `Page "${spec.title}" (${spec.pageType}, ${spec.platform}). Tokens: background ${t.colors.background}, surface ${t.colors.surface}, text ${t.colors.text}, muted ${t.colors.muted}, accent ${t.colors.accent} (labels ${t.colors.accentText}), line ${t.colors.line}; fonts ${t.fonts.display} / ${t.fonts.body}; scale ${t.scale}; radius ${t.radius}; style ${t.style}; images ${t.imageTreatment}.`;
+  const l = spec.look ?? lookFromTokens(t);
+  const look = `Look (${l.language}): type ratio ${l.ratio}, weight ${l.weight}, case ${l.case}, tracking ${l.tracking}, emphasis ${l.emphasis}, labels ${l.label}; grid ${l.grid}, align ${l.align}, width ${l.width}, rhythm ${l.rhythm}; containers ${l.containers}, rules ${l.rules}, buttons ${l.buttons}, image frame ${l.frame}; motifs ${l.motifs.join(', ') || 'none'}${l.shapes.length ? `; shapes ${l.shapes.join(', ')}` : ''}${l.accent2 ? `; second ink ${l.accent2}` : ''}.`;
   const body = spec.sections
-    .map((x, i) => `${i + 1}. [${x.id}] ${x.kind}/${x.variant}${x.images.length ? ` images: ${x.images.join(', ')}` : ''} content: ${JSON.stringify(x.content).slice(0, 900)}`)
+    .map((x, i) => `${i + 1}. [${x.id}] ${x.kind}/${x.variant}${x.tone && x.tone !== 'base' ? ` on ${x.tone}` : ''}${x.images.length ? ` images: ${x.images.join(', ')}` : ''} content: ${JSON.stringify(x.content).slice(0, 900)}`)
     .join('\n');
-  return `${head}\nSections:\n${body}`;
+  return `${head}\n${look}\nSections:\n${body}`;
 }
 
 /** Bracketed placeholders the model left for facts it did not have: "[Opening hours]". */

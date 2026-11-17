@@ -12,6 +12,7 @@
 // model's output — and returns a value the rest of the code can trust, or a
 // safe default. None of them throws. docs/SOCRIAUX-V0.md has the plan.
 
+import { EMPTY_DIRECTION, normalizeDirectionState, type DirectionState } from './direction';
 import { normalizeSpec, type DesignSpec } from './spec';
 import { bodyFont, displayFont } from './fonts';
 
@@ -354,8 +355,8 @@ export interface DesignBrief {
 
 // ── usage ────────────────────────────────────────────────────────────
 
-export type CallKind = 'discover' | 'direction' | 'brief' | 'refine-brief' | 'generate' | 'refine' | 'critique';
-export const CALL_KINDS: readonly CallKind[] = ['discover', 'direction', 'brief', 'refine-brief', 'generate', 'refine', 'critique'];
+export type CallKind = 'discover' | 'direction' | 'brief' | 'refine-brief' | 'art-direction' | 'generate' | 'refine' | 'critique';
+export const CALL_KINDS: readonly CallKind[] = ['discover', 'direction', 'brief', 'refine-brief', 'art-direction', 'generate', 'refine', 'critique'];
 
 export interface UsageTotals {
   calls: number;
@@ -375,6 +376,8 @@ export interface DesignProject {
   discovery: Discovery;
   moodboard: Moodboard;
   brief: { doc: DesignBrief | null; approved: boolean; version: number };
+  /** the art direction: proposed options, the designer's notes and locks, and the one approved (lib/ux-v0/direction.ts) */
+  direction: DirectionState;
   /** generated designs: every version, newest last; specIndex is the one shown */
   specs: DesignSpec[];
   specIndex: number;
@@ -816,6 +819,7 @@ export function normalizeProject(v: unknown, opts: { forSync?: boolean } = {}): 
     discovery: normalizeDiscovery(r.discovery),
     moodboard,
     brief: { doc: normalizeBrief(b.doc, kept.size ? kept : undefined), approved: b.approved === true, version: num(b.version, 0, 1e4, 0) },
+    direction: normalizeDirectionState(r.direction),
     specs,
     specIndex: specs.length ? num(r.specIndex, 0, specs.length - 1, specs.length - 1) : -1,
     artifact: normalizeArtifact(r.artifact),
@@ -837,6 +841,7 @@ export function makeProject(mode: ProjectMode, name: string, now = Date.now()): 
     discovery: emptyDiscovery(),
     moodboard: emptyMoodboard(),
     brief: { doc: null, approved: false, version: 0 },
+    direction: { ...EMPTY_DIRECTION, options: [], seen: [] },
     specs: [],
     specIndex: -1,
     artifact: null,

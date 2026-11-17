@@ -98,7 +98,8 @@ await page.locator('.v0-compose textarea').fill('And the hero buttons?');
 await page.locator('.v0-compose .sb-btn.is-primary').click();
 await page.waitForFunction(() => document.querySelectorAll('.v0-card .v0-turn').length >= 2, null, { timeout: 8000 });
 out('second png request thumb: ' + (critiques.at(-1).thumb ? 'sent' : 'not sent') + ', summary: ' + (critiques.at(-1).summary || '').slice(0, 60));
-// reload keeps everything
+// reload keeps everything that was saved (the header says when: a save waits at most 1.5 s)
+await page.waitForFunction(() => !/Saving/.test(document.querySelector('.v0-save')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForSelector('img.v0-image', { timeout: 15000 });
 out('after reload: cards=' + (await page.locator('.v0-card').count()) + ' url=' + page.url());

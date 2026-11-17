@@ -67,7 +67,7 @@ console.log('=== shapes ===');
 
 console.log('\n=== fonts ===');
 {
-  ok('the stylesheet asks for each family with its own axes', V.fontStylesheet(['Instrument Serif', 'Inter', 'Nope']) === 'https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400..700&display=swap');
+  ok('the stylesheet asks for each family with its own axes', V.fontStylesheet(['Instrument Serif', 'Inter', 'Nope']) === 'https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@100..900&display=swap');
   ok('no known fonts, no stylesheet', V.fontStylesheet(['Nope']) === null);
   ok('a stack falls back by kind', V.fontStack('Fraunces').includes('serif') && V.fontStack('Inter').includes('sans-serif'));
   ok('every font has a note for the model', V.FONTS.every((f) => f.note.length > 8));
@@ -133,6 +133,7 @@ console.log('\n=== the renderer ===');
   ok('every section is marked with its id', spec.sections.every((s) => r.html.includes(`data-ux-section="${s.id}"`)));
   ok('elements say which field they show', r.html.includes('data-ux-path="title"') && r.html.includes('data-ux-path="groups.0.items.0.name"'));
   ok('one h1', (r.html.match(/<h1/g) || []).length === 1);
+  ok('form fields carry no inline style of their own', !/<(input|select|textarea)[^>]*\sstyle=/.test(r.html));
   ok('every input has a label pointing at it', [...r.html.matchAll(/<input id="([^"]+)"/g)].every((m) => r.html.includes(`for="${m[1]}"`)));
   ok('images come from the moodboard', r.html.includes('https://images.example.org/a1.jpg') && !r.html.includes('r1.jpg'));
   ok('a used image is credited on the page', r.credits.length === 1 && r.html.includes('class="credits"') && r.html.includes('A. Photographer'));
@@ -476,6 +477,124 @@ console.log('\n=== how the moodboard searches ===');
   const many = Array.from({ length: 170 }, (_, i) => ({ provider: 'openverse', providerId: `m${i}`, url: `https://x.org/m${i}.jpg`, category: 'imagery', query: 'q', state: i < 5 ? 'kept' : i < 40 ? 'rejected' : 'proposed' }));
   const board = V.normalizeMoodboard({ refs: many });
   ok('a full board never lets go of a kept image', board.refs.length === 160 && board.refs.filter((x) => x.state === 'kept').length === 5 && board.refs.filter((x) => x.state === 'rejected').length === 25, J({ n: board.refs.length, kept: board.refs.filter((x) => x.state === 'kept').length }));
+}
+
+console.log('\n=== art direction ===');
+{
+  const mk = (o) => V.normalizeBrief({ pageType: 'website', platform: 'web', ...o }, new Set());
+  const cafe = mk({ objective: 'Fill weekday mornings at a neighbourhood coffee bar.', audience: 'Commuters nearby', personality: ['warm', 'honest', 'unhurried'], visualDirection: 'Morning light, wood, ceramics, handmade', palette: [{ hex: '#f6f1e9', role: 'background' }, { hex: '#2a2420', role: 'text' }, { hex: '#6b3e1f', role: 'accent' }, { hex: '#ffffff', role: 'accent-text' }], typography: { display: 'Fraunces', body: 'Inter' } });
+  const clinic = mk({ objective: 'Let patients book appointments', audience: 'Patients of all ages', personality: ['clear', 'kind', 'trustworthy'], visualDirection: 'Accessible, plain, high contrast', palette: [{ hex: '#ffffff', role: 'background' }, { hex: '#0b0c0c', role: 'text' }, { hex: '#005eb8', role: 'accent' }, { hex: '#ffffff', role: 'accent-text' }], typography: { display: 'Public Sans', body: 'Public Sans' } });
+  const bar = mk({ objective: 'Fill late sets at a jazz and cocktail bar', audience: 'Music lovers after dinner', personality: ['intimate', 'moody'], visualDirection: 'Low light, dark, brass', palette: [{ hex: '#12151c', role: 'background' }, { hex: '#f1ece2', role: 'text' }, { hex: '#e0a43c', role: 'accent' }, { hex: '#12151c', role: 'accent-text' }], typography: { display: 'Bodoni Moda', body: 'Inter' } });
+
+  ok('twelve visual languages, each a whole system', V.LANGUAGES.length === 12 && V.LANGUAGES.every((l) => l.display.every((f) => V.knownFont(f)) && l.body.every((f) => V.knownFont(f) && !V.knownFont(f).displayOnly)));
+  const d = V.proposeDirections({ brief: cafe });
+  ok('three directions, each a different language', d.length === 3 && new Set(d.map((x) => x.language)).size === 3, J(d.map((x) => x.language)));
+  ok('the first is the faithful reading: the brief’s palette and type exactly as approved', d[0].tokens.colors.accent === '#6b3e1f' && d[0].tokens.colors.background === '#f6f1e9' && d[0].tokens.fonts.display === 'Fraunces' && d[0].language === 'craft', J(d[0].tokens));
+  ok('the three are far apart (each pair at least a third different)', d.every((a, i) => d.every((b, j) => i >= j || V.directionDistance(a, b) >= 0.33)), J(d.map((a) => d.map((b) => V.directionDistance(a, b)))));
+  ok('the same brief always gives the same three', J(V.proposeDirections({ brief: cafe }).map((x) => [x.language, x.tokens.fonts.display])) === J(d.map((x) => [x.language, x.tokens.fonts.display])));
+  ok('different briefs lead with different languages', V.proposeDirections({ brief: clinic })[0].language === 'civic' && V.proposeDirections({ brief: bar })[0].language === 'night');
+  ok('a language wrong for the brief is never offered (after dark for a clinic)', !V.proposeDirections({ brief: clinic }).some((x) => x.language === 'night'));
+  const again = V.proposeDirections({ brief: cafe, round: 1, seen: d.map((x) => x.language) });
+  ok('asking again shows three new languages', again.every((x) => !d.some((y) => y.language === x.language)), J(again.map((x) => x.language)));
+  const said = V.proposeDirections({ brief: cafe, notes: 'darker, like an evening bar, no serifs', avoid: 'rounded corners' });
+  ok('the designer’s words lead: a dark ground, sans headlines, square corners, the language they point at', said[0].language === 'night' && V.isDark(said[0].tokens.colors.background) && said.every((x) => V.knownFont(x.tokens.fonts.display).kind !== 'serif' && x.tokens.radius === 'none'), J(said.map((x) => [x.language, x.tokens.fonts.display, x.tokens.radius])));
+  ok('…and every option says it heard them', said.every((x) => x.rationale.some((r) => /From your notes/.test(r))));
+  ok('an accent named in the notes is used', V.proposeDirections({ brief: cafe, notes: 'use #c4421a' }).every((x) => x.tokens.colors.accent === '#c4421a' || V.hslOf(x.tokens.colors.accent)[0] === V.hslOf('#c4421a')[0] || x.language !== 'craft'));
+  const base = { ...d[1], locks: ['palette', 'type'] };
+  const kept = V.proposeDirections({ brief: cafe, base, round: 1, seen: d.map((x) => x.language) });
+  ok('locked colours and type survive asking again', kept.every((x) => J(x.tokens.colors) === J(base.tokens.colors) && J(x.tokens.fonts) === J(base.tokens.fonts) && x.look.ratio === base.look.ratio && J(x.locks) === J(['palette', 'type'])), J(kept.map((x) => x.tokens.fonts)));
+  ok('…while what is not locked still changes', new Set(kept.map((x) => x.look.grid + x.look.containers)).size > 1);
+  const revised = V.reviseDirection(base, cafe, 'more like a printed newspaper');
+  ok('a direction revised in words keeps its locks', J(revised.tokens.colors) === J(base.tokens.colors) && revised.language === 'broadsheet', revised.language);
+  // what a spec does when a patch reaches a locked decision
+  const spec0 = V.normalizeSpec({ ...SPEC, tokens: d[0].tokens, look: d[0].look }, board);
+  ok('a token patch to locked colours is caught', J(V.lockedChanges(spec0, { op: 'tokens', tokens: { colors: { accent: '#000000' } } }, ['palette'])) === J(['palette']));
+  ok('…the same value is no change', V.lockedChanges(spec0, { op: 'tokens', tokens: { colors: { accent: spec0.tokens.colors.accent } } }, ['palette']).length === 0);
+  ok('…a look patch to a locked grid is caught; an unlocked one is not', J(V.lockedChanges(spec0, { op: 'look', look: { grid: 'swiss' } }, ['layout'])) === J(['layout']) && V.lockedChanges(spec0, { op: 'look', look: { grid: 'swiss' } }, ['palette']).length === 0);
+  // the model's words laid over the engine's three: nothing outside the rules reaches them
+  const ask = { brief: cafe, notes: '', avoid: '', base: { ...d[0], locks: ['type'] } };
+  const opts = V.proposeDirections(ask);
+  const written = V.parseDirections({ directions: [{ candidate: 1, name: 'Morning ledger', concept: 'A printed ledger of mornings.', fonts: { display: 'Comic Sans', body: 'Anton' }, language: 'night' }, { candidate: 2, name: 'Long table', fonts: { display: 'Syne', body: 'Anton' } }, { candidate: 9 }] }, ask, opts);
+  ok('the model’s names and concepts are used', written[0].name === 'Morning ledger' && written[0].concept.startsWith('A printed ledger') && written[0].source === 'model');
+  ok('…a font off the list, a display face as body text, or a locked type is never applied', J(written[0].tokens.fonts) === J(opts[0].tokens.fonts) && J(written[1].tokens.fonts) === J(opts[1].tokens.fonts), J(written.map((x) => x.tokens.fonts)));
+  ok('…and a language is not swapped unless the designer asked', written[0].language === opts[0].language);
+  ok('a stored direction comes back whole; a made-up language does not', V.normalizeDirection(J(d[2]) && JSON.parse(J(d[2])))?.language === d[2].language && V.normalizeDirection({ ...d[2], language: 'vaporwave' }) === null);
+  const st = V.normalizeDirectionState({ options: [d[0], { language: 'nope' }], chosen: d[1], approved: true, notes: 'x'.repeat(5000), seen: ['craft', 'nope'] });
+  ok('direction state is held to its shape', st.options.length === 1 && st.chosen.language === d[1].language && st.approved && st.notes.length === 1200 && J(st.seen) === J(['craft']));
+  ok('the generator is told the direction, its variants, and what to refuse', (() => { const t = V.generateSystem(cafe, d[0]); return t.includes('THE APPROVED ART DIRECTION') && t.includes(d[0].concept) && t.includes('do not write "tokens"') && t.includes('stock phrases'); })());
+  const gen = V.parseGenerate({ title: 'Halcyon', tokens: { colors: { accent: '#ff00ff' } }, sections: SPEC.sections }, cafe, board, 2, 'r', d[1]);
+  ok('a generated spec takes the direction’s tokens and look, whatever the model wrote', gen.tokens.colors.accent === d[1].tokens.colors.accent && gen.look.language === d[1].language && J(gen.look) === J(d[1].look), J(gen.tokens.colors));
+  ok('…and is planned: every content section on a ground, with its spacing', gen.sections.every((x) => x.tone && x.pad));
+}
+
+console.log('\n=== the look, drawn ===');
+{
+  const brief = V.normalizeBrief({ pageType: 'website', objective: 'Sell festival tickets', personality: ['bold', 'loud'], visualDirection: 'Big type, colour', palette: [{ hex: '#ffffff', role: 'background' }, { hex: '#111111', role: 'text' }, { hex: '#ff4b1f', role: 'accent' }, { hex: '#ffffff', role: 'accent-text' }], typography: { display: 'Archivo', body: 'Inter' } }, new Set());
+  const dirs = V.proposeDirections({ brief });
+  const sheets = dirs.map((x) => V.renderDesign(V.planLayout(V.normalizeSpec({ ...SPEC, tokens: x.tokens, look: x.look }, board)), board.refs).css);
+  ok('three directions, three different stylesheets', new Set(sheets).size === 3);
+  const poster = V.planLayout(V.normalizeSpec({ ...SPEC, tokens: dirs[0].tokens, look: dirs[0].look }, board));
+  const r = V.renderDesign(poster, board.refs);
+  ok('a poster look sets capitals, a marquee and colour bands', dirs[0].language === 'poster' && r.css.includes('text-transform:uppercase') && r.html.includes('class="marquee"') && /tone-(accent|alt|invert|accent2)/.test(r.html));
+  ok('…the marquee is decoration, hidden from screen readers', /<div class="marquee" aria-hidden="true">/.test(r.html));
+  ok('emphasis marks become emphasis; never in an attribute', V.renderDesign(V.normalizeSpec({ ...SPEC, title: 'A *slow* page', sections: [{ id: 'h', kind: 'hero', variant: 'statement', content: { title: 'Coffee for the *slow* part' } }] }, board), board.refs).html.includes('<em class="em">slow</em>') && V.renderDesign(V.normalizeSpec({ ...SPEC, title: 'A *slow* page', sections: [{ id: 'h', kind: 'hero', variant: 'statement', content: { title: 'x' } }] }, board), board.refs).html.includes('<title>A slow page</title>'));
+  const grounds = V.grounds({ background: '#f6f1e9', surface: '#fffaf3', text: '#2a2420', muted: '#6d6156', accent: '#e8a33d', accentText: '#2a2620', line: '#e4d8c8' }, '#3f45a6');
+  const { contrastRatio: cr } = await import('./.tmp/ux-under-test.mjs');
+  ok('on every ground a section can sit on, text and muted text read (7:1 and 4.5:1)', Object.values(grounds).every((g) => cr(g.text, g.bg) >= 4.5 && cr(g.muted, g.bg) >= 4.5 && cr(g.ink, g.bg) >= 4.5 && cr(g.btnFg, g.btnBg) >= 4.5), J(Object.fromEntries(Object.entries(grounds).map(([k, g]) => [k, [cr(g.text, g.bg).toFixed(1), cr(g.muted, g.bg).toFixed(1), cr(g.btnFg, g.btnBg).toFixed(1)]]))));
+  ok('…and shapes are drawn in inks that show on it', Object.values(grounds).every((g) => g.inks.every((i) => cr(i, g.bg) >= 1.6)));
+  ok('…and a card on any ground keeps its text readable', [grounds, V.grounds({ background: '#14161a', surface: '#1d2026', text: '#f2f0ea', muted: '#a8a49a', accent: '#d9b25f', accentText: '#14161a', line: '#2c3038' }, '#3f7c85')].every((gs) => Object.values(gs).every((g) => cr(g.text, g.card) >= 4.5 && cr(g.muted, g.card) >= 4.5)), J(Object.values(grounds).map((g) => [g.card, cr(g.text, g.card).toFixed(2)])));
+  const classic = V.normalizeSpec(SPEC, board);
+  ok('a spec from before looks is drawn with the classic look', classic.look.language === 'classic' && V.renderDesign(classic, board.refs).html.includes('look-classic'));
+  const plan = V.planLayout(V.normalizeSpec({ ...SPEC, look: { ...dirs[0].look }, tokens: dirs[0].tokens, sections: [
+    { id: 'nav', kind: 'nav', content: { brand: 'B', links: [] } },
+    { id: 'f1', kind: 'features', variant: 'grid', content: { items: [{ title: 'a' }, { title: 'b' }] } },
+    { id: 'f2', kind: 'features', variant: 'grid', content: { items: [{ title: 'a' }, { title: 'b' }] } },
+    { id: 'f3', kind: 'features', variant: 'grid', fixed: true, content: { items: [{ title: 'a' }, { title: 'b' }] } },
+    { id: 'c', kind: 'cta', variant: 'image', images: ['openverse:a1'], content: { title: 'Go', primary: 'Go' } },
+  ] }, board));
+  const v = Object.fromEntries(plan.sections.map((x) => [x.id, x.variant]));
+  ok('the planner never builds two neighbours the same way', v.f1 !== v.f2, J(v));
+  ok('…leaves what the designer fixed alone', v.f3 === 'grid');
+  ok('…and never drops a picture a section carries', v.c === 'image');
+  const tonePatch = V.applyPatch(plan, { op: 'tone', sectionId: 'f1', tone: 'invert', summary: 'Dark band' }, board);
+  ok('a tone patch sets one section’s ground and marks it the designer’s', tonePatch.ok && tonePatch.spec.sections.find((x) => x.id === 'f1').tone === 'invert' && tonePatch.spec.sections.find((x) => x.id === 'f1').fixed === true);
+  const lookPatch = V.applyPatch(plan, { op: 'look', look: { grid: 'swiss', motifs: ['numbering', 'sparkles'] }, summary: 'Swiss' }, board);
+  ok('a look patch changes only the look, held to its values', lookPatch.ok && lookPatch.spec.look.grid === 'swiss' && J(lookPatch.spec.look.motifs) === J(['numbering']) && J(lookPatch.spec.sections) === J(plan.sections));
+  ok('fonts: a display-only face is never body text; weights are the family’s own', V.bodyFont('Anton') === V.DEFAULT_BODY && V.nearestWeight('Instrument Serif', 800) === 400 && V.nearestWeight('Archivo', 950) === 900 && V.nearestWeight('Libre Baskerville', 600) === 700);
+}
+
+console.log('\n=== looking at the drawn page ===');
+{
+  const spec = V.planLayout(V.normalizeSpec({ ...SPEC, look: V.proposeDirections({ brief: V.normalizeBrief({ pageType: 'website', objective: 'x', personality: ['warm'], visualDirection: 'handmade cafe', palette: [], typography: { display: 'Fraunces', body: 'Inter' } }, new Set()) })[0].look }, board));
+  const audit = (o = {}) => V.normalizeAudit({ width: 390, viewport: 844, height: 6000, overflowX: 0, bodySize: 17, sections: [], headings: [{ level: 1, size: 48, lines: 3, width: 350, section: spec.sections[1].id, path: 'title', text: 'Hi' }], contrast: [], targets: [], images: [], overflow: [], measure: [], style: { gradients: 0, shadows: 0, roundedBoxes: 0, trackedCaps: 0, centred: 0, blocks: 20, emoji: 0, icons: 0, families: {} }, ...o });
+  ok('an audit from the frame is held to its shape', V.normalizeAudit({ width: 'x' }) === null && audit({ contrast: Array(99).fill({ ratio: 2 }) }).contrast.length === 40);
+  const clean = V.evaluateDesign(spec, { desktop: audit({ width: 1280 }), phone: audit() });
+  ok('a page that works has nothing to fix', clean.quality === 100 && !clean.findings.some((f) => f.severity !== 'low'), J(clean.findings));
+  const hero = spec.sections.find((x) => x.kind === 'hero');
+  const over = V.evaluateDesign(spec, { phone: audit({ overflow: [{ section: hero.id, path: 'title', by: 40, tag: 'h1' }] }) });
+  ok('a headline wider than the phone is serious, and fixed by stepping the type scale down', over.findings[0].severity === 'high' && over.findings[0].fix?.op === 'look' && over.findings[0].fix.look.ratio < spec.look.ratio);
+  const blocked = V.evaluateDesign(spec, { phone: audit({ overflow: [{ section: hero.id, path: 'title', by: 40, tag: 'h1' }] }) }, ['type']);
+  ok('…unless the designer locked the type: then it is said, not done', !blocked.findings[0].fix && /locked/.test(blocked.findings[0].blocked));
+  const banded = spec.sections.find((x) => x.tone && x.tone !== 'base');
+  const low = V.evaluateDesign(spec, { desktop: audit({ width: 1280, contrast: [{ section: banded.id, path: 'title', ratio: 2.1, need: 4.5, size: 16, text: 'x' }] }) });
+  ok('text that fails on a coloured band moves the section to the page’s own ground', low.findings[0].kind === 'contrast' && low.findings[0].fix?.op === 'tone' && low.findings[0].fix.tone === 'base');
+  const img = V.evaluateDesign(spec, { desktop: audit({ width: 1280, images: [{ section: spec.sections[1].id, path: 'images.0', ok: false }] }), phone: audit({ images: [{ section: spec.sections[1].id, path: 'images.0', ok: false }] }) });
+  ok('a picture that did not load is said once, and never taken away without asking', img.findings.filter((f) => f.kind === 'image').length === 1 && img.findings.find((f) => f.kind === 'image').manual && !V.fixesFor(img).some((f) => f.patch.op === 'images'));
+  const flat = V.evaluateDesign(spec, { desktop: audit({ width: 1280, headings: [{ level: 1, size: 30, lines: 1, section: hero.id }] }) });
+  ok('a headline barely bigger than the text is a missing hierarchy, fixed by a larger scale', flat.findings.some((f) => f.kind === 'hierarchy' && f.fix?.look?.ratio > spec.look.ratio));
+  const cl = V.clichesIn(V.normalizeSpec({ ...SPEC, sections: [{ id: 'h', kind: 'hero', content: { title: 'Unlock seamless coffee', subtitle: 'Welcome to the future' } }] }));
+  ok('stock phrases are found where they are', J(cl.map((c) => c.phrase)) === J(['unlock', 'seamless', 'welcome to']) && cl[0].path === 'title');
+  const classic = V.normalizeSpec(SPEC, board);
+  const g1 = V.evaluateDesign(classic, {}).distinctiveness;
+  const g2 = V.evaluateDesign(spec, {}).distinctiveness;
+  ok('a page with no art direction reads as more generic than one with it, with reasons', g1 < g2 && V.genericSignals(classic).some((x) => /No art direction/.test(x.reason)), `${g1} vs ${g2}`);
+  const many = V.fixesFor({ findings: [
+    { id: '1', severity: 'high', fix: { op: 'look', look: { ratio: 1.3 } } }, { id: '2', severity: 'medium', fix: { op: 'look', look: { ratio: 1.5 } } },
+    { id: '3', severity: 'low', fix: { op: 'variant', sectionId: 'a', variant: 'x' } }, { id: '4', severity: 'high', fix: { op: 'tone', sectionId: 'a', tone: 'base' } },
+  ] });
+  ok('one round fixes the serious first, one change to the look and one per section', J(many.map((f) => f.finding.id)) === J(['1', '4']));
+  ok('revisions are bounded', V.MAX_REVISION_ROUNDS === 2);
+  ok('the audit is one valid script, inside the inspector', (() => { try { new Function(V.AUDIT_SOURCE); return V.INSPECTOR_SOURCE.includes('__uxv0Audit') && V.INSPECTOR_SOURCE.includes("m.type === 'audit'"); } catch { return false; } })());
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

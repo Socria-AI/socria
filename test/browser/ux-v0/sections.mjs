@@ -31,7 +31,11 @@ const PALETTES = {
   ochre: { background: '#fffaf0', surface: '#ffffff', text: '#2a2620', muted: '#77706a', accent: '#e8a33d', accentText: '#ffffff', line: '#efe6d6' },
   night: { background: '#14161a', surface: '#1d2026', text: '#f2f0ea', muted: '#a8a49a', accent: '#d9b25f', accentText: '#14161a', line: '#2c3038' },
 };
-const RUNS = (process.env.RUNS || 'editorial:roast,bold:roast,warm:roast,technical:roast,minimal:roast,editorial:ochre,bold:ochre,warm:night').split(',').map((x) => x.split(':'));
+// the classic styles, then every visual language (look:<id>) — each section on a ground of its own, so every tone is drawn
+const PALS = ['roast', 'ochre', 'night'];
+const LOOKS = V.LANGUAGES.map((l, i) => `look-${l.id}:${PALS[i % 3]}`);
+const RUNS = (process.env.RUNS || ['editorial:roast,bold:roast,warm:roast,technical:roast,minimal:roast,editorial:ochre,bold:ochre,warm:night', ...LOOKS].join(',')).split(',').map((x) => x.split(':'));
+const SAMPLE = V.normalizeBrief({ pageType: 'website', objective: 'A sample', personality: ['warm'], palette: [], typography: { display: 'Fraunces', body: 'Inter' } }, new Set());
 let tokens;
 const b = await chromium.launch();
 const ctx = await b.newContext();
@@ -43,13 +47,23 @@ page.on('pageerror', (e) => errs.push(e.message));
 const report = [];
 let checked = 0;
 for (const [style, pal] of RUNS) {
-tokens = { colors: PALETTES[pal], fonts: { display: 'Instrument Serif', body: 'Inter' }, scale: 'comfortable', radius: 'soft', style, imageTreatment: 'natural' };
+let look;
+if (style.startsWith('look-')) {
+  const d = V.buildDirection(V.languageOf(style.slice(5)), SAMPLE, { seed: 7, faithful: false });
+  tokens = { ...d.tokens, colors: PALETTES[pal] };
+  look = { ...d.look, accent2: d.look.accent2 ? '#3f7c85' : '' };
+} else {
+  tokens = { colors: PALETTES[pal], fonts: { display: 'Instrument Serif', body: 'Inter' }, scale: 'comfortable', radius: 'soft', style, imageTreatment: 'natural' };
+  look = undefined;
+}
+let vi = 0;
 for (const def of V.LIBRARY) {
   for (const variant of def.variants) {
+    const tone = look ? V.TONES[vi++ % V.TONES.length] : undefined;
     const app = !def.pages.includes('website');
     const wantImgs = def.kind === 'gallery' ? 4 : def.images[1] > 0 ? 1 : 0;
-    const sec = { id: 's', kind: def.kind, variant, content: contentFor(def), images: refs.slice(0, wantImgs).map((r) => r.id) };
-    const raw = { title: 'Check', pageType: app ? 'app-screen' : 'website', platform: 'web', tokens, sections: app && def.kind !== 'app-nav' ? [{ id: 'nav', kind: 'app-nav', variant: 'topbar', content: { brand: 'Studio', items: ['Today', 'Classes', 'Profile'] }, images: [] }, sec] : [sec] };
+    const sec = { id: 's', kind: def.kind, variant, content: contentFor(def), images: refs.slice(0, wantImgs).map((r) => r.id), tone };
+    const raw = { title: 'Check', pageType: app ? 'app-screen' : 'website', platform: 'web', tokens, look, sections: app && def.kind !== 'app-nav' ? [{ id: 'nav', kind: 'app-nav', variant: 'topbar', content: { brand: 'Studio', items: ['Today', 'Classes', 'Profile'] }, images: [] }, sec] : [sec] };
     const spec = V.normalizeSpec(raw, { refs, seen: refs.map((r) => r.id), queries: [], palettes: [], type: [] });
     const tag = `${style}:${pal} ${def.kind}/${variant}`;
     if (!spec || !spec.sections.some((x) => x.kind === def.kind)) { report.push(`${tag}: did not survive normalisation`); continue; }
