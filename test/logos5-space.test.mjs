@@ -323,7 +323,7 @@ console.log('\n=== Logos 6: an element made in the conversation is used where it
   ok('never scaled to fit: full size, scrolling inside the card when taller, never widening its column', /\.ls-live \{ max-height: 560px; overflow: auto; contain: inline-size; \}/.test(css) && !/\.ls-live[^{]*\{[^}]*zoom/.test(css) && /\.ls:not\(\.is-phone\) \.ls-col\.is-made:has\(\.ls-made\.is-live\) \{ width: 400px; \}/.test(css));
   ok('the reply under it keeps to words: its Keep and Edit are on the element’s card', /\.ls-bub\.has-hero \.ln-keep-row \{ display: none; \}/.test(css));
   const app = read('components/LogosApp.tsx');
-  ok('the app gives each element card the element live (as it now stands, if kept), what is done with it kept, and Edit', /live: \(\s*<InlineBlock[\s\S]{0,260}host=\{\{ state, live: true, resolve: \(n: number\) => resolveInline\(msg, n\), \.\.\.\(!togetherReadOnly \? \{ onState: \(n: number, st: InlineState\) => keepInline\(msg, n, st\) \} : \{\}\)(?:, scope)? \}\}/.test(app) && /onEdit: \(\) => \{\s*editInline\(msg, el\.n, el\.spec\);/.test(app) && /\.\.\.\(c\.live \? \{ live: c\.live \} : \{\}\)/.test(app));
+  ok('the app gives each element card the element live (as it now stands, if kept), what is done with it kept, and Edit', /live: \(\s*<InlineBlock[\s\S]{0,260}host=\{\{ state, live: true, resolve: \(n: number\) => resolveInline\(msg, n\), \.\.\.\(!togetherReadOnly \? \{ onState: \(n: number, st: InlineState\) => keepInline\(msg, n, st\) \} : \{\}\)(?:, scope)?(?:, id: msg\.id, fresh)? \}\}/.test(app) && /onEdit: \(\) => \{\s*editInline\(msg, el\.n, el\.spec\);/.test(app) && /\.\.\.\(c\.live \? \{ live: c\.live \} : \{\}\)/.test(app));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

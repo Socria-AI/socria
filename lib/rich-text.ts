@@ -29,7 +29,7 @@ function uiBlock(body: string, n: number): { kind: 'ui'; spec: InlineSpec | null
 
 /** One run of inline text, and what it is. */
 export interface Inline {
-  kind: 'text' | 'em' | 'strong' | 'strong-em' | 'code' | 'link';
+  kind: 'text' | 'em' | 'strong' | 'strong-em' | 'code' | 'link' | 'vis';
   text: string;
   /** link: where it goes — http(s) or mailto only, never anything a click could run */
   href?: string;
@@ -283,7 +283,30 @@ export function bareUrlEnd(url: string): string {
   return u;
 }
 
+/**
+ * WHERE A REPLY POINTS (Logos 6, lib/visual/actions.ts): [words](vis:highlight/curve:demand) — a marker on its own
+ * words that lights a part of a picture as they are read. Read on every surface, so its syntax is never shown: where
+ * nothing can be pointed at, it is drawn as its words.
+ */
+export const VIS_LINK = /\[([^\]\n]{1,200})\]\((vis:[^\s)]{1,240})\)/g;
+/** A reply's words with its markers as plain words: for copying, reading aloud, previews, search. */
+export const withoutMarkers = (text: string): string => String(text ?? '').replace(VIS_LINK, '$1');
+
 function linksThenMarks(text: string, links: boolean): Inline[] {
+  if (text.includes('](vis:')) {
+    const out: Inline[] = [];
+    let at = 0;
+    for (const m of text.matchAll(VIS_LINK)) {
+      const i = m.index ?? 0;
+      if (i > at) out.push(...linksThenMarks(text.slice(at, i), links));
+      out.push({ kind: 'vis', text: stripMarks(m[1]) || m[1], href: m[2] });
+      at = i + m[0].length;
+    }
+    if (out.length) {
+      if (at < text.length) out.push(...linksThenMarks(text.slice(at), links));
+      return out;
+    }
+  }
   if (!links || (!text.includes('](') && !text.includes('://'))) return protectedMarks(text);
   type Hit = { at: number; end: number; seg: Inline };
   const hits: Hit[] = [];

@@ -55,3 +55,10 @@ export * from '@/lib/artifact-focus';
 export * from '@/lib/artifact-qa';
 // mind maps when they help: whether a line of thinking's ideas are spread across the Everything view
 export { ideasWanted, ideasWhyOf } from '@/lib/runtime/ideas-wanted';
+// visual intelligence (Logos 6): what on a picture can be pointed at, what can be done to it, a person's words about
+// it, and what Socria is told (lib/visual/*)
+export * as VE from '@/lib/visual/elements';
+export * as VA from '@/lib/visual/actions';
+export * as VI from '@/lib/visual/intent';
+export * as VC from '@/lib/visual/context';
+export { splitInline, withoutMarkers, VIS_LINK } from '@/lib/rich-text';

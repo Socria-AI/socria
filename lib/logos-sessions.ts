@@ -75,6 +75,12 @@ export interface LogosMsg {
    */
   did?: { from: string; said: string }[];
   /**
+   * What was on screen when they wrote this (lib/visual/context.ts VisNote): what was done for it (a curve
+   * highlighted, demand shifted), the part they had selected, the changes since they last wrote, a reference that
+   * fitted more than one part. Told to Socria with their words; never their words.
+   */
+  vis?: { done?: string[]; sel?: string; changes?: string[]; ask?: string; cannot?: string };
+  /**
    * What Socria's reply did, as the explanation engine planned it (lib/runtime/explain.ts ThreadNote): enum
    * codes for the moves, the rung, the question it left — kept only if the reply really asked it — and the
    * concept. How the next turn knows what was tried and what waits for an answer. Never their words.

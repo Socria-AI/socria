@@ -355,6 +355,14 @@ export function routeTurn(t: TurnInput): TurnRoute {
     reasons.push('inline:plot');
     return { intent: 'conversation', reasons, reveal: null };
   }
+  // A CHANGE TO WATCH in a model the conversation draws (Logos 6, lib/visual): a secant closing on a tangent,
+  // Riemann rectangles growing in number, demand shifting — drawn in the reply, where it plays, can be paused and
+  // replayed, and Socria can point at its parts while it explains. A simulation of the world (a projectile, a
+  // pendulum) is still made in the workspace, below.
+  if (INLINE_MOTION.test(text)) {
+    reasons.push('inline:motion');
+    return { intent: 'conversation', reasons, reveal: null };
+  }
 
   const sim = wantedSimulation(text);
   const named = readDisplayRequest(text);
@@ -443,6 +451,10 @@ export interface MapNeedInput {
    */
   drawUnasked?: boolean;
 }
+
+/** An animation of one of the models the conversation draws inline: a verb of motion and the model's own name. */
+export const INLINE_MOTION =
+  /\b(?:animat\w*|watch|approach\w*|shrink\w*|converg\w*|what happens (?:when|if|as)|make (?:it|them|the \w+) move)\b[^.?!]{0,80}\b(?:secant|tangent|riemann|rectangles|demand|supply|equilibrium|sampling distribution|limit|derivative|integral)\b|\b(?:secant|tangent|riemann|rectangles|demand|supply|sampling distribution)\b[^.?!]{0,60}\b(?:animat\w*|approach\w*|converg\w*|shift\w*|increas\w*|decreas\w*|narrow\w*|grow\w*)\b/i;
 
 export function needsMap(i: MapNeedInput): { map: boolean; why: string } {
   if (i.route.intent === 'command') return { map: false, why: 'command' };

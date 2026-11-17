@@ -134,6 +134,10 @@ import {
 } from '@/lib/runtime';
 import { runResearch } from '@/lib/core4/web-server';
 import { contentAsText, contentForCheck, contentForHistory, didLine, gateInlineBlock, sanitizeDid, sanitizeInlineState, type InlineContext } from '@/lib/inline-ui';
+import { catalogueOf, sanitizeVisNote, visNoteLine, visualBlock } from '@/lib/visual/context';
+
+/** The forms a reply can point into while it explains (lib/visual/elements.ts): offered, they bring the marker rule. */
+const VISUAL_FORMS = new Set(['graph', 'sim', 'vectors', 'trace', 'steps', 'diagram', 'sequence', 'equation']);
 import { GUEST_COOKIE, GUEST_LIMIT, guestMay } from '@/lib/guest-pass';
 import { TRIAL_ENDED_COOKIE, guestAfterTrial } from '@/lib/trial';
 import { GUEST_TURNS, GUEST_TURNS_LIMIT, guestTurnsUsed } from '@/lib/guest-limits';
@@ -465,7 +469,12 @@ export const POST = withMeter(async function POST(req: NextRequest) {
         // answer checked — in the model's copy only: one bracketed line before their words, so it is
         // read as what happened, never as what they said (lib/inline-ui.ts didLine).
         const did = m.role === 'user' ? sanitizeDid(m.did) : undefined;
-        const rendered = did && rendered0 ? `${didLine(did)}\n${rendered0}` : rendered0;
+        // …and what was on screen (lib/visual/context.ts): what was done for this message, what they selected, what
+        // changed — one more bracketed line, read as what happened, never as their words
+        const vis = m.role === 'user' ? sanitizeVisNote(m.vis) : undefined;
+        const visLine = vis ? visNoteLine(vis) : '';
+        const rendered1 = did && rendered0 ? `${didLine(did)}\n${rendered0}` : rendered0;
+        const rendered = visLine && rendered1 ? `${visLine}\n${rendered1}` : rendered1;
         const name = twoPeople && m.role === 'user' ? cleanPerson(m.by?.name) : '';
         // A turn that replies to a particular message says which, in the
         // model's copy only: one fixed-format line, quoted and clipped
@@ -1446,6 +1455,9 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       // …and how to make it understood (lib/runtime/explain.ts): read against the shape above, so nothing is said
       // twice — none for a direct answer or what is not here yet (mrMoveOf), a few lines of this turn's facts otherwise
       (mrMove === 'unseen' ? '' : renderTurnGuidance(explain, presentation, { said: { retrieval: assist.retrieval, selfExplain: assist.selfExplain } })) +
+      // …and the pictures on screen, each part by its id, and how a reply points at them while it explains
+      // (lib/visual/context.ts): only when there is a picture to point at, on screen or offered to this reply
+      visualBlock(catalogueOf(kept), (presentation.forms ?? []).some((f: string) => VISUAL_FORMS.has(f))) +
       // …and the course it is in, when one is (lib/teaching/use.ts)
       courseBlock +
       // What may be asserted on what (epistemic.ts) — then, last, what was computed.

@@ -26,6 +26,7 @@
 // person asked for depth — folds nothing. A document read in Content is not a
 // reply and is not laid out as one.
 
+import { VisRef } from '@/components/inline/VisRef';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { copyText } from '@/lib/copy-text';
 import { isTableRule, listLine, parseBlocks, splitInline, splitTableRow, stripMarks, type Block } from '@/lib/rich-text';
@@ -101,6 +102,15 @@ export function Inline({
       {splitInline(text, { code }).map((seg, i) => {
         const key = `${keyBase}-${i}`;
         if (seg.kind === 'code') return <code key={key} className="socria-code">{seg.text}</code>;
+        // words that point at the picture ([words](vis:…), lib/visual/actions.ts): a quiet control where there is a
+        // picture to point at, the words alone anywhere else
+        if (seg.kind === 'vis' && seg.href) {
+          return (
+            <VisRef key={key} words={seg.text} href={seg.href}>
+              <Body text={seg.text} math={math} cite={cite} />
+            </VisRef>
+          );
+        }
         // a link the reply wrote ([words](https://…)): http(s) and mailto only, read in lib/rich-text.ts
         if (seg.kind === 'link' && seg.href) {
           return (

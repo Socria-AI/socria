@@ -33,6 +33,11 @@ import { checkTyped, compileOver, compileOverT, curveFeatures, fitWindow, fitWin
 import { DIAGRAM_ROLE_SAID, diagramColumns, diagramFigure, linksOf, treeRows, mindRows, mindLayout, defaultFolds, REL_SAID } from '@/lib/inline-diagram';
 import { TeX } from '@/components/TeX';
 import { useMarks } from './marks';
+import { act, emphClass, noteChange, reducedMotion, select, touch, useCommand, useRegister, useVisual, type VisState } from './visual-bus';
+import { useInView, useTween } from './visual-motion';
+import { elementsOf, slug, titleOf, visualArtifact } from '@/lib/visual/elements';
+import { useParamAnimator, type ParamAnimator } from './visual-params';
+import { isApproach, tweenAt, tweenMs, type VisualAction } from '@/lib/visual/actions';
 import { copyText } from '@/lib/copy-text';
 // the one series palette (--ln-c1..6) is declared in the data display's sheet, so a chart here and
 // the same chart opened in Artifacts (components/display/DataFigure.tsx) draw their series alike
@@ -42,6 +47,13 @@ import './inline.css';
 export interface InlineHost {
   /** the reply these elements belong to (its message id): what one points at lights in the others (./marks.ts) */
   scope?: string;
+  /**
+   * The reply's own message id: each element is addressable as "<id>:<n>" (lib/visual/elements.ts) — what a reply's
+   * words, a person's request or a press points at, and what is kept for it (./visual-bus.ts). Absent: not addressable.
+   */
+  id?: string;
+  /** a reply just written: the change a graph was drawn to show plays once as it comes into view */
+  fresh?: boolean;
   /** what was done with each element, by its position in the reply */
   state?: Record<string, InlineState>;
   onState?: (n: number, s: InlineState) => void;
@@ -215,6 +227,7 @@ export class InlineSafe extends Component<{ spec: InlineSpec; children: ReactNod
 }
 
 function drawn(spec: InlineSpec, n: number, host: InlineHost | undefined, state: InlineState | undefined, setState: (s: InlineState) => void, renderInline: RenderInline) {
+  const vkey = host?.id ? `${host.id}:${n}` : undefined;
   switch (spec.type) {
     case 'chart':
       return <InlineChart spec={spec} onOpen={host?.onOpen ? () => host.onOpen!(n, spec) : undefined} />;
@@ -231,15 +244,15 @@ function drawn(spec: InlineSpec, n: number, host: InlineHost | undefined, state:
     case 'concepts':
       return <InlineConcepts spec={spec} state={state} onState={setState} onAsk={host?.live ? host?.onChoose : undefined} renderInline={renderInline} />;
     case 'sequence':
-      return <InlineSequence spec={spec} state={state} onState={setState} renderInline={renderInline} />;
+      return <InlineSequence spec={spec} state={state} onState={setState} renderInline={renderInline} vkey={vkey} />;
     case 'paths':
       return <InlinePaths spec={spec} state={state} onState={setState} onExplore={host?.onExplore ?? (host?.live ? host?.onChoose : undefined)} renderInline={renderInline} />;
     case 'decide':
       return <InlineDecide spec={spec} state={state} onState={host?.onState ? setState : undefined} onAsk={host?.onExplore ?? (host?.live ? host?.onChoose : undefined)} onOpen={host?.onOpen ? (s) => host.onOpen!(n, s) : undefined} />;
     case 'graph':
-      return <InlineGraph spec={spec} state={state} onState={setState} shared={!!host?.onState} renderInline={renderInline} scope={host?.scope} />;
+      return <InlineGraph spec={spec} state={state} onState={setState} shared={!!host?.onState} renderInline={renderInline} scope={host?.scope} vkey={vkey} fresh={host?.fresh} />;
     case 'sim':
-      return <InlineSim spec={spec} state={state} onState={setState} shared={!!host?.onState} />;
+      return <InlineSim spec={spec} state={state} onState={setState} shared={!!host?.onState} vkey={vkey} fresh={host?.fresh} />;
     case 'check':
       return (
         <div className="ln ln-check">
@@ -247,19 +260,19 @@ function drawn(spec: InlineSpec, n: number, host: InlineHost | undefined, state:
         </div>
       );
     case 'steps':
-      return <InlineSteps spec={spec} state={state} onState={setState} renderInline={renderInline} scope={host?.scope} />;
+      return <InlineSteps spec={spec} state={state} onState={setState} renderInline={renderInline} scope={host?.scope} vkey={vkey} />;
     case 'claim':
       return <InlineClaim spec={spec} state={state} onState={setState} shared={!!host?.onState} renderInline={renderInline} />;
     case 'diagram':
-      return <InlineDiagram spec={spec} state={state} onState={setState} renderInline={renderInline} onMap={host?.onMap ? () => host.onMap!(n, spec) : undefined} />;
+      return <InlineDiagram spec={spec} state={state} onState={setState} renderInline={renderInline} onMap={host?.onMap ? () => host.onMap!(n, spec) : undefined} vkey={vkey} />;
     case 'balance':
       return <InlineBalance spec={spec} renderInline={renderInline} />;
     case 'equation':
-      return <InlineEquation spec={spec} renderInline={renderInline} />;
+      return <InlineEquation spec={spec} renderInline={renderInline} vkey={vkey} />;
     case 'vectors':
-      return <InlineVectors spec={spec} state={state} onState={setState} />;
+      return <InlineVectors spec={spec} state={state} onState={setState} vkey={vkey} fresh={host?.fresh} />;
     case 'trace':
-      return <InlineTrace spec={spec} state={state} onState={setState} />;
+      return <InlineTrace spec={spec} state={state} onState={setState} vkey={vkey} />;
   }
 }
 
@@ -746,10 +759,22 @@ function InlineConcepts({
  * kept with the message), or events against their dates. An item with more to
  * say opens in place.
  */
-function InlineSequence({ spec, state, onState, renderInline }: { spec: SequenceSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline }) {
+function InlineSequence({ spec, state, onState, renderInline, vkey }: { spec: SequenceSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline; vkey?: string }) {
   const steps = spec.kind === 'steps';
   const done = new Set(state?.done ?? []);
   const picked = state?.picked;
+  // VISUAL ACTIONS: an item pointed at, or gone to (opened, when it has more to say)
+  const vis = useVisual(vkey);
+  useRegister(vkey, () => visualArtifact(vkey!, spec, state), () => ({}));
+  const rootRef = useRef<HTMLDivElement>(null);
+  useCommand(vis, ({ action }) => {
+    if (action.op === 'step' && action.step) onState({ ...state, picked: action.step - 1 });
+    else if (action.op === 'reset') onState({ ...state, picked: undefined });
+  });
+  useFocusScroll(vis, () => {
+    const id = vis.emph?.ids.find((x) => x.startsWith('item:'));
+    return id ? rootRef.current?.querySelector(`[data-vid="${id}"]`) : rootRef.current;
+  });
   const toggle = (i: number) => {
     const next = new Set(done);
     if (next.has(i)) next.delete(i);
@@ -757,13 +782,13 @@ function InlineSequence({ spec, state, onState, renderInline }: { spec: Sequence
     onState({ ...state, done: [...next].sort((a, b) => a - b) });
   };
   return (
-    <div className={`ln ln-seq is-${spec.kind}`}>
+    <div ref={rootRef} className={`ln ln-seq is-${spec.kind}${vis.emph ? ' has-vlit' : ''}`} onPointerDownCapture={() => vkey && touch(vkey)}>
       {spec.title && <p className="ln-title">{spec.title}</p>}
       <ol className="ln-seq-list">
         {spec.items.map((x, i) => {
           const open = picked === i && !!x.detail;
           return (
-            <li key={i} className={`ln-seq-item${done.has(i) ? ' is-done' : ''}${open ? ' is-open' : ''}`}>
+            <li key={i} data-vid={`item:${i + 1}`} className={`ln-seq-item${done.has(i) ? ' is-done' : ''}${open ? ' is-open' : ''}${emphClass(vis, `item:${i + 1}`)}`}>
               <span className="ln-seq-mark" aria-hidden="true">
                 {steps ? (done.has(i) ? '✓' : i + 1) : ''}
               </span>
@@ -1353,7 +1378,72 @@ type Lit = { kind: 'point'; x: number; y: number; label: string } | { kind: 'spa
 
 type Compiled = NonNullable<ReturnType<typeof compileOver>>;
 
-function InlineGraph({ spec, state, onState, shared, renderInline, scope }: { spec: GraphSpec; state?: InlineState; onState: (s: InlineState) => void; shared: boolean; renderInline: RenderInline; scope?: string }) {
+/** Artifacts whose own change has played once already on this page (a fresh reply plays it once, never again). */
+const PLAYED = new Set<string>();
+
+/** A curve's name on its equation: pressed, it is selected — "this" in their next message means it. */
+function CurveName({ name, id, vkey, selected }: { name: string; id: string; vkey?: string; selected: boolean }) {
+  if (!vkey) return <span className="ln-eq-name">{name}</span>;
+  return (
+    <button type="button" className={`ln-eq-name is-pick${selected ? ' is-vsel' : ''}`} aria-pressed={selected} title={selected ? 'Selected: ask about “this”' : `Select ${name}, then ask about “this”`} onClick={() => select(vkey, id)}>
+      {name}
+    </button>
+  );
+}
+
+/** A part pressed on a picture: selected, pressed again let go (./visual-bus.ts select). */
+const pick = (vkey: string | undefined, id: string) => vkey && select(vkey, id);
+
+/** The change an element was drawn to show, played once in a fresh reply as it comes into view (never on a reload). */
+function useAutoplay(vkey: string | undefined, fresh: boolean | undefined, has: boolean, inView: boolean, locked = false) {
+  useEffect(() => {
+    if (!has || !vkey || !fresh || PLAYED.has(vkey) || locked || !inView) return;
+    const t = setTimeout(() => {
+      if (PLAYED.has(vkey)) return;
+      PLAYED.add(vkey);
+      act(vkey, { op: 'animate', targets: [] }, 'socria');
+    }, 600);
+    return () => clearTimeout(t);
+  }, [vkey, fresh, has, inView, locked]);
+}
+
+/** A focused part brought into view (smoothly, unless motion is reduced). */
+function useFocusScroll(vis: VisState, el: () => Element | null | undefined) {
+  useEffect(() => {
+    if (!vis.emph || (vis.emph.op !== 'focus' && vis.emph.op !== 'zoom')) return;
+    el()?.scrollIntoView?.({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
+  }, [vis.emph?.n]);
+}
+
+/** Play, Pause, Replay and Reset for a model with a change to play — only what it can do, and each does it. */
+function VisPlay({ tween, anim, animate, params, values, press, locked }: { tween: { running: boolean; paused: boolean }; anim: ParamAnimator; animate?: GraphSpec['animate']; params: ParamSpec[]; values: Record<string, number>; press: (a: VisualAction) => void; locked?: boolean }) {
+  const moved = anim.last.current;
+  const mp = moved ? params.find((q) => q.name === moved.param) : null;
+  const ap = animate ? params.find((q) => q.name === animate.param) : null;
+  const changed = params.some((p) => (values[p.name] ?? p.value) !== p.value);
+  if ((!ap && !moved) || locked) return null;
+  return (
+    <div className="ln-vplay" role="group" aria-label="Play">
+      {tween.running ? (
+        <button type="button" className="ln-btn" aria-pressed={tween.paused} onClick={() => press({ op: tween.paused ? 'resume' : 'pause', targets: [] })}>
+          {tween.paused ? 'Play' : 'Pause'}
+        </button>
+      ) : (
+        <button type="button" className="ln-btn is-play" onClick={() => press({ op: moved ? 'replay' : 'animate', targets: [] })}>
+          {moved ? 'Replay' : 'Play'}
+        </button>
+      )}
+      <span className="ln-vplay-k">{moved && mp ? `${mp.label}: ${fmtWith(moved.from, mp.unit)} → ${fmtWith(moved.to, mp.unit)}` : ap && animate ? animate.label ?? `${ap.label}: ${fmtWith(ap.value, ap.unit)} → ${fmtWith(animate.to, ap.unit)}` : ''}</span>
+      {changed && !tween.running && (
+        <button type="button" className="ln-btn" onClick={() => press({ op: 'reset', targets: [] })}>
+          Reset
+        </button>
+      )}
+    </div>
+  );
+}
+
+function InlineGraph({ spec, state, onState, shared, renderInline, scope, vkey, fresh }: { spec: GraphSpec; state?: InlineState; onState: (s: InlineState) => void; shared: boolean; renderInline: RenderInline; scope?: string; vkey?: string; fresh?: boolean }) {
   const names = useMemo(() => spec.params.map((p) => p.name), [spec]);
   const marks = useMarks(scope);
   const c = useMemo(() => compileOver(spec.expr, names), [spec, names]);
@@ -1373,6 +1463,31 @@ function InlineGraph({ spec, state, onState, shared, renderInline, scope }: { sp
   const [hot, setHot] = useState<string | null>(null);
   const [probe, setProbe] = useState<{ x: number; y: number } | null>(null);
   const [drag, setDrag] = useState<string | null>(null);
+  // VISUAL ACTIONS (lib/visual, ./visual-bus.ts): what is pointed at, moved, zoomed, traced — on this graph's own model
+  const vis = useVisual(vkey);
+  const valuesRef = useRef(values);
+  valuesRef.current = values;
+  const parts = useMemo(() => elementsOf(spec), [spec]);
+  const pid = useMemo(() => {
+    const first = (re: RegExp) => parts.find((e) => re.test(e.id))?.id ?? '';
+    return {
+      curves: parts.filter((e) => e.kind === 'curve').map((e) => e.id),
+      meet: first(/^point:(?:equilibrium|mr-mc|crossing)/),
+      feat: { turning: first(/^point:turning/), root: first(/^point:root/), intercept: first(/^point:intercept/), crossing: first(/^point:(?:equilibrium|mr-mc|crossing)/), match: '' } as Record<string, string>,
+      points: parts.filter((e) => e.kind === 'point' && e.meta && 'open' in e.meta).map((e) => e.id),
+      handles: Object.fromEntries(parts.filter((e) => e.kind === 'point' && typeof e.meta?.param === 'string').map((e) => [String(e.meta!.param), e.id])) as Record<string, string>,
+      area: parts.find((e) => e.kind === 'region' && e.id !== 'region:rectangles')?.id ?? '',
+    };
+  }, [parts]);
+  useRegister(vkey, () => visualArtifact(vkey!, spec, { ...state, values: valuesRef.current }), () => valuesRef.current);
+  const [inViewRef, inView] = useInView<HTMLDivElement>();
+  const tween = useTween(inView);
+  const camera = useTween(inView);
+  const tracer = useTween(inView);
+  const [view, setView] = useState<{ x: [number, number]; y: [number, number] } | null>(null);
+  const [traced, setTraced] = useState<{ i: number; x: number } | null>(null);
+  const lastMove = useRef<{ param: string; from: number; to: number } | null>(null);
+  const handFrom = useRef<Record<string, number>>({});
   const [picked, setPicked] = useState<number | undefined>(state?.predicted);
   const [skipped, setSkipped] = useState(!!state?.skipped);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1385,7 +1500,7 @@ function InlineGraph({ spec, state, onState, shared, renderInline, scope }: { sp
   const clip = useClipId();
   const W = Math.max(240, width);
   const H = W < 420 ? 210 : 260;
-  const [x0, x1] = spec.x;
+  const [x0, x1] = view?.x ?? spec.x;
   const f = (x: number, v: Record<string, number> = values) => (c ? c.eval({ ...v, x }) : NaN);
   const curves = useMemo(() => [c, ...others.map((o) => o.c)].filter(Boolean) as Compiled[], [c, others]);
   const pointYs = (v: Record<string, number>) => [...(spec.at ?? []).map((n) => (c ? c.eval({ ...v, x: v[n] }) : NaN)), ...graphReadings(spec, v).points.map((q) => q.y)].filter(Number.isFinite);
@@ -1393,7 +1508,8 @@ function InlineGraph({ spec, state, onState, shared, renderInline, scope }: { sp
   // narrowed, when what they change takes it further
   const auto = useMemo(() => (c ? fitWindowAll(curves, [start], x0, x1, pointYs(start)) : ([-10, 10] as [number, number])), [c, curves, start, x0, x1]);
   const reach = useMemo(() => (c ? fitWindowAll(curves, [values], x0, x1, pointYs(values)) : auto), [c, curves, values, x0, x1, auto]);
-  const [y0, y1] = spec.y ?? [Math.min(auto[0], reach[0]), Math.max(auto[1], reach[1])];
+  const fitY: [number, number] = spec.y ?? [Math.min(auto[0], reach[0]), Math.max(auto[1], reach[1])];
+  const [y0, y1] = view?.y ?? fitY;
   const X = (x: number) => ((x - x0) / (x1 - x0)) * W;
   const Y = (y: number) => ((y1 - y) / (y1 - y0)) * H;
   const fit = useMemo(() => (c ? sampleCurve(c, start, x0, x1, 200) : null), [c, start, x0, x1]);
@@ -1476,12 +1592,158 @@ function InlineGraph({ spec, state, onState, shared, renderInline, scope }: { sp
   const locked = !!spec.predict && picked === undefined && !skipped;
   const save = (next: InlineState) => onState({ ...latest.current, ...next });
   const set = (name: string, v: number) => {
-    const next = { ...values, [name]: v };
+    const next = { ...valuesRef.current, [name]: v };
+    if (handFrom.current[name] === undefined) handFrom.current[name] = valuesRef.current[name] ?? start[name];
+    valuesRef.current = next;
     setValues(next);
-    // kept with the message once the hand stops, not on every pixel
+    // kept with the message once the hand stops, not on every pixel — and said once, for their next message
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => save({ values: next }), 400);
+    saveTimer.current = setTimeout(() => {
+      save({ values: next });
+      const p = spec.params.find((q) => q.name === name);
+      const from = handFrom.current[name];
+      delete handFrom.current[name];
+      if (vkey && p && from !== undefined && from !== next[name]) noteChange(vkey, `On “${titleOf(spec)}”, ${p.label} went from ${fmtVal(from)} to ${fmtVal(next[name])} (moved by them)${changeNote(next)}.`);
+    }, 400);
   };
+  /** What the model now says, beside a change: where the curves meet, the rectangles against the area, the slopes. */
+  const changeNote = (v: Record<string, number>) => {
+    const r = graphReadings(spec, v);
+    const bits = [
+      r.crossings[0] ? `; the curves meet at ${fmtPoint(r.crossings[0])}` : '',
+      r.area?.sum !== undefined ? `; ${r.area.n} rectangles total ${fmtVal(r.area.sum)} against the area ${fmtVal(r.area.value)}` : '',
+      r.chord ? `; average slope ${fmtVal(r.chord.slope)}` : '',
+      r.tangent && r.tangent.slope !== null ? `; slope at x = ${fmtVal(r.tangent.x)} is ${fmtVal(r.tangent.slope)}` : '',
+    ];
+    return bits.join('');
+  };
+  /** A parameter moved by the model's own steps (lib/visual/actions.ts tweenAt), kept when it arrives. */
+  const move = (param: string, to: number, ms?: number) => {
+    const p = spec.params.find((q) => q.name === param);
+    if (!p) return;
+    const from = valuesRef.current[param] ?? p.value;
+    const approach = isApproach(visualArtifact('g', spec, { values: valuesRef.current }), param, to);
+    lastMove.current = { param, from, to };
+    tween.start(
+      tweenMs(from, to, p, { ms }),
+      (t) => {
+        const v = tweenAt(t, from, to, p, approach);
+        valuesRef.current = { ...valuesRef.current, [param]: v };
+        setValues(valuesRef.current);
+      },
+      () => {
+        const next = { ...valuesRef.current, [param]: to };
+        valuesRef.current = next;
+        setValues(next);
+        save({ values: next });
+      }
+    );
+  };
+  /** Play the graph's own change (spec.animate) from where it starts. */
+  const play = (ms?: number) => {
+    const an = spec.animate;
+    if (!an) return;
+    const p = spec.params.find((q) => q.name === an.param);
+    if (!p) return;
+    valuesRef.current = { ...valuesRef.current, [p.name]: p.value };
+    setValues(valuesRef.current);
+    move(p.name, an.to, ms);
+  };
+  /** Where a part is now, for the camera. */
+  const whereIs = (id: string): { x: number; y: number } | null => {
+    const r = graphReadings(spec, valuesRef.current);
+    if (id === pid.meet && r.crossings[0]) return r.crossings[0];
+    const pi = pid.points.indexOf(id);
+    if (pi >= 0 && r.points[pi]) return r.points[pi];
+    const hp = Object.entries(pid.handles).find(([, v]) => v === id)?.[0];
+    if (hp) return { x: valuesRef.current[hp], y: f(valuesRef.current[hp], valuesRef.current) };
+    if (id === 'line:tangent' && r.tangent) return r.tangent;
+    const fk = Object.entries(pid.feat).find(([, v]) => v === id)?.[0];
+    const k = fk && c ? curveFeatures(c, valuesRef.current, spec.x[0], spec.x[1], [fk as Feature['kind']])[0] : null;
+    return k ?? null;
+  };
+  /** The camera to a window, eased (instantly, under reduced motion). */
+  const look = (to: { x: [number, number]; y: [number, number] } | null) => {
+    const fromV = view ?? { x: spec.x, y: fitY };
+    const goal = to ?? { x: spec.x, y: fitY };
+    camera.start(
+      650,
+      (t) => {
+        const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        const mix = (a: number, b: number) => a + (b - a) * e;
+        setView({ x: [mix(fromV.x[0], goal.x[0]), mix(fromV.x[1], goal.x[1])], y: [mix(fromV.y[0], goal.y[0]), mix(fromV.y[1], goal.y[1])] });
+      },
+      () => setView(to)
+    );
+  };
+  const exec = (a: VisualAction) => {
+    if (locked && a.op !== 'zoom' && a.op !== 'trace') return;
+    const param = a.targets.find((t) => t.startsWith('param:'))?.slice(6);
+    switch (a.op) {
+      case 'update_parameter':
+        if (param && a.to !== undefined) {
+          tween.cancel();
+          set(param, a.to);
+        }
+        break;
+      case 'animate':
+        if (param && a.to !== undefined) move(param, a.to, a.ms);
+        else play(a.ms);
+        break;
+      case 'replay':
+        if (lastMove.current) {
+          const m = lastMove.current;
+          valuesRef.current = { ...valuesRef.current, [m.param]: m.from };
+          setValues(valuesRef.current);
+          move(m.param, m.to);
+        } else play();
+        break;
+      case 'pause':
+        tween.pause();
+        break;
+      case 'resume':
+        if (tween.running) tween.resume();
+        else play();
+        break;
+      case 'reset':
+        tween.cancel();
+        valuesRef.current = { ...start };
+        setValues(valuesRef.current);
+        save({ values: { ...start } });
+        look(null);
+        break;
+      case 'zoom': {
+        const at = a.targets[0] ? whereIs(a.targets[0]) : null;
+        const k = a.k ?? 2.5;
+        const cx = at ? at.x : (spec.x[0] + spec.x[1]) / 2, cy = at ? at.y : (fitY[0] + fitY[1]) / 2;
+        const hw = (spec.x[1] - spec.x[0]) / (2 * k), hh = (fitY[1] - fitY[0]) / (2 * k);
+        look({ x: [cx - hw, cx + hw], y: [cy - hh, cy + hh] });
+        break;
+      }
+      case 'trace': {
+        const i = Math.max(0, pid.curves.indexOf(a.targets[0] ?? pid.curves[0]));
+        tracer.start(
+          2600,
+          (t) => setTraced({ i, x: spec.x[0] + (spec.x[1] - spec.x[0]) * t }),
+          () => setTimeout(() => setTraced(null), 1600)
+        );
+        break;
+      }
+    }
+  };
+  useCommand(vis, ({ action }) => exec(action));
+  // FIRST SHOWN: the change it was drawn to show plays once, in a fresh reply, when it comes into view
+  useAutoplay(vkey, fresh, !!spec.animate, inView, locked);
+  // a part focused is brought into view
+  useFocusScroll(vis, () => inViewRef.current);
+  /** A control pressed here: through the bus when it is on the page (so it is checked and said), else done here. */
+  const press = (a: VisualAction) => {
+    if (!vkey || !act(vkey, a, 'you')) exec(a);
+  };
+  const moved = lastMove.current;
+  const movedParam = moved ? spec.params.find((q) => q.name === moved.param) : null;
+  const playParam = spec.animate ? spec.params.find((q) => q.name === spec.animate!.param) : null;
+  const litSaid = vis.emph ? parts.filter((e) => vis.emph!.ids.includes(e.id)).map((e) => e.label).join(' and ') : '';
   // what changed, said once: the turning point, the average slope and where it is matched, where the curves meet
   const observe: string[] = [];
   if (reshaped && startTurn && nowTurn && (startTurn.x !== nowTurn.x || startTurn.y !== nowTurn.y)) {
@@ -1594,22 +1856,22 @@ function InlineGraph({ spec, state, onState, shared, renderInline, scope }: { sp
     readings.area && !spec.quiet ? areaSaid(readings.area) : readings.area ? `shaded from x = ${fmtVal(readings.area.from)} to x = ${fmtVal(readings.area.to)}` : '',
   ].filter(Boolean);
   return (
-    <div className="ln ln-graph" role="group" aria-label={spec.title || 'A graph you can change'}>
+    <div ref={inViewRef} className={`ln ln-graph${vis.emph ? ' has-vlit' : ''}`} role="group" aria-label={spec.title || 'A graph you can change'} onPointerDownCapture={() => vkey && touch(vkey)}>
       <p className="ln-figcap">
         <span className="ln-kind">Graph</span>
         {spec.title && <span className="ln-title">{spec.title}</span>}
       </p>
       <div className="ln-graph-head">
         <div className="ln-eqs">
-          <p className="ln-eq">
-            {spec.label && <span className="ln-eq-name">{spec.label}</span>}
+          <p className={`ln-eq${emphClass(vis, pid.curves[0])}`}>
+            {spec.label && <CurveName name={spec.label} id={pid.curves[0]} vkey={vkey} selected={vis.selected === pid.curves[0]} />}
             <i className="ln-eq-v">y</i>
             <span className="ln-eq-op">=</span>
             {segs ? <Expr segs={segs} params={spec.params} values={values} hot={hot} locked={locked} onScrub={set} onHot={setHot} /> : <code>{spec.expr}</code>}
           </p>
           {others.map((o, i) => (
-            <p key={i} className={`ln-eq ${CURVE_TONE[i + 1]}`}>
-              {o.label && <span className="ln-eq-name">{o.label}</span>}
+            <p key={i} className={`ln-eq ${CURVE_TONE[i + 1]}${emphClass(vis, pid.curves[i + 1])}`}>
+              {o.label && <CurveName name={o.label} id={pid.curves[i + 1]} vkey={vkey} selected={vis.selected === pid.curves[i + 1]} />}
               <i className="ln-eq-v">y</i>
               <span className="ln-eq-op">=</span>
               {o.segs ? <Expr segs={o.segs} params={spec.params} values={values} hot={hot} locked={locked} onScrub={set} onHot={setHot} /> : <code>{o.expr}</code>}
@@ -1646,7 +1908,15 @@ function InlineGraph({ spec, state, onState, shared, renderInline, scope }: { sp
               setHot(n);
               setProbe(null);
               moveTo(n, p.x);
-            } else probeAt(p.x);
+            } else {
+              probeAt(p.x);
+              // a press on a curve selects it (pressed again, let go): "this" in their next message means it
+              const hit = curves.findIndex((cc) => {
+                const yy = cc.eval({ ...values, x: p.x });
+                return Number.isFinite(yy) && Math.abs(Y(yy) - p.py) < 9;
+              });
+              if (hit >= 0 && pid.curves[hit]) pick(vkey, pid.curves[hit]);
+            }
           }}
           onPointerMove={(e) => {
             const p = toPlot(e);
@@ -1670,8 +1940,10 @@ function InlineGraph({ spec, state, onState, shared, renderInline, scope }: { sp
           <PlotClip id={clip} W={W} H={H} />
           <Grid x0={x0} x1={x1} y0={y0} y1={y1} X={X} Y={Y} W={W} H={H} />
           <g clipPath={`url(#${clip})`}>
-          {readings.area && (() => {
-            const a = readings.area;
+          {readings.area && (
+          <g className={`ln-vreg${emphClass(vis, readings.area.sum !== undefined && spec.area?.rects ? 'region:rectangles' : pid.area)}`}>
+          {(() => {
+            const a = readings.area!;
             const base = a.between ? curves[a.between] : null;
             const floor = (t: number) => (base ? base.eval({ ...values, x: t }) : 0);
             const clampY = (v: number) => Y(Math.max(y0 - (y1 - y0), Math.min(y1 + (y1 - y0), v)));
@@ -1727,21 +1999,23 @@ function InlineGraph({ spec, state, onState, shared, renderInline, scope }: { sp
               </g>
             );
           })()}
-          {reshaped && fit && <path className="ln-curve is-ghost" d={pathOf(fit.pts, X, Y, y0, y1)} />}
+          </g>
+          )}
+          {(reshaped || vis.compare) && fit && <path className="ln-curve is-ghost" d={pathOf(fit.pts, X, Y, y0, y1)} />}
           {reshaped &&
             others.map((o, i) => {
               const s = sampleCurve(o.c, start, x0, x1, 200);
               return s ? <path key={`g${i}`} className={`ln-curve is-ghost ${CURVE_TONE[i + 1]}`} d={pathOf(s.pts, X, Y, y0, y1)} /> : null;
             })}
-          {cur && <path className="ln-curve" d={pathOf(cur.pts, X, Y, y0, y1)} />}
+          {cur && <path className={`ln-curve${emphClass(vis, pid.curves[0])}`} d={pathOf(cur.pts, X, Y, y0, y1)} />}
           {others.map((o, i) => {
             const s = sampleCurve(o.c, values, x0, x1);
-            return s ? <path key={`c${i}`} className={`ln-curve ${CURVE_TONE[i + 1]}`} d={pathOf(s.pts, X, Y, y0, y1)} /> : null;
+            return s ? <path key={`c${i}`} className={`ln-curve ${CURVE_TONE[i + 1]}${emphClass(vis, pid.curves[i + 1])}`} d={pathOf(s.pts, X, Y, y0, y1)} /> : null;
           })}
           {c && spec.label && endLabel(c, spec.label, 'n0', '')}
           {others.map((o, i) => (o.label ? endLabel(o.c, o.label, `n${i + 1}`, CURVE_TONE[i + 1]) : null))}
           {readings.chord && (
-            <g className="ln-chord">
+            <g className={`ln-chord${emphClass(vis, 'line:secant')}`}>
               <line x1={X(readings.chord.a)} y1={Y(readings.chord.ya)} x2={X(readings.chord.b)} y2={Y(readings.chord.yb)} />
             </g>
           )}
@@ -1760,19 +2034,40 @@ function InlineGraph({ spec, state, onState, shared, renderInline, scope }: { sp
               );
             })}
           {readings.tangent && readings.tangent.slope !== null && (
-            <g className="ln-tan">
+            <g className={`ln-tan${emphClass(vis, 'line:tangent')}`}>
               <line {...through(readings.tangent.x, readings.tangent.y, readings.tangent.slope, 0.22)} />
             </g>
           )}
+          {traced && curves[traced.i] && (() => {
+            // TRACED: a point carried along the curve, its coordinates read from the curve at every frame
+            const cc = curves[traced.i];
+            const ty = cc.eval({ ...values, x: traced.x });
+            if (!Number.isFinite(ty) || ty < y0 || ty > y1) return null;
+            const right = X(traced.x) > W - 110;
+            return (
+              <g className="ln-vtrace" aria-hidden="true">
+                <circle cx={X(traced.x)} cy={Y(ty)} r={5.5} />
+                <text x={X(traced.x) + (right ? -10 : 10)} y={Math.max(14, Y(ty) - 10)} textAnchor={right ? 'end' : 'start'}>
+                  {`(${fmtVal(traced.x)}, ${fmtVal(ty)})`}
+                </text>
+              </g>
+            );
+          })()}
           </g>
           {/* a curve named at its end already stands by the axis's end: the axis is not named over it */}
           <Grid x0={x0} x1={x1} y0={y0} y1={y1} X={X} Y={Y} W={W} H={H} part="labels" xName={!spec.label && !others.some((o) => o.label)} />
           {reshaped && !spec.quiet && was.crossings.map((k, i) => (fmtPoint(k) !== fmtPoint(readings.crossings[i] ?? { x: NaN, y: NaN }) ? <circle key={`gx${i}`} className="ln-pt is-ghost" cx={X(k.x)} cy={Y(k.y)} r={4} /> : null))}
+          {vis.compare && reshaped && !spec.quiet && was.crossings[0] && fmtPoint(was.crossings[0]) !== fmtPoint(readings.crossings[0] ?? { x: NaN, y: NaN }) && (
+            <text className="ln-vbefore" x={X(was.crossings[0].x) + 8} y={Y(was.crossings[0].y) + 16}>
+              before
+            </text>
+          )}
           {reshaped && startTurn && nowTurn && (startTurn.x !== nowTurn.x || startTurn.y !== nowTurn.y) && <circle className="ln-pt is-ghost" cx={X(startTurn.x)} cy={Y(startTurn.y)} r={4} />}
           {ordered.map((k, i) => {
             const l = label(k);
             return (
-              <g key={i} className={`ln-feat is-${k.kind}`}>
+              <g key={i} className={`ln-feat is-${k.kind}${emphClass(vis, pid.feat[k.kind] ?? '')}`}>
+                {vis.emph?.ids.includes(pid.feat[k.kind] ?? '-') && <circle className="ln-vring" cx={l.px} cy={l.py} r={11} />}
                 <circle className="ln-pt" cx={l.px} cy={l.py} r={k.kind === 'turning' || k.kind === 'crossing' ? 5 : 3.5} />
                 {labelled.includes(k) && !hls.some((h) => h.kind === 'point' && Math.abs(X(h.x) - X(k.x)) < 6 && Math.abs(Y(h.y) - Y(k.y)) < 6) && (
                   <text x={l.tx} y={l.ty} textAnchor={l.anchor}>
@@ -1790,7 +2085,8 @@ function InlineGraph({ spec, state, onState, shared, renderInline, scope }: { sp
             const other = readings.points.find((o, j) => j !== i && o.x === q.x);
             const below = other ? q.y < other.y : false;
             return (
-              <g key={`p${i}`} className={`ln-mark ${q.open ? 'is-open' : 'is-filled'} ${CURVE_TONE[q.curve] ?? ''}`}>
+              <g key={`p${i}`} className={`ln-mark ${q.open ? 'is-open' : 'is-filled'} ${CURVE_TONE[q.curve] ?? ''}${emphClass(vis, pid.points[i] ?? '')}`}>
+                {vis.emph?.ids.includes(pid.points[i] ?? '-') && <circle className="ln-vring" cx={px} cy={py} r={11} />}
                 <circle cx={px} cy={py} r={q.open ? 4.6 : 4.4} />
                 {/* under the Answer Guard the marks are drawn and their coordinates are not: reading them off is theirs */}
                 {(!spec.quiet || q.label) && (
@@ -1807,7 +2103,7 @@ function InlineGraph({ spec, state, onState, shared, renderInline, scope }: { sp
             if (!Number.isFinite(y) || y < y0 || y > y1) return null;
             const p = spec.params.find((q) => q.name === n);
             return (
-              <g key={`h${n}`} className={`ln-handle${drag === n ? ' is-drag' : ''}${hot === n ? ' is-hot' : ''}${locked ? ' is-locked' : ''}`} aria-hidden="true">
+              <g key={`h${n}`} className={`ln-handle${drag === n ? ' is-drag' : ''}${hot === n ? ' is-hot' : ''}${locked ? ' is-locked' : ''}${emphClass(vis, pid.handles[n] ?? '')}`} aria-hidden="true">
                 <circle className="ln-halo" cx={X(x)} cy={Y(y)} r={14} />
                 <circle cx={X(x)} cy={Y(y)} r={6} />
                 <text x={X(x)} y={Y(y) - 12} textAnchor="middle">
@@ -1818,7 +2114,10 @@ function InlineGraph({ spec, state, onState, shared, renderInline, scope }: { sp
           })}
           {hls.map((h, i) => {
             const n = i + 1;
-            const cls = `ln-hl is-n${Math.min(4, n)}${marks.lit === n ? ' is-lit' : ''}${marks.lit && marks.lit !== n ? ' is-dim' : ''}`;
+            // lit by its number (a chip, a step) or by a visual action naming it (mark:n)
+            const pointed = vis.emph?.ids.some((x) => x.startsWith('mark:')) ? vis.emph!.ids.includes(`mark:${n}`) : null;
+            const on = marks.lit === n || pointed === true;
+            const cls = `ln-hl is-n${Math.min(4, n)}${on ? ' is-lit' : ''}${(marks.lit && marks.lit !== n) || pointed === false ? ' is-dim' : ''}`;
             const badge = (bx: number, by: number) => (
               <g
                 className="ln-hl-badge"
@@ -1901,19 +2200,53 @@ function InlineGraph({ spec, state, onState, shared, renderInline, scope }: { sp
       {rows.length > 0 && (
         <p className="ln-read ln-graph-read" aria-live="polite">
           {rows.map((r, i) => (
-            <span key={i} className={`ln-reading${r.k ? '' : ' is-note'}`}>
+            <span key={i} className={`ln-reading${r.k ? '' : ' is-note'}${r.k && vis.emph?.ids.includes(`readout:${slug(r.k) || 'value'}`) ? ' is-vlit' : ''}`}>
               {r.k && <span className="ln-k">{r.k}</span>}
               <b>{r.v}</b>
             </span>
           ))}
         </p>
       )}
+      {/* PLAY AND VIEW: only what this graph can do — its own change, put back, the whole graph again */}
+      {((spec.animate && playParam) || moved || view || vis.compare || (changed && !locked && !!vkey)) && (
+        <div className="ln-vplay" role="group" aria-label="Play and view">
+          {((spec.animate && playParam) || moved) && !locked &&
+            (tween.running ? (
+              <button type="button" className="ln-btn" aria-pressed={tween.paused} onClick={() => press({ op: tween.paused ? 'resume' : 'pause', targets: [] })}>
+                {tween.paused ? 'Play' : 'Pause'}
+              </button>
+            ) : (
+              <button type="button" className="ln-btn is-play" onClick={() => press({ op: moved ? 'replay' : 'animate', targets: [] })}>
+                {moved ? 'Replay' : 'Play'}
+              </button>
+            ))}
+          {moved && movedParam ? (
+            <span className="ln-vplay-k">{`${movedParam.label}: ${fmtWith(moved.from, movedParam.unit)} → ${fmtWith(moved.to, movedParam.unit)}`}</span>
+          ) : spec.animate && playParam ? (
+            <span className="ln-vplay-k">{spec.animate.label ?? `${playParam.label}: ${fmtWith(playParam.value, playParam.unit)} → ${fmtWith(spec.animate.to, playParam.unit)}`}</span>
+          ) : null}
+          {changed && !tween.running && !locked && (
+            <button type="button" className="ln-btn" onClick={() => press({ op: 'reset', targets: [] })}>
+              Reset
+            </button>
+          )}
+          {view && (
+            <button type="button" className="ln-btn" onClick={() => look(null)}>
+              Whole graph
+            </button>
+          )}
+          {vis.compare && reshaped && <span className="ln-vplay-k">Faint: where it started</span>}
+        </div>
+      )}
+      <p className="ln-sr" aria-live="polite">
+        {litSaid ? `Showing ${litSaid}.` : ''}
+      </p>
       {/* (a number that is in no equation — how many rectangles — has its slider, and no hint pointing at the equation) */}
       {!locked && (positions.size > 0 ? <p className="ln-hint">Drag the points along the curve.</p> : shapeParams.some((q) => inEquation.has(q.name)) ? <p className="ln-hint">Drag a number in the equation.</p> : null)}
       {spec.params.length > 0 && (
         <div className="ln-graph-vars">
           {spec.params.map((p) => (
-            <label key={p.name} className={`ln-var${hot === p.name ? ' is-hot' : ''}${!positions.has(p.name) && inEquation.has(p.name) ? ' is-dup' : ''}`}>
+            <label key={p.name} className={`ln-var${hot === p.name || vis.emph?.ids.includes(`param:${p.name}`) ? ' is-hot' : ''}${!positions.has(p.name) && inEquation.has(p.name) ? ' is-dup' : ''}`}>
               <span className="ln-var-top">
                 <span className="ln-var-k">{p.label}</span>
                 <span className="ln-var-v">{fmtWith(values[p.name] ?? p.value, p.unit)}</span>
@@ -1957,7 +2290,7 @@ function InlineGraph({ spec, state, onState, shared, renderInline, scope }: { sp
  * the sliders change what the vectors are formulas of. Everything drawn is vectorSum's — the same numbers Socria is
  * told when they ask about it.
  */
-function InlineVectors({ spec, state, onState }: { spec: VectorsSpec; state?: InlineState; onState: (s: InlineState) => void }) {
+function InlineVectors({ spec, state, onState, vkey, fresh }: { spec: VectorsSpec; state?: InlineState; onState: (s: InlineState) => void; vkey?: string; fresh?: boolean }) {
   const start = useMemo(() => Object.fromEntries(spec.params.map((p) => [p.name, p.value])), [spec]);
   const [values, setValues] = useState<Record<string, number>>(() => ({ ...start, ...(state?.values ?? {}) }));
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1971,6 +2304,21 @@ function InlineVectors({ spec, state, onState }: { spec: VectorsSpec; state?: In
     saveTimer.current = setTimeout(() => onState({ ...state, values: next }), 400);
   };
   const sum = useMemo(() => vectorSum(spec, values), [spec, values]);
+  // VISUAL ACTIONS: a force pointed at, a parameter moved by the model's own steps (./visual-params.ts)
+  const vis = useVisual(vkey);
+  const valuesRef = useRef(values);
+  valuesRef.current = values;
+  const vids = useMemo(() => elementsOf(spec).filter((e) => e.kind === 'vector').map((e) => e.id), [spec]);
+  useRegister(vkey, () => visualArtifact(vkey!, spec, { ...state, values: valuesRef.current }), () => valuesRef.current);
+  const [viewRef, inView] = useInView<HTMLDivElement>();
+  const tween = useTween(inView);
+  const anim = useParamAnimator({ params: spec.params, animate: spec.animate, values: valuesRef, setValues, save: (v) => onState({ ...state, values: v }), tween });
+  useCommand(vis, ({ action }) => anim.exec(action));
+  useAutoplay(vkey, fresh, !!spec.animate, inView);
+  useFocusScroll(vis, () => viewRef.current);
+  const press = (a: VisualAction) => {
+    if (!vkey || !act(vkey, a, 'you')) anim.exec(a);
+  };
   const [ref, width] = useWidth<HTMLDivElement>(420);
   const W = Math.max(240, Math.min(width, 520));
   const H = W < 420 ? 220 : 260;
@@ -2002,7 +2350,7 @@ function InlineVectors({ spec, state, onState }: { spec: VectorsSpec; state?: In
   const aria = [`${spec.title ?? 'Forces'}: ${sum.parts.map((q) => `${q.label} ${fmtVal(q.mag)}${u} at ${fmtVal(q.angle)} degrees`).join('; ')}`, spec.resultant ? `their sum ${fmtVal(sum.mag)}${u} at ${fmtVal(sum.angle)} degrees` : ''].filter(Boolean).join('; ');
   const balanced = spec.resultant && sum.mag < 1e-6 * Math.max(1, longest);
   return (
-    <div className="ln ln-vectors" role="group" aria-label={spec.title || 'Forces you can change'}>
+    <div ref={viewRef} className={`ln ln-vectors${vis.emph ? ' has-vlit' : ''}`} role="group" aria-label={spec.title || 'Forces you can change'} onPointerDownCapture={() => vkey && touch(vkey)}>
       <p className="ln-figcap">
         <span className="ln-kind">Forces</span>
         {spec.title && <span className="ln-title">{spec.title}</span>}
@@ -2011,8 +2359,8 @@ function InlineVectors({ spec, state, onState }: { spec: VectorsSpec; state?: In
         <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img" aria-label={aria}>
           <line className="ln-vec-axis" x1={8} y1={cy} x2={W - 8} y2={cy} />
           <line className="ln-vec-axis" x1={cx} y1={8} x2={cx} y2={H - 8} />
-          {sum.parts.map((q, i) => (Number.isFinite(q.x) && Number.isFinite(q.y) ? arrow(q.x, q.y, `is-${i % 3}`, `v${i}`, q.label) : null))}
-          {spec.resultant && !balanced && arrow(sum.x, sum.y, 'is-sum', 'sum', Math.hypot(sum.x, sum.y) * k >= 36 ? 'sum' : undefined)}
+          {sum.parts.map((q, i) => (Number.isFinite(q.x) && Number.isFinite(q.y) ? arrow(q.x, q.y, `is-${i % 3}${emphClass(vis, vids[i] ?? '')}`, `v${i}`, q.label) : null))}
+          {spec.resultant && !balanced && arrow(sum.x, sum.y, `is-sum${emphClass(vis, 'vector:sum')}`, 'sum', Math.hypot(sum.x, sum.y) * k >= 36 ? 'sum' : undefined)}
           <rect className="ln-vec-body" x={cx - 9} y={cy - 9} width={18} height={18} rx={3} />
           {spec.body && (
             <text className="ln-vec-bodyname" x={cx + 13} y={cy + 22}>
@@ -2035,6 +2383,7 @@ function InlineVectors({ spec, state, onState }: { spec: VectorsSpec; state?: In
           </span>
         )}
       </p>
+      <VisPlay tween={tween} anim={anim} animate={spec.animate} params={spec.params} values={values} press={press} />
       {spec.params.length > 0 && (
         <div className="ln-graph-vars">
           {spec.params.map((p) => (
@@ -2059,22 +2408,73 @@ function InlineVectors({ spec, state, onState }: { spec: VectorsSpec; state?: In
  * under them, and what the step did. Back and Next (or the arrow keys) move through it; nothing is computed here —
  * what they see is exactly what was written, so the gate's check of the steps is the check of the picture.
  */
-function InlineTrace({ spec, state, onState }: { spec: TraceSpec; state?: InlineState; onState: (s: InlineState) => void }) {
+function InlineTrace({ spec, state, onState, vkey }: { spec: TraceSpec; state?: InlineState; onState: (s: InlineState) => void; vkey?: string }) {
   const last = spec.steps.length - 1;
   const [at, setAt] = useState(() => Math.min(last, Math.max(0, state?.picked ?? 0)));
+  const atRef = useRef(at);
+  atRef.current = at;
   const go = (i: number) => {
     const n = Math.min(last, Math.max(0, i));
+    atRef.current = n;
     setAt(n);
     onState({ ...state, picked: n });
+  };
+  // VISUAL ACTIONS: a step gone to, the steps played one after another (each state exactly as written), cells pointed at
+  const vis = useVisual(vkey);
+  useRegister(vkey, () => visualArtifact(vkey!, spec, { ...state, picked: atRef.current }), () => ({}));
+  const [viewRef, inView] = useInView<HTMLDivElement>();
+  const [playing, setPlaying] = useState(false);
+  const player = useRef<ReturnType<typeof setInterval> | null>(null);
+  const seenRef = useRef(inView);
+  seenRef.current = inView;
+  const stopPlay = () => {
+    if (player.current) clearInterval(player.current);
+    player.current = null;
+    setPlaying(false);
+  };
+  const playFrom = (from: number) => {
+    stopPlay();
+    go(from);
+    setPlaying(true);
+    player.current = setInterval(() => {
+      if (!seenRef.current) return;
+      if (atRef.current >= last) return stopPlay();
+      go(atRef.current + 1);
+    }, reducedMotion() ? 1800 : 1300);
+  };
+  useEffect(() => () => stopPlay(), []);
+  const exec = (a: VisualAction) => {
+    if (a.op === 'step' && a.step) {
+      stopPlay();
+      go(a.step - 1);
+    } else if (a.op === 'animate' || (a.op === 'resume' && !playing)) playFrom(atRef.current >= last ? 0 : atRef.current);
+    else if (a.op === 'pause') stopPlay();
+    else if (a.op === 'replay') playFrom(0);
+    else if (a.op === 'reset') {
+      stopPlay();
+      go(0);
+    }
+  };
+  useCommand(vis, ({ action }) => exec(action));
+  // a step pointed at is the step shown
+  useEffect(() => {
+    const id = vis.emph?.ids.find((x) => x.startsWith('step:'));
+    if (id) go(Number(id.slice(5)) - 1);
+  }, [vis.emph?.n]);
+  useFocusScroll(vis, () => viewRef.current);
+  const press = (a: VisualAction) => {
+    if (!vkey || !act(vkey, a, 'you')) exec(a);
   };
   const st = spec.steps[at];
   const width = Math.max(...spec.steps.map((x) => x.cells.length), 1);
   return (
     <div
-      className={`ln ln-trace is-${spec.kind}`}
+      ref={viewRef}
+      className={`ln ln-trace is-${spec.kind}${vis.emph ? ' has-vlit' : ''}`}
       role="group"
       aria-label={spec.title || 'Step through it'}
       tabIndex={0}
+      onPointerDownCapture={() => vkey && touch(vkey)}
       onKeyDown={(e) => {
         if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
           e.preventDefault();
@@ -2092,7 +2492,7 @@ function InlineTrace({ spec, state, onState }: { spec: TraceSpec; state?: Inline
       </p>
       <div className="ln-trace-row" style={{ ['--ln-cells' as string]: String(width) }} aria-hidden="true">
         {st.cells.map((c, i) => (
-          <div key={i} className={`ln-cell${st.mark?.includes(i) ? ' is-mark' : ''}${st.done?.includes(i) ? ' is-done' : ''}`}>
+          <div key={i} className={`ln-cell${st.mark?.includes(i) ? ' is-mark' : ''}${st.done?.includes(i) ? ' is-done' : ''}${vis.emph?.ids.some((x) => x.startsWith('cell:')) ? emphClass(vis, `cell:${i}`) : ''}`}>
             <span className="ln-cell-v">{c}</span>
             <span className="ln-cell-i">{i}</span>
             <span className="ln-cell-ptr">{(st.pointers ?? []).filter((q) => q.at === i).map((q) => q.name).join(' ')}</span>
@@ -2104,6 +2504,9 @@ function InlineTrace({ spec, state, onState }: { spec: TraceSpec; state?: Inline
         <span className="ln-sr">{` The cells: ${st.cells.join(', ')}.${st.mark?.length ? ` Looking at positions ${st.mark.join(' and ')}.` : ''}${st.pointers?.length ? ` ${st.pointers.map((q) => `${q.name} at ${q.at}`).join(', ')}.` : ''}`}</span>
       </p>
       <div className="ln-trace-nav">
+        <button type="button" className="ln-btn is-play" aria-pressed={playing} onClick={() => press({ op: playing ? 'pause' : 'animate', targets: [] })}>
+          {playing ? 'Pause' : at === last ? 'Play again' : 'Play'}
+        </button>
         <button type="button" className="ln-btn" onClick={() => go(at - 1)} disabled={at === 0}>
           Back
         </button>
@@ -2174,7 +2577,7 @@ function InlineClaim({ spec, state, onState, shared, renderInline }: { spec: Cla
 
 // ── a simulation, small ──────────────────────────────────────────────
 
-function InlineSim({ spec, state, onState, shared }: { spec: SimSpec; state?: InlineState; onState: (s: InlineState) => void; shared: boolean }) {
+function InlineSim({ spec, state, onState, shared, vkey, fresh }: { spec: SimSpec; state?: InlineState; onState: (s: InlineState) => void; shared: boolean; vkey?: string; fresh?: boolean }) {
   const names = useMemo(() => spec.params.map((p) => p.name), [spec]);
   const cx = useMemo(() => compileOverT(spec.x, names), [spec, names]);
   const cy = useMemo(() => compileOverT(spec.y, names), [spec, names]);
@@ -2221,12 +2624,36 @@ function InlineSim({ spec, state, onState, shared }: { spec: SimSpec; state?: In
       return { label: ro.label, shown: Number.isFinite(v) ? fmtWith(Number(v.toFixed(ro.digits ?? 2)), ro.unit) : '—' };
     });
   const tag = (t: Record<string, number>) => spec.params.filter((p) => t[p.name] !== start[p.name] || spec.params.length === 1).slice(0, 1).map((p) => fmtWith(t[p.name], p.unit)).join(' ') || fmtWith(t[names[0]], spec.params[0].unit);
+  // VISUAL ACTIONS: the path traced (the body carried along it, at the model's own times), a parameter moved
+  const vis = useVisual(vkey);
+  const valuesRef = useRef(values);
+  valuesRef.current = values;
+  useRegister(vkey, () => visualArtifact(vkey!, spec, { ...state, values: valuesRef.current }), () => valuesRef.current);
+  const [viewRef, inView] = useInView<HTMLDivElement>();
+  const tween = useTween(inView);
+  const tracer = useTween(inView);
+  const [carried, setCarried] = useState<number | null>(null);
+  const anim = useParamAnimator({ params: spec.params, animate: spec.animate, values: valuesRef, setValues, save: (v) => save({ values: v }), tween });
+  const exec = (a: VisualAction) => {
+    if (locked) return;
+    if (a.op === 'trace') {
+      tracer.start(2400, (t) => setCarried(t), () => setTimeout(() => setCarried(null), 1600));
+      return;
+    }
+    anim.exec(a);
+  };
+  useCommand(vis, ({ action }) => exec(action));
+  useAutoplay(vkey, fresh, !!spec.animate, inView, locked);
+  useFocusScroll(vis, () => viewRef.current);
+  const press = (a: VisualAction) => {
+    if (!vkey || !act(vkey, a, 'you')) exec(a);
+  };
   const ghosts = tries.filter((t) => !same(t, values));
   const nowPath = pathAt(values);
   const endOf = (pts: Pt[]) => [...pts].reverse().find((p) => Number.isFinite(p.x) && Number.isFinite(p.y)) ?? null;
   const nowEnd = endOf(nowPath);
   return (
-    <div className="ln ln-sim" role="group" aria-label={spec.title || 'A simulation you can change'}>
+    <div ref={viewRef} className={`ln ln-sim${vis.emph ? ' has-vlit' : ''}`} role="group" aria-label={spec.title || 'A simulation you can change'} onPointerDownCapture={() => vkey && touch(vkey)}>
       {spec.title && <p className="ln-title">{spec.title}</p>}
       {spec.predict && picked === undefined && !skipped && (
         <Predict
@@ -2260,9 +2687,15 @@ function InlineSim({ spec, state, onState, shared }: { spec: SimSpec; state?: In
               </g>
             );
           })}
-          <path className="ln-curve" d={pathOf(nowPath, X, Y, y0, y1)} />
+          <path className={`ln-curve${emphClass(vis, 'path:trajectory')}`} d={pathOf(nowPath, X, Y, y0, y1)} />
           </g>
           {nowEnd && <circle className="ln-pt" cx={X(nowEnd.x)} cy={Y(nowEnd.y)} r={4.5} />}
+          {carried !== null && (() => {
+            // the body where the model puts it at that fraction of its time (the path's own samples, in time order)
+            const ok = nowPath.filter((q) => Number.isFinite(q.x) && Number.isFinite(q.y));
+            const q = ok[Math.min(ok.length - 1, Math.round(carried * (ok.length - 1)))];
+            return q ? <circle className="ln-vtrace-body" cx={X(q.x)} cy={Y(q.y)} r={6} aria-hidden="true" /> : null;
+          })()}
         </svg>
       </div>
       <div className="ln-graph-vars">
@@ -2275,6 +2708,14 @@ function InlineSim({ spec, state, onState, shared }: { spec: SimSpec; state?: In
             <input type="range" min={p.min} max={p.max} step={p.step} value={values[p.name]} disabled={locked} aria-valuetext={fmtWith(values[p.name], p.unit)} onChange={(e) => set(p.name, Number(e.target.value))} />
           </label>
         ))}
+      </div>
+      <div className="ln-vplay-row">
+        <VisPlay tween={tween} anim={anim} animate={spec.animate} params={spec.params} values={values} press={press} locked={locked} />
+        {!locked && (
+          <button type="button" className="ln-btn" onClick={() => press({ op: 'trace', targets: ['path:trajectory'] })} disabled={tracer.running}>
+            Follow the path
+          </button>
+        )}
       </div>
       {!!spec.readouts?.length && (
         <p className="ln-read" aria-live="polite">
@@ -2356,9 +2797,17 @@ function CheckBox({ part, state, onState, renderInline, kicker = 'Your turn' }: 
 
 // ── the working, with their numbers ──────────────────────────────────
 
-function InlineSteps({ spec, state, onState, renderInline, scope }: { spec: StepsSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline; scope?: string }) {
+function InlineSteps({ spec, state, onState, renderInline, scope, vkey }: { spec: StepsSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline; scope?: string; vkey?: string }) {
   const [whys, setWhys] = useState<number[]>(state?.whys ?? []);
   const marks = useMarks(scope);
+  // VISUAL ACTIONS: a line of the working pointed at (and brought into view)
+  const vis = useVisual(vkey);
+  useRegister(vkey, () => visualArtifact(vkey!, spec, state), () => ({}));
+  const rootRef = useRef<HTMLDivElement>(null);
+  useFocusScroll(vis, () => {
+    const id = vis.emph?.ids.find((x) => x.startsWith('step:'));
+    return id ? rootRef.current?.querySelector(`[data-vid="${id}"]`) : rootRef.current;
+  });
   const latest = useRef(state);
   latest.current = state;
   const toggle = (i: number) => {
@@ -2367,7 +2816,7 @@ function InlineSteps({ spec, state, onState, renderInline, scope }: { spec: Step
     onState({ ...latest.current, whys: next });
   };
   return (
-    <div className="ln ln-steps" role="group" aria-label={spec.title || 'The working'}>
+    <div ref={rootRef} className={`ln ln-steps${vis.emph ? ' has-vlit' : ''}`} role="group" aria-label={spec.title || 'The working'} onPointerDownCapture={() => vkey && touch(vkey)}>
       {spec.title && <p className="ln-title">{spec.title}</p>}
       <ol className="ln-lines">
         {spec.lines.map((l, i) => {
@@ -2377,7 +2826,8 @@ function InlineSteps({ spec, state, onState, renderInline, scope }: { spec: Step
           return (
             <li
               key={i}
-              className={[open ? 'is-open' : '', m ? `has-mark is-n${Math.min(4, m)}` : '', m && marks.lit === m ? 'is-lit' : ''].filter(Boolean).join(' ') || undefined}
+              data-vid={`step:${i + 1}`}
+              className={[open ? 'is-open' : '', m ? `has-mark is-n${Math.min(4, m)}` : '', m && marks.lit === m ? 'is-lit' : '', emphClass(vis, `step:${i + 1}`).trim()].filter(Boolean).join(' ') || undefined}
               {...(m ? { onMouseEnter: () => marks.enter(m), onMouseLeave: () => marks.leave() } : {})}
             >
               {m ? (
@@ -2422,12 +2872,16 @@ function InlineSteps({ spec, state, onState, renderInline, scope }: { spec: Step
  * its weight and line — heavy for an underlying cause, a bar for the trigger,
  * dashed for an amplifier, filled for the effect — never by colour alone.
  */
-function InlineDiagram({ spec, state, onState, renderInline, onMap }: { spec: DiagramSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline; onMap?: () => void }) {
-  if (spec.view === 'mind') return <InlineMind spec={spec} state={state} onState={onState} renderInline={renderInline} onMap={onMap} />;
-  return <InlineDiagramDrawn spec={spec} state={state} onState={onState} renderInline={renderInline} onMap={onMap} />;
+function InlineDiagram({ spec, state, onState, renderInline, onMap, vkey }: { spec: DiagramSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline; onMap?: () => void; vkey?: string }) {
+  if (spec.view === 'mind') return <InlineMind spec={spec} state={state} onState={onState} renderInline={renderInline} onMap={onMap} vkey={vkey} />;
+  return <InlineDiagramDrawn spec={spec} state={state} onState={onState} renderInline={renderInline} onMap={onMap} vkey={vkey} />;
 }
 
-function InlineDiagramDrawn({ spec, state, onState, renderInline, onMap }: { spec: DiagramSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline; onMap?: () => void }) {
+function InlineDiagramDrawn({ spec, state, onState, renderInline, onMap, vkey }: { spec: DiagramSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline; onMap?: () => void; vkey?: string }) {
+  // VISUAL ACTIONS: a part pointed at, a connection lit; a part focused is opened
+  const vis = useVisual(vkey);
+  useRegister(vkey, () => visualArtifact(vkey!, spec, state), () => ({}));
+  const nodeVid = (nid: string) => `node:${slug(nid)}`;
   const id = useId();
   const marker = `lnarrow${id.replace(/[^A-Za-z0-9_-]/g, '')}`;
   const [ref, width] = useWidth<HTMLDivElement>(600);
@@ -2438,6 +2892,12 @@ function InlineDiagramDrawn({ spec, state, onState, renderInline, onMap }: { spe
   const toggle = (nid: string) => pick(open === nid ? null : nid);
   const cur = open ? byId.get(open)! : null;
   const links = open ? linksOf(spec, open) : null;
+  useEffect(() => {
+    if (vis.emph?.op !== 'focus') return;
+    const nd = spec.nodes.find((x) => vis.emph!.ids.includes(nodeVid(x.id)));
+    if (nd && nd.id !== open) pick(nd.id);
+  }, [vis.emph?.n]);
+  useFocusScroll(vis, () => ref.current);
   const name = spec.title || (spec.view === 'cycle' ? 'A cycle' : spec.view === 'tree' ? 'How it is organised' : spec.view === 'causes' ? 'What led to it' : 'How it flows');
   // the part an opened part says: in a panel under the figure, or under the list item pressed (one of the two is seen at each width)
   const detail = (where: 'panel' | 'inline') =>
@@ -2469,7 +2929,7 @@ function InlineDiagramDrawn({ spec, state, onState, renderInline, onMap }: { spe
     return (
       <button
         type="button"
-        className={`ln-dg-node${nd.role ? ` is-${nd.role}` : ''}${open === nid ? ' is-on' : ''}${nd.detail ? ' has-detail' : ''}`}
+        className={`ln-dg-node${nd.role ? ` is-${nd.role}` : ''}${open === nid ? ' is-on' : ''}${nd.detail ? ' has-detail' : ''}${emphClass(vis, nodeVid(nid))}`}
         aria-expanded={open === nid}
         aria-controls={`${id}-d`}
         onClick={() => toggle(nid)}
@@ -2486,7 +2946,7 @@ function InlineDiagramDrawn({ spec, state, onState, renderInline, onMap }: { spe
   const leadsToNext = (i: number) => spec.view !== 'tree' && (spec.view === 'cycle' || (i + 1 < order.length && spec.edges.some(([a, b]) => a === order[i].id && b === order[i + 1].id)));
   const List = spec.view === 'tree' ? 'ul' : 'ol';
   return (
-    <div ref={ref} className={`ln ln-diagram is-${spec.view}${fig ? '' : ' is-listed'}`} role="group" aria-label={name} aria-describedby={`${id}-alt`}>
+    <div ref={ref} className={`ln ln-diagram is-${spec.view}${fig ? '' : ' is-listed'}${vis.emph ? ' has-vlit' : ''}`} role="group" aria-label={name} aria-describedby={`${id}-alt`} onPointerDownCapture={() => vkey && touch(vkey)}>
       {spec.title && <p className="ln-title">{spec.title}</p>}
       {fig && (
         <div className="ln-dg-fig" style={{ height: fig.H }}>
@@ -2500,7 +2960,7 @@ function InlineDiagramDrawn({ spec, state, onState, renderInline, onMap }: { spe
               <path
                 key={`${l.from}-${l.to}`}
                 d={l.d}
-                className={`ln-dg-link${open && (l.from === open || l.to === open) ? ' is-on' : ''}${byId.get(l.from)?.role === 'amplifier' ? ' is-amplifier' : ''}`}
+                className={`ln-dg-link${open && (l.from === open || l.to === open) ? ' is-on' : ''}${byId.get(l.from)?.role === 'amplifier' ? ' is-amplifier' : ''}${vis.emph ? (vis.emph.ids.includes(`edge:${slug(l.from)}>${slug(l.to)}`) || (vis.emph.ids.includes(nodeVid(l.from)) && vis.emph.ids.includes(nodeVid(l.to))) ? ' is-vlit' : ' is-vquiet') : ''}`}
                 markerEnd={spec.view === 'tree' ? undefined : `url(#${marker})`}
               />
             ))}
@@ -2518,7 +2978,7 @@ function InlineDiagramDrawn({ spec, state, onState, renderInline, onMap }: { spe
           // a connection that is not simply on to the next item is said under it
           const elsewhere = spec.view === 'cycle' ? [] : to.filter((nd) => !(leadsToNext(i) && nd.id === order[i + 1]?.id));
           return (
-            <li key={r.id} className={`ln-dg-item${leadsToNext(i) ? ' is-next' : ''}${spec.view === 'tree' ? ` is-d${r.depth}` : ''}`} style={spec.view === 'tree' ? ({ '--d': r.depth } as React.CSSProperties) : undefined}>
+            <li key={r.id} className={`ln-dg-item${leadsToNext(i) ? ' is-next' : ''}${spec.view === 'tree' ? ` is-d${r.depth}` : ''}${emphClass(vis, nodeVid(r.id))}`} style={spec.view === 'tree' ? ({ '--d': r.depth } as React.CSSProperties) : undefined}>
               {node(r.id, 'list')}
               {elsewhere.length > 0 && <span className="ln-dg-to">→ {elsewhere.map((nd) => nd.label).join(', ')}</span>}
               {open === r.id && detail('inline')}
@@ -2565,12 +3025,25 @@ const REL_CLASS: Record<string, string> = { causes: 'is-causes', leads: 'is-lead
  * it by pointer, touch or keyboard; none of it changes the map itself — that is Edit's (the map opened in
  * Artifacts, where its parts are added, renamed, moved and connected, each change undoable).
  */
-function InlineMind({ spec, state, onState, renderInline, onMap }: { spec: DiagramSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline; onMap?: () => void }) {
+function InlineMind({ spec, state, onState, renderInline, onMap, vkey }: { spec: DiagramSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline; onMap?: () => void; vkey?: string }) {
   const markerId = useId().replace(/[^A-Za-z0-9_-]/g, '');
   const [ref, width] = useWidth<HTMLDivElement>(640);
   const rows = useMemo(() => mindRows(spec), [spec]);
   const parentOf = useMemo(() => new Map(rows.map((r) => [r.id, r.parent])), [rows]);
   const [folded, setFolded] = useState<Set<string>>(() => defaultFolds(spec));
+  // VISUAL ACTIONS: a part pointed at is lit, and the branches over it unfolded so it can be seen
+  const vis = useVisual(vkey);
+  useRegister(vkey, () => visualArtifact(vkey!, spec, state), () => ({}));
+  useEffect(() => {
+    const lit = spec.nodes.filter((nd) => vis.emph?.ids.includes(`node:${slug(nd.id)}`)).map((nd) => nd.id);
+    if (!lit.length) return;
+    setFolded((cur) => {
+      const next = new Set(cur);
+      for (const id of lit) for (let p = parentOf.get(id); p; p = parentOf.get(p)) next.delete(p);
+      return next.size === cur.size ? cur : next;
+    });
+  }, [vis.emph?.n]);
+  useFocusScroll(vis, () => ref.current);
   const [query, setQuery] = useState('');
   const byId = useMemo(() => new Map(spec.nodes.map((nd) => [nd.id, nd])), [spec]);
   const picked = state?.node && byId.has(state.node) ? state.node : null;
@@ -2607,7 +3080,7 @@ function InlineMind({ spec, state, onState, renderInline, onMap }: { spec: Diagr
   const name = spec.title || `A map of ${spec.nodes[0].label}`;
   const folds = lay.boxes.filter((b) => b.hidden > 0).length;
   return (
-    <div className="ln ln-mind" role="group" aria-label={name}>
+    <div className={`ln ln-mind${vis.emph ? ' has-vlit' : ''}`} role="group" aria-label={name} onPointerDownCapture={() => vkey && touch(vkey)}>
       <p className="ln-figcap">
         <span className="ln-kind">Map</span>
         <span className="ln-title">{name}</span>
@@ -2646,7 +3119,7 @@ function InlineMind({ spec, state, onState, renderInline, onMap }: { spec: Diagr
             const isOn = picked === b.id;
             const say = `${nd.label}${b.kids ? `, ${b.kids} part${b.kids === 1 ? '' : 's'}${b.hidden ? ', folded' : ''}` : ''}`;
             return (
-              <g key={b.id} className={`ln-mind-node is-d${Math.min(b.depth, 3)}${isOn ? ' is-on' : ''}${dim(b.id) ? ' is-dim' : ''}${found?.has(b.id) ? ' is-found' : ''}`}>
+              <g key={b.id} className={`ln-mind-node is-d${Math.min(b.depth, 3)}${isOn ? ' is-on' : ''}${dim(b.id) ? ' is-dim' : ''}${found?.has(b.id) ? ' is-found' : ''}${emphClass(vis, `node:${slug(b.id)}`)}`}>
                 <g
                   role="button"
                   tabIndex={0}
@@ -2830,9 +3303,13 @@ const isTexSym = (sym: string) => /[\\^_{}]/.test(sym) || /^[A-Za-z](?:_?\d)?$/.
  * A wide equation scrolls inside its own box, never the page; on a phone the
  * terms stack, the symbol over its meaning.
  */
-function InlineEquation({ spec, renderInline }: { spec: EquationSpec; renderInline: RenderInline }) {
+function InlineEquation({ spec, renderInline, vkey }: { spec: EquationSpec; renderInline: RenderInline; vkey?: string }) {
+  // VISUAL ACTIONS: a term pointed at
+  const vis = useVisual(vkey);
+  useRegister(vkey, () => visualArtifact(vkey!, spec), () => ({}));
+  const tids = useMemo(() => elementsOf(spec).map((e) => e.id), [spec]);
   return (
-    <div className="ln ln-equation" role="group" aria-label={spec.title || 'The equation'}>
+    <div className={`ln ln-equation${vis.emph ? ' has-vlit' : ''}`} role="group" aria-label={spec.title || 'The equation'} onPointerDownCapture={() => vkey && touch(vkey)}>
       {spec.title && <p className="ln-title">{spec.title}</p>}
       <div className="ln-scroll ln-eqn-tex">
         <TeX tex={spec.tex} display />
@@ -2840,7 +3317,7 @@ function InlineEquation({ spec, renderInline }: { spec: EquationSpec; renderInli
       {!!spec.terms?.length && (
         <dl className="ln-eqn-terms">
           {spec.terms.map((t, i) => (
-            <div key={i} className="ln-eqn-term">
+            <div key={i} className={`ln-eqn-term${emphClass(vis, tids[i] ?? '')}`}>
               <dt>{isTexSym(t.sym) ? <TeX tex={t.sym} /> : t.sym}</dt>
               <dd>{renderInline(t.means, `m${i}`)}</dd>
             </div>

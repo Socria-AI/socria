@@ -231,6 +231,8 @@ import { OPENING, SPLIT_NAMES, VIEW_LABELS, afterSend, besideSide, chatSideFor, 
 import { acceptTitle } from '@/lib/logos5/title';
 import { needsMap, routeTurn, tableInReply, turnsSince, type TurnRoute } from '@/lib/runtime/orchestrate';
 import { ideasWanted } from '@/lib/runtime/ideas-wanted';
+import { readVisualAsk, type Scene, type SceneArtifact } from '@/lib/visual/intent';
+import { activeKey, onPage, selection as visSelection, sequence, takeChanges } from '@/components/inline/visual-bus';
 import type { Hit, IndexDoc } from '@/lib/runtime/representation';
 import { effectSaid, linksOf, turnEffect } from '@/lib/logos5/linking';
 import { L5Message, L5Pending, type L5Effect } from './logos5/L5Message';
@@ -886,6 +888,8 @@ export function LogosApp({
     [sessions, activeId]
   );
   const messages = active?.messages ?? [];
+  /** The newest reply's id: its elements are fresh for a few minutes (a change drawn to be shown plays once). */
+  const lastReplyId = (ms: readonly Msg[]) => [...ms].reverse().find((x) => x.role === 'assistant')?.id;
   // MIND MAPS WHEN THEY HELP (lib/runtime/ideas-wanted.ts): the ideas are spread across the Everything view when the
   // person asked for them, the subject has a shape, or they are thinking something through; otherwise they are folded,
   // a press away, and what was said and made fills the view
@@ -5425,6 +5429,10 @@ export function LogosApp({
       : workspaceOn
         ? describeFocus(focusRef.current, mapRef.current, docsRef.current)
         : null;
+    // WHAT IS ON SCREEN (lib/visual): their words read against the pictures drawn now — "highlight the demand curve"
+    // is done before Socria answers; a reference that fits two parts is left for Socria to ask about; the part they
+    // selected and what changed since they last wrote go with the message (never every frame)
+    const visNow = visualNoteFor(content);
     const didNow: DidItem[] = Object.values(didRef.current)
       .sort((a, b) => a.at - b.at)
       .slice(-4)
@@ -5443,6 +5451,7 @@ export function LogosApp({
       ...(via ? { via } : {}),
       // what they did with the replies' elements since they last wrote, as the box showed it
       ...(didNow.length ? { did: didNow } : {}),
+      ...(visNow ? { vis: visNow } : {}),
     };
     // said once: the box is clear of it for what comes next (a turn that fails gives it back)
     if (didNow.length) setDidPending({});
@@ -7299,6 +7308,44 @@ export function LogosApp({
   /** EDIT, pressed under a reply's element: kept first if it was not, then opened in Artifacts with its editor open. */
   function editInline(msg: Msg, n: number, spec: InlineSpec) {
     openInline(msg, n, spec, { edit: true });
+  }
+
+  /**
+   * The pictures on screen as a scene (lib/visual/intent.ts): each as it stands now — its parts, its parameters, its
+   * step — newest first, with what is selected and what was last touched.
+   */
+  function visualScene(): Scene {
+    const msgs = sessionsRef.current.find((x) => x.id === activeIdRef.current)?.messages ?? [];
+    const order = new Map(msgs.map((m, i) => [m.id, i]));
+    const arts: SceneArtifact[] = onPage().map(({ art, values }) => {
+      const [mid, n] = art.key.split(':');
+      const msg = msgs.find((m) => m.id === mid);
+      const spec = msg ? specsIn(msg.content)[Number(n)] ?? undefined : undefined;
+      const picked = msg?.ui?.[n]?.picked;
+      return { ...art, values, ...(spec ? { spec } : {}), ...(typeof picked === 'number' ? { at: picked + 1 } : {}) };
+    });
+    const rank = (k: string) => (k.startsWith('quiz:') ? -1 : (order.get(k.split(':')[0]) ?? -1) * 10 + Number(k.split(':')[1] ?? 0));
+    arts.sort((a, b) => rank(b.key) - rank(a.key));
+    return { artifacts: arts, selection: visSelection(), active: activeKey() };
+  }
+  /** Their message, read against the scene: acted on, or noted for Socria — and what changed since they last wrote. */
+  function visualNoteFor(text: string): Msg['vis'] | undefined {
+    const scene = visualScene();
+    if (!scene.artifacts.length) return undefined;
+    const ask = readVisualAsk(text, scene);
+    const note: NonNullable<Msg['vis']> = {};
+    if (ask?.kind === 'act') {
+      sequence(ask.key, ask.actions, 'you');
+      note.done = [ask.said];
+    } else if (ask?.kind === 'ambiguous') note.ask = ask.candidates.map((c) => `${c.label} on “${c.title}”`).join(' or ');
+    else if (ask?.kind === 'cannot') note.cannot = ask.said;
+    const sel = ask?.kind === 'about' && ask.id ? { key: ask.key, id: ask.id } : scene.selection;
+    const selArt = sel ? scene.artifacts.find((a) => a.key === sel.key) : null;
+    const selPart = selArt?.elements.find((e) => e.id === sel!.id);
+    if (selArt && selPart) note.sel = `${selPart.label} (${selPart.id}) on “${selArt.title}”`;
+    const changes = takeChanges();
+    if (changes.length) note.changes = changes;
+    return Object.keys(note).length ? note : undefined;
   }
 
   /** What was done with one of a reply's inline elements, merged into what is kept with that message. */
@@ -10390,8 +10437,10 @@ export function LogosApp({
           if (!msg) continue;
           if (el.kept) kept.add(el.kept);
           const state = sanitizeInlineState(msg.ui);
-          // what this reply's elements point at is lit across their cards (components/inline/marks.ts)
+          // what this reply's elements point at is lit across their cards (components/inline/marks.ts); each is
+          // addressable as "<id>:<n>" (lib/visual) — the same artifact here, enlarged, and in the conversation
           const scope = (msg.id && markScopes(messages).get(msg.id)) || msg.id;
+          const fresh = msg.id === lastReplyId(messages) && typeof msg.at === 'number' && Date.now() - msg.at < 180_000;
           const noun = ELEMENT_NOUN[el.spec.type] ?? 'Element';
           const said = describeInline(el.spec, state?.[el.n]);
           cards.push({
@@ -10401,7 +10450,7 @@ export function LogosApp({
             kicker: el.lane === 'practice' ? 'Practice' : `Artifact · ${noun}`,
             title: el.title,
             turn: el.turn,
-            preview: <InlineBlock spec={el.spec} open={false} n={el.n} host={{ state, live: false, resolve: (n: number) => resolveInline(msg, n), scope }} renderInline={(t, k) => <RichInline text={t} math keyBase={`bd-${el.key}-${k}`} />} />,
+            preview: <InlineBlock spec={el.spec} open={false} n={el.n} host={{ state, live: false, resolve: (n: number) => resolveInline(msg, n), scope, id: msg.id, fresh }} renderInline={(t, k) => <RichInline text={t} math keyBase={`bd-${el.key}-${k}`} />} />,
             // USED IN PLACE (Logos 6, the Everything view): the element itself, at full size and live — as it now stands
             // when it was kept (one identity) — and what is done with it kept as it is in the conversation
             live: (
@@ -10409,7 +10458,7 @@ export function LogosApp({
                 spec={el.spec}
                 open={false}
                 n={el.n}
-                host={{ state, live: true, resolve: (n: number) => resolveInline(msg, n), ...(!togetherReadOnly ? { onState: (n: number, st: InlineState) => keepInline(msg, n, st) } : {}), scope }}
+                host={{ state, live: true, resolve: (n: number) => resolveInline(msg, n), ...(!togetherReadOnly ? { onState: (n: number, st: InlineState) => keepInline(msg, n, st) } : {}), scope, id: msg.id, fresh }}
                 renderInline={(t, k) => <RichInline text={t} math keyBase={`bdl-${el.key}-${k}`} />}
               />
             ),
@@ -10911,8 +10960,10 @@ export function LogosApp({
           if (!msg) continue;
           if (el.kept) kept.add(el.kept);
           const state = sanitizeInlineState(msg.ui);
-          // what this reply's elements point at is lit across their cards (components/inline/marks.ts)
+          // what this reply's elements point at is lit across their cards (components/inline/marks.ts); each is
+          // addressable as "<id>:<n>" (lib/visual) — the same artifact here, enlarged, and in the conversation
           const scope = (msg.id && markScopes(messages).get(msg.id)) || msg.id;
+          const fresh = msg.id === lastReplyId(messages) && typeof msg.at === 'number' && Date.now() - msg.at < 180_000;
           const noun = ELEMENT_NOUN[el.spec.type] ?? 'Element';
           const draw = (live: boolean) => (
             <InlineBlock
@@ -10921,6 +10972,8 @@ export function LogosApp({
               n={el.n}
               host={{
                 scope,
+                id: msg.id,
+                fresh,
                 state,
                 live,
                 resolve: (n: number) => resolveInline(msg, n),

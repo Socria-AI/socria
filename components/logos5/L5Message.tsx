@@ -14,7 +14,8 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { LogosMsg } from '@/lib/logos-sessions';
-import { contentAsText, sanitizeInlineState, type InlineSpec, type InlineState } from '@/lib/inline-ui';
+import { contentAsText, sanitizeInlineState, specsIn, type InlineSpec, type InlineState } from '@/lib/inline-ui';
+import { VisReplyContext, type VisReply } from '@/components/inline/VisRef';
 import type { InlineHost } from '@/components/inline/InlineUI';
 import './reply.css';
 import { copyText } from '@/lib/copy-text';
@@ -283,12 +284,17 @@ export function L5Message(p: L5MessageProps) {
   const whose = p.who === 'You' ? 'your' : `${p.who}’s`;
   // the reply's inline elements: what was done with them, and where their actions go
   const { onInline, onChoose, onExplore, onOpenInline, onMapInline, onResolveInline, onEditInline, onResolveEdit, onUndoEdit, onOpenObject, onArtifactState, latest } = p;
+  // a reply just written: what it points at is done as it is first read, once (components/inline/VisRef.tsx)
+  const fresh = !!latest && m.role === 'assistant' && typeof m.at === 'number' && Date.now() - m.at < 180_000;
+  const visReply = useMemo<VisReply | null>(() => (m.role === 'assistant' && m.id ? { id: m.id, keys: specsIn(m.content ?? '').map((_, n) => `${m.id}:${n}`), fresh } : null), [m.id, m.content, m.role, fresh]);
   const inline = useMemo<InlineHost | undefined>(
     () =>
       m.role === 'assistant'
         ? {
             // the reply's elements share a scope: what one points at lights in the others (components/inline/marks.ts)
             ...(p.markScope || m.id ? { scope: p.markScope || m.id } : {}),
+            // each element addressable as "<id>:<n>" (lib/visual): pointed at, moved, kept for Socria
+            ...(m.id ? { id: m.id, fresh } : {}),
             state: sanitizeInlineState(m.ui),
             onState: onInline ? (n, s) => onInline(m, n, s) : undefined,
             onChoose: latest ? onChoose : undefined,
@@ -304,7 +310,7 @@ export function L5Message(p: L5MessageProps) {
             live: !!latest,
           }
         : undefined,
-    [m, p.markScope, onInline, onChoose, onExplore, onOpenInline, onMapInline, onResolveInline, onEditInline, onResolveEdit, onUndoEdit, onOpenObject, onArtifactState, latest]
+    [m, p.markScope, onInline, onChoose, onExplore, onOpenInline, onMapInline, onResolveInline, onEditInline, onResolveEdit, onUndoEdit, onOpenObject, onArtifactState, latest, fresh]
   );
 
   return (
@@ -400,7 +406,9 @@ export function L5Message(p: L5MessageProps) {
           <div className={m.role === 'assistant' ? 'l5-prose is-reply' : 'l5-said'}>
             {m.role === 'assistant' ? (
               <TexPick.Provider value={p.onPickTex ?? null}>
-                <RichText text={m.content} math rich cite={cite} askLast inline={inline} editorial disclose={p.disclose !== false} />
+                <VisReplyContext.Provider value={visReply}>
+                  <RichText text={m.content} math rich cite={cite} askLast inline={inline} editorial disclose={p.disclose !== false} />
+                </VisReplyContext.Provider>
               </TexPick.Provider>
             ) : (
               <SaidText text={m.content} />

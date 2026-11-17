@@ -808,3 +808,14 @@
     transition: none;
   }
 }
+
+/* a question pointed at (lib/visual, "highlight question 4's incorrect step"): lit by an outline, the others dimmed;
+   the answer that went wrong lit inside it. Shown, never edited. */
+.logos-root .qz-rc { transition: opacity 0.3s ease, box-shadow 0.25s ease; }
+.logos-root .qz-rc.is-vlit { box-shadow: 0 0 0 2px var(--l5-moss, #354620); }
+.logos-root .qz-rc.is-vquiet { opacity: 0.5; }
+.logos-root .qz-rc-ans > div.is-vlit { outline: 2px solid var(--l5-moss, #354620); outline-offset: 3px; border-radius: 6px; }
+.logos-root .qz-rc-ans > div.is-wrong.is-vlit dt::after { content: ' — this is where it went wrong'; font-weight: 500; }
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .qz-rc { transition: none; }
+}
