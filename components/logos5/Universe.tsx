@@ -953,15 +953,28 @@ export function UniverseView({
   else if (!tiles.length)
     body = (
       <div className="l5h-empty">
-        <p>Every conversation you have appears here — a map of your thinking, by day, by week and by subject.</p>
         {onNew ? (
-          <button type="button" className="l5h-go" onClick={onNew}>
-            Start your first line of thinking <span aria-hidden="true">+</span>
-          </button>
+          // THE FIRST THING TO DO, MADE OBVIOUS (a guest or a new account, nothing yet): one large plus, said in plain
+          // words under it — the whole of it one button, easy to find and to press on any screen
+          <>
+            <button type="button" className="l5h-start" onClick={onNew} aria-label="Start a new line of thinking">
+              <span className="l5h-start-plus" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </span>
+              <span className="l5h-start-t">Start a new line of thinking</span>
+              <span className="l5h-start-s">Click here to start a conversation</span>
+            </button>
+            <p className="l5h-start-about">Every conversation you have appears here — a map of your thinking, by day, by week and by subject.</p>
+          </>
         ) : (
-          <button type="button" className="l5h-go" onClick={() => findRef.current?.focus()}>
-            Ask anything, or drop your files in the box below <span aria-hidden="true">↓</span>
-          </button>
+          <>
+            <p>Every conversation you have appears here — a map of your thinking, by day, by week and by subject.</p>
+            <button type="button" className="l5h-go" onClick={() => findRef.current?.focus()}>
+              Ask anything, or drop your files in the box below <span aria-hidden="true">↓</span>
+            </button>
+          </>
         )}
       </div>
     );
