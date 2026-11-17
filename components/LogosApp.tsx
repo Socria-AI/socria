@@ -214,7 +214,7 @@ import { GIFT_HEADER, THEME_GIFT, accepted as giftAccepted, beginTryVisit, gifts
 import { chooseTheme, readTheme } from '@/lib/theme';
 import { SleepBar, SleepRing, SleepScreen, TrialEndedBar, TrialEndedScreen, useSleepWatch, useTrialEndedWatch } from '@/components/logos5/SleepMode';
 import type { SleepState } from '@/lib/sleep';
-import { dayOfLine, todayLine, type TrialState } from '@/lib/trial';
+import { todayLine, type TrialState } from '@/lib/trial';
 
 /** What the Socria One sheet says when it is opened from Sleep Mode. */
 const SLEEP_ONE = 'Socria One has no daily token allowance, so Socria stays awake — its own fair-use limits are the only ones.';
@@ -4100,28 +4100,6 @@ export function LogosApp({
       if (from !== undefined && from <= at) turn = t.index;
     }
     return turn ?? (turns.length ? turns[turns.length - 1].index : null);
-  }
-
-  /** Can a quiz be started from the board here: a conversation of their own with something in it, no quiz in hand. */
-  function mayQuizFromBoard(msgs: readonly Msg[]): boolean {
-    const sid = activeIdRef.current;
-    if (!sid || togetherReadOnly || (roomRef.current.active && sharedIdsRef.current.has(sid))) return false;
-    if (!msgs.some((m) => m.role === 'assistant' && typeof m.content === 'string' && m.content.trim())) return false;
-    return !quizzesHere().some(({ s }) => s.phase === 'taking');
-  }
-
-  /**
-   * "Quiz me" pressed on the board (the Everything view): the same as asking for it in words — the request is in the
-   * conversation, marked as one the quiz took — on what this conversation has been about.
-   */
-  function quizFromBoard() {
-    const sid = activeIdRef.current;
-    if (!sid) return;
-    const request = 'Quiz me on what this conversation has covered';
-    setError(null);
-    postTurn({ id: newMsgId(), at: Date.now(), role: 'user', content: request, via: 'quiz' }, true);
-    track('quiz_follow_up', { trigger: 'board' });
-    void startQuiz(request);
   }
 
   /** What a quiz shows, written into the learning ledger once per question (the quiz says which it has noted). */
@@ -10466,20 +10444,6 @@ export function LogosApp({
             },
           });
         }
-        // QUIZ ME, FROM THE BOARD: a quiz on this conversation, one press — it arrives here, live, as the card above
-        if (mayQuizFromBoard(messages)) {
-          cards.push({
-            key: 'q:start',
-            lane: 'practice',
-            tone: 'practice',
-            kicker: 'Quiz',
-            title: quizzesHere().length ? 'Another quiz on this' : 'Quiz me on this',
-            turn: turns.length ? turns[turns.length - 1].index : null,
-            preview: null,
-            note: 'Questions on this conversation, one at a time, marked as you go',
-            onOpen: quizFromBoard,
-          });
-        }
         // what was brought and written — beside the turn it came with — read large beside the board
         for (const c of contentItems) {
           cards.push({
@@ -11003,35 +10967,6 @@ export function LogosApp({
               showArtifact(a.key);
               openFull('artifacts');
             },
-          });
-        }
-        // QUIZ ME, FROM THE BOARD: one press starts a quiz on this conversation
-        if (mayQuizFromBoard(messages)) {
-          cards.push({
-            key: 'q:start',
-            lane: 'practice',
-            tone: 'practice',
-            kicker: 'Quiz',
-            title: quizzesHere().length ? 'Another quiz on this' : 'Quiz me on this',
-            turn: turns.length ? turns[turns.length - 1].index : null,
-            preview: (
-              <div className="lcv-art">
-                <span className="lcv-art-g" aria-hidden="true">
-                  ✓
-                </span>
-                <span>Questions on this conversation, one at a time</span>
-                <button
-                  type="button"
-                  className="lcv-act is-primary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    quizFromBoard();
-                  }}
-                >
-                  Start the quiz
-                </button>
-              </div>
-            ),
           });
         }
         // what was read and written: files brought, notes and write-ups — beside the turn they came with
