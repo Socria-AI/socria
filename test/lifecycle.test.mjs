@@ -155,7 +155,11 @@ console.log('\n=== the copy: what each says, and what none may say ===');
   // Since November 9, 2026 there is no free tier, only a seven-day trial counted by the day
   // (lib/trial.ts): what One lifts is the daily limit, and what it adds is its own features.
   ok('welcome says there is no daily limit', /begin as many lines of thinking as you have, with no daily limit\./.test(all['welcome-one'].text) && !/counted by the month/.test(all['welcome-one'].text));
-  ok('welcome says what is unlimited, from the plan table', all['welcome-one'].text.includes('Unlimited conversations, Logic Maps and artifacts after the trial, with Socria Voice, chat sharing, the experiments and the Celestial and Socria One themes'));
+  ok('welcome says what is unlimited, from the plan table', all['welcome-one'].text.includes('Unlimited conversations, Logic Maps and artifacts, with Socria Voice, chat sharing, the experiments and the Celestial and Socria One themes'));
+  // The free access is never called a trial in anything a person reads, and its length is not said.
+  for (const k of LIFECYCLE_KINDS) {
+    ok(`${k} never says "trial" or "seven days"`, !/\btrial\b|seven days|7 days|seven-day|7-day/i.test(`${all[k].subject}\n${all[k].text}\n${all[k].html}`));
+  }
   ok('welcome reassures', /Nothing you have already made changes/.test(all['welcome-one'].text));
   // No email names Core: the Core models and the Core chat were archived (docs/ARCHIVE.md).
   for (const k of LIFECYCLE_KINDS) {

@@ -37,7 +37,7 @@ export function SocriaOne() {
       <H2 id="plans">Free and the plan</H2>
       <p>
         Socria has one paid plan, <strong>Socria One, {priceWithPeriod()}</strong>,
-        and every account starts free, with{' '}
+        and every account starts with{' '}
         {freePlanSentence()}. Socria One is{' '}
         {onePlanSentence().replace(/^U/, 'u')} — and a Socria that
         carries what it learns about how you reason from each conversation

@@ -225,10 +225,13 @@ console.log('\n=== the plan table ===');
 {
   ok('voice, sharing and the experiments are Socria One’s', T.FEATURES.join() === 'voice,share,experiments' && !T.hasFeature('free', 'voice') && !T.hasFeature('free', 'share') && !T.hasFeature('free', 'experiments') && T.hasFeature('one', 'experiments'));
   ok('  the trial’s counts are lifted: tokens are its limit', T.PLANS.free.counters.maps === null && T.PLANS.free.counters.artifacts === null && T.PLANS.free.counters.chats === T.PLANS.one.counters.chats && T.TIERED_COUNTERS.length === 0);
-  ok('  the copy is written from the numbers', T.freePlanSentence() === 'a 7-day trial: 20,000 tokens a day, up to 140,000 in all' && /after the trial, with Socria Voice, chat sharing, the experiments and the Celestial and Socria One themes$/.test(T.onePlanSentence()));
+  // The trial is enforced as before, but the product says only the day's free tokens: never "trial", its days or its total.
+  const n = (x) => x.toLocaleString('en-GB');
+  const NOT_SAID = /\btrial\b|seven days|seven-day|\d-day|\d days ·|140,000/i;
+  ok('  the copy is written from the numbers: the day’s free tokens only', T.freePlanSentence() === `${n(T.TRIAL.daily)} free tokens a day` && /^Unlimited conversations, Logic Maps and artifacts, with Socria Voice, chat sharing, the experiments and the Celestial and Socria One themes$/.test(T.onePlanSentence()) && !NOT_SAID.test(`${T.freePlanSentence()} ${T.onePlanSentence()}`), `${T.freePlanSentence()} | ${T.onePlanSentence()}`);
   const rows = T.comparisonRows();
-  ok('  the comparison: trial against Socria One, themes and experiments named', rows.some((r) => r.id === 'experiments' && r.free === 'Not included' && r.one === 'Included') && rows.some((r) => r.id === 'themes') && rows[0].free === '7 days · 20,000 tokens a day');
-  ok('  the benefits sell what continues and what is One’s alone', T.ONE_FEATURES.map((f) => f.id).join() === 'conversations,voice,together,experiments,themes,history' && /Seven days to try it/.test(T.ONE_STANDFIRST));
+  ok('  the comparison: free against Socria One, themes and experiments named, the day’s tokens and no length', rows.some((r) => r.id === 'experiments' && r.free === 'Not included' && r.one === 'Included') && rows.some((r) => r.id === 'themes') && rows[0].free === `${n(T.TRIAL.daily)} tokens a day` && !rows.some((r) => NOT_SAID.test(`${r.label} ${r.free} ${r.one}`)), rows);
+  ok('  the benefits sell what continues and what is One’s alone — never "seven days to try it"', T.ONE_FEATURES.map((f) => f.id).join() === 'conversations,voice,together,experiments,themes,history' && T.ONE_STANDFIRST === 'Socria, without a daily limit — same models, same map.' && !NOT_SAID.test([T.ONE_STANDFIRST, ...T.ONE_FEATURES.map((f) => f.blurb)].join(' ')), T.ONE_STANDFIRST);
   const theme = read('lib/theme.ts');
   ok('  Celestial and the Socria One theme are One’s', /night: \{ id: 'night', label: 'Celestial'[^}]*one: true/.test(theme) && /one: \{ id: 'one', label: 'Socria One'[^}]*one: true/.test(theme));
 }
@@ -237,13 +240,14 @@ console.log('\n=== the screens ===');
 {
   const sleepUi = read('components/logos5/SleepMode.tsx');
   const app = read('components/LogosApp.tsx');
-  ok('the day’s rest, said as the trial’s day: today’s tokens, 00:00 UTC, day N of 7', /You’ve used today’s \$\{formatTokens\(sleep\.limit\)\} trial tokens/.test(sleepUi) && /Today’s trial tokens/.test(sleepUi) && /dayOfLine\(trial\)/.test(sleepUi));
-  ok('  the end: a card said once, a line over the box, one way on; everything stays open', /Seven days are up/.test(sleepUi) && /Every conversation, Logic Map and artifact stays open/.test(sleepUi) && /<TrialEndedBar on=\{!!trialEnded && plan !== 'one' && !!isSignedIn\}/.test(app));
+  ok('the day’s rest, said as today’s free tokens — never which day of the trial it is', /You’ve used today’s \$\{formatTokens\(sleep\.limit\)\} free tokens/.test(sleepUi) && /Today’s free tokens/.test(sleepUi) && !/trial tokens|dayOfLine\(|daysLeftLine\(/.test(sleepUi));
+  ok('  the end: a card said once, a line over the box, one way on; everything stays open — said as free access ending, not "seven days"', /Your free access has ended\./.test(sleepUi) && !/Seven days are up|Your trial/.test(sleepUi) && /Every conversation, Logic Map and artifact stays open/.test(sleepUi) && /<TrialEndedBar on=\{!!trialEnded && plan !== 'one' && !!isSignedIn\}/.test(app));
   ok('  a 402 from any route says it, so every surface agrees', /if \(b\?\.trialEnded\) window\.dispatchEvent\(new CustomEvent\(TRIAL_ENDED_EVENT/.test(sleepUi) && /useTrialEndedWatch\(/.test(app));
   ok('  sending after the end keeps the words and opens the card', /if \(trialOverNow\(\)\) \{\s*setTrialEndedOpen\(true\);\s*return;\s*\}/.test(app));
   ok('  the experiments, on the trial, are marked Socria One and open the sheet; the ways out always work', /const oneOnly = /.test(app) && /cabin \? \{ label: 'Leave big-screen mode'/.test(app) && /\[\{ label: 'Stop using your hands'/.test(app));
   const acct = read('components/account/AccountSheet.tsx');
-  ok('Account: the day, the days left, when it ends — and the numbers a press away', /<summary>Usage details<\/summary>/.test(acct) && /dayOfLine\(trial\)/.test(acct) && /Trial ended/.test(acct));
+  ok('Account: today’s free tokens and when they reset, the numbers a press away, and when free access has ended', /<summary>Usage details<\/summary>/.test(acct) && /\{todayLine\(trial\.today\)\}, \{dayResetLine\(trial\.today, now\)\}\./.test(acct) && /'Free access ended'/.test(acct) && /'Your free access has ended\.'/.test(acct));
+  ok('  and never the trial’s day, the days left, its end date or the whole-trial total', !/dayOfLine\(|daysLeftLine\(|endsAtWords\(|Whole trial|'Trial|Trial ended|Socria, seven-day trial|Your seven-day trial|Socria trial/.test(acct));
   ok('  the usage route sends the trial with today — and no resting day for a trial that is over', /trial, sleep: trial && trial\.status !== 'ended' \? trial\.today : null/.test(read('app/api/logos/usage/route.ts')));
   ok('  nor does the app draw one: the day’s bar, ring and card stand down once the trial is over', (app.match(/sleep=\{trialEnded \? null : sleep\}/g) ?? []).length === 3);
 }
@@ -252,19 +256,25 @@ console.log('\n=== the screens ===');
   const { renderToStaticMarkup } = await import('react-dom/server');
   const { createElement: h } = await import('react');
   const card = renderToStaticMarkup(h(T.TrialEndedScreen, { open: true, onClose() {}, onUpgrade() {} }));
-  ok('the card, drawn: a dialog, named, with what stays and one way on', /role="dialog"/.test(card) && /aria-labelledby="tr-t"/.test(card) && /Seven days are up/.test(card) && /Move, write, rename, organise and export by hand/.test(card) && /Continue with Socria One/.test(card) && /Keep exploring/.test(card), card);
-  ok('  closed, it draws nothing; the bar only while the trial is over', renderToStaticMarkup(h(T.TrialEndedScreen, { open: false, onClose() {}, onUpgrade() {} })) === '' && renderToStaticMarkup(h(T.TrialEndedBar, { on: false, onOpen() {} })) === '' && /Your trial has ended/.test(renderToStaticMarkup(h(T.TrialEndedBar, { on: true, onOpen() {} }))));
+  ok('the card, drawn: a dialog, named, with what stays and one way on — and no "trial" or "seven days"', /role="dialog"/.test(card) && /aria-labelledby="tr-t"/.test(card) && /Your free access has ended\./.test(card) && !/\btrial\b|seven days/i.test(card) && /Move, write, rename, organise and export by hand/.test(card) && /Continue with Socria One/.test(card) && /Keep exploring/.test(card), card);
+  const endBar = renderToStaticMarkup(h(T.TrialEndedBar, { on: true, onOpen() {} }));
+  ok('  closed, it draws nothing; the bar only while the trial is over, saying free access has ended', renderToStaticMarkup(h(T.TrialEndedScreen, { open: false, onClose() {}, onUpgrade() {} })) === '' && renderToStaticMarkup(h(T.TrialEndedBar, { on: false, onOpen() {} })) === '' && /Your free access has ended/.test(endBar) && !/\btrial\b/i.test(endBar), endBar);
   const now = Date.now();
   const d0 = T.dayStart(now);
   const day = renderToStaticMarkup(h(T.SleepScreen, { sleep: { asleep: true, used: 4000, limit: 4000, left: 0, weekStart: d0, resetAt: d0 + 86_400_000, period: 'day' }, open: true, onClose() {}, onUpgrade() {}, onWake() {}, timeZone: 'UTC', trial: T.trialState({ startedAt: now - 2 * 86_400_000, now, byDay: { [T.dayKey(now)]: 4000 } }) }));
-  ok('  the day spent, drawn: today’s 4,000, 00:00 UTC, day 3 of 7 (over the headline), and Socria One with no daily limit', /You’ve used today’s 4,000 trial tokens/.test(day) && /00:00 UTC/.test(day) && /Your trial · Day 3 of 7/.test(day) && /Socria One has no daily limit/.test(day) && !/Monday/.test(day), day);
+  ok('  the day spent, drawn: today’s 4,000 free tokens (over the headline too), 00:00 UTC, and Socria One with no daily limit — no "Day 3 of 7"', /You’ve used today’s 4,000 free tokens/.test(day) && /00:00 UTC/.test(day) && /Today’s free tokens/.test(day) && !/\btrial\b|Day \d+ of \d+/i.test(day) && /Socria One has no daily limit/.test(day) && !/Monday/.test(day), day);
   ok('  a guest is never shown the trial’s card: only an account has a trial to go on with', /plan !== 'one' && !!isSignedIn && !oneOpen/.test(read('components/LogosApp.tsx')) && /const trialOverNow = \(\) => !!trialEndedRef\.current && !!isSignedIn;/.test(read('components/LogosApp.tsx')));
 }
 
 console.log('\n=== the policy pages ===');
 {
-  ok('the privacy policy says the kept hash, and why', /That an address has had a trial\./.test(read('app/(legal)/privacy/page.tsx')) && /One trial a person/.test(read('app/(legal)/privacy/page.tsx')));
-  ok('  the terms say the trial and the one-trial rule', /<h2 id="free">The trial<\/h2>/.test(read('app/(legal)/terms/page.tsx')) && /keyed hash of a verified\s+email address is retained/.test(read('app/(legal)/terms/page.tsx')));
+  // The legal pages keep the facts (how long, how much, once a person) but call it free access, not a trial.
+  const privacy = read('app/(legal)/privacy/page.tsx');
+  const terms = read('app/(legal)/terms/page.tsx');
+  const termsBody = terms.slice(terms.indexOf('export default function'));
+  ok('the privacy policy says the kept hash, and why — as free access once a person', /That an address has had free access\./.test(privacy) && /Free access once a person/.test(privacy) && /does not begin free access a second time/.test(privacy) && !/\b[Tt]rial\b/.test(privacy));
+  ok('  the terms say free access, its facts from lib/trial.ts and the once-a-person rule', /<h2 id="free">Free access<\/h2>/.test(terms) && /\{TRIAL\.daily\.toLocaleString\('en-GB'\)\} tokens a day, up to\{' '\}\s*\{TRIAL\.total\.toLocaleString\('en-GB'\)\} in all/.test(terms) && /after\{' '\}\s*\{TRIAL\.days\} days, new AI requests require Socria One/.test(terms) && /Free access is offered once per person/.test(terms) && /keyed hash of a verified\s+email address is retained/.test(terms));
+  ok('    and never call it a trial', !/\b[Tt]rial\b/.test(termsBody), termsBody.match(/.{0,40}\b[Tt]rial\b.{0,40}/)?.[0]);
 }
 
 console.log('\n=== the analytics ===');

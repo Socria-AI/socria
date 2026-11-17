@@ -36,7 +36,7 @@ import { AccessCode } from './AccessCode';
 import { anyModelGated } from '@/lib/socria-model-store';
 import { LOGOS5 } from '@/lib/logos5/flags';
 import { freePlanSentence, onePlanSentence } from '@/lib/entitlements';
-import { dayOfLine, daysLeftLine, dayResetLine, endsAtWords, todayLine, type TrialState } from '@/lib/trial';
+import { dayResetLine, todayLine, type TrialState } from '@/lib/trial';
 import { formatTokens } from '@/lib/sleep';
 import { TestingTools } from './TestingTools';
 import { NameField, RolePicker } from './RolePicker';

@@ -36,11 +36,13 @@ ok('  the headline and the words under it are the One sheet’s (serif 32, body 
 ok('  the way on is the sheet’s full-width pill in One’s blue, the way to stay a word under it', /className="l5-btn is-primary is-one is-wide"/.test(sleepTsx) && /className="os-actions"/.test(sleepTsx));
 ok('the old centred card is gone: no moon in a circle, no centred text, no card of its own', !/sl-moon|sl-card|sl-acts|sl-one\b/.test(sleepTsx + sleepCss) && !/text-align: center/.test(sleepCss));
 ok('  nor does the One sheet centre its words (only the closing line under the pill)', !/text-align: center/.test(block(oneCss, ':is(.logos-root, .lg-tokens) .os-sheet')) && (oneCss.match(/text-align: center/g) ?? []).length === 2);
-ok('the label over the headline: the moon and the trial’s day, where the One sheet has its name', /<Moon size=\{15\} \/>/.test(sleepTsx) && /`Your trial · \$\{dayOfLine\(trial\)\}`/.test(sleepTsx));
+ok('the label over the headline: the moon and what ran out (today’s free tokens), where the One sheet has its name', /<Moon size=\{15\} \/>/.test(sleepTsx) && /const kicker = day \? 'Today’s free tokens' : 'This week’s tokens';/.test(sleepTsx));
+ok('  never the trial’s day, and the card at its end is labelled "Free access", not "Your trial"', !/Your trial|of your trial|dayOfLine\(|daysLeftLine\(/.test(sleepTsx) && /<span className="l5-label">Free access<\/span>/.test(sleepTsx));
 ok('what stays when the trial is over: hairline rows, no bullets', /\.tr-keep \{[^}]*list-style: none;/.test(sleepCss) && /\.tr-keep li \{[^}]*border-top: 1px solid var\(--c-rule\);/.test(sleepCss));
 
 console.log('\n=== one voice ===');
-ok('a headline that says what happened ends on a full stop', />\s*Socria is resting\.\s*</.test(sleepTsx) && />\s*Seven days are up\.\s*</.test(sleepTsx) && /'Socria, without a daily limit\.'/.test(oneTsx) && /LIMIT_HEADLINE = '[^']+\.'/.test(read('lib/entitlements.ts')));
+ok('a headline that says what happened ends on a full stop', />\s*Socria is resting\.\s*</.test(sleepTsx) && />\s*Your free access has ended\.\s*</.test(sleepTsx) && /'Socria, without a daily limit\.'/.test(oneTsx) && /LIMIT_HEADLINE = '[^']+\.'/.test(read('lib/entitlements.ts')));
+ok('  and none says "trial" or counts the days: no "Seven days are up", no "trial tokens"', !/Seven days|seven-day|trial tokens|Your trial/i.test(sleepTsx) && !/seven-day|Trial<\/th>|The trial compared/i.test(oneTsx), '');
 ok('one word for staying: "Keep exploring" (the trial’s end said "Keep browsing")', /Keep exploring/.test(sleepTsx) && !/Keep browsing/.test(sleepTsx));
 
 console.log('\n=== one focus ===');

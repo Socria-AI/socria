@@ -24,7 +24,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { RESET_WORDS, WEEK_MS, allowanceLine, formatTokens, leftLine, localReset, wakesIn, type SleepState } from '@/lib/sleep';
-import { DAY_RESET_WORDS, TRIAL_ENDED_NOTE, dayOfLine, daysLeftLine, dayResetLine, endsAtWords, todayLine, type TrialState } from '@/lib/trial';
+import { DAY_RESET_WORDS, TRIAL_ENDED_NOTE, dayResetLine, todayLine, type TrialState } from '@/lib/trial';
 import { L5Close } from './L5Chrome';
 import '../one/one-sheet.css';
 import './l5-controls.css';
@@ -312,12 +312,10 @@ export function SleepRing({ sleep, onOpen, onWake, timeZone, trial }: { sleep: S
   const R = 6.5;
   const C = 2 * Math.PI * R;
   const day = sleep.period === 'day';
-  // the plan's length is not said in the product: only the day's free tokens
-  const trialWords = '';
   const said = day
     ? sleep.asleep
-      ? `Socria is resting. ${todayLine(sleep)}; wakes ${DAY_RESET_WORDS}, in ${wakesIn(left)}${local ? ` (${local} your time)` : ''}.${trialWords}`
-      : `${todayLine(sleep)} · ${dayResetLine(sleep, now)}${local ? ` — ${local} your time` : ''}.${trialWords}`
+      ? `Socria is resting. ${todayLine(sleep)}; wakes ${DAY_RESET_WORDS}, in ${wakesIn(left)}${local ? ` (${local} your time)` : ''}.`
+      : `${todayLine(sleep)} · ${dayResetLine(sleep, now)}${local ? ` — ${local} your time` : ''}.`
     : sleep.asleep
       ? `Socria is resting. ${leftLine(sleep)}; wakes ${RESET_WORDS}, in ${wakesIn(left)}${local ? ` (${local} your time)` : ''}.`
       : `${allowanceLine(sleep, now)}${local ? ` — ${local} your time` : ''}.`;

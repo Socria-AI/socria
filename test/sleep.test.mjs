@@ -629,20 +629,21 @@ console.log('\n=== the screen (components/logos5/SleepMode.tsx) ===');
   const going = Tr.trialState({ startedAt: start, now, byDay: { [Tr.dayKey(now)]: 1_400 }, limits: Tr.trialLimits(process.env) });
   ok('the trial’s day, as the server reads it: period day, 4,000, resetting at the next 00:00 UTC', spent.status === 'active' && spent.today.period === 'day' && spent.today.asleep && spent.today.limit === 4_000 && spent.today.resetAt === Tr.nextMidnight(now) && !going.today.asleep && going.today.left === 2_600, spent.today);
   const dhtml = renderToStaticMarkup(h(UI.SleepScreen, { sleep: spent.today, trial: spent, open: true, onClose() {}, onUpgrade() {}, onWake() {}, timeZone: 'America/Chicago' }));
-  ok('the day spent: "Socria is resting", today’s 4,000 trial tokens, and what still works', /Socria is resting/.test(dhtml) && /You’ve used today’s 4,000 trial tokens/.test(dhtml) && /Everything you’ve made is still here — open any conversation, move your Logic Maps, edit your writing, keep drafting/.test(dhtml), text(dhtml));
+  ok('the day spent: "Socria is resting", today’s 4,000 free tokens, and what still works', /Socria is resting/.test(dhtml) && /You’ve used today’s 4,000 free tokens/.test(dhtml) && /Everything you’ve made is still here — open any conversation, move your Logic Maps, edit your writing, keep drafting/.test(dhtml), text(dhtml));
   ok('  when it wakes: a countdown, 00:00 UTC, and their own time as a clock time (no weekday)', /Wakes in/.test(dhtml) && /<span class="sl-keep">00:00 UTC<\/span> · <span class="sl-keep">\d{1,2}:00\s[AP]M your time<\/span>/.test(dhtml) && !/(Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day/.test(text(dhtml)), text(dhtml));
   ok('  Socria One offered as the way on: "Continue with Socria One" — it has no daily limit', /Keep exploring/.test(dhtml) && /Continue with Socria One/.test(dhtml) && /Socria One has no daily limit/.test(dhtml), text(dhtml));
-  ok('  and which day of the trial it is, over the headline', /Your trial · Day 1 of 7/.test(text(dhtml)), text(dhtml));
+  // the free access's length is not said in the product: over the headline is what ran out, not which day it is
+  ok('  over the headline, what ran out (today’s free tokens) — never "trial" or which day of it it is', /Today’s free tokens/.test(text(dhtml)) && !/\btrial\b|Day \d+ of \d+|days? left|Last day/i.test(text(dhtml)), text(dhtml));
   const dmember = renderToStaticMarkup(h(UI.SleepScreen, { sleep: spent.today, open: true, onClose() {}, onWake() {}, timeZone: 'UTC' }));
   ok('  no offer where there is none to make; no local time where theirs is UTC', !/Socria One/.test(dmember) && !/your time/.test(dmember) && /00:00 UTC/.test(dmember));
   const dbar = renderToStaticMarkup(h(UI.SleepBar, { sleep: spent.today, onOpen() {}, onWake() {}, timeZone: 'UTC' }));
   ok('the bar over the box: resting until 00:00 UTC, in how long — drafting still open', /Resting until 00:00 UTC/.test(dbar) && /aria-label="Socria is resting until 00:00 UTC, in [^"]+\. You can keep drafting; sending waits\."/.test(dbar), dbar);
   const dring = renderToStaticMarkup(h(UI.SleepRing, { sleep: going.today, trial: going, onOpen() {}, onWake() {}, timeZone: 'UTC' }));
-  ok('the ring, through the day: what is left today and when it resets, in one line', /stroke-dasharray="14\.29\d* 40\.84\d*"/.test(dring) && /aria-label="2,600 of 4,000 left today · resets 00:00 UTC \(in [^)]+\)\. Day 1 of 7 of your trial; 7 days left in your trial\."/.test(dring), dring);
+  ok('the ring, through the day: what is left today and when it resets, in one line — and nothing about the trial’s day or days left', /stroke-dasharray="14\.29\d* 40\.84\d*"/.test(dring) && /aria-label="2,600 of 4,000 left today · resets 00:00 UTC \(in [^)]+\)\."/.test(dring) && !/\btrial\b|Day \d+ of \d+|days? left|Last day/i.test(dring), dring);
   const dchicago = renderToStaticMarkup(h(UI.SleepRing, { sleep: going.today, onOpen() {}, onWake() {}, timeZone: 'America/Chicago' }));
   ok('  with their own time as a clock time', /— \d{1,2}:00 [AP]M your time\./.test(dchicago.replace(/\s/g, ' ')), dchicago);
   const dasleep = renderToStaticMarkup(h(UI.SleepRing, { sleep: spent.today, onOpen() {}, onWake() {}, timeZone: 'UTC' }));
-  ok('  resting: filled solid, and it says when Socria wakes', /sl-ring is-asleep/.test(dasleep) && /aria-label="Socria is resting\. Today’s 4,000 trial tokens are used; wakes 00:00 UTC, in /.test(dasleep), dasleep);
+  ok('  resting: filled solid, and it says when Socria wakes', /sl-ring is-asleep/.test(dasleep) && /aria-label="Socria is resting\. Today’s 4,000 free tokens are used; wakes 00:00 UTC, in /.test(dasleep), dasleep);
 
   // the day's words only with the day; the week's only where no day is meant
   const weekWords = [html, member, bar, ring, chicago, asleep].join(' ').replace(/<[^>]+>/g, ' ');
@@ -653,7 +654,7 @@ console.log('\n=== the screen (components/logos5/SleepMode.tsx) ===');
   ok('  and the week’s words none on the screens drawn for the day', !WEEKISH.test(dayWords), dayWords.match(WEEKISH)?.[0]);
   const weekBody = S.sleepRefusal(st);
   const dayBody = S.sleepRefusal(spent.today, Tr.TRIAL_DAY_NOTE);
-  ok('  the refusal too: the week’s says this week, the day’s says today — each with its period', weekBody.period === 'week' && /this week/.test(weekBody.error) && !DAYISH.test(weekBody.error) && dayBody.period === 'day' && /today’s trial tokens/.test(dayBody.error) && dayBody.resetAt === Tr.nextMidnight(now), { weekBody, dayBody });
+  ok('  the refusal too: the week’s says this week, the day’s says today — each with its period', weekBody.period === 'week' && /this week/.test(weekBody.error) && !DAYISH.test(weekBody.error) && dayBody.period === 'day' && /today’s free tokens/.test(dayBody.error) && !/\btrial\b/i.test(dayBody.error) && dayBody.resetAt === Tr.nextMidnight(now), { weekBody, dayBody });
 
   // the ring's tip opens when it is pressed: drawn in a document, and pressed as a person would
   const { JSDOM } = await import('jsdom');
@@ -680,7 +681,7 @@ console.log('\n=== the screen (components/logos5/SleepMode.tsx) ===');
     return out;
   };
   const dtip = await tipOf(h(UI.SleepRing, { sleep: going.today, trial: going, onOpen() {}, onWake() {}, timeZone: 'UTC' }));
-  ok('the ring pressed, through the day: "Today’s trial tokens", what is left, 00:00 UTC, and the trial’s day', dtip.title === 'Today’s trial tokens' && dtip.body === '2,600 of 4,000 left today' && /^Resets 00:00 UTC/.test(dtip.reset ?? '') && /Day 1 of 7/.test(dtip.trial ?? ''), dtip);
+  ok('the ring pressed, through the day: "Today’s free tokens", what is left and 00:00 UTC — no trial’s day, days left or end date', dtip.title === 'Today’s free tokens' && dtip.body === '2,600 of 4,000 left today' && /^Resets 00:00 UTC/.test(dtip.reset ?? '') && dtip.trial === null, dtip);
   const wtip = await tipOf(h(UI.SleepRing, { sleep: awake, onOpen() {}, onWake() {}, timeZone: 'UTC' }));
   ok('  with no period it keeps the week’s: "This week’s tokens", Monday 00:00 UTC', wtip.title === 'This week’s tokens' && wtip.body === '12,400 of 30,000 left this week' && /^Resets Monday 00:00 UTC/.test(wtip.reset ?? '') && wtip.trial === null, wtip);
 

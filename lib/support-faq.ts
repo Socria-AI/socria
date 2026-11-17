@@ -87,6 +87,7 @@ export const TOPICS: FaqTopic[] = [
         a: [
           `Every account starts with ${freePlanSentence()}. Tokens count what Socria reads and writes for you, together; a day’s tokens start again at ${DAY_RESET_WORDS}.`,
           'Free is the whole of Logos 5: every lens, every depth, Logic Maps, artifacts and Write. Socria Voice and sharing your own conversations are part of Socria One, as are the experiments and the Celestial and Socria One themes; joining a conversation somebody shares with you is free.',
+          'Nothing you make is taken away: every conversation, map and artifact stays open, and you can always move, write, rename, export and delete by hand.',
         ],
       },
       {
