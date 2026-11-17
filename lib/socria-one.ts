@@ -50,7 +50,7 @@ export function priceWithPeriod(): string {
 /** What the /one page says, word for word: its headline (the price follows it) and
  *  the line beside it. The share card says the same, so the two cannot drift. */
 export const ONE_HEADLINE = 'More of Socria.';
-export const ONE_STANDFIRST = 'Seven days to try it. Then Socria, without a daily limit — same models, same map.';
+export const ONE_STANDFIRST = 'Socria, without a daily limit — same models, same map.';
 
 // Imported for the map cap's default; entitlements imports only the TYPE
 // above, so this edge is one-directional at runtime.
@@ -120,7 +120,7 @@ export const ONE_FEATURES: { id: OneFeature; title: string; blurb: string }[] = 
   {
     id: 'conversations',
     title: 'No daily limit',
-    blurb: 'keep thinking after your seven-day trial — conversations, Logic Maps and artifacts, as many as the work needs.',
+    blurb: 'keep thinking without a daily limit — conversations, Logic Maps and artifacts, as many as the work needs.',
   },
   {
     id: 'voice',

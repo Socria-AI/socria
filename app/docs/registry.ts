@@ -118,7 +118,7 @@ export const DOC_PAGES: DocPage[] = [
   {
     slug: 'socria-one',
     title: 'Socria One',
-    blurb: 'The seven-day trial, the subscription, when Socria asks, codes, and how billing behaves.',
+    blurb: 'Free, the subscription, when Socria asks, codes, and how billing behaves.',
     group: 'Plans & accounts',
   },
   {

@@ -113,7 +113,7 @@ const FIXED: Record<string, OgCard> = {
   'sign-up': {
     kicker: 'Socria',
     title: `${TAGLINE}.`,
-    line: 'Create your account — seven days to try Socria, and your thinking on every device.',
+    line: 'Create your free account — and your thinking on every device.',
   },
   'sign-in': DEFAULT_CARD,
 };
@@ -151,7 +151,7 @@ export function ogCardFor(key: readonly string[], ctx: OgContext): OgCard {
       return {
         kicker: 'A friend invited you',
         title: 'Think it through with Socria.',
-        line: 'Create your account and try Socria for seven days — no card needed.',
+        line: 'Create your free account and try Socria — no card needed.',
       };
     }
     return FIXED[k[0]] ?? DEFAULT_CARD;

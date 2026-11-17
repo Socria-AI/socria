@@ -10,7 +10,7 @@ export const metadata: Metadata = pageMetadata({
   path: '/one',
   title: 'Socria One — Socria without a daily limit, with Voice, sharing and the experiments',
   absolute: true,
-  description: `Socria One: ${onePlanSentence().replace(/^U/, 'u')}, longer documents, and personalisation that learns how you reason. ${priceWithPeriod()}. Every account starts with a seven-day trial.`,
+  description: `Socria One: ${onePlanSentence().replace(/^U/, 'u')}, longer documents, and personalisation that learns how you reason. ${priceWithPeriod()}. Every account starts free.`,
 });
 
 export default function OnePage() {

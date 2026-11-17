@@ -23,8 +23,8 @@ export function AccountsData() {
       <p>
         You can use Socria without an account. Signed out, Logos 5 gives you
         a short preview — one line of thinking and its map, kept in that
-        browser; going further asks you to sign up, and a new account has a
-        seven-day trial. The one you have comes with you. An access key opens
+        browser; going further asks you to sign up, and a new account is
+        free, with 20,000 tokens a day. The one you have comes with you. An access key opens
         Logos 5 without an account as well, and what
         you think through with it is kept in that browser too.
       </p>
@@ -44,12 +44,12 @@ export function AccountsData() {
           Conversations and Logos sessions (each holding its messages, map,
           draft and grounded contexts), your cross-conversation Thinking
           Journey, your Conversation Style, any grant redeemed before codes
-          were retired, your trial&rsquo;s record — when it began and the
+          were retired, your free access&rsquo;s record — when it began and the
           tokens used each day — kept on the server, never in the browser;
-          once a trial begins, a keyed hash of your verified email address,
+          once free access begins, a keyed hash of your verified email address,
           never the address itself,
-          so that one address has one trial (it stays after an account is
-          deleted, so a new account on the same address starts with its trial
+          so that one address has free access once (it stays after an account is
+          deleted, so a new account on the same address starts with it
           used) — and, if you subscribe, the billing projection Stripe writes.
         </Def>
         <Def term="Your browser (local)">

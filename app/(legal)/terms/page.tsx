@@ -4,7 +4,7 @@
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { freePlanSentence } from '@/lib/entitlements';
+import { TRIAL } from '@/lib/trial';
 import { priceLabel, SOCRIA_ONE } from '@/lib/socria-one';
 import { pageMetadata } from '@/lib/seo';
 
@@ -121,13 +121,13 @@ export default function TermsPage() {
         </p>
       </div>
 
-      <h2 id="free">The trial</h2>
+      <h2 id="free">Free access</h2>
       <p>
-        A new account has {freePlanSentence()}, beginning with its first AI
-        request; after seven days, new AI requests require Socria One. One trial
-        is offered per person: to keep it so, a one-way keyed hash of a verified
-        email address is retained after an account is deleted, and never the
-        address itself. The trial does not include Socria Voice, sharing your own
+        A new account has free access: {TRIAL.daily.toLocaleString('en-GB')} tokens a day, up to{' '}
+        {TRIAL.total.toLocaleString('en-GB')} in all, beginning with its first AI request; after{' '}
+        {TRIAL.days} days, new AI requests require Socria One. Free access is offered once per person: to
+        keep it so, a one-way keyed hash of a verified email address is retained after an account is
+        deleted, and never the address itself. Free access does not include Socria Voice, sharing your own
         conversations, the experiments or the Celestial and Socria One themes,
         which are part of Socria One. Socria One is not offered free: not by
         code, reward or promotion. Reaching a limit stops new

@@ -245,7 +245,7 @@ export function SleepScreen({
   const day = sleep?.period === 'day';
   const shown = open && !!sleep?.asleep;
   // the label over the headline names what ran out: the trial's day (and which), or the week's free tokens
-  const kicker = day ? (trial?.status === 'active' ? `Your trial · ${dayOfLine(trial)}` : 'Today’s trial tokens') : 'This week’s tokens';
+  const kicker = day ? 'Today’s free tokens' : 'This week’s tokens';
   if (!shown || !sleep) return null;
   return (
     <SheetShell open={shown} onClose={onClose} labelledBy="sl-t" describedBy="sl-b">
@@ -258,7 +258,7 @@ export function SleepScreen({
       </h2>
       <p id="sl-b" className="os-sub">
         {day
-          ? `You’ve used today’s ${formatTokens(sleep.limit)} trial tokens. Everything you’ve made is still here — open any conversation, move your Logic Maps, edit your writing, keep drafting.`
+          ? `You’ve used today’s ${formatTokens(sleep.limit)} free tokens. Everything you’ve made is still here — open any conversation, move your Logic Maps, edit your writing, keep drafting.`
           : `You’ve used this week’s ${formatTokens(sleep.limit)} free tokens. Everything you’ve made is still here — open any conversation, move your Logic Maps, edit your writing, keep drafting.`}
       </p>
       <p className="sl-when" aria-live="polite">
@@ -312,7 +312,8 @@ export function SleepRing({ sleep, onOpen, onWake, timeZone, trial }: { sleep: S
   const R = 6.5;
   const C = 2 * Math.PI * R;
   const day = sleep.period === 'day';
-  const trialWords = day && trial?.status === 'active' ? ` ${dayOfLine(trial)} of your trial; ${daysLeftLine(trial).toLowerCase()}.` : '';
+  // the plan's length is not said in the product: only the day's free tokens
+  const trialWords = '';
   const said = day
     ? sleep.asleep
       ? `Socria is resting. ${todayLine(sleep)}; wakes ${DAY_RESET_WORDS}, in ${wakesIn(left)}${local ? ` (${local} your time)` : ''}.${trialWords}`
@@ -341,18 +342,12 @@ export function SleepRing({ sleep, onOpen, onWake, timeZone, trial }: { sleep: S
       </button>
       {shown && !sleep.asleep && (
         <span className="sl-ringtip" role="status">
-          <span className="sl-ringtip-t">{day ? 'Today’s trial tokens' : 'This week’s tokens'}</span>
+          <span className="sl-ringtip-t">{day ? 'Today’s free tokens' : 'This week’s tokens'}</span>
           <span className="sl-ringtip-b">{day ? todayLine(sleep) : leftLine(sleep)}</span>
           <span className="sl-ringtip-r">
             Resets {day ? DAY_RESET_WORDS : RESET_WORDS} <span className="sl-keep">(in {wakesIn(left)})</span>
           </span>
           {local && <span className="sl-ringtip-l">{local} your time</span>}
-          {day && trial?.status === 'active' && (
-            <span className="sl-ringtip-trial">
-              {dayOfLine(trial)} · {daysLeftLine(trial)}
-              {trial.endsAt ? <span className="sl-ringtip-l">Ends {endsAtWords(trial.endsAt, { timeZone })}</span> : null}
-            </span>
-          )}
         </span>
       )}
     </span>
@@ -372,10 +367,10 @@ export function TrialEndedScreen({ open, onClose, onUpgrade, note }: { open: boo
   return (
     <SheetShell open={open} onClose={onClose} labelledBy="tr-t" describedBy="tr-b">
       <p className="sl-k">
-        <span className="l5-label">Your trial</span>
+        <span className="l5-label">Free access</span>
       </p>
       <h2 id="tr-t" className="os-title">
-        Seven days are up.
+        Your free access has ended.
       </h2>
       <p id="tr-b" className="os-sub">
         {note || TRIAL_ENDED_NOTE}
@@ -395,8 +390,8 @@ export function TrialEndedScreen({ open, onClose, onUpgrade, note }: { open: boo
 export function TrialEndedBar({ on, onOpen }: { on: boolean; onOpen: () => void }) {
   if (!on) return null;
   return (
-    <button type="button" className="sl-bar tr-bar" onClick={onOpen} aria-label="Your trial has ended. New AI requests need Socria One; everything you made stays open.">
-      <span className="sl-bar-t">Your trial has ended</span>
+    <button type="button" className="sl-bar tr-bar" onClick={onOpen} aria-label="Your free access has ended. New AI requests need Socria One; everything you made stays open.">
+      <span className="sl-bar-t">Your free access has ended</span>
       <span className="sl-bar-n">Continue with Socria One</span>
     </button>
   );

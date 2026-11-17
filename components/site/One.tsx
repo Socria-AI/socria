@@ -74,7 +74,7 @@ export function One() {
               <div className="s-o-go">
                 <OneJoin place="cover" />
                 <a className="s-o-free" href={START}>
-                  Start a seven-day trial
+                  Start free
                 </a>
               </div>
             </div>
@@ -103,7 +103,7 @@ export function One() {
               </div>
               <div className="s-o-cap">
                 <h2 id="s-o-c1">No daily limit</h2>
-                <p>Seven days to try it; then as many conversations as you have, with nothing counted.</p>
+                <p>As many conversations as you have, with nothing counted.</p>
               </div>
             </section>
 

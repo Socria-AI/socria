@@ -137,7 +137,7 @@ import { addCard as addDraftCard, emptyDoc, isEmptyDoc, type CardKind, type Writ
 import { normalizeDraft, storedFrom } from '@/lib/write/parse';
 import { describeWriting, type WriteSel } from '@/lib/write/focus';
 import type { AssistInput, AssistResult } from '@/lib/write/assist';
-import { boundaryNote, COUNTER_NOUN, COUNTERS, DIRECT_UPLOAD_BYTES, FEATURE_NOTE, limitsFor, nearLimit, resetsAt, type Counter } from '@/lib/entitlements';
+import { boundaryNote, COUNTER_NOUN, COUNTERS, DIRECT_UPLOAD_BYTES, FEATURE_NOTE, freePlanSentence, limitsFor, nearLimit, resetsAt, type Counter } from '@/lib/entitlements';
 import { failureText, sendFailure } from '@/lib/upstream-error';
 import { isModelOp, parseVizOps, stripVizOps, type VizModelState, type VizOp } from '@/lib/viz-model';
 import {
@@ -219,7 +219,7 @@ import { dayOfLine, todayLine, type TrialState } from '@/lib/trial';
 /** What the Socria One sheet says when it is opened from Sleep Mode. */
 const SLEEP_ONE = 'Socria One has no daily token allowance, so Socria stays awake — its own fair-use limits are the only ones.';
 /** What the Socria One sheet says when it is opened from the end of the trial. */
-const TRIAL_ONE = 'Your seven-day trial has ended. Socria One picks up where you left off, with no daily limit — and everything you made is already here.';
+const TRIAL_ONE = 'Your free access has ended. Socria One picks up where you left off, with no daily limit — and everything you made is already here.';
 import { NEW_FOR_MS, type TipAction } from '@/lib/logos5/tips';
 import { canvasElements, canvasTurns, closingAsk, ELEMENT_NOUN, excerpt as canvasExcerpt, turnOfEntry, type CanvasTurn } from '@/lib/logos5/canvas';
 import { InlineBlock } from '@/components/inline/InlineUI';
@@ -8306,8 +8306,8 @@ export function LogosApp({
   /** under the welcome's field, on the trial (lib/trial.ts): what starting means — its seven days begin with it, or which day it is */
   const welcomeNote = (() => {
     if (!isSignedIn || one || !planKnown || !trial) return null;
-    if (trial.status === 'eligible') return 'Your seven-day trial begins with this question.';
-    if (trial.status === 'active') return `${dayOfLine(trial)} of your trial — ${todayLine(trial.today)}.`;
+    if (trial.status === 'eligible') return `Free: ${freePlanSentence()}.`;
+    if (trial.status === 'active') return `${todayLine(trial.today)}.`;
     return null;
   })();
 

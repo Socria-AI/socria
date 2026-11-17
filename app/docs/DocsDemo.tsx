@@ -239,7 +239,7 @@ export function DemoLimitsTable() {
         <thead>
           <tr>
             <th>What</th>
-            <th>Seven-day trial</th>
+            <th>Free</th>
             <th>
               Socria One · {SOCRIA_ONE.currency}
               {SOCRIA_ONE.price}/{SOCRIA_ONE.period}

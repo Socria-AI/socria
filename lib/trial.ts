@@ -198,12 +198,12 @@ export const dayOfLine = (s: TrialState) => (s.status === 'active' ? `Day ${s.da
 /** "4 days left" / "Last day" */
 export function daysLeftLine(s: TrialState): string {
   if (s.status !== 'active') return '';
-  return s.daysLeft <= 1 ? 'Last day of your trial' : `${s.daysLeft} days left in your trial`;
+  return s.daysLeft <= 1 ? 'Last day of free access' : `${s.daysLeft} days of free access left`;
 }
 
 /** "18,600 of 20,000 left today" — or, spent, "Today’s 20,000 trial tokens are used". */
 export function todayLine(day: SleepState): string {
-  return day.asleep ? `Today’s ${formatTokens(day.limit)} trial tokens are used` : `${formatTokens(day.left)} of ${formatTokens(day.limit)} left today`;
+  return day.asleep ? `Today’s ${formatTokens(day.limit)} free tokens are used` : `${formatTokens(day.left)} of ${formatTokens(day.limit)} left today`;
 }
 
 /** "resets 00:00 UTC (in 5 h 12 min)" */
@@ -219,18 +219,18 @@ export function endsAtWords(at: number, opts: { locale?: string; timeZone?: stri
 }
 
 /** What a request refused for the day says — short, and never a scolding. */
-export const TRIAL_DAY_NOTE = `You’ve used today’s trial tokens. Socria rests until ${DAY_RESET_WORDS}, and everything you’ve made is still here.`;
+export const TRIAL_DAY_NOTE = `You’ve used today’s free tokens. Socria rests until ${DAY_RESET_WORDS}, and everything you’ve made is still here.`;
 
 /** What a request is told when the trial cannot be read: paused, plainly, and nothing lost (sent with 503). */
 // One instruction, said once: the app adds "Your message is back in the box — try sending it again" to a
 // failed send, so this sentence does not say to try again as well (it said so twice, November 9, 2026).
-export const TRIAL_UNAVAILABLE = 'Your trial can’t be checked right now, so new requests to Socria are paused for a moment. Everything you already have stays open.';
+export const TRIAL_UNAVAILABLE = 'Your free tokens can’t be checked right now, so new requests to Socria are paused for a moment. Everything you already have stays open.';
 
 /** What a request refused after the trial says. */
-export const TRIAL_ENDED_NOTE = 'Your seven-day trial has ended. New questions, Logic Maps and artifacts need Socria One. Everything you’ve made is still here to open, move and edit.';
+export const TRIAL_ENDED_NOTE = 'Your free access has ended. New questions, Logic Maps and artifacts need Socria One. Everything you’ve made is still here to open, move and edit.';
 
 /** What an account whose address has had a trial before is told. */
-export const TRIAL_CLAIMED_NOTE = 'This email address has already had a Socria trial. New questions, Logic Maps and artifacts need Socria One. Everything you’ve made is still here.';
+export const TRIAL_CLAIMED_NOTE = 'This email address has already used Socria’s free access. New questions, Logic Maps and artifacts need Socria One. Everything you’ve made is still here.';
 
 /** The body of a request refused because the trial is over (sent with 402). */
 export function trialEndedRefusal(s: TrialState): { error: string; trialEnded: true; reason: string; startedAt: number | null; endsAt: number | null } {
@@ -241,7 +241,7 @@ export function trialEndedRefusal(s: TrialState): { error: string; trialEnded: t
 export const TRIAL_ENDED_COOKIE = 'socria_trial_over';
 
 /** What the guest preview says on a browser whose account's trial is over: the preview is not a second trial. */
-export const GUEST_AFTER_TRIAL_NOTE = 'This browser’s Socria account has finished its trial, so the guest preview is closed here. Sign in to open everything you made, and continue with Socria One.';
+export const GUEST_AFTER_TRIAL_NOTE = 'This browser’s Socria account has used its free access, so the guest preview is closed here. Sign in to open everything you made, and continue with Socria One.';
 
 /** The guest routes' refusal for that browser (sent with 402). */
 export const guestAfterTrial = () => ({ error: GUEST_AFTER_TRIAL_NOTE, trialEnded: true as const, guestLimit: true as const, requiresKey: true as const });

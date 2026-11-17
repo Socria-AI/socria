@@ -73,7 +73,7 @@ export function softwareApplicationLd(): Ld {
     publisher: { '@id': ORG_ID },
     offers: [
       // there is no free plan: every account starts with a seven-day trial (lib/trial.ts), then Socria One
-      { '@type': 'Offer', name: 'Seven-day trial', price: '0', priceCurrency: currency, url: absoluteUrl('/sign-up') },
+      { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: currency, url: absoluteUrl('/sign-up') },
       {
         '@type': 'Offer',
         name: SOCRIA_ONE.name,
