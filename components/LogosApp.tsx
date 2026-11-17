@@ -124,7 +124,7 @@ import { saveTemplate, templateChoice, templateOf, templatePayload } from '@/lib
 import { useTemplates } from '@/components/logos5/useTemplates';
 import { MADE_OFFER, madeAsked, madeListed, madeOffer, mapArtifacts, pictureRepeatsDisplay, plotArtifact, readMade, writeMade, type MadeKey, type MadeRecord } from '@/lib/logos5/artifacts';
 import { cleanTitle } from '@/lib/session-rail';
-import { artifactFromSpec, describeInline, editsIn, inlineFrom, sanitizeInlineState, sanitizeInlineStateOne, specsIn, type DidItem, type InlineSpec, type InlineState } from '@/lib/inline-ui';
+import { artifactFromSpec, describeInline, editsIn, inlineFrom, markScopes, sanitizeInlineState, sanitizeInlineStateOne, specsIn, type DidItem, type InlineSpec, type InlineState } from '@/lib/inline-ui';
 import { buildStarters, PENDING_TYPES } from '@/lib/starters';
 import { billingError, billingLine } from '@/lib/billing-message';
 import { ContextPanel } from '@/components/ContextPanel';
@@ -10104,6 +10104,7 @@ export function LogosApp({
       <Fragment key={m.id ?? i}>
       <L5Message
         m={m}
+        markScope={m.id ? markScopes(messages).get(m.id) : undefined}
         side={side}
         who={shownWho(m)}
         group={groupView}
@@ -10384,6 +10385,8 @@ export function LogosApp({
           if (!msg) continue;
           if (el.kept) kept.add(el.kept);
           const state = sanitizeInlineState(msg.ui);
+          // what this reply's elements point at is lit across their cards (components/inline/marks.ts)
+          const scope = (msg.id && markScopes(messages).get(msg.id)) || msg.id;
           const noun = ELEMENT_NOUN[el.spec.type] ?? 'Element';
           const said = describeInline(el.spec, state?.[el.n]);
           cards.push({
@@ -10393,7 +10396,7 @@ export function LogosApp({
             kicker: el.lane === 'practice' ? 'Practice' : `Artifact · ${noun}`,
             title: el.title,
             turn: el.turn,
-            preview: <InlineBlock spec={el.spec} open={false} n={el.n} host={{ state, live: false, resolve: (n: number) => resolveInline(msg, n) }} renderInline={(t, k) => <RichInline text={t} math keyBase={`bd-${el.key}-${k}`} />} />,
+            preview: <InlineBlock spec={el.spec} open={false} n={el.n} host={{ state, live: false, resolve: (n: number) => resolveInline(msg, n), scope }} renderInline={(t, k) => <RichInline text={t} math keyBase={`bd-${el.key}-${k}`} />} />,
             // USED IN PLACE (Logos 6, the Everything view): the element itself, at full size and live — as it now stands
             // when it was kept (one identity) — and what is done with it kept as it is in the conversation
             live: (
@@ -10401,7 +10404,7 @@ export function LogosApp({
                 spec={el.spec}
                 open={false}
                 n={el.n}
-                host={{ state, live: true, resolve: (n: number) => resolveInline(msg, n), ...(!togetherReadOnly ? { onState: (n: number, st: InlineState) => keepInline(msg, n, st) } : {}) }}
+                host={{ state, live: true, resolve: (n: number) => resolveInline(msg, n), ...(!togetherReadOnly ? { onState: (n: number, st: InlineState) => keepInline(msg, n, st) } : {}), scope }}
                 renderInline={(t, k) => <RichInline text={t} math keyBase={`bdl-${el.key}-${k}`} />}
               />
             ),
@@ -10902,6 +10905,8 @@ export function LogosApp({
           if (!msg) continue;
           if (el.kept) kept.add(el.kept);
           const state = sanitizeInlineState(msg.ui);
+          // what this reply's elements point at is lit across their cards (components/inline/marks.ts)
+          const scope = (msg.id && markScopes(messages).get(msg.id)) || msg.id;
           const noun = ELEMENT_NOUN[el.spec.type] ?? 'Element';
           const draw = (live: boolean) => (
             <InlineBlock
@@ -10909,6 +10914,7 @@ export function LogosApp({
               open={false}
               n={el.n}
               host={{
+                scope,
                 state,
                 live,
                 resolve: (n: number) => resolveInline(msg, n),

@@ -29,9 +29,10 @@ import { Component, useEffect, useId, useMemo, useRef, useState, type ReactNode,
 import { compileExpr } from '@/lib/logos-math';
 import { linearScale, scaleAt, fmtNum } from '@/lib/objects/display-data';
 import { type EditSpec, CLAIM_SAID, decideLeaning, decideTally, graphReadings, HOLDS_SAID, inlinePlainText, meanSaid, pathAsk, SCORE_SAID, WEIGHT_SAID, type BalanceItem, type BalanceSpec, type DiagramSpec, type EquationSpec, type ChartSpec, type CheckPart, type ClaimSpec, type CompareSpec, type GraphFeature, type ConceptsSpec, type DecideSpec, type DraftSpec, type GraphSpec, type InlineSpec, type InlineState, type OptionsSpec, type ParamSpec, type PathsSpec, type PredictSpec, type ReasoningSpec, type SequenceSpec, type SimSpec, type SliderSpec, type StepsSpec, areaSaid, vectorSum, type VectorsSpec, type TraceSpec } from '@/lib/inline-ui';
-import { checkTyped, compileOver, compileOverT, curveFeatures, fitWindow, fitWindowAll, fmtPoint, fmtVal, prettyExpr, sampleCurve, samplePath, timeAt, type Feature, type Pt, type Seg } from '@/lib/inline-math';
+import { checkTyped, compileOver, compileOverT, curveFeatures, fitWindow, fitWindowAll, fmtPoint, fmtVal, prettyExpr, sampleCurve, samplePath, signedPieces, signedValue, timeAt, type Feature, type Pt, type Seg } from '@/lib/inline-math';
 import { DIAGRAM_ROLE_SAID, diagramColumns, diagramFigure, linksOf, treeRows, mindRows, mindLayout, defaultFolds, REL_SAID } from '@/lib/inline-diagram';
 import { TeX } from '@/components/TeX';
+import { useMarks } from './marks';
 import { copyText } from '@/lib/copy-text';
 // the one series palette (--ln-c1..6) is declared in the data display's sheet, so a chart here and
 // the same chart opened in Artifacts (components/display/DataFigure.tsx) draw their series alike
@@ -39,6 +40,8 @@ import '@/components/display/data.css';
 import './inline.css';
 
 export interface InlineHost {
+  /** the reply these elements belong to (its message id): what one points at lights in the others (./marks.ts) */
+  scope?: string;
   /** what was done with each element, by its position in the reply */
   state?: Record<string, InlineState>;
   onState?: (n: number, s: InlineState) => void;
@@ -234,7 +237,7 @@ function drawn(spec: InlineSpec, n: number, host: InlineHost | undefined, state:
     case 'decide':
       return <InlineDecide spec={spec} state={state} onState={host?.onState ? setState : undefined} onAsk={host?.onExplore ?? (host?.live ? host?.onChoose : undefined)} onOpen={host?.onOpen ? (s) => host.onOpen!(n, s) : undefined} />;
     case 'graph':
-      return <InlineGraph spec={spec} state={state} onState={setState} shared={!!host?.onState} renderInline={renderInline} />;
+      return <InlineGraph spec={spec} state={state} onState={setState} shared={!!host?.onState} renderInline={renderInline} scope={host?.scope} />;
     case 'sim':
       return <InlineSim spec={spec} state={state} onState={setState} shared={!!host?.onState} />;
     case 'check':
@@ -244,7 +247,7 @@ function drawn(spec: InlineSpec, n: number, host: InlineHost | undefined, state:
         </div>
       );
     case 'steps':
-      return <InlineSteps spec={spec} state={state} onState={setState} renderInline={renderInline} />;
+      return <InlineSteps spec={spec} state={state} onState={setState} renderInline={renderInline} scope={host?.scope} />;
     case 'claim':
       return <InlineClaim spec={spec} state={state} onState={setState} shared={!!host?.onState} renderInline={renderInline} />;
     case 'diagram':
@@ -1341,10 +1344,18 @@ function scrubbedIn(segs: Seg[] | null | undefined, out = new Set<string>()): Se
 const FEATURE_KINDS: Partial<Record<GraphFeature, Feature['kind']>> = { turning: 'turning', roots: 'root', intercept: 'intercept' };
 /** The second and third curves on one graph: each its own ink, named at its end. */
 const CURVE_TONE = ['', 'is-second', 'is-third'];
+
+/** Where a piece's value is set, given the curve's height at the piece's middle: inside it, clear of the axis's numbers. */
+const valueY = (h: number) => (h < 0 ? h * 0.62 : h * 0.45);
+
+/** A highlight where it is now: a point on the curve, or a stretch of it. */
+type Lit = { kind: 'point'; x: number; y: number; label: string } | { kind: 'span'; from: number; to: number; label: string };
+
 type Compiled = NonNullable<ReturnType<typeof compileOver>>;
 
-function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: GraphSpec; state?: InlineState; onState: (s: InlineState) => void; shared: boolean; renderInline: RenderInline }) {
+function InlineGraph({ spec, state, onState, shared, renderInline, scope }: { spec: GraphSpec; state?: InlineState; onState: (s: InlineState) => void; shared: boolean; renderInline: RenderInline; scope?: string }) {
   const names = useMemo(() => spec.params.map((p) => p.name), [spec]);
+  const marks = useMarks(scope);
   const c = useMemo(() => compileOver(spec.expr, names), [spec, names]);
   const segs = useMemo(() => prettyExpr(spec.expr, names), [spec, names]);
   // more curves over the same x and parameters (supply beside demand), each drawable or left off
@@ -1404,6 +1415,63 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
     if (labelled.length >= 4) break;
     const crowd = labelled.some((g) => Math.abs(X(g.x) - X(k.x)) < 64 && Math.abs(Y(g.y) - Y(k.y)) < 30);
     if (!crowd) labelled.push(k);
+  }
+  // WHAT THE WORDS POINT AT, where it is now: positions are numbers or formulas in the parameters, so they move
+  const hlAt = useMemo(
+    () =>
+      (spec.highlights ?? []).map((h) =>
+        [h.x, h.from, h.to].map((p) => {
+          if (p === undefined) return null;
+          if (typeof p === 'number') return () => p;
+          const cc = compileOver(p, names);
+          return (v: Record<string, number>) => (cc ? cc.eval({ ...v, x: 0 }) : NaN);
+        })
+      ),
+    [spec, names]
+  );
+  const hls = (spec.highlights ?? []).flatMap((h, i): Lit[] => {
+    const [ax, af, at] = hlAt[i].map((g) => (g ? g(values) : null));
+    if (ax !== null && Number.isFinite(ax)) {
+      const y = f(ax);
+      return [{ kind: 'point' as const, x: Math.max(x0, Math.min(x1, ax)), y: Math.max(y0, Math.min(y1, Number.isFinite(y) ? y : 0)), label: h.label }];
+    }
+    if (af !== null && at !== null && Number.isFinite(af) && Number.isFinite(at) && at > af) return [{ kind: 'span' as const, from: Math.max(x0, af), to: Math.min(x1, at), label: h.label }];
+    return [];
+  });
+  // where each badge sits: the first of a few places round what it points at that is clear of the badges already
+  // placed, of the rings it does not belong to and of the area's values — two highlights near one point never overlap
+  const signedArea = readings.area && !readings.area.between && !(readings.area.sum !== undefined && spec.area?.rects) ? readings.area : null;
+  const valueBoxes = (() => {
+    if (!signedArea || spec.quiet) return [];
+    const pieces = signedPieces((t) => f(t), signedArea.from, signedArea.to);
+    if (!(pieces.some((q) => q.v > 0) && pieces.some((q) => q.v < 0))) return [];
+    return pieces
+      .filter((q) => X(q.b) - X(q.a) >= 30)
+      .map((q) => ({ x: X((q.a + q.b) / 2), y: Math.max(14, Math.min(H - 6, Y(valueY(f((q.a + q.b) / 2))) + 5)) - 4 }));
+  })();
+  const rings = hls.flatMap((h) => (h.kind === 'point' ? [[X(h.x), Y(h.y)] as [number, number]] : []));
+  const badgeAt: [number, number][] = [];
+  for (const h of hls) {
+    const cands: [number, number][] = [];
+    if (h.kind === 'point') {
+      const px = X(h.x), py = Y(h.y);
+      for (const [dx, dy] of [[18, -18], [-18, -18], [18, 18], [-18, 18], [0, -28], [0, 28], [30, 0], [-30, 0]]) cands.push([px + dx, py + dy]);
+    } else {
+      const mid = (h.from + h.to) / 2, ym = f(mid);
+      if (signedArea && mid >= signedArea.from && mid <= signedArea.to) {
+        const vy = Y(valueY(ym));
+        cands.push([X(mid) - 34, vy], [X(mid) + 34, vy], [X(mid), vy - 22], [X(mid), vy + 22], [X(mid), Y(ym) + (ym >= 0 ? -18 : 18)]);
+      } else {
+        const off = ym >= 0 ? -18 : 18;
+        cands.push([X(mid), Y(ym) + off], [X(mid), Y(ym) - off], [X(mid) - 26, Y(ym)], [X(mid) + 26, Y(ym)]);
+      }
+    }
+    const clamp = ([x, y]: [number, number]): [number, number] => [Math.max(12, Math.min(W - 12, x)), Math.max(12, Math.min(H - 12, y))];
+    const clear = ([x, y]: [number, number]) =>
+      badgeAt.every(([bx, by]) => Math.hypot(bx - x, by - y) >= 22) &&
+      rings.every(([rx, ry]) => Math.hypot(rx - x, ry - y) >= 20) &&
+      valueBoxes.every((v) => Math.abs(v.x - x) > 32 || Math.abs(v.y - y) > 14);
+    badgeAt.push(cands.map(clamp).find(clear) ?? clamp(cands[0]));
   }
   const locked = !!spec.predict && picked === undefined && !skipped;
   const save = (next: InlineState) => onState({ ...latest.current, ...next });
@@ -1622,16 +1690,42 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
                 </g>
               );
             }
-            const n = 120;
-            const top: string[] = [], bottom: string[] = [];
-            for (let i = 0; i <= n; i++) {
-              const t = a.from + ((a.to - a.from) * i) / n;
-              const yt = f(t), yb = floor(t);
-              if (!Number.isFinite(yt) || !Number.isFinite(yb)) continue;
-              top.push(`${X(t).toFixed(1)},${clampY(yt).toFixed(1)}`);
-              bottom.unshift(`${X(t).toFixed(1)},${clampY(yb).toFixed(1)}`);
-            }
-            return top.length > 1 ? <polygon className="ln-area" points={[...top, ...bottom].join(' ')} aria-hidden="true" /> : null;
+            const shape = (from: number, to: number, cls: string, key?: string | number) => {
+              const n = 120;
+              const top: string[] = [], bottom: string[] = [];
+              for (let i = 0; i <= n; i++) {
+                const t = from + ((to - from) * i) / n;
+                const yt = f(t), yb = floor(t);
+                if (!Number.isFinite(yt) || !Number.isFinite(yb)) continue;
+                top.push(`${X(t).toFixed(1)},${clampY(yt).toFixed(1)}`);
+                bottom.unshift(`${X(t).toFixed(1)},${clampY(yb).toFixed(1)}`);
+              }
+              return top.length > 1 ? <polygon key={key} className={cls} points={[...top, ...bottom].join(' ')} aria-hidden="true" /> : null;
+            };
+            if (base) return shape(a.from, a.to, 'ln-area');
+            // TO THE AXIS, SIGNED: where the curve crosses, each piece in its own colour — below counts negative — and,
+            // when it has both, each piece's value computed here (never written by the reply), so "why is it 0?" is
+            // answered by the picture
+            const pieces = signedPieces((t) => f(t), a.from, a.to);
+            const both = pieces.some((q) => q.v > 0) && pieces.some((q) => q.v < 0);
+            return (
+              <g className="ln-areas">
+                {pieces.map((q, i) => shape(q.a, q.b, `ln-area${q.v < 0 ? ' is-below' : both ? ' is-above' : ''}`, i))}
+                {both &&
+                  !spec.quiet &&
+                  pieces.map((q, i) => {
+                    if (X(q.b) - X(q.a) < 30) return null;
+                    const mid = (q.a + q.b) / 2;
+                    const ym = valueY(f(mid));
+                    if (!Number.isFinite(ym)) return null;
+                    return (
+                      <text key={`v${i}`} className={`ln-area-v${q.v < 0 ? ' is-below' : ' is-above'}`} x={X(mid)} y={Math.max(14, Math.min(H - 6, Y(ym) + 5))} textAnchor="middle">
+                        {signedValue(q.v)}
+                      </text>
+                    );
+                  })}
+              </g>
+            );
           })()}
           {reshaped && fit && <path className="ln-curve is-ghost" d={pathOf(fit.pts, X, Y, y0, y1)} />}
           {reshaped &&
@@ -1680,7 +1774,7 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
             return (
               <g key={i} className={`ln-feat is-${k.kind}`}>
                 <circle className="ln-pt" cx={l.px} cy={l.py} r={k.kind === 'turning' || k.kind === 'crossing' ? 5 : 3.5} />
-                {labelled.includes(k) && (
+                {labelled.includes(k) && !hls.some((h) => h.kind === 'point' && Math.abs(X(h.x) - X(k.x)) < 6 && Math.abs(Y(h.y) - Y(k.y)) < 6) && (
                   <text x={l.tx} y={l.ty} textAnchor={l.anchor}>
                     {fmtPoint(k)}
                   </text>
@@ -1722,6 +1816,43 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
               </g>
             );
           })}
+          {hls.map((h, i) => {
+            const n = i + 1;
+            const cls = `ln-hl is-n${Math.min(4, n)}${marks.lit === n ? ' is-lit' : ''}${marks.lit && marks.lit !== n ? ' is-dim' : ''}`;
+            const badge = (bx: number, by: number) => (
+              <g
+                className="ln-hl-badge"
+                onPointerDown={(e) => e.stopPropagation()}
+                onPointerEnter={() => marks.enter(n)}
+                onPointerLeave={() => marks.leave()}
+                onClick={() => marks.press(n)}
+              >
+                <circle cx={bx} cy={by} r={9} />
+                <text x={bx} y={by + 3.6} textAnchor="middle">
+                  {n}
+                </text>
+              </g>
+            );
+            if (h.kind === 'point') {
+              return (
+                <g key={`hl${i}`} className={cls}>
+                  <circle className="ln-hl-ring" cx={X(h.x)} cy={Y(h.y)} r={marks.lit === n ? 12 : 9} />
+                  {badge(badgeAt[i][0], badgeAt[i][1])}
+                </g>
+              );
+            }
+            const d = Array.from({ length: 41 }, (_, k) => {
+              const t = h.from + ((h.to - h.from) * k) / 40;
+              const yt = f(t);
+              return Number.isFinite(yt) ? `${k ? 'L' : 'M'}${X(t).toFixed(1)},${Y(Math.max(y0, Math.min(y1, yt))).toFixed(1)}` : '';
+            }).join(' ');
+            return (
+              <g key={`hl${i}`} className={cls}>
+                <path className="ln-hl-span" d={d} />
+                {badge(badgeAt[i][0], badgeAt[i][1])}
+              </g>
+            );
+          })}
           {probe && !drag && probe.y >= y0 && probe.y <= y1 && (
             <g className="ln-probe" aria-hidden="true">
               <circle cx={X(probe.x)} cy={Y(probe.y)} r={3.5} />
@@ -1732,6 +1863,35 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
           )}
         </svg>
       </div>
+      {hls.length > 0 && (
+        <div className="ln-hl-list">
+          <span className="ln-hl-k">On the graph</span>
+          <ol>
+            {hls.map((h, i) => {
+              const n = i + 1;
+              return (
+                <li key={i}>
+                  <button
+                    type="button"
+                    className={`ln-hl-chip is-n${Math.min(4, n)}${marks.lit === n ? ' is-lit' : ''}`}
+                    aria-pressed={marks.lit === n}
+                    onMouseEnter={() => marks.enter(n)}
+                    onMouseLeave={() => marks.leave()}
+                    onFocus={() => marks.enter(n)}
+                    onBlur={() => marks.leave()}
+                    onClick={() => marks.press(n)}
+                  >
+                    <span className="ln-hl-n" aria-hidden="true">
+                      {n}
+                    </span>
+                    <span>{renderInline(h.label, `hl${i}`)}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      )}
       {reshaped && (
         <p className="ln-was" aria-hidden="true">
           <span className="is-now">now</span>
@@ -2196,8 +2356,9 @@ function CheckBox({ part, state, onState, renderInline, kicker = 'Your turn' }: 
 
 // ── the working, with their numbers ──────────────────────────────────
 
-function InlineSteps({ spec, state, onState, renderInline }: { spec: StepsSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline }) {
+function InlineSteps({ spec, state, onState, renderInline, scope }: { spec: StepsSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline; scope?: string }) {
   const [whys, setWhys] = useState<number[]>(state?.whys ?? []);
+  const marks = useMarks(scope);
   const latest = useRef(state);
   latest.current = state;
   const toggle = (i: number) => {
@@ -2211,8 +2372,19 @@ function InlineSteps({ spec, state, onState, renderInline }: { spec: StepsSpec; 
       <ol className="ln-lines">
         {spec.lines.map((l, i) => {
           const open = whys.includes(i);
+          const m = l.mark;
+          // a line about something on the graph carries its number: pointing at either lights both (./marks.ts)
           return (
-            <li key={i} className={open ? 'is-open' : undefined}>
+            <li
+              key={i}
+              className={[open ? 'is-open' : '', m ? `has-mark is-n${Math.min(4, m)}` : '', m && marks.lit === m ? 'is-lit' : ''].filter(Boolean).join(' ') || undefined}
+              {...(m ? { onMouseEnter: () => marks.enter(m), onMouseLeave: () => marks.leave() } : {})}
+            >
+              {m ? (
+                <button type="button" className="ln-step-mark" aria-pressed={marks.lit === m} aria-label={`Show ${m} on the graph`} onClick={() => marks.press(m)} onFocus={() => marks.enter(m)} onBlur={() => marks.leave()}>
+                  {m}
+                </button>
+              ) : null}
               <span className="ln-step">
                 <TeX tex={l.tex} />
               </span>

@@ -430,6 +430,13 @@ const FINANCE = /\b(?:finance|financial|trading|traders?|options|futures|swaps|h
 const LIMIT_ASK = /\b(?:limits?\s+(?:of|as|at)\b|(?:left|right|one|two)[- ]?(?:hand(?:ed)?|sided)\s+limits?|the\s+limit\b|a\s+limit\b|continuit\w*|(?:dis)?continuous|discontinu\w*|removable|jump\s+discontinuit\w*|hole\s+in\s+(?:the|a)\s+graph|open\s+(?:circle|dot|point)|as\s+x\s+(?:approaches|goes\s+to|tends\s+to|gets\s+close)|(?:approaches|tends\s+to)\s+[-−]?\d|x\s*(?:→|->)\s*[-−]?\d|lim\s*_?\s*\{?\s*x)/i;
 const NOT_LIMIT = /\b(?:speed|credit|age|word|character|time|rate|upload|file|size|spending|budget|legal|data|usage)\s+limits?\b|\blimits?\s+(?:of\s+(?:my|our|your|the\s+(?:law|account|plan|app))|on\s+(?:my|our|your))\b/i;
 /** Areas under curves, integrals and their sums. */
+/**
+ * Signed area, said in the words a calculus course uses — a picture's question on its own, without a formula in sight.
+ * "Net" and "total" area also name a house's floor space, so those two count only beside a calculus word.
+ */
+const SIGNED_AREA = /\bsigned\s+area\b|\bdefinite\s+integrals?\b|\barea\s+(?:below|beneath|under)\s+the\s+(?:x[\s-]?)?axis\b/i;
+const NET_AREA = /\b(?:net|total)\s+area\b/i;
+const CALCULUS_WORD = /\b(?:integrals?|integrat\w+|curve|axis|function|calculus|antiderivative|f\s*\(\s*x\s*\))\b/i;
 const AREA_ASK = /\b(?:integrals?|integrat(?:e|ion|ing)|area\s+under|riemann|(?:left|right|midpoint)\s+(?:sum|rule|endpoint)|trapezoid(?:al)?\s+rule|definite|antiderivative|accumulat\w+\s+(?:area|change)|fundamental\s+theorem\s+of\s+calculus)\b/i;
 /** Market structure with a price-setter: marginal revenue against marginal cost. */
 const MONOPOLY_ASK = /\b(?:monopol\w+|marginal\s+revenue|mr\s*=\s*mc|price[- ]setter|deadweight\s+loss|profit[- ]maximi[sz]\w*)\b/i;
@@ -543,7 +550,8 @@ export function planPresentation(i: PresentationInput): Presentation {
   const market = !livedOn && (MARKET_SURE.test(t) || (MARKET_SOFT.test(t) && (ECON.test(t) || domain === 'learning' || domain === 'business')));
   const elastic = ELASTIC.test(t) && (mathy || /\b(?:demand|supply|price|prices|pricing)\b/i.test(t));
   const limitAsk = LIMIT_ASK.test(t) && !NOT_LIMIT.test(t) && !/\bcontinuous\s+(?:integration|deployment|delivery|improvement|learning|monitoring|glucose)\b/i.test(t) && (mathy || /\b(?:x|f\s*\(|function|curve|graph|calculus|continuity|discontinu\w*|removable)\b/i.test(t));
-  const areaAsk = (AREA_ASK.test(t) && (mathy || /\b(?:curve|function|calculus|x)\b/i.test(t))) || SURPLUS_ASK.test(t);
+  const signedArea = SIGNED_AREA.test(t) || (NET_AREA.test(t) && (mathy || CALCULUS_WORD.test(t)));
+  const areaAsk = (AREA_ASK.test(t) && (mathy || /\b(?:curve|function|calculus|x)\b/i.test(t))) || signedArea || SURPLUS_ASK.test(t);
   const monopoly = MONOPOLY_ASK.test(t) && (ECON.test(t) || /\b(?:firm|market|output|quantity)\b/i.test(t) || domain === 'learning' || domain === 'business');
   const subject = SUBJECT.test(t) || ((domain === 'math' || domain === 'learning' || domain === 'research') && SUBJECT_GENERIC.test(t)) || mathRel || rate || market || elastic || limitAsk || areaAsk || monopoly || domain === 'math';
   const listAsked = LIST_ASK.test(t) || LIST_LEAD.test(t);
@@ -638,7 +646,7 @@ export function planPresentation(i: PresentationInput): Presentation {
   // an equals sign, not a curve to see — the working is the answer there)
   const proving = /\b(?:prove|proof|induction|show\s+that)\b/i.test(t);
   const liveOk = !tender && !story;
-  if (variant && liveOk && !namedLaw && work !== 'creation' && work !== 'diagnosis' && (work !== 'verification' || /\b(?:plot|graph|draw|sketch|show)\b/i.test(t)) && (plotted || (work !== 'practice' && !proving)) && x.kind !== 'brainstorm' && !claim && !comparing && (plotted || !STEPS_ASK.test(t)) && (plotted || understanding || WHY_HOW.test(t) || FORMULA.test(t) || variant === 'limit' || (variant === 'area' && /\b(?:riemann|surplus|area\s+under)\b/i.test(t)))) {
+  if (variant && liveOk && !namedLaw && work !== 'creation' && work !== 'diagnosis' && (work !== 'verification' || /\b(?:plot|graph|draw|sketch|show)\b/i.test(t)) && (plotted || (work !== 'practice' && !proving)) && x.kind !== 'brainstorm' && !claim && (!comparing || (variant === 'area' && signedArea)) && (plotted || !STEPS_ASK.test(t)) && (plotted || understanding || WHY_HOW.test(t) || FORMULA.test(t) || variant === 'limit' || (variant === 'area' && (signedArea || /\b(?:riemann|surplus|area\s+under)\b/i.test(t))))) {
     // (a limit is what a curve approaches against what it takes: asked as plainly as "what is the limit?", the picture
     // is the explanation — and so are rectangles under a curve, and a surplus)
     if (offer('graph', `graph:${variant}`)) graph = variant;
@@ -829,7 +837,7 @@ const GRAMMAR: Record<InlineKind, string> = {
   check:
     '{"type":"check","prompt":"Where is the vertex of y = 2x² − 8x + 3?","label":"x","answer":"-(-8)/(2*2)","explain":"x = −b/2a = 8/4 = 2"} — a question they work out and check: "answer" is plain arithmetic the engine evaluates, and "explain" shows only after they try. To let them try, never instead of explaining. Your prose: what it practises — never its answer.',
   steps:
-    '{"type":"steps","title":"Complete the square","lines":[{"tex":"y = x^2 - 8x + 10"},{"tex":"= (x^2 - 8x + 16) - 16 + 10","why":"half of −8, squared, makes a perfect square"},{"tex":"= (x-4)^2 - 6"}],"check":{"prompt":"Now you: where is the vertex of y = x² + 2x − 5?","label":"x","answer":"-2/2"}} — the working as lines of maths (TeX), with their own numbers when they have them; "why" folds under a line; "check" (optional) gives them one like it to do. Never the working that is theirs to do. Your prose: the method in a line; the lines carry the working.',
+    '{"type":"steps","title":"Complete the square","lines":[{"tex":"y = x^2 - 8x + 10"},{"tex":"= (x^2 - 8x + 16) - 16 + 10","why":"half of −8, squared, makes a perfect square"},{"tex":"= (x-4)^2 - 6"}],"check":{"prompt":"Now you: where is the vertex of y = x² + 2x − 5?","label":"x","answer":"-2/2"}} — the working as lines of maths (TeX), with their own numbers when they have them; "why" folds under a line; a line may carry "mark": n — the number of a highlight on a graph in the same reply that the line is about, so pointing at either lights the other; "check" (optional) gives them one like it to do. Never the working that is theirs to do. Your prose: the method in a line; the lines carry the working.',
   diagram:
     '{"type":"diagram","view":"flow","title":"How a fever starts","nodes":[{"id":"a","label":"An infection"},{"id":"b","label":"Immune signals released","detail":"they reach the brain through the blood"},{"id":"c","label":"The brain raises its set point"},{"id":"d","label":"Shivering heats the body"}],"edges":[["a","b"],["b","c"],["c","d"]]} — a chain from cause to effect (it may branch); 3–9 nodes, labels a few words, "detail" a line read when opened. Your prose: what drives it, in a sentence; the nodes carry the parts — do not also list them.',
   balance:
@@ -900,7 +908,14 @@ const PATHS_NEXT_IDEA =
  * and the tangent that matches it, not a parabola to reshape.
  */
 const GRAPH_MARKS = ' Everything marked on it — turning points, roots, crossings, slopes, where a tangent matches a chord, the readings — is computed on the curve as it is now, so state no value you have not computed.';
-const GRAPH_TAIL = GRAPH_MARKS + ' Your prose: one or two lines — what to try in it.';
+/**
+ * POINTING AT THE PICTURE (November 2026): the words say what to look at, and the picture shows it — numbered
+ * highlights Socria places on the curve, the same numbers in the prose and on the working's lines. An area that
+ * crosses the axis is split by sign and each piece's value computed by the code, never written by the reply.
+ */
+const GRAPH_POINTING =
+  ' Point at what your words are about with "highlights" (up to 4, numbered on the picture in order): {"x":2,"label":"crosses the axis: split here"} for a point on the curve, {"from":0,"to":2,"label":"below the axis: counts as negative"} for a stretch of it; x, from and to may be numbers or formulas in the parameters, so they move with them. In your prose, refer to them as ①, ②, ③ where you point at them. An area that crosses the axis is drawn in two colours, each piece with its signed value computed for you: never write those values on the picture yourself. A highlight is only for something your words explain — never decoration.';
+const GRAPH_TAIL = GRAPH_MARKS + GRAPH_POINTING + ' Your prose: one or two lines — what to try in it.';
 const GRAPH_GRAMMAR: Record<GraphVariant, string> = {
   plot:
     '{"type":"graph","title":"y = x²","expr":"x^2","x":[-3,3],"params":[],"features":["turning","roots","intercept"]} — the function exactly as they wrote it, over the range they gave (or one that shows its shape); no parameters unless they asked to vary something. One line of prose at most: what to notice, never a value you have not computed. If they want to come back to it, Keep files it in Artifacts.' + GRAPH_TAIL,

@@ -248,6 +248,8 @@ export interface GraphSpec {
   points?: GraphPoint[];
   /** a shaded region under the first curve (or between it and another), or rectangles that approximate it */
   area?: GraphArea;
+  /** what the reply's words point at, numbered on the picture in order (GraphHighlight) */
+  highlights?: GraphHighlight[];
   /** under the Answer Guard: the lines are drawn, the numbers that would answer it are not */
   quiet?: true;
   predict?: PredictSpec;
@@ -278,6 +280,18 @@ export interface GraphArea {
   label?: string;
 }
 export type GraphFeature = 'turning' | 'roots' | 'intercept' | 'crossings' | 'mean-value';
+/**
+ * WHAT THE WORDS POINT AT (November 2026). A point on the first curve (x) or a stretch of it (from–to), with what
+ * Socria says about it. Numbered on the picture in the order given; the reply's prose says ①, ②… where it points,
+ * and a line of the working can carry the same number (StepsSpec lines' `mark`), so pointing at either lights the
+ * other. Positions are numbers or formulas in the parameters, so they move with them. Never decoration: at most four.
+ */
+export interface GraphHighlight {
+  x?: number | string;
+  from?: number | string;
+  to?: number | string;
+  label: string;
+}
 /**
  * A SIMULATION, SMALL. A path traced over time — x(t) and y(t) over up to
  * three parameters (a throw: the angle, the speed) — from t0 to t1, either an
@@ -321,7 +335,7 @@ export interface CheckSpec extends CheckPart {
 export interface StepsSpec {
   type: 'steps';
   title?: string;
-  lines: { tex: string; why?: string }[];
+  lines: { tex: string; why?: string; mark?: number }[];
   check?: CheckPart;
 }
 /**
@@ -891,6 +905,27 @@ function numberOrFormula(v: unknown, names: readonly string[], vals: Record<stri
   return c && Number.isFinite(c.eval(vals)) ? e : null;
 }
 const RULES: readonly RiemannRule[] = ['left', 'right', 'mid'];
+/** The highlights a reply places: a point (x) or a stretch (from–to) inside the window as it starts, each with words; at most four. */
+function sanitizeHighlights(v: unknown, names: readonly string[], vals: Record<string, number>, x: [number, number]): GraphHighlight[] {
+  const out: GraphHighlight[] = [];
+  const at = (p: number | string) => (typeof p === 'number' ? p : compileExpr(p, [...names])?.eval(vals) ?? NaN);
+  const inside = (p: number | string) => {
+    const n = at(p);
+    return Number.isFinite(n) && n >= x[0] - 1e-9 && n <= x[1] + 1e-9;
+  };
+  for (const it of (Array.isArray(v) ? v : []).slice(0, 6)) {
+    const o = it && typeof it === 'object' ? (it as Record<string, unknown>) : null;
+    const label = line(o?.label ?? o?.say ?? o?.text, 90);
+    if (!o || !label) continue;
+    const px = o.x === undefined ? null : numberOrFormula(o.x, names, vals);
+    const pf = o.from === undefined ? null : numberOrFormula(o.from, names, vals);
+    const pt = o.to === undefined ? null : numberOrFormula(o.to, names, vals);
+    if (px !== null && inside(px)) out.push({ x: px, label });
+    else if (pf !== null && pt !== null && inside(pf) && inside(pt) && at(pt) > at(pf)) out.push({ from: pf, to: pt, label });
+    if (out.length >= 4) break;
+  }
+  return out;
+}
 /**
  * The points and the region, read against the curves they belong to (see GraphPoint). Returns null — the graph is not
  * drawn — when a point contradicts its curve; drops what is merely malformed.
@@ -1003,6 +1038,7 @@ function sanitizeGraph(r: Record<string, unknown>): GraphSpec | null {
   if (!marked) return null;
   // the first curve's name stays even when it is the only curve ("demand", with a point dragged along it)
   const label = line(r.label, L.label);
+  const highlights = sanitizeHighlights(r.highlights ?? r.callouts, names, vals, x);
   return {
     type: 'graph',
     ...(title ? { title } : {}),
@@ -1019,6 +1055,7 @@ function sanitizeGraph(r: Record<string, unknown>): GraphSpec | null {
     ...(readouts.length ? { readouts } : {}),
     ...(marked.points.length ? { points: marked.points } : {}),
     ...(marked.area ? { area: marked.area } : {}),
+    ...(highlights.length ? { highlights } : {}),
     ...(r.quiet === true ? { quiet: true as const } : {}),
     ...(predict ? { predict } : {}),
   };
@@ -1153,7 +1190,9 @@ function sanitizeSteps(r: Record<string, unknown>): StepsSpec | null {
     const tex = line(field(o, 'tex', 'math'), L.tex);
     if (!tex || TEX_UNSAFE.test(tex)) continue;
     const why = line(o?.why, L.why);
-    lines.push({ tex, ...(why ? { why } : {}) });
+    const m = Number(o?.mark ?? o?.highlight);
+    const mark = Number.isInteger(m) && m >= 1 && m <= 4 ? m : undefined;
+    lines.push({ tex, ...(why ? { why } : {}), ...(mark ? { mark } : {}) });
   }
   if (lines.length < 2) return null;
   const check = r.check === undefined ? null : sanitizeCheckPart(r.check);
@@ -1914,7 +1953,7 @@ export function inlinePlainText(spec: InlineSpec): string {
       const r0 = graphReadings(spec, vals);
       const pts = r0.points.map((q) => `${q.open ? 'an open circle (the curve approaches but does not take it)' : 'a filled point'} at (${fmtAt(q.x)}, ${fmtAt(q.y)})${q.label ? ` labelled ${q.label}` : ''}`);
       const marks = [spec.chord ? `the chord from x = ${spec.chord[0]} to x = ${spec.chord[1]} and its slope` : '', spec.tangent ? `the tangent at x = ${spec.tangent} and its slope` : '', spec.features.includes('mean-value') ? 'where a tangent runs parallel to the chord' : '', spec.features.includes('crossings') ? 'where the curves cross' : '', ...pts, r0.area ? areaSaid(r0.area) : '', ...(spec.readouts ?? []).map((ro) => `${ro.label} = ${ro.expr}`)].filter(Boolean);
-      return `${spec.title ? `${spec.title}: ` : ''}${curves}${spec.params.length ? ` (${spec.params.map((p) => `${p.label} = ${num(p.value)}`).join(', ')})` : ''}, x from ${num(spec.x[0])} to ${num(spec.x[1])}${marks.length ? `; showing ${marks.join(', ')}` : ''}${spec.predict ? `\n${spec.predict.prompt} ${spec.predict.options.join(' / ')}` : ''}`;
+      return `${spec.title ? `${spec.title}: ` : ''}${curves}${spec.params.length ? ` (${spec.params.map((p) => `${p.label} = ${num(p.value)}`).join(', ')})` : ''}, x from ${num(spec.x[0])} to ${num(spec.x[1])}${marks.length ? `; showing ${marks.join(', ')}` : ''}${spec.predict ? `\n${spec.predict.prompt} ${spec.predict.options.join(' / ')}` : ''}${spec.highlights?.length ? ` Pointed at: ${spec.highlights.map((h, i) => `${i + 1}. ${h.label}`).join('; ')}.` : ''}`;
     }
     case 'sim':
       return `${spec.title ? `${spec.title}: ` : 'A simulation: '}x(t) = ${spec.x}, y(t) = ${spec.y}; ${spec.params.map((p) => `${p.label} ${num(p.value)}${p.unit ?? ''}`).join(', ')}${spec.predict ? `\n${spec.predict.prompt} ${spec.predict.options.join(' / ')}` : ''}`;
@@ -1947,6 +1986,38 @@ export function inlinePlainText(spec: InlineSpec): string {
 }
 
 const UI_FENCE = /```[ \t]*ui[ \t]*\n([\s\S]*?)```/gi;
+
+/**
+ * WHICH GRAPH A REPLY'S NUMBERS POINT AT (components/inline/marks.ts). A graph's highlights are numbered; the working
+ * in the same reply — or in a later one that explains the same picture ("so how do I get the actual area?") — can
+ * carry those numbers. Each reply's scope is the id of the latest reply, at or before it, that holds a graph with
+ * highlights; a reply with none before it is its own scope. Read once per message list.
+ */
+const scopesSeen = new WeakMap<readonly unknown[], Map<string, string>>();
+export function markScopes(messages: readonly { id?: string; role?: string; content?: unknown }[]): Map<string, string> {
+  const seen = scopesSeen.get(messages);
+  if (seen) return seen;
+  const out = new Map<string, string>();
+  let last: string | null = null;
+  for (const m of messages) {
+    if (!m.id || m.role !== 'assistant' || typeof m.content !== 'string') continue;
+    let has = false;
+    if (m.content.includes('highlights')) {
+      for (const f of m.content.matchAll(UI_FENCE)) {
+        try {
+          const o = JSON.parse(f[1]);
+          if (o && o.type === 'graph' && Array.isArray(o.highlights) && o.highlights.length) has = true;
+        } catch {
+          // not a spec: nothing pointed at
+        }
+      }
+    }
+    if (has) last = m.id;
+    out.set(m.id, last ?? m.id);
+  }
+  scopesSeen.set(messages, out);
+  return out;
+}
 
 /** A reply's inline blocks in order, numbered as the renderer numbers them (every ```ui block counts, drawn or not). */
 /**

@@ -3619,12 +3619,15 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   --ln-g1: #456b1f;
   --ln-g2: #2a7bb0;
   --ln-g3: #c27a2e;
+  /* an area below the axis, counted negative (signed areas, November 2026); above it is --ln-g1 */
+  --ln-neg: #b0482f;
 }
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]),
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) :is(.logos-root, .lg-tokens) {
   --ln-g1: #3b7f3a;
   --ln-g2: #4c8fd6;
   --ln-g3: #c2843c;
+  --ln-neg: #d56b50;
 }
 
 /* ── mathematics: LaTeX, flags, notes ────────────────────────────── */
