@@ -32,15 +32,19 @@ import {
   lookFromTokens,
   normalizeLook,
   normalizeTokens,
+  STILL_MOTION,
   type DesignSpec,
   type DesignTokens,
   type Look,
+  type Motion,
   type Pad,
   type Patch,
   type Section,
   type Tone,
 } from './spec';
-import type { DesignBrief } from './types';
+import type { BriefPart, DesignBrief } from './types';
+import { motionFor, readMotionWords } from './motion';
+import { paletteFromSwatches, type BoardReading } from './references';
 
 // ── the visual languages ─────────────────────────────────────────────
 
@@ -89,6 +93,9 @@ export interface Language {
   };
   /** a second ink: the accent's hue turned by `turn` degrees at this saturation and lightness (for a light ground), or none */
   accent2: { turn: number; s: number; l: number } | null;
+  /** how it moves: the feels that belong to it, best first, and what it does its own way */
+  motion: Alt<Motion['feel']>;
+  moTweak?: Partial<Motion>;
   /** section variants that speak this language, best first */
   prefer: Record<string, readonly string[]>;
   /** the grounds sections sit on */
@@ -121,6 +128,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['plain'], motifs: [['numbering', 'captions', 'pull-quote'], ['captions', 'pull-quote']], shapes: [[]],
     },
     accent2: null,
+    motion: ['measured', 'calm'], moTweak: { hover: 'underline', parallax: 0, headline: 'mask', sections: 'none' },
     prefer: { hero: ['editorial', 'statement', 'split'], features: ['index', 'columns', 'numbered'], quote: ['pull', 'large'], stats: ['row'], cta: ['statement', 'band'], text: ['two-column', 'lead'], gallery: ['mosaic', 'grid'], split: ['image-left', 'image-right'], faq: ['two-column', 'accordion'], list: ['simple', 'schedule', 'menu'] },
     tones: { alternate: false },
     concept: (c) => `A considered broadsheet for ${c.audience}: serif headlines, heads set in a side column and hairline rules, so ${c.what} reads like something written, not sold.`,
@@ -149,6 +157,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['plain'], motifs: [['numbering', 'big-numerals'], ['big-numerals']], shapes: [[]],
     },
     accent2: null,
+    motion: ['lively', 'measured'], moTweak: { entrance: 'slide', ease: 'snap', hover: 'invert', sections: 'wipe', headline: 'mask', parallax: 0 },
     prefer: { hero: ['statement', 'split', 'editorial'], features: ['columns', 'numbered', 'index'], quote: ['pull'], stats: ['giant', 'row'], cta: ['statement', 'band'], text: ['two-column', 'lead'], gallery: ['grid'], faq: ['two-column'], list: ['simple', 'schedule'] },
     tones: { alternate: false, cta: 'accent' },
     concept: (c) => `A strict typographic system for ${c.audience}: one grotesk, a hard column grid and a single loud colour, so ${c.what} feels exact and certain.`,
@@ -177,6 +186,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['inset', 'arch'], motifs: [['captions'], []], shapes: [[]],
     },
     accent2: null,
+    motion: ['calm'], moTweak: { duration: 1150, ease: 'gentle', entrance: 'fade', headline: 'fade', parallax: 1, hover: 'zoom', distance: 10 },
     prefer: { hero: ['full-bleed', 'centered', 'split'], features: ['columns', 'list'], quote: ['large'], stats: ['row'], cta: ['centered', 'statement'], text: ['narrow', 'lead'], gallery: ['strip', 'mosaic'], split: ['image-left', 'image-right'], faq: ['accordion'], list: ['menu', 'simple'] },
     tones: { alternate: false, quote: 'alt', cta: 'alt' },
     concept: (c) => `Quiet luxury for ${c.audience}: light serif type, wide margins and very little colour, so ${c.what} feels unhurried and certain of its worth.`,
@@ -205,6 +215,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['plain', 'offset'], motifs: [['marquee', 'big-numerals', 'shapes'], ['marquee', 'big-numerals']], shapes: [['circle', 'square'], ['diamond', 'circle']],
     },
     accent2: { turn: 40, s: 0.85, l: 0.56 },
+    motion: ['kinetic', 'lively'], moTweak: { hover: 'invert', sections: 'expand' },
     prefer: { hero: ['poster', 'statement', 'full-bleed'], features: ['numbered', 'index'], quote: ['pull'], stats: ['giant', 'band'], cta: ['statement', 'band'], text: ['lead'], gallery: ['strip', 'grid'], faq: ['accordion'], list: ['schedule', 'simple'] },
     tones: { alternate: true, stats: 'invert', quote: 'accent2', cta: 'accent' },
     concept: (c) => `A poster for ${c.audience}: headlines as big as the screen allows, colour bands edge to edge and a running marquee, so ${c.what} is impossible to scroll past.`,
@@ -233,6 +244,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['arch', 'circle'], motifs: [['shapes', 'captions'], ['shapes']], shapes: [['arch', 'circle'], ['circle', 'blob']],
     },
     accent2: { turn: 35, s: 0.5, l: 0.72 },
+    motion: ['calm', 'measured'], moTweak: { hover: 'lift', entrance: 'rise', parallax: 1 },
     prefer: { hero: ['split', 'editorial', 'centered'], features: ['list', 'grid'], quote: ['with-portrait', 'large'], stats: ['row'], cta: ['image', 'band'], text: ['narrow', 'lead'], gallery: ['mosaic', 'grid'], list: ['menu', 'schedule'], split: ['image-left', 'image-right'], faq: ['accordion'] },
     tones: { alternate: true, cta: 'accent', quote: 'alt' },
     concept: (c) => `A warm, hand-set page for ${c.audience}: a soft serif, a cream ground and photographs in arched frames, so ${c.what} feels like a place you already know.`,
@@ -261,6 +273,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['arch', 'circle'], motifs: [['shapes', 'numbering'], ['shapes']], shapes: [['arch', 'circle', 'quarter', 'square', 'diamond'], ['circle', 'quarter', 'square']],
     },
     accent2: { turn: -60, s: 0.78, l: 0.66 },
+    motion: ['measured'], moTweak: { duration: 320, stagger: 60, distance: 12, ease: 'out', entrance: 'rise', headline: 'mask', hover: 'lift', parallax: 1, sections: 'none' },
     prefer: { hero: ['statement', 'split', 'editorial'], features: ['columns', 'numbered', 'index'], quote: ['pull', 'large'], stats: ['giant', 'row'], cta: ['statement', 'band'], text: ['lead', 'two-column'], gallery: ['mosaic'], faq: ['two-column', 'accordion'], list: ['simple'] },
     tones: { alternate: false, cta: 'accent', stats: 'accent2', quote: 'alt' },
     concept: (c) => `Paper, ink and a few flat shapes for ${c.audience}: a scholarly serif asks, a precise grotesk answers, so ${c.what} feels thoughtful and open rather than technical.`,
@@ -289,6 +302,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['plain'], motifs: [['numbering', 'icons'], ['numbering']], shapes: [[]],
     },
     accent2: null,
+    motion: ['measured'], moTweak: { duration: 220, stagger: 30, distance: 8, ease: 'snap', entrance: 'fade', headline: 'fade', parallax: 0, hover: 'underline', sections: 'none' },
     prefer: { hero: ['statement', 'split'], features: ['grid', 'index'], quote: ['large'], stats: ['row', 'band'], cta: ['band', 'statement'], text: ['two-column'], faq: ['two-column'], list: ['schedule', 'simple'], gallery: ['grid'] },
     tones: { alternate: false, cta: 'invert' },
     concept: (c) => `An instrument panel for ${c.audience}: mono labels, a modular ruled grid and exact numbers, so ${c.what} reads as something built carefully.`,
@@ -317,6 +331,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['plain'], motifs: [['captions'], ['captions', 'numbering']], shapes: [[]],
     },
     accent2: null,
+    motion: ['calm', 'still'], moTweak: { duration: 1200, entrance: 'fade', headline: 'fade', parallax: 0, hover: 'none', distance: 0 },
     prefer: { hero: ['full-bleed', 'editorial', 'split'], features: ['columns', 'list'], quote: ['large'], stats: ['row'], cta: ['statement'], text: ['narrow', 'two-column'], gallery: ['mosaic', 'strip', 'grid'], split: ['image-right', 'image-left'], faq: ['accordion'], list: ['simple'] },
     tones: { alternate: false },
     concept: (c) => `A white cube for ${c.audience}: the work at full size, small exact type and asymmetric space, so ${c.what} gets out of the way of what it shows.`,
@@ -345,6 +360,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['circle', 'arch'], motifs: [['shapes'], ['shapes', 'captions']], shapes: [['blob', 'circle'], ['circle', 'arch']],
     },
     accent2: { turn: 40, s: 0.35, l: 0.8 },
+    motion: ['calm'], moTweak: { entrance: 'rise', hover: 'lift', parallax: 1, ease: 'gentle' },
     prefer: { hero: ['split', 'centered'], features: ['grid', 'list'], quote: ['with-portrait', 'large'], stats: ['row'], cta: ['band', 'centered'], text: ['narrow'], faq: ['accordion'], list: ['simple', 'schedule'], gallery: ['grid'], split: ['image-left', 'image-right'] },
     tones: { alternate: true, cta: 'accent' },
     concept: (c) => `Soft ground for ${c.audience}: a light humane serif, tinted grounds and round forms, so ${c.what} feels safe to take a first step on.`,
@@ -373,6 +389,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['plain'], motifs: [['icons', 'numbering'], ['numbering']], shapes: [[]],
     },
     accent2: null,
+    motion: ['still', 'calm'], moTweak: { duration: 300, entrance: 'fade', headline: 'none', parallax: 0, hover: 'underline', sections: 'none' },
     prefer: { hero: ['statement', 'split'], features: ['list', 'grid', 'index'], quote: ['large'], stats: ['row', 'band'], cta: ['band'], text: ['narrow'], faq: ['accordion'], list: ['schedule', 'simple'], form: ['stacked', 'split'], gallery: ['grid'] },
     tones: { alternate: true, cta: 'accent', stats: 'alt' },
     concept: (c) => `A clear public service for ${c.audience}: plain language, strong contrast and big obvious actions, so ${c.what} gets everyone to what they came for.`,
@@ -401,6 +418,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['plain'], motifs: [['marquee', 'captions'], ['captions', 'numbering']], shapes: [[]],
     },
     accent2: null,
+    motion: ['lively', 'calm'], moTweak: { headline: 'mask', parallax: 2, hover: 'zoom', sections: 'wipe' },
     prefer: { hero: ['full-bleed', 'poster', 'statement'], features: ['index', 'numbered'], quote: ['pull'], stats: ['giant'], cta: ['statement', 'image'], text: ['lead'], gallery: ['strip', 'mosaic'], list: ['menu', 'schedule'], faq: ['accordion'] },
     tones: { alternate: false, cta: 'accent' },
     concept: (c) => `After dark for ${c.audience}: a black ground, light type and one bright accent, so ${c.what} feels like the lights going down.`,
@@ -429,6 +447,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['offset'], motifs: [['shapes', 'marquee', 'numbering'], ['shapes', 'numbering']], shapes: [['circle', 'diamond'], ['square', 'circle']],
     },
     accent2: { turn: 150, s: 0.7, l: 0.5 },
+    motion: ['kinetic', 'lively'], moTweak: { entrance: 'slide', hover: 'invert', sections: 'wipe', ease: 'snap' },
     prefer: { hero: ['poster', 'split', 'statement'], features: ['numbered', 'grid'], quote: ['pull', 'large'], stats: ['giant', 'band'], cta: ['band', 'statement'], text: ['lead'], gallery: ['grid', 'mosaic'], list: ['menu', 'schedule'], faq: ['accordion'] },
     tones: { alternate: false, cta: 'accent', stats: 'accent2', quote: 'invert' },
     concept: (c) => `Two inks on newsprint for ${c.audience}: a chunky serif, framed boxes with hard shadows and a running ticker, so ${c.what} feels made by people, not a template.`,
@@ -458,6 +477,9 @@ const CLASHES: Record<string, readonly string[]> = {
   'retro-print': ['luxury', 'clinic', 'patients', 'legal', 'bank', 'funeral', 'pension', 'hotel', 'spa', 'enterprise'],
 };
 
+/** How well each language suits a working interface (an app screen), added to its fit when the designer's words do not name one. */
+const APP_FIT: Record<string, number> = { utility: 7, civic: 4, swiss: 3, geometric: 2, organic: 0, broadsheet: -1, craft: -3, gallery: -3, night: -2, 'quiet-luxury': -5, poster: -6, 'retro-print': -5 };
+
 /** Words people use for a language, by its id. */
 const SYNONYMS: Record<string, readonly string[]> = {
   broadsheet: ['newspaper', 'broadsheet', 'editorial', 'magazine', 'literary', 'journal'],
@@ -476,9 +498,9 @@ const SYNONYMS: Record<string, readonly string[]> = {
 
 // ── the direction ────────────────────────────────────────────────────
 
-export const LOCK_GROUPS = ['palette', 'type', 'layout', 'surface', 'imagery', 'motifs', 'voice'] as const;
+export const LOCK_GROUPS = ['palette', 'type', 'layout', 'surface', 'imagery', 'motifs', 'motion', 'voice'] as const;
 export type LockGroup = (typeof LOCK_GROUPS)[number];
-export const LOCK_LABEL: Record<LockGroup, string> = { palette: 'Colours', type: 'Type', layout: 'Layout', surface: 'Surfaces', imagery: 'Imagery', motifs: 'Motifs', voice: 'Voice' };
+export const LOCK_LABEL: Record<LockGroup, string> = { palette: 'Colours', type: 'Type', layout: 'Layout', surface: 'Surfaces', imagery: 'Imagery', motifs: 'Motifs', motion: 'Motion', voice: 'Voice' };
 
 export interface ArtDirection {
   id: string;
@@ -527,7 +549,52 @@ export const EMPTY_DIRECTION: DirectionState = { options: [], chosen: null, appr
 
 /** A short fingerprint of a brief, to know when directions were made for an older one. */
 export function briefKey(b: DesignBrief): string {
-  return hash(JSON.stringify([b.objective, b.audience, b.personality, b.visualDirection, b.layoutDirection, b.palette, b.typography, b.pageType])).toString(36);
+  return hash(JSON.stringify([b.objective, b.audience, b.personality, b.visualDirection, b.layoutDirection, b.palette, b.typography, b.pageType, b.decisions ?? null, b.spec ?? null, b.rules ?? null])).toString(36);
+}
+
+/** A brief part, and the direction group it governs. */
+export const PART_GROUP: Partial<Record<BriefPart, LockGroup>> = { colour: 'palette', typography: 'type', layout: 'layout', imagery: 'imagery', motion: 'motion' };
+
+/**
+ * The brief's own decisions, on a direction. A part the designer locked is
+ * applied to every option and locked there, so asking again, regenerating and
+ * refining keep it. An exact specification they set but did not lock shapes the
+ * faithful reading only: the other options explore around it. A delegated part
+ * leaves the engine free. AAA contrast lifts every text colour to 7:1.
+ */
+export function applyBrief(dir: ArtDirection, brief: DesignBrief, faithful: boolean): ArtDirection {
+  const dec = brief.decisions ?? {};
+  const sp = brief.spec ?? {};
+  const out: ArtDirection = { ...dir, tokens: { ...dir.tokens, colors: { ...dir.tokens.colors }, fonts: { ...dir.tokens.fonts } }, look: { ...dir.look }, locks: [...dir.locks] };
+  const lock = (g: LockGroup) => {
+    if (!out.locks.includes(g)) out.locks.push(g);
+  };
+  const use = (part: BriefPart) => dec[part] === 'locked' || (faithful && dec[part] !== 'delegated');
+  if (dec.colour === 'locked' && brief.palette.length) {
+    out.tokens = normalizeTokens({ ...out.tokens, colors: { ...briefColors(brief) } }, []);
+    lock('palette');
+  }
+  if (dec.typography === 'locked') {
+    out.tokens.fonts = { display: brief.typography.display, body: brief.typography.body };
+    out.look.weight = nearestWeight(brief.typography.display, out.look.weight);
+    lock('type');
+  }
+  if (sp.ratio && use('typography')) out.look.ratio = sp.ratio;
+  if (sp.density && use('layout')) out.tokens.scale = sp.density;
+  if (sp.grid && use('layout')) out.look.grid = sp.grid;
+  if (sp.width && use('layout')) out.look.width = sp.width;
+  if (sp.corners && use('layout')) out.tokens.radius = sp.corners;
+  if (dec.layout === 'locked' && (sp.density || sp.grid || sp.width)) lock('layout');
+  if (dec.layout === 'locked' && sp.corners) lock('surface');
+  if (sp.motion && use('motion')) out.look.motion = { ...sp.motion };
+  if (dec.motion === 'locked' && sp.motion) lock('motion');
+  if (sp.contrast === 'AAA') {
+    const c = out.tokens.colors;
+    out.tokens.colors = { ...c, text: ensureContrast(c.text, c.background, 7), muted: ensureContrast(c.muted, c.background, 7), accentText: ensureContrast(c.accentText, c.accent, 7) };
+  }
+  // square corners mean square buttons as well
+  if (out.tokens.radius === 'none' && out.look.buttons === 'pill' && (sp.corners === 'none' || (brief.rules ?? []).some((r) => /\bno (rounded|round corners|pills?)\b|\bsquare corners\b/i.test(r)))) out.look.buttons = 'solid';
+  return out;
 }
 
 // ── helpers ──────────────────────────────────────────────────────────
@@ -647,6 +714,8 @@ export function fitScores(brief: DesignBrief, notes = '', avoid = ''): Fit[] {
     if (l.display.includes(brief.typography.display)) score += 1.5;
     if (l.palette === 'dark' && bgDark) score += 4;
     if (l.palette === 'dark' && !bgDark) score -= 1.5;
+    // an app screen is a working interface: languages built for interfaces come forward, posters and showrooms step back
+    if (brief.pageType === 'app-screen' && !asked) score += APP_FIT[l.id] ?? 0;
     return { id: l.id, score: Math.round(score * 100) / 100, matched: [...matched].slice(0, 6) };
   }).sort((a, b) => b.score - a.score);
 }
@@ -730,6 +799,12 @@ interface Directives {
   minimal?: boolean;
   loud?: boolean;
   accent?: string;
+  /** what the words say about motion */
+  motion?: Motion['feel'];
+  parallax?: boolean;
+  /** a composition the designer's references ask for */
+  grid?: Look['grid'];
+  density?: 'airy' | 'dense';
   fonts: string[];
   said: string[];
 }
@@ -740,18 +815,28 @@ export function readDirectives(notes: string, avoid: string): Directives {
   const d: Directives = { fonts: [], said: [] };
   const say = (s: string) => d.said.push(s);
   if (/\b(dark|darker|black background|night|nighttime|night-time|dark mode|moody|after dark)\b/.test(n) && !/\b(not|no) dark\b/.test(n)) (d.dark = true), say('a dark ground');
-  if (/\b(dark|black)\b/.test(a) || /\b(light|bright|white background)\b/.test(n)) (d.dark = false), say('a light ground');
+  // "a light ground", "white background", "light and airy": the colour of the page. Not "the light" of a
+  // photograph ("the light, not the bar itself"), which is atmosphere, and not "bright colours", which is colour.
+  const lightGround = /\b(light|pale|white|bright) (ground|background|backgrounds|mode|theme|page|pages|paper)\b|\b(light|pale) (palette|colou?rs?|tones?)\b|\b(light|bright) and airy\b|\bairy and (light|bright)\b/;
+  if (/\b(dark|black)\b/.test(a) || (lightGround.test(n) && !/\b(no|not) (light|white|bright)\b/.test(n))) (d.dark = false), say('a light ground');
   if (/\b(no|not|without) serifs?\b/.test(n) || /\bserifs?\b/.test(a)) (d.serif = false), say('sans-serif headlines');
   else if (/\bserif\b/.test(n) && !/\bsans\b/.test(n)) (d.serif = true), say('serif headlines');
   else if (/\bsans\b/.test(n)) (d.serif = false), say('sans-serif headlines');
-  if (/\b(uppercase|all caps|capitals)\b/.test(n)) (d.upper = true), say('capitals for headlines');
-  if (/\b(uppercase|all caps|capitals|caps)\b/.test(a)) (d.upper = false), say('no capitals');
-  if (/\b(rounded|round|soft corners|friendly shapes)\b/.test(n)) (d.corners = 'round'), say('rounded corners');
+  const noCaps = /\b(no|not|without|avoid|never) (uppercase|all caps|capitals|caps)\b/.test(n) || /\b(uppercase|all caps|capitals|caps)\b/.test(a);
+  if (!noCaps && /\b(uppercase|all caps|capitals)\b/.test(n)) (d.upper = true), say('capitals for headlines');
+  if (noCaps) (d.upper = false), say('no capitals');
+  if (/\b(rounded|round|soft corners|friendly shapes)\b/.test(n) && !/\b(no|not|without|avoid|never) (rounded|round)\b/.test(n)) (d.corners = 'round'), say('rounded corners');
   if (/\b(sharp|square|hard edges|no rounded)\b/.test(n) || /\b(rounded|round corners)\b/.test(a)) (d.corners = 'none'), say('square corners');
   if (/\b(no (photos|images|photography|pictures)|type only|typographic only)\b/.test(n) || /\b(photos|images|photography|stock)\b/.test(a)) (d.noImages = true), say('type before pictures');
   if (/\b(colou?rful|vibrant|bright colou?rs|multicolou?r)\b/.test(n)) (d.colourful = true), say('more colour');
   if (/\b(minimal|minimalist|spare|restrained|quiet)\b/.test(n)) (d.minimal = true), say('restraint');
-  if (/\b(bold|loud|big type|huge type|punchy|striking)\b/.test(n)) (d.loud = true), say('bigger, bolder type');
+  if (/\b(bold|bolder|loud|louder|punchy|striking|oversized|(big|bigger|huge|giant|massive|enormous) (type|headlines?|letters|typography))\b/.test(n)) (d.loud = true), say('bigger, bolder type');
+  const mo = readMotionWords(notes);
+  if (mo.feel) d.motion = mo.feel;
+  if (mo.parallax !== undefined) d.parallax = mo.parallax;
+  if (/\b(motion|animation|animations|moving)\b/.test(a)) (d.motion = 'still'), mo.said.splice(0, mo.said.length, 'no motion');
+  if (/\bparallax\b/.test(a)) (d.parallax = false), mo.said.includes('no parallax') || mo.said.push('no parallax');
+  for (const x of mo.said) say(x);
   const hexes = notes.match(/#[0-9a-f]{6}\b/i);
   if (hexes) (d.accent = hexes[0].toLowerCase()), say(`${d.accent} as the accent`);
   for (const f of FONTS) if (n.includes(f.name.toLowerCase())) d.fonts.push(f.name);
@@ -785,6 +870,10 @@ export interface BuildOptions {
   usedFonts?: Set<string>;
   /** the designer's own words, for saying why it fits */
   notes?: string;
+  /** colours to start from instead of the brief's (sampled from references kept for their colour) */
+  baseColors?: Partial<DesignTokens['colors']>;
+  /** where those colours came from, for saying why */
+  colorNote?: string;
 }
 
 /** One direction, from a language and the brief. Deterministic for a seed. */
@@ -797,15 +886,18 @@ export function buildDirection(lang: Language, brief: DesignBrief, opt: BuildOpt
   let strategy: PaletteStrategy = lang.palette;
   if (d.dark === true) strategy = 'dark';
   if (d.dark === false && strategy === 'dark') strategy = 'paper';
-  const base = briefColors(brief);
+  const base = { ...briefColors(brief), ...(opt.baseColors ?? {}) };
   if (d.accent) base.accent = d.accent;
-  let colors = f && d.dark === undefined ? { ...base, accentText: base.accentText } : paletteFor(strategy, base);
+  // the faithful reading keeps the brief's palette and type, unless the designer left them to SocriaUX
+  const keepColours = f && brief.decisions?.colour !== 'delegated';
+  const keepType = f && brief.decisions?.typography !== 'delegated';
+  let colors = (keepColours && d.dark === undefined) || opt.baseColors ? { ...base, accentText: base.accentText } : paletteFor(strategy, base);
   if (f && d.dark === true && !isDark(colors.background)) colors = paletteFor('dark', base);
   // type
   const used = opt.usedFonts ?? new Set<string>();
   const wantSerif = d.serif;
-  let display = f ? brief.typography.display : fontFor(lang.display, r, false, used, wantSerif);
-  let body = f ? brief.typography.body : fontFor(lang.body, r, false, new Set([display]), undefined);
+  let display = keepType ? brief.typography.display : fontFor(lang.display, r, false, used, wantSerif);
+  let body = keepType ? brief.typography.body : fontFor(lang.body, r, false, new Set([display]), undefined);
   if (f && wantSerif !== undefined && (knownFont(display)?.kind === 'serif') !== wantSerif) display = fontFor(lang.display, r, true, new Set(), wantSerif);
   if (d.fonts.length) {
     display = d.fonts[0];
@@ -829,6 +921,13 @@ export function buildDirection(lang: Language, brief: DesignBrief, opt: BuildOpt
     if (!shapes.length) shapes = ['circle', 'square'];
   }
   if (!motifs.includes('shapes')) shapes = [];
+  // motion: the language's own feel, unless the words ask for another; restraint and loudness move it a step
+  let feel: Motion['feel'] = d.motion ?? nth(lang.motion, r, f);
+  if (!d.motion && d.minimal) feel = feel === 'kinetic' ? 'measured' : feel === 'lively' ? 'calm' : feel;
+  if (!d.motion && d.loud && feel !== 'still') feel = feel === 'calm' ? 'measured' : feel === 'measured' ? 'lively' : 'kinetic';
+  // the language's own way of moving applies to its own feels; a feel the designer asks for that it does not have comes as itself
+  const motion: Motion = feel === 'still' ? { ...STILL_MOTION } : (lang.motion as readonly string[]).includes(feel) ? motionFor(feel, lang.moTweak) : motionFor(feel);
+  if (feel !== 'still' && d.parallax !== undefined) motion.parallax = d.parallax ? Math.max(1, motion.parallax) : 0;
   let containers = nth(L.containers, r, f);
   if (d.colourful && containers === 'open') containers = 'bands';
   const turn = lang.accent2 ?? (d.colourful ? { turn: 150, s: 0.6, l: 0.6 } : null);
@@ -842,17 +941,19 @@ export function buildDirection(lang: Language, brief: DesignBrief, opt: BuildOpt
       emphasis: nth(L.emphasis, r, f),
       label: d.upper === false && nth(L.label, r, f) === 'caps' ? 'sentence' : nth(L.label, r, f),
       mono: monoName,
-      grid: nth(L.grid, r, f),
+      grid: d.grid ?? nth(L.grid, r, f),
       align: nth(L.align, r, f),
       width: nth(L.width, r, f),
       rhythm: nth(L.rhythm, r, f),
       containers,
       rules: nth(L.rules, r, f),
-      buttons: nth(L.buttons, r, f),
+      // drawn once, where it always was, so the options' other choices stay as they were; square corners make pills solid
+      buttons: ((b) => (d.corners === 'none' && b === 'pill' ? 'solid' : b))(nth(L.buttons, r, f)),
       frame: d.noImages ? 'plain' : nth(L.frame, r, f),
       motifs,
       shapes,
       accent2: turn === null ? '' : secondInk(colors.accent, turn, colors.background),
+      motion,
     },
     lookFromTokens(DEFAULT_TOKENS)
   );
@@ -863,7 +964,7 @@ export function buildDirection(lang: Language, brief: DesignBrief, opt: BuildOpt
     {
       colors,
       fonts: { display, body },
-      scale: nth(lang.scale, r, f),
+      scale: d.density === 'airy' ? 'spacious' : d.density === 'dense' ? 'compact' : nth(lang.scale, r, f),
       radius: d.corners ?? nth(lang.radius, r, f),
       style: lang.style,
       imageTreatment: nth(lang.treatment, r, f),
@@ -876,6 +977,7 @@ export function buildDirection(lang: Language, brief: DesignBrief, opt: BuildOpt
     fit && fit.matched.length ? `${opt.notes ? 'Your brief and notes speak' : 'The brief speaks'} of ${fit.matched.slice(0, 3).join(', ')}; ${lang.name.toLowerCase()} is a language built for that.` : `A deliberate contrast to the obvious reading of the brief: ${lang.blurb.split(':')[0]}.`,
     f && d.dark === undefined && !d.accent ? 'Keeps the palette and type pair you approved in the brief exactly as they are.' : f ? `Keeps your brief’s type; its colours move ${d.dark ? 'onto a dark ground' : 'to the accent you named'}, as your notes ask.` : `Takes the brief’s accent into ${strategy === 'dark' ? 'a dark ground' : strategy === 'tinted' ? 'a tinted ground of its own hue' : strategy === 'ink' ? 'two inks on newsprint' : strategy === 'white' ? 'a white page with the colour turned up' : 'a paper ground with deep ink'}, set in ${display} and ${body}.`,
     ...(d.said.length ? [`From your notes: ${d.said.join(', ')}.`] : []),
+    ...(opt.colorNote ? [opt.colorNote] : []),
   ];
   return {
     id: `dir_${lang.id}_${(opt.seed >>> 0).toString(36)}`,
@@ -930,6 +1032,7 @@ export function directionDistance(a: ArtDirection, b: ArtDirection): number {
     [1, ne(a.tokens.imageTreatment, b.tokens.imageTreatment)],
     [2, jac(A.motifs, B.motifs)],
     [1.5, hueDistance(a.tokens.colors.accent, b.tokens.colors.accent)],
+    [1.5, ne(A.motion?.feel ?? 'still', B.motion?.feel ?? 'still')],
   ];
   const total = parts.reduce((s, [w]) => s + w, 0);
   return Math.round((parts.reduce((s, [w, v]) => s + w * v, 0) / total) * 1000) / 1000;
@@ -968,6 +1071,9 @@ export function applyLocks(to: ArtDirection, from: ArtDirection | null | undefin
         out.look.motifs = [...from.look.motifs];
         out.look.shapes = [...from.look.shapes];
         break;
+      case 'motion':
+        out.look.motion = { ...from.look.motion };
+        break;
       case 'voice':
         out.voice = from.voice;
         break;
@@ -979,7 +1085,7 @@ export function applyLocks(to: ArtDirection, from: ArtDirection | null | undefin
 const TOKEN_GROUP: Record<string, LockGroup> = { colors: 'palette', fonts: 'type', scale: 'layout', radius: 'surface', imageTreatment: 'imagery', style: 'surface' };
 const LOOK_GROUP: Record<string, LockGroup> = {
   accent2: 'palette', ratio: 'type', weight: 'type', case: 'type', tracking: 'type', emphasis: 'type', label: 'type', mono: 'type',
-  grid: 'layout', align: 'layout', width: 'layout', rhythm: 'layout', containers: 'surface', rules: 'surface', buttons: 'surface', frame: 'imagery', motifs: 'motifs', shapes: 'motifs',
+  grid: 'layout', align: 'layout', width: 'layout', rhythm: 'layout', containers: 'surface', rules: 'surface', buttons: 'surface', frame: 'imagery', motifs: 'motifs', shapes: 'motifs', motion: 'motion',
 };
 
 /** The locked groups a patch would change: a change to any of them waits for the designer. */
@@ -1007,7 +1113,7 @@ export function lockedChanges(spec: DesignSpec, patch: Patch, locks: readonly Lo
 
 /** The tokens and look a design takes from its direction. */
 export function designFromDirection(dir: ArtDirection): { tokens: DesignTokens; look: Look } {
-  return { tokens: { ...dir.tokens, colors: { ...dir.tokens.colors }, fonts: { ...dir.tokens.fonts } }, look: { ...dir.look, motifs: [...dir.look.motifs], shapes: [...dir.look.shapes] } };
+  return { tokens: { ...dir.tokens, colors: { ...dir.tokens.colors }, fonts: { ...dir.tokens.fonts } }, look: { ...dir.look, motifs: [...dir.look.motifs], shapes: [...dir.look.shapes], motion: { ...(dir.look.motion ?? STILL_MOTION) } } };
 }
 
 // ── proposing ────────────────────────────────────────────────────────
@@ -1022,6 +1128,8 @@ export interface DirectionAsk {
   /** languages already shown: asking again prefers new ones */
   seen?: readonly string[];
   count?: number;
+  /** what the moodboard says (lib/ux-v0/references.ts): the designer's notes on references, colours, motion, composition */
+  board?: BoardReading;
 }
 
 /**
@@ -1031,13 +1139,25 @@ export interface DirectionAsk {
  */
 export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
   const { brief } = ask;
-  const notes = ask.notes ?? '';
-  const avoid = ask.avoid ?? '';
+  const board = ask.board;
+  // the designer's own words: their notes for the direction, then what they wrote on their references
+  // the brief's rules are hard: read for every option, like the designer's own notes
+  const notes = [ask.notes ?? '', board?.words ?? '', (brief.rules ?? []).join('. ')].filter(Boolean).join('. ');
+  const avoid = [ask.avoid ?? '', board?.avoid ?? ''].filter(Boolean).join('. ');
   const round = Math.max(0, ask.round ?? 0);
   const count = Math.max(1, Math.min(4, ask.count ?? 3));
   const seen = new Set(ask.seen ?? []);
   const seed = hash(`${briefText(brief)}|${notes}|${avoid}|${round}`);
   const directives = readDirectives(notes, avoid);
+  if (board) {
+    // what the references show, where the words did not already say
+    if (board.serif !== undefined && directives.serif === undefined) directives.serif = board.serif;
+    if (board.motion && !directives.motion) (directives.motion = board.motion), directives.said.push(`${board.motion} motion, from your moving references`);
+    if (board.parallax !== undefined && directives.parallax === undefined) directives.parallax = board.parallax;
+    if (board.grid) (directives.grid = board.grid), directives.said.push(`${/^[aeiou]/.test(board.grid) ? 'an' : 'a'} ${board.grid} composition, from your references`);
+    if (board.density) (directives.density = board.density), directives.said.push(board.density === 'airy' ? 'generous space, from your references' : 'a denser page, from your references');
+  }
+  const fromRefs = board?.colours.length ? paletteFromSwatches(board.colours) : null;
   const fits = fitScores(brief, notes, avoid);
   const top = Math.max(1, fits[0].score);
   // asking again: what was shown steps back, so new languages come forward
@@ -1047,7 +1167,16 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
   const usedFonts = new Set<string>();
   const usedIds = new Set<string>();
   const make = (id: string, faithful: boolean) => {
-    const d = buildDirection(languageOf(id)!, brief, { seed: seed + chosen.length * 7919, faithful, directives, usedFonts, notes });
+    // the second option takes its colours from the references kept for their colour, when there are any (and colour is not locked)
+    const refColours = chosen.length === 1 && fromRefs && !(ask.base && ask.base.locks.includes('palette'));
+    const d = buildDirection(languageOf(id)!, brief, {
+      seed: seed + chosen.length * 7919,
+      faithful,
+      directives,
+      usedFonts,
+      notes,
+      ...(refColours ? { baseColors: fromRefs!, colorNote: `Colours sampled from your references (${(board!.colourFrom.slice(0, 2).map((t) => `“${t}”`).join(' and ')) || 'the moodboard'}).` } : {}),
+    });
     usedFonts.add(d.tokens.fonts.display);
     return d;
   };
@@ -1072,7 +1201,7 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
     chosen.push(make(best.id, false));
   }
   return chosen.map((d, i) => {
-    const locked = applyLocks(d, ask.base);
+    const locked = applyLocks(applyBrief(d, brief, i === 0 && round === 0), ask.base);
     return { ...locked, id: `dir_${d.language}_${round}_${i}` };
   });
 }
@@ -1235,9 +1364,24 @@ export function directionBrief(dir: ArtDirection, pageType: 'website' | 'app-scr
     `The renderer already draws the look from this direction (${dir.tokens.fonts.display} and ${dir.tokens.fonts.body}; ${L.grid} grid; ${L.containers} surfaces; ${L.buttons} buttons; ${L.case === 'upper' ? 'capital' : 'sentence-case'} headlines; motifs: ${L.motifs.join(', ') || 'none'}). You do not choose tokens: you choose sections, variants and copy that serve it.`,
     prefer ? `Variants that speak this language (best first): ${prefer}.` : '',
     L.motifs.includes('icons') ? '' : 'Icons are not part of this language: leave feature icons out.',
+    motionBrief(L.motion),
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+/** What the approved motion asks of the words: the renderer plays it, but copy written for it moves better. */
+function motionBrief(m: Motion | undefined): string {
+  if (!m || m.feel === 'still') return 'Motion: still. Nothing on the page animates, so the order and hierarchy alone must carry it.';
+  const head =
+    m.headline === 'letters'
+      ? 'The opening headline arrives letter by letter: keep it to six words or fewer, every letter earning its place.'
+      : m.headline === 'words'
+        ? 'The opening headline arrives word by word: write it so each word lands on its own, ten words at most.'
+        : m.headline === 'mask'
+          ? 'The opening headline rises through a mask: a short, confident statement reads best.'
+          : '';
+  return `Motion (${m.feel}): the renderer plays it as CSS. ${head} ${m.scroll ? 'Sections arrive as they scroll in, so give each one a single clear idea.' : ''}`.replace(/\s+/g, ' ').trim();
 }
 
 // ── planning the page's rhythm ───────────────────────────────────────

@@ -11,7 +11,9 @@
 // updates what SocriaUX understands.
 
 import { useEffect, useState } from 'react';
-import { TOPIC_LABEL, type Discovery, type DiscoveryQuestion } from '@/lib/ux-v0/types';
+import { fontStack } from '@/lib/ux-v0/fonts';
+import { ASPECT_LABEL, takenFrom } from '@/lib/ux-v0/references';
+import { TOPIC_LABEL, type Discovery, type DiscoveryQuestion, type Moodboard } from '@/lib/ux-v0/types';
 
 const typing = (t: EventTarget | null) => !!(t as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable="true"]');
 
@@ -27,6 +29,11 @@ export function QuestionBand({
   onBrief,
   onCombine,
   onDesignNow,
+  onDelegate,
+  onSeeDirections,
+  intent,
+  board,
+  onPicture,
 }: {
   q: DiscoveryQuestion | null;
   n: number;
@@ -41,6 +48,14 @@ export function QuestionBand({
   onCombine: (answer: string) => void;
   /** write the brief from what is known and design at once, in the direction SocriaUX chooses */
   onDesignNow: () => void;
+  /** leave this question to SocriaUX */
+  onDelegate: () => void;
+  /** write the brief from what is known and open the directions (nothing is generated yet) */
+  onSeeDirections: () => void;
+  intent: string;
+  /** the board, to answer a visual question with a picture, a palette or a type pair */
+  board: Moodboard;
+  onPicture: (answer: string, refId?: string) => void;
 }) {
   const [chosen, setChosen] = useState<string[]>([]);
   useEffect(() => setChosen([]), [q?.id]);
@@ -90,6 +105,9 @@ export function QuestionBand({
             <button type="button" className="sb-btn is-primary" onClick={onBrief} disabled={!!busy}>
               Write the brief
             </button>
+            <button type="button" className="sb-link is-meta is-strong" onClick={onSeeDirections} disabled={!!busy}>
+              See directions
+            </button>
             <button type="button" className="sb-link is-go" onClick={onDesignNow} disabled={!!busy}>
               Design it now <span className="sb-ar">→</span>
             </button>
@@ -105,6 +123,13 @@ export function QuestionBand({
   }
 
   const toggle = (o: string) => setChosen((c) => (c.includes(o) ? c.filter((x) => x !== o) : [...c, o]));
+  // a detailed intent already says much of what a question would ask
+  const detailed = n === 1 && intent.trim().split(/\s+/).length >= 22;
+  // a visual question can be answered with something on the board
+  const visual = q.topic === 'visual' || q.topic === 'brand';
+  const pictures = visual ? board.refs.filter((r) => r.state !== 'rejected' && !r.avoid && (r.thumb || r.url) && r.media !== 'video').slice(0, 5) : [];
+  const palettes = visual ? board.palettes.filter((x) => x.state !== 'rejected').slice(0, 2) : [];
+  const pairs = visual ? board.type.filter((x) => x.state !== 'rejected').slice(0, 2) : [];
   return (
     <section className="v0-question st-ask" aria-label="Socria asks" aria-live="polite">
       <div className="st-ask-meta">
@@ -115,6 +140,14 @@ export function QuestionBand({
       <div className="st-ask-main" key={q.id}>
         <p className="v0-q-text st-q">{q.question}</p>
         {q.why && <p className="v0-q-why st-why">{q.why}</p>}
+        {detailed && (
+          <p className="st-detailed">
+            You have said a lot already.{' '}
+            <button type="button" className="sb-link is-meta is-strong" onClick={onSeeDirections} disabled={!!busy}>
+              Skip the questions and see directions
+            </button>
+          </p>
+        )}
         {q.options.length > 0 && (
           <ul className="v0-options st-options" aria-label={q.multi ? 'Suggested answers: choose any' : 'Suggested answers'}>
             {q.options.map((o, i) => {
@@ -146,6 +179,35 @@ export function QuestionBand({
             })}
           </ul>
         )}
+        {(pictures.length > 0 || palettes.length > 0 || pairs.length > 0) && (
+          <div className="st-visual">
+            <span className="st-visual-l">Or answer with something on your board</span>
+            <div className="st-visual-row">
+              {pictures.map((r) => {
+                const t = takenFrom(r);
+                const what = t.take.length && !(t.take.length === 1 && t.take[0] === 'atmosphere') ? `, for its ${t.take.map((a) => ASPECT_LABEL[a].toLowerCase()).join(' and ')}` : '';
+                return (
+                  <button key={r.id} type="button" className="st-visual-pic" onClick={() => onPicture(`Like “${r.title || 'this reference'}”${what}`, r.id)} disabled={!!busy} aria-label={`Answer: like “${r.title || 'this reference'}”`}>
+                    <img src={r.thumb || r.url} alt="" loading="lazy" referrerPolicy="no-referrer" />
+                  </button>
+                );
+              })}
+              {palettes.map((x) => (
+                <button key={x.id} type="button" className="st-visual-pal" onClick={() => onPicture(`The palette “${x.name}”: ${x.colors.map((c) => c.hex).join(', ')}`)} disabled={!!busy} aria-label={`Answer: the palette ${x.name}`}>
+                  {x.colors.slice(0, 5).map((c, i) => (
+                    <span key={i} style={{ background: c.hex }} />
+                  ))}
+                </button>
+              ))}
+              {pairs.map((t) => (
+                <button key={t.id} type="button" className="st-visual-type" onClick={() => onPicture(`Type like ${t.display} with ${t.body}`)} disabled={!!busy} aria-label={`Answer: type like ${t.display} with ${t.body}`}>
+                  <span style={{ fontFamily: fontStack(t.display) }}>Aa</span>
+                  <small>{t.display}</small>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="st-ask-acts">
           {q.multi && chosen.length > 0 && (
             <button type="button" className="sb-btn is-primary is-sm" onClick={() => (onAnswer(chosen.join('; ')), setChosen([]))} disabled={!!busy}>
@@ -155,11 +217,17 @@ export function QuestionBand({
           <button type="button" className="sb-link is-meta" onClick={onSkip} disabled={!!busy}>
             Skip
           </button>
+          <button type="button" className="sb-link is-meta" onClick={onDelegate} disabled={!!busy} title="SocriaUX decides this, and will not ask it again">
+            You decide
+          </button>
           {answered >= 1 && (
             <button type="button" className="sb-link is-meta" onClick={onBrief} disabled={!!busy}>
               Write the brief now
             </button>
           )}
+          <button type="button" className="sb-link is-meta" onClick={onSeeDirections} disabled={!!busy}>
+            See directions
+          </button>
           <button type="button" className="sb-link is-meta is-strong" onClick={onDesignNow} disabled={!!busy}>
             Design it now <span className="sb-ar">→</span>
           </button>
@@ -172,7 +240,7 @@ export function QuestionBand({
 
 /** The conversation so far: what is being made, what is understood, every answer editable. */
 export function QuestionsRail({ discovery, intent, onEdit, onIntent }: { discovery: Discovery; intent: string; onEdit: (id: string, answer: string) => void; onIntent: (v: string) => void }) {
-  const answered = discovery.questions.filter((q) => q.answer || q.skipped);
+  const answered = discovery.questions.filter((q) => q.answer || q.skipped || q.delegated);
   return (
     <div className="v0-rail-body st-rail">
       <section className="st-rail-sec">
@@ -198,7 +266,7 @@ export function QuestionsRail({ discovery, intent, onEdit, onIntent }: { discove
               </span>
               <div>
                 <p className="st-answer-q">{q.question}</p>
-                {q.skipped ? <p className="st-answer-skipped">Skipped</p> : <EditLine value={q.answer} onSave={(v) => onEdit(q.id, v)} />}
+                {q.delegated ? <p className="st-answer-skipped">Left to SocriaUX</p> : q.skipped ? <p className="st-answer-skipped">Skipped</p> : <EditLine value={q.answer} onSave={(v) => onEdit(q.id, v)} />}
               </div>
             </li>
           ))}

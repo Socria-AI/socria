@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { INSPECTOR_SOURCE } from '@/lib/ux-v0/inspector';
 import { renderDesign } from '@/lib/ux-v0/render';
-import { LOCK_LABEL, briefKey, languageOf, normalizeDirection, proposeDirections, type ArtDirection, type LockGroup } from '@/lib/ux-v0/direction';
+import { LOCK_LABEL, briefKey, languageOf, lockedChanges, normalizeDirection, proposeDirections, type ArtDirection, type LockGroup } from '@/lib/ux-v0/direction';
 import { MAX_REVISION_ROUNDS, evaluateDesign, fixesFor, type Evaluation, type Finding } from '@/lib/ux-v0/evaluate';
 import { buildSandboxDoc, makeNonce } from '@/lib/ux-v0/sandbox';
 import { applyPatch, normalizeSpec, placeholdersIn, specDigest, type DesignSpec, type Patch } from '@/lib/ux-v0/spec';
@@ -27,9 +27,11 @@ import {
   addUsage,
   currentSpec,
   fileId,
+  normalizeRef,
   uid,
   type CardTurn,
   type DesignBrief,
+  type BriefPart,
   type DesignProject,
   type DiscoveryQuestion,
   type ImportedArtifact,
@@ -54,6 +56,11 @@ import { measurePage } from './measure';
 import { Composer, type ComposeMode } from './Composer';
 import { QuestionBand, QuestionsRail } from './Discovery';
 import { LivingBrief } from './LivingBrief';
+import { isContent, readBoard } from '@/lib/ux-v0/references';
+import { PART_LABEL, briefToDesign, changedVisualParts, delegatedParts, mergeDecided } from '@/lib/ux-v0/brief';
+import { ADJUST_GROUPS, ADJUST_LABEL, adjust, readAdjust, type Adjust } from '@/lib/ux-v0/refine-local';
+import { addUpload, sampleSwatches, useUploads, withUploads } from './uploads';
+import { Preview } from './Preview';
 import { checkFile, fetchOriginal, imageSize, keepOriginal } from './files';
 import { Inspect } from './Inspect';
 import { elementSelection } from '@/lib/ux-v0/selection';
@@ -89,6 +96,10 @@ const EXAMPLES = ['A premium coffee shop website', 'A landing page for a univers
 
 export function Workspace({ initial, signedIn, onExit, startIntent, startFile }: { initial: DesignProject; signedIn: boolean; onExit: () => void; startIntent?: string; startFile?: File | null }) {
   const { project, update, save, current } = useV0Project(initial, signedIn);
+  // the designer's own references, with their addresses: object URLs for the workspace, data URLs for sealed frames
+  const uiRefs = useUploads(project.moodboard.refs);
+  const frameRefs = useUploads(project.moodboard.refs, true);
+  const uiBoard = useMemo(() => ({ ...project.moodboard, refs: uiRefs }), [project.moodboard, uiRefs]);
   const spec = currentSpec(project);
   const art = project.artifact;
   const imported = art?.type === 'imported' ? art : null;
@@ -114,6 +125,10 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const [zoom, setZoom] = useState(1);
   const [checks, setChecks] = useState<Checks | null>(null);
   const [dirNote, setDirNote] = useState('');
+  // the design in a real viewport, its motion playing
+  const [previewing, setPreviewing] = useState(false);
+  // visual parts of the brief changed since the design was drawn: what "Apply to the design" would carry over
+  const [briefEdits, setBriefEdits] = useState<BriefPart[]>([]);
   const stage = useRef<StageHandle>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const nonce = useMemo(() => makeNonce(), []);
@@ -159,7 +174,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   }, [imported?.id, imported?.kind, signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── what the canvas draws ───────────────────────────────────────────
-  const rendered = useMemo(() => (spec ? renderDesign(spec, project.moodboard.refs) : null), [spec, project.moodboard.refs]);
+  const rendered = useMemo(() => (spec ? renderDesign(spec, frameRefs) : null), [spec, frameRefs]);
   const doc = useMemo(() => {
     const parse = (s: string) => new DOMParser().parseFromString(s, 'text/html');
     if (rendered && !imported) return buildSandboxDoc(rendered.html, { parse, runScripts: false, nonce, inspector: INSPECTOR_SOURCE }).doc;
@@ -213,7 +228,8 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       const all = results.flatMap((x) => x.refs);
       update((p2) => {
         const known = new Set(p2.moodboard.refs.map((x) => x.id));
-        const add = all.filter((x) => !known.has(x.id));
+        // a found picture inspires; it is placed in the design only if the designer marks it as content
+        const add = all.filter((x) => !known.has(x.id)).map((x) => ({ ...x, asContent: false }));
         const queriesNext = [...p2.moodboard.queries];
         for (const res of results) {
           const k = queriesNext.findIndex((x) => x.query === res.query);
@@ -253,9 +269,12 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       setBusy(null);
       if (!r.ok) return failed(r);
       const d = r.data;
+      // never ask again about a topic already answered or left to SocriaUX
+      const settled = new Set(p.discovery.questions.filter((q) => (q.answer && !/^(not sure|unsure|don't know|no idea)/i.test(q.answer)) || q.delegated).map((q) => q.topic));
+      const fresh = d.questions.filter((q) => !settled.has(q.topic));
       update((p2) => ({
         ...p2,
-        discovery: { questions: [...p2.discovery.questions, ...d.questions].slice(-24), understanding: d.understanding, ready: d.ready, note: d.note },
+        discovery: { questions: [...p2.discovery.questions, ...fresh].slice(-24), understanding: d.understanding, ready: d.ready || (!fresh.length && d.questions.length > 0), note: d.note },
         moodboard: { ...p2.moodboard, palettes: [...p2.moodboard.palettes, ...d.palettes].slice(-12), type: [...p2.moodboard.type, ...d.type].slice(-12) },
         usage: addUsage(p2.usage, d.usage),
       }));
@@ -276,12 +295,12 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     [update, discoverTurn]
   );
 
-  const currentQuestion = project.discovery.questions.find((q) => !q.answer && !q.skipped) ?? null;
+  const currentQuestion = project.discovery.questions.find((q) => !q.answer && !q.skipped && !q.delegated) ?? null;
 
   const answer = useCallback(
-    async (qid: string, ans: string, skipped = false) => {
+    async (qid: string, ans: string, skipped = false, delegated = false) => {
       const p = current.current;
-      const questions = p.discovery.questions.map((q) => (q.id === qid ? { ...q, answer: skipped ? '' : ans.trim().slice(0, 800), skipped } : q));
+      const questions = p.discovery.questions.map((q) => (q.id === qid ? { ...q, answer: skipped || delegated ? '' : ans.trim().slice(0, 800), skipped, delegated } : q));
       update((p2) => ({ ...p2, discovery: { ...p2.discovery, questions } }));
       await discoverTurn({ questions });
     },
@@ -289,6 +308,40 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   );
 
   const setRef = (id: string, state: RefState) => update((p) => ({ ...p, moodboard: { ...p.moodboard, refs: p.moodboard.refs.map((r) => (r.id === id ? { ...r, state } : r)) } }));
+  /** What a reference means changed: what to take, its note, key, steer away, on the page, its colours. A picture
+      marked for the page joins the brief's pictures (and leaves them when unmarked). */
+  const updateRef = (id: string, patch: Partial<MoodboardRef>) =>
+    update((p) => {
+      const refs = p.moodboard.refs.map((r) => (r.id === id ? normalizeRef({ ...r, ...patch, url: r.url, thumb: r.thumb }) ?? r : r));
+      const ref = refs.find((r) => r.id === id);
+      let brief = p.brief;
+      if (brief.doc && ref && ('asContent' in patch || 'avoid' in patch)) {
+        const rest = brief.doc.references.filter((x) => x !== id);
+        brief = { ...brief, doc: { ...brief.doc, references: isContent(ref) ? [...rest, id] : rest } };
+      }
+      return { ...p, moodboard: { ...p.moodboard, refs }, brief };
+    });
+  /** The designer's own files onto the board, kept in this browser. */
+  const uploadRefs = async (files: File[]) => {
+    setImgError('');
+    setImgBusy(files.length === 1 ? 'Adding your reference…' : `Adding ${Math.min(12, files.length)} references…`);
+    const added: MoodboardRef[] = [];
+    const errors: string[] = [];
+    for (const f of files.slice(0, 12)) {
+      const r = await addUpload(f);
+      if (r.ok) added.push(r.ref);
+      else errors.push(r.error);
+    }
+    setImgBusy(null);
+    if (added.length) update((p) => ({ ...p, moodboard: { ...p.moodboard, refs: [...added, ...p.moodboard.refs] } }));
+    if (errors.length) setImgError(errors.length > 1 ? `${errors[0]} (and ${errors.length - 1} more)` : errors[0]);
+  };
+  const sampleRef = async (ref: MoodboardRef) => {
+    const sw = await sampleSwatches(ref.thumb || ref.url);
+    if (sw.length) updateRef(ref.id, { swatches: sw });
+    else setImgError('That library does not let its pictures’ colours be read. Add your own copy to sample it.');
+  };
+  const addPalette = (pal: Palette) => update((p) => ({ ...p, moodboard: { ...p.moodboard, palettes: [...p.moodboard.palettes, pal].slice(-12) } }));
   const replaceRef = async (ref: MoodboardRef) => {
     setRef(ref.id, 'rejected');
     const got = await fetchImages([{ category: ref.category, query: ref.query }], 1);
@@ -347,16 +400,48 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     });
     setBusy(null);
     if (!r.ok) return failed(r);
-    update((p2) => ({ ...p2, brief: { doc: r.data.brief, approved: false, version: p2.brief.version + 1 }, usage: addUsage(p2.usage, r.data.usage) }));
+    // what the designer decided stays decided: locked parts keep their words, a changed approved part is reopened
+    const merged = refining
+      ? mergeDecided(r.data.brief, p.brief.doc)
+      : { brief: { ...r.data.brief, ...(Object.keys(delegatedParts(p.discovery.questions)).length ? { decisions: { ...delegatedParts(p.discovery.questions), ...(r.data.brief.decisions ?? {}) } } : {}) }, kept: [], reopened: [] };
+    update((p2) => ({ ...p2, brief: { doc: merged.brief, approved: false, version: p2.brief.version + 1 }, usage: addUsage(p2.usage, r.data.usage) }));
+    setBriefEdits((e) => [...new Set([...e, ...changedVisualParts(p.brief.doc, merged.brief)])]);
     setView('brief');
     if (!refining) return;
-    say('The brief was changed as you asked. Check it, then approve.');
+    const keptNote = merged.kept.length ? ` Kept as you locked them: ${merged.kept.map((x) => PART_LABEL[x].toLowerCase()).join(', ')}.` : '';
+    const reopenNote = merged.reopened.length ? ` Changed after you approved them, so they need your approval again: ${merged.reopened.map((x) => PART_LABEL[x].toLowerCase()).join(', ')}.` : '';
+    say(`The brief was changed as you asked. Check it, then approve.${keptNote}${reopenNote}`);
     // the visual direction moved: the board follows, with images to keep or remove
     const qs = r.data.queries ?? [];
     if (qs.length) {
       const got = await fetchImages(qs, 4);
       if (got.length) say(`The brief was changed, and its visual direction moved: ${got.length} new image${got.length === 1 ? '' : 's'} on the moodboard to keep or remove.`, 'info', { acts: [{ label: 'See the moodboard', run: () => setView('discovery') }] });
     }
+  };
+
+  /** The brief's changed visual parts, carried into the design in place: a new version, no regeneration. */
+  const applyBriefToDesign = () => {
+    const p = current.current;
+    const doc = p.brief.doc;
+    const s = currentSpec(p);
+    if (!doc || !s || !briefEdits.length) return;
+    const next = briefToDesign(s, doc, briefEdits);
+    update((p2) => {
+      const specs = [...p2.specs.slice(0, p2.specIndex + 1), next].slice(-30);
+      const chosen = p2.direction.chosen ? { ...p2.direction.chosen, tokens: next.tokens, look: next.look, source: 'person' as const } : p2.direction.chosen;
+      return { ...p2, specs, specIndex: specs.length - 1, direction: { ...p2.direction, chosen }, brief: { ...p2.brief, approved: true } };
+    });
+    const what = briefEdits.map((x) => PART_LABEL[x].toLowerCase()).join(', ');
+    setBriefEdits([]);
+    say(`Applied to the design without redrawing it: ${what}.`, 'info', { acts: [{ label: 'See it', run: () => setView('design'), strong: true }, { label: 'Undo', run: () => stepVersion(-1) }] });
+  };
+
+  /** From the questions: write the brief from what is known and open the directions, with nothing generated yet. */
+  const seeDirections = async () => {
+    await writeBrief();
+    await new Promise((r) => setTimeout(r, 0));
+    if (!current.current.brief.doc) return;
+    openDirection();
   };
 
   /** From anywhere in the questions: write the brief from what is known, approve it, and design
@@ -379,7 +464,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const base = st.options.find((o) => o.locks.length) ?? (st.chosen && st.chosen.locks.length ? st.chosen : null);
     const round = again ? st.round + 1 : st.round;
     const seen = again ? [...new Set([...st.seen, ...st.options.map((o) => o.language)])] : st.seen;
-    return { brief: p.brief.doc!, notes: st.notes, avoid: st.avoid, base, round, seen };
+    return { brief: p.brief.doc!, notes: st.notes, avoid: st.avoid, base, round, seen, board: readBoard(p.moodboard) };
   };
 
   const proposeDirectionsFor = async (again: boolean) => {
@@ -403,6 +488,24 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
         }),
       },
       usage: addUsage(p2.usage, r.data.usage),
+    }));
+  };
+
+  /** Swap one direction for one the engine has not shown yet; the other two, and any locks, stay. No model call. */
+  const replaceDirection = (id: string) => {
+    const p = current.current;
+    if (!p.brief.doc) return;
+    const st = p.direction;
+    const shown = [...new Set([...st.seen, ...st.options.map((o) => o.language)])];
+    const [fresh] = proposeDirections({ ...directionAsk(p, false), count: 1, round: st.round + 1, seen: shown });
+    if (!fresh) return;
+    update((p2) => ({
+      ...p2,
+      direction: {
+        ...p2.direction,
+        options: p2.direction.options.map((o) => (o.id === id ? { ...fresh, id: `${fresh.id}_${Date.now().toString(36)}` } : o)),
+        seen: [...new Set([...p2.direction.seen, fresh.language])].slice(-24),
+      },
     }));
   };
 
@@ -433,9 +536,10 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const inspect = async (from: DesignSpec, autofix: boolean): Promise<{ spec: DesignSpec; fixed: string[]; ev: Evaluation }> => {
     const locks = current.current.direction.chosen?.locks ?? [];
     const measureAt = async (s: DesignSpec) => {
-      const html = renderDesign(s, current.current.moodboard.refs).html;
+      const html = renderDesign(s, withUploads(current.current.moodboard.refs, true)).html;
       const [desktop, phone] = await Promise.all([measurePage(html, 1280, 900, nonce), measurePage(html, 390, 844, nonce)]);
-      return evaluateDesign(s, { desktop, phone }, locks);
+      // and whether it keeps what was decided: the approved direction, the brief's locked parts and rules, the pictures it may place
+      return evaluateDesign(s, { desktop, phone }, locks, { direction: current.current.direction.chosen, brief: current.current.brief.doc, board: current.current.moodboard });
     };
     let spec = from;
     const fixed: string[] = [];
@@ -505,16 +609,25 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   };
 
   const applyLocal = useCallback(
-    (patch: Patch, label: string) => {
+    (patchOrPatches: Patch | Patch[], label: string) => {
       const p = current.current;
       const s = currentSpec(p);
       if (!s) return;
-      const res = applyPatch(s, patch, p.moodboard);
+      // several patches (a pairing changes faces and weight) land as one version
+      const patches = Array.isArray(patchOrPatches) ? patchOrPatches : [patchOrPatches];
+      let res: ReturnType<typeof applyPatch> = { ok: true, spec: s, touched: [] };
+      for (const pt of patches) {
+        if (!res.ok) break;
+        const next = applyPatch(res.spec, pt, p.moodboard);
+        res = next.ok ? { ...next, spec: { ...next.spec, version: s.version + 1 } } : next;
+      }
       if (!res.ok) return say(`That change could not be applied: ${res.error}`, 'error');
+      const patch = patches[patches.length - 1];
+      const lookChanged = patches.some((pt) => pt.op === 'tokens' || pt.op === 'look');
       update((p2) => {
         const specs = [...p2.specs.slice(0, p2.specIndex + 1), res.spec].slice(-30);
         // what the designer changes in the look becomes the direction's: a later generation keeps it
-        const chosen = p2.direction.chosen && (patch.op === 'tokens' || patch.op === 'look') ? { ...p2.direction.chosen, tokens: res.spec.tokens, look: res.spec.look, source: 'person' as const } : p2.direction.chosen;
+        const chosen = p2.direction.chosen && lookChanged ? { ...p2.direction.chosen, tokens: res.spec.tokens, look: res.spec.look, source: 'person' as const } : p2.direction.chosen;
         return { ...p2, specs, specIndex: specs.length - 1, direction: { ...p2.direction, chosen } };
       });
       setSelection(null);
@@ -524,10 +637,37 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     [current, update, say] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
+  /** One creative decision changed, everything else kept: in code, as a version Undo takes back. */
+  const adjustDesign = (as: Adjust[]): boolean => {
+    const p = current.current;
+    const s = currentSpec(p);
+    if (!s || !as.length) return false;
+    const locks = p.direction.chosen?.locks ?? [];
+    const done: { patches: Patch[]; label: string }[] = [];
+    const refused: string[] = [];
+    for (const a of as) {
+      const r = adjust(s, a);
+      if (!r) continue;
+      const hit = [...new Set(r.patches.flatMap((pt) => lockedChanges(s, pt, locks)))];
+      if (hit.length) refused.push(`${ADJUST_LABEL[a].toLowerCase()} would change ${hit.map((g) => LOCK_LABEL[g].toLowerCase()).join(' and ')}, which you locked`);
+      else done.push(r);
+    }
+    if (done.length) applyLocal(done.flatMap((d) => d.patches), done.map((d) => d.label).join('; '));
+    if (refused.length) say(`${done.length ? 'Done, except: ' : 'Nothing changed: '}${refused.join('; ')}. Unlock it in the direction to change it.`, 'info');
+    else if (!done.length) say('Nothing to change: the design is already there.', 'info');
+    return true;
+  };
+
   const refine = async (comment: string) => {
     const p = current.current;
     const s = currentSpec(p);
     if (!s) return;
+    // the everyday ways of asking for one change are done at once, in code, keeping everything else
+    const quick = readAdjust(comment);
+    if (quick.length && !p.artifact?.type?.startsWith('imported')) {
+      adjustDesign(quick);
+      return;
+    }
     setBusy('Working out the change…');
     const r = await post<{ understood: string; challenge: string; question: string; regenerate: string; patch: Patch; applies: boolean; locked?: LockGroup[]; error: string; usage: Usage }>('/api/ux-v0/refine', {
       projectId: p.id,
@@ -914,7 +1054,30 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                   <button type="button" className="sb-link is-meta" onClick={() => setView('discovery')}>
                     Moodboard
                   </button>
+                  <button type="button" className="sb-btn is-sm v0-preview-btn" onClick={() => setPreviewing(true)} title="See it in a real viewport, with its motion">
+                    Preview
+                  </button>
                 </span>
+              )}
+              {spec && !imported && (
+                <details className="v0-adjust">
+                  <summary className="sb-link is-meta">Adjust</summary>
+                  <div className="v0-adjust-panel" role="group" aria-label="Change one decision, keep everything else">
+                    <p className="v0-adjust-l">Change one thing; keep everything else. Each is a version Undo takes back.</p>
+                    {ADJUST_GROUPS.map(([g, as]) => (
+                      <div key={g} className="v0-adjust-row">
+                        <span className="v0-adjust-g">{g}</span>
+                        <span className="v0-adjust-acts">
+                          {as.map((a) => (
+                            <button key={a} type="button" className="sb-link is-meta" onClick={(e) => (adjustDesign([a]), (e.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open'))}>
+                              {ADJUST_LABEL[a]}
+                            </button>
+                          ))}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
               )}
             </div>
           )}
@@ -979,13 +1142,21 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
               <div className="v0-discovery">
                 <QuestionBand
                   q={currentQuestion}
-                  n={project.discovery.questions.filter((q) => q.answer || q.skipped).length + 1}
+                  n={project.discovery.questions.filter((q) => q.answer || q.skipped || q.delegated).length + 1}
                   busy={busy}
                   ready={project.discovery.ready}
                   answered={project.discovery.questions.filter((q) => q.answer).length}
                   note={project.discovery.note}
                   onAnswer={(a) => currentQuestion && answer(currentQuestion.id, a)}
                   onSkip={() => currentQuestion && answer(currentQuestion.id, '', true)}
+                  onDelegate={() => currentQuestion && answer(currentQuestion.id, '', false, true)}
+                  onSeeDirections={seeDirections}
+                  intent={project.intent}
+                  board={uiBoard}
+                  onPicture={(text: string, refId?: string) => {
+                    if (refId) setRef(refId, 'kept');
+                    if (currentQuestion) answer(currentQuestion.id, text);
+                  }}
                   onBrief={() => writeBrief()}
                   onCombine={(o) => {
                     setText((t) => (t.trim() ? `${t.trim().replace(/[;,.]$/, '')}; ${o}` : o));
@@ -997,7 +1168,11 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                   onDesignNow={designNow}
                 />
                 <Moodboard
-                  board={project.moodboard}
+                  board={uiBoard}
+                  onUpdate={updateRef}
+                  onUpload={uploadRefs}
+                  onAddPalette={addPalette}
+                  onSample={sampleRef}
                   sample={project.name}
                   busy={imgBusy}
                   error={imgError}
@@ -1019,10 +1194,16 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                 brief={project.brief.doc}
                 version={project.brief.version}
                 approved={project.brief.approved}
-                refs={project.moodboard.refs}
+                refs={uiRefs}
                 busy={busy}
                 hasDesign={!!spec}
-                onChange={(b) => update((p) => ({ ...p, brief: { ...p.brief, doc: b, approved: false } }))}
+                onChange={(b) => {
+                  const before = current.current.brief.doc;
+                  if (spec) setBriefEdits((e) => [...new Set([...e, ...changedVisualParts(before, b)])]);
+                  update((p) => ({ ...p, brief: { ...p.brief, doc: b, approved: false } }));
+                }}
+                edited={spec ? briefEdits : []}
+                onApplyToDesign={applyBriefToDesign}
                 onApprove={openDirection}
                 onSkip={() => {
                   update((p) => ({ ...p, brief: { ...p.brief, approved: true } }));
@@ -1037,7 +1218,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                 state={project.direction}
                 brief={project.brief.doc}
                 name={project.name}
-                refs={project.moodboard.refs}
+                refs={frameRefs}
                 busy={busy}
                 note={dirNote}
                 onNotes={(notes, avoid) => update((p) => ({ ...p, direction: { ...p.direction, notes: notes.slice(0, 1200), avoid: avoid.slice(0, 400) } }))}
@@ -1047,6 +1228,8 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                 onApprove={approveDirection}
                 onAuto={() => project.direction.options[0] && approveDirection(project.direction.options[0])}
                 onBack={() => setView('brief')}
+                onReplace={replaceDirection}
+                nonce={nonce}
               />
             )}
 
@@ -1146,7 +1329,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
               <LivingBrief
                 intent={project.intent}
                 discovery={project.discovery}
-                board={project.moodboard}
+                board={uiBoard}
                 brief={project.brief}
                 busy={busy}
                 onIntent={(v) => (update((p) => ({ ...p, intent: v })), discoverTurn({ intent: v }))}
@@ -1236,6 +1419,9 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                         <span>
                           <b>{checks.ev?.distinctiveness ?? '–'}</b> its own
                         </span>
+                        <span>
+                          <b>{checks.ev?.fidelity ?? '–'}</b> faithful
+                        </span>
                       </div>
                       <p className="v0-quiet" role="status">
                         {checks.running ? 'Measuring again…' : checks.ev?.summary}
@@ -1263,6 +1449,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                         <li key={f.id} className={`is-${f.severity}`}>
                           <span className="v0-finding-k">{f.severity === 'high' ? 'Must fix' : f.severity === 'medium' ? 'Should fix' : 'Worth a look'} · {f.viewport}</span>
                           <span className="v0-body">{f.message}</span>
+                          {f.why && <span className="v0-quiet v0-finding-why">Why: {f.why}</span>}
                           {f.blocked && <span className="v0-quiet">{f.blocked}</span>}
                           <span className="v0-finding-acts">
                             {f.fix && (
@@ -1277,6 +1464,16 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                             )}
                           </span>
                         </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                {checks?.ev && checks.ev.kept?.length > 0 && (
+                  <section className="v0-cellset">
+                    <span className="sb-label">What it keeps</span>
+                    <ul className="v0-plain v0-kept">
+                      {checks.ev.kept.map((x, i) => (
+                        <li key={i}>{x}</li>
                       ))}
                     </ul>
                   </section>
@@ -1353,7 +1550,9 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                       type="button"
                       className="sb-link is-meta is-strong"
                       onClick={() => {
-                        const url = URL.createObjectURL(new Blob([rendered.html], { type: 'text/html' }));
+                        // the exported page carries its motion (CSS only, with its reduced-motion alternative)
+                        const page = spec && !imported ? renderDesign(spec, frameRefs, { motion: 'play' }).html : rendered.html;
+                        const url = URL.createObjectURL(new Blob([page], { type: 'text/html' }));
                         const a = document.createElement('a');
                         a.href = url;
                         a.download = `${(spec?.title || project.name).replace(/[^\w-]+/g, '-').toLowerCase()}.html`;
@@ -1426,6 +1625,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
           </div>
         </aside>
       </div>
+      {previewing && spec && !imported && <Preview spec={spec} refs={frameRefs} nonce={nonce} title={spec.title || project.name} onClose={() => setPreviewing(false)} />}
       <input
         ref={fileInput}
         type="file"

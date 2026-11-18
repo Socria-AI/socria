@@ -60,7 +60,8 @@ export interface DiscoverResult {
 
 const RULES = `Rules for questions:
 - Ask only what would change the design. Skip anything the intent already answers.
-- Never ask about a topic already answered. At most two questions per turn, usually one.
+- Never ask about a topic already answered, skipped or left to you, and never ask for what the intent or an answer already says. At most two questions per turn, usually one.
+- When the intent is already detailed (it names audience, purpose, look or constraints), ask at most one question, or none: say ready and let the designer see directions.
 - An answer that is "not sure yet" leaves its topic open: do not record it as understood. If it matters, come back to it later in a more concrete form (an example, or answers to choose between); never ask it the same way again.
 - Order: who it is for and what it must achieve first; then brand, visual direction, content and functionality; constraints and hierarchy when they matter.
 - Each question gets "why" (one short sentence: why its answer matters to the design) and 2–5 short suggested answers that genuinely differ — not leading, not exhaustive. "multi": true when several answers can apply together.
@@ -109,14 +110,14 @@ function moodSummary(m: Moodboard): string {
 }
 
 export function discoverUser(input: DiscoverInput): string {
-  const answered = input.questions.filter((q) => q.answer || q.skipped);
+  const answered = input.questions.filter((q) => q.answer || q.skipped || q.delegated);
   const known = Object.entries(input.understanding.known)
     .map(([t, v]) => `- ${TOPIC_LABEL[t as Topic] ?? t}: ${v}`)
     .join('\n');
   return [
     `WHAT THEY WANT TO MAKE: “${input.intent}”`,
     answered.length
-      ? `QUESTIONS SO FAR:\n${answered.map((q, i) => `${i + 1}. [${q.topic}] ${q.question}\n   → ${q.skipped ? '(skipped)' : unsure(q.answer) ? `(not sure yet: “${q.answer}”)` : q.answer}`).join('\n')}`
+      ? `QUESTIONS SO FAR:\n${answered.map((q, i) => `${i + 1}. [${q.topic}] ${q.question}\n   → ${q.delegated ? '(left to you: decide it well, and do not ask it again)' : q.skipped ? '(skipped)' : unsure(q.answer) ? `(not sure yet: “${q.answer}”)` : q.answer}`).join('\n')}`
       : 'QUESTIONS SO FAR: none yet.',
     known ? `UNDERSTOOD SO FAR:\n${known}` : '',
     `THE MOODBOARD:\n${moodSummary(input.moodboard)}`,

@@ -597,5 +597,200 @@ console.log('\n=== looking at the drawn page ===');
   ok('the audit is one valid script, inside the inspector', (() => { try { new Function(V.AUDIT_SOURCE); return V.INSPECTOR_SOURCE.includes('__uxv0Audit') && V.INSPECTOR_SOURCE.includes("m.type === 'audit'"); } catch { return false; } })());
 }
 
+console.log('\n=== motion ===');
+{
+  const mk = (o) => V.normalizeBrief({ pageType: 'website', platform: 'web', palette: [], typography: { display: 'Inter', body: 'Inter' }, ...o }, new Set());
+  const launch = mk({ objective: 'Launch a festival', personality: ['bold', 'loud'], visualDirection: 'A loud poster, big type' });
+  const clinic = mk({ objective: 'Book a GP appointment', audience: 'patients', personality: ['calm', 'clear'], visualDirection: 'plain and accessible public service' });
+  const loud = V.proposeDirections({ brief: launch });
+  const calm = V.proposeDirections({ brief: clinic });
+  ok('every direction carries a motion', [...loud, ...calm].every((d) => d.look.motion && V.MOTION_FEELS.includes(d.look.motion.feel)));
+  ok('a loud launch moves more than a public-service page', (() => { const lv = (d) => V.MOTION_FEELS.indexOf(d.look.motion.feel); return lv(loud[0]) > lv(calm[0]); })(), `${loud[0].language}:${loud[0].look.motion.feel} vs ${calm[0].language}:${calm[0].look.motion.feel}`);
+  const still = V.proposeDirections({ brief: launch, notes: 'no animation please' });
+  ok('"no animation" makes every option still', still.every((d) => d.look.motion.feel === 'still'));
+  const kin = V.proposeDirections({ brief: clinic, notes: 'make it kinetic, with parallax' });
+  ok('"kinetic, with parallax" is read', kin.every((d) => d.look.motion.feel === 'kinetic' && d.look.motion.parallax >= 1) && kin[0].rationale.join(' ').includes('kinetic motion'));
+  ok('a feel the language lacks comes as itself, not bent by the language', kin.every((d) => d.look.motion.duration === V.MOTION_PRESETS.kinetic.duration || V.languageOf(d.language).motion.includes('kinetic')));
+  const locked = { ...kin[0], locks: ['motion'] };
+  const again = V.proposeDirections({ brief: clinic, base: locked, round: 1, seen: kin.map((d) => d.language) });
+  ok('a locked motion survives asking again', again.every((d) => J(d.look.motion) === J(locked.look.motion)));
+  ok('older looks are still', J(V.lookFromTokens(SPEC.tokens ?? V.DEFAULT_TOKENS).motion) === J(V.STILL_MOTION) && V.normalizeLook({}, V.lookFromTokens(V.DEFAULT_TOKENS)).motion.feel === 'still');
+  ok('motion is normalised and bounded', (() => { const m = V.normalizeMotion({ feel: 'lively', duration: 99999, stagger: -4, parallax: 9, ease: 'bogus' }, V.MOTION_PRESETS.calm); return m.duration === 1800 && m.stagger === 0 && m.parallax === 3 && m.ease === 'gentle'; })());
+  ok('calmer and livelier step through the feels', V.stepMotion(V.MOTION_PRESETS.lively, -1).feel === 'measured' && V.stepMotion(V.MOTION_PRESETS.measured, -1).feel === 'calm' && V.stepMotion(V.MOTION_PRESETS.lively, 1).feel === 'kinetic' && V.stepMotion(V.MOTION_PRESETS.still, -1).feel === 'still');
+  const look = { ...loud[0].look, motion: V.MOTION_PRESETS.kinetic, motifs: [...loud[0].look.motifs, 'marquee', 'shapes'] };
+  const play = V.motionCss(look, 'play');
+  ok('playing writes load arrivals, scroll-driven arrivals behind @supports, parallax, section openings and a condensing nav', /mo-t-word/.test(play) && /@supports \(animation-timeline: view\(\)\)\{[^]*animation-timeline:view\(\)/.test(play) && /mo-par|mo-drift/.test(play) && /mo-sec/.test(play) && /scroll\(root\)/.test(play) && /mo-mq/.test(play));
+  ok('every played motion has a reduced-motion alternative', /@media \(prefers-reduced-motion:reduce\)\{body \*/.test(play));
+  const stat = V.motionCss(look, 'static');
+  ok('static writes hovers only: nothing arrives, nothing follows the scroll', !/@keyframes|animation-timeline/.test(stat) && /@media \(hover:hover\)/.test(stat));
+  ok('a still look writes no motion at all', V.motionCss({ ...look, motion: V.STILL_MOTION }, 'play') === '');
+  const k = V.kineticHeadline('Think as long as it <em>needs</em>.', 'words');
+  ok('kinetic words keep the emphasis and the spaces', k.includes('<em><span class="kw" style="--i:5">needs</span></em>') && (k.match(/class="kw"/g) || []).length === 7 && / <span/.test(k));
+  ok('letters fall back to words for a long headline', !V.kineticHeadline('A headline that is far too long to animate letter by letter, honestly', 'letters').includes('class="kl"'));
+  const spec = V.normalizeSpec({ ...SPEC, look }, board);
+  const htmlPlay = V.renderDesign(spec, board.refs, { motion: 'play' }).html;
+  const htmlStatic = V.renderDesign(spec, board.refs).html;
+  ok('the renderer plays motion only when asked; the default draws the page at rest', htmlPlay.includes('mo-t-') && !htmlStatic.includes('@keyframes') && htmlStatic.includes(' mo mo-kinetic'));
+  ok('a kinetic headline keeps its words for screen readers', /<h1 class="h-hero[^"]*"[^>]*aria-label="[^"]+"/.test(htmlPlay) && !/aria-label/.test(htmlStatic.match(/<h1[^>]*>/)?.[0] ?? ''));
+  ok('motion counts in how different two directions are', V.directionDistance(loud[0], { ...loud[0], look: { ...loud[0].look, motion: V.STILL_MOTION } }) > 0);
+  ok('motion is its own lock group, with a label', V.LOCK_GROUPS.includes('motion') && V.LOCK_LABEL.motion === 'Motion');
+}
+
+console.log('\n=== the moodboard as art direction ===');
+{
+  const n1 = V.interpretNote('I love this typography, not the palette.');
+  ok('"this typography, not the palette" takes type and leaves colour', J(n1.take) === J(['typography']) && J(n1.leave) === J(['colour']), J(n1));
+  const n2 = V.interpretNote('Use the architectural atmosphere, not the building itself.');
+  ok('"the atmosphere, not the building itself" takes atmosphere and leaves the subject', n2.take.includes('atmosphere') && n2.leave.includes('imagery') && !n2.take.includes('imagery'), J(n2));
+  const n3 = V.interpretNote('Take inspiration from the movement, not the visual styling.');
+  ok('"the movement, not the styling" takes motion and leaves colour, type and texture', n3.take.includes('motion') && ['colour', 'typography', 'texture'].every((a) => n3.leave.includes(a)), J(n3));
+  const n4 = V.interpretNote('Make the entire website feel like these references.');
+  ok('"the entire website should feel like this" is a key atmosphere reference', n4.key && n4.take.includes('atmosphere'), J(n4));
+  ok('"nothing like this" steers away', V.interpretNote('nothing like this, too corporate').avoid);
+  const base = { provider: 'openverse', width: 1600, height: 1067, title: 't', creator: 'A', license: 'CC BY', category: 'imagery', state: 'kept' };
+  const r = (id, o = {}) => V.normalizeRef({ ...base, providerId: id, url: `https://x.test/${id}.jpg`, ...o });
+  const up = 'a'.repeat(32);
+  const mb = V.normalizeMoodboard({ refs: [
+    r('legacy'),
+    r('insp', { asContent: false, note: 'love the typography, not the palette' }),
+    r('page', { asContent: true }),
+    r('away', { avoid: true, note: 'too corporate, rounded cards' }),
+    r('col', { asContent: false, take: ['colour'], swatches: ['#1b2a3a', '#e8e1d4', '#c8553d'], title: 'Harbour at dusk' }),
+    { provider: 'upload', providerId: up, width: 800, height: 600, title: 'clip', state: 'kept', media: 'video', take: ['motion'], note: 'a slow, calm drift' },
+  ] });
+  const ids = V.usableImages(mb);
+  ok('only pictures marked for the page (and ones kept before the distinction) can be placed', ids.has('openverse:legacy') && ids.has('openverse:page') && !ids.has('openverse:insp') && !ids.has('openverse:away') && !ids.has('openverse:col') && !ids.has(`upload:${up}`));
+  const clip = mb.refs.find((x) => x.provider === 'upload');
+  ok('an upload keeps no address at rest, and is credited as the designer’s own', !!clip && clip.url === '' && V.creditText(clip).includes('your own'));
+  const reading = V.readBoard(mb);
+  ok('the board is read: notes, colours from colour references, motion from moving references, what to avoid', /typography/.test(reading.words) && reading.colours.includes('#c8553d') && reading.motion === 'calm' && /corporate/.test(reading.avoid), J(reading.said));
+  ok('only the designer’s words are read, never a library’s titles', !/Harbour/.test(reading.words));
+  const brief = V.normalizeBrief({ pageType: 'website', objective: 'A harbour restaurant', personality: ['warm'], visualDirection: 'seaside', palette: [], typography: { display: 'Fraunces', body: 'Inter' } }, new Set());
+  const opts = V.proposeDirections({ brief, board: reading });
+  ok('one option takes its colours from the references kept for colour', opts.some((d) => d.rationale.some((x) => /Colours sampled from your references/.test(x)) && d.tokens.colors.background.toLowerCase() === '#e8e1d4'), opts.map((d) => d.tokens.colors.background).join(','));
+  ok('moving references give the motion, unless the notes say otherwise', opts.every((d) => d.look.motion.feel === 'calm') && V.proposeDirections({ brief, board: reading, notes: 'kinetic' }).every((d) => d.look.motion.feel === 'kinetic'));
+  const prompt = V.generateUser({ brief, moodboard: mb });
+  ok('generation is told which pictures it may place and which only inspire', /PICTURES YOU MAY PLACE[^]*openverse:page[^]*REFERENCES THAT INSPIRE[^]*openverse:insp[^]*take: typography[^]*leave: colour/.test(prompt) && /STEER AWAY FROM[^]*openverse:away/.test(prompt) && !prompt.split('REFERENCES THAT INSPIRE')[0].includes('openverse:insp'));
+  ok('a reading survives the trip to a route, bounded', (() => { const x = V.normalizeReading({ ...reading, colours: ['#zzzzzz', '#112233'], motion: 'nope', grid: 'swiss' }); return x.colours.length === 1 && !x.motion && x.grid === 'swiss'; })());
+  ok('a palette comes from swatches, with an accent that reads', (() => { const p = V.paletteFromSwatches(['#1b2a3a', '#e8e1d4', '#c8553d']); return !!p && p.background === '#e8e1d4' && p.accent === '#c8553d'; })());
+  const spec = V.normalizeSpec({ ...SPEC, sections: [{ id: 'h', kind: 'hero', variant: 'split', content: { title: 'Hi' }, images: ['openverse:insp'] }] }, mb);
+  ok('a picture that only inspires cannot reach the page, even if the model places it', spec.sections[0].images.length === 0);
+}
+
+console.log('\n=== the Living Brief as a specification ===');
+{
+  const base = { pageType: 'website', platform: 'web', objective: 'Bring neighbours in on weekday mornings', audience: 'Neighbours', personality: ['warm', 'exact'], visualDirection: 'paper and roast', palette: [{ name: 'Paper', hex: '#f4efe6', role: 'background' }, { name: 'Roast', hex: '#221c17', role: 'text' }, { name: 'Walnut', hex: '#8a5a3c', role: 'accent' }, { name: 'Ash', hex: '#8b8178', role: 'muted' }], typography: { display: 'Fraunces', body: 'Inter' } };
+  const prev = V.normalizeBrief({ ...base, decisions: { audience: 'locked', personality: 'approved', colour: 'delegated', nonsense: 'locked' }, spec: { ratio: 9, grid: 'swiss', motion: { feel: 'calm' }, contrast: 'AAA' }, rules: ['no animation'] }, new Set());
+  ok('decisions, rules and exact specs are normalised and bounded', prev.decisions.audience === 'locked' && !('nonsense' in prev.decisions) && prev.spec.ratio === 1.618 && prev.spec.grid === 'swiss' && prev.spec.motion.feel === 'calm' && prev.rules[0] === 'no animation');
+  const next = V.normalizeBrief({ ...base, audience: 'Commuters in a hurry', personality: ['loud'] }, new Set());
+  const m = V.mergeDecided(next, prev);
+  ok('a revised brief keeps a locked part word for word', m.brief.audience === 'Neighbours' && m.kept.includes('audience'), m.brief.audience);
+  ok('an approved part the model changed is kept as changed, and reopened', J(m.brief.personality) === J(['loud']) && m.reopened.includes('personality') && !m.brief.decisions.personality);
+  ok('statuses, specs and rules carry over a revision', m.brief.decisions.colour === 'delegated' && m.brief.spec.grid === 'swiss' && m.brief.rules[0] === 'no animation');
+  ok('a delegated question becomes a delegated part', J(V.delegatedParts([{ topic: 'visual', delegated: true }, { topic: 'audience', delegated: false }])) === J({ colour: 'delegated', typography: 'delegated', imagery: 'delegated' }));
+  const locked = V.normalizeBrief({ ...base, decisions: { colour: 'locked', motion: 'locked' }, spec: { motion: V.MOTION_PRESETS.kinetic } }, new Set());
+  const dirs = V.proposeDirections({ brief: locked });
+  ok('a locked palette is in every direction, and locked there', dirs.every((d) => d.tokens.colors.background === '#f4efe6' && d.locks.includes('palette')));
+  ok('a locked motion is in every direction, and locked there', dirs.every((d) => d.look.motion.feel === 'kinetic' && d.locks.includes('motion')));
+  const pref = V.normalizeBrief({ ...base, spec: { grid: 'poster' } }, new Set());
+  const pd = V.proposeDirections({ brief: pref });
+  ok('an exact spec that is not locked shapes the faithful reading only', pd[0].look.grid === 'poster' && pd.slice(1).some((d) => d.look.grid !== 'poster'), pd.map((d) => d.look.grid).join(','));
+  const deleg = V.normalizeBrief({ ...base, typography: { display: 'Fraunces', body: 'Inter' }, decisions: { typography: 'delegated' } }, new Set());
+  ok('delegated type frees the faithful reading from the brief’s faces', V.proposeDirections({ brief: deleg })[0].tokens.fonts.display !== 'Fraunces' || V.languageOf(V.proposeDirections({ brief: deleg })[0].language).display[0] === 'Fraunces');
+  const aaa = V.normalizeBrief({ ...base, spec: { contrast: 'AAA' } }, new Set());
+  ok('AAA lifts every text colour to 7:1 in every direction', V.proposeDirections({ brief: aaa }).every((d) => V.ensureContrast(d.tokens.colors.text, d.tokens.colors.background, 7) === d.tokens.colors.text && V.ensureContrast(d.tokens.colors.muted, d.tokens.colors.background, 7) === d.tokens.colors.muted));
+  const ruled = V.normalizeBrief({ ...base, rules: ['no animation'] }, new Set());
+  ok('a rule is read for every direction', V.proposeDirections({ brief: ruled }).every((d) => d.look.motion.feel === 'still'));
+  ok('a changed spec, status or rule asks for new directions', V.briefKey(pref) !== V.briefKey(V.normalizeBrief(base, new Set())) && V.briefKey(ruled) !== V.briefKey(V.normalizeBrief(base, new Set())));
+  const b2 = V.normalizeBrief({ ...base, typography: { display: 'Archivo', body: 'Inter' }, spec: { grid: 'swiss', motion: V.MOTION_PRESETS.lively } }, new Set());
+  ok('the visual parts that changed are found', J(V.changedVisualParts(V.normalizeBrief(base, new Set()), b2)) === J(['typography', 'layout', 'motion']));
+  const spec = V.normalizeSpec({ ...SPEC, look: dirs[0].look }, board);
+  const applied = V.briefToDesign(spec, b2, ['typography', 'motion']);
+  ok('only the parts named reach the design: type and motion change, colour and grid do not', applied.tokens.fonts.display === 'Archivo' && applied.look.motion.feel === 'lively' && J(applied.tokens.colors) === J(spec.tokens.colors) && applied.look.grid === spec.look.grid && applied.version === spec.version + 1);
+}
+
+console.log('\n=== knowledge, fidelity and precise refinement ===');
+{
+  ok('the principles are structured: an area, a rule and a reason each, with unique ids', V.DESIGN_PRINCIPLES.length >= 30 && new Set(V.DESIGN_PRINCIPLES.map((p) => p.id)).size === V.DESIGN_PRINCIPLES.length && V.DESIGN_PRINCIPLES.every((p) => p.rule && p.why && p.area));
+  const kin = { ...V.lookFromTokens(V.DEFAULT_TOKENS), grid: 'poster', motion: V.MOTION_PRESETS.kinetic };
+  ok('a kinetic poster is reminded of kinetic type and reduced motion; a still page is not', V.principlesForLook(kin).some((p) => p.id === 'type.kinetic') && V.principlesForLook(kin).some((p) => p.id === 'motion.reduced') && !V.principlesForLook(V.lookFromTokens(V.DEFAULT_TOKENS)).some((p) => p.area === 'motion'));
+  ok('every finding kind has a reason', ['overflow', 'contrast', 'target', 'measure', 'rhythm', 'fidelity', 'motion'].every((k) => V.whyFor(k).length > 20));
+  const brief0 = V.normalizeBrief({ pageType: 'website', objective: 'Sell festival tickets', personality: ['bold'], visualDirection: 'poster', palette: [{ hex: '#ffffff', role: 'background' }, { hex: '#111111', role: 'text' }, { hex: '#ff4b1f', role: 'accent' }], typography: { display: 'Archivo', body: 'Inter' } }, new Set());
+  const dir = { ...V.proposeDirections({ brief: brief0 })[0], locks: ['palette', 'motion'] };
+  const d = V.designFromDirection(dir);
+  const good = V.normalizeSpec({ ...SPEC, tokens: d.tokens, look: d.look }, board);
+  const ev0 = V.evaluateDesign(good, {}, dir.locks, { direction: dir });
+  ok('a page that keeps its direction is fully faithful, and says so', ev0.fidelity === 100 && ev0.kept.some((k) => k.includes(dir.name)));
+  const drifted = { ...good, tokens: { ...good.tokens, colors: { ...good.tokens.colors, accent: '#00ff00' } }, look: { ...good.look, motion: V.STILL_MOTION } };
+  const ev1 = V.evaluateDesign(drifted, {}, dir.locks, { direction: dir });
+  const fixes = ev1.findings.filter((f) => f.kind === 'fidelity');
+  ok('drift from a locked colour and motion is found, with fixes that put them back (not blocked by the locks)', fixes.length === 2 && fixes.every((f) => f.fix && !f.blocked) && ev1.fidelity < 100);
+  const ruled = V.normalizeBrief({ ...brief0, rules: ['No animation', 'No capitals', 'Must feel handmade'] }, new Set());
+  const loud = V.normalizeSpec({ ...SPEC, tokens: d.tokens, look: { ...d.look, case: 'upper', motion: V.MOTION_PRESETS.lively } }, board);
+  const ev2 = V.evaluateDesign(loud, {}, [], { brief: ruled });
+  ok('checkable rules are checked, with fixes; the others are said to be given, not measured', ev2.findings.filter((f) => /Breaks the rule/.test(f.message)).length === 2 && ev2.findings.every((f) => !/Breaks the rule/.test(f.message) || f.fix) && ev2.kept.some((k) => /cannot be measured/.test(k)));
+  const aaa = V.normalizeBrief({ ...brief0, spec: { contrast: 'AAA' } }, new Set());
+  const faint = V.normalizeSpec({ ...SPEC, tokens: { ...d.tokens, colors: { ...d.tokens.colors, muted: '#8a8a8a', background: '#ffffff' } }, look: d.look }, board);
+  ok('an AAA brief catches text below 7:1, with a fix', V.evaluateDesign(faint, {}, [], { brief: aaa }).findings.some((f) => f.kind === 'fidelity' && /AAA/.test(f.message) && f.fix));
+  const civic = V.normalizeSpec({ ...SPEC, tokens: d.tokens, look: { ...d.look, language: 'civic', motion: V.MOTION_PRESETS.kinetic } }, board);
+  ok('kinetic motion for a public service is questioned, with a calmer fix', V.evaluateDesign(civic, {}, [], {}).findings.some((f) => f.kind === 'motion' && f.fix && f.fix.look.motion.feel === 'lively'));
+  ok('a moving page states its reduced-motion alternative', ev2.kept.some((k) => /reduced-motion/.test(k)));
+  // precise refinement
+  const asked = (w) => J(V.readAdjust(w));
+  ok('"keep everything, but change the typography" is a new pairing', asked('Keep everything, but change the typography.') === J(['type-pairing']));
+  ok('"use warmer colours", "reduce the motion intensity", "make the layout more experimental" are read', asked('Use warmer colors') === J(['colour-warmer']) && asked('Reduce the motion intensity.') === J(['motion-calmer']) && asked('Make the layout more experimental') === J(['layout-experimental']));
+  ok('"keep the composition, but make the interaction more expressive" changes only the interaction', asked('Keep the composition, but make the interaction more expressive') === J(['motion-more-expressive-hover']));
+  ok('anything else goes to the model', asked('Rewrite the hero headline about first light') === '[]');
+  const t = V.adjust(good, 'type-pairing');
+  const typed = t.patches.reduce((sp, pt) => V.applyPatch(sp, pt, board).spec, good);
+  ok('a new pairing changes the faces and nothing else', typed.tokens.fonts.display !== good.tokens.fonts.display && J(typed.tokens.colors) === J(good.tokens.colors) && typed.look.grid === good.look.grid);
+  const warm = V.applyPatch(good, V.adjust(good, 'colour-warmer').patches[0], board).spec;
+  ok('warmer colours keep text readable', V.ensureContrast(warm.tokens.colors.text, warm.tokens.colors.background, 7) === warm.tokens.colors.text && warm.tokens.colors.accent !== good.tokens.colors.accent);
+  ok('calmer motion steps down one feel; at still there is nothing to do', V.adjust({ ...good, look: { ...good.look, motion: V.MOTION_PRESETS.kinetic } }, 'motion-calmer').patches[0].look.motion.feel === 'lively' && V.adjust({ ...good, look: { ...good.look, motion: V.STILL_MOTION } }, 'motion-calmer') === null);
+  ok('a locked group stands in the way of an adjustment (it is checked before applying)', V.lockedChanges(good, V.adjust(good, 'colour-cooler').patches[0], ['palette']).includes('palette'));
+}
+
+console.log('\n=== found by dogfooding: notes, fit, app screens, charts ===');
+{
+  // a reference note about light is about atmosphere, not the colour of the page
+  const lightNote = V.readDirectives('The light, not the bar itself', '');
+  ok('"the light, not the bar itself" does not ask for a light ground', lightNote.dark === undefined && !lightNote.said.includes('a light ground'), J(lightNote));
+  ok('"a light background" and "light and airy" do', V.readDirectives('a light background please', '').dark === false && V.readDirectives('light and airy', '').dark === false);
+  ok('"bright colours" is colour, not a light ground', V.readDirectives('bright colours', '').dark === undefined && V.readDirectives('bright colours', '').colourful === true);
+  ok('"louder" and "oversized type" ask for bigger, bolder type', V.readDirectives('louder', '').loud === true && V.readDirectives('oversized type', '').loud === true);
+  const reading = V.readBoard(V.normalizeMoodboard({ refs: [ref('g1', { note: 'This asymmetric grid', take: ['composition'] })] }));
+  ok('an asymmetric composition is "an asymmetric", not "a asymmetric"', reading.said.some((x) => x === 'an asymmetric composition'), J(reading.said));
+  // headlines are sized so their longest word fits, from measured advances
+  ok('measured advances: Unbounded sets wider than Inter, Anton narrower; capitals wider than lower case', V.advanceEm('Unbounded', 800, true) > V.advanceEm('Inter', 800, true) && V.advanceEm('Anton', 400, true) < V.advanceEm('Inter', 400, true) && V.advanceEm('Inter', 400, true) > V.advanceEm('Inter', 400, false));
+  ok('an unknown face falls back to a typical width', V.advanceEm('Nonesuch Grotesk', 400, true) === 0.72);
+  const posterLook = { ...V.lookFromTokens(V.DEFAULT_TOKENS), language: 'poster', grid: 'poster', case: 'upper', weight: 800 };
+  const posterTokens = { ...V.DEFAULT_TOKENS, fonts: { display: 'Unbounded', body: 'Inter' } };
+  const long = V.normalizeSpec({ ...SPEC, tokens: posterTokens, look: posterLook, sections: [{ id: 'h', kind: 'hero', variant: 'poster', content: { title: 'Drawings that *move*.', subtitle: 'x', primary: 'Go' } }] }, board);
+  const lhtml = V.renderDesign(long, board.refs).html;
+  const fit = lhtml.match(/--fit-hero:calc\(\(100vw - 40px\) \/ ([\d.]+)\)/);
+  ok('a poster headline gets a size cap from its longest word ("Drawings", 8 letters of wide capitals)', !!fit && Number(fit[1]) > 8 * 0.85 && /font-size:min\(var\(--fs-hero\),var\(--fit-hero,999px\)\)/.test(lhtml), fit?.[0]);
+  const short = V.normalizeSpec({ ...SPEC, tokens: posterTokens, look: posterLook, sections: [{ id: 'h', kind: 'hero', variant: 'poster', content: { title: 'Go on, try it.', subtitle: 'x', primary: 'Go' } }] }, board);
+  const sfit = Number(V.renderDesign(short, board.refs).html.match(/--fit-hero:calc\(\(100vw - 40px\) \/ ([\d.]+)\)/)?.[1]);
+  ok('a headline of short words is allowed larger than one with a long word', sfit > 0 && sfit < Number(fit?.[1]));
+  // the kinetic headline marks where a highlighted word starts, so its highlight arrives with it
+  ok('a highlighted word in a kinetic headline knows its first letter', /<em class="em" style="--hl-i:8">/.test(V.kineticHeadline('Drawings <em class="em">move</em>.', 'letters')));
+  const hlCss = V.motionCss({ ...posterLook, emphasis: 'highlight', motion: V.MOTION_PRESETS.kinetic }, 'play');
+  ok('in play the highlight sweeps in (and under reduced motion every animation is off, leaving it drawn)', /@keyframes mo-hl/.test(hlCss) && /animation-delay:calc\(var\(--hl-i,0\)/.test(hlCss) && /prefers-reduced-motion:reduce\)\{body \*/.test(hlCss));
+  // app screens
+  const appSpec = V.normalizeSpec({ ...SPEC, pageType: 'app-screen', sections: [
+    { id: 'n', kind: 'app-nav', variant: 'sidebar', content: { brand: 'L', items: ['Close'], active: 'Close' } },
+    { id: 'c', kind: 'chart', variant: 'area', content: { title: 'By day', labels: ['Mon', 'Tue', 'Wed'], series: [{ name: 'This month', values: [1, 2, 3] }, { name: 'Last month', values: [2, 3, 1] }] } },
+    { id: 't', kind: 'table', variant: 'default', content: { title: 'Accounts', columns: ['Account', 'Owner', 'Status'], rows: [{ cells: ['Bank', 'Priya'], status: 'Reconciled' }] } },
+  ] }, board);
+  const ahtml = V.renderDesign(appSpec, board.refs).html;
+  const adoc = parse(ahtml);
+  ok('the desktop twelve-column app grid is not overridden by the one-column phone rule', /@media \(max-width:1099px\)\{\.app main\{grid-template-columns:minmax\(0,1fr\)\}\}/.test(ahtml) && !/\.app main\{min-width:0;padding:[^}]*grid-template-columns/.test(ahtml));
+  ok('a chart with nothing beside it spans the row; only a chart paired with a feed takes eight columns', /\.app main>\.sx-chart:has\(\+\.sx-feed\)/.test(ahtml) && !/\.app main>\.sx-chart\{grid-column:span 8\}/.test(ahtml));
+  ok('a table that already has a Status column gets the status there, not a second "Status" column', [...adoc.querySelectorAll('th')].filter((th) => th.textContent === 'Status').length === 1 && adoc.querySelector('td .status')?.textContent.includes('Reconciled'));
+  ok('only the subject series is filled; the comparison is a dashed line with a dashed key', adoc.querySelectorAll('polygon.area').length === 1 && adoc.querySelector('polygon.area').classList.contains('s0') && adoc.querySelector('polyline.cmp.s1') && adoc.querySelector('.key-line.s1'));
+  const plainTable = V.normalizeSpec({ ...SPEC, pageType: 'app-screen', sections: [{ id: 't', kind: 'table', variant: 'default', content: { title: 'A', columns: ['Account', 'Owner'], rows: [{ cells: ['Bank', 'Priya'], status: 'Open' }] } }] }, board);
+  ok('a table without a Status column still gets one for its statuses', [...parse(V.renderDesign(plainTable, board.refs).html).querySelectorAll('th')].map((th) => th.textContent).join('|') === 'Account|Owner|Status');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

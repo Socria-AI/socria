@@ -19,6 +19,7 @@ import { renderDesign } from '@/lib/ux-v0/render';
 import { buildSandboxDoc } from '@/lib/ux-v0/sandbox';
 import { getArtifact, getProject } from '@/lib/ux-v0/store';
 import { currentSpec, type ProjectSummary } from '@/lib/ux-v0/types';
+import { preloadUploads, withUploads } from './uploads';
 
 export interface RemoteWork {
   id: string;
@@ -143,7 +144,11 @@ function Plate({ s, ratio, nonce }: { s: ProjectSummary; ratio: number; nonce: s
       // the same sealed document the workspace frames: no scripts, the nonce policy
       const seal = (html: string) => buildSandboxDoc(html, { parse: (h) => new DOMParser().parseFromString(h, 'text/html'), runScripts: false, nonce, inspector: '' }).doc;
       const spec = currentSpec(p);
-      if (spec) return setShown({ kind: 'page', html: seal(renderDesign(spec, p.moodboard.refs).html) });
+      if (spec) {
+        await preloadUploads(p.moodboard.refs, true);
+        if (!live) return;
+        return setShown({ kind: 'page', html: seal(renderDesign(spec, withUploads(p.moodboard.refs, true)).html) });
+      }
       const a = p.artifact?.type === 'imported' ? p.artifact : null;
       if (!a) return;
       const rec = await getArtifact(a.id);

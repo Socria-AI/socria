@@ -108,6 +108,65 @@ export function nearestWeight(name: string, want: number): number {
   return [...f.weights].sort((a, b) => Math.abs(a - want) - Math.abs(b - want))[0];
 }
 
+/**
+ * How wide each family sets: the average advance per character, in ems, of capitals and of lower case, at
+ * 400 and at 800 (or the nearest weight the family has). Measured by SocriaUX in Chromium with each family's
+ * Google Fonts files, over twelve common words ("drawings", "downloadable", "international"…), November 2026.
+ * Used to size a headline so its longest word fits the screen instead of breaking in the middle.
+ */
+const ADVANCE: Record<string, readonly [up400: number, lo400: number, up800: number, lo800: number]> = {
+  'Instrument Serif': [0.477, 0.386, 0.477, 0.386],
+  Fraunces: [0.701, 0.536, 0.746, 0.584],
+  'Playfair Display': [0.645, 0.511, 0.694, 0.53],
+  'DM Serif Display': [0.601, 0.508, 0.601, 0.508],
+  'Cormorant Garamond': [0.638, 0.438, 0.65, 0.444],
+  'Libre Baskerville': [0.799, 0.583, 0.827, 0.603],
+  Lora: [0.67, 0.529, 0.688, 0.544],
+  Newsreader: [0.684, 0.478, 0.731, 0.519],
+  'Source Serif 4': [0.673, 0.546, 0.686, 0.572],
+  'EB Garamond': [0.663, 0.43, 0.687, 0.476],
+  'Bodoni Moda': [0.692, 0.522, 0.738, 0.564],
+  'Young Serif': [0.765, 0.567, 0.765, 0.567],
+  'Old Standard TT': [0.704, 0.475, 0.712, 0.49],
+  Spectral: [0.705, 0.5, 0.72, 0.512],
+  'IBM Plex Serif': [0.672, 0.54, 0.695, 0.559],
+  Gloock: [0.677, 0.525, 0.677, 0.525],
+  Inter: [0.669, 0.533, 0.689, 0.568],
+  'DM Sans': [0.626, 0.526, 0.66, 0.567],
+  Manrope: [0.625, 0.527, 0.662, 0.567],
+  'Space Grotesk': [0.616, 0.551, 0.62, 0.551],
+  'Work Sans': [0.662, 0.553, 0.681, 0.567],
+  'Plus Jakarta Sans': [0.664, 0.547, 0.682, 0.567],
+  'IBM Plex Sans': [0.632, 0.512, 0.657, 0.537],
+  Outfit: [0.644, 0.504, 0.677, 0.535],
+  Sora: [0.711, 0.583, 0.727, 0.605],
+  Archivo: [0.68, 0.502, 0.723, 0.574],
+  'Public Sans': [0.666, 0.525, 0.698, 0.55],
+  Karla: [0.6, 0.524, 0.665, 0.567],
+  Syne: [0.639, 0.504, 1.177, 0.921],
+  'Bricolage Grotesque': [0.64, 0.537, 0.677, 0.573],
+  Geist: [0.644, 0.517, 0.685, 0.572],
+  'Instrument Sans': [0.674, 0.525, 0.68, 0.549],
+  'Hanken Grotesk': [0.621, 0.506, 0.633, 0.516],
+  'Familjen Grotesk': [0.596, 0.482, 0.613, 0.51],
+  Unbounded: [0.84, 0.69, 0.888, 0.745],
+  Anton: [0.467, 0.461, 0.467, 0.461],
+  'Big Shoulders Display': [0.344, 0.331, 0.444, 0.422],
+  'IBM Plex Mono': [0.6, 0.6, 0.6, 0.6],
+  'JetBrains Mono': [0.6, 0.6, 0.6, 0.6],
+  'Space Mono': [0.612, 0.612, 0.612, 0.612],
+  'Geist Mono': [0.6, 0.6, 0.6, 0.6],
+};
+
+/** The average advance of one character of this face at this weight, in ems (capitals or lower case). */
+export function advanceEm(name: string, weight: number, upper: boolean): number {
+  const f = knownFont(name);
+  const a = f ? ADVANCE[f.name] : undefined;
+  if (!a) return f?.kind === 'mono' ? 0.6 : upper ? 0.72 : 0.56;
+  const t = Math.max(0, Math.min(1, (weight - 400) / 400));
+  return upper ? a[0] + (a[2] - a[0]) * t : a[1] + (a[3] - a[1]) * t;
+}
+
 /** Whether the family has a true italic loaded. */
 export function hasItalic(name: string): boolean {
   return !!knownFont(name)?.italic;

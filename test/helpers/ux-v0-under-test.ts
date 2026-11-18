@@ -23,3 +23,12 @@ export * from '@/lib/ux-v0/direction';
 export * from '@/lib/ux-v0/color';
 export * from '@/lib/ux-v0/evaluate';
 export { AUDIT_SOURCE } from '@/lib/ux-v0/audit-source';
+// motion: presets, words, the CSS that plays them, kinetic headlines
+export * from '@/lib/ux-v0/motion';
+// the moodboard as art direction: reading notes and boards, content and inspiration
+export * from '@/lib/ux-v0/references';
+// the Living Brief's rules: decided stays decided, delegation, applying the brief to a design
+export * from '@/lib/ux-v0/brief';
+// design knowledge, and one decision changed in code
+export * from '@/lib/ux-v0/knowledge';
+export * from '@/lib/ux-v0/refine-local';
