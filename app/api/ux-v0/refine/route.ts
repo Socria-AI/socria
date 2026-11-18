@@ -18,14 +18,15 @@ import { enforceRateLimit } from '@/lib/rate-limit';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
 import { withMeter } from '@/lib/token-meter';
-import { askJson } from '@/lib/ux-v0/ask';
+import { askRouted } from '@/lib/ux-v0/ask';
+import { budgets } from '@/lib/ux-v0/budget';
 import { parseRefine, refineSystem, refineUser } from '@/lib/ux-v0/design';
 import { LOCK_GROUPS, LOCK_LABEL, lockedChanges, type LockGroup } from '@/lib/ux-v0/direction';
-import { MAX_TOKENS, socriauxLadder } from '@/lib/ux-v0/model';
+import { MAX_TOKENS, economyRoute, refineTier } from '@/lib/ux-v0/model';
 import { bad, failed, noModel, projectIdOf, readBody, signInFirst } from '@/lib/ux-v0/route-kit';
 import { applyPatch, normalizeSpec } from '@/lib/ux-v0/spec';
 import { normalizeBrief, normalizeMoodboard, normalizeSelection } from '@/lib/ux-v0/types';
-import { recordUsage, underCaps } from '@/lib/ux-v0/usage-server';
+import { gate, noticeOf, recordUsage } from '@/lib/ux-v0/usage-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -48,8 +49,12 @@ export const POST = withMeter(async function POST(req: NextRequest) {
   const locks: LockGroup[] = Array.isArray(body.locks) ? [...new Set(body.locks.filter((x: unknown): x is LockGroup => typeof x === 'string' && (LOCK_GROUPS as readonly string[]).includes(x)))] : [];
   const projectId = projectIdOf(body.projectId);
 
-  const caps = await underCaps(userId, 'refine');
-  if (!caps.ok) return NextResponse.json({ error: caps.error, limit: true }, { status: 429 });
+  const system = refineSystem();
+  const user = refineUser({ brief: normalizeBrief(body.brief), spec, moodboard, selection, comment, force, locks });
+  // a small change to the selected part is economy work; a change to the whole, its structure or its feel is premium
+  const complexity = refineTier(comment, selection);
+  const g = await gate(userId, projectId, 'refine', system.length + user.length, { tier: complexity.tier });
+  if (!g.ok) return NextResponse.json({ error: g.error, limit: true }, { status: 429 });
 
   const plan = await resolvePlanForRequest(req, userId);
   const sleep = await sleepGate(req, userId, plan);
@@ -58,13 +63,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
 
   const openai = tracked(new OpenAI({ apiKey }), 'ux-v0/refine');
   try {
-    const asked = await askJson(openai, socriauxLadder(), {
-      system: refineSystem(),
-      user: refineUser({ brief: normalizeBrief(body.brief), spec, moodboard, selection, comment, force, locks }),
-      maxTokens: MAX_TOKENS.refine,
-      temperature: 0.4,
-      label: 'refine',
-    });
+    const asked = await askRouted(openai, g.route, { system, user, maxTokens: MAX_TOKENS.refine, temperature: 0.4, label: 'refine', maxRetries: budgets().maxRetries }, economyRoute('refine'));
     const r = parseRefine(asked.json, force);
     // a locked decision is never changed silently: the designer is asked first
     const locked = lockedChanges(spec, r.patch, locks);
@@ -72,7 +71,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       const what = locked.map((g) => LOCK_LABEL[g].toLowerCase()).join(' and ');
       r.challenge = `This changes the ${what}, which you locked in the art direction. ${r.challenge ? `${r.challenge} ` : ''}Make the change anyway?`.trim();
     }
-    await recordUsage(userId, projectId, 'refine', asked.usage);
+    await recordUsage(userId, projectId, 'refine', asked.usage, Date.now(), { api: asked.api, downgraded: !!g.downgraded || !!asked.fellBack });
     const trial = r.patch.op === 'none' ? null : applyPatch(spec, r.patch, moodboard);
     return NextResponse.json({
       understood: r.understood,
@@ -84,6 +83,8 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       applies: !!trial?.ok,
       error: trial && !trial.ok ? trial.error : '',
       usage: asked.usage,
+      complexity: { tier: g.route.tier, why: complexity.why },
+      ...noticeOf(g, asked),
     });
   } catch (e) {
     // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure

@@ -187,3 +187,6 @@ alter table ux_v0_usage force row level security;
 revoke all on ux_v0_usage from anon, authenticated;
 revoke execute on function bump_ux_v0_usage(text, text, text, integer, integer, bigint, bigint, numeric, bigint) from public, anon, authenticated;
 grant execute on function bump_ux_v0_usage(text, text, text, integer, integer, bigint, bigint, numeric, bigint) to service_role;
+alter table ux_v0_calls enable row level security;
+alter table ux_v0_calls force row level security;
+revoke all on ux_v0_calls from anon, authenticated;

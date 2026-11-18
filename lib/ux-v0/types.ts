@@ -198,6 +198,10 @@ export interface Usage {
   output: number;
   /** US$; null when the model has no published price */
   cost: number | null;
+  /** the stage and tier the call was routed to, and its reasoning effort (lib/ux-v0/model.ts routeFor) */
+  stage?: CallKind;
+  tier?: 'economy' | 'premium';
+  effort?: string;
 }
 
 export interface CardTurn {
@@ -430,11 +434,35 @@ export interface DesignBrief {
 export type CallKind = 'discover' | 'direction' | 'brief' | 'refine-brief' | 'art-direction' | 'generate' | 'refine' | 'critique';
 export const CALL_KINDS: readonly CallKind[] = ['discover', 'direction', 'brief', 'refine-brief', 'art-direction', 'generate', 'refine', 'critique'];
 
+/** What each stage is, in words, for the cost panel, the settings and the report. */
+export const STAGE_LABEL: Record<CallKind, string> = {
+  discover: 'Questions',
+  direction: 'Moodboard direction',
+  brief: 'Brief',
+  'refine-brief': 'Brief revision',
+  'art-direction': 'Art direction',
+  generate: 'Generation',
+  refine: 'Refinement',
+  critique: 'Critique',
+};
+
+export interface StageSpend {
+  calls: number;
+  /** US$, as the provider reported it (measured) */
+  cost: number;
+  /** of those calls, how many ran on the premium model */
+  premium: number;
+}
+
 export interface UsageTotals {
   calls: number;
   input: number;
   output: number;
   cost: number;
+  /** what each stage cost: the questions, the brief, art direction, generation… (measured) */
+  byStage?: Partial<Record<CallKind, StageSpend>>;
+  /** the design versions the designer accepted by downloading them: cost per accepted design is cost / accepted */
+  accepted?: number[];
 }
 
 // ── the project ──────────────────────────────────────────────────────
@@ -637,6 +665,9 @@ export function normalizeUsage(v: unknown): Usage | null {
     cached: num(r.cached, 0, 1e8, 0),
     output: num(r.output, 0, 1e8, 0),
     cost: typeof r.cost === 'number' && Number.isFinite(r.cost) && r.cost >= 0 ? r.cost : null,
+    ...((CALL_KINDS as readonly string[]).includes(r.stage as string) ? { stage: r.stage as CallKind } : {}),
+    ...(r.tier === 'economy' || r.tier === 'premium' ? { tier: r.tier } : {}),
+    ...(typeof r.effort === 'string' && /^[a-z]{2,8}$/.test(r.effort) ? { effort: r.effort } : {}),
   };
 }
 
@@ -910,7 +941,17 @@ export function normalizeArtifact(v: unknown): Artifact | null {
 
 const usageTotals = (v: unknown): UsageTotals => {
   const r = obj(v);
-  return { calls: num(r.calls, 0, 1e7, 0), input: num(r.input, 0, 1e12, 0), output: num(r.output, 0, 1e12, 0), cost: num(r.cost, 0, 1e7, 0) };
+  const out: UsageTotals = { calls: num(r.calls, 0, 1e7, 0), input: num(r.input, 0, 1e12, 0), output: num(r.output, 0, 1e12, 0), cost: num(r.cost, 0, 1e7, 0) };
+  const by: Partial<Record<CallKind, StageSpend>> = {};
+  for (const [k, x] of Object.entries(obj(r.byStage))) {
+    if (!(CALL_KINDS as readonly string[]).includes(k)) continue;
+    const o = obj(x);
+    by[k as CallKind] = { calls: num(o.calls, 0, 1e7, 0), cost: num(o.cost, 0, 1e7, 0), premium: num(o.premium, 0, 1e7, 0) };
+  }
+  if (Object.keys(by).length) out.byStage = by;
+  const accepted = (Array.isArray(r.accepted) ? r.accepted : []).filter((x): x is number => Number.isInteger(x) && x > 0 && x < 1e6);
+  if (accepted.length) out.accepted = [...new Set(accepted)].slice(-200);
+  return out;
 };
 
 export function emptyDiscovery(): Discovery {
@@ -1028,5 +1069,22 @@ export function currentSpec(p: DesignProject): DesignSpec | null {
 /** Add one call's usage to a project's totals. */
 export function addUsage(t: UsageTotals, u: Usage | null): UsageTotals {
   if (!u) return t;
-  return { calls: t.calls + 1, input: t.input + u.input, output: t.output + u.output, cost: Math.round((t.cost + (u.cost ?? 0)) * 1e6) / 1e6 };
+  const round = (n: number) => Math.round(n * 1e6) / 1e6;
+  const out: UsageTotals = { ...t, calls: t.calls + 1, input: t.input + u.input, output: t.output + u.output, cost: round(t.cost + (u.cost ?? 0)) };
+  if (u.stage) {
+    const was = t.byStage?.[u.stage] ?? { calls: 0, cost: 0, premium: 0 };
+    out.byStage = { ...(t.byStage ?? {}), [u.stage]: { calls: was.calls + 1, cost: round(was.cost + (u.cost ?? 0)), premium: was.premium + (u.tier === 'premium' ? 1 : 0) } };
+  }
+  return out;
+}
+
+/** The project's spend with one more design version accepted (downloaded). */
+export function acceptDesign(t: UsageTotals, version: number): UsageTotals {
+  return { ...t, accepted: [...new Set([...(t.accepted ?? []), version])].slice(-200) };
+}
+
+/** What each accepted design cost, on average (measured spend over accepted versions), or null before any. */
+export function costPerAccepted(t: UsageTotals): number | null {
+  const n = t.accepted?.length ?? 0;
+  return n ? Math.round((t.cost / n) * 1e6) / 1e6 : null;
 }

@@ -41,3 +41,4 @@ export * from '@/lib/ux-v0/intent';
 export * from '@/lib/ux-v0/fit';
 export * from '@/lib/ux-v0/study';
 export { BEHAVIOR_SOURCE } from '@/lib/ux-v0/behaviors';
+export * from '@/lib/ux-v0/budget';

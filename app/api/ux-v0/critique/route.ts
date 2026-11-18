@@ -16,13 +16,14 @@ import { enforceRateLimit } from '@/lib/rate-limit';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
 import { withMeter } from '@/lib/token-meter';
-import { askJson } from '@/lib/ux-v0/ask';
+import { askRouted } from '@/lib/ux-v0/ask';
+import { budgets } from '@/lib/ux-v0/budget';
 import { formatFor } from '@/lib/ux-v0/schemas';
 import { critiqueSystem, critiqueUser, gateReasoning, type CritiqueInput } from '@/lib/ux-v0/critique';
-import { MAX_TOKENS, socriauxLadder } from '@/lib/ux-v0/model';
+import { MAX_TOKENS, economyRoute } from '@/lib/ux-v0/model';
 import { bad, failed, imageDataUrl, noModel, projectIdOf, readBody, signInFirst } from '@/lib/ux-v0/route-kit';
 import { normalizeBrief, normalizeCard, normalizeSelection, VIEWPORTS, type CardTurn } from '@/lib/ux-v0/types';
-import { recordUsage, underCaps } from '@/lib/ux-v0/usage-server';
+import { gate, noticeOf, recordUsage } from '@/lib/ux-v0/usage-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -59,8 +60,10 @@ export const POST = withMeter(async function POST(req: NextRequest) {
   };
   const projectId = projectIdOf(body.projectId);
 
-  const caps = await underCaps(userId, 'critique');
-  if (!caps.ok) return NextResponse.json({ error: caps.error, limit: true }, { status: 429 });
+  const system = critiqueSystem();
+  const user = critiqueUser(input);
+  const g = await gate(userId, projectId, 'critique', system.length + user.length + (selection.crop ? 3000 : 0) + (thumb ? 400 : 0));
+  if (!g.ok) return NextResponse.json({ error: g.error, limit: true }, { status: 429 });
 
   const plan = await resolvePlanForRequest(req, userId);
   const sleep = await sleepGate(req, userId, plan);
@@ -73,18 +76,10 @@ export const POST = withMeter(async function POST(req: NextRequest) {
   if (thumb) images.push({ url: thumb, detail: 'low' });
 
   try {
-    const asked = await askJson(openai, socriauxLadder(), {
-      system: critiqueSystem(),
-      user: critiqueUser(input),
-      maxTokens: MAX_TOKENS.critique,
-      temperature: 0.4,
-      images,
-      label: 'critique',
-      format: formatFor('critique'),
-    });
+    const asked = await askRouted(openai, g.route, { system, user, maxTokens: MAX_TOKENS.critique, temperature: 0.4, images, label: 'critique', format: formatFor('critique'), maxRetries: budgets().maxRetries }, economyRoute('critique'));
     const gated = gateReasoning(asked.json, input);
-    await recordUsage(userId, projectId, 'critique', asked.usage);
-    return NextResponse.json({ reasoning: gated.reasoning, artifactSummary: gated.artifactSummary, demoted: gated.demoted, usage: asked.usage });
+    await recordUsage(userId, projectId, 'critique', asked.usage, Date.now(), { api: asked.api, downgraded: !!g.downgraded || !!asked.fellBack });
+    return NextResponse.json({ reasoning: gated.reasoning, artifactSummary: gated.artifactSummary, demoted: gated.demoted, usage: asked.usage, ...noticeOf(g, asked) });
   } catch (e) {
     // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure
     const resting = sleepAnswer(e);

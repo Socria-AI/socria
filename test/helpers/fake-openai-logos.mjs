@@ -37,11 +37,14 @@ const responsesUsage = (u) =>
 export default class OpenAI {
   constructor() {
     this.responses = {
-      create: async (p) => {
+      create: async (p, opts) => {
         const g = globalThis;
         (g.__logosCalls ??= []).push(p);
+        (g.__logosOptions ??= []).push(opts ?? null);
         if ((g.__logosRefuse ?? []).includes(p.model))
           throw Object.assign(new Error(`The model \`${p.model}\` does not exist or you do not have access to it.`), { status: 404, code: 'model_not_found' });
+        // a model listed in globalThis.__logosSlow does not answer within a call's time limit: the SDK's timeout
+        if ((g.__logosSlow ?? []).includes(p.model) && opts?.timeout) throw Object.assign(new Error('Request timed out.'), { name: 'APIConnectionTimeoutError' });
         const next = (g.__logosScript ??= []).shift();
         if (next instanceof Error) throw next;
         const text = next === undefined ? '' : typeof next === 'string' ? next : JSON.stringify(next);
@@ -50,9 +53,11 @@ export default class OpenAI {
     };
     this.chat = {
       completions: {
-        create: async (p) => {
+        create: async (p, opts) => {
           const g = globalThis;
           (g.__logosCalls ??= []).push(p);
+          (g.__logosOptions ??= []).push(opts ?? null);
+          if ((g.__logosSlow ?? []).includes(p.model) && opts?.timeout) throw Object.assign(new Error('Request timed out.'), { name: 'APIConnectionTimeoutError' });
           if (p.stream) {
             if ((g.__logosRefuse ?? []).includes(p.model))
               throw Object.assign(new Error(`The model \`${p.model}\` does not exist or you do not have access to it.`), { status: 404, code: 'model_not_found' });

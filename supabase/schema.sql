@@ -1118,6 +1118,33 @@ begin
 end;
 $$;
 
+-- ux_v0_calls: one row per SocriaUX model call, for cost by stage and by tier.
+-- What the provider reported (tokens, priced: measured, never estimated), the
+-- stage and tier it was routed to (lib/ux-v0/model.ts routeFor), the model that
+-- answered and its effort, and whether the budget moved it to the economy
+-- model. No prompt, answer or design is stored here. A deployment without the
+-- table still works: the per-day totals above are kept as before.
+create table if not exists ux_v0_calls (
+  id bigint generated always as identity primary key,
+  user_id text not null,
+  project_id text not null,
+  at bigint not null,
+  day text not null,
+  stage text not null,
+  tier text not null,
+  model text not null,
+  api text not null default 'chat',
+  effort text not null default 'default',
+  input_tokens bigint not null default 0,
+  cached_tokens bigint not null default 0,
+  output_tokens bigint not null default 0,
+  cost_usd numeric(14, 6),
+  downgraded boolean not null default false
+);
+
+create index if not exists ux_v0_calls_user_day_idx on ux_v0_calls (user_id, day);
+create index if not exists ux_v0_calls_project_idx on ux_v0_calls (user_id, project_id);
+
 -- ── Socria events: RSVP and attendance ─────────────────────────────────
 --
 -- events: one row per event, edited by Socria admins. A date is shown on the

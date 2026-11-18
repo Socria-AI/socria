@@ -14,13 +14,14 @@ import { enforceRateLimit } from '@/lib/rate-limit';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
 import { withMeter } from '@/lib/token-meter';
-import { askJson } from '@/lib/ux-v0/ask';
+import { askRouted } from '@/lib/ux-v0/ask';
+import { budgets } from '@/lib/ux-v0/budget';
 import { formatFor } from '@/lib/ux-v0/schemas';
 import { ASPECTS, directionSystem, directionUser, discoverSystem, discoverUser, parseDirection, parseDiscover, type Aspect, type DiscoverInput } from '@/lib/ux-v0/discovery';
-import { MAX_TOKENS, socriauxLadder } from '@/lib/ux-v0/model';
+import { MAX_TOKENS, economyRoute } from '@/lib/ux-v0/model';
 import { bad, failed, noModel, projectIdOf, readBody, signInFirst } from '@/lib/ux-v0/route-kit';
 import { normalizeDiscovery, normalizeMoodboard } from '@/lib/ux-v0/types';
-import { recordUsage, underCaps } from '@/lib/ux-v0/usage-server';
+import { gate, noticeOf, recordUsage } from '@/lib/ux-v0/usage-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -49,8 +50,10 @@ export const POST = withMeter(async function POST(req: NextRequest) {
   const kind = action === 'direction' ? 'direction' : 'discover';
   const projectId = projectIdOf(body.projectId);
 
-  const caps = await underCaps(userId, kind);
-  if (!caps.ok) return NextResponse.json({ error: caps.error, limit: true }, { status: 429 });
+  const system = action === 'direction' ? directionSystem() : discoverSystem();
+  const user = action === 'direction' ? directionUser(input, aspect) : discoverUser(input);
+  const g = await gate(userId, projectId, kind, system.length + user.length);
+  if (!g.ok) return NextResponse.json({ error: g.error, limit: true }, { status: 429 });
 
   const plan = await resolvePlanForRequest(req, userId);
   const sleep = await sleepGate(req, userId, plan);
@@ -59,17 +62,10 @@ export const POST = withMeter(async function POST(req: NextRequest) {
 
   const openai = tracked(new OpenAI({ apiKey }), `ux-v0/${kind}`);
   try {
-    const asked = await askJson(openai, socriauxLadder(), {
-      system: action === 'direction' ? directionSystem() : discoverSystem(),
-      user: action === 'direction' ? directionUser(input, aspect) : discoverUser(input),
-      maxTokens: MAX_TOKENS[kind],
-      temperature: action === 'direction' ? 0.8 : 0.5,
-      label: kind,
-      format: formatFor(kind, aspect),
-    });
-    await recordUsage(userId, projectId, kind, asked.usage);
-    if (action === 'direction') return NextResponse.json({ ...parseDirection(asked.json, input, aspect), usage: asked.usage });
-    return NextResponse.json({ ...parseDiscover(asked.json, input), usage: asked.usage });
+    const asked = await askRouted(openai, g.route, { system, user, maxTokens: MAX_TOKENS[kind], temperature: action === 'direction' ? 0.8 : 0.5, label: kind, format: formatFor(kind, aspect), maxRetries: budgets().maxRetries }, economyRoute(kind));
+    await recordUsage(userId, projectId, kind, asked.usage, Date.now(), { api: asked.api, downgraded: !!g.downgraded || !!asked.fellBack });
+    if (action === 'direction') return NextResponse.json({ ...parseDirection(asked.json, input, aspect), usage: asked.usage, ...noticeOf(g, asked) });
+    return NextResponse.json({ ...parseDiscover(asked.json, input), usage: asked.usage, ...noticeOf(g, asked) });
   } catch (e) {
     // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure
     const resting = sleepAnswer(e);

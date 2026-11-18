@@ -25,7 +25,9 @@ import { getArtifact, putArtifact } from '@/lib/ux-v0/store';
 import type { Aspect } from '@/lib/ux-v0/discovery';
 import {
   VIEWPORT_WIDTH,
+  acceptDesign,
   addUsage,
+  costPerAccepted,
   currentSpec,
   fileId,
   normalizeRef,
@@ -46,7 +48,10 @@ import {
   type TypePair,
   type Understanding,
   type Usage,
+  type UsageTotals,
+  type CallKind,
   type Viewport,
+  STAGE_LABEL,
 } from '@/lib/ux-v0/types';
 import { interleave, searchOpenverse } from '@/lib/ux-v0/image-search';
 import { post } from './api';
@@ -136,6 +141,18 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const started = useRef(false);
 
   const say = useCallback((text: string, kind: Notice['kind'] = 'info', extra: Partial<Notice> = {}) => setNotice({ text, kind, ...extra }), []);
+  // what the server said about a call's model or budget: shown at once, and kept in the cost panel
+  const [spendNote, setSpendNote] = useState('');
+  useEffect(() => {
+    const heard = (e: Event) => {
+      const t = String((e as CustomEvent).detail ?? '').slice(0, 400);
+      if (!t) return;
+      setSpendNote(t);
+      say(t);
+    };
+    window.addEventListener('ux-v0-notice', heard);
+    return () => window.removeEventListener('ux-v0-notice', heard);
+  }, [say]);
   // what a screen reader hears: each selection as it is made, or why a step went nowhere
   const [stepNote, setStepNote] = useState('');
   // missing linked files are mentioned once per file opened; the full list is under File
@@ -572,7 +589,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const approved = art ?? (p.direction.approved ? p.direction.chosen : null);
     setBusy(approved ? `Designing in the “${approved.name}” direction…` : 'Designing from the brief…');
     const version = (p.specs[p.specs.length - 1]?.version ?? 0) + 1;
-    const r = await post<{ spec: DesignSpec; artDirection?: ArtDirection; placeholders: string[]; usage: Usage }>('/api/ux-v0/generate', { projectId: p.id, brief: p.brief.doc, moodboard: p.moodboard, direction: dir, artDirection: approved, version });
+    const r = await post<{ spec: DesignSpec; artDirection?: ArtDirection; placeholders: string[]; usage: Usage; notice?: string }>('/api/ux-v0/generate', { projectId: p.id, brief: p.brief.doc, moodboard: p.moodboard, direction: dir, artDirection: approved, version });
     setBusy(null);
     if (!r.ok) return failed(r);
     const fresh = normalizeSpec(r.data.spec, current.current.moodboard);
@@ -607,7 +624,9 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     setMode('element');
     setComposeMode('change');
     const ph = r.data.placeholders;
-    say(ph.length ? `Designed. ${ph.length} placeholder${ph.length === 1 ? '' : 's'} for facts only you have: ${ph.slice(0, 5).join(', ')}${ph.length > 5 ? '…' : ''}` : 'Designed from the brief. Select any part to question or change it.');
+    const done = ph.length ? `Designed. ${ph.length} placeholder${ph.length === 1 ? '' : 's'} for facts only you have: ${ph.slice(0, 5).join(', ')}${ph.length > 5 ? '…' : ''}` : 'Designed from the brief. Select any part to question or change it.';
+    // a fallback or a budget note is said with the result, never dropped by it
+    say(r.data.notice ? `${done} ${r.data.notice}` : done);
   };
 
   const applyLocal = useCallback(
@@ -996,9 +1015,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
           </nav>
         )}
         <div className="v0-head-r">
-          <span className="v0-cost" title={`${project.usage.input.toLocaleString()} tokens read, ${project.usage.output.toLocaleString()} written`}>
-            {project.usage.calls ? `US$${project.usage.cost.toFixed(4)} · ${project.usage.calls} call${project.usage.calls === 1 ? '' : 's'}` : ''}
-          </span>
+          {project.usage.calls > 0 && <CostPanel usage={project.usage} note={spendNote} />}
           <span className={`v0-save s-${save}`} role="status">
             {SAVE_WORDS[save]}
           </span>
@@ -1560,6 +1577,8 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                         a.download = `${(spec?.title || project.name).replace(/[^\w-]+/g, '-').toLowerCase()}.html`;
                         a.click();
                         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+                        // a downloaded design is an accepted one: what the project cost, per accepted design
+                        if (spec && !imported) update((p) => ({ ...p, usage: acceptDesign(p.usage, spec.version) }));
                       }}
                     >
                       Download the page as HTML
@@ -1640,5 +1659,55 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
         }}
       />
     </div>
+  );
+}
+
+const STAGE_ORDER: readonly CallKind[] = ['discover', 'direction', 'brief', 'refine-brief', 'art-direction', 'generate', 'refine', 'critique'];
+
+/** What the project has cost, by stage, as the provider reported it; and per accepted (downloaded) design. */
+function CostPanel({ usage, note }: { usage: UsageTotals; note: string }) {
+  const by = usage.byStage ?? {};
+  const staged = STAGE_ORDER.filter((k) => by[k]?.calls);
+  const counted = staged.reduce((n, k) => n + (by[k]?.calls ?? 0), 0);
+  const per = costPerAccepted(usage);
+  const accepted = usage.accepted?.length ?? 0;
+  return (
+    <details className="v0-cost">
+      <summary title={`${usage.input.toLocaleString()} tokens read, ${usage.output.toLocaleString()} written`}>
+        US${usage.cost.toFixed(4)} · {usage.calls} call{usage.calls === 1 ? '' : 's'}
+      </summary>
+      <div className="v0-cost-panel" role="group" aria-label="What this project has cost">
+        <p className="v0-cost-h">What this project has cost, as the provider reported it</p>
+        {staged.length > 0 && (
+          <table className="v0-cost-table">
+            <thead>
+              <tr>
+                <th scope="col">Stage</th>
+                <th scope="col">Calls</th>
+                <th scope="col">Premium</th>
+                <th scope="col">US$</th>
+              </tr>
+            </thead>
+            <tbody>
+              {staged.map((k) => (
+                <tr key={k}>
+                  <th scope="row">{STAGE_LABEL[k]}</th>
+                  <td>{by[k]!.calls}</td>
+                  <td>{by[k]!.premium}</td>
+                  <td>{by[k]!.cost.toFixed(4)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {usage.calls > counted && (
+          <p className="v0-cost-l">
+            {usage.calls - counted} earlier call{usage.calls - counted === 1 ? '' : 's'}, from before stages were recorded.
+          </p>
+        )}
+        <p className="v0-cost-l">{per != null ? `Per accepted design: US$${per.toFixed(4)} (${accepted} downloaded).` : 'Cost per accepted design appears once you download a design.'}</p>
+        {note && <p className="v0-cost-l is-note">{note}</p>}
+      </div>
+    </details>
   );
 }

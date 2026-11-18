@@ -1025,5 +1025,38 @@ console.log('\n=== what is being made: intent, the booking, the behaviour runtim
   ok('generation is told what it must do, by id, and what was ruled out', (() => { const b2 = { ...brief, intent: { ...brief.intent, prohibitions: ['stock photos'] } }; const t = V.generateSystem(b2); return t.includes('WHAT IT MUST DO') && t.includes('req-book') && t.includes('stock photos') && t.includes('NOT a page about it'); })());
 }
 
+console.log('\n=== routing: the model for each stage; budgets ===');
+{
+  const R = (stage, env = {}, want = {}) => V.routeFor(stage, want, env);
+  const table = V.routingTable({});
+  ok('by default: questions, the brief and the moodboard on the economy model; direction, generation, critique on the premium', J(table.map((r) => `${r.stage}:${r.tier}:${r.model}`)) === J(['discover:economy:gpt-6-luna', 'direction:economy:gpt-6-luna', 'brief:economy:gpt-6-luna', 'refine-brief:economy:gpt-6-luna', 'art-direction:premium:gpt-6.1-sol', 'generate:premium:gpt-6.1-sol', 'refine:economy:gpt-6-luna', 'critique:premium:gpt-6.1-sol']), J(table.map((r) => `${r.stage}:${r.tier}:${r.model}`)));
+  ok('the premium tier on Sol: the Responses API at medium effort; the economy tier on Luna: Chat Completions at its own', R('generate').api === 'responses' && R('generate').effort === 'medium' && R('discover').api === 'chat' && R('discover').effort === undefined);
+  ok('a complex refinement asks for premium; a tier set for the stage overrides it', R('refine', {}, { tier: 'premium' }).tier === 'premium' && R('refine', { SOCRIAUX_TIER_REFINE: 'economy' }, { tier: 'premium' }).tier === 'economy');
+  ok('SOCRIAUX_ROUTING=single: everything on the economy model', V.routingTable({ SOCRIAUX_ROUTING: 'single' }).every((r) => r.model === 'gpt-6-luna' && r.source === 'single'));
+  ok('legacy SOCRIAUX_MODEL: every stage on it, with its old effort (Sol at high)', V.routingTable({ SOCRIAUX_MODEL: 'gpt-6.1-sol' }).every((r) => r.model === 'gpt-6.1-sol' && r.effort === 'high' && r.api === 'responses' && r.source === 'legacy'));
+  ok('tiers, efforts and single stages are configured, never asked for by a request', R('art-direction', { SOCRIAUX_PREMIUM_MODEL: 'gpt-6.1-terra', SOCRIAUX_PREMIUM_EFFORT: 'low' }).model === 'gpt-6.1-terra' && R('art-direction', { SOCRIAUX_PREMIUM_EFFORT: 'high' }).effort === 'high' && R('critique', { SOCRIAUX_MODEL_CRITIQUE: 'gpt-4o-mini' }).model === 'gpt-4o-mini' && R('critique', { SOCRIAUX_MODEL_CRITIQUE: 'rm -rf /' }).model === 'gpt-6.1-sol');
+  ok('a stage on the economy tier for fallbacks and budgets', V.economyRoute('generate', {}).model === 'gpt-6-luna' && V.economyRoute('generate', {}).tier === 'economy');
+  // refinement complexity, in code
+  const el = { element: { ux: { section: 'hero' } }, region: null };
+  ok('a short change to a selected part is economy', V.refineTier('Make the headline say mornings', el).tier === 'economy' && V.refineTier('Make the button darker', el).tier === 'economy');
+  ok('no selection, or the structure, or the feel, is premium', V.refineTier('Make the headline say mornings', null).tier === 'premium' && V.refineTier('Rethink the whole hierarchy', el).tier === 'premium' && V.refineTier('Make it feel more premium', el).tier === 'premium' && V.refineTier('x'.repeat(300), el).tier === 'premium');
+  // estimates are labelled estimates; budgets hold
+  const gen = R('generate');
+  const worst = V.worstCost(gen, 20000);
+  ok('a premium generation\'s worst case is its prompt, its cap and its reasoning room at Sol\'s price', Math.abs(worst - ((5000 * 2 + (V.MAX_TOKENS.generate + 8192) * 10) / 1e6)) < 1e-9, worst);
+  ok('a model with no price has no estimate', V.worstCost({ model: 'no-such-model', effort: undefined, stage: 'generate' }, 1000) === null);
+  const B = V.budgets({});
+  ok('default budgets: US$2 a day, US$20 a month, US$5 a project, US$0.40 a call, warned at 80%, one retry', B.dailyUsd === 2 && B.monthlyUsd === 20 && B.projectUsd === 5 && B.operationUsd === 0.4 && B.warnAt === 0.8 && B.maxRetries === 1);
+  ok('budgets are read from the environment, within bounds', V.budgets({ SOCRIAUX_DAILY_USD: '0.5', SOCRIAUX_WARN_AT: '7', SOCRIAUX_MAX_RETRIES: '9' }).dailyUsd === 0.5 && V.budgets({ SOCRIAUX_WARN_AT: '7' }).warnAt === 0.8 && V.budgets({ SOCRIAUX_MAX_RETRIES: '9' }).maxRetries === 2);
+  const none = { day: 0, month: 0, project: 0 };
+  const fine = V.decide(gen, 20000, none, B, {});
+  ok('within every budget: the premium model, no warning', fine.ok && fine.route.model === 'gpt-6.1-sol' && !fine.downgraded && !fine.warning);
+  const tight = V.decide(gen, 20000, { day: 1.95, month: 1.95, project: 1.95 }, B, {});
+  ok('a premium call the budget would not hold: the economy model, said, and a warning', tight.ok && tight.route.model === 'gpt-6-luna' && /past its limit/.test(tight.downgraded) && /98% of a SocriaUX budget/.test(tight.warning), J(tight));
+  ok('a budget spent: refused, plainly', !V.decide(gen, 100, { day: 0, month: 20, project: 0 }, B, {}).ok && /this month/i.test(V.decide(gen, 100, { day: 0, month: 20, project: 0 }, B, {}).error));
+  ok('an economy call is never moved: it runs while any budget remains', V.decide(R('discover'), 100, { day: 1.999, month: 0, project: 0 }, B, {}).route.model === 'gpt-6-luna');
+  ok('the automatic repair loop is code, bounded', V.MAX_REVISION_ROUNDS === 2);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

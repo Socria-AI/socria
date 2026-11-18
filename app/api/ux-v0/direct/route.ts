@@ -18,14 +18,15 @@ import { enforceRateLimit } from '@/lib/rate-limit';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
 import { withMeter } from '@/lib/token-meter';
-import { askJson } from '@/lib/ux-v0/ask';
+import { askRouted } from '@/lib/ux-v0/ask';
+import { budgets } from '@/lib/ux-v0/budget';
 import { formatFor } from '@/lib/ux-v0/schemas';
 import { directSystem, directUser, normalizeDirection, parseDirections, proposeDirections, type DirectionAsk } from '@/lib/ux-v0/direction';
-import { MAX_TOKENS, socriauxLadder } from '@/lib/ux-v0/model';
+import { MAX_TOKENS, economyRoute } from '@/lib/ux-v0/model';
 import { bad, failed, noModel, projectIdOf, readBody, signInFirst } from '@/lib/ux-v0/route-kit';
 import { normalizeBrief } from '@/lib/ux-v0/types';
 import { normalizeReading } from '@/lib/ux-v0/references';
-import { recordUsage, underCaps } from '@/lib/ux-v0/usage-server';
+import { gate, noticeOf, recordUsage } from '@/lib/ux-v0/usage-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -55,8 +56,10 @@ export const POST = withMeter(async function POST(req: NextRequest) {
   const projectId = projectIdOf(body.projectId);
   const options = proposeDirections(ask);
 
-  const caps = await underCaps(userId, 'art-direction');
-  if (!caps.ok) return NextResponse.json({ error: caps.error, limit: true }, { status: 429 });
+  const system = directSystem();
+  const user = directUser(ask, options);
+  const g = await gate(userId, projectId, 'art-direction', system.length + user.length);
+  if (!g.ok) return NextResponse.json({ error: g.error, limit: true }, { status: 429 });
 
   const plan = await resolvePlanForRequest(req, userId);
   const sleep = await sleepGate(req, userId, plan);
@@ -65,21 +68,15 @@ export const POST = withMeter(async function POST(req: NextRequest) {
 
   const openai = tracked(new OpenAI({ apiKey }), 'ux-v0/direct');
   try {
-    const asked = await askJson(openai, socriauxLadder(), {
-      system: directSystem(),
-      user: directUser(ask, options),
-      maxTokens: MAX_TOKENS['art-direction'],
-      temperature: 0.8,
-      label: 'art-direction',
-      format: formatFor('art-direction'),
-    });
-    await recordUsage(userId, projectId, 'art-direction', asked.usage);
-    return NextResponse.json({ options: parseDirections(asked.json, ask, options), usage: asked.usage });
+    const asked = await askRouted(openai, g.route, { system, user, maxTokens: MAX_TOKENS['art-direction'], temperature: 0.8, label: 'art-direction', format: formatFor('art-direction'), maxRetries: budgets().maxRetries }, economyRoute('art-direction'));
+    await recordUsage(userId, projectId, 'art-direction', asked.usage, Date.now(), { api: asked.api, downgraded: !!g.downgraded || !!asked.fellBack });
+    return NextResponse.json({ options: parseDirections(asked.json, ask, options), usage: asked.usage, ...noticeOf(g, asked) });
   } catch (e) {
     // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure
     const resting = sleepAnswer(e);
     if (resting) return resting;
     console.error('ux-v0 direct failed:', e instanceof Error ? e.message : e);
+    // the browser already shows the direction engine's three, and says the written concepts could not be fetched
     return failed();
   }
 });

@@ -67,6 +67,10 @@ export const db = {
 
 const keyOf = (t, r) => (PK[t] ?? ['id']).map((k) => String(r[k])).join('|');
 
+// Tables whose id Postgres makes (`generated always as identity`): an inserted row gets the next one.
+const IDENTITY = new Set(['ux_v0_calls']);
+let identity = 0;
+
 function colErr(table, col, write) {
   return write
     ? { code: 'PGRST204', message: `Could not find the '${col}' column of '${table}' in the schema cache` }
@@ -208,6 +212,7 @@ class Query {
         if (err) return { data: null, error: err, count: null };
       }
       const out = [];
+      if (IDENTITY.has(t)) this.payload = this.payload.map((row) => (row.id === undefined ? { ...row, id: ++identity } : row));
       for (const row of this.payload) {
         const k = keyOf(t, row);
         const i = all.findIndex((r) => keyOf(t, r) === k);

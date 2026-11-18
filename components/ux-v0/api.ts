@@ -11,7 +11,12 @@ export async function post<T>(path: string, body: unknown): Promise<ApiResult<T>
     return { ok: false, error: 'You appear to be offline. Your work is saved in this browser.', status: 0 };
   }
   const j = await res.json().catch(() => null);
-  if (res.ok && j && !j.error) return { ok: true, data: j as T };
+  if (res.ok && j && !j.error) {
+    // what the server says about this call's model or budget (made on the economy model, a budget nearly used):
+    // said to the designer wherever the call came from (components/ux-v0/Workspace.tsx listens)
+    if (typeof j.notice === 'string' && j.notice && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('ux-v0-notice', { detail: j.notice.slice(0, 400) }));
+    return { ok: true, data: j as T };
+  }
   const error =
     res.status === 401
       ? 'Reasoning with SocriaUX needs a Socria account.'

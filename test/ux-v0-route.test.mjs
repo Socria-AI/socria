@@ -50,6 +50,9 @@ process.env.RATE_LIMIT_DISABLED = '1';
 process.env.SOCRIA_ONE_USER_IDS = 'user_v0_a,user_v0_b';
 process.env.SOCRIAUX_DAILY_CALLS = '50';
 process.env.SOCRIAUX_DAILY_GENERATIONS = '2';
+// the sections before "routing" test every route on one model (GPT-6 Luna, Chat Completions), as SocriaUX ran
+// before routing; SOCRIAUX_ROUTING=single keeps that. The routing section takes it away.
+process.env.SOCRIAUX_ROUTING = 'single';
 delete process.env.UNSPLASH_ACCESS_KEY;
 delete process.env.PEXELS_API_KEY;
 
@@ -341,6 +344,82 @@ console.log('\n=== GPT-6.1 Sol through every route (the Responses API) ===');
   delete process.env.SOCRIAUX_MODEL;
   const back = await post('direct', { projectId: 'uxv0_sol', brief, notes: '', avoid: '' }, C, [{ directions: [] }]);
   ok('SOCRIAUX_MODEL unset: back to Luna on Chat Completions', back.status === 200 && back.calls[0].model === 'gpt-6-luna' && Array.isArray(back.calls[0].messages) && back.calls[0].instructions === undefined);
+}
+
+console.log('\n=== routing: the economy model for questions and the brief, the premium model for direction, generation, critique ===');
+{
+  delete process.env.SOCRIAUX_ROUTING;
+  delete process.env.SOCRIAUX_MODEL;
+  const U = 'user_v0_route';
+  const P = 'uxv0_route';
+  const brief = { objective: 'Fill weekday mornings at a coffee bar.', audience: 'Commuters', personality: ['warm', 'honest'], visualDirection: 'Handmade, morning light', palette: [{ hex: '#f6f1e9', role: 'background' }, { hex: '#2a2420', role: 'text' }, { hex: '#6b3e1f', role: 'accent' }, { hex: '#ffffff', role: 'accent-text' }], typography: { display: 'Fraunces', body: 'Inter' }, userGoals: [], functionalRequirements: [], references: [] };
+  const spec = { title: 'Halcyon', pageType: 'website', sections: [{ id: 'nav', kind: 'nav', content: { brand: 'Halcyon', links: ['Menu'] } }, { id: 'hero', kind: 'hero', content: { title: 'Coffee, slowly', primary: 'Book' } }, { id: 'f', kind: 'footer', content: { brand: 'Halcyon' } }] };
+  const sel = { ...elementSel, element: { ...capture, ux: { section: 'hero', path: 'title' } } };
+  const onSol = (out) => out.calls[0]?.model === 'gpt-6.1-sol' && typeof out.calls[0]?.instructions === 'string' && out.calls[0]?.reasoning?.effort === 'medium';
+  const onLuna = (out) => out.calls[0]?.model === 'gpt-6-luna' && Array.isArray(out.calls[0]?.messages);
+  const q = await post('discover', { projectId: P, action: 'turn', intent: 'A coffee shop website', questions: [], understanding: {}, moodboard: {} }, U, [{ understanding: { summary: 's', known: {}, gaps: [] }, questions: [], ready: true }]);
+  ok('questions: the economy model (GPT-6 Luna), Chat Completions', q.status === 200 && onLuna(q), J(q.calls[0]?.model));
+  const b = await post('brief', { projectId: P, action: 'synthesize', intent: 'A coffee shop website', moodboard: {} }, U, [{ objective: 'Fill weekday mornings.', audience: 'Commuters', personality: ['warm'], visualDirection: 'Morning light', palette: brief.palette, typography: { display: 'Fraunces', body: 'Inter' } }]);
+  ok('the brief: the economy model', b.status === 200 && onLuna(b));
+  const d = await post('direct', { projectId: P, brief, notes: '', avoid: '' }, U, [{ directions: [] }]);
+  ok('art direction: the premium model (GPT-6.1 Sol) at medium effort, on the Responses API', d.status === 200 && onSol(d), J(d.calls[0]?.model));
+  ok('  with a time limit, so a slow answer leaves room for another', globalThis.__logosOptions.at(-1)?.timeout === 45000);
+  const g = await post('generate', { projectId: P, brief, moodboard: {}, version: 1 }, U, [spec]);
+  ok('generation: the premium model', g.status === 200 && onSol(g));
+  ok('  its usage says the stage, the tier and the effort', g.json.usage.stage === 'generate' && g.json.usage.tier === 'premium' && g.json.usage.effort === 'medium' && g.json.usage.model === 'gpt-6.1-sol', J(g.json.usage));
+  const small = await post('refine', { projectId: P, spec: g.json.spec, brief, moodboard: {}, selection: sel, comment: 'Make the headline say mornings' }, U, [{ understood: 'x', patch: { op: 'content', sectionId: 'hero', content: { title: 'Mornings' }, summary: 's' } }]);
+  ok('a small change to a selected part: the economy model, and it says why', small.status === 200 && onLuna(small) && small.json.complexity.tier === 'economy', J(small.json.complexity));
+  const big = await post('refine', { projectId: P, spec: g.json.spec, brief, moodboard: {}, selection: sel, comment: 'Rethink the whole hierarchy so it feels more editorial' }, U, [{ understood: 'x', patch: { op: 'none' } }]);
+  ok('a change to the structure or the feel: the premium model', big.status === 200 && onSol(big) && big.json.complexity.tier === 'premium', J(big.json.complexity));
+  const c = await post('critique', { projectId: P, selection: elementSel, comment: 'Is this CTA prominent enough?', kind: 'generated', name: 'Halcyon' }, U, [REASONING]);
+  ok('critique: the premium model', c.status === 200 && onSol(c));
+  const logged = db.rows('ux_v0_calls').filter((r) => r.user_id === U);
+  ok('every call is logged with its stage, tier, model, effort, API and measured cost', logged.length === 7 && J(logged.map((r) => `${r.stage}:${r.tier}:${r.model}`)) === J(['discover:economy:gpt-6-luna', 'brief:economy:gpt-6-luna', 'art-direction:premium:gpt-6.1-sol', 'generate:premium:gpt-6.1-sol', 'refine:economy:gpt-6-luna', 'refine:premium:gpt-6.1-sol', 'critique:premium:gpt-6.1-sol']) && logged.every((r) => typeof r.cost_usd === 'number' && r.input_tokens === 1200) && logged[2].api === 'responses' && logged[2].effort === 'medium' && logged[0].api === 'chat', J(logged.map((r) => [r.stage, r.tier, r.model, r.api, r.effort])));
+
+  // configured, server-side
+  process.env.SOCRIAUX_PREMIUM_MODEL = 'gpt-6-luna';
+  const all = await post('direct', { projectId: P, brief, notes: '', avoid: '' }, U, [{ directions: [] }]);
+  ok('SOCRIAUX_PREMIUM_MODEL=gpt-6-luna keeps every stage on Luna', all.status === 200 && onLuna(all));
+  delete process.env.SOCRIAUX_PREMIUM_MODEL;
+  process.env.SOCRIAUX_TIER_CRITIQUE = 'economy';
+  const ce = await post('critique', { projectId: P, selection: elementSel, comment: 'Is this CTA prominent enough?', kind: 'generated', name: 'Halcyon' }, U, [REASONING]);
+  ok('SOCRIAUX_TIER_CRITIQUE=economy moves one stage', ce.status === 200 && onLuna(ce));
+  delete process.env.SOCRIAUX_TIER_CRITIQUE;
+  process.env.SOCRIAUX_MODEL_GENERATE = 'gpt-6.1-terra';
+  const gt = await post('generate', { projectId: P, brief, moodboard: {}, version: 2 }, 'user_v0_route2', [spec]);
+  ok('SOCRIAUX_MODEL_GENERATE names one stage\'s model', gt.status === 200 && gt.calls[0]?.model === 'gpt-6.1-terra', J(gt.calls[0]?.model));
+  delete process.env.SOCRIAUX_MODEL_GENERATE;
+  process.env.SOCRIAUX_MODEL = 'gpt-6-luna';
+  const legacy = await post('direct', { projectId: P, brief, notes: '', avoid: '' }, U, [{ directions: [] }]);
+  ok('legacy SOCRIAUX_MODEL still runs every stage on its one model', legacy.status === 200 && onLuna(legacy));
+  delete process.env.SOCRIAUX_MODEL;
+
+  // a premium model that does not answer in time: the economy model answers, and the designer is told
+  globalThis.__logosSlow = ['gpt-6.1-sol'];
+  const slow = await post('generate', { projectId: P, brief, moodboard: {}, version: 3 }, 'user_v0_route3', [spec]);
+  globalThis.__logosSlow = [];
+  ok('a premium call past its time limit: Luna answers in the same request, and the designer is told', slow.status === 200 && slow.calls.map((p) => p.model).join() === 'gpt-6.1-sol,gpt-6-luna' && /gave no answer in 45 seconds/.test(slow.json.notice ?? '') && slow.json.usage.model === 'gpt-6-luna', J({ calls: slow.calls.map((p) => p.model), notice: slow.json?.notice }));
+  globalThis.__logosScript = [];
+
+  // budgets: measured spend from ux_v0_usage, the call's worst case estimated
+  const today = new Date().toISOString().slice(0, 10);
+  const seed = (user, project, cost) => db.rows('ux_v0_usage').push({ user_id: user, project_id: project, day: today, calls: 1, generations: 0, input_tokens: 0, output_tokens: 0, cost_usd: cost });
+  seed('user_v0_budget', 'uxv0_b', 1.95);
+  const tight = await post('generate', { projectId: 'uxv0_b', brief, moodboard: {}, version: 1 }, 'user_v0_budget', [spec]);
+  ok('a premium call the day\'s budget would not hold is made on the economy model, and said', tight.status === 200 && onLuna(tight) && /economy model \(gpt-6-luna\)/.test(tight.json.notice ?? '') && /past its limit/.test(tight.json.notice ?? ''), J({ model: tight.calls[0]?.model, notice: tight.json?.notice }));
+  ok('  and the designer is warned the budget is nearly used', /9[78]% of a SocriaUX budget is used/.test(tight.json.notice ?? ''), tight.json?.notice);
+  seed('user_v0_budget', 'uxv0_b', 0.06);
+  const spent = await post('discover', { projectId: 'uxv0_b', action: 'turn', intent: 'A coffee shop website', questions: [], understanding: {}, moodboard: {} }, 'user_v0_budget', [{ understanding: { summary: 's', known: {}, gaps: [] }, questions: [], ready: true }]);
+  ok('a day\'s budget spent: refused plainly, nothing asked, the work kept', spent.status === 429 && spent.json.limit === true && /Today’s SocriaUX budget \(US\$2\.00\) is spent/.test(spent.json.error) && /saved/.test(spent.json.error) && spent.calls.length === 0, J(spent.json));
+  db.rows('ux_v0_usage').push({ user_id: 'user_v0_proj', project_id: 'uxv0_big', day: '2020-01-01', calls: 90, generations: 9, input_tokens: 0, output_tokens: 0, cost_usd: 5.01 });
+  const proj = await post('discover', { projectId: 'uxv0_big', action: 'turn', intent: 'x', questions: [], understanding: {}, moodboard: {} }, 'user_v0_proj', []);
+  const other = await post('discover', { projectId: 'uxv0_small', action: 'turn', intent: 'x', questions: [], understanding: {}, moodboard: {} }, 'user_v0_proj', [{ understanding: { summary: 's', known: {}, gaps: [] }, questions: [], ready: true }]);
+  ok('a project\'s budget is its own: that project stops, another goes on', proj.status === 429 && /This project’s budget \(US\$5\.00\) is spent/.test(proj.json.error) && other.status === 200, J([proj.json, other.status]));
+  process.env.SOCRIAUX_OPERATION_USD = '0.01';
+  const op = await post('direct', { projectId: P, brief, notes: '', avoid: '' }, 'user_v0_op', [{ directions: [] }]);
+  ok('a premium call that could cost more than one operation may: the economy model, and why', op.status === 200 && onLuna(op) && /more than one change may \(US\$0\.01\)/.test(op.json.notice ?? ''), J(op.json?.notice));
+  delete process.env.SOCRIAUX_OPERATION_USD;
+  process.env.SOCRIAUX_ROUTING = 'single';
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

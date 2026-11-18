@@ -106,7 +106,7 @@
 .v0-steps {
   flex: 0 0 auto;
 }
-.v0-cost,
+.v0-cost > summary,
 .v0-save {
   font-size: 12px;
   color: var(--sb-ink-60);
@@ -114,6 +114,98 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* what the project has cost, by stage: a small panel under the figure */
+.v0-cost {
+  position: relative;
+  min-width: 0;
+}
+.v0-cost > summary {
+  display: block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  list-style: none;
+  cursor: pointer;
+  transition: background-color var(--sb-fast) var(--sb-ease), color var(--sb-fast) var(--sb-ease);
+}
+.v0-cost > summary::-webkit-details-marker {
+  display: none;
+}
+.v0-cost > summary:hover,
+.v0-cost[open] > summary {
+  background: var(--sb-well);
+  color: var(--sb-ink);
+}
+.v0-cost > summary:focus-visible {
+  outline: 2px solid var(--sb-moss);
+  outline-offset: 2px;
+}
+.v0-cost-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, 86vw);
+  padding: 14px 16px 16px;
+  border-radius: 10px;
+  background: var(--sb-surface);
+  box-shadow: var(--sb-float), 0 0 0 1px var(--sb-rule);
+  animation: st-arrive var(--sb-open) var(--sb-ease) both;
+}
+.v0-cost-h {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--sb-ink);
+}
+.v0-cost-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.v0-cost-table th,
+.v0-cost-table td {
+  padding: 5px 0;
+  border-top: 1px solid var(--sb-rule);
+  text-align: right;
+  font-weight: 500;
+}
+.v0-cost-table thead th {
+  border-top: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--sb-ink-60);
+}
+.v0-cost-table th:first-child {
+  text-align: left;
+}
+.v0-cost-table tbody th {
+  color: var(--sb-ink);
+}
+.v0-cost-table td {
+  color: var(--sb-ink-70);
+}
+.v0-cost-l {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--sb-ink-70);
+  white-space: normal;
+}
+.v0-cost-l.is-note {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--sb-tint-idea);
+  color: var(--sb-moss);
+}
+@media (prefers-reduced-motion: reduce) {
+  .v0-cost-panel {
+    animation: none;
+  }
 }
 .v0-save.s-quota,
 .v0-save.s-unkept,

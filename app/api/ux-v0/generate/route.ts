@@ -21,15 +21,16 @@ import { enforceRateLimit } from '@/lib/rate-limit';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
 import { withMeter } from '@/lib/token-meter';
-import { askJson } from '@/lib/ux-v0/ask';
+import { askRouted } from '@/lib/ux-v0/ask';
+import { budgets } from '@/lib/ux-v0/budget';
 import { generateSystem, generateUser, parseGenerate } from '@/lib/ux-v0/design';
 import { autoDirection, normalizeDirection, reviseDirection } from '@/lib/ux-v0/direction';
 import { pingUse } from '@/lib/ux-v0/images-server';
-import { MAX_TOKENS, socriauxLadder } from '@/lib/ux-v0/model';
+import { MAX_TOKENS, economyRoute } from '@/lib/ux-v0/model';
 import { bad, failed, noModel, projectIdOf, readBody, signInFirst } from '@/lib/ux-v0/route-kit';
 import { placeholdersIn } from '@/lib/ux-v0/spec';
 import { normalizeBrief, normalizeMoodboard } from '@/lib/ux-v0/types';
-import { recordUsage, underCaps } from '@/lib/ux-v0/usage-server';
+import { gate, noticeOf, recordUsage } from '@/lib/ux-v0/usage-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -55,8 +56,11 @@ export const POST = withMeter(async function POST(req: NextRequest) {
   const version = Number.isFinite(body.version) ? Math.max(1, Math.round(body.version)) : 1;
   const projectId = projectIdOf(body.projectId);
 
-  const caps = await underCaps(userId, 'generate');
-  if (!caps.ok) return NextResponse.json({ error: caps.error, limit: true }, { status: 429 });
+  const system = generateSystem(brief, art);
+  const user = generateUser({ brief, moodboard, direction });
+  // the stage's model (premium), held to the budgets: a call they would not hold is made on the economy model
+  const g = await gate(userId, projectId, 'generate', system.length + user.length);
+  if (!g.ok) return NextResponse.json({ error: g.error, limit: true }, { status: 429 });
 
   const plan = await resolvePlanForRequest(req, userId);
   const sleep = await sleepGate(req, userId, plan);
@@ -65,20 +69,14 @@ export const POST = withMeter(async function POST(req: NextRequest) {
 
   const openai = tracked(new OpenAI({ apiKey }), 'ux-v0/generate');
   try {
-    const asked = await askJson(openai, socriauxLadder(), {
-      system: generateSystem(brief, art),
-      user: generateUser({ brief, moodboard, direction }),
-      maxTokens: MAX_TOKENS.generate,
-      temperature: 0.6,
-      label: 'generate',
-    });
+    const asked = await askRouted(openai, g.route, { system, user, maxTokens: MAX_TOKENS.generate, temperature: 0.6, label: 'generate', maxRetries: budgets().maxRetries }, economyRoute('generate'));
     const spec = parseGenerate(asked.json, brief, moodboard, version, direction ? `Generated again: ${direction}` : `Generated in the “${art.name}” direction`, art);
-    await recordUsage(userId, projectId, 'generate', asked.usage);
+    await recordUsage(userId, projectId, 'generate', asked.usage, Date.now(), { api: asked.api, downgraded: !!g.downgraded || !!asked.fellBack });
     if (!spec) return NextResponse.json({ error: 'The model’s design did not hold together. Nothing changed; try again.', usage: asked.usage }, { status: 502 });
     // Unsplash asks to be told when a photo is used in a design
     const used = new Set(spec.sections.flatMap((s) => s.images));
     await Promise.all(moodboard.refs.filter((r) => used.has(r.id)).map((r) => pingUse(r)));
-    return NextResponse.json({ spec, artDirection: art, placeholders: placeholdersIn(spec), usage: asked.usage });
+    return NextResponse.json({ spec, artDirection: art, placeholders: placeholdersIn(spec), usage: asked.usage, ...noticeOf(g, asked) });
   } catch (e) {
     // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure
     const resting = sleepAnswer(e);

@@ -23,7 +23,7 @@ import type OpenAI from 'openai';
 import { firstAccepted } from '../model-router';
 import { cannotSee, type Effort } from '../model-params';
 import { responseText, usageFromResponses } from '../openai-usage';
-import { socriauxApi, socriauxEffort, usageOf, type Api } from './model';
+import { socriauxApi, socriauxEffort, usageOf, type Api, type Route, type Tier } from './model';
 import type { JsonFormat } from './schemas';
 import type { Usage } from './types';
 
@@ -37,6 +37,10 @@ export interface AskOptions {
   label: string;
   /** the answer's shape, for the Responses API's structured outputs (lib/ux-v0/schemas.ts formatFor) */
   format?: JsonFormat;
+  /** give up on the call after this long (ms), so a slow model leaves time to ask another within the route's limit */
+  timeoutMs?: number;
+  /** how many times a structured answer cut at its cap is asked again in JSON mode (default 1) */
+  maxRetries?: number;
 }
 
 export interface Asked {
@@ -51,6 +55,10 @@ export interface Asked {
   incomplete: string | null;
   /** a structured answer was cut at its cap and asked again in JSON mode (both calls billed), else null */
   retried?: string | null;
+  /** the tier the call was routed to (lib/ux-v0/model.ts routeFor), when it was routed */
+  tier?: Tier;
+  /** the routed model did not answer in time and the economy model answered instead: why, else absent */
+  fellBack?: string;
 }
 
 type Env = Record<string, string | undefined>;
@@ -69,14 +77,34 @@ export function readJson(raw: string): unknown {
   }
 }
 
-export async function askJson(openai: OpenAI, ladder: string[], o: AskOptions, env: Env = process.env): Promise<Asked> {
-  const api = socriauxApi(env);
-  const effort = socriauxEffort(env);
+const isRoute = (v: Env | Route): v is Route => typeof (v as Route).stage === 'string' && typeof (v as Route).tier === 'string';
+
+/**
+ * One JSON call. `how` is the stage's route (lib/ux-v0/model.ts routeFor: its API and effort), or, as before
+ * routing, the environment the API and effort are read from.
+ */
+export async function askJson(openai: OpenAI, ladder: string[], o: AskOptions, how: Env | Route = process.env): Promise<Asked> {
+  const route = isRoute(how) ? how : null;
+  const api = route ? route.api : socriauxApi(how as Env);
+  const effort = route ? route.effort : socriauxEffort(how as Env);
+  const tag = (usage: Usage): Usage => (route ? { ...usage, stage: route.stage, tier: route.tier, effort: effort ?? 'default' } : usage);
+  const requestOptions = o.timeoutMs ? { timeout: o.timeoutMs, maxRetries: 0 } : undefined;
+  // a call past its time limit is not a model to step down from (the next rung would get the whole limit again,
+  // past the route's own): it is thrown as itself, for askRouted to ask the economy model instead
+  const limit = <T>(p: Promise<T>): Promise<T> =>
+    o.timeoutMs
+      ? p.catch((e) => {
+          if (/APIConnectionTimeoutError|AbortError/.test(String((e as { name?: string })?.name ?? '')) || /timed out/i.test(String((e as { message?: string })?.message ?? ''))) throw Object.assign(new Error(`no answer within ${o.timeoutMs} ms`), { name: 'SocriauxTimeout' });
+          throw e;
+        })
+      : p;
+  const retries = Math.max(0, Math.min(2, o.maxRetries ?? 1));
   const warn = (from: string, to: string, why: string) => console.warn('ux-v0 %s: %s refused (%s); asking %s', o.label, from, why, to);
   const also = o.images?.length ? cannotSee : undefined;
   if (api === 'responses') {
     const make = (format: JsonFormat | undefined) => (model: string): Promise<any> =>
-      (openai as any).responses.create({
+      limit((openai as any).responses.create(
+        {
         model,
         instructions: o.system,
         input: [
@@ -93,7 +121,9 @@ export async function askJson(openai: OpenAI, ladder: string[], o: AskOptions, e
         ...(effort ? { reasoning: { effort } } : {}),
         text: { format: format ?? { type: 'json_object' } },
         store: false,
-      });
+        },
+        requestOptions
+      ));
     const read = (result: any) => {
       const refused = (result?.output ?? []).some((item: any) => item?.type === 'message' && (item.content ?? []).some((c: any) => c?.type === 'refusal'));
       const incomplete = refused ? 'refusal' : result?.status === 'incomplete' ? String(result?.incomplete_details?.reason ?? 'incomplete') : null;
@@ -109,7 +139,7 @@ export async function askJson(openai: OpenAI, ladder: string[], o: AskOptions, e
     // never closed: it wrote until the cap (about 17,000 tokens, two minutes) with little reasoning, the loop
     // constrained decoding can fall into. Asked once more in plain JSON mode, on the same model, it answers;
     // both calls are billed and counted. (Plain JSON mode was not seen to do this.)
-    if (incomplete === 'max_output_tokens' && o.format) {
+    if (incomplete === 'max_output_tokens' && o.format && retries > 0) {
       retried = 'structured answer cut at its cap; asked again in JSON mode';
       console.warn('ux-v0 %s: asking %s again in JSON mode', o.label, model);
       const again = await firstAccepted([model], make(undefined), warn, also);
@@ -119,26 +149,51 @@ export async function askJson(openai: OpenAI, ladder: string[], o: AskOptions, e
       model = again.model;
       if (incomplete) console.warn('ux-v0 %s: %s stopped early again (%s)', o.label, model, incomplete);
     }
-    return { json: readJson(raw), raw, usage, model, api, effort: effort ?? 'default', incomplete, retried };
+    return { json: readJson(raw), raw, usage: tag(usage), model, api, effort: effort ?? 'default', incomplete, retried, ...(route ? { tier: route.tier } : {}) };
   }
   const userContent: any = o.images?.length
     ? [{ type: 'text', text: o.user }, ...o.images.map((im) => ({ type: 'image_url', image_url: { url: im.url, detail: im.detail } }))]
     : o.user;
   const make = (model: string) =>
-    openai.chat.completions.create({
-      model,
-      temperature: o.temperature ?? 0.5,
-      max_tokens: o.maxTokens,
-      ...(effort ? { reasoning_effort: effort } : {}),
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: o.system },
-        { role: 'user', content: userContent },
-      ],
-    } as any);
+    limit(openai.chat.completions.create(
+      {
+        model,
+        temperature: o.temperature ?? 0.5,
+        max_tokens: o.maxTokens,
+        ...(effort ? { reasoning_effort: effort } : {}),
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: o.system },
+          { role: 'user', content: userContent },
+        ],
+      } as any,
+      requestOptions as any
+    ));
   const { result, model } = await firstAccepted(ladder, make, warn, also);
   const raw = (result as any).choices?.[0]?.message?.content ?? '';
   const finish = (result as any).choices?.[0]?.finish_reason;
   const incomplete = finish === 'length' || finish === 'content_filter' ? String(finish) : null;
-  return { json: readJson(raw), raw, usage: usageOf(model, (result as any).usage), model, api, effort: effort ?? 'default', incomplete, retried: null };
+  return { json: readJson(raw), raw, usage: tag(usageOf(model, (result as any).usage)), model, api, effort: effort ?? 'default', incomplete, retried: null, ...(route ? { tier: route.tier } : {}) };
+}
+
+/** A call that did not answer in time (the SDK's own timeout, or an abort). */
+export const timedOut = (e: unknown): boolean => String((e as { name?: string })?.name ?? '') === 'SocriauxTimeout';
+
+/**
+ * One routed call. A PREMIUM call gets a time limit (SOCRIAUX_PREMIUM_TIMEOUT_MS, default 45 s), so a slow
+ * answer leaves room, within the route's 60 s, to ask the economy model instead; the designer is told it
+ * fell back. The timed-out call's cost cannot be measured (no usage comes back) and is not invented.
+ */
+export async function askRouted(openai: OpenAI, route: Route, o: AskOptions, economy: Route | null, env: Env = process.env): Promise<Asked> {
+  if (route.tier !== 'premium' || !economy || economy.model === route.model) return askJson(openai, route.ladder, o, route);
+  const n = parseInt(env.SOCRIAUX_PREMIUM_TIMEOUT_MS ?? '', 10);
+  const timeoutMs = Number.isFinite(n) && n >= 5000 ? Math.min(n, 55_000) : 45_000;
+  try {
+    return await askJson(openai, route.ladder, { ...o, timeoutMs }, route);
+  } catch (e) {
+    if (!timedOut(e)) throw e;
+    console.warn('ux-v0 %s: %s gave no answer in %d s; asking %s', o.label, route.model, Math.round(timeoutMs / 1000), economy.model);
+    const asked = await askJson(openai, economy.ladder, o, economy);
+    return { ...asked, fellBack: `${route.model} gave no answer in ${Math.round(timeoutMs / 1000)} seconds, so ${asked.model} answered instead.` };
+  }
 }
