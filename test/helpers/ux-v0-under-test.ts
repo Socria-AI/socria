@@ -29,3 +29,6 @@ export * from '@/lib/ux-v0/motion';
 export * from '@/lib/ux-v0/references';
 // the Living Brief's rules: decided stays decided, delegation, applying the brief to a design
 export * from '@/lib/ux-v0/brief';
+// design knowledge, and one decision changed in code
+export * from '@/lib/ux-v0/knowledge';
+export * from '@/lib/ux-v0/refine-local';

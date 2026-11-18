@@ -2834,3 +2834,66 @@
   text-overflow: ellipsis;
   color: var(--sb-ink-60);
 }
+
+/* ── adjust one decision, keep everything else ────────────────────── */
+.v0-adjust {
+  position: relative;
+}
+.v0-adjust > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.v0-adjust > summary::-webkit-details-marker {
+  display: none;
+}
+.v0-adjust > summary::after {
+  content: ' ▾';
+  font-size: 10px;
+}
+.v0-adjust-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(440px, 86vw);
+  padding: 14px 16px 16px;
+  border-radius: 10px;
+  background: var(--sb-surface);
+  box-shadow: var(--sb-float), 0 0 0 1px var(--sb-rule);
+  animation: st-arrive var(--sb-open) var(--sb-ease) both;
+}
+.v0-adjust-l {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--sb-ink-60);
+}
+.v0-adjust-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--sb-rule);
+}
+.v0-adjust-g {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.v0-adjust-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.v0-adjust-acts .sb-link {
+  font-size: 13px;
+}
+.v0-finding-why {
+  display: block;
+  margin-top: 2px;
+}
+.v0-kept li {
+  color: var(--sb-moss);
+}

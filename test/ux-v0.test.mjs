@@ -709,5 +709,46 @@ console.log('\n=== the Living Brief as a specification ===');
   ok('only the parts named reach the design: type and motion change, colour and grid do not', applied.tokens.fonts.display === 'Archivo' && applied.look.motion.feel === 'lively' && J(applied.tokens.colors) === J(spec.tokens.colors) && applied.look.grid === spec.look.grid && applied.version === spec.version + 1);
 }
 
+console.log('\n=== knowledge, fidelity and precise refinement ===');
+{
+  ok('the principles are structured: an area, a rule and a reason each, with unique ids', V.DESIGN_PRINCIPLES.length >= 30 && new Set(V.DESIGN_PRINCIPLES.map((p) => p.id)).size === V.DESIGN_PRINCIPLES.length && V.DESIGN_PRINCIPLES.every((p) => p.rule && p.why && p.area));
+  const kin = { ...V.lookFromTokens(V.DEFAULT_TOKENS), grid: 'poster', motion: V.MOTION_PRESETS.kinetic };
+  ok('a kinetic poster is reminded of kinetic type and reduced motion; a still page is not', V.principlesForLook(kin).some((p) => p.id === 'type.kinetic') && V.principlesForLook(kin).some((p) => p.id === 'motion.reduced') && !V.principlesForLook(V.lookFromTokens(V.DEFAULT_TOKENS)).some((p) => p.area === 'motion'));
+  ok('every finding kind has a reason', ['overflow', 'contrast', 'target', 'measure', 'rhythm', 'fidelity', 'motion'].every((k) => V.whyFor(k).length > 20));
+  const brief0 = V.normalizeBrief({ pageType: 'website', objective: 'Sell festival tickets', personality: ['bold'], visualDirection: 'poster', palette: [{ hex: '#ffffff', role: 'background' }, { hex: '#111111', role: 'text' }, { hex: '#ff4b1f', role: 'accent' }], typography: { display: 'Archivo', body: 'Inter' } }, new Set());
+  const dir = { ...V.proposeDirections({ brief: brief0 })[0], locks: ['palette', 'motion'] };
+  const d = V.designFromDirection(dir);
+  const good = V.normalizeSpec({ ...SPEC, tokens: d.tokens, look: d.look }, board);
+  const ev0 = V.evaluateDesign(good, {}, dir.locks, { direction: dir });
+  ok('a page that keeps its direction is fully faithful, and says so', ev0.fidelity === 100 && ev0.kept.some((k) => k.includes(dir.name)));
+  const drifted = { ...good, tokens: { ...good.tokens, colors: { ...good.tokens.colors, accent: '#00ff00' } }, look: { ...good.look, motion: V.STILL_MOTION } };
+  const ev1 = V.evaluateDesign(drifted, {}, dir.locks, { direction: dir });
+  const fixes = ev1.findings.filter((f) => f.kind === 'fidelity');
+  ok('drift from a locked colour and motion is found, with fixes that put them back (not blocked by the locks)', fixes.length === 2 && fixes.every((f) => f.fix && !f.blocked) && ev1.fidelity < 100);
+  const ruled = V.normalizeBrief({ ...brief0, rules: ['No animation', 'No capitals', 'Must feel handmade'] }, new Set());
+  const loud = V.normalizeSpec({ ...SPEC, tokens: d.tokens, look: { ...d.look, case: 'upper', motion: V.MOTION_PRESETS.lively } }, board);
+  const ev2 = V.evaluateDesign(loud, {}, [], { brief: ruled });
+  ok('checkable rules are checked, with fixes; the others are said to be given, not measured', ev2.findings.filter((f) => /Breaks the rule/.test(f.message)).length === 2 && ev2.findings.every((f) => !/Breaks the rule/.test(f.message) || f.fix) && ev2.kept.some((k) => /cannot be measured/.test(k)));
+  const aaa = V.normalizeBrief({ ...brief0, spec: { contrast: 'AAA' } }, new Set());
+  const faint = V.normalizeSpec({ ...SPEC, tokens: { ...d.tokens, colors: { ...d.tokens.colors, muted: '#8a8a8a', background: '#ffffff' } }, look: d.look }, board);
+  ok('an AAA brief catches text below 7:1, with a fix', V.evaluateDesign(faint, {}, [], { brief: aaa }).findings.some((f) => f.kind === 'fidelity' && /AAA/.test(f.message) && f.fix));
+  const civic = V.normalizeSpec({ ...SPEC, tokens: d.tokens, look: { ...d.look, language: 'civic', motion: V.MOTION_PRESETS.kinetic } }, board);
+  ok('kinetic motion for a public service is questioned, with a calmer fix', V.evaluateDesign(civic, {}, [], {}).findings.some((f) => f.kind === 'motion' && f.fix && f.fix.look.motion.feel === 'lively'));
+  ok('a moving page states its reduced-motion alternative', ev2.kept.some((k) => /reduced-motion/.test(k)));
+  // precise refinement
+  const asked = (w) => J(V.readAdjust(w));
+  ok('"keep everything, but change the typography" is a new pairing', asked('Keep everything, but change the typography.') === J(['type-pairing']));
+  ok('"use warmer colours", "reduce the motion intensity", "make the layout more experimental" are read', asked('Use warmer colors') === J(['colour-warmer']) && asked('Reduce the motion intensity.') === J(['motion-calmer']) && asked('Make the layout more experimental') === J(['layout-experimental']));
+  ok('"keep the composition, but make the interaction more expressive" changes only the interaction', asked('Keep the composition, but make the interaction more expressive') === J(['motion-more-expressive-hover']));
+  ok('anything else goes to the model', asked('Rewrite the hero headline about first light') === '[]');
+  const t = V.adjust(good, 'type-pairing');
+  const typed = t.patches.reduce((sp, pt) => V.applyPatch(sp, pt, board).spec, good);
+  ok('a new pairing changes the faces and nothing else', typed.tokens.fonts.display !== good.tokens.fonts.display && J(typed.tokens.colors) === J(good.tokens.colors) && typed.look.grid === good.look.grid);
+  const warm = V.applyPatch(good, V.adjust(good, 'colour-warmer').patches[0], board).spec;
+  ok('warmer colours keep text readable', V.ensureContrast(warm.tokens.colors.text, warm.tokens.colors.background, 7) === warm.tokens.colors.text && warm.tokens.colors.accent !== good.tokens.colors.accent);
+  ok('calmer motion steps down one feel; at still there is nothing to do', V.adjust({ ...good, look: { ...good.look, motion: V.MOTION_PRESETS.kinetic } }, 'motion-calmer').patches[0].look.motion.feel === 'lively' && V.adjust({ ...good, look: { ...good.look, motion: V.STILL_MOTION } }, 'motion-calmer') === null);
+  ok('a locked group stands in the way of an adjustment (it is checked before applying)', V.lockedChanges(good, V.adjust(good, 'colour-cooler').patches[0], ['palette']).includes('palette'));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

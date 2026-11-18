@@ -18,6 +18,7 @@
 import { designFromDirection, directionBrief, LOCK_LABEL, planLayout, type ArtDirection, type LockGroup } from './direction';
 import { normQ, readQueries } from './discovery';
 import { fontMenu } from './fonts';
+import { knowledgeBrief } from './knowledge';
 import { avoidRefs, contentRefs, describeRef, inspirationRefs, isContent } from './references';
 import { BUTTONS, CONTAINERS, GRIDS, LABELS, libraryMenu, MOTIFS, normalizePatch, normalizeSpec, specDigest, TONES, type DesignSpec, type Patch } from './spec';
 import {
@@ -177,6 +178,7 @@ export function generateSystem(brief: DesignBrief, dir: ArtDirection | null = nu
   return `You are SocriaUX's design generator. Turn the approved brief into a design specification that a renderer draws. You do not write HTML: you choose sections from the library below and write their content${dir ? '' : ', and choose tokens'}.
 ${dir ? `
 ${directionBrief(dir, brief.pageType)}
+${knowledgeBrief(dir.look)}
 ` : ''}
 THE LIBRARY (only these kinds, variants and fields; * marks required):
 ${libraryMenu(brief.pageType)}

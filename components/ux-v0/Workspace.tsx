@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { INSPECTOR_SOURCE } from '@/lib/ux-v0/inspector';
 import { renderDesign } from '@/lib/ux-v0/render';
-import { LOCK_LABEL, briefKey, languageOf, normalizeDirection, proposeDirections, type ArtDirection, type LockGroup } from '@/lib/ux-v0/direction';
+import { LOCK_LABEL, briefKey, languageOf, lockedChanges, normalizeDirection, proposeDirections, type ArtDirection, type LockGroup } from '@/lib/ux-v0/direction';
 import { MAX_REVISION_ROUNDS, evaluateDesign, fixesFor, type Evaluation, type Finding } from '@/lib/ux-v0/evaluate';
 import { buildSandboxDoc, makeNonce } from '@/lib/ux-v0/sandbox';
 import { applyPatch, normalizeSpec, placeholdersIn, specDigest, type DesignSpec, type Patch } from '@/lib/ux-v0/spec';
@@ -58,6 +58,7 @@ import { QuestionBand, QuestionsRail } from './Discovery';
 import { LivingBrief } from './LivingBrief';
 import { isContent, readBoard } from '@/lib/ux-v0/references';
 import { PART_LABEL, briefToDesign, changedVisualParts, delegatedParts, mergeDecided } from '@/lib/ux-v0/brief';
+import { ADJUST_GROUPS, ADJUST_LABEL, adjust, readAdjust, type Adjust } from '@/lib/ux-v0/refine-local';
 import { addUpload, sampleSwatches, useUploads, withUploads } from './uploads';
 import { Preview } from './Preview';
 import { checkFile, fetchOriginal, imageSize, keepOriginal } from './files';
@@ -537,7 +538,8 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const measureAt = async (s: DesignSpec) => {
       const html = renderDesign(s, withUploads(current.current.moodboard.refs, true)).html;
       const [desktop, phone] = await Promise.all([measurePage(html, 1280, 900, nonce), measurePage(html, 390, 844, nonce)]);
-      return evaluateDesign(s, { desktop, phone }, locks);
+      // and whether it keeps what was decided: the approved direction, the brief's locked parts and rules, the pictures it may place
+      return evaluateDesign(s, { desktop, phone }, locks, { direction: current.current.direction.chosen, brief: current.current.brief.doc, board: current.current.moodboard });
     };
     let spec = from;
     const fixed: string[] = [];
@@ -607,16 +609,25 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   };
 
   const applyLocal = useCallback(
-    (patch: Patch, label: string) => {
+    (patchOrPatches: Patch | Patch[], label: string) => {
       const p = current.current;
       const s = currentSpec(p);
       if (!s) return;
-      const res = applyPatch(s, patch, p.moodboard);
+      // several patches (a pairing changes faces and weight) land as one version
+      const patches = Array.isArray(patchOrPatches) ? patchOrPatches : [patchOrPatches];
+      let res: ReturnType<typeof applyPatch> = { ok: true, spec: s, touched: [] };
+      for (const pt of patches) {
+        if (!res.ok) break;
+        const next = applyPatch(res.spec, pt, p.moodboard);
+        res = next.ok ? { ...next, spec: { ...next.spec, version: s.version + 1 } } : next;
+      }
       if (!res.ok) return say(`That change could not be applied: ${res.error}`, 'error');
+      const patch = patches[patches.length - 1];
+      const lookChanged = patches.some((pt) => pt.op === 'tokens' || pt.op === 'look');
       update((p2) => {
         const specs = [...p2.specs.slice(0, p2.specIndex + 1), res.spec].slice(-30);
         // what the designer changes in the look becomes the direction's: a later generation keeps it
-        const chosen = p2.direction.chosen && (patch.op === 'tokens' || patch.op === 'look') ? { ...p2.direction.chosen, tokens: res.spec.tokens, look: res.spec.look, source: 'person' as const } : p2.direction.chosen;
+        const chosen = p2.direction.chosen && lookChanged ? { ...p2.direction.chosen, tokens: res.spec.tokens, look: res.spec.look, source: 'person' as const } : p2.direction.chosen;
         return { ...p2, specs, specIndex: specs.length - 1, direction: { ...p2.direction, chosen } };
       });
       setSelection(null);
@@ -626,10 +637,37 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     [current, update, say] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
+  /** One creative decision changed, everything else kept: in code, as a version Undo takes back. */
+  const adjustDesign = (as: Adjust[]): boolean => {
+    const p = current.current;
+    const s = currentSpec(p);
+    if (!s || !as.length) return false;
+    const locks = p.direction.chosen?.locks ?? [];
+    const done: { patches: Patch[]; label: string }[] = [];
+    const refused: string[] = [];
+    for (const a of as) {
+      const r = adjust(s, a);
+      if (!r) continue;
+      const hit = [...new Set(r.patches.flatMap((pt) => lockedChanges(s, pt, locks)))];
+      if (hit.length) refused.push(`${ADJUST_LABEL[a].toLowerCase()} would change ${hit.map((g) => LOCK_LABEL[g].toLowerCase()).join(' and ')}, which you locked`);
+      else done.push(r);
+    }
+    if (done.length) applyLocal(done.flatMap((d) => d.patches), done.map((d) => d.label).join('; '));
+    if (refused.length) say(`${done.length ? 'Done, except: ' : 'Nothing changed: '}${refused.join('; ')}. Unlock it in the direction to change it.`, 'info');
+    else if (!done.length) say('Nothing to change: the design is already there.', 'info');
+    return true;
+  };
+
   const refine = async (comment: string) => {
     const p = current.current;
     const s = currentSpec(p);
     if (!s) return;
+    // the everyday ways of asking for one change are done at once, in code, keeping everything else
+    const quick = readAdjust(comment);
+    if (quick.length && !p.artifact?.type?.startsWith('imported')) {
+      adjustDesign(quick);
+      return;
+    }
     setBusy('Working out the change…');
     const r = await post<{ understood: string; challenge: string; question: string; regenerate: string; patch: Patch; applies: boolean; locked?: LockGroup[]; error: string; usage: Usage }>('/api/ux-v0/refine', {
       projectId: p.id,
@@ -1021,6 +1059,26 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                   </button>
                 </span>
               )}
+              {spec && !imported && (
+                <details className="v0-adjust">
+                  <summary className="sb-link is-meta">Adjust</summary>
+                  <div className="v0-adjust-panel" role="group" aria-label="Change one decision, keep everything else">
+                    <p className="v0-adjust-l">Change one thing; keep everything else. Each is a version Undo takes back.</p>
+                    {ADJUST_GROUPS.map(([g, as]) => (
+                      <div key={g} className="v0-adjust-row">
+                        <span className="v0-adjust-g">{g}</span>
+                        <span className="v0-adjust-acts">
+                          {as.map((a) => (
+                            <button key={a} type="button" className="sb-link is-meta" onClick={(e) => (adjustDesign([a]), (e.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open'))}>
+                              {ADJUST_LABEL[a]}
+                            </button>
+                          ))}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
             </div>
           )}
 
@@ -1361,6 +1419,9 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                         <span>
                           <b>{checks.ev?.distinctiveness ?? '–'}</b> its own
                         </span>
+                        <span>
+                          <b>{checks.ev?.fidelity ?? '–'}</b> faithful
+                        </span>
                       </div>
                       <p className="v0-quiet" role="status">
                         {checks.running ? 'Measuring again…' : checks.ev?.summary}
@@ -1388,6 +1449,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                         <li key={f.id} className={`is-${f.severity}`}>
                           <span className="v0-finding-k">{f.severity === 'high' ? 'Must fix' : f.severity === 'medium' ? 'Should fix' : 'Worth a look'} · {f.viewport}</span>
                           <span className="v0-body">{f.message}</span>
+                          {f.why && <span className="v0-quiet v0-finding-why">Why: {f.why}</span>}
                           {f.blocked && <span className="v0-quiet">{f.blocked}</span>}
                           <span className="v0-finding-acts">
                             {f.fix && (
@@ -1402,6 +1464,16 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                             )}
                           </span>
                         </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                {checks?.ev && checks.ev.kept?.length > 0 && (
+                  <section className="v0-cellset">
+                    <span className="sb-label">What it keeps</span>
+                    <ul className="v0-plain v0-kept">
+                      {checks.ev.kept.map((x, i) => (
+                        <li key={i}>{x}</li>
                       ))}
                     </ul>
                   </section>

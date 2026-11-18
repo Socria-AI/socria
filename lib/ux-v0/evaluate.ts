@@ -20,8 +20,14 @@
 //                      stock phrases. A heuristic, not taste; the reasons are
 //                      listed so a designer can disagree with them.
 
-import { lockedChanges, type LockGroup } from './direction';
-import { kindDef, lookFromTokens, type DesignSpec, type Patch, type Section } from './spec';
+import { contrastRatio } from '../ux/audit';
+import { isDark } from './color';
+import { LOCK_LABEL, briefColors, lockedChanges, type ArtDirection, type LockGroup } from './direction';
+import { knownFont } from './fonts';
+import { whyFor } from './knowledge';
+import { stepMotion } from './motion';
+import { STILL_MOTION, ensureContrast, kindDef, lookFromTokens, usableImages, type DesignSpec, type Patch, type Section } from './spec';
+import type { DesignBrief, Moodboard } from './types';
 
 // ── what the audit reports (from inside the sandbox: never trusted as is) ──
 
@@ -177,7 +183,7 @@ export type Severity = 'high' | 'medium' | 'low';
 
 export interface Finding {
   id: string;
-  kind: 'overflow' | 'contrast' | 'target' | 'image' | 'hierarchy' | 'headline' | 'measure' | 'rhythm' | 'cliche' | 'length' | 'placeholder' | 'generic';
+  kind: 'overflow' | 'contrast' | 'target' | 'image' | 'hierarchy' | 'headline' | 'measure' | 'rhythm' | 'cliche' | 'length' | 'placeholder' | 'generic' | 'fidelity' | 'motion';
   severity: Severity;
   viewport: 'desktop' | 'phone' | 'page';
   section: string;
@@ -190,11 +196,19 @@ export interface Finding {
   ask?: string;
   /** a fix exists but touches something the designer locked */
   blocked?: string;
+  /** the fix puts back something the designer decided: it is not held back by their locks */
+  restore?: boolean;
+  /** why it matters (lib/ux-v0/knowledge.ts) */
+  why?: string;
 }
 
 export interface Evaluation {
   quality: number;
   distinctiveness: number;
+  /** how faithfully the page keeps the approved direction, the brief's decisions and its rules (0–100) */
+  fidelity: number;
+  /** what it keeps, said plainly: the direction, rules, contrast, the reduced-motion alternative */
+  kept: string[];
   findings: Finding[];
   signals: Signal[];
   /** one line, for the rail */
@@ -216,12 +230,19 @@ const SAFER: Record<string, string> = { hero: 'centered', features: 'list', stat
  * `locks`: the groups the designer locked — fixes that would touch them are
  * reported, never applied.
  */
-export function evaluateDesign(spec: DesignSpec, audits: { desktop?: PageAudit | null; phone?: PageAudit | null }, locks: readonly LockGroup[] = []): Evaluation {
+export interface FidelityContext {
+  direction?: ArtDirection | null;
+  brief?: DesignBrief | null;
+  board?: Moodboard | null;
+}
+
+export function evaluateDesign(spec: DesignSpec, audits: { desktop?: PageAudit | null; phone?: PageAudit | null }, locks: readonly LockGroup[] = [], ctx: FidelityContext = {}): Evaluation {
   const findings: Finding[] = [];
-  const add = (f: Omit<Finding, 'id'>) => {
+  const add = (f0: Omit<Finding, 'id'>) => {
+    const f = { ...f0, why: f0.why ?? whyFor(f0.kind) };
     const id = `${f.kind}:${f.viewport}:${f.section}:${findings.length}`;
-    // a fix that would change a locked decision is held back and said
-    if (f.fix) {
+    // a fix that would change a locked decision is held back and said (unless it puts that decision back)
+    if (f.fix && !f.restore) {
       const hit = lockedChanges(spec, f.fix, locks);
       if (hit.length) {
         findings.push({ ...f, id, fix: undefined, blocked: `It would change ${hit.join(' and ')}, which you locked.` });
@@ -305,14 +326,153 @@ export function evaluateDesign(spec: DesignSpec, audits: { desktop?: PageAudit |
   JSON.stringify(spec.sections.map((x) => x.content)).replace(/\[[^\]\n]{2,40}\]/g, (m) => (ph.add(m), m));
   if (ph.size >= 6) add({ kind: 'placeholder', severity: 'low', viewport: 'page', section: '', message: `${ph.size} facts are still placeholders (${[...ph].slice(0, 3).join(', ')}…).` });
 
+  // 12 · fidelity: the approved direction, the brief's decisions and rules, the pictures it may place; and its motion
+  const held = fidelityChecks(spec, ctx, add);
+
   const signals = genericSignals(spec, audits.desktop ?? audits.phone ?? null);
-  const quality = Math.max(0, 100 - findings.reduce((t, f) => t + (f.kind === 'cliche' || f.kind === 'placeholder' ? 0 : PENALTY[f.severity]), 0));
+  const quality = Math.max(0, 100 - findings.reduce((t, f) => t + (f.kind === 'cliche' || f.kind === 'placeholder' || f.kind === 'fidelity' ? 0 : PENALTY[f.severity]), 0));
+  const fidelity = Math.max(0, 100 - findings.filter((f) => f.kind === 'fidelity').reduce((t, f) => t + (f.severity === 'high' ? 20 : f.severity === 'medium' ? 8 : 2), 0));
   const distinctiveness = Math.max(0, 100 - signals.reduce((t, x) => t + x.weight, 0));
   const high = findings.filter((f) => f.severity === 'high').length;
   const summary = !findings.length
     ? 'Checked at desktop and phone widths: nothing to fix.'
     : `${findings.length} finding${findings.length > 1 ? 's' : ''}${high ? `, ${high} serious` : ''}; ${findings.filter((f) => f.fix).length} can be fixed without asking.`;
-  return { quality, distinctiveness, findings, signals, summary };
+  return { quality, distinctiveness, fidelity, kept: held, findings, signals, summary };
+}
+
+/** A patch that puts a locked group back as the direction has it. */
+function restore(g: LockGroup, dir: ArtDirection): Patch | undefined {
+  switch (g) {
+    case 'palette':
+      return { op: 'tokens', tokens: { colors: { ...dir.tokens.colors } }, summary: 'Colours put back as the direction has them' };
+    case 'type':
+      return { op: 'tokens', tokens: { fonts: { ...dir.tokens.fonts } }, summary: 'Typefaces put back as the direction has them' };
+    case 'layout':
+      return { op: 'look', look: { grid: dir.look.grid, width: dir.look.width }, summary: 'Grid put back as the direction has it' };
+    case 'surface':
+      return { op: 'look', look: { containers: dir.look.containers, buttons: dir.look.buttons }, summary: 'Surfaces put back as the direction has them' };
+    case 'imagery':
+      return { op: 'tokens', tokens: { imageTreatment: dir.tokens.imageTreatment }, summary: 'Picture treatment put back as the direction has it' };
+    case 'motion':
+      return { op: 'look', look: { motion: { ...(dir.look.motion ?? STILL_MOTION) } }, summary: 'Motion put back as the direction has it' };
+    default:
+      return undefined;
+  }
+}
+
+const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/**
+ * Does the page keep what was decided? The approved direction's locked groups,
+ * the brief's locked parts and its rules (those a page can be checked
+ * against), its contrast target, and the line between pictures for the page
+ * and references that only inspire. Then how it moves. Returns what holds.
+ */
+function fidelityChecks(spec: DesignSpec, ctx: FidelityContext, add: (f: Omit<Finding, 'id'>) => void): string[] {
+  const kept: string[] = [];
+  const look = spec.look ?? lookFromTokens(spec.tokens);
+  const tk = spec.tokens;
+  const dir = ctx.direction;
+  if (dir) {
+    const drift: [LockGroup, boolean][] = [
+      ['palette', !same(tk.colors, dir.tokens.colors)],
+      ['type', tk.fonts.display !== dir.tokens.fonts.display || tk.fonts.body !== dir.tokens.fonts.body],
+      ['layout', look.grid !== dir.look.grid || look.width !== dir.look.width],
+      ['surface', look.containers !== dir.look.containers || look.buttons !== dir.look.buttons],
+      ['imagery', tk.imageTreatment !== dir.tokens.imageTreatment],
+      ['motion', !same(look.motion, dir.look.motion ?? STILL_MOTION)],
+    ];
+    const broken = drift.filter(([g, d]) => d && dir.locks.includes(g)).map(([g]) => g);
+    for (const g of broken)
+      add({ kind: 'fidelity', severity: 'high', viewport: 'page', section: '', message: `The page has drifted from the direction’s ${LOCK_LABEL[g].toLowerCase()}, which you locked.`, fix: restore(g, dir), restore: true, why: 'A locked decision is a promise: it holds through regenerating and refining.' });
+    if (!broken.length) kept.push(`Follows the approved direction, “${dir.name}”${dir.locks.length ? `, with its locked ${dir.locks.map((g) => LOCK_LABEL[g].toLowerCase()).join(', ')}` : ''}.`);
+  }
+  const b = ctx.brief;
+  if (b) {
+    const dec = b.decisions ?? {};
+    if (dec.colour === 'locked' && b.palette.length) {
+      const want = briefColors(b);
+      const off = (['background', 'text', 'accent'] as const).filter((k) => (tk.colors[k] ?? '').toLowerCase() !== (want[k] ?? '').toLowerCase());
+      if (off.length) add({ kind: 'fidelity', severity: 'high', viewport: 'page', section: '', message: `Not the palette you locked in the brief (${off.join(', ')}).`, fix: { op: 'tokens', tokens: { colors: { ...tk.colors, ...want } }, summary: 'The brief’s locked palette put back' }, restore: true });
+      else kept.push('Keeps the palette you locked in the brief.');
+    }
+    if (dec.typography === 'locked') {
+      if (tk.fonts.display !== b.typography.display || tk.fonts.body !== b.typography.body)
+        add({ kind: 'fidelity', severity: 'high', viewport: 'page', section: '', message: `Not the type you locked in the brief (${b.typography.display} with ${b.typography.body}).`, fix: { op: 'tokens', tokens: { fonts: { display: b.typography.display, body: b.typography.body } }, summary: 'The brief’s locked type put back' }, restore: true });
+      else kept.push('Keeps the type you locked in the brief.');
+    }
+    if (dec.motion === 'locked' && b.spec?.motion) {
+      if (!same(look.motion, b.spec.motion)) add({ kind: 'fidelity', severity: 'high', viewport: 'page', section: '', message: 'Not the motion you locked in the brief.', fix: { op: 'look', look: { motion: { ...b.spec.motion } }, summary: 'The brief’s locked motion put back' }, restore: true });
+      else kept.push('Moves as you locked it in the brief.');
+    }
+    if (b.spec?.contrast === 'AAA') {
+      const r = Math.min(contrastRatio(tk.colors.text, tk.colors.background), contrastRatio(tk.colors.muted, tk.colors.background));
+      if (r < 7) add({ kind: 'fidelity', severity: 'high', viewport: 'page', section: '', message: `Some text reads at ${r.toFixed(1)}:1; the brief asks for AAA (7:1) for all of it.`, fix: { op: 'tokens', tokens: { colors: { ...tk.colors, text: ensureContrast(tk.colors.text, tk.colors.background, 7), muted: ensureContrast(tk.colors.muted, tk.colors.background, 7) } }, summary: 'Text darkened to AAA contrast' }, restore: true, why: whyFor('contrast') });
+      else kept.push('Text reaches AAA contrast (7:1), as the brief asks.');
+    }
+    // rules a page can be checked against
+    for (const rule of b.rules ?? []) {
+      const r = ` ${rule.toLowerCase()} `;
+      const broke = (msg: string, fix?: Patch, manual = false) => add({ kind: 'fidelity', severity: 'high', viewport: 'page', section: '', message: `Breaks the rule “${rule}”: ${msg}`, fix, manual, restore: true, why: 'A rule in the brief is non-negotiable; everything else is a preference.' });
+      let checked = false;
+      if (/\b(no|without) (motion|animation|animations|movement)\b|\bnothing (should )?moves?\b|\bstatic\b/.test(r)) {
+        checked = true;
+        if ((look.motion?.feel ?? 'still') !== 'still') broke('the page moves.', { op: 'look', look: { motion: { ...STILL_MOTION } }, summary: 'Motion stilled, as the rule asks' });
+        else kept.push(`Keeps the rule “${rule}”.`);
+      } else if (/\bno parallax\b/.test(r)) {
+        checked = true;
+        if ((look.motion?.parallax ?? 0) > 0) broke('pictures move in parallax.', { op: 'look', look: { motion: { ...(look.motion ?? STILL_MOTION), parallax: 0 } }, summary: 'Parallax removed, as the rule asks' });
+        else kept.push(`Keeps the rule “${rule}”.`);
+      } else if (/\b(no|without) (photos|photographs|photography|images|pictures)\b/.test(r)) {
+        checked = true;
+        const withPics = spec.sections.filter((x) => x.images.length).map((x) => x.id);
+        if (withPics.length) broke(`${withPics.length} section${withPics.length === 1 ? ' shows' : 's show'} pictures (${withPics.slice(0, 3).join(', ')}).`, undefined, true);
+        else kept.push(`Keeps the rule “${rule}”.`);
+      } else if (/\bno serifs?\b|\bsans[- ]serif only\b/.test(r)) {
+        checked = true;
+        if (knownFont(tk.fonts.display)?.kind === 'serif') broke(`the headlines are set in ${tk.fonts.display}, a serif.`);
+        else kept.push(`Keeps the rule “${rule}”.`);
+      } else if (/\bno (rounded|round corners|pills?)\b|\bsquare corners\b/.test(r)) {
+        checked = true;
+        if (tk.radius !== 'none' || look.buttons === 'pill') broke('corners are rounded.', { op: 'tokens', tokens: { radius: 'none' }, summary: 'Corners squared, as the rule asks' });
+        else kept.push(`Keeps the rule “${rule}”.`);
+      } else if (/\bno (capitals|uppercase|all caps)\b/.test(r)) {
+        checked = true;
+        if (look.case === 'upper') broke('headlines are set in capitals.', { op: 'look', look: { case: 'sentence' }, summary: 'Headlines in sentence case, as the rule asks' });
+        else kept.push(`Keeps the rule “${rule}”.`);
+      } else if (/\bno icons\b/.test(r)) {
+        checked = true;
+        if (look.motifs.includes('icons')) broke('the page uses icons.', { op: 'look', look: { motifs: look.motifs.filter((m) => m !== 'icons') }, summary: 'Icons left out, as the rule asks' });
+        else kept.push(`Keeps the rule “${rule}”.`);
+      } else if (/\bno dark\b|\blight (ground|background)\b/.test(r)) {
+        checked = true;
+        if (isDark(tk.colors.background)) broke('the ground is dark.');
+        else kept.push(`Keeps the rule “${rule}”.`);
+      }
+      if (!checked) kept.push(`The rule “${rule}” was given to SocriaUX; it cannot be measured on the page.`);
+    }
+  }
+  // a reference kept only to inspire must not be pasted in
+  if (ctx.board) {
+    const ok = usableImages(ctx.board);
+    for (const s of spec.sections) {
+      const stray = s.images.filter((id) => ok && !ok.has(id));
+      if (stray.length) add({ kind: 'fidelity', severity: 'high', viewport: 'page', section: s.id, message: `Shows ${stray.length === 1 ? 'a reference' : `${stray.length} references`} kept only to inspire.`, manual: true, why: whyFor('', 'ref.aspect') });
+    }
+  }
+  // motion: purposeful, timed, and calm where calm was asked for
+  const m = look.motion ?? STILL_MOTION;
+  if (m.feel !== 'still') {
+    kept.push('Every movement has a reduced-motion alternative: a short fade, nothing travelling.');
+    const hero = spec.sections.find((x) => x.kind === 'hero');
+    const title = String(hero?.content?.title ?? '').replace(/\*/g, '');
+    if (m.headline === 'letters' && title.length > 42) add({ kind: 'motion', severity: 'low', viewport: 'page', section: hero?.id ?? '', message: `The headline (${title.length} characters) is long for letter-by-letter arrival; it arrives word by word instead.`, why: whyFor('', 'type.kinetic') });
+    const calmAsked = (b?.accessibility ?? []).some((x) => /\b(motion|vestibular|calm|older|anxious|anxiety|dizz)/i.test(x)) || look.language === 'civic';
+    if (calmAsked && (m.feel === 'kinetic' || m.feel === 'lively'))
+      add({ kind: 'motion', severity: 'medium', viewport: 'page', section: '', message: `${m.feel === 'kinetic' ? 'Kinetic' : 'Lively'} motion for an audience that asked for calm.`, fix: { op: 'look', look: { motion: stepMotion(m, -1) }, summary: 'Motion made calmer' }, why: whyFor('', 'motion.reduced') });
+    if (m.scroll && m.duration > 1200) add({ kind: 'motion', severity: 'low', viewport: 'page', section: '', message: `Arrivals take ${m.duration} ms; tied to scrolling, that can feel slow.`, fix: { op: 'look', look: { motion: { ...m, duration: 900 } }, summary: 'Arrivals shortened to 900 ms' }, why: whyFor('', 'motion.timing') });
+  }
+  return kept;
 }
 
 /** The fixes worth applying in one round: at most one per section, the serious first. */
