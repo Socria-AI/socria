@@ -19,6 +19,7 @@
 // The Chat Completions path (every other model) is unchanged: JSON mode, as before.
 
 import { FONTS } from './fonts';
+import { EXPERIENCES } from './intent';
 import { LANGUAGES } from './direction';
 import { MOOD_CATEGORIES, PALETTE_ROLES, VERDICTS, type CallKind } from './types';
 
@@ -89,6 +90,7 @@ const briefFields = {
   responsive: strOrNull,
   pageType: oneOf(['website', 'app-screen']),
   platform: oneOf(['web', 'mobile']),
+  experienceKind: oneOf(EXPERIENCES),
 };
 const brief = object(briefFields);
 const refineBrief = object({ ...briefFields, moodboardQueries: list(query, 3) });

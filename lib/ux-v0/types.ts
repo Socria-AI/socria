@@ -12,6 +12,7 @@
 // model's output — and returns a value the rest of the code can trust, or a
 // safe default. None of them throws. docs/SOCRIAUX-V0.md has the plan.
 
+import { normalizeIntent, type DesignIntent } from './intent';
 import { EMPTY_DIRECTION, normalizeDirectionState, type DirectionState } from './direction';
 import { GRIDS, normalizeMotion, normalizeSpec, type DesignSpec, type Motion } from './spec';
 import { bodyFont, displayFont } from './fonts';
@@ -418,6 +419,8 @@ export interface DesignBrief {
   accessibility?: string[];
   responsive?: string[];
   spec?: BriefSpec;
+  /** what is being made (lib/ux-v0/intent.ts): the experience, its task and its requirements, with stable ids */
+  intent?: DesignIntent;
   /** optional parts the designer added to the brief */
   parts?: BriefPart[];
 }
@@ -877,6 +880,8 @@ function briefExtras(r: Record<string, any>): Partial<DesignBrief> {
   if (sp.motion && typeof sp.motion === 'object') spec.motion = normalizeMotion(sp.motion);
   if (sp.contrast === 'AA' || sp.contrast === 'AAA') spec.contrast = sp.contrast;
   if (Object.keys(spec).length) out.spec = spec;
+  const intent = normalizeIntent(r.intent);
+  if (intent) out.intent = intent;
   const parts = strings(r.parts, BRIEF_PARTS.length, 20).filter((x): x is BriefPart => (BRIEF_PARTS as readonly string[]).includes(x));
   if (parts.length) out.parts = [...new Set(parts)];
   return out;

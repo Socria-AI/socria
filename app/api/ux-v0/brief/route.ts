@@ -17,6 +17,7 @@ import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
 import { withMeter } from '@/lib/token-meter';
 import { askJson } from '@/lib/ux-v0/ask';
 import { formatFor } from '@/lib/ux-v0/schemas';
+import { designerWords, pageTypeFor, settleIntent } from '@/lib/ux-v0/intent';
 import { briefSystem, briefUser, parseBrief, type BriefInput, briefQueries } from '@/lib/ux-v0/design';
 import { MAX_TOKENS, socriauxLadder } from '@/lib/ux-v0/model';
 import { bad, failed, noModel, projectIdOf, readBody, signInFirst } from '@/lib/ux-v0/route-kit';
@@ -58,9 +59,13 @@ export const POST = withMeter(async function POST(req: NextRequest) {
   const openai = tracked(new OpenAI({ apiKey }), `ux-v0/${kind}`);
   try {
     const asked = await askJson(openai, socriauxLadder(), { system: briefSystem(refining), user: briefUser(input), maxTokens: MAX_TOKENS[kind], temperature: 0.4, label: kind, format: formatFor(kind) });
-    const brief = parseBrief(asked.json, moodboard);
+    const parsed = parseBrief(asked.json, moodboard);
     await recordUsage(userId, projectId, kind, asked.usage);
-    if (!brief) return NextResponse.json({ error: 'SocriaUX could not write a usable brief from that. Try again, or write it yourself.', usage: asked.usage }, { status: 502 });
+    if (!parsed) return NextResponse.json({ error: 'SocriaUX could not write a usable brief from that. Try again, or write it yourself.', usage: asked.usage }, { status: 502 });
+    // WHAT IS BEING MADE, from the designer's own words (lib/ux-v0/intent.ts): a booking screen stays a booking
+    // screen whatever the prose says, and a correction the designer made survives the rewrite
+    const intentNow = settleIntent(designerWords(intent, discovery.questions, instruction), { briefKind: (asked.json as any)?.experienceKind, current: current?.intent ?? null, override: body.experience });
+    const brief = { ...parsed, intent: intentNow, pageType: pageTypeFor(intentNow, parsed.pageType) };
     // a refinement that moved the visual direction brings new searches for the board
     return NextResponse.json({ brief, queries: refining ? briefQueries(asked.json, moodboard) : [], usage: asked.usage });
   } catch (e) {

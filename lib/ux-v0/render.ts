@@ -28,6 +28,7 @@ import { isDark, mix, rgbOf } from './color';
 import { advanceEm, fontStack, fontStylesheet, hasItalic, knownFont, nearestWeight } from './fonts';
 import { NEEDS_IMAGE, ensureContrast, kindDef, lookFromTokens, type DesignSpec, type DesignTokens, type Look, type Section, type Shape } from './spec';
 import { creditText, type MoodboardRef } from './types';
+import { BEHAVIOR_SOURCE } from './behaviors';
 import { kineticHeadline, motionCss, type MotionMode } from './motion';
 
 export interface Credit {
@@ -50,6 +51,11 @@ export interface RenderOptions {
    * exported page), or `reduced` (the reduced-motion alternative, to preview it).
    */
   motion?: MotionMode;
+  /**
+   * Inline SocriaUX's behaviour runtime (lib/ux-v0/behaviors.ts) in the page: for an exported page,
+   * which has no sandbox to add it. The canvas, the preview and the checks add it by nonce instead.
+   */
+  runtime?: boolean;
 }
 
 // ── text ─────────────────────────────────────────────────────────────
@@ -274,6 +280,10 @@ function shapeArt(look: Look, turn: number, cls = 'art'): string {
 interface Ctx {
   look: Look;
   first: boolean;
+  /** drawn inside an app screen's own layout (no page wrapper) */
+  app?: boolean;
+  /** the screen's leading heading: nothing above it is a hero or a screen header */
+  lead?: boolean;
   /** motion plays: the opening headline may be set as kinetic type */
   play: boolean;
   /** the section's number, when the look numbers sections */
@@ -398,6 +408,48 @@ const SECTIONS: Record<string, R> = {
     if (s.variant === 'image' && im.has(s, 0)) return `<div class="wrap cta-image"><figure class="cta-media">${im.img(s, 0, 'media-img')}${im.cap(s, 0)}</figure><div class="cta-text">${inner}</div></div>`;
     return `<div class="wrap"><div class="cta-box c-${s.variant}">${inner}</div></div>`;
   },
+  // THE BOOKING ITSELF: what is booked, its days and times with availability, one confirm action and the
+  // confirmation. Real radio inputs, so it is keyboard- and screen-reader-operable before any script; the
+  // behaviour runtime (lib/ux-v0/behaviors.ts) adds the state: the chosen day's times, the chosen time
+  // summarised, the confirm action enabled, a loading state, and the confirmation. Five compositions.
+  booking: (s, c, x) => {
+    const sid = s.id;
+    const days = (c.days as any[]).slice(0, 14);
+    const stOf = (v: unknown): 'open' | 'few' | 'full' => (v === 'full' ? 'full' : v === 'few' ? 'few' : 'open');
+    const SAY = { open: 'Available', few: 'Few places left', full: 'Full' } as const;
+    const list = s.variant === 'list';
+    const openIn = (d: any) => (d.slots as any[]).filter((tm) => stOf(tm.status) !== 'full').length;
+    const firstDay = Math.max(0, days.findIndex((d) => openIn(d) > 0));
+    const H = x.lead ? 'h1' : 'h2';
+    const head = `<div class="bk-head">${secNo(x)}${eyebrow(s, c.eyebrow)}<${H} class="h-section bk-title" ${attr(sid, 'title')}>${t(c.title)}</${H}>${c.intro ? `<p class="lede" ${attr(sid, 'intro')}>${t(c.intro)}</p>` : ''}</div>`;
+    const details = (c.details as string[]) ?? [];
+    const item = `<div class="bk-item"><p class="bk-kicker">Booking</p><p class="bk-item-name" ${attr(sid, 'item')}>${t(c.item)}</p>${details.length ? `<ul class="bk-details">${details.map((d, i) => `<li ${attr(sid, `details.${i}`)}>${t(d)}</li>`).join('')}</ul>` : ''}<p class="bk-choice" data-ux-bind="choice" aria-live="polite">No time chosen yet</p></div>`;
+    const dayPicker = list
+      ? ''
+      : `<fieldset class="bk-days"><legend class="bk-legend">Day</legend><div class="bk-day-row">${days
+          .map((d, i) => {
+            const n = openIn(d);
+            return `<label class="bk-day${n ? '' : ' is-closed'}"><input type="radio" name="${sid}-day" value="${i}"${i === firstDay ? ' checked' : ''}${n ? '' : ' disabled'}><span class="bk-day-label" ${attr(sid, `days.${i}.label`)}>${t(d.label)}</span>${d.date ? `<span class="bk-day-date" ${attr(sid, `days.${i}.date`)}>${t(d.date)}</span>` : ''}<span class="bk-day-count">${n ? `${n} ${n === 1 ? 'time' : 'times'}` : 'Full'}</span></label>`;
+          })
+          .join('')}</div></fieldset>`;
+    const times = days
+      .map((d, i) => {
+        const slots = (d.slots as any[])
+          .map((tm, j) => {
+            const st = stOf(tm.status);
+            return `<label class="bk-slot is-${st}"><input type="radio" name="${sid}-time" value="${i}:${j}" data-day-label="${plain(d.label)}" data-time="${plain(tm.time)}"${st === 'full' ? ' disabled' : ''}><span class="bk-time" ${attr(sid, `days.${i}.slots.${j}.time`)}>${t(tm.time)}</span><span class="bk-status">${tm.note ? t(tm.note) : SAY[st]}</span></label>`;
+          })
+          .join('');
+        const legend = list ? `<span ${attr(sid, `days.${i}.label`)}>${t(d.label)}</span>${d.date ? ` <span class="bk-day-date">${t(d.date)}</span>` : ''}` : `Times, ${plain(d.label)}`;
+        return `<fieldset class="bk-times" data-day="${i}"${!list && i !== firstDay ? ' hidden' : ''}><legend class="bk-legend">${legend}</legend><div class="bk-slot-grid">${slots}</div></fieldset>`;
+      })
+      .join('');
+    const form = `<form class="bk-form" data-ux-booking-form novalidate>${dayPicker}<div class="bk-times-wrap">${times}</div><p class="bk-error" data-ux-error role="alert" hidden>Choose a time first.</p><div class="bk-actions"><button type="submit" class="btn btn-primary bk-action" data-ux-confirm ${attr(sid, 'action')}>${t(c.action)}</button></div>${c.note ? `<p class="bk-note small muted" ${attr(sid, 'note')}>${t(c.note)}</p>` : ''}</form>`;
+    const done = `<div class="bk-done" data-ux-done role="status" tabindex="-1" hidden><p class="bk-done-title" ${attr(sid, 'confirmTitle')}>${t(c.confirmTitle || 'Booked')}</p><p class="bk-done-summary" data-ux-bind="summary"></p>${c.confirmText ? `<p class="bk-done-text" ${attr(sid, 'confirmText')}>${t(c.confirmText)}</p>` : ''}<p class="bk-proto small muted">A prototype: no booking was made.</p><button type="button" class="btn btn-secondary bk-change" data-ux-change>Change the time</button></div>`;
+    const media = s.variant === 'immersive' && x.im.has(s, 0) ? `<figure class="bk-media">${x.im.img(s, 0, 'bk-img', true)}${x.im.cap(s, 0)}</figure>` : '';
+    const body = `<div class="bk-body">${item}<div class="bk-flow">${form}${done}</div></div>`;
+    return `<div class="${x.app ? '' : 'wrap '}bk bk-${s.variant}" data-ux-booking>${media}<div class="bk-panel">${head}${body}</div></div>`;
+  },
   form: (s, c, x) => {
     const fields = (c.fields as any[])
       .map((f, i) => {
@@ -411,7 +463,7 @@ const SECTIONS: Record<string, R> = {
         return `<div class="field">${label}<input id="${id}" type="${esc(f.type || 'text')}"${ph}${req}></div>`;
       })
       .join('');
-    const form = `<form class="form" action="#" method="post"><div class="fields">${fields}</div><button type="submit" class="btn btn-primary" ${attr(s.id, 'submit')}>${t(c.submit)}</button>${c.note ? `<p class="small muted" ${attr(s.id, 'note')}>${t(c.note)}</p>` : ''}</form>`;
+    const form = `<form class="form" action="#" method="post" data-ux-form novalidate><div class="fields">${fields}</div><button type="submit" class="btn btn-primary" ${attr(s.id, 'submit')}>${t(c.submit)}</button>${c.note ? `<p class="small muted" ${attr(s.id, 'note')}>${t(c.note)}</p>` : ''}<p class="fm-done" data-ux-done role="status" tabindex="-1" hidden>Sent. <span class="muted">A prototype: nothing was sent.</span></p></form>`;
     return `<div class="wrap form-wrap fm-${s.variant}"><div class="form-head">${secNo(x)}<h2 class="h-section" ${attr(s.id, 'title')}>${t(c.title)}</h2>${c.intro ? `<p class="body-lg" ${attr(s.id, 'intro')}>${t(c.intro)}</p>` : ''}</div>${form}</div>`;
   },
   text: (s, c, x) =>
@@ -625,6 +677,8 @@ function css(tk: DesignTokens, look: Look, heads: Headlines = NO_HEADLINES): str
 
   // ── base
   add(`*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+.app.nav-none main{width:min(100%,1200px);margin-inline:auto}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--text);font-family:var(--body);font-size:var(--fs);line-height:1.6;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-kerning:normal}
 img{display:block;max-width:100%}
@@ -789,10 +843,59 @@ p{max-width:68ch}
   if (L.containers !== 'cards' && L.containers !== 'framed') add(`.plan{background:transparent;border:0;border-top:var(--rule-w) solid var(--rule-c);border-radius:0;padding:22px 0 0}.plan.is-featured{box-shadow:none;border-top-color:var(--accent-ink);border-top-width:3px}`);
   if (L.containers === 'open') add(`.f-numbered .feature,.f-list .feature{border-top:0;padding-top:0}`);
 
+  // ── the booking: drawn in the design's own tokens, so each direction draws it in its own language
+  add(`.bk{display:grid;gap:clamp(20px,3vw,36px)}.bk-panel{display:grid;gap:clamp(20px,3vw,36px);min-width:0}.bk fieldset{border:0;margin:0;padding:0;min-width:0}
+.bk-head .h-section{margin-bottom:6px}.bk-head .lede{margin:0}
+.bk-legend{display:block;padding:0;margin:0 0 10px;font-size:.82rem;color:var(--muted)}
+.bk-body{display:grid;gap:clamp(18px,2.5vw,28px);min-width:0}.bk-item{display:grid;gap:6px;align-content:start}.bk-item p{margin:0}
+.bk-kicker{font-size:.8rem;color:var(--muted)}.bk-item-name{font-family:var(--display);font-weight:var(--iw);font-size:var(--fs-h3);line-height:1.15}
+.bk-details{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px 18px;color:var(--muted);font-size:.95rem}
+.bk-choice{margin-top:6px!important;font-weight:600}
+.bk label{position:relative;cursor:pointer;-webkit-tap-highlight-color:transparent}.bk input[type=radio]{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:inherit}
+.bk-day-row{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px;scrollbar-width:thin}
+.bk-day{flex:none;display:grid;gap:2px;align-content:center;min-width:88px;min-height:64px;padding:10px 14px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--surface);transition:border-color .16s ease,background-color .16s ease,color .16s ease}
+.bk-day-label{font-weight:600}.bk-day-date,.bk-day-count{font-size:.8rem;color:var(--muted)}
+.bk-day:has(input:checked){border-color:var(--text);background:var(--text);color:var(--bg)}.bk-day:has(input:checked) :is(.bk-day-date,.bk-day-count){color:inherit;opacity:.8}
+.bk-day:hover:not(.is-closed),.bk-slot:hover:not(.is-full){border-color:var(--text)}
+.bk-day:has(input:focus-visible),.bk-slot:has(input:focus-visible){outline:2px solid var(--accent-ink);outline-offset:3px}
+.bk-day.is-closed,.bk-slot.is-full{opacity:.42;cursor:not-allowed}.bk-slot.is-full .bk-time{text-decoration:line-through}
+.bk-times-wrap{display:grid;gap:18px;margin-top:18px}
+.bk-slot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,118px),1fr));gap:8px}
+.bk-slot{display:grid;gap:2px;align-content:center;min-height:58px;padding:10px 14px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--surface);transition:border-color .16s ease,background-color .16s ease,color .16s ease}
+.bk-time{font-size:1.12rem;font-weight:600;font-variant-numeric:tabular-nums}.bk-status{font-size:.78rem;color:var(--muted)}.bk-slot.is-few .bk-status{color:var(--accent-ink);font-weight:600}
+.bk-slot:has(input:checked){border-color:var(--accent);background:var(--accent);color:var(--on-accent)}.bk-slot:has(input:checked) .bk-status{color:inherit}
+.bk-error{margin:14px 0 0;font-weight:600;color:var(--accent-ink)}
+.bk-actions{margin-top:22px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}.bk-action{min-width:min(100%,220px)}
+.bk-action[aria-disabled=true]{opacity:.5}.bk-action[aria-busy=true]{cursor:progress;opacity:.75}
+.bk-note{margin:14px 0 0}
+.bk-done{display:grid;gap:10px;padding:clamp(22px,3vw,34px);border:1.5px solid var(--text);border-radius:var(--r);background:var(--surface)}.bk-done p{margin:0}.bk-done:focus{outline:none}
+.bk-done-title{font-family:var(--display);font-weight:var(--iw);font-size:var(--fs-h3);line-height:1.15}.bk-done-summary{font-weight:600}.bk-change{justify-self:start;margin-top:6px}
+.bk-done{transition:opacity .32s cubic-bezier(.2,.7,.2,1),transform .32s cubic-bezier(.2,.7,.2,1)}.bk-done.is-arriving{opacity:0;transform:translateY(8px)}
+.fm-done{margin:14px 0 0;font-weight:600}.field.is-invalid :is(input,textarea,select){border-color:var(--accent-ink)}.fm-error{margin:6px 0 0;font-size:.85rem;color:var(--accent-ink);font-weight:600}
+th .th-sort{all:unset;cursor:pointer;display:inline-flex;gap:6px;align-items:center}th .th-sort:focus-visible{outline:2px solid var(--accent-ink);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.bk-day,.bk-slot,.bk-done{transition:none}}
+/* calendar: the days as a grid, the times beside */
+.bk-calendar .bk-day-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,124px),1fr));overflow:visible}.bk-day-label{overflow-wrap:anywhere}
+@media (min-width:900px){.bk-calendar .bk-form{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);column-gap:clamp(24px,4vw,56px);align-items:start}.bk-calendar .bk-days{grid-row:1/span 4}.bk-calendar .bk-day{min-height:104px;align-content:space-between}.bk-calendar .bk-day-label{font-family:var(--display);font-size:1.15rem}.bk-calendar .bk-times-wrap{margin-top:0}.bk-calendar .bk-slot-grid{grid-template-columns:1fr 1fr}}
+/* list: every day and time as one typographic list */
+.bk-list .bk-times{padding-top:18px;border-top:var(--rule-w) solid var(--rule-c)}.bk-list .bk-times-wrap{gap:28px}
+.bk-list .bk-legend{font-family:var(--display);font-weight:var(--iw);font-size:var(--fs-h3);color:var(--text)}
+.bk-list .bk-slot-grid{grid-template-columns:1fr;gap:0}
+.bk-list .bk-slot{grid-template-columns:8ch minmax(0,1fr);align-items:baseline;gap:16px;min-height:54px;padding:12px 4px;border:0;border-bottom:1px solid var(--line);border-radius:0;background:none}
+.bk-list .bk-time{font-family:var(--display);font-size:1.45rem;font-weight:var(--iw)}
+.bk-list .bk-slot:has(input:checked){background:none;color:var(--text);box-shadow:inset 3px 0 0 var(--accent);padding-left:16px}.bk-list .bk-slot:has(input:checked) .bk-status{color:var(--accent-ink);font-weight:600}
+/* split: the choice summarised beside the picker */
+@media (min-width:900px){.bk-split .bk-body{grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:clamp(28px,5vw,72px);align-items:start}.bk-split .bk-item{position:sticky;top:24px;padding:clamp(22px,2.6vw,34px);background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}.bk-split .bk-item-name{font-size:var(--fs-h2)}}
+/* strip: the days as one row over the times */
+.bk-strip .bk-item{grid-auto-flow:row}@media (min-width:900px){.bk-strip .bk-item{grid-template-columns:auto 1fr;column-gap:24px;align-items:baseline}.bk-strip .bk-kicker{grid-column:1/-1}.bk-strip .bk-choice{grid-column:1/-1}}
+/* immersive: one picture, the picker over it */
+.bk-immersive{position:relative}.bk-media{margin:0}.bk-media img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:var(--r);filter:var(--img)}
+@media (min-width:900px){.bk-immersive{min-height:min(90vh,780px);padding-block:clamp(28px,5vw,64px)}.bk-immersive .bk-media{position:absolute;inset:0}.bk-immersive .bk-media img{height:100%;aspect-ratio:auto;border-radius:0}.bk-immersive .bk-media figcaption{position:absolute;left:16px;bottom:12px;color:#fff;font-size:.75rem}.bk-immersive .bk-panel{position:relative;width:min(100%,600px);margin-left:auto;padding:clamp(24px,3vw,40px);background:var(--bg);border-radius:var(--r);box-shadow:0 24px 64px rgba(0,0,0,.22)}}`);
+
   // one column on a phone, and a column that never grows past the screen: an implicit track would widen to
   // its longest word ("DOWNLOADABLE" in poster capitals), pushing the page sideways; with a zero minimum the
   // headings' break-word takes over instead. The wider layouts below replace it.
-  add(`.split,.hero-split,.hs-foot,.hp-row,.features,.lists,.plans,.cta-image,.cta-statement,.cs-row,.form-wrap,.tb-two-column,.q-with-portrait,.foot{grid-template-columns:minmax(0,1fr)}`);
+  add(`.split,.hero-split,.hs-foot,.hp-row,.features,.lists,.plans,.cta-image,.cta-statement,.cs-row,.form-wrap,.tb-two-column,.q-with-portrait,.foot,.bk-body{grid-template-columns:minmax(0,1fr)}`);
 
   // ── the grid the page hangs from
   add(`@media (min-width:1000px){`);
@@ -928,6 +1031,8 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], op
   const im = new Images(new Map(refs.filter((r) => r.state !== 'rejected').map((r) => [r.id, r])), look.motifs.includes('captions'));
   const app = spec.pageType === 'app-screen';
   let heroSeen = false;
+  // the screen's leading heading: the first content section, when no hero or screen header leads
+  const leadId = spec.sections.some((x) => x.kind === 'hero' || x.kind === 'app-header') ? null : (spec.sections.find((x) => !['nav', 'app-nav', 'footer'].includes(x.kind))?.id ?? null);
   let counter = 0;
   let turn = 0;
   let marqueeDone = !look.motifs.includes('marquee') || app;
@@ -943,7 +1048,7 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], op
     const tag = s.kind === 'nav' || s.kind === 'footer' || s.kind === 'app-nav' ? 'div' : 'section';
     const tone = s.tone && s.tone !== 'base' ? ` tone-${s.tone}` : '';
     const pad = s.pad && s.pad !== 'm' ? ` pad-${s.pad}` : '';
-    const html = `<${tag} class="sx sx-${s.kind} v-${s.variant}${tone}${pad}" data-ux-section="${esc(s.id)}"${cols}>${fn(s, s.content, { look, first, play, no, turn: turn++, im })}</${tag}>`;
+    const html = `<${tag} class="sx sx-${s.kind} v-${s.variant}${tone}${pad}" data-ux-section="${esc(s.id)}"${cols}>${fn(s, s.content, { look, first, play, no, turn: turn++, im, app, lead: s.id === leadId })}</${tag}>`;
     // a running marquee follows the opening statement
     if (!marqueeDone && s.kind === 'hero') {
       marqueeDone = true;
@@ -967,7 +1072,9 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], op
     const navIdx = spec.sections.findIndex((s) => s.kind === 'app-nav');
     const nav = navIdx >= 0 ? blocks[navIdx] : '';
     const rest = blocks.filter((_, i) => i !== navIdx).join('\n');
-    const navVariant = navIdx >= 0 ? spec.sections[navIdx].variant : 'sidebar';
+    // a screen with no app navigation has no sidebar column: its content is the whole screen (it used to
+    // default to "sidebar" and sit in the 248px column a navigation would have had)
+    const navVariant = navIdx >= 0 ? spec.sections[navIdx].variant : 'none';
     body = `<div class="app nav-${navVariant}${spec.platform === 'mobile' ? ' is-mobile' : ''}">${nav}<main>${rest}${creditHtml ? `<div class="sx">${creditHtml}</div>` : ''}</main></div>`;
   }
 
@@ -990,7 +1097,7 @@ ${fonts ? `<link rel="stylesheet" href="${esc(fonts)}">` : ''}
 <style>${style}</style>
 </head>
 <body class="s-${spec.tokens.style} look-${esc(look.language)} grid-${look.grid}${look.motion && look.motion.feel !== 'still' ? ` mo mo-${look.motion.feel}` : ''}">
-${body}
+${body}${opts.runtime ? `\n<script>${BEHAVIOR_SOURCE}</script>` : ''}
 </body>
 </html>`;
   return { html, css: style, credits };

@@ -24,6 +24,7 @@ import { HEADLINE_LABEL, MOTION_LABEL, describeMotion, motionFor } from '@/lib/u
 import { ASPECT_LABEL, isContent, takenFrom } from '@/lib/ux-v0/references';
 import { GRIDS, MOTION_FEELS, STILL_MOTION, type Motion } from '@/lib/ux-v0/spec';
 import { DECISIONS, PALETTE_ROLES, hex, type BriefPart, type BriefSpec, type Decision, type DesignBrief, type MoodboardRef, type PaletteRole } from '@/lib/ux-v0/types';
+import { EXPERIENCES, EXPERIENCE_LABEL, correctKind, intentOf, pageTypeFor, editRequirements, type DesignIntent, type Experience } from '@/lib/ux-v0/intent';
 
 interface Props {
   brief: DesignBrief;
@@ -169,6 +170,64 @@ function Spec<T extends string | number>({ label, value, options, onChange, disa
   );
 }
 
+/**
+ * WHAT IT IS: the experience being made (a booking screen, a site, a dashboard…), its task, and what it must
+ * do, each requirement with a stable id. Read from the designer's own words, said with the words it was read
+ * from, and theirs to correct: a correction is final, survives every rewrite of the brief, and decides how the
+ * design is built (lib/ux-v0/intent.ts).
+ */
+function IntentBlock({ brief, onChange }: { brief: DesignBrief; onChange: (b: DesignBrief) => void }) {
+  const intent = intentOf(brief);
+  const put = (next: DesignIntent) => onChange({ ...brief, intent: next, pageType: pageTypeFor(next, brief.pageType) });
+  const by = intent.source === 'designer' ? 'as you set it' : intent.signals.length ? `read from your words: ${intent.signals.join(', ')}` : 'read from the brief';
+  return (
+    <section className="st-block c-12 st-intent" id="bp-intent" aria-label="What it is">
+      <span className="st-block-label">
+        <span className="st-glyph g-idea is-sm" aria-hidden="true" />
+        <span className="sb-label">What it is</span>
+        <span className="st-block-note">{by}</span>
+      </span>
+      <div className="st-intent-body">
+        <div className="st-intent-what">
+          <label className="st-intent-kind">
+            <span className="v0-sr">What is being made</span>
+            <select value={intent.kind} onChange={(e) => put(correctKind(intent, e.target.value as Experience))}>
+              {EXPERIENCES.map((k) => (
+                <option key={k} value={k}>
+                  {EXPERIENCE_LABEL[k]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="st-intent-by">{intent.screen ? 'The interface itself, task first: no landing-page sections unless you ask for them.' : 'A composed page, opening on what matters most.'}</p>
+          <label className="st-intent-task">
+            <span className="st-intent-label">The task</span>
+            <Prose value={intent.task} onChange={(v) => put({ ...intent, task: v.slice(0, 200), taskByDesigner: true })} label="The task" />
+          </label>
+        </div>
+        <div className="st-intent-reqs">
+          <span className="st-intent-label">It must let people</span>
+          <Lines items={intent.requirements.map((r) => r.text)} onChange={(v) => put(editRequirements(intent, v))} label="Requirement" add="Add something it must let people do" />
+          {intent.requirements.some((r) => r.component) && (
+            <p className="st-intent-note">
+              {intent.requirements
+                .filter((r) => r.component)
+                .map((r) => `${r.text.split(/[,.]/)[0]}: a working ${r.component === 'stat-cards' ? 'set of figures' : r.component}`)
+                .join(' · ')}
+            </p>
+          )}
+        </div>
+        {intent.prohibitions.length > 0 && (
+          <div className="st-intent-not">
+            <span className="st-intent-label">Ruled out</span>
+            <Words items={intent.prohibitions} onChange={(v) => put({ ...intent, prohibitions: v.slice(0, 8) })} />
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onChange, onApprove, onSkip, onBack, edited, onApplyToDesign }: Props) {
   const set = <K extends keyof DesignBrief>(k: K, v: DesignBrief[K]) => onChange({ ...brief, [k]: v });
   const sp = brief.spec ?? {};
@@ -237,6 +296,7 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
 
   // the contents: every part on the board, numbered as it hangs
   const sections: [string, string][] = [
+    ['intent', 'What it is'],
     ['audience', 'Audience'],
     ['goals', 'What they come to do'],
     ['personality', 'Personality'],
@@ -338,6 +398,7 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
         </nav>
 
         <div className="st-board">
+          <IntentBlock brief={brief} onChange={onChange} />
           <section className="st-block c-5" id="bp-audience" aria-label="Audience">
             {head('Audience', 'audience', 'idea')}
             <label className="v0-brief-field">

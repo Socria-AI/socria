@@ -899,5 +899,131 @@ console.log('\n=== GPT-6.1 Sol: the Responses API, structured outputs, high effo
   console.info = quietInfo;
 }
 
+console.log('\n=== what is being made: intent, the booking, the behaviour runtime ===');
+{
+  const read = (w, o) => V.readIntent(w, o);
+  const yoga = read('Booking screen for an already-selected yoga class');
+  ok('"booking screen" is a booking screen, task first, with its booking requirement and subject', yoga.kind === 'booking' && yoga.screen && yoga.subject === 'yoga class' && yoga.requirements.some((r) => r.id === 'req-book' && r.component === 'booking'), J(yoga));
+  const promo = read('A website promoting a yoga booking app');
+  ok('"a website promoting a booking app" is a site, with no booking to build', promo.kind === 'site' && !promo.screen && !V.requiredComponents(promo).length, J(promo));
+  const studio = read('A website for my yoga studio with class booking');
+  ok('"a website … with class booking" is a site that must still let people book', studio.kind === 'site' && V.requiredComponents(studio).includes('booking'), J(studio));
+  const dash = read('An analytics dashboard for lab sensor readings');
+  ok('a dashboard needs figures and a table', dash.kind === 'dashboard' && dash.screen && ['stat-cards', 'table'].every((c) => V.requiredComponents(dash).includes(c)), J(dash));
+  ok('a checkout is a checkout', read('Checkout flow for a ceramics shop').kind === 'checkout');
+  ok('the designer\'s choice wins over the words', (() => { const r = read('Booking screen for yoga', { override: 'site' }); return r.kind === 'site' && r.source === 'designer'; })());
+  ok('the brief\'s reading counts only when the words are weak', read('something calm and clear', { briefKind: 'booking' }).kind === 'booking' && read('Booking screen for yoga', { briefKind: 'site' }).kind === 'booking');
+  ok('a screen is built as an app screen, a site as a website', V.pageTypeFor(yoga, 'website') === 'app-screen' && V.pageTypeFor(promo, 'website') === 'website');
+  ok('a screen is told it is the interface, not a page about it', V.structureRule(yoga, 'app-screen').includes('NOT a page about it') && !/nav first|footer last/i.test(V.structureRule(yoga, 'app-screen')));
+  ok('a stored intent is held to its shape', V.normalizeIntent({ kind: 'spaceship' }) === null && (() => { const n = V.normalizeIntent({ ...yoga, requirements: [...yoga.requirements, { id: 'bad id', text: 'x' }, { id: 'req-x', text: '' }], taskByDesigner: true, dropped: ['req-old', 'nope!'] }); return n.requirements.length === 1 && n.taskByDesigner === true && J(n.dropped) === J(['req-old']); })());
+
+  // the designer's corrections are final through every rewrite of the brief
+  const asSite = V.correctKind(yoga, 'site');
+  ok('correcting the kind is the designer\'s, and drops the old kind\'s needs', asSite.kind === 'site' && asSite.source === 'designer' && !V.requiredComponents(asSite).includes('booking'));
+  ok('…and a rewrite keeps the correction, whatever the words say', V.settleIntent('Booking screen for yoga', { current: asSite }).kind === 'site');
+  const mine = { ...yoga, task: 'Book the 7am class in two taps', taskByDesigner: true };
+  ok('a task the designer wrote survives a rewrite', V.settleIntent('Booking screen for an already-selected yoga class', { current: mine }).task === 'Book the 7am class in two taps');
+  const without = V.editRequirements(yoga, []);
+  ok('taking a requirement out is remembered…', !without.requirements.length && J(without.dropped) === J(['req-book']));
+  ok('…so no rewrite puts it back', !V.settleIntent('Booking screen for an already-selected yoga class', { current: without }).requirements.some((r) => r.id === 'req-book'));
+  const added = V.editRequirements(yoga, [...yoga.requirements.map((r) => r.text), 'See the teacher before booking']);
+  ok('a requirement the designer adds is theirs, kept through a rewrite, with an id stable for its words', added.requirements.at(-1).authority === 'designer' && /^req-/.test(added.requirements.at(-1).id) && V.settleIntent('Booking screen for yoga', { current: added }).requirements.some((r) => r.text === 'See the teacher before booking') && V.requirementFrom('See the teacher before booking').id === added.requirements.at(-1).id);
+
+  // the booking component: held to its shape, drawn as a real interface
+  const sample = V.sampleBooking(yoga, {});
+  ok('sample times are labelled as samples, never live availability', /not live availability/i.test(sample.note) && sample.days.length >= 3 && sample.days.some((d) => d.slots.some((x) => x.status === 'full')));
+  const tooMany = V.normalizeSection({ kind: 'booking', variant: 'nope', content: { ...sample, days: Array(30).fill(sample.days[0]) } }, 'app-screen', null, new Set());
+  ok('a booking is held to its limits: 14 days at most, a known variant', tooMany.content.days.length === 14 && tooMany.variant === 'strip');
+  ok('a booking with no times is no booking', V.normalizeSection({ kind: 'booking', content: { title: 'Book' } }, 'app-screen', null, new Set()) === null);
+
+  const brief = V.normalizeBrief({ pageType: 'website', platform: 'web', objective: 'Booking screen for an already-selected yoga class', audience: 'members', personality: ['calm', 'warm'], visualDirection: 'warm earthy studio', palette: [], typography: { display: 'Fraunces', body: 'Inter' } }, new Set());
+  brief.intent = V.settleIntent(V.briefWords(brief), {});
+  // the failure this replaces: a landing page about the brand, for a booking screen
+  const landing = { title: 'Lotus Yoga', sections: [
+    { id: 'nav', kind: 'nav', content: { brand: 'Lotus', links: ['Classes'], cta: 'Begin' } },
+    { id: 'hero', kind: 'hero', content: { title: 'Find your flow', subtitle: 'Yoga for everyone', primary: 'Begin', secondary: 'Read more' } },
+    { id: 'why', kind: 'features', content: { title: 'Why us', items: [{ title: 'Calm', text: 'x' }, { title: 'Warm', text: 'y' }] } },
+    { id: 'foot', kind: 'footer', content: { brand: 'Lotus', columns: [] } },
+  ] };
+  const fixed = V.parseGenerate(landing, brief, board, 1, 'Generated');
+  ok('a landing page written for a booking screen becomes the booking screen', fixed.pageType === 'app-screen' && fixed.sections[0]?.kind === 'booking', J(fixed.sections.map((x) => x.kind)));
+  ok('  no hero, no "why us" grid, no footer; each change said in the notes', !fixed.sections.some((x) => ['hero', 'features', 'footer'].includes(x.kind)) && fixed.notes.some((n) => /booking/i.test(n)), J(fixed.notes));
+  const html = V.renderDesign(fixed, board.refs).html;
+  ok('the booking is drawn as a real form: radio days and times, full times disabled, a confirm action', /type="radio" name="[^"]+-day"/.test(html) && /type="radio" name="[^"]+-time"[^>]*disabled/.test(html) && html.includes('data-ux-confirm') && html.includes('data-ux-booking-form'));
+  ok('  its confirmation says plainly that no booking was made', /no booking was made/i.test(html));
+  ok('  the page is not written as a landing page around it: no "Begin", no "Read more"', !/>Begin<|>Read more</.test(html));
+  ok('the behaviour runtime is inlined only in an export', !html.includes('__uxBehaviors') && V.renderDesign(fixed, board.refs, { runtime: true }).html.includes('__uxBehaviors'));
+
+  // the trusted runtime, run in a DOM: choose, confirm, see it, change it
+  const dom = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true });
+  const w = dom.window;
+  w.eval(V.BEHAVIOR_SOURCE);
+  const doc = w.document;
+  const root = doc.querySelector('[data-ux-booking]');
+  const btn = root.querySelector('[data-ux-confirm]');
+  ok('before a time is chosen, the confirm action says it is not ready', btn.getAttribute('aria-disabled') === 'true');
+  root.querySelector('[data-ux-booking-form]').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  ok('confirming with no time says so, and books nothing', !root.querySelector('[data-ux-error]').hidden && root.querySelector('[data-ux-done]').hidden);
+  const slot = [...root.querySelectorAll('.bk-times:not([hidden]) input[name$="-time"]')].find((r) => !r.disabled);
+  slot.checked = true;
+  slot.dispatchEvent(new w.Event('change', { bubbles: true }));
+  ok('choosing a time enables the action and shows the choice', btn.getAttribute('aria-disabled') === 'false' && root.querySelector('[data-ux-bind="choice"]').textContent.includes(slot.getAttribute('data-time')) && root.querySelector('[data-ux-error]').hidden);
+  root.querySelector('[data-ux-booking-form]').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  ok('confirming shows that it is working', btn.getAttribute('aria-busy') === 'true');
+  await new Promise((r) => setTimeout(r, 720));
+  const done = root.querySelector('[data-ux-done]');
+  ok('…then the confirmation, naming the time', !done.hidden && done.textContent.includes(slot.getAttribute('data-time')) && root.querySelector('[data-ux-booking-form]').hidden);
+  root.querySelector('[data-ux-change]').click();
+  ok('"change the time" goes back to the choice, still chosen', done.hidden && !root.querySelector('[data-ux-booking-form]').hidden && slot.checked);
+  const days = [...root.querySelectorAll('input[name$="-day"]:not([disabled])')];
+  if (days.length > 1) {
+    days[1].checked = true;
+    days[1].dispatchEvent(new w.Event('change', { bubbles: true }));
+    ok('another day shows its own times and clears the old choice', !root.querySelector(`.bk-times[data-day="${days[1].value}"]`).hidden && !slot.checked && btn.getAttribute('aria-disabled') === 'true');
+  }
+  const self = w.__uxBehaviors.selfTest();
+  ok('the self-test the audit runs finds a working booking, and leaves it as it was', self.length === 1 && !self[0].problems.length && self[0].slots > 0 && btn.getAttribute('aria-disabled') === 'true', J(self));
+  w.eval(V.BEHAVIOR_SOURCE);
+  ok('run twice, it binds each booking once', w.__uxBehaviors.bookings === 0 && root.hasAttribute('data-ux-bound'));
+  // a broken booking (its confirmation missing) is reported, not hidden
+  const broken = new JSDOM(html.replace(/data-ux-done/g, 'data-x'), { runScripts: 'outside-only' });
+  broken.window.eval(V.BEHAVIOR_SOURCE);
+  const bt = broken.window.__uxBehaviors.selfTest();
+  ok('a booking that cannot confirm is caught by its self-test', bt[0].problems.includes('confirming does not show a confirmation'), J(bt));
+
+  // a form, validated in place
+  const formSpec = V.normalizeSpec({ title: 'Contact', pageType: 'website', sections: [{ id: 'f', kind: 'form', content: V.sampleFor('form', V.readIntent('a contact form'), {}) }] }, board);
+  const fdom = new JSDOM(V.renderDesign(formSpec, board.refs).html, { runScripts: 'outside-only' });
+  fdom.window.eval(V.BEHAVIOR_SOURCE);
+  const f = fdom.window.document.querySelector('form[data-ux-form]');
+  f.querySelector('input[type=email]').value = 'not-an-email';
+  f.dispatchEvent(new fdom.window.Event('submit', { bubbles: true, cancelable: true }));
+  const errs = [...f.querySelectorAll('.fm-error')].map((e) => e.textContent);
+  ok('a form says each problem beside its field, and sends nothing', errs.includes('This is needed.') && errs.some((e) => /email/i.test(e)) && f.querySelector('[aria-invalid="true"]') !== null && f.querySelector('[data-ux-done]').hidden, J(errs));
+
+  // directions differ in composition, and the studies show the thing being made
+  const dirs = V.proposeDirections({ brief });
+  const comps = dirs.map((d) => d.compose?.booking);
+  ok('three directions, three ways to compose the booking', comps.every(Boolean) && new Set(comps).size === 3, J(comps));
+  ok('composition counts in how different two directions are', V.directionDistance(dirs[0], { ...dirs[0], compose: { booking: comps[0] === 'list' ? 'calendar' : 'list' } }) > V.directionDistance(dirs[0], { ...dirs[0] }));
+  ok('a stored direction keeps its composition', V.normalizeDirection(JSON.parse(J(dirs[0])))?.compose?.booking === comps[0]);
+  const studies = dirs.map((d) => V.studySpec(d, brief, 'Lotus', board.refs));
+  ok('each study is the booking in its direction\'s composition', studies.every((st, i) => st.sections.some((x) => x.kind === 'booking' && x.variant === (comps[i] === 'immersive' && !board.refs.length ? 'split' : comps[i]))), J(studies.map((st) => st.sections.map((x) => `${x.kind}/${x.variant}`))));
+  const siteBrief = V.normalizeBrief({ pageType: 'website', platform: 'web', objective: 'A website for a ceramics studio', userGoals: ['See the pieces', 'Visit the studio'], personality: ['calm'], visualDirection: 'quiet', palette: [], typography: { display: 'Fraunces', body: 'Inter' } }, new Set());
+  const siteStudy = V.studySpec(V.proposeDirections({ brief: siteBrief })[0], siteBrief, 'Kiln', board.refs);
+  ok('a site\'s study uses the brief\'s own words and actions, never "Begin"', !J(siteStudy).includes('"Begin"') && !J(siteStudy).includes('Read more') && siteStudy.sections.find((x) => x.kind === 'hero')?.content.title.includes('ceramics'));
+
+  // the function checks: a design missing what it must do is a finding with a fix
+  const bare = V.normalizeSpec({ title: 'Lotus', pageType: 'app-screen', sections: [{ id: 'h', kind: 'app-header', content: { title: 'Lotus', subtitle: '', actions: [] } }] }, board);
+  const ev = V.evaluateDesign(bare, {}, [], { brief, direction: dirs[1] });
+  const fn = ev.findings.find((x) => x.kind === 'function');
+  ok('a booking screen with no booking is a high finding, with the fix in its direction\'s composition', fn && fn.severity === 'high' && fn.restore && fn.fix?.op === 'add' && fn.fix.section.kind === 'booking' && fn.fix.section.variant === comps[1], J(fn));
+  const applied = V.applyPatch(bare, V.fixesFor(ev).find((x) => x.finding.kind === 'function').patch, board);
+  ok('…which is applied and puts the booking in', applied.ok && applied.spec.sections.some((x) => x.kind === 'booking'));
+  const evb = V.evaluateDesign(fixed, { desktop: V.normalizeAudit({ width: 1280, viewport: 800, height: 2000, overflowX: 0, bodySize: 17, sections: [], headings: [], contrast: [], behaviors: [{ index: 0, slots: 6, problems: ['confirming does not show a confirmation'] }] }) }, [], { brief });
+  ok('a booking whose self-test fails is a manual high finding', evb.findings.some((x) => x.kind === 'function' && x.manual && x.severity === 'high' && x.message.includes('confirming does not show')), J(evb.findings.map((x) => x.message)));
+  ok('generation is told what it must do, by id, and what was ruled out', (() => { const b2 = { ...brief, intent: { ...brief.intent, prohibitions: ['stock photos'] } }; const t = V.generateSystem(b2); return t.includes('WHAT IT MUST DO') && t.includes('req-book') && t.includes('stock photos') && t.includes('NOT a page about it'); })());
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

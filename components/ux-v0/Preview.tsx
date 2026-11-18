@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { describeMotion, MOTION_LABEL } from '@/lib/ux-v0/motion';
 import { renderDesign } from '@/lib/ux-v0/render';
+import { BEHAVIOR_SOURCE } from '@/lib/ux-v0/behaviors';
 import { buildSandboxDoc } from '@/lib/ux-v0/sandbox';
 import { STILL_MOTION, type DesignSpec } from '@/lib/ux-v0/spec';
 import type { MoodboardRef } from '@/lib/ux-v0/types';
@@ -43,7 +44,7 @@ export function Preview({ spec, refs, nonce, title, onClose }: { spec: DesignSpe
 
   const doc = useMemo(() => {
     const html = renderDesign(spec, refs, { motion: reduced ? 'reduced' : 'play' }).html;
-    return buildSandboxDoc(html, { parse: (h) => new DOMParser().parseFromString(h, 'text/html'), runScripts: false, nonce, inspector: '' }).doc;
+    return buildSandboxDoc(html, { parse: (h) => new DOMParser().parseFromString(h, 'text/html'), runScripts: false, nonce, inspector: BEHAVIOR_SOURCE }).doc;
   }, [spec, refs, reduced, nonce]);
 
   const W = DEVICES[device].w;

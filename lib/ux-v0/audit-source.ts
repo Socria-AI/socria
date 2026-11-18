@@ -140,6 +140,8 @@ export const AUDIT_SOURCE = String.raw`(function () {
       if ((rect.right > W + 1 || rect.left < -1) && !clipped(el) && out.overflow.length < 20) { var wo = where(el); if (!out.overflow.some(function (o) { return o.section === wo.section; })) out.overflow.push({ section: wo.section, path: wo.path, by: Math.round(Math.max(rect.right - W, -rect.left)), tag: el.tagName.toLowerCase() }); }
     }
     out.style = st;
+    // whether its components work: SocriaUX's behaviour runtime tries each booking in place (lib/ux-v0/behaviors.ts)
+    try { out.behaviors = window.__uxBehaviors && window.__uxBehaviors.selfTest ? window.__uxBehaviors.selfTest() : []; } catch (e) { out.behaviors = [{ index: 0, slots: 0, problems: ['the behaviour check failed: ' + String(e && e.message || e).slice(0, 80)] }]; }
     return out;
   };
 })();`;

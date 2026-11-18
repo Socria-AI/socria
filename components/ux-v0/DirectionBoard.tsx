@@ -32,6 +32,7 @@ import { EASE_CURVE, HEADLINE_LABEL, MOTION_LABEL, describeMotion, motionFor, st
 import { takenFrom } from '@/lib/ux-v0/references';
 import { renderDesign } from '@/lib/ux-v0/render';
 import { buildSandboxDoc } from '@/lib/ux-v0/sandbox';
+import { studySpec } from '@/lib/ux-v0/study';
 import { BUTTONS, CONTAINERS, FRAMES, GRIDS, MOTIFS, MOTION_FEELS, STILL_MOTION, TREATMENTS, normalizeSpec, type DesignSpec, type Look, type Motion } from '@/lib/ux-v0/spec';
 import type { DesignBrief, MoodboardRef } from '@/lib/ux-v0/types';
 import { Preview } from './Preview';
@@ -82,35 +83,8 @@ const ARRANGE: Record<string, 'type' | 'picture' | 'system'> = {
   utility: 'system', civic: 'system', broadsheet: 'system',
 };
 
-/** A short page in the direction, from the brief's own words: what the design will be drawn like. */
-function specimenSpec(d: ArtDirection, brief: DesignBrief, name: string, refs: MoodboardRef[]): DesignSpec | null {
-  const lang = languageOf(d.language);
-  // only a picture marked for the page appears in the page; references only inspire
-  const usable = refs.filter((r) => r.state !== 'rejected' && r.media !== 'video' && !r.avoid && r.asContent !== false && (r.provider !== 'upload' || r.asContent === true) && r.url);
-  const img = usable[0] ? [usable[0].id] : [];
-  const heroPref = (lang?.prefer.hero ?? ['statement']).find((v) => (v === 'split' || v === 'full-bleed' ? img.length > 0 : true)) ?? 'statement';
-  const goals = brief.userGoals.slice(0, 3);
-  return normalizeSpec(
-    {
-      title: name,
-      pageType: 'website',
-      tokens: d.tokens,
-      look: d.look,
-      sections: [
-        { id: 'nav', kind: 'nav', variant: 'inline', content: { brand: name, links: ['About', 'Work', 'Visit'], cta: 'Begin' } },
-        {
-          id: 'hero', kind: 'hero', variant: heroPref, images: img, tone: 'base', pad: 'm',
-          content: { eyebrow: brief.personality.slice(0, 3).join(' · '), title: name, subtitle: brief.objective, primary: 'Begin', secondary: 'Read more' },
-        },
-        goals.length >= 2
-          ? { id: 'goals', kind: 'features', variant: (lang?.prefer.features ?? ['columns'])[0], tone: d.look.containers === 'bands' ? 'alt' : 'base', content: { title: 'What people come to do', items: goals.map((g) => ({ title: g, text: '' })) } }
-          : null,
-        { id: 'cta', kind: 'cta', variant: (lang?.prefer.cta ?? ['band'])[0], tone: lang?.tones.cta ?? 'base', content: { title: brief.audience ? `For ${brief.audience.charAt(0).toLowerCase()}${brief.audience.slice(1, 60)}` : 'Begin here', primary: 'Begin' } },
-      ].filter(Boolean),
-    },
-    { refs, queries: [], palettes: [], type: [] } as any
-  );
-}
+/** A short design in the direction, of the thing being made (lib/ux-v0/study.ts). */
+const specimenSpec = (d: ArtDirection, brief: DesignBrief, name: string, refs: MoodboardRef[]) => studySpec(d, brief, name, refs);
 
 /** A study: the specimen drawn at a width and scaled to its box. */
 function Study({ html, width, label, ratio }: { html: string; width: number; label: string; ratio: number }) {

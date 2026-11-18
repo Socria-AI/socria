@@ -961,7 +961,7 @@
   border-top: 1px solid var(--sb-rule-2);
   animation: st-arrive var(--sb-move) var(--sb-ease) both;
 }
-.st-board > .st-block:nth-child(-n + 3) {
+.st-board > .st-block:nth-child(-n + 4) {
   border-top-color: var(--sb-ink);
 }
 .st-objective {
@@ -1460,7 +1460,7 @@
   .c-4 {
     grid-column: span 6;
   }
-  .st-board > .st-block:nth-child(-n + 3) {
+  .st-board > .st-block:nth-child(-n + 4) {
     border-top-color: var(--sb-rule-2);
   }
   .st-board > .st-block:first-child {
@@ -2896,4 +2896,105 @@
 }
 .v0-kept li {
   color: var(--sb-moss);
+}
+
+/* ── what it is: the experience being made, its task, what it must let people do ── */
+.st-intent {
+  padding-bottom: 4px;
+}
+.st-intent .st-block-note {
+  max-width: 46ch;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.st-intent-body {
+  display: grid;
+  grid-template-columns: minmax(0, 6fr) minmax(0, 6fr);
+  gap: 22px clamp(18px, 2.2vw, 32px);
+  align-items: start;
+}
+.st-intent-what {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.st-intent-kind select {
+  max-width: 100%;
+  margin: 0 -10px;
+  padding: 2px 34px 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1.5 1.5l5.5 5.5 5.5-5.5' fill='none' stroke='%2320201b' stroke-opacity='.55' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 10px center;
+  color: var(--sb-ink);
+  font-family: var(--sb-voice);
+  font-weight: var(--sb-voice-weight);
+  font-size: clamp(28px, 2.7vw, 40px);
+  line-height: 1.1;
+  letter-spacing: -0.014em;
+  appearance: none;
+  cursor: pointer;
+  transition: background-color var(--sb-fast) var(--sb-ease), box-shadow var(--sb-fast) var(--sb-ease);
+}
+.st-intent-kind select:hover {
+  background-color: rgba(32, 32, 27, 0.035);
+}
+.st-intent-kind select:focus-visible {
+  outline: none;
+  background-color: var(--sb-surface);
+  box-shadow: inset 0 0 0 1.5px var(--sb-moss);
+}
+.st-intent-by {
+  max-width: 52ch;
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--sb-ink-70);
+}
+.st-intent-task {
+  display: block;
+  margin-top: 6px;
+}
+.st-intent-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sb-ink-60);
+}
+.st-intent-reqs,
+.st-intent-not {
+  min-width: 0;
+}
+.st-intent-reqs {
+  padding: 14px 16px 12px;
+  border-radius: 8px;
+  background: var(--sb-tint-idea);
+}
+.st-intent-reqs .st-intent-label {
+  color: var(--sb-moss);
+}
+.st-intent-note {
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--sb-rule);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--sb-moss);
+}
+.st-intent-not {
+  grid-column: 2;
+}
+@media (max-width: 960px) {
+  .st-intent-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .st-intent-not {
+    grid-column: auto;
+  }
+  .st-intent .st-block-note {
+    display: none;
+  }
 }

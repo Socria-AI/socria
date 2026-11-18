@@ -15,6 +15,8 @@
 //             designer decides; a change of direction is offered as a new
 //             generation rather than squeezed into a patch.
 
+import { fitToIntent } from './fit';
+import { EXPERIENCE_LABEL, intentOf, pageTypeFor, structureRule } from './intent';
 import { designFromDirection, directionBrief, LOCK_LABEL, planLayout, type ArtDirection, type LockGroup } from './direction';
 import { normQ, readQueries } from './discovery';
 import { fontMenu } from './fonts';
@@ -116,6 +118,7 @@ The brief:
 - rules: ONLY constraints the designer stated as musts or nevers ("no animation", "must work without images"), each short; omit otherwise.
 - accessibility, responsive: short notes, only where the designer or the audience makes them matter (optional).
 - pageType: "website" or "app-screen"; platform: "web" or "mobile".
+- experienceKind: what is being made, one of site, booking, checkout, dashboard, form, flow, app, editorial, portfolio, interactive, data. A booking screen is "booking", not "site"; a website ABOUT a booking app is "site".
 ${refining ? 'Parts the designer approved or locked (in "decisions") stay exactly as they are; "delegated" parts are yours to decide.\n' : ''}${
     refining
       ? `
@@ -172,20 +175,26 @@ const NOT_GENERIC = `Avoid the generic generated page:
 - Vary the structure: no two neighbouring sections of the same kind; not the stock order hero → features → pricing → questions → call to action unless this brief needs exactly that.`;
 
 export function generateSystem(brief: DesignBrief, dir: ArtDirection | null = null): string {
+  // WHAT IS BEING MADE decides the structure, not a page type: a booking screen is the booking itself
+  const intent = intentOf(brief);
+  const pageType = pageTypeFor(intent, brief.pageType);
+  const musts = intent.requirements.filter((r) => r.required);
   const tokens = dir
     ? '- Tokens and the look are already decided by the approved art direction below: do not write "tokens".'
     : "- Tokens: colors {background, surface, text, muted, accent, accentText, line} from the brief's palette roles; fonts {display, body} from the brief's typography; scale compact|comfortable|spacious; radius none|soft|round; style editorial|minimal|bold|warm|technical; imageTreatment natural|muted|warm|mono — all chosen to express the brief's personality and visual direction.";
   return `You are SocriaUX's design generator. Turn the approved brief into a design specification that a renderer draws. You do not write HTML: you choose sections from the library below and write their content${dir ? '' : ', and choose tokens'}.
 ${dir ? `
-${directionBrief(dir, brief.pageType)}
+${directionBrief(dir, pageType)}${dir.compose ? `\nIts composition for the task: ${Object.entries(dir.compose).map(([k, v]) => `${k} as "${v}"`).join(', ')}.` : ''}
 ${knowledgeBrief(dir.look)}
 ` : ''}
+WHAT IT IS: ${EXPERIENCE_LABEL[intent.kind]}. Task: ${intent.task}.${musts.length ? `\nWHAT IT MUST DO (every one, by id):\n${musts.map((r) => `- ${r.id}: ${r.text}${r.component ? ` (the ${r.component} component)` : ''}`).join('\n')}` : ''}${intent.prohibitions.length ? `\nRULED OUT BY THE DESIGNER: ${intent.prohibitions.join('; ')}.` : ''}
+
 THE LIBRARY (only these kinds, variants and fields; * marks required):
-${libraryMenu(brief.pageType)}
+${libraryMenu(pageType)}
 
 Rules:
 ${tokens}
-- Structure: ${brief.pageType === 'website' ? 'a nav first, a footer last; 5–9 sections between them, in the order a visitor needs them; one primary action, repeated at most twice.' : 'an app-nav first (tabbar for mobile, sidebar or topbar for web), then an app-header, then the content the screen exists for.'}
+${structureRule(intent, pageType)}
 - Copy: real, specific to this brief, in ${dir ? 'the voice the direction describes' : "the brand's voice"}. Never lorem ipsum. Headlines short and concrete. Facts you were not given — prices, addresses, dates, numbers, opening hours, people's names — are written as [bracketed placeholders] (e.g. "[Opening hours]", "[£ price]"); never invent them. A testimonial without a real source uses "[Customer name]".
 - Images: only the moodboard ids listed below, in "images" on the sections that take them; prefer landscape for wide slots and portrait for tall ones. If there are none, choose variants that need no image.
 - Every section has a short unique id (lowercase, hyphenated), a kind, a variant, content and images.
@@ -193,7 +202,7 @@ ${tokens}
 ${NOT_GENERIC}
 
 ${VOICE}
-Respond with ONE JSON object: {"title": "...", "pageType": "${brief.pageType}", "platform": "${brief.platform}", ${dir ? '' : '"tokens": {...}, '}"sections": [{"id": "...", "kind": "...", "variant": "...", "content": {...}, "images": ["..."]}]}`;
+Respond with ONE JSON object: {"title": "...", "pageType": "${pageType}", "platform": "${brief.platform}", ${dir ? '' : '"tokens": {...}, '}"sections": [{"id": "...", "kind": "...", "variant": "...", "content": {...}, "images": ["..."]}]}`;
 }
 
 export function generateUser(input: GenerateInput): string {
@@ -215,10 +224,14 @@ export function generateUser(input: GenerateInput): string {
  */
 export function parseGenerate(raw: unknown, brief: DesignBrief, moodboard: Moodboard, version: number, reason: string, dir: ArtDirection | null = null): DesignSpec | null {
   const r = obj(raw);
+  const intent = intentOf(brief);
+  const pageType = pageTypeFor(intent, brief.pageType);
+  // whatever the model wrote, the design does what the intent requires (lib/ux-v0/fit.ts)
+  const fit = (spec: DesignSpec | null) => (spec ? fitToIntent(spec, intent, { brief, dir }).spec : null);
   if (dir) {
     const { tokens, look } = designFromDirection(dir);
-    const spec = normalizeSpec({ ...r, tokens, look, pageType: brief.pageType, platform: brief.platform, version, reason, createdAt: Date.now() }, moodboard);
-    return spec ? planLayout(spec) : null;
+    const spec = normalizeSpec({ ...r, tokens, look, pageType, platform: brief.platform, version, reason, createdAt: Date.now() }, moodboard);
+    return fit(spec ? planLayout(spec) : null);
   }
   const pal = Object.fromEntries(brief.palette.map((p) => [p.role, p.hex]));
   const t = obj(r.tokens);
@@ -236,7 +249,7 @@ export function parseGenerate(raw: unknown, brief: DesignBrief, moodboard: Moodb
     },
     fonts: { display: obj(t.fonts).display ?? brief.typography.display, body: obj(t.fonts).body ?? brief.typography.body },
   };
-  return normalizeSpec({ ...r, tokens, pageType: brief.pageType, platform: brief.platform, version, reason, createdAt: Date.now() }, moodboard);
+  return fit(normalizeSpec({ ...r, tokens, pageType, platform: brief.platform, version, reason, createdAt: Date.now() }, moodboard));
 }
 
 // ── changing it ──────────────────────────────────────────────────────

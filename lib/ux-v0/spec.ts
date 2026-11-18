@@ -78,6 +78,9 @@ export const LIBRARY: readonly KindDef[] = [
     fields: { title: T(120, true), text: T(280), primary: T(30, true), secondary: T(30) } },
   { kind: 'form', label: 'Form', pages: BOTH, variants: ['stacked', 'split'], images: [0, 0], note: 'every field has a visible label',
     fields: { title: T(110, true), intro: T(320), fields: { t: 'list', n: [1, 10], req: true, item: { label: T(48, true), type: { t: 'enum', values: ['text', 'email', 'tel', 'textarea', 'select', 'checkbox', 'date', 'number'] }, placeholder: T(60), options: TS(40, 0, 8), required: { t: 'bool' } } }, submit: T(30, true), note: T(180) } },
+  { kind: 'booking', label: 'Booking', pages: BOTH, variants: ['strip', 'calendar', 'list', 'split', 'immersive'], images: [0, 1],
+    note: 'the booking itself, working: what is booked, its days and times with availability (open, few, full), one confirm action, and the confirmation it leads to. strip: a row of days over a grid of times; calendar: the days as a grid, the times beside; list: every day and its times as one typographic list; split: the choice summarised beside the picker; immersive: one picture, the picker over it',
+    fields: { eyebrow: T(48), title: T(110, true), intro: T(240), item: T(80, true), details: TS(60, 0, 5), days: { t: 'list', n: [1, 14], req: true, item: { label: T(24, true), date: T(24), slots: { t: 'list', n: [1, 16], req: true, item: { time: T(20, true), status: { t: 'enum', values: ['open', 'few', 'full'] }, note: T(40) } } } }, action: T(40, true), confirmTitle: T(80), confirmText: T(240), note: T(200) } },
   { kind: 'text', label: 'Text', pages: BOTH, variants: ['narrow', 'two-column', 'lead'], images: [0, 0], note: 'an about or story block; lead sets the first paragraph large',
     fields: { eyebrow: T(48), title: T(120), paragraphs: TS(900, 1, 6, true) } },
   { kind: 'footer', label: 'Footer', pages: WEB, variants: ['simple', 'columns'], images: [0, 0], note: 'brand, columns of links, legal line',
@@ -103,6 +106,7 @@ export const NEEDS_IMAGE: Record<string, Record<string, string>> = {
   hero: { split: 'centered', 'full-bleed': 'centered' },
   cta: { image: 'band' },
   quote: { 'with-portrait': 'large' },
+  booking: { immersive: 'split' },
 };
 export type SectionKind = string;
 const DEF = new Map(LIBRARY.map((k) => [k.kind, k]));

@@ -60,6 +60,7 @@ export const DESIGN_PRINCIPLES: readonly Principle[] = [
   { id: 'motion.stagger', area: 'motion', rule: 'Stagger a group in reading order, briefly.', why: 'A short stagger reveals structure; a long one makes the visitor wait for the last item.' },
   { id: 'motion.reduced', area: 'motion', rule: 'Always offer a reduced-motion alternative: fade, never travel.', why: 'Parallax and large movements cause discomfort for people with vestibular disorders.' },
   // interaction
+  { id: 'ix.task-first', area: 'interaction', rule: 'A screen for a task offers the task first, working: what someone came to do is the first thing they can do.', why: 'A page that describes a function instead of providing it makes people hunt for it, and many give up.' },
   { id: 'ix.targets', area: 'interaction', rule: 'Make anything tappable at least 44 by 44 px.', why: 'Fingers are imprecise; small targets cause mistaps, worst for older or motor-impaired people.' },
   { id: 'ix.feedback', area: 'interaction', rule: 'Answer every action within a tenth of a second, even if only with a state change.', why: 'Below that threshold an interface feels direct; above it, uncertain.' },
   // responsive
@@ -95,6 +96,7 @@ export const FINDING_PRINCIPLE: Record<string, string> = {
   generic: 'comp.grid',
   fidelity: 'crit.brief',
   motion: 'motion.purpose',
+  function: 'ix.task-first',
 };
 
 /** Why a finding matters, in one sentence. */

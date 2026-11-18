@@ -45,6 +45,7 @@ import {
 import type { BriefPart, DesignBrief } from './types';
 import { motionFor, readMotionWords } from './motion';
 import { paletteFromSwatches, type BoardReading } from './references';
+import { intentOf, requiredComponents } from './intent';
 
 // ── the visual languages ─────────────────────────────────────────────
 
@@ -526,6 +527,50 @@ export interface ArtDirection {
   locks: LockGroup[];
   /** who wrote it last */
   source: 'engine' | 'model' | 'person';
+  /**
+   * The composition this direction gives the design's functional core, by section kind: a booking as a
+   * calendar here, as a typographic list there. Three directions for one task differ in structure, not
+   * only in colour and type.
+   */
+  compose?: Record<string, string>;
+}
+
+/** How each language would compose a booking, in order of preference. */
+const BOOKING_AFFINITY: Record<string, readonly string[]> = {
+  broadsheet: ['list', 'split', 'calendar'],
+  swiss: ['calendar', 'strip', 'split'],
+  'quiet-luxury': ['split', 'list', 'immersive'],
+  poster: ['strip', 'immersive', 'calendar'],
+  craft: ['split', 'list', 'strip'],
+  geometric: ['strip', 'calendar', 'split'],
+  utility: ['calendar', 'strip', 'split'],
+  gallery: ['list', 'immersive', 'split'],
+  organic: ['split', 'immersive', 'list'],
+  civic: ['list', 'calendar', 'strip'],
+  night: ['immersive', 'strip', 'split'],
+  'retro-print': ['strip', 'calendar', 'list'],
+};
+const BOOKING_SAY: Record<string, string> = {
+  strip: 'The booking as a strip: the days in one row, the times as a grid beneath.',
+  calendar: 'The booking as a calendar: the days as a grid of their own, the times beside them.',
+  list: 'The booking as a list: every day and its times set as one typographic column, read top to bottom.',
+  split: 'The booking split: what is booked and the chosen time summarised on one side, the picker on the other.',
+  immersive: 'The booking immersive: one picture fills the screen, the picker floats over it.',
+};
+
+/**
+ * Compositions for the components a design must have, one per direction, as different as the
+ * languages allow: each direction takes its most fitting composition not already taken.
+ */
+export function composeDirections(dirs: ArtDirection[], components: readonly (string | undefined)[], hasImage: boolean): ArtDirection[] {
+  if (!components.includes('booking')) return dirs;
+  const used = new Set<string>();
+  return dirs.map((d) => {
+    const prefs = (BOOKING_AFFINITY[d.language] ?? ['strip', 'calendar', 'list', 'split']).filter((v) => v !== 'immersive' || hasImage);
+    const pick = prefs.find((v) => !used.has(v)) ?? ['strip', 'calendar', 'list', 'split'].find((v) => !used.has(v)) ?? prefs[0];
+    used.add(pick);
+    return { ...d, compose: { ...(d.compose ?? {}), booking: pick }, composition: `${BOOKING_SAY[pick]} ${d.composition}`.slice(0, 280) };
+  });
 }
 
 export interface DirectionState {
@@ -682,6 +727,8 @@ export function fitScores(brief: DesignBrief, notes = '', avoid = ''): Fit[] {
   const avoidLow = avoid.toLowerCase();
   const aw = words(avoid);
   const bgDark = isDark(roleOf(brief, 'background', '#ffffff'));
+  const intentKind = intentOf(brief).kind;
+  const interfaceLike = intentKind === 'dashboard' || intentKind === 'data' || (intentKind === 'app' && brief.pageType === 'app-screen');
   const wantsLoud = /\b(loud|louder|bold|bolder|bigger|punchy|striking|more colou?r)\b/.test(notesLow);
   const wantsQuiet = /\b(quiet|quieter|calm|calmer|minimal|restrained|subtle|understated)\b/.test(notesLow);
   return LANGUAGES.map((l) => {
@@ -715,7 +762,8 @@ export function fitScores(brief: DesignBrief, notes = '', avoid = ''): Fit[] {
     if (l.palette === 'dark' && bgDark) score += 4;
     if (l.palette === 'dark' && !bgDark) score -= 1.5;
     // an app screen is a working interface: languages built for interfaces come forward, posters and showrooms step back
-    if (brief.pageType === 'app-screen' && !asked) score += APP_FIT[l.id] ?? 0;
+    // (a consumer-facing screen, a booking or a checkout, takes its look from the brand, not from tools)
+    if (interfaceLike && !asked) score += APP_FIT[l.id] ?? 0;
     return { id: l.id, score: Math.round(score * 100) / 100, matched: [...matched].slice(0, 6) };
   }).sort((a, b) => b.score - a.score);
 }
@@ -1013,6 +1061,8 @@ export function directionDistance(a: ArtDirection, b: ArtDirection): number {
   };
   const parts: [number, number][] = [
     [3, ne(A.grid, B.grid)],
+    // the functional core composed differently is a different design, not a recolour
+    [3, ne(JSON.stringify(a.compose ?? {}), JSON.stringify(b.compose ?? {}))],
     [1.5, ne(A.align, B.align)],
     [2, ne(A.containers, B.containers)],
     [1.5, ne(A.buttons, B.buttons)],
@@ -1200,10 +1250,12 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
     usedIds.add(best.id);
     chosen.push(make(best.id, false));
   }
-  return chosen.map((d, i) => {
+  const finished = chosen.map((d, i) => {
     const locked = applyLocks(applyBrief(d, brief, i === 0 && round === 0), ask.base);
     return { ...locked, id: `dir_${d.language}_${round}_${i}` };
   });
+  // the task's own components composed differently in each direction (a booking: calendar, list, split…)
+  return composeDirections(finished, requiredComponents(intentOf(brief)), (brief.references ?? []).length > 0);
 }
 
 /** SocriaUX's own choice, when the designer leaves it: the faithful reading. */
@@ -1245,7 +1297,15 @@ export function normalizeDirection(v: unknown): ArtDirection | null {
     look,
     locks: Array.isArray(r.locks) ? [...new Set(r.locks.filter((x: unknown): x is LockGroup => typeof x === 'string' && LOCKS.has(x)))] : [],
     source: r.source === 'model' || r.source === 'person' ? r.source : 'engine',
+    ...composeOf(r.compose),
   };
+}
+
+function composeOf(v: unknown): { compose?: Record<string, string> } {
+  const c = o(v);
+  const out: Record<string, string> = {};
+  for (const [kind, variant] of Object.entries(c)) if (typeof variant === 'string' && kindDef(kind)?.variants.includes(variant)) out[kind] = variant;
+  return Object.keys(out).length ? { compose: out } : {};
 }
 
 export function normalizeDirectionState(v: unknown): DirectionState {

@@ -14,6 +14,7 @@
 // foot always comments on something specific.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BEHAVIOR_SOURCE } from '@/lib/ux-v0/behaviors';
 import { INSPECTOR_SOURCE } from '@/lib/ux-v0/inspector';
 import { renderDesign } from '@/lib/ux-v0/render';
 import { LOCK_LABEL, briefKey, languageOf, lockedChanges, normalizeDirection, proposeDirections, type ArtDirection, type LockGroup } from '@/lib/ux-v0/direction';
@@ -177,7 +178,8 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const rendered = useMemo(() => (spec ? renderDesign(spec, frameRefs) : null), [spec, frameRefs]);
   const doc = useMemo(() => {
     const parse = (s: string) => new DOMParser().parseFromString(s, 'text/html');
-    if (rendered && !imported) return buildSandboxDoc(rendered.html, { parse, runScripts: false, nonce, inspector: INSPECTOR_SOURCE }).doc;
+    // a generated design: the inspector, and SocriaUX's own behaviour runtime (never the model's code)
+    if (rendered && !imported) return buildSandboxDoc(rendered.html, { parse, runScripts: false, nonce, inspector: `${INSPECTOR_SOURCE}\n${BEHAVIOR_SOURCE}` }).doc;
     if (imported?.kind === 'html' && fileHtml !== null) return buildSandboxDoc(fileHtml, { parse, runScripts: imported.runScripts, nonce, inspector: INSPECTOR_SOURCE }).doc;
     return null;
   }, [rendered, imported, fileHtml, nonce]);
@@ -1551,7 +1553,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                       className="sb-link is-meta is-strong"
                       onClick={() => {
                         // the exported page carries its motion (CSS only, with its reduced-motion alternative)
-                        const page = spec && !imported ? renderDesign(spec, frameRefs, { motion: 'play' }).html : rendered.html;
+                        const page = spec && !imported ? renderDesign(spec, frameRefs, { motion: 'play', runtime: true }).html : rendered.html;
                         const url = URL.createObjectURL(new Blob([page], { type: 'text/html' }));
                         const a = document.createElement('a');
                         a.href = url;

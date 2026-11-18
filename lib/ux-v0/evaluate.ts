@@ -20,6 +20,8 @@
 //                      stock phrases. A heuristic, not taste; the reasons are
 //                      listed so a designer can disagree with them.
 
+import { sampleFor } from './fit';
+import { intentOf, requiredComponents } from './intent';
 import { contrastRatio } from '../ux/audit';
 import { isDark } from './color';
 import { LOCK_LABEL, briefColors, lockedChanges, type ArtDirection, type LockGroup } from './direction';
@@ -45,6 +47,8 @@ export interface PageAudit {
   overflow: { section: string; path: string; by: number; tag: string }[];
   measure: { section: string; path: string; cpl: number }[];
   style: { gradients: number; shadows: number; roundedBoxes: number; trackedCaps: number; centred: number; blocks: number; emoji: number; icons: number; families: Record<string, number> };
+  /** each booking, tried in place by the behaviour runtime: what did not work */
+  behaviors: { index: number; slots: number; problems: string[] }[];
 }
 
 const o = (v: unknown): Record<string, any> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, any>) : {});
@@ -76,6 +80,7 @@ export function normalizeAudit(v: unknown): PageAudit | null {
       gradients: n(st.gradients, 0, 1e5), shadows: n(st.shadows, 0, 1e5), roundedBoxes: n(st.roundedBoxes, 0, 1e5), trackedCaps: n(st.trackedCaps, 0, 1e5),
       centred: n(st.centred, 0, 1e5), blocks: n(st.blocks, 0, 1e5), emoji: n(st.emoji, 0, 1e5), icons: n(st.icons, 0, 1e5), families: fam,
     },
+    behaviors: list(r.behaviors, 10, (x) => ({ index: n(x.index, 0, 100), slots: n(x.slots, 0, 1000), problems: (Array.isArray(x.problems) ? x.problems : []).map((p: unknown) => s(p, 120)).filter(Boolean).slice(0, 6) })),
   };
 }
 
@@ -183,7 +188,7 @@ export type Severity = 'high' | 'medium' | 'low';
 
 export interface Finding {
   id: string;
-  kind: 'overflow' | 'contrast' | 'target' | 'image' | 'hierarchy' | 'headline' | 'measure' | 'rhythm' | 'cliche' | 'length' | 'placeholder' | 'generic' | 'fidelity' | 'motion';
+  kind: 'overflow' | 'contrast' | 'target' | 'image' | 'hierarchy' | 'headline' | 'measure' | 'rhythm' | 'cliche' | 'length' | 'placeholder' | 'generic' | 'fidelity' | 'motion' | 'function';
   severity: Severity;
   viewport: 'desktop' | 'phone' | 'page';
   section: string;
@@ -327,6 +332,7 @@ export function evaluateDesign(spec: DesignSpec, audits: { desktop?: PageAudit |
   if (ph.size >= 6) add({ kind: 'placeholder', severity: 'low', viewport: 'page', section: '', message: `${ph.size} facts are still placeholders (${[...ph].slice(0, 3).join(', ')}…).` });
 
   // 12 · fidelity: the approved direction, the brief's decisions and rules, the pictures it may place; and its motion
+  functionChecks(spec, audits, ctx, add);
   const held = fidelityChecks(spec, ctx, add);
 
   const signals = genericSignals(spec, audits.desktop ?? audits.phone ?? null);
@@ -368,6 +374,40 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stri
  * against), its contrast target, and the line between pictures for the page
  * and references that only inspire. Then how it moves. Returns what holds.
  */
+/**
+ * WHETHER IT DOES ITS JOB. A design for a task must contain what the task needs (a booking screen, a
+ * booking), and what it contains must work: each booking is tried in the page by the behaviour runtime
+ * (choose a time, confirm, see the confirmation, go back). A missing component is added by its fix,
+ * with sample content; one that does not work is reported plainly.
+ */
+function functionChecks(spec: DesignSpec, audits: { desktop?: PageAudit | null; phone?: PageAudit | null }, ctx: FidelityContext, add: (f: Omit<Finding, 'id'>) => void): void {
+  if (ctx.brief) {
+    const intent = intentOf(ctx.brief);
+    for (const component of requiredComponents(intent)) {
+      if (!component || spec.sections.some((x) => x.kind === component)) continue;
+      const def = kindDef(component);
+      const content = sampleFor(component, intent, ctx.brief);
+      if (!def || !content || !def.pages.includes(spec.pageType)) continue;
+      const req = intent.requirements.find((r) => r.component === component);
+      const lead = spec.sections.filter((x) => ['nav', 'app-nav', 'app-header'].includes(x.kind) || (!intent.screen && x.kind === 'hero')).pop();
+      add({
+        kind: 'function',
+        severity: 'high',
+        viewport: 'page',
+        section: '',
+        message: `It has no ${def.label.toLowerCase()}, and the brief needs one${req ? `: ${req.text.toLowerCase()}` : ''}.`,
+        fix: { op: 'add', after: lead?.id ?? null, section: { id: component, kind: component, variant: ctx.direction?.compose?.[component] ?? def.variants[0], content, images: [] }, summary: `Add the ${def.label.toLowerCase()} the brief needs` } as Patch,
+        restore: true,
+      });
+    }
+  }
+  for (const b of audits.desktop?.behaviors ?? []) {
+    if (!b.problems.length) continue;
+    const sec = spec.sections.filter((x) => x.kind === 'booking')[b.index];
+    add({ kind: 'function', severity: 'high', viewport: 'page', section: sec?.id ?? '', message: `The booking does not work as it should: ${b.problems.join('; ')}.`, manual: true });
+  }
+}
+
 function fidelityChecks(spec: DesignSpec, ctx: FidelityContext, add: (f: Omit<Finding, 'id'>) => void): string[] {
   const kept: string[] = [];
   const look = spec.look ?? lookFromTokens(spec.tokens);
