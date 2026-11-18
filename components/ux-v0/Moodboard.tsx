@@ -48,15 +48,19 @@ function BoardSearch({ busy, onSearch }: { busy: boolean; onSearch: Props['onSea
       <label className="v0-sr" htmlFor="v0-board-q">
         Search the image libraries
       </label>
-      <input id="v0-board-q" className="v0-field v0-board-q" value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Search the libraries — two or three words work best" maxLength={80} />
-      <select className="v0-select" aria-label="Kind of image" value={cat} onChange={(e) => setCat(e.target.value as MoodCategory)}>
+      <svg className="st-search-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="7" cy="7" r="4.6" />
+        <path d="M10.4 10.4 14 14" />
+      </svg>
+      <input id="v0-board-q" className="v0-board-q" value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Search the libraries" maxLength={80} />
+      <select className="st-search-kind" aria-label="Kind of image" value={cat} onChange={(e) => setCat(e.target.value as MoodCategory)}>
         {MOOD_CATEGORIES.map((c) => (
           <option key={c} value={c}>
             {CAT_LABEL[c]}
           </option>
         ))}
       </select>
-      <button type="submit" className="sb-link is-meta is-strong" disabled={busy || !term.trim()}>
+      <button type="submit" className="st-search-go" disabled={busy || !term.trim()}>
         Search
       </button>
     </form>
@@ -82,6 +86,11 @@ function Tile({ r, onRef, onReplace }: { r: MoodboardRef; onRef: Props['onRef'];
     <figure className={`v0-tile${r.state === 'kept' ? ' is-kept' : ''}`} style={{ ['--ratio' as any]: Math.min(1.6, Math.max(0.5, ratio)) }}>
       <div className="v0-tile-img" style={{ background: r.color ?? undefined }}>
         <img src={r.thumb} alt={r.title || `${CAT_LABEL[r.category]} reference`} loading="lazy" referrerPolicy="no-referrer" />
+        {r.state === 'kept' && (
+          <span className="st-kept-badge" aria-hidden="true">
+            Kept
+          </span>
+        )}
       </div>
       <figcaption>
         <span className="v0-credit">
@@ -130,6 +139,11 @@ function PaletteRow({ p, onPalette }: { p: Palette; onPalette: Props['onPalette'
   return (
     <div className={`v0-palette${p.state === 'kept' ? ' is-kept' : ''}`}>
       <div className="v0-palette-strip">
+        {p.state === 'kept' && (
+          <span className="st-kept-badge" aria-hidden="true">
+            Kept
+          </span>
+        )}
         {p.colors.map((c, i) => (
           <span key={i} className="v0-chip-colour" style={{ background: c.hex, color: contrastRatio('#ffffff', c.hex) > contrastRatio('#111111', c.hex) ? '#fff' : '#111' }}>
             <span>{c.role}</span>
@@ -137,8 +151,9 @@ function PaletteRow({ p, onPalette }: { p: Palette; onPalette: Props['onPalette'
           </span>
         ))}
       </div>
-      <p className="v0-quiet">
-        {p.name} · text on background {ratio.toFixed(1)}:1{ratio < 4.5 ? ' — too faint for body text' : ''}
+      <p className="st-taste-name">{p.name}</p>
+      <p className={`st-taste-note${ratio < 4.5 ? ' is-fail' : ''}`}>
+        Text on background {ratio.toFixed(1)}:1{ratio < 4.5 ? ', too faint for body text' : ''}
       </p>
       <span className="v0-tile-acts">
         <button type="button" className="sb-link is-meta is-strong" onClick={() => onPalette(p.id, p.state === 'kept' ? 'proposed' : 'kept')} aria-pressed={p.state === 'kept'}>
@@ -155,16 +170,21 @@ function PaletteRow({ p, onPalette }: { p: Palette; onPalette: Props['onPalette'
 function TypeCard({ t, sample, onType }: { t: TypePair; sample: string; onType: Props['onType'] }) {
   return (
     <div className={`v0-type${t.state === 'kept' ? ' is-kept' : ''}`}>
+      {t.state === 'kept' && (
+        <span className="st-kept-badge" aria-hidden="true">
+          Kept
+        </span>
+      )}
       <p className="v0-type-display" style={{ fontFamily: fontStack(t.display) }}>
         {sample}
       </p>
       <p className="v0-type-body" style={{ fontFamily: fontStack(t.body) }}>
-        Body text set in {t.body}: legible at small sizes, steady over a long paragraph, and quiet enough to let the headline lead.
+        Set in {t.body}: steady over a long paragraph, and quiet enough to let the headline lead.
       </p>
-      <p className="v0-quiet">
-        {t.display} / {t.body}
-        {t.note ? ` — ${t.note}` : ''}
+      <p className="st-taste-name">
+        {t.display} <span>with {t.body}</span>
       </p>
+      {t.note && <p className="st-taste-note">{t.note}</p>}
       <span className="v0-tile-acts">
         <button type="button" className="sb-link is-meta is-strong" onClick={() => onType(t.id, t.state === 'kept' ? 'proposed' : 'kept')} aria-pressed={t.state === 'kept'}>
           {t.state === 'kept' ? 'Kept' : 'Keep'}
@@ -186,22 +206,23 @@ export function Moodboard(p: Props) {
   const credits = shown.filter((r) => r.state === 'kept');
   return (
     <div className="v0-board" aria-label="Moodboard">
-      <header className="v0-board-head">
-        <span className="sb-label">Moodboard</span>
-        <span className="v0-quiet">
-          {shown.length} image{shown.length === 1 ? '' : 's'} · {kept} kept
+      <header className="v0-board-head st-board-head">
+        <h2 className="st-board-title">The moodboard</h2>
+        <span className="st-board-count">
+          {shown.length} image{shown.length === 1 ? '' : 's'}
+          {kept ? ` · ${kept} kept` : ''}
         </span>
-        <span className="v0-spacer" />
         {p.busy && (
-          <span className="v0-quiet" role="status" aria-live="polite">
+          <span className="st-board-busy" role="status" aria-live="polite">
             {p.busy}
           </span>
         )}
+        <span className="v0-spacer" />
+        <BoardSearch busy={!!p.busy} onSearch={p.onSearch} />
         <button type="button" className="sb-link is-meta" onClick={p.onMore} disabled={!!p.busy || !p.board.queries.length}>
           More images
         </button>
       </header>
-      <BoardSearch busy={!!p.busy} onSearch={p.onSearch} />
       {p.error && (
         <p className="v0-error-line" role="alert">
           {p.error}

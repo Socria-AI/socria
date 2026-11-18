@@ -43,6 +43,28 @@ The home is drawn as a design museum's archive rather than a dashboard, inside t
 - **Motion.** Exhibits settle in at 320ms. A plate lifts and its title is underlined on hover. Opening or leaving a work is a short cross-fade (view transitions, where the browser has them). None of it runs for a visitor who asks for less motion.
 - **The editor is unchanged.** It stays a clean working surface.
 
+## The questions and the Living Brief
+
+Before a design exists, the workspace is a studio wall rather than a questionnaire (`components/ux-v0/Discovery.tsx`, `Moodboard.tsx`, `LivingBrief.tsx`, `BriefDoc.tsx`, `studio.css`).
+
+- **A question is a catalogue page.** Its number and subject sit in the margin, beside the brandbook's apricot arch. The question is in Cormorant, with one line on why it matters, and its answers are a short numbered index.
+  - Picking an answer, or pressing its number, answers at once.
+  - "+" takes an answer into your own words, to combine or change.
+  - Skip, "Write the brief now" and "Design it now" are always there. "Design it now" writes the brief from what is known, approves it and designs in the direction SocriaUX chooses.
+- **The moodboard is a collection.** It has square-cornered plates with a quiet credit, and a "Kept" mark instead of a frame. Palettes are swatch strips that open on hover; type pairs are specimens set in the real faces.
+- **The brief, so far.** The rail arranges what is decided as you go: the idea, the decided subjects, pinned references, the kept palette and type, and what is still to find out. An arch shows how much of the brief is filled, drawn only as far as it is true. Anything can be let go of from the rail without leaving the conversation.
+- **The Living Brief is a board.** The objective is the headline, and the decisions hang as blocks on one grid, each with its kind's glyph:
+  - who it is for;
+  - what they come to do (a list you add to with Enter);
+  - its personality as words;
+  - the palette as swatches you can lift and re-colour, with the contrast each pairing will have;
+  - the type set live on the palette's own paper;
+  - the references, in the brief or left out;
+  - how it should look and be laid out;
+  - what it must do, and what is still open.
+
+  Text is typeset until you edit it: nothing on the board looks like a form field until it has the caret. Approving stays one sticky bar away.
+
 ## Where it bends, and why
 
 - Geist is used up to weight 600. The brandbook allows 700, but the house rule (`test/ux-consistency.test.mjs`) caps weights at 600, and none of the brandbook's app sizes needs 700.

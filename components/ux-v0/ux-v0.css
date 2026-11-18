@@ -299,81 +299,7 @@
   border: 0;
 }
 
-/* ── discovery ────────────────────────────────────────────────────── */
-.v0-discovery {
-  box-sizing: border-box;
-  height: 100%;
-  overflow-y: auto;
-  padding: 28px clamp(20px, 3vw, 44px) 40px;
-}
-/* the question waiting on you: the one solid apricot surface, floating; Socria speaks in Cormorant Garamond */
-.v0-question {
-  max-width: 780px;
-  margin: 0 auto 30px;
-  padding: 22px 26px 20px;
-  border-radius: 22px;
-}
-.v0-asks-label {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 8px;
-}
-.v0-asks-n {
-  font-weight: 500;
-  color: var(--sb-ink);
-}
-.v0-asks-n::before {
-  content: '·';
-  margin-right: 8px;
-}
-.v0-q-text {
-  margin: 12px 0 6px;
-  font-family: var(--sb-voice);
-  font-size: clamp(26px, 2.6vw, 32px);
-  line-height: 1.15;
-  letter-spacing: -0.01em;
-  text-wrap: pretty;
-}
-.v0-q-why {
-  margin: 0 0 14px;
-  max-width: 62ch;
-  font-size: 14px;
-  line-height: 1.55;
-  color: var(--sb-ink);
-}
-.v0-question.is-ready .v0-q-why,
-.v0-question.is-ready .v0-quiet {
-  color: var(--sb-ink-70);
-}
-.v0-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 4px 0 14px;
-}
-.v0 .v0-option {
-  height: auto;
-  min-height: 38px;
-  padding: 9px 16px;
-  white-space: normal;
-  text-align: left;
-  line-height: 1.3;
-  background: rgba(255, 255, 255, 0.62);
-}
-.v0 .v0-option:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.9);
-}
-.v0 .v0-option.is-on {
-  background: var(--sb-surface);
-  box-shadow: inset 0 0 0 2px var(--sb-ink);
-}
-.v0 .v0-on-q {
-  background: rgba(32, 32, 27, 0.08);
-}
-.v0 .v0-on-q:hover:not(:disabled) {
-  background: rgba(32, 32, 27, 0.14);
-}
+/* the questions, the moodboard and the brief are drawn by ./studio.css */
 .v0-q-acts {
   display: flex;
   flex-wrap: wrap;
@@ -381,160 +307,8 @@
   gap: 8px 10px;
 }
 
-/* ── the moodboard ────────────────────────────────────────────────── */
-.v0-board {
-  max-width: 1240px;
-  margin: 0 auto;
-}
-.v0-board-head {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-height: 40px;
-  border-bottom: 1px solid var(--sb-rule-2);
-}
-.v0-board-empty {
-  padding: 24px 0;
-}
-.v0-board-group {
-  padding: 18px 0 6px;
-}
-/* the designer's own search, under the board's header: a ruled field, a kind, a word to act */
-.v0-board-search {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 14px;
-  margin: 0 0 18px;
-}
-.v0-board-q {
-  flex: 1 1 260px;
-  min-width: 0;
-}
-.v0-group-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 20px;
-  margin-bottom: 12px;
-}
-.v0-masonry {
-  columns: 4 220px;
-  column-gap: 16px;
-}
-.v0-tile {
-  break-inside: avoid;
-  margin: 0 0 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.v0-tile-img {
-  position: relative;
-  overflow: hidden;
-  aspect-ratio: 1 / var(--ratio, 0.75);
-  border-radius: 12px;
-  background-color: var(--sb-well);
-}
-.v0-tile-img img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-/* kept is the person's: moss */
-.v0-tile.is-kept .v0-tile-img {
-  outline: 3px solid var(--sb-moss-tone);
-  outline-offset: 3px;
-}
-.v0-tile figcaption {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.v0-credit {
-  font-size: 11.5px;
-  line-height: 1.4;
-  color: var(--sb-ink-60);
-}
-.v0-credit a {
-  color: inherit;
-}
-.v0-tile-acts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 16px;
-}
-.v0-taste {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 22px;
-}
-.v0-palette,
-.v0-type {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px;
-  border-radius: var(--sb-r-card);
-  background: var(--sb-surface);
-}
-.v0-palette.is-kept,
-.v0-type.is-kept {
-  background: var(--sb-tint-idea);
-}
-.v0-palette-strip {
-  display: flex;
-  height: 92px;
-  overflow: hidden;
-  border-radius: 10px;
-}
-.v0-chip-colour {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 2px;
-  padding: 6px;
-  font-size: 10.5px;
-  font-variant-numeric: tabular-nums;
-  overflow: hidden;
-}
-.v0-type-display {
-  margin: 0;
-  font-size: 40px;
-  line-height: 1.04;
-  letter-spacing: -0.01em;
-  overflow-wrap: anywhere;
-}
-.v0-type-body {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.55;
-  color: var(--sb-ink-70);
-}
-.v0-credits {
-  margin-top: 18px;
-  padding: 16px 0;
-  border-top: 1px solid var(--sb-rule);
-}
-.v0-credits ul {
-  margin: 6px 0 0;
-  padding-left: 18px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--sb-ink-60);
-}
-
 /* ── the brief ────────────────────────────────────────────────────── */
-.v0-brief {
-  box-sizing: border-box;
-  height: 100%;
-  overflow-y: auto;
-  padding: 28px clamp(20px, 3vw, 44px) 64px;
-}
 .v0-brief-head,
-.v0-brief-grid,
 .v0-brief-foot {
   max-width: 1120px;
   margin-left: auto;
@@ -548,18 +322,6 @@
   font-size: clamp(26px, 3vw, 38px);
   line-height: 1.14;
   letter-spacing: -0.01em;
-}
-.v0-brief-grid {
-  display: grid;
-  grid-template-columns: 1.15fr 1fr;
-  gap: 0 44px;
-}
-.v0-brief-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 14px 0 16px;
-  border-top: 1px solid var(--sb-rule-2);
 }
 .v0-field {
   box-sizing: border-box;
@@ -598,18 +360,6 @@
   font-weight: 500;
   cursor: pointer;
 }
-.v0-pal-edit {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 8px;
-}
-.v0-pal-edit li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
 .v0-swatch {
   display: inline-block;
   width: 12px;
@@ -623,42 +373,10 @@
   height: 28px;
   flex: none;
 }
-.v0-hex {
-  max-width: 110px;
-  font-variant-numeric: tabular-nums;
-}
 .v0-type-pick {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-.v0-ref-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.v0-ref {
-  width: 76px;
-  height: 76px;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  border-radius: 12px;
-  background: none;
-  cursor: pointer;
-  opacity: 0.45;
-  transition: opacity 0.2s;
-}
-.v0-ref.is-on {
-  opacity: 1;
-  outline: 3px solid var(--sb-moss-tone);
-  outline-offset: 2px;
-}
-.v0-ref img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
 }
 .v0-brief-foot {
   display: flex;
@@ -1420,7 +1138,6 @@
     border-left: 0;
     border-top: 1px solid var(--sb-rule);
   }
-  .v0-brief-grid,
   .v0-direct-own {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1463,16 +1180,8 @@
   .v0-steps {
     gap: 14px;
   }
-  .v0-masonry {
-    columns: 2 140px;
-  }
   .v0-compose .sb-compose-line textarea {
     font-size: 16px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .v0-ref {
-    transition: none;
   }
 }
 

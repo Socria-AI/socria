@@ -53,6 +53,7 @@ import { DirectionBoard } from './DirectionBoard';
 import { measurePage } from './measure';
 import { Composer, type ComposeMode } from './Composer';
 import { QuestionBand, QuestionsRail } from './Discovery';
+import { LivingBrief } from './LivingBrief';
 import { checkFile, fetchOriginal, imageSize, keepOriginal } from './files';
 import { Inspect } from './Inspect';
 import { elementSelection } from '@/lib/ux-v0/selection';
@@ -61,7 +62,7 @@ import { Stage, type SelectMode, type StageHandle } from './Stage';
 import { SAVE_WORDS, useV0Project } from './useV0Project';
 
 type View = 'intent' | 'import' | 'discovery' | 'brief' | 'direction' | 'design';
-type Rail = 'questions' | 'reasoning' | 'selection' | 'checks' | 'history' | 'file';
+type Rail = 'brief' | 'questions' | 'reasoning' | 'selection' | 'checks' | 'history' | 'file';
 
 /** What the last look at the drawn design found, and what it fixed on its own. */
 interface Checks {
@@ -95,7 +96,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const [view, setView] = useState<View>(() =>
     initial.mode === 'critique' ? (initial.artifact ? 'design' : 'import') : currentSpec(initial) ? 'design' : initial.direction.options.length && initial.brief.approved ? 'direction' : initial.brief.doc ? 'brief' : initial.intent ? 'discovery' : 'intent'
   );
-  const [rail, setRail] = useState<Rail>(() => (initial.mode === 'create' && !currentSpec(initial) ? 'questions' : 'reasoning'));
+  const [rail, setRail] = useState<Rail>(() => (initial.mode === 'create' && !currentSpec(initial) ? (initial.brief.doc ? 'questions' : 'brief') : 'reasoning'));
   const [selection, setSelection] = useState<SelectionContext | null>(null);
   const [activeCard, setActiveCard] = useState<string | null>(null);
   const [mode, setMode] = useState<SelectMode>(imported && imported.kind !== 'html' ? 'area' : 'element');
@@ -269,7 +270,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       if (!t) return;
       update((p) => ({ ...p, intent: t, name: p.name === 'Untitled design' ? nameFrom(t) : p.name }));
       setView('discovery');
-      setRail('questions');
+      setRail('brief');
       await discoverTurn({ intent: t });
     },
     [update, discoverTurn]
@@ -356,6 +357,18 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       const got = await fetchImages(qs, 4);
       if (got.length) say(`The brief was changed, and its visual direction moved: ${got.length} new image${got.length === 1 ? '' : 's'} on the moodboard to keep or remove.`, 'info', { acts: [{ label: 'See the moodboard', run: () => setView('discovery') }] });
     }
+  };
+
+  /** From anywhere in the questions: write the brief from what is known, approve it, and design
+      in the direction SocriaUX chooses. The brief stays there to read and change afterwards. */
+  const designNow = async () => {
+    await writeBrief();
+    // the brief arrives through a state update: let it land before reading it back
+    await new Promise((r) => setTimeout(r, 0));
+    if (!current.current.brief.doc) return;
+    update((p) => ({ ...p, brief: { ...p.brief, approved: true } }));
+    await new Promise((r) => setTimeout(r, 0));
+    await generate();
   };
 
   // ── art direction ───────────────────────────────────────────────────
@@ -793,9 +806,13 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
           { id: 'design', label: 'Design', ok: !!spec },
         ]
       : [];
+  // before there is a design, the rail is the brief as it forms, and the conversation behind it;
+  // on the brief itself, only the conversation (the brief is the page)
+  const railShown: Rail = rail === 'brief' && (view === 'brief' || !!spec || project.mode !== 'create') ? 'questions' : rail;
   const railTabs: { id: Rail; label: string }[] =
     project.mode === 'create'
       ? [
+          ...(!spec && view !== 'brief' ? [{ id: 'brief' as Rail, label: 'Brief so far' }] : []),
           { id: 'questions', label: 'Questions' },
           ...(spec ? [{ id: 'reasoning' as Rail, label: `Cards${project.cards.length ? ` ${project.cards.filter((c) => c.state !== 'dismissed').length}` : ''}` }] : []),
           ...(spec ? [{ id: 'selection' as Rail, label: 'Selection' }] : []),
@@ -970,6 +987,14 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                   onAnswer={(a) => currentQuestion && answer(currentQuestion.id, a)}
                   onSkip={() => currentQuestion && answer(currentQuestion.id, '', true)}
                   onBrief={() => writeBrief()}
+                  onCombine={(o) => {
+                    setText((t) => (t.trim() ? `${t.trim().replace(/[;,.]$/, '')}; ${o}` : o));
+                    requestAnimationFrame(() => {
+                      const el = document.querySelector<HTMLTextAreaElement>('.v0-compose textarea');
+                      if (el) (el.focus(), el.setSelectionRange(el.value.length, el.value.length));
+                    });
+                  }}
+                  onDesignNow={designNow}
                 />
                 <Moodboard
                   board={project.moodboard}
@@ -1111,13 +1136,28 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
         <aside className="v0-rail" aria-label="Design details">
           <div className="sb-seg is-tight v0-rail-tabs" role="tablist">
             {railTabs.map((t) => (
-              <button key={t.id} type="button" role="tab" aria-selected={rail === t.id} className={`sb-seg-item${rail === t.id ? ' is-on' : ''}`} onClick={() => setRail(t.id)}>
+              <button key={t.id} type="button" role="tab" aria-selected={railShown === t.id} className={`sb-seg-item${railShown === t.id ? ' is-on' : ''}`} onClick={() => setRail(t.id)}>
                 {t.label}
               </button>
             ))}
           </div>
           <div className="v0-rail-scroll">
-            {rail === 'questions' && (
+            {railShown === 'brief' && (
+              <LivingBrief
+                intent={project.intent}
+                discovery={project.discovery}
+                board={project.moodboard}
+                brief={project.brief}
+                busy={busy}
+                onIntent={(v) => (update((p) => ({ ...p, intent: v })), discoverTurn({ intent: v }))}
+                onRef={setRef}
+                onPalette={(id, state) => update((p) => ({ ...p, moodboard: { ...p.moodboard, palettes: p.moodboard.palettes.map((x) => (x.id === id ? { ...x, state } : x)) } }))}
+                onType={(id, state) => update((p) => ({ ...p, moodboard: { ...p.moodboard, type: p.moodboard.type.map((x) => (x.id === id ? { ...x, state } : x)) } }))}
+                onWrite={() => writeBrief()}
+                onOpen={() => setView('brief')}
+              />
+            )}
+            {railShown === 'questions' && (
               <QuestionsRail
                 discovery={project.discovery}
                 intent={project.intent}

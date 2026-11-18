@@ -19,6 +19,7 @@ import { Workspace } from './Workspace';
 import '@/components/brand/socria-brand.css';
 import './ux-v0.css';
 import './home.css';
+import './studio.css';
 
 const idFromUrl = () => {
   if (typeof window === 'undefined') return null;
