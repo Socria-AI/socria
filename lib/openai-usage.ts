@@ -43,7 +43,7 @@
 //
 // SERVER ONLY.
 
-import { adaptRefused, REASONING_ROOM, refusedParam, shapeRequest, type Effort } from './model-params';
+import { adaptRefused, adaptRefusedResponses, REASONING_ROOM, refusedParam, shapeRequest, shapeResponsesRequest, type Effort } from './model-params';
 import { countedTokens } from './sleep';
 import { estimateTokens, requestTokens } from './token-allowance';
 
@@ -89,28 +89,57 @@ const UNCAPPED_OUTPUT = 4_096;
 
 /** The most a call may write, as it is about to be sent. */
 function outputOf(params: any): number {
-  const v = params?.max_completion_tokens ?? params?.max_tokens;
+  const v = params?.max_completion_tokens ?? params?.max_output_tokens ?? params?.max_tokens;
   return typeof v === 'number' && v > 0 ? Math.ceil(v) : UNCAPPED_OUTPUT;
 }
 /** The room a reasoning call keeps for its reasoning (lib/model-params.ts shapeRequest). */
 function reasoningRoomOf(params: any): number {
-  const e = typeof params?.reasoning_effort === 'string' ? (params.reasoning_effort as Effort) : null;
-  return e && typeof params?.max_completion_tokens === 'number' ? (REASONING_ROOM[e] ?? 0) : 0;
+  // a Chat call's effort, or a Responses call's (lib/model-params.ts shapeResponsesRequest)
+  const e = typeof params?.reasoning_effort === 'string' ? (params.reasoning_effort as Effort) : typeof params?.reasoning?.effort === 'string' ? (params.reasoning.effort as Effort) : null;
+  return e && (typeof params?.max_completion_tokens === 'number' || typeof params?.max_output_tokens === 'number') ? (REASONING_ROOM[e] ?? 0) : 0;
 }
 /** The least a shortened call is left to write: an answer, and any room it keeps for its reasoning. */
 export function floorFor(params: any): number {
   return MIN_ANSWER_TOKENS + reasoningRoomOf(params);
 }
 /** A call that answers in plain text can be shortened; one that answers in JSON cannot. */
-const cappableCall = (params: any) => !params?.response_format;
+const cappableCall = (params: any) => !params?.response_format && (params?.text?.format?.type ?? 'text') === 'text';
 /** The call, writing no more than `cap`. */
 function capped(params: any, cap: number): any {
   if (typeof params?.max_completion_tokens === 'number') return { ...params, max_completion_tokens: Math.min(params.max_completion_tokens, cap) };
+  if (typeof params?.max_output_tokens === 'number') return { ...params, max_output_tokens: Math.min(params.max_output_tokens, cap) };
   if (typeof params?.max_tokens === 'number') return { ...params, max_tokens: Math.min(params.max_tokens, cap) };
   return { ...params, max_tokens: cap };
 }
 /** What a buffered answer wrote, for a call whose provider sent no usage. */
 const textOf = (res: any) => String(res?.choices?.[0]?.message?.content ?? '');
+
+/**
+ * The text a Responses API answer wrote: the SDK's `output_text` where it added
+ * one, else every output_text part of every message, in order. A refusal part
+ * is not text: an answer that only refused reads as empty.
+ */
+export function responseText(res: any): string {
+  if (typeof res?.output_text === 'string') return res.output_text;
+  const out: string[] = [];
+  for (const item of Array.isArray(res?.output) ? res.output : []) {
+    if (item?.type !== 'message') continue;
+    for (const part of Array.isArray(item.content) ? item.content : []) if (part?.type === 'output_text' && typeof part.text === 'string') out.push(part.text);
+  }
+  return out.join('');
+}
+
+/** A Responses API usage, in the Chat Completions shape every count here reads. */
+export function usageFromResponses(u: any): Usage | null {
+  if (!u || typeof u !== 'object') return null;
+  return {
+    prompt_tokens: u.input_tokens ?? 0,
+    completion_tokens: u.output_tokens ?? 0,
+    total_tokens: u.total_tokens ?? (u.input_tokens ?? 0) + (u.output_tokens ?? 0),
+    prompt_tokens_details: { cached_tokens: u.input_tokens_details?.cached_tokens ?? 0 },
+    completion_tokens_details: { reasoning_tokens: u.output_tokens_details?.reasoning_tokens ?? 0 },
+  };
+}
 
 export interface Usage {
   prompt_tokens?: number;
@@ -147,6 +176,7 @@ const ADAPTATIONS = 4;
  * and logged under `route`. Wrapping twice shapes and logs once.
  */
 export function tracked<T extends Creatable>(client: T, route: string): T {
+  wrapResponses(client, route);
   const completions = client.chat.completions as { create: (...args: any[]) => any; [WRAPPED]?: boolean };
   if (completions[WRAPPED]) return client;
   const create = completions.create.bind(completions);
@@ -190,6 +220,81 @@ export function tracked<T extends Creatable>(client: T, route: string): T {
   };
   completions[WRAPPED] = true;
   return client;
+}
+
+/**
+ * The client's Responses API (`client.responses.create`), held to the same
+ * rules as its chat completions: shaped for the model (lib/model-params.ts
+ * shapeResponsesRequest), held against the week's tokens and settled at what
+ * it cost, a refused setting answered on the same model
+ * (adaptRefusedResponses), and its usage logged in the same line. A client
+ * without the Responses API (an older SDK, a fake) is left as it is.
+ */
+function wrapResponses(client: any, route: string): void {
+  const responses = client?.responses as { create?: (...args: any[]) => any; [WRAPPED]?: boolean } | undefined;
+  if (!responses || typeof responses.create !== 'function' || responses[WRAPPED]) return;
+  const create = responses.create.bind(responses);
+  responses.create = async (params: any, ...rest: any[]) => {
+    const streamed = !!params?.stream;
+    let asked = shapeResponsesRequest(params, process.env);
+    const input = requestTokens(asked);
+    const hold = metering
+      ? await metering.begin({ route, input, output: outputOf(asked), cappable: cappableCall(asked), floor: floorFor(asked) })
+      : null;
+    const fit = (p: any) => (hold?.outputCap != null && cappableCall(p) ? capped(p, hold.outputCap) : p);
+    asked = fit(asked);
+    let res: any;
+    for (let tries = 0; ; tries++) {
+      try {
+        res = await create(asked, ...rest);
+        break;
+      } catch (e) {
+        const again = tries < ADAPTATIONS ? adaptRefusedResponses(asked, e) : null;
+        if (!again) {
+          hold?.end(0);
+          throw e;
+        }
+        console.warn('[openai] %s refused %s on %s; asked again without it', String(asked?.model ?? '?'), refusedParam(e) ?? (e as any)?.param ?? 'a setting', route);
+        asked = fit(again);
+      }
+    }
+    if (!streamed) {
+      const usage = usageFromResponses(res?.usage);
+      logUsage(route, res?.model ?? params?.model, usage);
+      hold?.end(usage ? countedTokens(usage) : input + estimateTokens(responseText(res)));
+      return res;
+    }
+    return watchResponses(res, route, params?.model, hold, input);
+  };
+  responses[WRAPPED] = true;
+}
+
+/** A Responses stream, its usage logged and its hold settled when it ends (the usage comes in `response.completed`). */
+function watchResponses(stream: any, route: string, model: string | undefined, hold: MeterHold | null, input: number): any {
+  if (!stream || typeof stream[Symbol.asyncIterator] !== 'function') {
+    hold?.end(input);
+    return stream;
+  }
+  const inner = stream[Symbol.asyncIterator].bind(stream);
+  stream[Symbol.asyncIterator] = async function* () {
+    let usage: Usage | null = null;
+    let served: string | undefined;
+    let written = 0;
+    try {
+      for await (const event of { [Symbol.asyncIterator]: inner }) {
+        if (event?.type === 'response.completed' || event?.type === 'response.incomplete') {
+          usage = usageFromResponses(event.response?.usage);
+          served ||= event.response?.model;
+        }
+        if (hold && event?.type === 'response.output_text.delta' && typeof event.delta === 'string') written += estimateTokens(event.delta);
+        yield event;
+      }
+    } finally {
+      logUsage(route, served ?? model, usage);
+      hold?.end(usage ? countedTokens(usage) : input + written);
+    }
+  };
+  return stream;
 }
 
 /**

@@ -792,5 +792,89 @@ console.log('\n=== found by dogfooding: notes, fit, app screens, charts ===');
   ok('a table without a Status column still gets one for its statuses', [...parse(V.renderDesign(plainTable, board.refs).html).querySelectorAll('th')].map((th) => th.textContent).join('|') === 'Account|Owner|Status');
 }
 
+console.log('\n=== GPT-6.1 Sol: the Responses API, structured outputs, high effort ===');
+{
+  const F = await import('./helpers/fake-openai-contract.mjs');
+  const U = await import('./.tmp/openai-usage.mjs');
+  const { format } = await import('node:util');
+  // which model, which API, which effort
+  ok('by default: GPT-6 Luna on Chat Completions at its own effort, exactly as before', V.socriauxModel({}) === 'gpt-6-luna' && V.socriauxApi({}) === 'chat' && V.socriauxEffort({}) === undefined);
+  const SOL = { SOCRIAUX_MODEL: 'gpt-6.1-sol' };
+  ok('SOCRIAUX_MODEL=gpt-6.1-sol: the Responses API at effort high', V.socriauxApi(SOL) === 'responses' && V.socriauxEffort(SOL) === 'high' && V.socriauxLadder(SOL)[0] === 'gpt-6.1-sol');
+  ok('SOCRIAUX_EFFORT=medium for comparison; a word it does not know leaves high', V.socriauxEffort({ ...SOL, SOCRIAUX_EFFORT: 'medium' }) === 'medium' && V.socriauxEffort({ ...SOL, SOCRIAUX_EFFORT: 'turbo' }) === 'high');
+  ok('SOCRIAUX_API=chat puts Sol on Chat Completions; responses puts any model on the Responses API', V.socriauxApi({ ...SOL, SOCRIAUX_API: 'chat' }) === 'chat' && V.socriauxApi({ SOCRIAUX_API: 'responses' }) === 'responses');
+  ok('a malformed model id is ignored: Luna', V.socriauxModel({ SOCRIAUX_MODEL: 'gpt 6; drop' }) === 'gpt-6-luna');
+  // the schemas
+  ok('structured: art direction, the brief and its revision, the moodboard direction, the critique', J([...V.STRUCTURED_KINDS].sort()) === J(['art-direction', 'brief', 'critique', 'direction', 'refine-brief']));
+  ok('plain JSON, on purpose: discovery (an open map), generation and refinement (content by kind)', ['discover', 'generate', 'refine'].every((k) => V.formatFor(k) === undefined));
+  const accepted = V.STRUCTURED_KINDS.map((k) => [k, F.judgeResponses({ model: 'gpt-6.1-sol', instructions: 'JSON', input: 'x', text: { format: V.formatFor(k) } }).error?.message ?? 'ok']);
+  ok('every schema is strict and closed, as the API requires (each object closed, every field required)', accepted.every(([, m]) => m === 'ok'), J(accepted));
+  const ad = V.formatFor('art-direction').schema.properties.directions.items.properties;
+  ok('the art direction can only name catalogue languages and allowlisted fonts', J(ad.language.enum) === J(V.LANGUAGES.map((l) => l.id)) && ad.fonts.anyOf[0].properties.display.enum.every((f) => V.knownFont(f)) && ad.fonts.anyOf[0].properties.body.enum.every((f) => !V.knownFont(f).displayOnly));
+  // a schema-shaped answer (nulls where the prompt says optional) reads as the free-form one does
+  const sBrief = V.normalizeBrief({ pageType: 'website', platform: 'web', objective: 'Bring neighbours in on weekday mornings', audience: 'Neighbours', personality: ['warm', 'unhurried', 'precise'], visualDirection: 'Warm morning light', palette: [{ hex: '#f6f1e8', role: 'background' }, { hex: '#1d1a16', role: 'text' }, { hex: '#a4532b', role: 'accent' }, { hex: '#ffffff', role: 'accent-text' }], typography: { display: 'Fraunces', body: 'Inter', rationale: '' }, userGoals: [], functionalRequirements: [], openQuestions: [], references: [] }, null);
+  const options = V.proposeDirections({ brief: sBrief });
+  const fromSchema = V.parseDirections({ directions: [{ candidate: 1, language: options[0].language, name: 'Morning ledger', concept: 'A page that reads like the first coffee.', rationale: ['For neighbours.'], voice: 'Plain and warm. “The first pour is at seven.”', composition: 'One column.', imagery: 'Window light.', avoid: ['stock smiles'], fonts: null }] }, { brief: sBrief }, options);
+  ok('art direction: fonts null keeps the candidate\'s faces, every written field is taken', fromSchema[0].name === 'Morning ledger' && J(fromSchema[0].tokens.fonts) === J(options[0].tokens.fonts) && fromSchema[0].source === 'model');
+  const briefAnswer = { objective: 'Bring neighbours in.', audience: 'Neighbours on the way to work', userGoals: ['see the hours'], personality: ['warm', 'calm', 'exact'], visualDirection: 'Morning light, paper, ink.', palette: [{ hex: '#f6f1e8', role: 'background' }, { hex: '#1d1a16', role: 'text' }, { hex: '#a4532b', role: 'accent' }, { hex: '#ffffff', role: 'accent-text' }, { hex: '#5f574e', role: 'muted' }], typography: { display: 'Fraunces', body: 'Inter', rationale: 'Warm and steady.' }, layoutDirection: 'One long column.', functionalRequirements: ['opening hours'], references: [], openQuestions: [], experience: null, rules: [], accessibility: null, responsive: null, pageType: 'website', platform: 'web' };
+  const parsedBrief = V.parseBrief(briefAnswer, V.normalizeMoodboard({}));
+  ok('brief: experience, accessibility and responsive null read as not given', !!parsedBrief && parsedBrief.objective === 'Bring neighbours in.' && !parsedBrief.experience && !parsedBrief.accessibility && !parsedBrief.responsive && parsedBrief.typography.display === 'Fraunces', J(parsedBrief && { e: parsedBrief.experience, a: parsedBrief.accessibility, r: parsedBrief.responsive }));
+  const cSel = V.elementSelection(capture(), 'generated', 'mobile');
+  const cInput = { selection: cSel, comment: 'Is this CTA prominent enough?', history: [], brief: null, summary: '', section: '', kind: 'generated', name: 'Halcyon', viewport: 'mobile', wantsSummary: false };
+  const gated = V.gateReasoning({ read: 'A small button in the hero.', verdict: 'mixed', issues: [], questions: ['Who taps it first?'], principles: [], alternatives: [], artifactSummary: null }, cInput);
+  ok('critique: artifactSummary null when not asked, the reading kept', gated.artifactSummary === null && gated.reasoning.read.startsWith('A small button'));
+  const dInput = { intent: 'A coffee shop website', questions: [], understanding: V.normalizeUnderstanding({}), moodboard: V.normalizeMoodboard({}), remark: '' };
+  const mood = V.parseDirection({ direction: 'Industrial', moodboard: { queries: [{ category: 'texture', query: 'raw concrete' }], palettes: [], type: [] } }, dInput, 'texture');
+  ok('moodboard direction: empty palettes and type lists read as none', mood.direction === 'Industrial' && mood.queries.length === 1);
+  // askJson, end to end, through the tracked client and the strict fake
+  const quiet = console.warn;
+  const quietInfo = console.info;
+  const warned = [];
+  console.warn = (...a) => warned.push(format(...a));
+  console.info = () => {};
+  const client = U.tracked(new F.default(), 'ux-v0/test');
+  const run = async (env, o, script) => {
+    globalThis.__contractCalls = [];
+    globalThis.__contractScript = [...script];
+    const asked = await V.askJson(client, V.socriauxLadder(env), { system: V.directSystem(), user: 'Three directions for the coffee house.', maxTokens: V.MAX_TOKENS['art-direction'], temperature: 0.8, label: 'art-direction', ...o }, env);
+    return { asked, calls: globalThis.__contractCalls };
+  };
+  const answer = { directions: [{ candidate: 1, language: 'broadsheet', name: 'Morning ledger', concept: 'c', rationale: ['r'], voice: 'v', composition: 'c', imagery: 'i', avoid: ['a'], fonts: null }] };
+  const a1 = await run(SOL, { format: V.formatFor('art-direction') }, [answer]);
+  const sent = a1.calls[0]?.params ?? {};
+  ok('Sol: one Responses call, instructions + input, effort high, a strict schema, not stored', a1.calls.length === 1 && a1.calls[0].api === 'responses' && sent.model === 'gpt-6.1-sol' && sent.instructions === V.directSystem() && sent.input[0].content[0].type === 'input_text' && sent.reasoning.effort === 'high' && sent.text.format.type === 'json_schema' && sent.text.format.strict === true && sent.store === false, J({ ...sent, instructions: '…', text: sent.text?.format?.type }));
+  ok('  its answer cap leaves room to think at high, and no temperature is sent (Sol refuses one)', sent.max_output_tokens === V.MAX_TOKENS['art-direction'] + 16384 && sent.temperature === undefined);
+  ok('  the answer is read (no output_text from the raw API: read from the message parts)', J(a1.asked.json) === J(answer) && a1.asked.api === 'responses' && a1.asked.effort === 'high' && a1.asked.incomplete === null);
+  ok('  and priced at Sol\'s rates, reasoning billed as output', a1.asked.usage.model === 'gpt-6.1-sol' && a1.asked.usage.output >= 7000 && Math.abs(a1.asked.usage.cost - (a1.asked.usage.input * 2 + a1.asked.usage.output * 10) / 1e6) < 1e-9, J(a1.asked.usage));
+  const a2 = await run({ ...SOL, SOCRIAUX_EFFORT: 'medium' }, { format: V.formatFor('art-direction') }, [answer]);
+  ok('SOCRIAUX_EFFORT=medium: the same call at medium, with medium\'s room', a2.calls[0].params.reasoning.effort === 'medium' && a2.calls[0].params.max_output_tokens === V.MAX_TOKENS['art-direction'] + 8192);
+  const a3 = await run(SOL, {}, ['{"questions":[]}']);
+  ok('a call with no schema (discovery, generation, refinement): plain JSON on the Responses API', a3.calls[0].params.text.format.type === 'json_object' && J(a3.asked.json) === '{"questions":[]}');
+  globalThis.__contractUnavailable = ['gpt-6.1-sol'];
+  const a4 = await run(SOL, { format: V.formatFor('art-direction') }, [answer]);
+  globalThis.__contractUnavailable = [];
+  ok('Sol not enabled on the account: the ladder answers (GPT-5.6 Sol), still on the Responses API', a4.calls.map((c) => c.outcome).join() === '404 model_not_found,ok' && a4.asked.model === 'gpt-5.6-sol' && a4.calls[1].api === 'responses', J(a4.calls.map((c) => [c.model, c.outcome])));
+  globalThis.__contractUnavailable = ['gpt-6.1-sol', 'gpt-5.6-sol', 'gpt-6.1-terra'];
+  const a5 = await run(SOL, { format: V.formatFor('art-direction') }, [answer]);
+  globalThis.__contractUnavailable = [];
+  ok('down to GPT-4o (no reasoning): asked without a reasoning setting, with its temperature, and answered', a5.asked.model === 'gpt-4o' && a5.calls.at(-1).params.reasoning === undefined && a5.calls.at(-1).params.temperature === 0.8 && a5.calls.at(-1).outcome === 'ok', J(a5.calls.map((c) => [c.model, c.outcome])));
+  globalThis.__contractNoSchema = ['gpt-6.1-sol'];
+  const a6 = await run(SOL, { format: V.formatFor('art-direction') }, [answer]);
+  globalThis.__contractNoSchema = [];
+  ok('structured outputs refused: plain JSON on Sol, not a step down the ladder', a6.calls.length === 2 && a6.calls.every((c) => c.model === 'gpt-6.1-sol') && a6.calls[1].params.text.format.type === 'json_object' && a6.asked.model === 'gpt-6.1-sol');
+  globalThis.__contractReasoning = { ...F.REASONING, high: 18170 };
+  const a7 = await run(SOL, { format: V.formatFor('art-direction') }, [answer]);
+  globalThis.__contractReasoning = undefined;
+  ok('an answer cut by its cap is said to be incomplete (and does not parse as a whole)', a7.asked.incomplete === 'max_output_tokens' && a7.asked.json === null && warned.some((w) => /stopped early \(max_output_tokens\)/.test(w)), J({ inc: a7.asked.incomplete }));
+  const a8 = await run(SOL, { format: V.formatFor('art-direction') }, [{ refusal: 'I can not help with that.' }]);
+  ok('a refusal: no JSON, said as a refusal, never read as an answer', a8.asked.incomplete === 'refusal' && a8.asked.json === null && a8.asked.raw === '');
+  const a9 = await run(SOL, { images: [{ url: 'data:image/png;base64,AAAA', detail: 'low' }] }, ['{"read":"x"}']);
+  ok('an image (a critique crop) goes as input_image with its detail', J(a9.calls[0].params.input[0].content[1]) === J({ type: 'input_image', image_url: 'data:image/png;base64,AAAA', detail: 'low' }));
+  const a10 = await run({}, {}, ['{"directions":[]}']);
+  ok('without Sol: Chat Completions, JSON mode, as before', !a10.calls[0].api && a10.calls[0].params.messages[0].role === 'system' && a10.calls[0].params.response_format.type === 'json_object' && a10.asked.api === 'chat' && a10.asked.model === 'gpt-6-luna');
+  console.warn = quiet;
+  console.info = quietInfo;
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

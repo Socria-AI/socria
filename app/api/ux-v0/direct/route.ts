@@ -19,6 +19,7 @@ import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
 import { withMeter } from '@/lib/token-meter';
 import { askJson } from '@/lib/ux-v0/ask';
+import { formatFor } from '@/lib/ux-v0/schemas';
 import { directSystem, directUser, normalizeDirection, parseDirections, proposeDirections, type DirectionAsk } from '@/lib/ux-v0/direction';
 import { MAX_TOKENS, socriauxLadder } from '@/lib/ux-v0/model';
 import { bad, failed, noModel, projectIdOf, readBody, signInFirst } from '@/lib/ux-v0/route-kit';
@@ -70,6 +71,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       maxTokens: MAX_TOKENS['art-direction'],
       temperature: 0.8,
       label: 'art-direction',
+      format: formatFor('art-direction'),
     });
     await recordUsage(userId, projectId, 'art-direction', asked.usage);
     return NextResponse.json({ options: parseDirections(asked.json, ask, options), usage: asked.usage });

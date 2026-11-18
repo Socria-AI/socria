@@ -4,17 +4,56 @@
 // v0 specification names) for every SocriaUX call, whatever the person's
 // plan; the router's ladder answers when it is refused. The model id appears
 // nowhere else in v0. Daily caps per person are environment settings too.
+//
+// GPT-6.1 SOL, AS AN EXPERIMENT. SOCRIAUX_MODEL=gpt-6.1-sol runs every
+// SocriaUX call on Sol, through OpenAI's Responses API, at reasoning effort
+// high, with structured outputs where a call's answer has a fixed shape
+// (lib/ux-v0/schemas.ts). Unset it to go back to GPT-6 Luna exactly as before.
+//
+//   SOCRIAUX_API      chat | responses — which API the calls go through
+//                     (default: responses for Sol, chat for every other model)
+//   SOCRIAUX_EFFORT   none | low | medium | high | xhigh | max — the reasoning
+//                     effort (default: high for Sol, so its creative work is
+//                     measured at its best; medium for comparison; for other
+//                     models, their own default, lib/model-params.ts)
+//
+// Server-side only: no request can name a model, an API or an effort.
 
+import { EFFORTS, type Effort } from '../model-params';
 import { LADDERS, costOf } from '../model-router';
 import type { CallKind, Usage } from './types';
 
 export const DEFAULT_MODEL = 'gpt-6-luna';
+/** The experimental model: GPT-6.1 Sol. */
+export const SOL = 'gpt-6.1-sol';
+const IS_SOL = /^gpt-6\.1-sol(?:[-:.]|$)/i;
 
 type Env = Record<string, string | undefined>;
 
 export function socriauxModel(env: Env = process.env): string {
   const m = (env.SOCRIAUX_MODEL ?? '').trim();
   return /^[a-z0-9][a-z0-9.\-:]{1,60}$/i.test(m) ? m : DEFAULT_MODEL;
+}
+
+export type Api = 'chat' | 'responses';
+
+/** Which OpenAI API SocriaUX's calls go through. */
+export function socriauxApi(env: Env = process.env): Api {
+  const v = (env.SOCRIAUX_API ?? '').trim().toLowerCase();
+  if (v === 'chat' || v === 'responses') return v;
+  return IS_SOL.test(socriauxModel(env)) ? 'responses' : 'chat';
+}
+
+/** The reasoning effort SocriaUX's calls ask for, or undefined for the model's own default. */
+export function socriauxEffort(env: Env = process.env): Effort | undefined {
+  const v = (env.SOCRIAUX_EFFORT ?? '').trim().toLowerCase();
+  if ((EFFORTS as readonly string[]).includes(v)) return v as Effort;
+  return IS_SOL.test(socriauxModel(env)) ? 'high' : undefined;
+}
+
+/** What SocriaUX is running on, in one line for the logs and the evaluation. */
+export function socriauxSetup(env: Env = process.env): { model: string; api: Api; effort: Effort | 'default'; ladder: string[] } {
+  return { model: socriauxModel(env), api: socriauxApi(env), effort: socriauxEffort(env) ?? 'default', ladder: socriauxLadder(env) };
 }
 
 /** The model, then what answers if it is refused. */

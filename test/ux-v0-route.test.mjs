@@ -282,5 +282,66 @@ console.log('\n=== projects: private, normalised, newest wins ===');
   ok('the owner can', !db.rows('ux_v0_projects').some((r) => r.id === 'uxv0_sync1'));
 }
 
+console.log('\n=== GPT-6.1 Sol through every route (the Responses API) ===');
+{
+  const C = 'user_v0_sol';
+  process.env.SOCRIAUX_MODEL = 'gpt-6.1-sol';
+  const sent = (out) => out.calls[0] ?? {};
+  const onResponses = (p) => typeof p.instructions === 'string' && Array.isArray(p.input) && p.messages === undefined && p.store === false;
+  const formatOf = (p) => (p.text?.format?.type === 'json_schema' ? p.text.format.name : p.text?.format?.type);
+  const brief = { objective: 'Fill weekday mornings at a coffee bar.', audience: 'Commuters', personality: ['warm', 'honest'], visualDirection: 'Handmade, morning light', palette: [{ hex: '#f6f1e9', role: 'background' }, { hex: '#2a2420', role: 'text' }, { hex: '#6b3e1f', role: 'accent' }, { hex: '#ffffff', role: 'accent-text' }], typography: { display: 'Fraunces', body: 'Inter' }, pageType: 'website' };
+  const moodboard = { refs: [{ provider: 'openverse', providerId: 'k1', url: 'https://x.org/k1.jpg', category: 'imagery', query: 'q', state: 'kept', asContent: true }] };
+  const steps = [];
+  // 1 adaptive questions
+  const q = await post('discover', { projectId: 'uxv0_sol', action: 'turn', intent: 'A premium coffee shop website', questions: [], understanding: {}, moodboard: {} }, C, [
+    { understanding: { summary: 'A café site.', known: { objective: 'mornings' }, gaps: ['audience'] }, questions: [{ topic: 'audience', question: 'Who is it for?', why: 'It sets the tone.', options: ['Commuters', 'Remote workers'] }], moodboard: { queries: [{ category: 'imagery', query: 'espresso bar morning light' }] }, ready: false },
+  ]);
+  steps.push(['questions', q, 'json_object']);
+  // 2 the moodboard: another direction
+  const md = await post('discover', { projectId: 'uxv0_sol', action: 'direction', aspect: 'palette', intent: 'A premium coffee shop website', moodboard: {} }, C, [{ direction: 'Cool and spare', moodboard: { queries: [], palettes: [{ name: 'Slate', colors: [{ hex: '#1d2a33', role: 'text' }, { hex: '#f3f5f6', role: 'background' }] }], type: [] } }]);
+  steps.push(['moodboard direction', md, 'socriaux_direction']);
+  // 3 the Living Brief, written and revised
+  const b = await post('brief', { projectId: 'uxv0_sol', action: 'synthesize', intent: 'A premium coffee shop website', moodboard }, C, [
+    { objective: 'Fill weekday mornings.', audience: 'Commuters', userGoals: [], personality: ['warm'], visualDirection: 'Morning light', palette: [{ hex: '#f6f1e9', role: 'background' }, { hex: '#222222', role: 'text' }, { hex: '#6b3e1f', role: 'accent' }, { hex: '#ffffff', role: 'accent-text' }], typography: { display: 'Fraunces', body: 'Inter', rationale: '' }, layoutDirection: '', functionalRequirements: [], references: ['openverse:k1'], openQuestions: [], experience: null, rules: [], accessibility: null, responsive: null, pageType: 'website', platform: 'web' },
+  ]);
+  steps.push(['brief', b, 'socriaux_brief']);
+  const rb = await post('brief', { projectId: 'uxv0_sol', action: 'refine', intent: 'x', current: b.json?.brief, instruction: 'Darker, evening light', moodboard }, C, [{ ...b.json?.brief, visualDirection: 'Evening light', moodboardQueries: [{ category: 'imagery', query: 'candlelit cafe evening' }] }]);
+  steps.push(['brief revision', rb, 'socriaux_refine_brief']);
+  // 4 art direction
+  const d = await post('direct', { projectId: 'uxv0_sol', brief, notes: '', avoid: '' }, C, [{ directions: [{ candidate: 1, language: 'broadsheet', name: 'Long table mornings', concept: 'A printed card.', rationale: ['Warm'], voice: 'Plain.', composition: 'One column.', imagery: 'Window light.', avoid: ['stock'], fonts: null }] }]);
+  steps.push(['art direction', d, 'socriaux_art_direction']);
+  // 5 generation in that direction
+  const g = await post('generate', { projectId: 'uxv0_sol', brief: b.json?.brief, moodboard, version: 1, artDirection: d.json?.options?.[0] }, C, [
+    { title: 'Halcyon', sections: [{ id: 'nav', kind: 'nav', content: { brand: 'Halcyon', links: ['Menu'] } }, { id: 'hero', kind: 'hero', variant: 'split', content: { title: 'Coffee, slowly', primary: 'Book' }, images: ['openverse:k1'] }, { id: 'f', kind: 'footer', content: { brand: 'Halcyon' } }] },
+  ]);
+  steps.push(['generation', g, 'json_object']);
+  // 6 a targeted change on the canvas
+  const r = await post('refine', { projectId: 'uxv0_sol', spec: g.json?.spec, brief: b.json?.brief, moodboard, selection: { ...elementSel, element: { ...capture, ux: { section: 'hero', path: 'title' } } }, comment: 'Make the headline say mornings' }, C, [
+    { understood: 'Rewrite the hero headline.', patch: { op: 'content', sectionId: 'hero', content: { title: 'Mornings, slowly' }, summary: 'Headline about mornings' } },
+  ]);
+  steps.push(['targeted refinement', r, 'json_object']);
+  // 7 critique of an area, with its crop and the thumbnail
+  const c = await post('critique', { projectId: 'uxv0_sol', selection: regionSel, comment: 'Why does this feel cluttered?', kind: 'png', name: 'shot.png', thumb: THUMB }, C, [{ ...REASONING, artifactSummary: 'A landing page with a dense header.' }]);
+  steps.push(['critique', c, 'socriaux_critique']);
+  for (const [what, out, fmt] of steps) {
+    const p = sent(out);
+    ok(`${what}: 200, one Responses call to Sol at effort high, ${fmt}, not stored`, out.status === 200 && out.calls.length === 1 && onResponses(p) && p.model === 'gpt-6.1-sol' && p.reasoning?.effort === 'high' && p.temperature === undefined && formatOf(p) === fmt, J({ status: out.status, n: out.calls.length, model: p.model, effort: p.reasoning?.effort, fmt: formatOf(p), err: out.json?.error }));
+  }
+  ok('the work comes through: a question, palettes, a brief and its searches, three directions, a spec, a patch, a reading', q.json.questions.length === 1 && md.json.palettes.length === 1 && J(b.json.brief.references) === J(['openverse:k1']) && rb.json.queries.length === 1 && d.json.options.length === 3 && d.json.options[0].name === 'Long table mornings' && g.json.spec.sections.length === 3 && r.json.applies === true && c.json.reasoning.read.length > 0);
+  ok('the critique sends its crop and thumbnail as input images, high and low detail', J(sent(c).input[0].content.filter((x) => x.type === 'input_image').map((x) => x.detail)) === J(['high', 'low']));
+  ok('each call is priced at Sol\'s rates ($2 / $10 per million) and recorded', q.json.usage.model === 'gpt-6.1-sol' && Math.abs(q.json.usage.cost - (1200 * 2 + 300 * 10) / 1e6) < 1e-9 && bumps.at(-1)?.p_project === 'uxv0_sol', J(q.json.usage));
+  process.env.SOCRIAUX_EFFORT = 'medium';
+  const med = await post('direct', { projectId: 'uxv0_sol', brief, notes: '', avoid: '' }, C, [{ directions: [] }]);
+  ok('SOCRIAUX_EFFORT=medium: the same route at medium', med.status === 200 && sent(med).reasoning?.effort === 'medium');
+  delete process.env.SOCRIAUX_EFFORT;
+  globalThis.__logosRefuse = ['gpt-6.1-sol'];
+  const down = await post('direct', { projectId: 'uxv0_sol', brief, notes: '', avoid: '' }, C, [{ directions: [] }]);
+  globalThis.__logosRefuse = [];
+  ok('Sol not enabled on the account: the ladder answers on GPT-5.6 Sol, and the designer still gets directions', down.status === 200 && down.calls.map((p) => p.model).join() === 'gpt-6.1-sol,gpt-5.6-sol' && down.json.options.length === 3);
+  delete process.env.SOCRIAUX_MODEL;
+  const back = await post('direct', { projectId: 'uxv0_sol', brief, notes: '', avoid: '' }, C, [{ directions: [] }]);
+  ok('SOCRIAUX_MODEL unset: back to Luna on Chat Completions', back.status === 200 && back.calls[0].model === 'gpt-6-luna' && Array.isArray(back.calls[0].messages) && back.calls[0].instructions === undefined);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

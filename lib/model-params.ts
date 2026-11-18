@@ -231,3 +231,99 @@ export function cannotSee(e: unknown): boolean {
   const x = e as ErrLike | null;
   return statusOf(x) === 400 && /image|vision/i.test(messageOf(x)) && failureOf(e) !== 'param';
 }
+
+// ── the Responses API ────────────────────────────────────────────────
+//
+// The same rules for a call made through OpenAI's Responses API
+// (`client.responses.create`), which names things differently: the cap is
+// `max_output_tokens` (reasoning counts against it, as with
+// `max_completion_tokens`), the effort is `reasoning.effort`, and the
+// answer's format is `text.format`. A call is written with the cap meant for
+// the ANSWER, as a Chat Completions call is; the reasoning gets its room on
+// top here, so a cap written for the words is not spent thinking.
+
+const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+
+/** A Responses API call, as the model it goes to takes it. */
+export function shapeResponsesRequest<P extends Params>(params: P, env: Env = {}): P {
+  const model = String(params?.model ?? '');
+  const t = traitsOf(model);
+  const out: Params = { ...params };
+  const reasoning = obj(params.reasoning);
+  if (t.family === 'classic') {
+    // a model without reasoning refuses the setting: the rest of the call is as it was
+    delete out.reasoning;
+    return out as P;
+  }
+  const effort = effortFor(model, reasoning.effort, env);
+  out.reasoning = { ...reasoning, effort };
+  if (typeof params.max_output_tokens === 'number') out.max_output_tokens = Math.round(params.max_output_tokens) + REASONING_ROOM[effort];
+  if (effort !== 'none') for (const k of SAMPLING) delete out[k];
+  return out as P;
+}
+
+/** Never changed by an adaptation of a Responses call: what the call is. */
+const RESPONSES_ESSENTIAL = new Set(['model', 'input', 'instructions', 'stream', 'tools', 'tool_choice', 'max_output_tokens', 'previous_response_id']);
+
+/**
+ * The parameter a refused Responses call names: a refusal the Chat rules
+ * already read as one parameter, or a 400 that names a setting of the answer's
+ * format or of reasoning (`text.format`, `reasoning.effort`), however its code
+ * reads, since the model is there either way.
+ */
+function responsesParamOf(e: unknown): string | null {
+  if (failureOf(e) === 'param') return refusedParam(e);
+  const x = e as ErrLike | null;
+  const named = x?.param ?? x?.error?.param;
+  if (statusOf(x) === 400 && typeof named === 'string' && /^(?:text|reasoning)(?:\.|$)/.test(named)) return named.replace(/^.*\./, '');
+  return null;
+}
+
+/**
+ * A Responses call again, without (or with eased) the one setting the model
+ * refused, on the same model: a structured format it does not take becomes
+ * plain JSON, then no format; an effort it has not got becomes low (for none)
+ * or its own default. Null when the refusal is not of a setting this call has.
+ */
+export function adaptRefusedResponses<P extends Params>(params: P, e: unknown): P | null {
+  const param = responsesParamOf(e);
+  if (!param) return null;
+  const out: Params = { ...params };
+  const reasoning = obj(params.reasoning);
+  const text = obj(params.text);
+  switch (param) {
+    case 'effort':
+    case 'reasoning':
+    case 'summary': {
+      if (params.reasoning === undefined) return null;
+      if (reasoning.effort === 'none') {
+        out.reasoning = { ...reasoning, effort: 'low' };
+        for (const k of SAMPLING) delete out[k];
+        if (typeof out.max_output_tokens === 'number') out.max_output_tokens = (out.max_output_tokens as number) + REASONING_ROOM.low;
+        return out as P;
+      }
+      delete out.reasoning;
+      if (typeof out.max_output_tokens === 'number') out.max_output_tokens = Math.max(out.max_output_tokens as number, REASONING_ROOM.medium + 2048);
+      return out as P;
+    }
+    case 'format':
+    case 'text':
+    case 'schema':
+    case 'strict':
+    case 'json_schema': {
+      const format = obj(text.format);
+      if (format.type === 'json_schema') {
+        out.text = { ...text, format: { type: 'json_object' } };
+        return out as P;
+      }
+      if (params.text === undefined) return null;
+      delete out.text;
+      return out as P;
+    }
+    default: {
+      if (RESPONSES_ESSENTIAL.has(param) || !(param in params)) return null;
+      delete out[param];
+      return out as P;
+    }
+  }
+}

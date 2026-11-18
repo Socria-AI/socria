@@ -20,8 +20,34 @@
 // test reads the two as the one prompt they are (./prompt.mjs).
 import { systemOf } from './prompt.mjs';
 
+// The Responses API (SocriaUX on GPT-6.1 Sol, lib/ux-v0/ask.ts): the same script, recorded in the same
+// list, answered in the Responses shape (output items, usage as input_tokens / output_tokens).
+const responsesUsage = (u) =>
+  u
+    ? {
+        usage: {
+          input_tokens: u.prompt_tokens ?? 0,
+          input_tokens_details: { cached_tokens: u.prompt_tokens_details?.cached_tokens ?? 0 },
+          output_tokens: u.completion_tokens ?? 0,
+          output_tokens_details: { reasoning_tokens: u.completion_tokens_details?.reasoning_tokens ?? 0 },
+        },
+      }
+    : {};
+
 export default class OpenAI {
   constructor() {
+    this.responses = {
+      create: async (p) => {
+        const g = globalThis;
+        (g.__logosCalls ??= []).push(p);
+        if ((g.__logosRefuse ?? []).includes(p.model))
+          throw Object.assign(new Error(`The model \`${p.model}\` does not exist or you do not have access to it.`), { status: 404, code: 'model_not_found' });
+        const next = (g.__logosScript ??= []).shift();
+        if (next instanceof Error) throw next;
+        const text = next === undefined ? '' : typeof next === 'string' ? next : JSON.stringify(next);
+        return { object: 'response', model: p.model, status: 'completed', output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text }] }], ...responsesUsage(g.__logosUsage) };
+      },
+    };
     this.chat = {
       completions: {
         create: async (p) => {

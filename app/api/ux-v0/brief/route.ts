@@ -16,6 +16,7 @@ import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
 import { withMeter } from '@/lib/token-meter';
 import { askJson } from '@/lib/ux-v0/ask';
+import { formatFor } from '@/lib/ux-v0/schemas';
 import { briefSystem, briefUser, parseBrief, type BriefInput, briefQueries } from '@/lib/ux-v0/design';
 import { MAX_TOKENS, socriauxLadder } from '@/lib/ux-v0/model';
 import { bad, failed, noModel, projectIdOf, readBody, signInFirst } from '@/lib/ux-v0/route-kit';
@@ -56,7 +57,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
 
   const openai = tracked(new OpenAI({ apiKey }), `ux-v0/${kind}`);
   try {
-    const asked = await askJson(openai, socriauxLadder(), { system: briefSystem(refining), user: briefUser(input), maxTokens: MAX_TOKENS[kind], temperature: 0.4, label: kind });
+    const asked = await askJson(openai, socriauxLadder(), { system: briefSystem(refining), user: briefUser(input), maxTokens: MAX_TOKENS[kind], temperature: 0.4, label: kind, format: formatFor(kind) });
     const brief = parseBrief(asked.json, moodboard);
     await recordUsage(userId, projectId, kind, asked.usage);
     if (!brief) return NextResponse.json({ error: 'SocriaUX could not write a usable brief from that. Try again, or write it yourself.', usage: asked.usage }, { status: 502 });

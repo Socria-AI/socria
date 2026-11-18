@@ -17,6 +17,7 @@ import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
 import { withMeter } from '@/lib/token-meter';
 import { askJson } from '@/lib/ux-v0/ask';
+import { formatFor } from '@/lib/ux-v0/schemas';
 import { critiqueSystem, critiqueUser, gateReasoning, type CritiqueInput } from '@/lib/ux-v0/critique';
 import { MAX_TOKENS, socriauxLadder } from '@/lib/ux-v0/model';
 import { bad, failed, imageDataUrl, noModel, projectIdOf, readBody, signInFirst } from '@/lib/ux-v0/route-kit';
@@ -79,6 +80,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       temperature: 0.4,
       images,
       label: 'critique',
+      format: formatFor('critique'),
     });
     const gated = gateReasoning(asked.json, input);
     await recordUsage(userId, projectId, 'critique', asked.usage);

@@ -169,5 +169,73 @@ console.log('\n=== through the wrapper every client goes through (lib/openai-usa
   console.warn = quiet;
 }
 
+console.log('\n=== the Responses API (GPT-6.1 Sol in SocriaUX) ===');
+{
+  const quiet = console.warn;
+  const quietInfo = console.info;
+  const warned = [];
+  const logged = [];
+  console.warn = (...a) => warned.push(format(...a));
+  console.info = (...a) => logged.push(format(...a));
+  const call = { instructions: 'Answer in JSON.', input: [{ role: 'user', content: [{ type: 'input_text', text: 'Three directions.' }] }], max_output_tokens: 1800, temperature: 0.8, text: { format: { type: 'json_object' } }, store: false };
+  // shaping, purely
+  const sol = P.shapeResponsesRequest({ model: 'gpt-6.1-sol', ...call, reasoning: { effort: 'high' } });
+  ok('Sol at high: the effort kept, the reasoning room on top of the answer cap, no temperature', sol.reasoning.effort === 'high' && sol.max_output_tokens === 1800 + P.REASONING_ROOM.high && sol.temperature === undefined, J(sol));
+  const solDefault = P.shapeResponsesRequest({ model: 'gpt-6.1-sol', ...call });
+  ok('Sol with no effort asked: low (Sol has no "none"), with room for it', solDefault.reasoning.effort === 'low' && solDefault.max_output_tokens === 1800 + P.REASONING_ROOM.low);
+  const luna = P.shapeResponsesRequest({ model: 'gpt-6-luna', ...call });
+  ok('Luna with no effort asked: none, and its temperature stands', luna.reasoning.effort === 'none' && luna.temperature === 0.8 && luna.max_output_tokens === 1800);
+  const classic = P.shapeResponsesRequest({ model: 'gpt-4o', ...call, reasoning: { effort: 'high' } });
+  ok('GPT-4o (no reasoning): the reasoning setting goes, the rest stands', classic.reasoning === undefined && classic.temperature === 0.8 && classic.max_output_tokens === 1800);
+  ok('every model on the contract takes the shaped call', MODELS.every((m) => !F.judgeResponses(P.shapeResponsesRequest({ model: m, ...call, reasoning: { effort: 'high' } })).error || F.CONTRACT[m].efforts?.includes('high') === false), J(MODELS.map((m) => [m, F.judgeResponses(P.shapeResponsesRequest({ model: m, ...call, reasoning: { effort: 'high' } })).error?.message])));
+  // adaptation, purely
+  const schemaRefused = F.judgeResponses({ ...sol, model: 'gpt-6.1-sol', text: { format: { type: 'json_schema', name: 'x', schema: { type: 'object', additionalProperties: false, required: [], properties: {} }, strict: true } } });
+  ok('(a model that has none of a structured format answers schema calls with a refusal of text.format)', !schemaRefused.error);
+  globalThis.__contractNoSchema = ['gpt-6.1-sol'];
+  const refusedSchema = F.judgeResponses({ ...sol, text: { format: { type: 'json_schema', name: 'x', schema: { type: 'object', additionalProperties: false, required: [], properties: {} }, strict: true } } }).error;
+  const eased = P.adaptRefusedResponses({ ...sol, text: { format: { type: 'json_schema', name: 'x', schema: {}, strict: true } } }, refusedSchema);
+  ok('a structured format refused: asked again as plain JSON, on the same model, nothing else changed', eased?.text?.format?.type === 'json_object' && eased.model === 'gpt-6.1-sol' && eased.reasoning.effort === 'high', J(eased));
+  ok('  and plain JSON refused in turn: asked with no format', P.adaptRefusedResponses(eased, Object.assign(new Error('400 x'), { status: 400, param: 'text.format' }))?.text === undefined);
+  const effortRefused = F.judgeResponses({ ...sol, reasoning: { effort: 'none' } }).error;
+  ok('an effort the model has not got ("none" on Sol): asked again at low, with room', P.adaptRefusedResponses({ ...sol, reasoning: { effort: 'none' } }, effortRefused)?.reasoning?.effort === 'low');
+  ok('the input, the instructions and the cap are never adapted away', P.adaptRefusedResponses(sol, Object.assign(new Error("400 Unsupported parameter: 'input'"), { status: 400, param: 'input', code: 'unsupported_parameter' })) === null);
+  ok('a model that is not there is not a parameter: no adaptation (the ladder answers it)', P.adaptRefusedResponses(sol, F.judgeResponses({ ...sol, model: 'gpt-9-nope' }).error) === null);
+  // through the tracked client: shaped, adapted, logged, metered
+  const client = U.tracked(new F.default(), 'test/responses');
+  globalThis.__contractCalls = [];
+  globalThis.__contractContent = () => '{"directions":[]}';
+  const res = await client.responses.create({ model: 'gpt-6.1-sol', ...call, reasoning: { effort: 'high' }, text: { format: { type: 'json_schema', name: 'socriaux_x', schema: { type: 'object', additionalProperties: false, required: ['directions'], properties: { directions: { type: 'array', items: { type: 'string' } } } }, strict: true } } });
+  const calls = globalThis.__contractCalls;
+  ok('through tracked(): a schema refused by Sol is asked again as JSON on Sol, and answered', calls.length === 2 && calls.every((c) => c.model === 'gpt-6.1-sol' && c.api === 'responses') && calls[1].outcome === 'ok' && U.responseText(res) === '{"directions":[]}', J(calls.map((c) => c.outcome)));
+  ok('  and the log says which setting was eased', warned.some((w) => /gpt-6\.1-sol refused format on test\/responses/.test(w)), J(warned));
+  const line = logged.find((l) => l.includes('"route":"test/responses"'));
+  ok('its usage is logged in the house line, reasoning included', !!line && /"model":"gpt-6\.1-sol"/.test(line) && /"reasoning":7000/.test(line), line);
+  globalThis.__contractNoSchema = [];
+  // usage in the Chat shape every count reads
+  const u = U.usageFromResponses({ input_tokens: 1000, input_tokens_details: { cached_tokens: 200 }, output_tokens: 900, output_tokens_details: { reasoning_tokens: 600 } });
+  ok('Responses usage read as Chat usage: input, cached, output with its reasoning', u.prompt_tokens === 1000 && u.prompt_tokens_details.cached_tokens === 200 && u.completion_tokens === 900 && u.completion_tokens_details.reasoning_tokens === 600);
+  // metering holds the Responses call too, and settles it at what it cost
+  const held = [];
+  U.onMetering({
+    begin: async (c) => {
+      held.push(c);
+      return { outputCap: null, end: (t) => held.push({ settled: t }) };
+    },
+  });
+  globalThis.__contractContent = () => '{"ok":true}';
+  await client.responses.create({ model: 'gpt-6.1-sol', ...call, reasoning: { effort: 'high' } });
+  U.onMetering(null);
+  ok('a free account\'s week holds the Responses call: its input, its cap with reasoning, not shortened (JSON)', held[0].input > 0 && held[0].output === 1800 + P.REASONING_ROOM.high && held[0].cappable === false, J(held[0]));
+  ok('  and settles it at what it cost (input read afresh + output with reasoning)', typeof held[1]?.settled === 'number' && held[1].settled >= 7000, J(held[1]));
+  // a stream: usage from response.completed
+  logged.length = 0;
+  const stream = await client.responses.create({ model: 'gpt-6.1-sol', ...call, text: undefined, stream: true });
+  let streamed = '';
+  for await (const ev of stream) if (ev.type === 'response.output_text.delta') streamed += ev.delta;
+  ok('a streamed Responses call: the words through, its usage logged when it ends', streamed === '{"ok":true}' && logged.some((l) => l.includes('"route":"test/responses"')), J(logged));
+  console.warn = quiet;
+  console.info = quietInfo;
+}
+
 console.log(`\nmodel-params: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

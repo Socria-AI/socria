@@ -231,20 +231,25 @@ export const IMAGE_TOKENS = 1_500;
  * whose provider never reported its usage.
  */
 export function requestTokens(params: unknown): number {
-  const p = params as { messages?: unknown; input?: unknown; tools?: unknown; functions?: unknown } | null;
+  const p = params as { messages?: unknown; input?: unknown; instructions?: unknown; tools?: unknown; functions?: unknown } | null;
   let n = 3;
   const part = (c: unknown): number => {
     if (typeof c === 'string') return estimateTokens(c);
     if (!c || typeof c !== 'object') return 0;
-    const x = c as { type?: string; text?: unknown; image_url?: { detail?: string } };
-    if (x.type === 'image_url' || x.type === 'input_image') return x.image_url?.detail === 'low' ? 100 : IMAGE_TOKENS;
+    // Chat's image_url carries its detail inside; a Responses input_image beside its url
+    const x = c as { type?: string; text?: unknown; detail?: string; image_url?: { detail?: string } | string };
+    if (x.type === 'image_url' || x.type === 'input_image') return (typeof x.image_url === 'object' ? x.image_url?.detail : x.detail) === 'low' ? 100 : IMAGE_TOKENS;
     return typeof x.text === 'string' ? estimateTokens(x.text) : 0;
   };
-  for (const m of Array.isArray(p?.messages) ? p!.messages : []) {
+  const message = (m: unknown) => {
     const content = (m as { content?: unknown })?.content;
-    n += 4 + (Array.isArray(content) ? content.reduce((s: number, c) => s + part(c), 0) : part(content));
-  }
+    return 4 + (Array.isArray(content) ? content.reduce((s: number, c) => s + part(c), 0) : part(content));
+  };
+  for (const m of Array.isArray(p?.messages) ? p!.messages : []) n += message(m);
+  // the Responses API: its instructions, and its input as text or as messages
+  if (typeof p?.instructions === 'string') n += estimateTokens(p.instructions);
   if (typeof p?.input === 'string') n += estimateTokens(p.input);
+  else if (Array.isArray(p?.input)) for (const m of p!.input) n += message(m);
   for (const extra of [p?.tools, p?.functions]) if (extra) n += estimateTokens(JSON.stringify(extra));
   return n;
 }
