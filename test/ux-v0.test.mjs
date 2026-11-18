@@ -597,5 +597,44 @@ console.log('\n=== looking at the drawn page ===');
   ok('the audit is one valid script, inside the inspector', (() => { try { new Function(V.AUDIT_SOURCE); return V.INSPECTOR_SOURCE.includes('__uxv0Audit') && V.INSPECTOR_SOURCE.includes("m.type === 'audit'"); } catch { return false; } })());
 }
 
+console.log('\n=== motion ===');
+{
+  const mk = (o) => V.normalizeBrief({ pageType: 'website', platform: 'web', palette: [], typography: { display: 'Inter', body: 'Inter' }, ...o }, new Set());
+  const launch = mk({ objective: 'Launch a festival', personality: ['bold', 'loud'], visualDirection: 'A loud poster, big type' });
+  const clinic = mk({ objective: 'Book a GP appointment', audience: 'patients', personality: ['calm', 'clear'], visualDirection: 'plain and accessible public service' });
+  const loud = V.proposeDirections({ brief: launch });
+  const calm = V.proposeDirections({ brief: clinic });
+  ok('every direction carries a motion', [...loud, ...calm].every((d) => d.look.motion && V.MOTION_FEELS.includes(d.look.motion.feel)));
+  ok('a loud launch moves more than a public-service page', (() => { const lv = (d) => V.MOTION_FEELS.indexOf(d.look.motion.feel); return lv(loud[0]) > lv(calm[0]); })(), `${loud[0].language}:${loud[0].look.motion.feel} vs ${calm[0].language}:${calm[0].look.motion.feel}`);
+  const still = V.proposeDirections({ brief: launch, notes: 'no animation please' });
+  ok('"no animation" makes every option still', still.every((d) => d.look.motion.feel === 'still'));
+  const kin = V.proposeDirections({ brief: clinic, notes: 'make it kinetic, with parallax' });
+  ok('"kinetic, with parallax" is read', kin.every((d) => d.look.motion.feel === 'kinetic' && d.look.motion.parallax >= 1) && kin[0].rationale.join(' ').includes('kinetic motion'));
+  ok('a feel the language lacks comes as itself, not bent by the language', kin.every((d) => d.look.motion.duration === V.MOTION_PRESETS.kinetic.duration || V.languageOf(d.language).motion.includes('kinetic')));
+  const locked = { ...kin[0], locks: ['motion'] };
+  const again = V.proposeDirections({ brief: clinic, base: locked, round: 1, seen: kin.map((d) => d.language) });
+  ok('a locked motion survives asking again', again.every((d) => J(d.look.motion) === J(locked.look.motion)));
+  ok('older looks are still', J(V.lookFromTokens(SPEC.tokens ?? V.DEFAULT_TOKENS).motion) === J(V.STILL_MOTION) && V.normalizeLook({}, V.lookFromTokens(V.DEFAULT_TOKENS)).motion.feel === 'still');
+  ok('motion is normalised and bounded', (() => { const m = V.normalizeMotion({ feel: 'lively', duration: 99999, stagger: -4, parallax: 9, ease: 'bogus' }, V.MOTION_PRESETS.calm); return m.duration === 1800 && m.stagger === 0 && m.parallax === 3 && m.ease === 'gentle'; })());
+  ok('calmer and livelier step through the feels', V.stepMotion(V.MOTION_PRESETS.lively, -1).feel === 'measured' && V.stepMotion(V.MOTION_PRESETS.measured, -1).feel === 'calm' && V.stepMotion(V.MOTION_PRESETS.lively, 1).feel === 'kinetic' && V.stepMotion(V.MOTION_PRESETS.still, -1).feel === 'still');
+  const look = { ...loud[0].look, motion: V.MOTION_PRESETS.kinetic, motifs: [...loud[0].look.motifs, 'marquee', 'shapes'] };
+  const play = V.motionCss(look, 'play');
+  ok('playing writes load arrivals, scroll-driven arrivals behind @supports, parallax, section openings and a condensing nav', /mo-t-word/.test(play) && /@supports \(animation-timeline: view\(\)\)\{[^]*animation-timeline:view\(\)/.test(play) && /mo-par|mo-drift/.test(play) && /mo-sec/.test(play) && /scroll\(root\)/.test(play) && /mo-mq/.test(play));
+  ok('every played motion has a reduced-motion alternative', /@media \(prefers-reduced-motion:reduce\)\{body \*/.test(play));
+  const stat = V.motionCss(look, 'static');
+  ok('static writes hovers only: nothing arrives, nothing follows the scroll', !/@keyframes|animation-timeline/.test(stat) && /@media \(hover:hover\)/.test(stat));
+  ok('a still look writes no motion at all', V.motionCss({ ...look, motion: V.STILL_MOTION }, 'play') === '');
+  const k = V.kineticHeadline('Think as long as it <em>needs</em>.', 'words');
+  ok('kinetic words keep the emphasis and the spaces', k.includes('<em><span class="kw" style="--i:5">needs</span></em>') && (k.match(/class="kw"/g) || []).length === 7 && / <span/.test(k));
+  ok('letters fall back to words for a long headline', !V.kineticHeadline('A headline that is far too long to animate letter by letter, honestly', 'letters').includes('class="kl"'));
+  const spec = V.normalizeSpec({ ...SPEC, look }, board);
+  const htmlPlay = V.renderDesign(spec, board.refs, { motion: 'play' }).html;
+  const htmlStatic = V.renderDesign(spec, board.refs).html;
+  ok('the renderer plays motion only when asked; the default draws the page at rest', htmlPlay.includes('mo-t-') && !htmlStatic.includes('@keyframes') && htmlStatic.includes(' mo mo-kinetic'));
+  ok('a kinetic headline keeps its words for screen readers', /<h1 class="h-hero[^"]*"[^>]*aria-label="[^"]+"/.test(htmlPlay) && !/aria-label/.test(htmlStatic.match(/<h1[^>]*>/)?.[0] ?? ''));
+  ok('motion counts in how different two directions are', V.directionDistance(loud[0], { ...loud[0], look: { ...loud[0].look, motion: V.STILL_MOTION } }) > 0);
+  ok('motion is its own lock group, with a label', V.LOCK_GROUPS.includes('motion') && V.LOCK_LABEL.motion === 'Motion');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

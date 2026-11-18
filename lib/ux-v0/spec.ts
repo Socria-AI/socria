@@ -245,6 +245,65 @@ export const SHAPES = ['circle', 'arch', 'square', 'quarter', 'diamond', 'blob']
 export const TONES = ['base', 'alt', 'accent', 'accent2', 'invert'] as const;
 export const PADS = ['s', 'm', 'l'] as const;
 
+// ── motion: how the page moves, as part of its look ──────────────────
+// Written by the renderer as CSS only (lib/ux-v0/motion.ts): no scripts, so it
+// plays in the sealed preview and in the exported page alike, and every rule
+// has a reduced-motion alternative.
+
+export const MOTION_FEELS = ['still', 'calm', 'measured', 'lively', 'kinetic'] as const;
+/** how content arrives as it scrolls into view */
+export const ENTRANCES = ['none', 'fade', 'rise', 'slide', 'scale', 'mask'] as const;
+/** how the opening headline arrives: kinetic typography */
+export const HEADLINES = ['none', 'fade', 'mask', 'words', 'letters'] as const;
+export const HOVERS = ['none', 'lift', 'underline', 'invert', 'zoom'] as const;
+export const EASES = ['gentle', 'out', 'expo', 'snap', 'linear'] as const;
+/** how coloured sections arrive */
+export const SECTION_MOTIONS = ['none', 'wipe', 'expand'] as const;
+
+export interface Motion {
+  feel: (typeof MOTION_FEELS)[number];
+  /** how long an arrival takes, ms */
+  duration: number;
+  /** between words, letters and items in a row, ms */
+  stagger: number;
+  /** how far things travel as they arrive, px */
+  distance: number;
+  ease: (typeof EASES)[number];
+  entrance: (typeof ENTRANCES)[number];
+  headline: (typeof HEADLINES)[number];
+  /** arrivals follow the scroll (CSS scroll-driven animation) rather than only the first screen */
+  scroll: boolean;
+  /** depth of layered parallax on pictures and shapes, 0–3 */
+  parallax: number;
+  hover: (typeof HOVERS)[number];
+  sections: (typeof SECTION_MOTIONS)[number];
+  /** the navigation stays and condenses as the page scrolls */
+  nav: boolean;
+}
+
+/** No motion: what older designs, and anything that asks for stillness, are drawn with. */
+export const STILL_MOTION: Motion = { feel: 'still', duration: 0, stagger: 0, distance: 0, ease: 'out', entrance: 'none', headline: 'none', scroll: false, parallax: 0, hover: 'none', sections: 'none', nav: false };
+
+export function normalizeMotion(v: unknown, base: Motion = STILL_MOTION): Motion {
+  const r = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+  const n = (x: unknown, lo: number, hi: number, d: number) => (typeof x === 'number' && Number.isFinite(x) ? Math.round(Math.max(lo, Math.min(hi, x))) : d);
+  const p = <T extends string>(x: unknown, allowed: readonly T[], d: T): T => ((allowed as readonly string[]).includes(x as string) ? (x as T) : d);
+  return {
+    feel: p(r.feel, MOTION_FEELS, base.feel),
+    duration: n(r.duration, 0, 1800, base.duration),
+    stagger: n(r.stagger, 0, 240, base.stagger),
+    distance: n(r.distance, 0, 80, base.distance),
+    ease: p(r.ease, EASES, base.ease),
+    entrance: p(r.entrance, ENTRANCES, base.entrance),
+    headline: p(r.headline, HEADLINES, base.headline),
+    scroll: typeof r.scroll === 'boolean' ? r.scroll : base.scroll,
+    parallax: n(r.parallax, 0, 3, base.parallax),
+    hover: p(r.hover, HOVERS, base.hover),
+    sections: p(r.sections, SECTION_MOTIONS, base.sections),
+    nav: typeof r.nav === 'boolean' ? r.nav : base.nav,
+  };
+}
+
 export type Grid = (typeof GRIDS)[number];
 export type Motif = (typeof MOTIFS)[number];
 export type Shape = (typeof SHAPES)[number];
@@ -278,6 +337,8 @@ export interface Look {
   shapes: Shape[];
   /** a second ink, for languages that print in two colours; "" for none */
   accent2: string;
+  /** how it moves */
+  motion: Motion;
 }
 
 /** The renderer as it was before looks: what an older spec is drawn with. */
@@ -302,6 +363,7 @@ export function lookFromTokens(tk: DesignTokens): Look {
     motifs: ['icons'],
     shapes: [],
     accent2: '',
+    motion: { ...STILL_MOTION },
   };
 }
 
@@ -334,6 +396,7 @@ export function normalizeLook(v: unknown, base: Look): Look {
     motifs: list(r.motifs, MOTIFS, base.motifs),
     shapes: list(r.shapes, SHAPES, base.shapes),
     accent2: r.accent2 === '' ? '' : hx(r.accent2, base.accent2 || '') ,
+    motion: normalizeMotion(r.motion, base.motion ?? STILL_MOTION),
   };
 }
 

@@ -32,15 +32,18 @@ import {
   lookFromTokens,
   normalizeLook,
   normalizeTokens,
+  STILL_MOTION,
   type DesignSpec,
   type DesignTokens,
   type Look,
+  type Motion,
   type Pad,
   type Patch,
   type Section,
   type Tone,
 } from './spec';
 import type { DesignBrief } from './types';
+import { motionFor, readMotionWords } from './motion';
 
 // ── the visual languages ─────────────────────────────────────────────
 
@@ -89,6 +92,9 @@ export interface Language {
   };
   /** a second ink: the accent's hue turned by `turn` degrees at this saturation and lightness (for a light ground), or none */
   accent2: { turn: number; s: number; l: number } | null;
+  /** how it moves: the feels that belong to it, best first, and what it does its own way */
+  motion: Alt<Motion['feel']>;
+  moTweak?: Partial<Motion>;
   /** section variants that speak this language, best first */
   prefer: Record<string, readonly string[]>;
   /** the grounds sections sit on */
@@ -121,6 +127,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['plain'], motifs: [['numbering', 'captions', 'pull-quote'], ['captions', 'pull-quote']], shapes: [[]],
     },
     accent2: null,
+    motion: ['measured', 'calm'], moTweak: { hover: 'underline', parallax: 0, headline: 'mask', sections: 'none' },
     prefer: { hero: ['editorial', 'statement', 'split'], features: ['index', 'columns', 'numbered'], quote: ['pull', 'large'], stats: ['row'], cta: ['statement', 'band'], text: ['two-column', 'lead'], gallery: ['mosaic', 'grid'], split: ['image-left', 'image-right'], faq: ['two-column', 'accordion'], list: ['simple', 'schedule', 'menu'] },
     tones: { alternate: false },
     concept: (c) => `A considered broadsheet for ${c.audience}: serif headlines, heads set in a side column and hairline rules, so ${c.what} reads like something written, not sold.`,
@@ -149,6 +156,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['plain'], motifs: [['numbering', 'big-numerals'], ['big-numerals']], shapes: [[]],
     },
     accent2: null,
+    motion: ['lively', 'measured'], moTweak: { entrance: 'slide', ease: 'snap', hover: 'invert', sections: 'wipe', headline: 'mask', parallax: 0 },
     prefer: { hero: ['statement', 'split', 'editorial'], features: ['columns', 'numbered', 'index'], quote: ['pull'], stats: ['giant', 'row'], cta: ['statement', 'band'], text: ['two-column', 'lead'], gallery: ['grid'], faq: ['two-column'], list: ['simple', 'schedule'] },
     tones: { alternate: false, cta: 'accent' },
     concept: (c) => `A strict typographic system for ${c.audience}: one grotesk, a hard column grid and a single loud colour, so ${c.what} feels exact and certain.`,
@@ -177,6 +185,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['inset', 'arch'], motifs: [['captions'], []], shapes: [[]],
     },
     accent2: null,
+    motion: ['calm'], moTweak: { duration: 1150, ease: 'gentle', entrance: 'fade', headline: 'fade', parallax: 1, hover: 'zoom', distance: 10 },
     prefer: { hero: ['full-bleed', 'centered', 'split'], features: ['columns', 'list'], quote: ['large'], stats: ['row'], cta: ['centered', 'statement'], text: ['narrow', 'lead'], gallery: ['strip', 'mosaic'], split: ['image-left', 'image-right'], faq: ['accordion'], list: ['menu', 'simple'] },
     tones: { alternate: false, quote: 'alt', cta: 'alt' },
     concept: (c) => `Quiet luxury for ${c.audience}: light serif type, wide margins and very little colour, so ${c.what} feels unhurried and certain of its worth.`,
@@ -205,6 +214,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['plain', 'offset'], motifs: [['marquee', 'big-numerals', 'shapes'], ['marquee', 'big-numerals']], shapes: [['circle', 'square'], ['diamond', 'circle']],
     },
     accent2: { turn: 40, s: 0.85, l: 0.56 },
+    motion: ['kinetic', 'lively'], moTweak: { hover: 'invert', sections: 'expand' },
     prefer: { hero: ['poster', 'statement', 'full-bleed'], features: ['numbered', 'index'], quote: ['pull'], stats: ['giant', 'band'], cta: ['statement', 'band'], text: ['lead'], gallery: ['strip', 'grid'], faq: ['accordion'], list: ['schedule', 'simple'] },
     tones: { alternate: true, stats: 'invert', quote: 'accent2', cta: 'accent' },
     concept: (c) => `A poster for ${c.audience}: headlines as big as the screen allows, colour bands edge to edge and a running marquee, so ${c.what} is impossible to scroll past.`,
@@ -233,6 +243,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['arch', 'circle'], motifs: [['shapes', 'captions'], ['shapes']], shapes: [['arch', 'circle'], ['circle', 'blob']],
     },
     accent2: { turn: 35, s: 0.5, l: 0.72 },
+    motion: ['calm', 'measured'], moTweak: { hover: 'lift', entrance: 'rise', parallax: 1 },
     prefer: { hero: ['split', 'editorial', 'centered'], features: ['list', 'grid'], quote: ['with-portrait', 'large'], stats: ['row'], cta: ['image', 'band'], text: ['narrow', 'lead'], gallery: ['mosaic', 'grid'], list: ['menu', 'schedule'], split: ['image-left', 'image-right'], faq: ['accordion'] },
     tones: { alternate: true, cta: 'accent', quote: 'alt' },
     concept: (c) => `A warm, hand-set page for ${c.audience}: a soft serif, a cream ground and photographs in arched frames, so ${c.what} feels like a place you already know.`,
@@ -261,6 +272,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['arch', 'circle'], motifs: [['shapes', 'numbering'], ['shapes']], shapes: [['arch', 'circle', 'quarter', 'square', 'diamond'], ['circle', 'quarter', 'square']],
     },
     accent2: { turn: -60, s: 0.78, l: 0.66 },
+    motion: ['measured'], moTweak: { duration: 320, stagger: 60, distance: 12, ease: 'out', entrance: 'rise', headline: 'mask', hover: 'lift', parallax: 1, sections: 'none' },
     prefer: { hero: ['statement', 'split', 'editorial'], features: ['columns', 'numbered', 'index'], quote: ['pull', 'large'], stats: ['giant', 'row'], cta: ['statement', 'band'], text: ['lead', 'two-column'], gallery: ['mosaic'], faq: ['two-column', 'accordion'], list: ['simple'] },
     tones: { alternate: false, cta: 'accent', stats: 'accent2', quote: 'alt' },
     concept: (c) => `Paper, ink and a few flat shapes for ${c.audience}: a scholarly serif asks, a precise grotesk answers, so ${c.what} feels thoughtful and open rather than technical.`,
@@ -289,6 +301,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['plain'], motifs: [['numbering', 'icons'], ['numbering']], shapes: [[]],
     },
     accent2: null,
+    motion: ['measured'], moTweak: { duration: 220, stagger: 30, distance: 8, ease: 'snap', entrance: 'fade', headline: 'fade', parallax: 0, hover: 'underline', sections: 'none' },
     prefer: { hero: ['statement', 'split'], features: ['grid', 'index'], quote: ['large'], stats: ['row', 'band'], cta: ['band', 'statement'], text: ['two-column'], faq: ['two-column'], list: ['schedule', 'simple'], gallery: ['grid'] },
     tones: { alternate: false, cta: 'invert' },
     concept: (c) => `An instrument panel for ${c.audience}: mono labels, a modular ruled grid and exact numbers, so ${c.what} reads as something built carefully.`,
@@ -317,6 +330,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['plain'], motifs: [['captions'], ['captions', 'numbering']], shapes: [[]],
     },
     accent2: null,
+    motion: ['calm', 'still'], moTweak: { duration: 1200, entrance: 'fade', headline: 'fade', parallax: 0, hover: 'none', distance: 0 },
     prefer: { hero: ['full-bleed', 'editorial', 'split'], features: ['columns', 'list'], quote: ['large'], stats: ['row'], cta: ['statement'], text: ['narrow', 'two-column'], gallery: ['mosaic', 'strip', 'grid'], split: ['image-right', 'image-left'], faq: ['accordion'], list: ['simple'] },
     tones: { alternate: false },
     concept: (c) => `A white cube for ${c.audience}: the work at full size, small exact type and asymmetric space, so ${c.what} gets out of the way of what it shows.`,
@@ -345,6 +359,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['circle', 'arch'], motifs: [['shapes'], ['shapes', 'captions']], shapes: [['blob', 'circle'], ['circle', 'arch']],
     },
     accent2: { turn: 40, s: 0.35, l: 0.8 },
+    motion: ['calm'], moTweak: { entrance: 'rise', hover: 'lift', parallax: 1, ease: 'gentle' },
     prefer: { hero: ['split', 'centered'], features: ['grid', 'list'], quote: ['with-portrait', 'large'], stats: ['row'], cta: ['band', 'centered'], text: ['narrow'], faq: ['accordion'], list: ['simple', 'schedule'], gallery: ['grid'], split: ['image-left', 'image-right'] },
     tones: { alternate: true, cta: 'accent' },
     concept: (c) => `Soft ground for ${c.audience}: a light humane serif, tinted grounds and round forms, so ${c.what} feels safe to take a first step on.`,
@@ -373,6 +388,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['plain'], motifs: [['icons', 'numbering'], ['numbering']], shapes: [[]],
     },
     accent2: null,
+    motion: ['still', 'calm'], moTweak: { duration: 300, entrance: 'fade', headline: 'none', parallax: 0, hover: 'underline', sections: 'none' },
     prefer: { hero: ['statement', 'split'], features: ['list', 'grid', 'index'], quote: ['large'], stats: ['row', 'band'], cta: ['band'], text: ['narrow'], faq: ['accordion'], list: ['schedule', 'simple'], form: ['stacked', 'split'], gallery: ['grid'] },
     tones: { alternate: true, cta: 'accent', stats: 'alt' },
     concept: (c) => `A clear public service for ${c.audience}: plain language, strong contrast and big obvious actions, so ${c.what} gets everyone to what they came for.`,
@@ -401,6 +417,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['plain'], motifs: [['marquee', 'captions'], ['captions', 'numbering']], shapes: [[]],
     },
     accent2: null,
+    motion: ['lively', 'calm'], moTweak: { headline: 'mask', parallax: 2, hover: 'zoom', sections: 'wipe' },
     prefer: { hero: ['full-bleed', 'poster', 'statement'], features: ['index', 'numbered'], quote: ['pull'], stats: ['giant'], cta: ['statement', 'image'], text: ['lead'], gallery: ['strip', 'mosaic'], list: ['menu', 'schedule'], faq: ['accordion'] },
     tones: { alternate: false, cta: 'accent' },
     concept: (c) => `After dark for ${c.audience}: a black ground, light type and one bright accent, so ${c.what} feels like the lights going down.`,
@@ -429,6 +446,7 @@ export const LANGUAGES: readonly Language[] = [
       frame: ['offset'], motifs: [['shapes', 'marquee', 'numbering'], ['shapes', 'numbering']], shapes: [['circle', 'diamond'], ['square', 'circle']],
     },
     accent2: { turn: 150, s: 0.7, l: 0.5 },
+    motion: ['kinetic', 'lively'], moTweak: { entrance: 'slide', hover: 'invert', sections: 'wipe', ease: 'snap' },
     prefer: { hero: ['poster', 'split', 'statement'], features: ['numbered', 'grid'], quote: ['pull', 'large'], stats: ['giant', 'band'], cta: ['band', 'statement'], text: ['lead'], gallery: ['grid', 'mosaic'], list: ['menu', 'schedule'], faq: ['accordion'] },
     tones: { alternate: false, cta: 'accent', stats: 'accent2', quote: 'invert' },
     concept: (c) => `Two inks on newsprint for ${c.audience}: a chunky serif, framed boxes with hard shadows and a running ticker, so ${c.what} feels made by people, not a template.`,
@@ -476,9 +494,9 @@ const SYNONYMS: Record<string, readonly string[]> = {
 
 // ── the direction ────────────────────────────────────────────────────
 
-export const LOCK_GROUPS = ['palette', 'type', 'layout', 'surface', 'imagery', 'motifs', 'voice'] as const;
+export const LOCK_GROUPS = ['palette', 'type', 'layout', 'surface', 'imagery', 'motifs', 'motion', 'voice'] as const;
 export type LockGroup = (typeof LOCK_GROUPS)[number];
-export const LOCK_LABEL: Record<LockGroup, string> = { palette: 'Colours', type: 'Type', layout: 'Layout', surface: 'Surfaces', imagery: 'Imagery', motifs: 'Motifs', voice: 'Voice' };
+export const LOCK_LABEL: Record<LockGroup, string> = { palette: 'Colours', type: 'Type', layout: 'Layout', surface: 'Surfaces', imagery: 'Imagery', motifs: 'Motifs', motion: 'Motion', voice: 'Voice' };
 
 export interface ArtDirection {
   id: string;
@@ -730,6 +748,9 @@ interface Directives {
   minimal?: boolean;
   loud?: boolean;
   accent?: string;
+  /** what the words say about motion */
+  motion?: Motion['feel'];
+  parallax?: boolean;
   fonts: string[];
   said: string[];
 }
@@ -752,6 +773,12 @@ export function readDirectives(notes: string, avoid: string): Directives {
   if (/\b(colou?rful|vibrant|bright colou?rs|multicolou?r)\b/.test(n)) (d.colourful = true), say('more colour');
   if (/\b(minimal|minimalist|spare|restrained|quiet)\b/.test(n)) (d.minimal = true), say('restraint');
   if (/\b(bold|loud|big type|huge type|punchy|striking)\b/.test(n)) (d.loud = true), say('bigger, bolder type');
+  const mo = readMotionWords(notes);
+  if (mo.feel) d.motion = mo.feel;
+  if (mo.parallax !== undefined) d.parallax = mo.parallax;
+  if (/\b(motion|animation|animations|moving)\b/.test(a)) (d.motion = 'still'), mo.said.splice(0, mo.said.length, 'no motion');
+  if (/\bparallax\b/.test(a)) (d.parallax = false), mo.said.includes('no parallax') || mo.said.push('no parallax');
+  for (const x of mo.said) say(x);
   const hexes = notes.match(/#[0-9a-f]{6}\b/i);
   if (hexes) (d.accent = hexes[0].toLowerCase()), say(`${d.accent} as the accent`);
   for (const f of FONTS) if (n.includes(f.name.toLowerCase())) d.fonts.push(f.name);
@@ -829,6 +856,13 @@ export function buildDirection(lang: Language, brief: DesignBrief, opt: BuildOpt
     if (!shapes.length) shapes = ['circle', 'square'];
   }
   if (!motifs.includes('shapes')) shapes = [];
+  // motion: the language's own feel, unless the words ask for another; restraint and loudness move it a step
+  let feel: Motion['feel'] = d.motion ?? nth(lang.motion, r, f);
+  if (!d.motion && d.minimal) feel = feel === 'kinetic' ? 'measured' : feel === 'lively' ? 'calm' : feel;
+  if (!d.motion && d.loud && feel !== 'still') feel = feel === 'calm' ? 'measured' : feel === 'measured' ? 'lively' : 'kinetic';
+  // the language's own way of moving applies to its own feels; a feel the designer asks for that it does not have comes as itself
+  const motion: Motion = feel === 'still' ? { ...STILL_MOTION } : (lang.motion as readonly string[]).includes(feel) ? motionFor(feel, lang.moTweak) : motionFor(feel);
+  if (feel !== 'still' && d.parallax !== undefined) motion.parallax = d.parallax ? Math.max(1, motion.parallax) : 0;
   let containers = nth(L.containers, r, f);
   if (d.colourful && containers === 'open') containers = 'bands';
   const turn = lang.accent2 ?? (d.colourful ? { turn: 150, s: 0.6, l: 0.6 } : null);
@@ -853,6 +887,7 @@ export function buildDirection(lang: Language, brief: DesignBrief, opt: BuildOpt
       motifs,
       shapes,
       accent2: turn === null ? '' : secondInk(colors.accent, turn, colors.background),
+      motion,
     },
     lookFromTokens(DEFAULT_TOKENS)
   );
@@ -930,6 +965,7 @@ export function directionDistance(a: ArtDirection, b: ArtDirection): number {
     [1, ne(a.tokens.imageTreatment, b.tokens.imageTreatment)],
     [2, jac(A.motifs, B.motifs)],
     [1.5, hueDistance(a.tokens.colors.accent, b.tokens.colors.accent)],
+    [1.5, ne(A.motion?.feel ?? 'still', B.motion?.feel ?? 'still')],
   ];
   const total = parts.reduce((s, [w]) => s + w, 0);
   return Math.round((parts.reduce((s, [w, v]) => s + w * v, 0) / total) * 1000) / 1000;
@@ -968,6 +1004,9 @@ export function applyLocks(to: ArtDirection, from: ArtDirection | null | undefin
         out.look.motifs = [...from.look.motifs];
         out.look.shapes = [...from.look.shapes];
         break;
+      case 'motion':
+        out.look.motion = { ...from.look.motion };
+        break;
       case 'voice':
         out.voice = from.voice;
         break;
@@ -979,7 +1018,7 @@ export function applyLocks(to: ArtDirection, from: ArtDirection | null | undefin
 const TOKEN_GROUP: Record<string, LockGroup> = { colors: 'palette', fonts: 'type', scale: 'layout', radius: 'surface', imageTreatment: 'imagery', style: 'surface' };
 const LOOK_GROUP: Record<string, LockGroup> = {
   accent2: 'palette', ratio: 'type', weight: 'type', case: 'type', tracking: 'type', emphasis: 'type', label: 'type', mono: 'type',
-  grid: 'layout', align: 'layout', width: 'layout', rhythm: 'layout', containers: 'surface', rules: 'surface', buttons: 'surface', frame: 'imagery', motifs: 'motifs', shapes: 'motifs',
+  grid: 'layout', align: 'layout', width: 'layout', rhythm: 'layout', containers: 'surface', rules: 'surface', buttons: 'surface', frame: 'imagery', motifs: 'motifs', shapes: 'motifs', motion: 'motion',
 };
 
 /** The locked groups a patch would change: a change to any of them waits for the designer. */
@@ -1007,7 +1046,7 @@ export function lockedChanges(spec: DesignSpec, patch: Patch, locks: readonly Lo
 
 /** The tokens and look a design takes from its direction. */
 export function designFromDirection(dir: ArtDirection): { tokens: DesignTokens; look: Look } {
-  return { tokens: { ...dir.tokens, colors: { ...dir.tokens.colors }, fonts: { ...dir.tokens.fonts } }, look: { ...dir.look, motifs: [...dir.look.motifs], shapes: [...dir.look.shapes] } };
+  return { tokens: { ...dir.tokens, colors: { ...dir.tokens.colors }, fonts: { ...dir.tokens.fonts } }, look: { ...dir.look, motifs: [...dir.look.motifs], shapes: [...dir.look.shapes], motion: { ...(dir.look.motion ?? STILL_MOTION) } } };
 }
 
 // ── proposing ────────────────────────────────────────────────────────
@@ -1235,9 +1274,24 @@ export function directionBrief(dir: ArtDirection, pageType: 'website' | 'app-scr
     `The renderer already draws the look from this direction (${dir.tokens.fonts.display} and ${dir.tokens.fonts.body}; ${L.grid} grid; ${L.containers} surfaces; ${L.buttons} buttons; ${L.case === 'upper' ? 'capital' : 'sentence-case'} headlines; motifs: ${L.motifs.join(', ') || 'none'}). You do not choose tokens: you choose sections, variants and copy that serve it.`,
     prefer ? `Variants that speak this language (best first): ${prefer}.` : '',
     L.motifs.includes('icons') ? '' : 'Icons are not part of this language: leave feature icons out.',
+    motionBrief(L.motion),
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+/** What the approved motion asks of the words: the renderer plays it, but copy written for it moves better. */
+function motionBrief(m: Motion | undefined): string {
+  if (!m || m.feel === 'still') return 'Motion: still. Nothing on the page animates, so the order and hierarchy alone must carry it.';
+  const head =
+    m.headline === 'letters'
+      ? 'The opening headline arrives letter by letter: keep it to six words or fewer, every letter earning its place.'
+      : m.headline === 'words'
+        ? 'The opening headline arrives word by word: write it so each word lands on its own, ten words at most.'
+        : m.headline === 'mask'
+          ? 'The opening headline rises through a mask: a short, confident statement reads best.'
+          : '';
+  return `Motion (${m.feel}): the renderer plays it as CSS. ${head} ${m.scroll ? 'Sections arrive as they scroll in, so give each one a single clear idea.' : ''}`.replace(/\s+/g, ' ').trim();
 }
 
 // ── planning the page's rhythm ───────────────────────────────────────

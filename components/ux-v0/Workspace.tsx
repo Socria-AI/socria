@@ -54,6 +54,7 @@ import { measurePage } from './measure';
 import { Composer, type ComposeMode } from './Composer';
 import { QuestionBand, QuestionsRail } from './Discovery';
 import { LivingBrief } from './LivingBrief';
+import { Preview } from './Preview';
 import { checkFile, fetchOriginal, imageSize, keepOriginal } from './files';
 import { Inspect } from './Inspect';
 import { elementSelection } from '@/lib/ux-v0/selection';
@@ -114,6 +115,8 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const [zoom, setZoom] = useState(1);
   const [checks, setChecks] = useState<Checks | null>(null);
   const [dirNote, setDirNote] = useState('');
+  // the design in a real viewport, its motion playing
+  const [previewing, setPreviewing] = useState(false);
   const stage = useRef<StageHandle>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const nonce = useMemo(() => makeNonce(), []);
@@ -914,6 +917,9 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                   <button type="button" className="sb-link is-meta" onClick={() => setView('discovery')}>
                     Moodboard
                   </button>
+                  <button type="button" className="sb-btn is-sm v0-preview-btn" onClick={() => setPreviewing(true)} title="See it in a real viewport, with its motion">
+                    Preview
+                  </button>
                 </span>
               )}
             </div>
@@ -1353,7 +1359,9 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                       type="button"
                       className="sb-link is-meta is-strong"
                       onClick={() => {
-                        const url = URL.createObjectURL(new Blob([rendered.html], { type: 'text/html' }));
+                        // the exported page carries its motion (CSS only, with its reduced-motion alternative)
+                        const page = spec && !imported ? renderDesign(spec, project.moodboard.refs, { motion: 'play' }).html : rendered.html;
+                        const url = URL.createObjectURL(new Blob([page], { type: 'text/html' }));
                         const a = document.createElement('a');
                         a.href = url;
                         a.download = `${(spec?.title || project.name).replace(/[^\w-]+/g, '-').toLowerCase()}.html`;
@@ -1426,6 +1434,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
           </div>
         </aside>
       </div>
+      {previewing && spec && !imported && <Preview spec={spec} refs={project.moodboard.refs} nonce={nonce} title={spec.title || project.name} onClose={() => setPreviewing(false)} />}
       <input
         ref={fileInput}
         type="file"

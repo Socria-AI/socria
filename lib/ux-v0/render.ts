@@ -28,6 +28,7 @@ import { isDark, mix, rgbOf } from './color';
 import { fontStack, fontStylesheet, hasItalic, knownFont, nearestWeight } from './fonts';
 import { NEEDS_IMAGE, ensureContrast, kindDef, lookFromTokens, type DesignSpec, type DesignTokens, type Look, type Section, type Shape } from './spec';
 import { creditText, type MoodboardRef } from './types';
+import { kineticHeadline, motionCss, type MotionMode } from './motion';
 
 export interface Credit {
   id: string;
@@ -40,6 +41,15 @@ export interface Rendered {
   html: string;
   css: string;
   credits: Credit[];
+}
+
+export interface RenderOptions {
+  /**
+   * How motion is written: `static` (the default: the canvas, specimens and the
+   * checks see the page at rest, hovers only), `play` (the preview and the
+   * exported page), or `reduced` (the reduced-motion alternative, to preview it).
+   */
+  motion?: MotionMode;
 }
 
 // ── text ─────────────────────────────────────────────────────────────
@@ -264,6 +274,8 @@ function shapeArt(look: Look, turn: number, cls = 'art'): string {
 interface Ctx {
   look: Look;
   first: boolean;
+  /** motion plays: the opening headline may be set as kinetic type */
+  play: boolean;
   /** the section's number, when the look numbers sections */
   no: string;
   turn: number;
@@ -293,7 +305,9 @@ const SECTIONS: Record<string, R> = {
     const { im, look } = x;
     const sub = c.subtitle ? `<p class="hero-sub" ${attr(s.id, 'subtitle')}>${t(c.subtitle)}</p>` : '';
     const note = c.note ? `<p class="small muted hero-note" ${attr(s.id, 'note')}>${t(c.note)}</p>` : '';
-    const h1 = (cls = '') => `<h1 class="h-hero${cls}" ${attr(s.id, 'title')}>${t(c.title)}</h1>`;
+    const kinetic = x.play && x.first && (look.motion?.headline === 'words' || look.motion?.headline === 'letters') ? look.motion.headline : null;
+    const words = kinetic ? kineticHeadline(t(c.title), kinetic) : t(c.title);
+    const h1 = (cls = '') => `<h1 class="h-hero${cls}" ${attr(s.id, 'title')}${kinetic ? ` aria-label="${plain(c.title)}"` : ''}>${words}</h1>`;
     const text = `<div class="hero-text">${eyebrow(s, c.eyebrow)}${h1()}${sub}${actions(s, c)}${note}</div>`;
     const fig = (cls: string, imgCls: string) => `<figure class="${cls}">${im.img(s, 0, imgCls, true)}${im.cap(s, 0)}</figure>`;
     if (s.variant === 'full-bleed' && im.has(s, 0)) return `<div class="hero-bleed">${im.img(s, 0, 'bleed-img', true)}<div class="bleed-shade scrim"></div><div class="wrap">${text}</div></div>`;
@@ -844,8 +858,10 @@ function marqueeWords(spec: DesignSpec): string[] {
 }
 
 /** Draw a spec. `refs`: the project's moodboard references. */
-export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[]): Rendered {
+export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], opts: RenderOptions = {}): Rendered {
   const look = spec.look ?? lookFromTokens(spec.tokens);
+  const mode: MotionMode = opts.motion ?? 'static';
+  const play = mode === 'play' && (look.motion?.feel ?? 'still') !== 'still';
   const im = new Images(new Map(refs.filter((r) => r.state !== 'rejected').map((r) => [r.id, r])), look.motifs.includes('captions'));
   const app = spec.pageType === 'app-screen';
   let heroSeen = false;
@@ -864,13 +880,14 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[]): R
     const tag = s.kind === 'nav' || s.kind === 'footer' || s.kind === 'app-nav' ? 'div' : 'section';
     const tone = s.tone && s.tone !== 'base' ? ` tone-${s.tone}` : '';
     const pad = s.pad && s.pad !== 'm' ? ` pad-${s.pad}` : '';
-    const html = `<${tag} class="sx sx-${s.kind} v-${s.variant}${tone}${pad}" data-ux-section="${esc(s.id)}"${cols}>${fn(s, s.content, { look, first, no, turn: turn++, im })}</${tag}>`;
+    const html = `<${tag} class="sx sx-${s.kind} v-${s.variant}${tone}${pad}" data-ux-section="${esc(s.id)}"${cols}>${fn(s, s.content, { look, first, play, no, turn: turn++, im })}</${tag}>`;
     // a running marquee follows the opening statement
     if (!marqueeDone && s.kind === 'hero') {
       marqueeDone = true;
       const words = marqueeWords(spec).map((w) => esc(String(w).replace(/\*/g, '').slice(0, 40)));
       const run = Array.from({ length: Math.max(2, Math.ceil(10 / words.length)) }, () => words.map((w) => `<span>${w}</span><i class="mq-dot"></i>`).join('')).join('');
-      return `${html}\n<div class="marquee" aria-hidden="true"><div class="mq-track">${run}</div></div>`;
+      // when it runs, the strip is written twice so the loop is seamless
+      return `${html}\n<div class="marquee" aria-hidden="true"><div class="mq-track">${play ? run + run : run}</div></div>`;
     }
     return html;
   });
@@ -898,7 +915,7 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[]): R
   }
 
   const fonts = fontStylesheet([spec.tokens.fonts.display, spec.tokens.fonts.body, ...(look.label === 'mono' ? [look.mono] : [])]);
-  const style = css(spec.tokens, look);
+  const style = [css(spec.tokens, look), motionCss(look, mode, { app })].filter(Boolean).join('\n');
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -908,7 +925,7 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[]): R
 ${fonts ? `<link rel="stylesheet" href="${esc(fonts)}">` : ''}
 <style>${style}</style>
 </head>
-<body class="s-${spec.tokens.style} look-${esc(look.language)} grid-${look.grid}">
+<body class="s-${spec.tokens.style} look-${esc(look.language)} grid-${look.grid}${look.motion && look.motion.feel !== 'still' ? ` mo mo-${look.motion.feel}` : ''}">
 ${body}
 </body>
 </html>`;
