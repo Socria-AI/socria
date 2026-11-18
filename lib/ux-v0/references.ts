@@ -175,7 +175,7 @@ export function readBoard(board: Moodboard | null | undefined): BoardReading {
   if (out.colours.length) said.push(`colours sampled from ${colourFrom.slice(0, 2).map((t) => `“${t}”`).join(' and ')}`);
   if (typeFrom) said.push(`typography from “${typeFrom}”`);
   if (out.motion) said.push(`${out.motion} motion from your moving references`);
-  if (out.grid) said.push(`a ${out.grid} composition`);
+  if (out.grid) said.push(`${/^[aeiou]/.test(out.grid) ? 'an' : 'a'} ${out.grid} composition`);
   if (avoiding.length) said.push(`steering away from ${avoiding.length} reference${avoiding.length === 1 ? '' : 's'}`);
   return out;
 }

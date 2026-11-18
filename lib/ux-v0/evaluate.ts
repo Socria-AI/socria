@@ -26,7 +26,7 @@ import { LOCK_LABEL, briefColors, lockedChanges, type ArtDirection, type LockGro
 import { knownFont } from './fonts';
 import { whyFor } from './knowledge';
 import { stepMotion } from './motion';
-import { STILL_MOTION, ensureContrast, kindDef, lookFromTokens, usableImages, type DesignSpec, type Patch, type Section } from './spec';
+import { STILL_MOTION, ensureContrast, kindDef, lookFromTokens, normalizeTokens, usableImages, type DesignSpec, type Patch, type Section } from './spec';
 import type { DesignBrief, Moodboard } from './types';
 
 // ── what the audit reports (from inside the sandbox: never trusted as is) ──
@@ -374,8 +374,10 @@ function fidelityChecks(spec: DesignSpec, ctx: FidelityContext, add: (f: Omit<Fi
   const tk = spec.tokens;
   const dir = ctx.direction;
   if (dir) {
+    // the direction's colours as a page would normalise them, so contrast fixes are not mistaken for drift
+    const dirColors = normalizeTokens(dir.tokens, []).colors;
     const drift: [LockGroup, boolean][] = [
-      ['palette', !same(tk.colors, dir.tokens.colors)],
+      ['palette', !same(tk.colors, dirColors)],
       ['type', tk.fonts.display !== dir.tokens.fonts.display || tk.fonts.body !== dir.tokens.fonts.body],
       ['layout', look.grid !== dir.look.grid || look.width !== dir.look.width],
       ['surface', look.containers !== dir.look.containers || look.buttons !== dir.look.buttons],

@@ -127,7 +127,7 @@ export function principlesForLook(look: Look | null | undefined, n = 8): Princip
 
 /** Those principles, as lines for a prompt. */
 export function knowledgeBrief(look: Look | null | undefined): string {
-  return `DESIGN DESIGN_PRINCIPLES TO HONOUR (each with why):\n${principlesForLook(look)
+  return `DESIGN PRINCIPLES TO HONOUR (each with why):\n${principlesForLook(look)
     .map((p) => `- ${p.rule} (${p.why})`)
     .join('\n')}`;
 }

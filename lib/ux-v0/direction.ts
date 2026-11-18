@@ -477,6 +477,9 @@ const CLASHES: Record<string, readonly string[]> = {
   'retro-print': ['luxury', 'clinic', 'patients', 'legal', 'bank', 'funeral', 'pension', 'hotel', 'spa', 'enterprise'],
 };
 
+/** How well each language suits a working interface (an app screen), added to its fit when the designer's words do not name one. */
+const APP_FIT: Record<string, number> = { utility: 7, civic: 4, swiss: 3, geometric: 2, organic: 0, broadsheet: -1, craft: -3, gallery: -3, night: -2, 'quiet-luxury': -5, poster: -6, 'retro-print': -5 };
+
 /** Words people use for a language, by its id. */
 const SYNONYMS: Record<string, readonly string[]> = {
   broadsheet: ['newspaper', 'broadsheet', 'editorial', 'magazine', 'literary', 'journal'],
@@ -568,7 +571,7 @@ export function applyBrief(dir: ArtDirection, brief: DesignBrief, faithful: bool
   };
   const use = (part: BriefPart) => dec[part] === 'locked' || (faithful && dec[part] !== 'delegated');
   if (dec.colour === 'locked' && brief.palette.length) {
-    out.tokens.colors = { ...briefColors(brief) };
+    out.tokens = normalizeTokens({ ...out.tokens, colors: { ...briefColors(brief) } }, []);
     lock('palette');
   }
   if (dec.typography === 'locked') {
@@ -589,6 +592,8 @@ export function applyBrief(dir: ArtDirection, brief: DesignBrief, faithful: bool
     const c = out.tokens.colors;
     out.tokens.colors = { ...c, text: ensureContrast(c.text, c.background, 7), muted: ensureContrast(c.muted, c.background, 7), accentText: ensureContrast(c.accentText, c.accent, 7) };
   }
+  // square corners mean square buttons as well
+  if (out.tokens.radius === 'none' && out.look.buttons === 'pill' && (sp.corners === 'none' || (brief.rules ?? []).some((r) => /\bno (rounded|round corners|pills?)\b|\bsquare corners\b/i.test(r)))) out.look.buttons = 'solid';
   return out;
 }
 
@@ -709,6 +714,8 @@ export function fitScores(brief: DesignBrief, notes = '', avoid = ''): Fit[] {
     if (l.display.includes(brief.typography.display)) score += 1.5;
     if (l.palette === 'dark' && bgDark) score += 4;
     if (l.palette === 'dark' && !bgDark) score -= 1.5;
+    // an app screen is a working interface: languages built for interfaces come forward, posters and showrooms step back
+    if (brief.pageType === 'app-screen' && !asked) score += APP_FIT[l.id] ?? 0;
     return { id: l.id, score: Math.round(score * 100) / 100, matched: [...matched].slice(0, 6) };
   }).sort((a, b) => b.score - a.score);
 }
@@ -808,18 +815,22 @@ export function readDirectives(notes: string, avoid: string): Directives {
   const d: Directives = { fonts: [], said: [] };
   const say = (s: string) => d.said.push(s);
   if (/\b(dark|darker|black background|night|nighttime|night-time|dark mode|moody|after dark)\b/.test(n) && !/\b(not|no) dark\b/.test(n)) (d.dark = true), say('a dark ground');
-  if (/\b(dark|black)\b/.test(a) || /\b(light|bright|white background)\b/.test(n)) (d.dark = false), say('a light ground');
+  // "a light ground", "white background", "light and airy": the colour of the page. Not "the light" of a
+  // photograph ("the light, not the bar itself"), which is atmosphere, and not "bright colours", which is colour.
+  const lightGround = /\b(light|pale|white|bright) (ground|background|backgrounds|mode|theme|page|pages|paper)\b|\b(light|pale) (palette|colou?rs?|tones?)\b|\b(light|bright) and airy\b|\bairy and (light|bright)\b/;
+  if (/\b(dark|black)\b/.test(a) || (lightGround.test(n) && !/\b(no|not) (light|white|bright)\b/.test(n))) (d.dark = false), say('a light ground');
   if (/\b(no|not|without) serifs?\b/.test(n) || /\bserifs?\b/.test(a)) (d.serif = false), say('sans-serif headlines');
   else if (/\bserif\b/.test(n) && !/\bsans\b/.test(n)) (d.serif = true), say('serif headlines');
   else if (/\bsans\b/.test(n)) (d.serif = false), say('sans-serif headlines');
-  if (/\b(uppercase|all caps|capitals)\b/.test(n)) (d.upper = true), say('capitals for headlines');
-  if (/\b(uppercase|all caps|capitals|caps)\b/.test(a)) (d.upper = false), say('no capitals');
-  if (/\b(rounded|round|soft corners|friendly shapes)\b/.test(n)) (d.corners = 'round'), say('rounded corners');
+  const noCaps = /\b(no|not|without|avoid|never) (uppercase|all caps|capitals|caps)\b/.test(n) || /\b(uppercase|all caps|capitals|caps)\b/.test(a);
+  if (!noCaps && /\b(uppercase|all caps|capitals)\b/.test(n)) (d.upper = true), say('capitals for headlines');
+  if (noCaps) (d.upper = false), say('no capitals');
+  if (/\b(rounded|round|soft corners|friendly shapes)\b/.test(n) && !/\b(no|not|without|avoid|never) (rounded|round)\b/.test(n)) (d.corners = 'round'), say('rounded corners');
   if (/\b(sharp|square|hard edges|no rounded)\b/.test(n) || /\b(rounded|round corners)\b/.test(a)) (d.corners = 'none'), say('square corners');
   if (/\b(no (photos|images|photography|pictures)|type only|typographic only)\b/.test(n) || /\b(photos|images|photography|stock)\b/.test(a)) (d.noImages = true), say('type before pictures');
   if (/\b(colou?rful|vibrant|bright colou?rs|multicolou?r)\b/.test(n)) (d.colourful = true), say('more colour');
   if (/\b(minimal|minimalist|spare|restrained|quiet)\b/.test(n)) (d.minimal = true), say('restraint');
-  if (/\b(bold|loud|big type|huge type|punchy|striking)\b/.test(n)) (d.loud = true), say('bigger, bolder type');
+  if (/\b(bold|bolder|loud|louder|punchy|striking|oversized|(big|bigger|huge|giant|massive|enormous) (type|headlines?|letters|typography))\b/.test(n)) (d.loud = true), say('bigger, bolder type');
   const mo = readMotionWords(notes);
   if (mo.feel) d.motion = mo.feel;
   if (mo.parallax !== undefined) d.parallax = mo.parallax;
@@ -936,7 +947,8 @@ export function buildDirection(lang: Language, brief: DesignBrief, opt: BuildOpt
       rhythm: nth(L.rhythm, r, f),
       containers,
       rules: nth(L.rules, r, f),
-      buttons: nth(L.buttons, r, f),
+      // drawn once, where it always was, so the options' other choices stay as they were; square corners make pills solid
+      buttons: ((b) => (d.corners === 'none' && b === 'pill' ? 'solid' : b))(nth(L.buttons, r, f)),
       frame: d.noImages ? 'plain' : nth(L.frame, r, f),
       motifs,
       shapes,
@@ -1142,7 +1154,7 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
     if (board.serif !== undefined && directives.serif === undefined) directives.serif = board.serif;
     if (board.motion && !directives.motion) (directives.motion = board.motion), directives.said.push(`${board.motion} motion, from your moving references`);
     if (board.parallax !== undefined && directives.parallax === undefined) directives.parallax = board.parallax;
-    if (board.grid) (directives.grid = board.grid), directives.said.push(`a ${board.grid} composition, from your references`);
+    if (board.grid) (directives.grid = board.grid), directives.said.push(`${/^[aeiou]/.test(board.grid) ? 'an' : 'a'} ${board.grid} composition, from your references`);
     if (board.density) (directives.density = board.density), directives.said.push(board.density === 'airy' ? 'generous space, from your references' : 'a denser page, from your references');
   }
   const fromRefs = board?.colours.length ? paletteFromSwatches(board.colours) : null;

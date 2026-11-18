@@ -25,7 +25,7 @@
 
 import { contrastRatio } from '../ux/audit';
 import { isDark, mix, rgbOf } from './color';
-import { fontStack, fontStylesheet, hasItalic, knownFont, nearestWeight } from './fonts';
+import { advanceEm, fontStack, fontStylesheet, hasItalic, knownFont, nearestWeight } from './fonts';
 import { NEEDS_IMAGE, ensureContrast, kindDef, lookFromTokens, type DesignSpec, type DesignTokens, type Look, type Section, type Shape } from './spec';
 import { creditText, type MoodboardRef } from './types';
 import { kineticHeadline, motionCss, type MotionMode } from './motion';
@@ -437,13 +437,26 @@ const SECTIONS: Record<string, R> = {
       )
       .join('')}</div>`,
   chart: (s, c) => `<div class="card chart-card"><h2 class="h-card" ${attr(s.id, 'title')}>${t(c.title)}</h2>${chartSvg(s, c)}${c.note ? `<p class="small muted" ${attr(s.id, 'note')}>${t(c.note)}</p>` : ''}</div>`,
-  table: (s, c) =>
-    `<div class="card table-card">${c.title ? `<h2 class="h-card" ${attr(s.id, 'title')}>${t(c.title)}</h2>` : ''}<div class="table-scroll"><table><thead><tr>${(c.columns as string[]).map((h, i) => `<th scope="col" ${attr(s.id, `columns.${i}`)}>${t(h)}</th>`).join('')}${(c.rows as any[]).some((r) => r.status) ? '<th scope="col">Status</th>' : ''}</tr></thead><tbody>${(c.rows as any[])
+  table: (s, c) => {
+    const cols = c.columns as string[];
+    const rows = c.rows as any[];
+    const hasStatus = rows.some((r) => r.status);
+    // a column already called "Status" holds the status; otherwise the status gets a column of its own
+    const statusCol = hasStatus ? cols.findIndex((h) => /^\s*status\s*$/i.test(String(h))) : -1;
+    const extra = hasStatus && statusCol < 0;
+    const pill = (r: any, i: number) => (r.status ? `<span class="status" ${attr(s.id, `rows.${i}.status`)}><span class="dot" aria-hidden="true"></span>${t(r.status)}</span>` : '');
+    return `<div class="card table-card">${c.title ? `<h2 class="h-card" ${attr(s.id, 'title')}>${t(c.title)}</h2>` : ''}<div class="table-scroll"><table><thead><tr>${cols.map((h, i) => `<th scope="col" ${attr(s.id, `columns.${i}`)}>${t(h)}</th>`).join('')}${extra ? '<th scope="col">Status</th>' : ''}</tr></thead><tbody>${rows
       .map(
         (r, i) =>
-          `<tr>${(c.columns as string[]).map((_, j) => `<td ${attr(s.id, `rows.${i}.cells.${j}`)}>${t((r.cells as string[])[j] ?? '')}</td>`).join('')}${(c.rows as any[]).some((x) => x.status) ? `<td ${attr(s.id, `rows.${i}.status`)}>${r.status ? `<span class="status"><span class="dot" aria-hidden="true"></span>${t(r.status)}</span>` : ''}</td>` : ''}</tr>`
+          `<tr>${cols
+            .map((_, j) => {
+              const cell = (r.cells as string[])[j] ?? '';
+              return j === statusCol && !String(cell).trim() ? `<td>${pill(r, i)}</td>` : `<td ${attr(s.id, `rows.${i}.cells.${j}`)}>${t(cell)}</td>`;
+            })
+            .join('')}${extra ? `<td>${pill(r, i)}</td>` : ''}</tr>`
       )
-      .join('')}</tbody></table></div></div>`,
+      .join('')}</tbody></table></div></div>`;
+  },
   feed: (s, c) =>
     `<div class="card feed-card">${c.title ? `<h2 class="h-card" ${attr(s.id, 'title')}>${t(c.title)}</h2>` : ''}<ol class="feed">${(c.items as any[])
       .map((it, i) => `<li><p class="feed-title" ${attr(s.id, `items.${i}.title`)}>${t(it.title)}</p>${it.meta ? `<p class="small muted" ${attr(s.id, `items.${i}.meta`)}>${t(it.meta)}</p>` : ''}${it.text ? `<p class="small" ${attr(s.id, `items.${i}.text`)}>${t(it.text)}</p>` : ''}</li>`)
@@ -485,16 +498,20 @@ function chartSvg(s: Section, c: Record<string, any>): string {
       )
       .join('');
   } else {
+    // the first series is the subject: only it is filled, and it is drawn last, on top; the others are
+    // comparisons, drawn as dashed lines beneath it (two overlapping fills read as one muddy shape)
     marks = series
       .map((se, k) => {
         const pts = se.values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
-        const area = s.variant === 'area' ? `<polygon class="area s${k}" points="${x(0).toFixed(1)},${y(min).toFixed(1)} ${pts} ${x(se.values.length - 1).toFixed(1)},${y(min).toFixed(1)}"/>` : '';
-        return `${area}<polyline class="line s${k}" points="${pts}"/>`;
+        const area = s.variant === 'area' && k === 0 ? `<polygon class="area s${k}" points="${x(0).toFixed(1)},${y(min).toFixed(1)} ${pts} ${x(se.values.length - 1).toFixed(1)},${y(min).toFixed(1)}"/>` : '';
+        return `${area}<polyline class="line s${k}${k > 0 ? ' cmp' : ''}" points="${pts}"/>`;
       })
+      .reverse()
       .join('');
   }
   const summary = series.map((se) => `${se.name}: ${se.values.map((v, i) => `${labels[i]} ${v}`).join(', ')}`).join('; ');
-  const legend = series.length > 1 ? `<ul class="legend">${series.map((se, k) => `<li><span class="key s${k}" aria-hidden="true"></span>${esc(se.name)}</li>`).join('')}</ul>` : '';
+  // the key draws each series as it is drawn: a swatch for the filled subject, a dashed line for a comparison
+  const legend = series.length > 1 ? `<ul class="legend">${series.map((se, k) => `<li><span class="key s${k}${k > 0 && s.variant !== 'bar' ? ' key-line' : ''}" aria-hidden="true"></span>${esc(se.name)}</li>`).join('')}</ul>` : '';
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${plain(`${c.title}. ${summary}`)}" ${attr(s.id, 'series')}>${grid}${marks}${xl}</svg>${legend}`;
 }
 
@@ -512,7 +529,31 @@ function duotoneFilter(dark: string, light: string): string {
   return `<svg class="defs" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute"><filter id="ux-duo" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0.299 0.587 0.114 0 0 0.299 0.587 0.114 0 0 0.299 0.587 0.114 0 0 0 0 0 1 0"/><feComponentTransfer><feFuncR type="table" tableValues="${r1} ${r2}"/><feFuncG type="table" tableValues="${g1} ${g2}"/><feFuncB type="table" tableValues="${b1} ${b2}"/></feComponentTransfer></filter></svg>`;
 }
 
-function css(tk: DesignTokens, look: Look): string {
+/** The headlines a design sets, by size: their longest words decide how large each size may be. */
+interface Headlines {
+  hero: readonly string[];
+  section: readonly string[];
+  giant: readonly string[];
+}
+const NO_HEADLINES: Headlines = { hero: [], section: [], giant: [] };
+const longestWord = (text: unknown) => Math.max(0, ...String(text ?? '').replace(/<[^>]+>/g, '').replace(/[*_~`]/g, '').split(/\s+/).map((w) => [...w].length));
+
+/** The headlines of a spec, sorted into the three sizes they are set at. */
+function headlinesOf(spec: DesignSpec): Headlines {
+  const hero: string[] = [];
+  const section: string[] = [];
+  const giant: string[] = [];
+  for (const s of spec.sections) {
+    const title = (s.content as Record<string, unknown>)?.title;
+    if (typeof title !== 'string' || !title) continue;
+    if (s.kind === 'hero') hero.push(title);
+    else if (s.kind === 'cta' && s.variant === 'statement') giant.push(title);
+    else if (!/^(nav|footer|app-|stat-cards|chart|table|feed)/.test(s.kind)) section.push(title);
+  }
+  return { hero, section, giant };
+}
+
+function css(tk: DesignTokens, look: Look, heads: Headlines = NO_HEADLINES): string {
   const c = tk.colors;
   const g = grounds(c, look.accent2);
   const dark = isDark(c.background);
@@ -537,6 +578,14 @@ function css(tk: DesignTokens, look: Look): string {
   const lede = clampN(step(0.5), 18, 23);
   const weight = nearestWeight(tk.fonts.display, L.weight);
   const itemWeight = nearestWeight(tk.fonts.display, Math.min(L.weight, displayKind === 'serif' ? 600 : 700));
+  // the size at which a headline's longest word still fits: capitals of a wide face at poster scale can be
+  // wider than a phone, and a word must never break in the middle. Measured advances (lib/ux-v0/fonts.ts),
+  // a margin for the widest letters, and the page's 40px of gutters.
+  const perChar = advanceEm(tk.fonts.display, weight, upper);
+  const wordEms = (titles: readonly string[], tr: number) => {
+    const n = Math.max(0, ...titles.map(longestWord));
+    return n ? n * (perChar + tr) * 1.1 : 0;
+  };
   const heavy = weight >= 700;
   const track =
     L.tracking === 'tight' ? (upper ? -0.01 : heavy ? -0.035 : -0.025) : L.tracking === 'wide' ? (upper ? 0.06 : 0.015) : upper ? 0.02 : -0.01;
@@ -557,11 +606,20 @@ function css(tk: DesignTokens, look: Look): string {
   const heroSize = classic ? (tk.scale === 'compact' ? 'clamp(2.3rem, 4.8vw, 3.8rem)' : tk.scale === 'spacious' ? 'clamp(2.8rem, 7.4vw, 6.4rem)' : 'clamp(2.5rem, 6vw, 5rem)') : fluid(heroMin, heroMax);
   const h2Size = classic ? (tk.scale === 'compact' ? 'clamp(1.6rem, 2.8vw, 2.3rem)' : 'clamp(1.8rem, 3.6vw, 3rem)') : fluid(h2Min, h2Max);
 
+  const fitHero = wordEms(heads.hero, track);
+  const fitH2 = wordEms(heads.section, trackH2);
+  const fitGiant = wordEms(heads.giant, track);
+  const fitVars = [
+    fitHero ? `--fit-hero:calc((100vw - 40px) / ${fitHero.toFixed(2)})` : '',
+    fitH2 ? `--fit-h2:calc((100vw - 40px) / ${fitH2.toFixed(2)});--fit-h2-col:calc((min(var(--wrap), 100vw - 40px) - clamp(32px, 5vw, 88px)) / 3 / ${fitH2.toFixed(2)})` : '',
+    fitGiant ? `--fit-giant:calc((100vw - 40px) / ${fitGiant.toFixed(2)})` : '',
+  ].filter(Boolean).map((v) => `${v};`).join('');
+
   // ── tokens
   add(`:root{${groundVars(g.base)};--accent:${c.accent};--accent2:${L.accent2 || c.accent};--on-accent:${c.accentText};
 --display:${fontStack(tk.fonts.display)};--body:${fontStack(tk.fonts.body)};--mono:${fontStack(L.mono)};--label-font:${labelFont};
 --r:${corner}px;--btn-r:${btnR};--space:${space};--wrap:${wrap}px;--rule-w:${ruleW};--rule-c:${ruleC};
---fs:${classic ? 17 : base}px;--fs-lede:${classic ? '1.15rem' : px(lede)};--fs-h3:${classic ? '1.25rem' : px(h3)};--fs-h2:${h2Size};--fs-hero:${heroSize};--fs-giant:${fluid(clampN(giantMax * 0.4, 40, 56), giantMax)};
+--fs:${classic ? 17 : base}px;--fs-lede:${classic ? '1.15rem' : px(lede)};--fs-h3:${classic ? '1.25rem' : px(h3)};--fs-h2:${h2Size};--fs-hero:${heroSize};--fs-giant:${fluid(clampN(giantMax * 0.4, 40, 56), giantMax)};${fitVars}
 --hw:${weight};--iw:${classic ? weight : itemWeight};--track:${classic ? -0.025 : track}em;--track-h2:${classic ? -0.018 : trackH2}em;--lh-hero:${classic ? 1.02 : lhHero};--img:${filter};color-scheme:${dark ? 'dark' : 'light'}}`);
   for (const [name, gr] of Object.entries(g)) if (name !== 'base') add(`.tone-${name}{${groundVars(gr)};background:var(--bg);color:var(--text)}`);
 
@@ -587,9 +645,9 @@ a{color:inherit}
   add(`.h-hero,.h-section,.h-item,.h-app,.h-card,.h-giant,.brand,.price,.stat dd,.stat-value,blockquote,.lead-p{font-family:var(--display)}
 .h-hero,.h-section,.h-giant,.stat dd,.price,blockquote{font-weight:var(--hw)}
 .h-item,.h-card,.h-app,.brand{font-weight:var(--iw)}
-.h-hero{margin:0;font-size:var(--fs-hero);line-height:var(--lh-hero);letter-spacing:var(--track);text-wrap:balance;overflow-wrap:break-word;hyphens:manual}
-.h-section{margin:0 0 16px;font-size:var(--fs-h2);line-height:1.08;letter-spacing:var(--track-h2);text-wrap:balance;overflow-wrap:break-word}
-.h-giant{margin:0;font-size:var(--fs-giant);line-height:${upper ? 0.95 : 1.02};letter-spacing:var(--track);text-wrap:balance;overflow-wrap:break-word}
+.h-hero{margin:0;font-size:min(var(--fs-hero),var(--fit-hero,999px));line-height:var(--lh-hero);letter-spacing:var(--track);text-wrap:balance;overflow-wrap:break-word;hyphens:manual}
+.h-section{margin:0 0 16px;font-size:min(var(--fs-h2),var(--fit-h2,999px));line-height:1.08;letter-spacing:var(--track-h2);text-wrap:balance;overflow-wrap:break-word}
+.h-giant{margin:0;font-size:min(var(--fs-giant),var(--fit-giant,999px));line-height:${upper ? 0.95 : 1.02};letter-spacing:var(--track);text-wrap:balance;overflow-wrap:break-word}
 .h-item{margin:0 0 8px;font-size:var(--fs-h3);line-height:1.22;letter-spacing:${upper ? '0.01em' : '-0.005em'}}
 .lede,.body-lg,.hero-sub{font-size:var(--fs-lede);line-height:1.55;color:var(--muted);max-width:60ch}
 .hero-sub{margin:24px 0 0}
@@ -663,7 +721,7 @@ p{max-width:68ch}
 .hs-foot{display:grid;gap:24px;margin-top:clamp(28px,4vw,48px);padding-top:24px;border-top:var(--rule-w) solid var(--rule-c)}.hs-foot .hero-sub{margin:0}.hs-act .actions{margin-top:0}
 .art{width:clamp(120px,22vw,300px);flex:none}.art svg{display:block;width:100%;height:auto}
 .hero-statement.has-art .hs-top{display:grid;gap:28px}.hs-words{min-width:0}
-.hero-poster .h-poster{max-width:none;font-size:var(--fs-hero)}
+.hero-poster .h-poster{max-width:none;font-size:min(var(--fs-hero),var(--fit-hero,999px))}
 .hp-row{display:grid;gap:clamp(24px,4vw,56px);margin-top:clamp(28px,4vw,52px);align-items:start}.hp-text .hero-sub{margin-top:0}
 .hp-media .media-img{width:100%;aspect-ratio:3/2;object-fit:cover;border-radius:var(--r);filter:var(--img)}
 .art-poster{justify-self:end}.art-wide{margin-top:clamp(36px,5vw,64px);width:clamp(140px,30vw,360px)}`);
@@ -731,12 +789,17 @@ p{max-width:68ch}
   if (L.containers !== 'cards' && L.containers !== 'framed') add(`.plan{background:transparent;border:0;border-top:var(--rule-w) solid var(--rule-c);border-radius:0;padding:22px 0 0}.plan.is-featured{box-shadow:none;border-top-color:var(--accent-ink);border-top-width:3px}`);
   if (L.containers === 'open') add(`.f-numbered .feature,.f-list .feature{border-top:0;padding-top:0}`);
 
+  // one column on a phone, and a column that never grows past the screen: an implicit track would widen to
+  // its longest word ("DOWNLOADABLE" in poster capitals), pushing the page sideways; with a zero minimum the
+  // headings' break-word takes over instead. The wider layouts below replace it.
+  add(`.split,.hero-split,.hs-foot,.hp-row,.features,.lists,.plans,.cta-image,.cta-statement,.cs-row,.form-wrap,.tb-two-column,.q-with-portrait,.foot{grid-template-columns:minmax(0,1fr)}`);
+
   // ── the grid the page hangs from
   add(`@media (min-width:1000px){`);
-  if (L.grid === 'editorial') add(`.has-head{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);column-gap:clamp(32px,5vw,88px);align-items:start;padding-top:24px;border-top:var(--rule-w) solid var(--rule-c)}.has-head>.section-head{position:sticky;top:28px;margin:0;text-align:left}.has-head>.section-head .h-section{font-size:calc(var(--fs-h2) * .82)}.has-head>:not(.section-head){grid-column:2}.text-block.tb-two-column,.form-wrap.fm-split{padding-top:24px;border-top:var(--rule-w) solid var(--rule-c)}`);
+  if (L.grid === 'editorial') add(`.has-head{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);column-gap:clamp(32px,5vw,88px);align-items:start;padding-top:24px;border-top:var(--rule-w) solid var(--rule-c)}.has-head>.section-head{position:sticky;top:28px;margin:0;text-align:left}.has-head>.section-head .h-section{font-size:min(calc(var(--fs-h2) * .82),var(--fit-h2-col,999px))}.has-head>:not(.section-head){grid-column:2}.text-block.tb-two-column,.form-wrap.fm-split{padding-top:24px;border-top:var(--rule-w) solid var(--rule-c)}`);
   if (L.grid === 'swiss') add(`.sx:not(.sx-nav):not(.sx-hero):not(.sx-footer)>.wrap{border-top:var(--rule-w) solid var(--rule-c);padding-top:28px}.section-head{max-width:none;display:grid;grid-template-columns:2fr 10fr;column-gap:24px}.section-head>*{grid-column:2}.section-head>.sec-no{grid-column:1;grid-row:1/span 3}.section-head .h-section{max-width:18ch}.section-head.center{text-align:left}`);
   if (L.grid === 'asymmetric') add(`.sx:nth-of-type(even) .section-head{margin-left:calc(100% / 12 * 4)}.sx:nth-of-type(odd) .has-head>:not(.section-head){margin-left:calc(100% / 12 * 2)}.section-head.center{text-align:left;margin-inline:0}.sx:nth-of-type(even) .section-head.center{margin-left:calc(100% / 12 * 4)}`);
-  if (L.grid === 'poster') add(`.section-head{max-width:none}.section-head .h-section{font-size:var(--fs-h2);max-width:18ch}.section-head.center{text-align:left}`);
+  if (L.grid === 'poster') add(`.section-head{max-width:none}.section-head .h-section{font-size:min(var(--fs-h2),var(--fit-h2,999px));max-width:18ch}.section-head.center{text-align:left}`);
   if (L.grid === 'modular') add(`.features.f-grid,.features.f-columns{gap:0;border-top:1px solid var(--line);border-left:1px solid var(--line)}.features.f-grid .feature,.features.f-columns .feature{border:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);border-radius:0;padding:28px;box-shadow:none}.section-head{max-width:none;display:flex;flex-wrap:wrap;align-items:baseline;column-gap:24px}.section-head .h-section{flex:1 1 420px;margin:0}.section-head .lede{flex:1 1 320px}.section-head .eyebrow,.section-head .sec-no{flex-basis:100%}.section-head.center{text-align:left}`);
   if (L.grid === 'centered' || L.align === 'center') add(`.section-head{margin-inline:auto;text-align:center}.section-head .lede{margin-inline:auto}.f-columns .feature,.f-grid .feature{text-align:center}.f-columns .feature{border-left:0;padding-left:0}.f-grid .ic{margin-inline:auto}.split-text{text-align:left}`);
   add(`}`);
@@ -781,7 +844,7 @@ p{max-width:68ch}
 .lists.n-3{grid-template-columns:repeat(3,minmax(0,1fr))}.plans.n-3{grid-template-columns:repeat(3,minmax(0,1fr))}.plans.n-4{grid-template-columns:repeat(4,minmax(0,1fr))}
 .gallery.g-grid.n-4{grid-template-columns:repeat(4,minmax(0,1fr))}.gallery.g-grid.n-4 .g-item{grid-column:auto}.gallery.g-grid.n-4 .g-img{aspect-ratio:1}
 .app.nav-sidebar{grid-template-columns:248px 1fr}
-.app main{grid-template-columns:repeat(12,minmax(0,1fr))}.app main>*{grid-column:1/-1}.app main>.sx-chart{grid-column:span 8}.app main>.sx-feed{grid-column:span 4}
+.app main{grid-template-columns:repeat(12,minmax(0,1fr))}.app main>*{grid-column:1/-1}.app main>.sx-chart:has(+.sx-feed),.app main>.sx-feed+.sx-chart{grid-column:span 8}.app main>.sx-chart+.sx-feed,.app main>.sx-feed:has(+.sx-chart){grid-column:span 4}
 }
 @media (max-width:759px){
 .nav-links{display:none}.nav-in .btn{margin-left:auto}
@@ -793,7 +856,7 @@ p{max-width:68ch}
   if (L.grid === 'swiss' || L.grid === 'poster') add(`@media (min-width:1100px){.split{grid-template-columns:5fr 7fr}.split.is-left{grid-template-columns:7fr 5fr}}`);
 
   // ── app screens
-  add(`.app{min-height:100vh;display:grid;background:var(--bg)}.app>*{min-width:0}.app main{min-width:0;padding:clamp(18px,3vw,36px);display:grid;gap:22px;align-content:start}
+  add(`.app{min-height:100vh;display:grid;grid-template-columns:minmax(0,1fr);background:var(--bg)}.app>*{min-width:0}.appnav{min-width:0;max-width:100%}.app main{min-width:0;padding:clamp(18px,3vw,36px);display:grid;gap:22px;align-content:start}@media (max-width:1099px){.app main{grid-template-columns:minmax(0,1fr)}}.app main>*{min-width:0}.apphead-acts input{max-width:100%;min-width:0}
 .app .sx{padding:0}.appnav{padding:20px;display:flex;flex-direction:column;gap:22px;background:var(--surface);border-right:1px solid var(--line)}
 .appnav ul{list-style:none;margin:0;padding:0;display:grid;gap:4px}.appnav a{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:${Math.min(corner, 10)}px;text-decoration:none;color:var(--muted);font-weight:500}
 .appnav a[aria-current=page]{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--text)}.appnav .ic{width:20px;height:20px;stroke:currentColor}.an-user{margin-top:auto}
@@ -804,13 +867,13 @@ p{max-width:68ch}
 .apphead{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px}.h-app{margin:0;font-size:clamp(1.6rem,2.6vw,2.2rem);line-height:1.1}.apphead p{margin:6px 0 0}
 .apphead-acts{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.apphead .btn{min-height:44px;padding:0 18px;font-size:.92rem}
 .search{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 12px;border:1.5px solid var(--line);border-radius:${btnR};background:var(--surface)}.search .ic{width:18px;height:18px;stroke:var(--muted)}.search input{align-self:stretch;border:0;background:none;font:inherit;color:var(--text);outline:none;min-width:0;flex:1}
-.cards-row{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.cards-row{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}@media (max-width:759px){.cards-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.cards-row>.stat-card:last-child:nth-child(odd){grid-column:1/-1}.stat-card{padding:16px}}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px}.h-card{margin:0 0 14px;font-size:1.15rem}
 .stat-card p{margin:0}.stat-value{font-size:2rem;line-height:1.1;margin:6px 0 4px!important;letter-spacing:-.02em}.delta{font-size:.875rem;font-weight:600}.d-up{color:var(--accent-ink)}.d-down{color:var(--muted)}
 .chart{width:100%;height:auto;overflow:visible}.chart .grid{stroke:var(--line);stroke-width:1}.chart .axis{fill:var(--muted);font-size:11px;font-family:var(--body)}
 .chart .line{fill:none;stroke-width:2.4;stroke-linejoin:round;stroke-linecap:round}.chart .area{opacity:.14}
 .s0{stroke:var(--accent);fill:var(--accent);background:var(--accent)}.s1{stroke:var(--muted);fill:var(--muted);background:var(--muted)}.s2{stroke:var(--text);fill:var(--text);background:var(--text)}
-.line.s0,.line.s1,.line.s2{fill:none}.legend{display:flex;gap:16px;list-style:none;margin:10px 0 0;padding:0;font-size:.85rem;color:var(--muted)}.key{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
+.line.s0,.line.s1,.line.s2{fill:none}.chart .cmp{stroke-dasharray:6 5;stroke-width:2}.key-line{width:16px;height:0;background:none!important;border-top:2px dashed var(--muted);border-radius:0;vertical-align:middle}.key-line.s2{border-top-color:var(--text)}.legend{display:flex;gap:16px;list-style:none;margin:10px 0 0;padding:0;font-size:.85rem;color:var(--muted)}.key{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
 .table-scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:.94rem}th{text-align:left;font-weight:600;color:var(--muted);font-size:.82rem;padding:10px 12px;border-bottom:1px solid var(--line)}td{padding:12px;border-bottom:1px solid var(--line)}
 .status{display:inline-flex;align-items:center;gap:6px}.status .dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
 .feed{list-style:none;margin:0;padding:0;display:grid}.feed li{padding:12px 0;border-bottom:1px solid var(--line)}.feed p{margin:0}.feed-title{font-weight:600}
@@ -916,7 +979,7 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], op
   }
 
   const fonts = fontStylesheet([spec.tokens.fonts.display, spec.tokens.fonts.body, ...(look.label === 'mono' ? [look.mono] : [])]);
-  const style = [css(spec.tokens, look), motionCss(look, mode, { app })].filter(Boolean).join('\n');
+  const style = [css(spec.tokens, look, headlinesOf(spec)), motionCss(look, mode, { app })].filter(Boolean).join('\n');
   const html = `<!doctype html>
 <html lang="en">
 <head>

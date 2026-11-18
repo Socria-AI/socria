@@ -750,5 +750,47 @@ console.log('\n=== knowledge, fidelity and precise refinement ===');
   ok('a locked group stands in the way of an adjustment (it is checked before applying)', V.lockedChanges(good, V.adjust(good, 'colour-cooler').patches[0], ['palette']).includes('palette'));
 }
 
+console.log('\n=== found by dogfooding: notes, fit, app screens, charts ===');
+{
+  // a reference note about light is about atmosphere, not the colour of the page
+  const lightNote = V.readDirectives('The light, not the bar itself', '');
+  ok('"the light, not the bar itself" does not ask for a light ground', lightNote.dark === undefined && !lightNote.said.includes('a light ground'), J(lightNote));
+  ok('"a light background" and "light and airy" do', V.readDirectives('a light background please', '').dark === false && V.readDirectives('light and airy', '').dark === false);
+  ok('"bright colours" is colour, not a light ground', V.readDirectives('bright colours', '').dark === undefined && V.readDirectives('bright colours', '').colourful === true);
+  ok('"louder" and "oversized type" ask for bigger, bolder type', V.readDirectives('louder', '').loud === true && V.readDirectives('oversized type', '').loud === true);
+  const reading = V.readBoard(V.normalizeMoodboard({ refs: [ref('g1', { note: 'This asymmetric grid', take: ['composition'] })] }));
+  ok('an asymmetric composition is "an asymmetric", not "a asymmetric"', reading.said.some((x) => x === 'an asymmetric composition'), J(reading.said));
+  // headlines are sized so their longest word fits, from measured advances
+  ok('measured advances: Unbounded sets wider than Inter, Anton narrower; capitals wider than lower case', V.advanceEm('Unbounded', 800, true) > V.advanceEm('Inter', 800, true) && V.advanceEm('Anton', 400, true) < V.advanceEm('Inter', 400, true) && V.advanceEm('Inter', 400, true) > V.advanceEm('Inter', 400, false));
+  ok('an unknown face falls back to a typical width', V.advanceEm('Nonesuch Grotesk', 400, true) === 0.72);
+  const posterLook = { ...V.lookFromTokens(V.DEFAULT_TOKENS), language: 'poster', grid: 'poster', case: 'upper', weight: 800 };
+  const posterTokens = { ...V.DEFAULT_TOKENS, fonts: { display: 'Unbounded', body: 'Inter' } };
+  const long = V.normalizeSpec({ ...SPEC, tokens: posterTokens, look: posterLook, sections: [{ id: 'h', kind: 'hero', variant: 'poster', content: { title: 'Drawings that *move*.', subtitle: 'x', primary: 'Go' } }] }, board);
+  const lhtml = V.renderDesign(long, board.refs).html;
+  const fit = lhtml.match(/--fit-hero:calc\(\(100vw - 40px\) \/ ([\d.]+)\)/);
+  ok('a poster headline gets a size cap from its longest word ("Drawings", 8 letters of wide capitals)', !!fit && Number(fit[1]) > 8 * 0.85 && /font-size:min\(var\(--fs-hero\),var\(--fit-hero,999px\)\)/.test(lhtml), fit?.[0]);
+  const short = V.normalizeSpec({ ...SPEC, tokens: posterTokens, look: posterLook, sections: [{ id: 'h', kind: 'hero', variant: 'poster', content: { title: 'Go on, try it.', subtitle: 'x', primary: 'Go' } }] }, board);
+  const sfit = Number(V.renderDesign(short, board.refs).html.match(/--fit-hero:calc\(\(100vw - 40px\) \/ ([\d.]+)\)/)?.[1]);
+  ok('a headline of short words is allowed larger than one with a long word', sfit > 0 && sfit < Number(fit?.[1]));
+  // the kinetic headline marks where a highlighted word starts, so its highlight arrives with it
+  ok('a highlighted word in a kinetic headline knows its first letter', /<em class="em" style="--hl-i:8">/.test(V.kineticHeadline('Drawings <em class="em">move</em>.', 'letters')));
+  const hlCss = V.motionCss({ ...posterLook, emphasis: 'highlight', motion: V.MOTION_PRESETS.kinetic }, 'play');
+  ok('in play the highlight sweeps in (and under reduced motion every animation is off, leaving it drawn)', /@keyframes mo-hl/.test(hlCss) && /animation-delay:calc\(var\(--hl-i,0\)/.test(hlCss) && /prefers-reduced-motion:reduce\)\{body \*/.test(hlCss));
+  // app screens
+  const appSpec = V.normalizeSpec({ ...SPEC, pageType: 'app-screen', sections: [
+    { id: 'n', kind: 'app-nav', variant: 'sidebar', content: { brand: 'L', items: ['Close'], active: 'Close' } },
+    { id: 'c', kind: 'chart', variant: 'area', content: { title: 'By day', labels: ['Mon', 'Tue', 'Wed'], series: [{ name: 'This month', values: [1, 2, 3] }, { name: 'Last month', values: [2, 3, 1] }] } },
+    { id: 't', kind: 'table', variant: 'default', content: { title: 'Accounts', columns: ['Account', 'Owner', 'Status'], rows: [{ cells: ['Bank', 'Priya'], status: 'Reconciled' }] } },
+  ] }, board);
+  const ahtml = V.renderDesign(appSpec, board.refs).html;
+  const adoc = parse(ahtml);
+  ok('the desktop twelve-column app grid is not overridden by the one-column phone rule', /@media \(max-width:1099px\)\{\.app main\{grid-template-columns:minmax\(0,1fr\)\}\}/.test(ahtml) && !/\.app main\{min-width:0;padding:[^}]*grid-template-columns/.test(ahtml));
+  ok('a chart with nothing beside it spans the row; only a chart paired with a feed takes eight columns', /\.app main>\.sx-chart:has\(\+\.sx-feed\)/.test(ahtml) && !/\.app main>\.sx-chart\{grid-column:span 8\}/.test(ahtml));
+  ok('a table that already has a Status column gets the status there, not a second "Status" column', [...adoc.querySelectorAll('th')].filter((th) => th.textContent === 'Status').length === 1 && adoc.querySelector('td .status')?.textContent.includes('Reconciled'));
+  ok('only the subject series is filled; the comparison is a dashed line with a dashed key', adoc.querySelectorAll('polygon.area').length === 1 && adoc.querySelector('polygon.area').classList.contains('s0') && adoc.querySelector('polyline.cmp.s1') && adoc.querySelector('.key-line.s1'));
+  const plainTable = V.normalizeSpec({ ...SPEC, pageType: 'app-screen', sections: [{ id: 't', kind: 'table', variant: 'default', content: { title: 'A', columns: ['Account', 'Owner'], rows: [{ cells: ['Bank', 'Priya'], status: 'Open' }] } }] }, board);
+  ok('a table without a Status column still gets one for its statuses', [...parse(V.renderDesign(plainTable, board.refs).html).querySelectorAll('th')].map((th) => th.textContent).join('|') === 'Account|Owner|Status');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

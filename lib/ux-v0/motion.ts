@@ -104,6 +104,8 @@ export function kineticHeadline(html: string, by: 'words' | 'letters'): string {
   return html
     .split(/(<[^>]+>)/)
     .map((part) => {
+      // an emphasised word learns where its letters start, so a highlight behind it can arrive with them
+      if (part.startsWith('<em class="em"')) return part.replace('<em class="em"', `<em class="em" style="--hl-i:${i}"`);
       if (!part || part.startsWith('<')) return part;
       return part
         .split(/(\s+)/)
@@ -184,8 +186,12 @@ export function motionCss(look: Look, mode: MotionMode, opts: { app?: boolean } 
   const hl = '.sx-hero .h-hero';
   if (m.headline === 'fade') add(`${hl}{animation:mo-t-fade calc(var(--mo-d) * 1.2) var(--mo-e) both}`);
   if (m.headline === 'mask') add(`${hl}{animation:mo-t-mask calc(var(--mo-d) * 1.5) var(--mo-e) both}`);
-  if (m.headline === 'words' || m.headline === 'letters')
+  if (m.headline === 'words' || m.headline === 'letters') {
     add(`${hl} .kw,${hl} .kl{display:inline-block;animation:mo-t-word var(--mo-d) var(--mo-e) both;animation-delay:calc(var(--i) * var(--mo-s) + 60ms)}${hl} .kword{display:inline-block;white-space:nowrap}`);
+    // a highlighted word: the highlight sweeps in with its first letter, instead of waiting there empty
+    if (look.emphasis === 'highlight')
+      add(`@keyframes mo-hl{from{background-size:0% 100%}to{background-size:100% 100%}}${hl} .em{background-color:transparent;background-image:linear-gradient(color-mix(in srgb,var(--accent) 32%,transparent),color-mix(in srgb,var(--accent) 32%,transparent));background-repeat:no-repeat;background-size:100% 100%;animation:mo-hl calc(var(--mo-d) * 1.1) var(--mo-e) both;animation-delay:calc(var(--hl-i,0) * var(--mo-s) + 60ms)}`);
+  }
   const after = m.headline === 'words' || m.headline === 'letters' ? 'calc(var(--mo-d) * .7 + var(--mo-s) * 6)' : 'calc(var(--mo-d) * .55)';
   add(`.sx-hero .eyebrow{animation:mo-t-rise var(--mo-d) var(--mo-e) both}.sx-hero .hero-sub,.sx-hero .hs-foot,.sx-hero .hp-text{animation:mo-t-rise var(--mo-d) var(--mo-e) both;animation-delay:${after}}.sx-hero .actions{animation:mo-t-rise var(--mo-d) var(--mo-e) both;animation-delay:calc(${after} + var(--mo-s) * 2)}`);
   add(`.sx-hero figure,.sx-hero .bleed-img,.sx-hero .art{animation:mo-t-media calc(var(--mo-d) * 1.8) var(--mo-e) both;animation-delay:calc(var(--mo-d) * .15)}`);
