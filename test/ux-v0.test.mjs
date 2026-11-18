@@ -636,5 +636,46 @@ console.log('\n=== motion ===');
   ok('motion is its own lock group, with a label', V.LOCK_GROUPS.includes('motion') && V.LOCK_LABEL.motion === 'Motion');
 }
 
+console.log('\n=== the moodboard as art direction ===');
+{
+  const n1 = V.interpretNote('I love this typography, not the palette.');
+  ok('"this typography, not the palette" takes type and leaves colour', J(n1.take) === J(['typography']) && J(n1.leave) === J(['colour']), J(n1));
+  const n2 = V.interpretNote('Use the architectural atmosphere, not the building itself.');
+  ok('"the atmosphere, not the building itself" takes atmosphere and leaves the subject', n2.take.includes('atmosphere') && n2.leave.includes('imagery') && !n2.take.includes('imagery'), J(n2));
+  const n3 = V.interpretNote('Take inspiration from the movement, not the visual styling.');
+  ok('"the movement, not the styling" takes motion and leaves colour, type and texture', n3.take.includes('motion') && ['colour', 'typography', 'texture'].every((a) => n3.leave.includes(a)), J(n3));
+  const n4 = V.interpretNote('Make the entire website feel like these references.');
+  ok('"the entire website should feel like this" is a key atmosphere reference', n4.key && n4.take.includes('atmosphere'), J(n4));
+  ok('"nothing like this" steers away', V.interpretNote('nothing like this, too corporate').avoid);
+  const base = { provider: 'openverse', width: 1600, height: 1067, title: 't', creator: 'A', license: 'CC BY', category: 'imagery', state: 'kept' };
+  const r = (id, o = {}) => V.normalizeRef({ ...base, providerId: id, url: `https://x.test/${id}.jpg`, ...o });
+  const up = 'a'.repeat(32);
+  const mb = V.normalizeMoodboard({ refs: [
+    r('legacy'),
+    r('insp', { asContent: false, note: 'love the typography, not the palette' }),
+    r('page', { asContent: true }),
+    r('away', { avoid: true, note: 'too corporate, rounded cards' }),
+    r('col', { asContent: false, take: ['colour'], swatches: ['#1b2a3a', '#e8e1d4', '#c8553d'], title: 'Harbour at dusk' }),
+    { provider: 'upload', providerId: up, width: 800, height: 600, title: 'clip', state: 'kept', media: 'video', take: ['motion'], note: 'a slow, calm drift' },
+  ] });
+  const ids = V.usableImages(mb);
+  ok('only pictures marked for the page (and ones kept before the distinction) can be placed', ids.has('openverse:legacy') && ids.has('openverse:page') && !ids.has('openverse:insp') && !ids.has('openverse:away') && !ids.has('openverse:col') && !ids.has(`upload:${up}`));
+  const clip = mb.refs.find((x) => x.provider === 'upload');
+  ok('an upload keeps no address at rest, and is credited as the designer’s own', !!clip && clip.url === '' && V.creditText(clip).includes('your own'));
+  const reading = V.readBoard(mb);
+  ok('the board is read: notes, colours from colour references, motion from moving references, what to avoid', /typography/.test(reading.words) && reading.colours.includes('#c8553d') && reading.motion === 'calm' && /corporate/.test(reading.avoid), J(reading.said));
+  ok('only the designer’s words are read, never a library’s titles', !/Harbour/.test(reading.words));
+  const brief = V.normalizeBrief({ pageType: 'website', objective: 'A harbour restaurant', personality: ['warm'], visualDirection: 'seaside', palette: [], typography: { display: 'Fraunces', body: 'Inter' } }, new Set());
+  const opts = V.proposeDirections({ brief, board: reading });
+  ok('one option takes its colours from the references kept for colour', opts.some((d) => d.rationale.some((x) => /Colours sampled from your references/.test(x)) && d.tokens.colors.background.toLowerCase() === '#e8e1d4'), opts.map((d) => d.tokens.colors.background).join(','));
+  ok('moving references give the motion, unless the notes say otherwise', opts.every((d) => d.look.motion.feel === 'calm') && V.proposeDirections({ brief, board: reading, notes: 'kinetic' }).every((d) => d.look.motion.feel === 'kinetic'));
+  const prompt = V.generateUser({ brief, moodboard: mb });
+  ok('generation is told which pictures it may place and which only inspire', /PICTURES YOU MAY PLACE[^]*openverse:page[^]*REFERENCES THAT INSPIRE[^]*openverse:insp[^]*take: typography[^]*leave: colour/.test(prompt) && /STEER AWAY FROM[^]*openverse:away/.test(prompt) && !prompt.split('REFERENCES THAT INSPIRE')[0].includes('openverse:insp'));
+  ok('a reading survives the trip to a route, bounded', (() => { const x = V.normalizeReading({ ...reading, colours: ['#zzzzzz', '#112233'], motion: 'nope', grid: 'swiss' }); return x.colours.length === 1 && !x.motion && x.grid === 'swiss'; })());
+  ok('a palette comes from swatches, with an accent that reads', (() => { const p = V.paletteFromSwatches(['#1b2a3a', '#e8e1d4', '#c8553d']); return !!p && p.background === '#e8e1d4' && p.accent === '#c8553d'; })());
+  const spec = V.normalizeSpec({ ...SPEC, sections: [{ id: 'h', kind: 'hero', variant: 'split', content: { title: 'Hi' }, images: ['openverse:insp'] }] }, mb);
+  ok('a picture that only inspires cannot reach the page, even if the model places it', spec.sections[0].images.length === 0);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

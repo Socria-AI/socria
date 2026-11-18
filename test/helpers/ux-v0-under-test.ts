@@ -25,3 +25,5 @@ export * from '@/lib/ux-v0/evaluate';
 export { AUDIT_SOURCE } from '@/lib/ux-v0/audit-source';
 // motion: presets, words, the CSS that plays them, kinetic headlines
 export * from '@/lib/ux-v0/motion';
+// the moodboard as art direction: reading notes and boards, content and inspiration
+export * from '@/lib/ux-v0/references';

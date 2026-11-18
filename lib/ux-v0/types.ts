@@ -228,10 +228,20 @@ export type Provider = 'unsplash' | 'openverse' | 'pexels';
 export const PROVIDERS: readonly Provider[] = ['unsplash', 'openverse', 'pexels'];
 export type RefState = 'proposed' | 'kept' | 'rejected';
 
+/**
+ * What a reference is for. A photograph may be kept for its light, a spread
+ * for its typography, a building for its composition, a clip for its pacing:
+ * the designer says which (or SocriaUX reads it from their note), and only
+ * that is taken from it. "imagery" is the subject itself.
+ */
+export const REF_ASPECTS = ['atmosphere', 'colour', 'typography', 'composition', 'imagery', 'texture', 'motion'] as const;
+export type RefAspect = (typeof REF_ASPECTS)[number];
+
 export interface MoodboardRef {
-  /** provider:id */
+  /** provider:id (an upload: upload:<file id>) */
   id: string;
-  provider: Provider;
+  /** a licensed library, or the designer's own upload (kept in this browser's file store) */
+  provider: Provider | 'upload';
   providerId: string;
   url: string;
   thumb: string;
@@ -253,6 +263,26 @@ export interface MoodboardRef {
   query: string;
   state: RefState;
   addedAt: number;
+  /** what to take from it; none means its overall atmosphere */
+  take?: RefAspect[];
+  /** what to leave behind: "this typography, not the palette" */
+  leave?: RefAspect[];
+  /** a reference to steer away from */
+  avoid?: boolean;
+  /** a key reference: it counts most */
+  key?: boolean;
+  /** the designer's own words about it */
+  note?: string;
+  /**
+   * The picture may appear in the design itself. References inspire; only a
+   * picture the designer marks as content is placed on the page. (Absent on
+   * references kept before the distinction existed, which stay usable.)
+   */
+  asContent?: boolean;
+  /** colours sampled from it, most present first */
+  swatches?: string[];
+  /** an upload can be a picture or a moving reference (a clip or an animated GIF) */
+  media?: 'image' | 'video';
 }
 
 export interface Palette {
@@ -601,16 +631,30 @@ export function normalizeCard(v: unknown): ReasoningCard | null {
 
 export function normalizeRef(v: unknown): MoodboardRef | null {
   const r = obj(v);
-  const provider = oneOf(r.provider, PROVIDERS, 'openverse');
-  const url = httpsUrl(r.url);
-  const providerId = clean(r.providerId, 80);
-  if (!url || !providerId) return null;
+  const upload = r.provider === 'upload';
+  const provider: MoodboardRef['provider'] = upload ? 'upload' : oneOf(r.provider, PROVIDERS, 'openverse');
+  // an upload's picture lives in this browser's file store, found by its id; its address is made when it is shown
+  const url = upload ? '' : httpsUrl(r.url);
+  const providerId = upload ? (typeof r.providerId === 'string' && /^[a-f0-9]{32}$/.test(r.providerId) ? r.providerId : '') : clean(r.providerId, 80);
+  if ((!url && !upload) || !providerId) return null;
+  const aspects = (x: unknown): RefAspect[] => [...new Set(arr(x).filter((a): a is RefAspect => (REF_ASPECTS as readonly string[]).includes(a as string)))];
+  const take = aspects(r.take);
+  const leave = aspects(r.leave).filter((a) => !take.includes(a));
+  const swatches = arr(r.swatches).map(hex).filter((x): x is string => !!x).slice(0, 6);
   return {
+    ...(take.length ? { take } : {}),
+    ...(leave.length ? { leave } : {}),
+    ...(r.avoid === true ? { avoid: true } : {}),
+    ...(r.key === true ? { key: true } : {}),
+    ...(clean(r.note, 400) ? { note: clean(r.note, 400) } : {}),
+    ...(typeof r.asContent === 'boolean' ? { asContent: r.asContent } : {}),
+    ...(swatches.length ? { swatches } : {}),
+    ...(r.media === 'video' ? { media: 'video' as const } : {}),
     id: `${provider}:${providerId}`,
     provider,
     providerId,
     url,
-    thumb: httpsUrl(r.thumb) || url,
+    thumb: upload ? '' : httpsUrl(r.thumb) || url,
     width: num(r.width, 0, 100000, 0),
     height: num(r.height, 0, 100000, 0),
     color: hex(r.color),
@@ -658,6 +702,7 @@ export function normalizeTypePair(v: unknown): TypePair | null {
  * it is shown), never a library's long legal sentence.
  */
 export function creditText(r: Pick<MoodboardRef, 'provider' | 'title' | 'creator' | 'license'>): string {
+  if (r.provider === 'upload') return `${r.title ? `“${r.title}”, ` : ''}your own reference`;
   const by = r.creator ? ` by ${r.creator}` : '';
   if (r.provider === 'unsplash') return `Photo${by} on Unsplash`;
   if (r.provider === 'pexels') return `Photo${by} on Pexels`;

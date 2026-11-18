@@ -44,6 +44,7 @@ import {
 } from './spec';
 import type { DesignBrief } from './types';
 import { motionFor, readMotionWords } from './motion';
+import { paletteFromSwatches, type BoardReading } from './references';
 
 // ── the visual languages ─────────────────────────────────────────────
 
@@ -751,6 +752,9 @@ interface Directives {
   /** what the words say about motion */
   motion?: Motion['feel'];
   parallax?: boolean;
+  /** a composition the designer's references ask for */
+  grid?: Look['grid'];
+  density?: 'airy' | 'dense';
   fonts: string[];
   said: string[];
 }
@@ -812,6 +816,10 @@ export interface BuildOptions {
   usedFonts?: Set<string>;
   /** the designer's own words, for saying why it fits */
   notes?: string;
+  /** colours to start from instead of the brief's (sampled from references kept for their colour) */
+  baseColors?: Partial<DesignTokens['colors']>;
+  /** where those colours came from, for saying why */
+  colorNote?: string;
 }
 
 /** One direction, from a language and the brief. Deterministic for a seed. */
@@ -824,9 +832,9 @@ export function buildDirection(lang: Language, brief: DesignBrief, opt: BuildOpt
   let strategy: PaletteStrategy = lang.palette;
   if (d.dark === true) strategy = 'dark';
   if (d.dark === false && strategy === 'dark') strategy = 'paper';
-  const base = briefColors(brief);
+  const base = { ...briefColors(brief), ...(opt.baseColors ?? {}) };
   if (d.accent) base.accent = d.accent;
-  let colors = f && d.dark === undefined ? { ...base, accentText: base.accentText } : paletteFor(strategy, base);
+  let colors = (f && d.dark === undefined) || opt.baseColors ? { ...base, accentText: base.accentText } : paletteFor(strategy, base);
   if (f && d.dark === true && !isDark(colors.background)) colors = paletteFor('dark', base);
   // type
   const used = opt.usedFonts ?? new Set<string>();
@@ -876,7 +884,7 @@ export function buildDirection(lang: Language, brief: DesignBrief, opt: BuildOpt
       emphasis: nth(L.emphasis, r, f),
       label: d.upper === false && nth(L.label, r, f) === 'caps' ? 'sentence' : nth(L.label, r, f),
       mono: monoName,
-      grid: nth(L.grid, r, f),
+      grid: d.grid ?? nth(L.grid, r, f),
       align: nth(L.align, r, f),
       width: nth(L.width, r, f),
       rhythm: nth(L.rhythm, r, f),
@@ -898,7 +906,7 @@ export function buildDirection(lang: Language, brief: DesignBrief, opt: BuildOpt
     {
       colors,
       fonts: { display, body },
-      scale: nth(lang.scale, r, f),
+      scale: d.density === 'airy' ? 'spacious' : d.density === 'dense' ? 'compact' : nth(lang.scale, r, f),
       radius: d.corners ?? nth(lang.radius, r, f),
       style: lang.style,
       imageTreatment: nth(lang.treatment, r, f),
@@ -911,6 +919,7 @@ export function buildDirection(lang: Language, brief: DesignBrief, opt: BuildOpt
     fit && fit.matched.length ? `${opt.notes ? 'Your brief and notes speak' : 'The brief speaks'} of ${fit.matched.slice(0, 3).join(', ')}; ${lang.name.toLowerCase()} is a language built for that.` : `A deliberate contrast to the obvious reading of the brief: ${lang.blurb.split(':')[0]}.`,
     f && d.dark === undefined && !d.accent ? 'Keeps the palette and type pair you approved in the brief exactly as they are.' : f ? `Keeps your brief’s type; its colours move ${d.dark ? 'onto a dark ground' : 'to the accent you named'}, as your notes ask.` : `Takes the brief’s accent into ${strategy === 'dark' ? 'a dark ground' : strategy === 'tinted' ? 'a tinted ground of its own hue' : strategy === 'ink' ? 'two inks on newsprint' : strategy === 'white' ? 'a white page with the colour turned up' : 'a paper ground with deep ink'}, set in ${display} and ${body}.`,
     ...(d.said.length ? [`From your notes: ${d.said.join(', ')}.`] : []),
+    ...(opt.colorNote ? [opt.colorNote] : []),
   ];
   return {
     id: `dir_${lang.id}_${(opt.seed >>> 0).toString(36)}`,
@@ -1061,6 +1070,8 @@ export interface DirectionAsk {
   /** languages already shown: asking again prefers new ones */
   seen?: readonly string[];
   count?: number;
+  /** what the moodboard says (lib/ux-v0/references.ts): the designer's notes on references, colours, motion, composition */
+  board?: BoardReading;
 }
 
 /**
@@ -1070,13 +1081,24 @@ export interface DirectionAsk {
  */
 export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
   const { brief } = ask;
-  const notes = ask.notes ?? '';
-  const avoid = ask.avoid ?? '';
+  const board = ask.board;
+  // the designer's own words: their notes for the direction, then what they wrote on their references
+  const notes = [ask.notes ?? '', board?.words ?? ''].filter(Boolean).join('. ');
+  const avoid = [ask.avoid ?? '', board?.avoid ?? ''].filter(Boolean).join('. ');
   const round = Math.max(0, ask.round ?? 0);
   const count = Math.max(1, Math.min(4, ask.count ?? 3));
   const seen = new Set(ask.seen ?? []);
   const seed = hash(`${briefText(brief)}|${notes}|${avoid}|${round}`);
   const directives = readDirectives(notes, avoid);
+  if (board) {
+    // what the references show, where the words did not already say
+    if (board.serif !== undefined && directives.serif === undefined) directives.serif = board.serif;
+    if (board.motion && !directives.motion) (directives.motion = board.motion), directives.said.push(`${board.motion} motion, from your moving references`);
+    if (board.parallax !== undefined && directives.parallax === undefined) directives.parallax = board.parallax;
+    if (board.grid) (directives.grid = board.grid), directives.said.push(`a ${board.grid} composition, from your references`);
+    if (board.density) (directives.density = board.density), directives.said.push(board.density === 'airy' ? 'generous space, from your references' : 'a denser page, from your references');
+  }
+  const fromRefs = board?.colours.length ? paletteFromSwatches(board.colours) : null;
   const fits = fitScores(brief, notes, avoid);
   const top = Math.max(1, fits[0].score);
   // asking again: what was shown steps back, so new languages come forward
@@ -1086,7 +1108,16 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
   const usedFonts = new Set<string>();
   const usedIds = new Set<string>();
   const make = (id: string, faithful: boolean) => {
-    const d = buildDirection(languageOf(id)!, brief, { seed: seed + chosen.length * 7919, faithful, directives, usedFonts, notes });
+    // the second option takes its colours from the references kept for their colour, when there are any (and colour is not locked)
+    const refColours = chosen.length === 1 && fromRefs && !(ask.base && ask.base.locks.includes('palette'));
+    const d = buildDirection(languageOf(id)!, brief, {
+      seed: seed + chosen.length * 7919,
+      faithful,
+      directives,
+      usedFonts,
+      notes,
+      ...(refColours ? { baseColors: fromRefs!, colorNote: `Colours sampled from your references (${(board!.colourFrom.slice(0, 2).map((t) => `“${t}”`).join(' and ')) || 'the moodboard'}).` } : {}),
+    });
     usedFonts.add(d.tokens.fonts.display);
     return d;
   };

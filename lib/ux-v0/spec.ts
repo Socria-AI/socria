@@ -485,10 +485,20 @@ export function normalizeSection(v: unknown, pageType: PageType, imageIds: Reado
   return sec;
 }
 
-/** The ids a spec's sections may draw on: references on the moodboard that were not rejected. */
+/**
+ * The ids a spec's sections may draw on: pictures on the moodboard that may
+ * appear in the design. References inspire; a picture is placed only when the
+ * designer marks it as content (references kept before that distinction stay
+ * usable, so older designs keep their pictures). Moving references, ones to
+ * steer away from and removed ones never are.
+ */
 export function usableImages(m: Moodboard | null | undefined): Set<string> | null {
   if (!m) return null;
-  return new Set(m.refs.filter((x) => x.state !== 'rejected').map((x) => x.id));
+  return new Set(
+    m.refs
+      .filter((x) => x.state !== 'rejected' && x.media !== 'video' && !x.avoid && x.asContent !== false && (x.provider !== 'upload' || x.asContent === true))
+      .map((x) => x.id)
+  );
 }
 
 /** Any document into a spec the renderer can draw — or null when there is nothing valid to draw. */

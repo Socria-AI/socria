@@ -18,6 +18,7 @@
 import { designFromDirection, directionBrief, LOCK_LABEL, planLayout, type ArtDirection, type LockGroup } from './direction';
 import { normQ, readQueries } from './discovery';
 import { fontMenu } from './fonts';
+import { avoidRefs, contentRefs, describeRef, inspirationRefs, isContent } from './references';
 import { BUTTONS, CONTAINERS, GRIDS, LABELS, libraryMenu, MOTIFS, normalizePatch, normalizeSpec, specDigest, TONES, type DesignSpec, type Patch } from './spec';
 import {
   normalizeBrief,
@@ -34,11 +35,29 @@ import {
 
 const VOICE = 'Voice: plain, calm, precise. No emoji, no exclamation marks, no hype words ("powerful", "seamless", "revolutionary").';
 
+/** Pictures the design may place: the ones the designer marked as content. */
 function keptRefs(m: Moodboard): string {
-  const kept = m.refs.filter((r) => r.state === 'kept');
-  if (!kept.length) return 'none kept';
+  const kept = contentRefs(m);
+  if (!kept.length) return 'none: no picture is marked for the page. Use variants that need no picture, and never invent an image id.';
   return kept
     .map((r) => `- [${r.id}] ${r.category}: ${r.title || r.query}${r.width && r.height ? ` (${r.width > r.height * 1.15 ? 'landscape' : r.height > r.width * 1.15 ? 'portrait' : 'square'})` : ''}${r.color ? `, dominant ${r.color}` : ''}`)
+    .join('\n');
+}
+
+/**
+ * References that inspire: what to take from each and what to leave, in the
+ * designer's words. They shape tone, composition, type, colour and copy; they
+ * are never placed on the page.
+ */
+function inspiration(m: Moodboard): string {
+  const like = inspirationRefs(m).filter((r) => !isContent(r) || r.note || r.take?.length || r.leave?.length);
+  const away = avoidRefs(m);
+  if (!like.length && !away.length) return '';
+  return [
+    like.length ? `REFERENCES THAT INSPIRE (take only what each says; never place them, never copy them literally):\n${like.slice(0, 16).map((r) => `- ${describeRef(r)}`).join('\n')}` : '',
+    away.length ? `REFERENCES TO STEER AWAY FROM:\n${away.slice(0, 8).map((r) => `- ${describeRef(r)}`).join('\n')}` : '',
+  ]
+    .filter(Boolean)
     .join('\n');
 }
 
@@ -73,7 +92,7 @@ The brief:
 - typography: display and body, chosen ONLY from: ${fontMenu()}. Say why in "rationale".
 - layoutDirection: structure and rhythm.
 - functionalRequirements: what it must do (sections, forms, flows).
-- references: ids of kept moodboard references the design should draw on (only ids given to you).
+- references: ids of the pictures marked for the page that the design should show (only ids listed under PICTURES MARKED FOR THE PAGE; an empty list when none are). Inspiring references shape the other fields: say in visualDirection and layoutDirection what is taken from them.
 - openQuestions: what is still undecided.
 - pageType: "website" or "app-screen"; platform: "web" or "mobile".${
     refining
@@ -92,7 +111,8 @@ export function briefUser(input: BriefInput): string {
     `WHAT THEY WANT TO MAKE: “${input.intent}”`,
     input.understanding.summary ? `UNDERSTOOD: ${input.understanding.summary}` : '',
     answers.length ? `THEIR ANSWERS:\n${answers.join('\n')}` : '',
-    `KEPT MOODBOARD REFERENCES:\n${keptRefs(input.moodboard)}`,
+    inspiration(input.moodboard),
+    `PICTURES MARKED FOR THE PAGE:\n${keptRefs(input.moodboard)}`,
     keptTaste(input.moodboard),
     input.current ? `THE BRIEF AS IT STANDS:\n${JSON.stringify(input.current)}` : '',
     input.instruction ? `CHANGE: “${input.instruction}”` : '',
@@ -102,7 +122,7 @@ export function briefUser(input: BriefInput): string {
 }
 
 export function parseBrief(raw: unknown, moodboard: Moodboard): DesignBrief | null {
-  const kept = new Set(moodboard.refs.filter((r) => r.state === 'kept').map((r) => r.id));
+  const kept = new Set(contentRefs(moodboard).map((r) => r.id));
   return normalizeBrief(raw, kept);
 }
 
@@ -156,7 +176,8 @@ Respond with ONE JSON object: {"title": "...", "pageType": "${brief.pageType}", 
 export function generateUser(input: GenerateInput): string {
   return [
     `THE APPROVED BRIEF:\n${JSON.stringify(input.brief)}`,
-    `MOODBOARD IMAGES YOU MAY USE (id, category, subject, orientation):\n${keptRefs(input.moodboard)}`,
+    `PICTURES YOU MAY PLACE (id, category, subject, orientation):\n${keptRefs(input.moodboard)}`,
+    inspiration(input.moodboard),
     input.direction ? `A NEW DIRECTION THE DESIGNER ASKED FOR: “${input.direction}”` : '',
   ]
     .filter(Boolean)
@@ -239,7 +260,7 @@ export function refineUser(input: RefineInput): string {
   return [
     input.brief ? `THE BRIEF: objective — ${input.brief.objective}; audience — ${input.brief.audience}; personality — ${input.brief.personality.join(', ')}.` : '',
     `THE DESIGN NOW:\n${specDigest(input.spec)}`,
-    `MOODBOARD IMAGES AVAILABLE:\n${keptRefs(input.moodboard)}`,
+    `PICTURES THAT MAY BE PLACED:\n${keptRefs(input.moodboard)}`,
     where,
     input.locks?.length ? `LOCKED IN THE ART DIRECTION (the designer decided these): ${input.locks.map((g) => LOCK_LABEL[g]).join(', ')}. If the comment asks to change one, make the patch but say in "challenge" that it changes a locked decision.` : '',
     `THE COMMENT: “${input.comment}”`,

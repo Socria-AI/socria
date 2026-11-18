@@ -16,6 +16,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { contrastRatio } from '@/lib/ux/audit';
 import { FONTS, fontStack, fontStylesheet } from '@/lib/ux-v0/fonts';
 import { PALETTE_ROLES, hex, type DesignBrief, type MoodboardRef, type PaletteRole } from '@/lib/ux-v0/types';
+import { ASPECT_LABEL, isContent, takenFrom } from '@/lib/ux-v0/references';
 
 interface Props {
   brief: DesignBrief;
@@ -180,8 +181,10 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
     { label: 'Muted text', a: role('muted'), b: role('background'), need: 4.5 },
     { label: 'Button text', a: role('accent-text'), b: role('accent'), need: 4.5 },
   ];
-  const kept = refs.filter((r) => r.state === 'kept');
-  const inBrief = kept.filter((r) => brief.references.includes(r.id)).length;
+  // pictures marked for the page, and the references that only inspire
+  const content = refs.filter(isContent);
+  const inspiring = refs.filter((r) => r.state === 'kept' && !r.avoid && !isContent(r));
+  const inBrief = content.filter((r) => brief.references.includes(r.id)).length;
   const setColour = (i: number, h: string) => set('palette', brief.palette.map((x, j) => (j === i ? { ...x, hex: h } : x)));
   const sample = brief.objective.split(/[.:;,—–-]/)[0].trim().split(/\s+/).slice(0, 6).join(' ') || 'A headline in this face';
   const bg = role('background') ?? '#ffffff';
@@ -323,11 +326,11 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
             {brief.typography.rationale && <p className="st-why-note">{brief.typography.rationale}</p>}
           </Block>
 
-          <Block label="References" kind="file" className="c-7" note={kept.length ? `${inBrief} of ${kept.length} kept images in the brief` : undefined}>
-            {!kept.length && <p className="st-none">No images kept on the moodboard, so the design will use layouts that need none.</p>}
-            {kept.length > 0 && (
+          <Block label="Pictures on the page" kind="file" className="c-7" note={content.length ? `${inBrief} of ${content.length} in the brief` : undefined}>
+            {!content.length && <p className="st-none">No picture is marked for the page, so the design will be typographic, or carried by shape and colour. To place a picture, open its notes on the moodboard and choose “Use the picture on the page”.</p>}
+            {content.length > 0 && (
               <ul className="st-refs">
-                {kept.map((r) => {
+                {content.map((r) => {
                   const on = brief.references.includes(r.id);
                   return (
                     <li key={r.id}>
@@ -338,7 +341,7 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
                         title={`${on ? 'In the brief' : 'Not in the brief'}: ${r.attribution}`}
                         onClick={() => set('references', on ? brief.references.filter((x) => x !== r.id) : [...brief.references, r.id])}
                       >
-                        <img src={r.thumb} alt={r.title || 'Reference'} loading="lazy" referrerPolicy="no-referrer" />
+                        <img src={r.thumb || r.url} alt={r.title || 'Picture'} loading="lazy" referrerPolicy="no-referrer" />
                         <span className="st-ref-mark" aria-hidden="true">
                           {on ? 'In the brief' : 'Left out'}
                         </span>
@@ -347,6 +350,26 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
                   );
                 })}
               </ul>
+            )}
+            {inspiring.length > 0 && (
+              <div className="st-inspire">
+                <span className="st-inspire-l">What the references give it</span>
+                <ul>
+                  {inspiring.slice(0, 8).map((r) => {
+                    const t = takenFrom(r);
+                    return (
+                      <li key={r.id}>
+                        {r.media === 'video' ? <span className="st-inspire-clip" aria-hidden="true">Clip</span> : <img src={r.thumb || r.url} alt="" loading="lazy" referrerPolicy="no-referrer" />}
+                        <span>
+                          <b>{t.take.map((a) => ASPECT_LABEL[a]).join(', ') || 'Atmosphere'}</b>
+                          {t.leave.length ? `, not ${t.leave.map((a) => ASPECT_LABEL[a].toLowerCase()).join(' or ')}` : ''}
+                          {r.note ? ` · “${r.note.slice(0, 60)}”` : ''}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             )}
           </Block>
 

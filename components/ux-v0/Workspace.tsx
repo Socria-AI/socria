@@ -27,6 +27,7 @@ import {
   addUsage,
   currentSpec,
   fileId,
+  normalizeRef,
   uid,
   type CardTurn,
   type DesignBrief,
@@ -54,6 +55,8 @@ import { measurePage } from './measure';
 import { Composer, type ComposeMode } from './Composer';
 import { QuestionBand, QuestionsRail } from './Discovery';
 import { LivingBrief } from './LivingBrief';
+import { isContent, readBoard } from '@/lib/ux-v0/references';
+import { addUpload, sampleSwatches, useUploads, withUploads } from './uploads';
 import { Preview } from './Preview';
 import { checkFile, fetchOriginal, imageSize, keepOriginal } from './files';
 import { Inspect } from './Inspect';
@@ -90,6 +93,10 @@ const EXAMPLES = ['A premium coffee shop website', 'A landing page for a univers
 
 export function Workspace({ initial, signedIn, onExit, startIntent, startFile }: { initial: DesignProject; signedIn: boolean; onExit: () => void; startIntent?: string; startFile?: File | null }) {
   const { project, update, save, current } = useV0Project(initial, signedIn);
+  // the designer's own references, with their addresses: object URLs for the workspace, data URLs for sealed frames
+  const uiRefs = useUploads(project.moodboard.refs);
+  const frameRefs = useUploads(project.moodboard.refs, true);
+  const uiBoard = useMemo(() => ({ ...project.moodboard, refs: uiRefs }), [project.moodboard, uiRefs]);
   const spec = currentSpec(project);
   const art = project.artifact;
   const imported = art?.type === 'imported' ? art : null;
@@ -162,7 +169,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   }, [imported?.id, imported?.kind, signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── what the canvas draws ───────────────────────────────────────────
-  const rendered = useMemo(() => (spec ? renderDesign(spec, project.moodboard.refs) : null), [spec, project.moodboard.refs]);
+  const rendered = useMemo(() => (spec ? renderDesign(spec, frameRefs) : null), [spec, frameRefs]);
   const doc = useMemo(() => {
     const parse = (s: string) => new DOMParser().parseFromString(s, 'text/html');
     if (rendered && !imported) return buildSandboxDoc(rendered.html, { parse, runScripts: false, nonce, inspector: INSPECTOR_SOURCE }).doc;
@@ -216,7 +223,8 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       const all = results.flatMap((x) => x.refs);
       update((p2) => {
         const known = new Set(p2.moodboard.refs.map((x) => x.id));
-        const add = all.filter((x) => !known.has(x.id));
+        // a found picture inspires; it is placed in the design only if the designer marks it as content
+        const add = all.filter((x) => !known.has(x.id)).map((x) => ({ ...x, asContent: false }));
         const queriesNext = [...p2.moodboard.queries];
         for (const res of results) {
           const k = queriesNext.findIndex((x) => x.query === res.query);
@@ -292,6 +300,40 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   );
 
   const setRef = (id: string, state: RefState) => update((p) => ({ ...p, moodboard: { ...p.moodboard, refs: p.moodboard.refs.map((r) => (r.id === id ? { ...r, state } : r)) } }));
+  /** What a reference means changed: what to take, its note, key, steer away, on the page, its colours. A picture
+      marked for the page joins the brief's pictures (and leaves them when unmarked). */
+  const updateRef = (id: string, patch: Partial<MoodboardRef>) =>
+    update((p) => {
+      const refs = p.moodboard.refs.map((r) => (r.id === id ? normalizeRef({ ...r, ...patch, url: r.url, thumb: r.thumb }) ?? r : r));
+      const ref = refs.find((r) => r.id === id);
+      let brief = p.brief;
+      if (brief.doc && ref && ('asContent' in patch || 'avoid' in patch)) {
+        const rest = brief.doc.references.filter((x) => x !== id);
+        brief = { ...brief, doc: { ...brief.doc, references: isContent(ref) ? [...rest, id] : rest } };
+      }
+      return { ...p, moodboard: { ...p.moodboard, refs }, brief };
+    });
+  /** The designer's own files onto the board, kept in this browser. */
+  const uploadRefs = async (files: File[]) => {
+    setImgError('');
+    setImgBusy(files.length === 1 ? 'Adding your reference…' : `Adding ${Math.min(12, files.length)} references…`);
+    const added: MoodboardRef[] = [];
+    const errors: string[] = [];
+    for (const f of files.slice(0, 12)) {
+      const r = await addUpload(f);
+      if (r.ok) added.push(r.ref);
+      else errors.push(r.error);
+    }
+    setImgBusy(null);
+    if (added.length) update((p) => ({ ...p, moodboard: { ...p.moodboard, refs: [...added, ...p.moodboard.refs] } }));
+    if (errors.length) setImgError(errors.length > 1 ? `${errors[0]} (and ${errors.length - 1} more)` : errors[0]);
+  };
+  const sampleRef = async (ref: MoodboardRef) => {
+    const sw = await sampleSwatches(ref.thumb || ref.url);
+    if (sw.length) updateRef(ref.id, { swatches: sw });
+    else setImgError('That library does not let its pictures’ colours be read. Add your own copy to sample it.');
+  };
+  const addPalette = (pal: Palette) => update((p) => ({ ...p, moodboard: { ...p.moodboard, palettes: [...p.moodboard.palettes, pal].slice(-12) } }));
   const replaceRef = async (ref: MoodboardRef) => {
     setRef(ref.id, 'rejected');
     const got = await fetchImages([{ category: ref.category, query: ref.query }], 1);
@@ -382,7 +424,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const base = st.options.find((o) => o.locks.length) ?? (st.chosen && st.chosen.locks.length ? st.chosen : null);
     const round = again ? st.round + 1 : st.round;
     const seen = again ? [...new Set([...st.seen, ...st.options.map((o) => o.language)])] : st.seen;
-    return { brief: p.brief.doc!, notes: st.notes, avoid: st.avoid, base, round, seen };
+    return { brief: p.brief.doc!, notes: st.notes, avoid: st.avoid, base, round, seen, board: readBoard(p.moodboard) };
   };
 
   const proposeDirectionsFor = async (again: boolean) => {
@@ -436,7 +478,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const inspect = async (from: DesignSpec, autofix: boolean): Promise<{ spec: DesignSpec; fixed: string[]; ev: Evaluation }> => {
     const locks = current.current.direction.chosen?.locks ?? [];
     const measureAt = async (s: DesignSpec) => {
-      const html = renderDesign(s, current.current.moodboard.refs).html;
+      const html = renderDesign(s, withUploads(current.current.moodboard.refs, true)).html;
       const [desktop, phone] = await Promise.all([measurePage(html, 1280, 900, nonce), measurePage(html, 390, 844, nonce)]);
       return evaluateDesign(s, { desktop, phone }, locks);
     };
@@ -1003,7 +1045,11 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                   onDesignNow={designNow}
                 />
                 <Moodboard
-                  board={project.moodboard}
+                  board={uiBoard}
+                  onUpdate={updateRef}
+                  onUpload={uploadRefs}
+                  onAddPalette={addPalette}
+                  onSample={sampleRef}
                   sample={project.name}
                   busy={imgBusy}
                   error={imgError}
@@ -1025,7 +1071,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                 brief={project.brief.doc}
                 version={project.brief.version}
                 approved={project.brief.approved}
-                refs={project.moodboard.refs}
+                refs={uiRefs}
                 busy={busy}
                 hasDesign={!!spec}
                 onChange={(b) => update((p) => ({ ...p, brief: { ...p.brief, doc: b, approved: false } }))}
@@ -1043,7 +1089,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                 state={project.direction}
                 brief={project.brief.doc}
                 name={project.name}
-                refs={project.moodboard.refs}
+                refs={frameRefs}
                 busy={busy}
                 note={dirNote}
                 onNotes={(notes, avoid) => update((p) => ({ ...p, direction: { ...p.direction, notes: notes.slice(0, 1200), avoid: avoid.slice(0, 400) } }))}
@@ -1152,7 +1198,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
               <LivingBrief
                 intent={project.intent}
                 discovery={project.discovery}
-                board={project.moodboard}
+                board={uiBoard}
                 brief={project.brief}
                 busy={busy}
                 onIntent={(v) => (update((p) => ({ ...p, intent: v })), discoverTurn({ intent: v }))}
@@ -1360,7 +1406,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                       className="sb-link is-meta is-strong"
                       onClick={() => {
                         // the exported page carries its motion (CSS only, with its reduced-motion alternative)
-                        const page = spec && !imported ? renderDesign(spec, project.moodboard.refs, { motion: 'play' }).html : rendered.html;
+                        const page = spec && !imported ? renderDesign(spec, frameRefs, { motion: 'play' }).html : rendered.html;
                         const url = URL.createObjectURL(new Blob([page], { type: 'text/html' }));
                         const a = document.createElement('a');
                         a.href = url;
@@ -1434,7 +1480,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
           </div>
         </aside>
       </div>
-      {previewing && spec && !imported && <Preview spec={spec} refs={project.moodboard.refs} nonce={nonce} title={spec.title || project.name} onClose={() => setPreviewing(false)} />}
+      {previewing && spec && !imported && <Preview spec={spec} refs={frameRefs} nonce={nonce} title={spec.title || project.name} onClose={() => setPreviewing(false)} />}
       <input
         ref={fileInput}
         type="file"

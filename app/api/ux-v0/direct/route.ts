@@ -23,6 +23,7 @@ import { directSystem, directUser, normalizeDirection, parseDirections, proposeD
 import { MAX_TOKENS, socriauxLadder } from '@/lib/ux-v0/model';
 import { bad, failed, noModel, projectIdOf, readBody, signInFirst } from '@/lib/ux-v0/route-kit';
 import { normalizeBrief } from '@/lib/ux-v0/types';
+import { normalizeReading } from '@/lib/ux-v0/references';
 import { recordUsage, underCaps } from '@/lib/ux-v0/usage-server';
 
 export const runtime = 'nodejs';
@@ -48,6 +49,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
     base: body.base ? normalizeDirection(body.base) : null,
     round: Number.isFinite(body.round) ? Math.max(0, Math.min(99, Math.round(body.round))) : 0,
     seen: Array.isArray(body.seen) ? body.seen.filter((x: unknown): x is string => typeof x === 'string').slice(0, 24) : [],
+    board: normalizeReading(body.board),
   };
   const projectId = projectIdOf(body.projectId);
   const options = proposeDirections(ask);

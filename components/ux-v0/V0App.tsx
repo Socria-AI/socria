@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { makeNonce } from '@/lib/ux-v0/sandbox';
-import { deleteProject, getProject, listProjects, putProject } from '@/lib/ux-v0/store';
+import { deleteArtifacts, deleteProject, getProject, listProjects, putProject } from '@/lib/ux-v0/store';
 import { makeProject, normalizeProject, type DesignProject, type ProjectSummary } from '@/lib/ux-v0/types';
 import { checkFile } from './files';
 import { Home, type RemoteWork } from './Home';
@@ -120,6 +120,8 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
     const p = await getProject(s.id);
     const artifactId = p?.artifact?.type === 'imported' ? p.artifact.id : undefined;
     await deleteProject(s.id, artifactId);
+    // the designer's own references go with the project
+    await deleteArtifacts(p?.moodboard.refs.filter((r) => r.provider === 'upload').map((r) => r.providerId) ?? []);
     if (signedIn) {
       await fetch(`/api/ux-v0/projects?id=${encodeURIComponent(s.id)}`, { method: 'DELETE' }).catch(() => undefined);
       if (artifactId && p?.artifact?.type === 'imported' && p.artifact.kept === 'account') await fetch(`/api/files/original/${artifactId}`, { method: 'DELETE' }).catch(() => undefined);

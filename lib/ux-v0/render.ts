@@ -891,7 +891,8 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], op
     }
     return html;
   });
-  const credits = [...im.used.values()].map(creditLine);
+  // the designer's own pictures need no credit on the page
+  const credits = [...im.used.values()].filter((r) => r.provider !== 'upload').map(creditLine);
   const creditHtml = credits.length
     ? `<p class="credits">Images: ${credits.map((c) => (c.url ? `<a href="${esc(c.url)}" rel="noreferrer">${esc(c.text)}</a>` : esc(c.text))).join(' · ')}</p>`
     : '';
