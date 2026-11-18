@@ -34,11 +34,16 @@ export interface JsonFormat {
 
 const str: Schema = { type: 'string' };
 const strOrNull: Schema = { type: ['string', 'null'] };
-const strs: Schema = { type: 'array', items: str };
+/**
+ * Every list is bounded, at a little over what its prompt asks for: a strict schema with an open list let
+ * one live answer run on until it hit its cap (17,184 tokens, docs/SOCRIAUX-SOL.md), and a bound keeps a
+ * list from becoming that loop. The parsers keep their own, tighter limits.
+ */
+const strs = (max: number): Schema => ({ type: 'array', items: str, maxItems: max });
 const oneOf = (values: readonly string[]): Schema => ({ type: 'string', enum: [...values] });
 /** An object whose every field is required and nothing else allowed: what strict mode asks. */
 const object = (properties: Record<string, Schema>): Schema => ({ type: 'object', additionalProperties: false, required: Object.keys(properties), properties });
-const list = (items: Schema): Schema => ({ type: 'array', items });
+const list = (items: Schema, max: number): Schema => ({ type: 'array', items, maxItems: max });
 
 const DISPLAY = oneOf(FONTS.filter((f) => f.kind !== 'mono').map((f) => f.name));
 const BODY = oneOf(FONTS.filter((f) => !f.displayOnly && f.kind !== 'mono').map((f) => f.name));
@@ -53,14 +58,15 @@ const artDirection = object({
       language: oneOf(LANGUAGES.map((l) => l.id)),
       name: str,
       concept: str,
-      rationale: strs,
+      rationale: strs(4),
       voice: str,
       composition: str,
       imagery: str,
-      avoid: strs,
+      avoid: strs(5),
       // optional in the prompt: null keeps the candidate's own faces
       fonts: { anyOf: [object({ display: DISPLAY, body: BODY }), { type: 'null' }] },
-    })
+    }),
+    3
   ),
 });
 
@@ -68,43 +74,48 @@ const artDirection = object({
 const briefFields = {
   objective: str,
   audience: str,
-  userGoals: strs,
-  personality: strs,
+  userGoals: strs(8),
+  personality: strs(6),
   visualDirection: str,
-  palette: list(colour),
+  palette: list(colour, 8),
   typography: object({ display: DISPLAY, body: BODY, rationale: str }),
   layoutDirection: str,
-  functionalRequirements: strs,
-  references: strs,
-  openQuestions: strs,
+  functionalRequirements: strs(12),
+  references: strs(12),
+  openQuestions: strs(8),
   experience: strOrNull,
-  rules: strs,
+  rules: strs(10),
   accessibility: strOrNull,
   responsive: strOrNull,
   pageType: oneOf(['website', 'app-screen']),
   platform: oneOf(['web', 'mobile']),
 };
 const brief = object(briefFields);
-const refineBrief = object({ ...briefFields, moodboardQueries: list(query) });
+const refineBrief = object({ ...briefFields, moodboardQueries: list(query, 3) });
 
 /** lib/ux-v0/discovery.ts directionSystem: another direction for one aspect of the moodboard. */
-const moodDirection = object({
-  direction: str,
-  moodboard: object({
-    queries: list(query),
-    palettes: list(object({ name: str, colors: list(colour) })),
-    type: list(object({ display: DISPLAY, body: BODY, note: str })),
-  }),
-});
+const MOOD_PARTS = {
+  queries: list(query, 5),
+  palettes: list(object({ name: str, colors: list(colour, 8) }), 3),
+  type: list(object({ display: DISPLAY, body: BODY, note: str }), 3),
+};
+const moodDirection = object({ direction: str, moodboard: object(MOOD_PARTS) });
+/**
+ * Only the part the aspect asks for: searches for imagery, texture or composition, palettes for colour,
+ * pairs for type. Making the model close two empty lists it was never asked about did it no good (in the
+ * first live run, this call ran on to its cap twice in four tries with all three required).
+ */
+const moodDirectionFor = (aspect: string): Schema =>
+  object({ direction: str, moodboard: object(aspect === 'palette' ? { palettes: MOOD_PARTS.palettes } : aspect === 'type' ? { type: MOOD_PARTS.type } : { queries: MOOD_PARTS.queries }) });
 
 /** lib/ux-v0/critique.ts critiqueSystem: a reading of the selection, with evidence. */
 const critique = object({
   read: str,
   verdict: oneOf(VERDICTS),
-  issues: list(object({ text: str, evidence: str })),
-  questions: strs,
-  principles: list(object({ name: str, applies: str })),
-  alternatives: list(object({ text: str, tradeoff: str })),
+  issues: list(object({ text: str, evidence: str }), 3),
+  questions: strs(2),
+  principles: list(object({ name: str, applies: str }), 3),
+  alternatives: list(object({ text: str, tradeoff: str }), 3),
   // only when the route asks for it; null otherwise
   artifactSummary: strOrNull,
 });
@@ -118,8 +129,8 @@ const SCHEMAS: Partial<Record<CallKind, Schema>> = {
 };
 
 /** The structured format for a kind of call, or undefined when it answers in plain JSON (see above). */
-export function formatFor(kind: CallKind): JsonFormat | undefined {
-  const schema = SCHEMAS[kind];
+export function formatFor(kind: CallKind, aspect?: string): JsonFormat | undefined {
+  const schema = kind === 'direction' && aspect ? moodDirectionFor(aspect) : SCHEMAS[kind];
   return schema ? { type: 'json_schema', name: `socriaux_${kind.replace(/-/g, '_')}`, schema, strict: true } : undefined;
 }
 

@@ -65,7 +65,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       maxTokens: MAX_TOKENS[kind],
       temperature: action === 'direction' ? 0.8 : 0.5,
       label: kind,
-      format: formatFor(kind),
+      format: formatFor(kind, aspect),
     });
     await recordUsage(userId, projectId, kind, asked.usage);
     if (action === 'direction') return NextResponse.json({ ...parseDirection(asked.json, input, aspect), usage: asked.usage });

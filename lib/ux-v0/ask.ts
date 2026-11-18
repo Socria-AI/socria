@@ -80,7 +80,9 @@ export async function askJson(openai: OpenAI, ladder: string[], o: AskOptions, e
         input: [
           {
             role: 'user',
-            content: [{ type: 'input_text', text: o.user }, ...(o.images ?? []).map((im) => ({ type: 'input_image', image_url: im.url, detail: im.detail }))],
+            // plain JSON mode on the Responses API needs the word in the INPUT, not only in the instructions
+            // (a 400 otherwise, found by the first live run): said once, at the end, where a schema is not given
+            content: [{ type: 'input_text', text: o.format ? o.user : `${o.user}\n\nAnswer with the one JSON object described.` }, ...(o.images ?? []).map((im) => ({ type: 'input_image', image_url: im.url, detail: im.detail }))],
           },
         ],
         // the cap for the answer: the tracked client gives the reasoning its room on top

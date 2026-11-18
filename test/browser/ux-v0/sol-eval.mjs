@@ -100,8 +100,10 @@ async function ask(setup, kind, system, user, extra = {}) {
   const row = { setup: setup.label, project: current, kind, ms: 0, ok: false, model: null, effort: null, api: null, input: 0, output: 0, cost: 0, incomplete: null, error: null };
   calls.push(row);
   try {
-    const a = await V.askJson(client, ladder, { system, user, maxTokens: V.MAX_TOKENS[kind], temperature: extra.temperature ?? 0.5, label: kind, format: V.formatFor(kind), images: extra.images }, env);
+    const a = await V.askJson(client, ladder, { system, user, maxTokens: V.MAX_TOKENS[kind], temperature: extra.temperature ?? 0.5, label: kind, format: extra.format ?? V.formatFor(kind), images: extra.images }, env);
     Object.assign(row, { ms: Date.now() - t0, model: a.model, effort: a.effort, api: a.api, input: a.usage.input, output: a.usage.output, cost: a.usage.cost, incomplete: a.incomplete, ok: a.json != null });
+    // an answer cut short or unreadable is kept (its start and end) so what went wrong can be read
+    if (a.incomplete || a.json == null) row.raw = a.raw.length > 2400 ? `${a.raw.slice(0, 1800)} … ${a.raw.slice(-600)}` : a.raw;
     spent += a.usage.cost;
     return a.json;
   } catch (e) {
@@ -209,7 +211,7 @@ try {
       };
       // 3 another direction for the moodboard's imagery
       const mIn = { ...dIn, moodboard: board };
-      const mRaw = await ask(setup, 'direction', V.directionSystem(), V.directionUser(mIn, 'imagery'), { temperature: 0.8 });
+      const mRaw = await ask(setup, 'direction', V.directionSystem(), V.directionUser(mIn, 'imagery'), { temperature: 0.8, format: V.formatFor('direction', 'imagery') });
       const mood = V.parseDirection(mRaw, mIn, 'imagery');
       out.steps.moodboard = { direction: mood.direction, queries: mood.queries.map((q) => q.query) };
       // 4 art direction

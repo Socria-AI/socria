@@ -826,6 +826,20 @@ console.log('\n=== GPT-6.1 Sol: the Responses API, structured outputs, high effo
   const dInput = { intent: 'A coffee shop website', questions: [], understanding: V.normalizeUnderstanding({}), moodboard: V.normalizeMoodboard({}), remark: '' };
   const mood = V.parseDirection({ direction: 'Industrial', moodboard: { queries: [{ category: 'texture', query: 'raw concrete' }], palettes: [], type: [] } }, dInput, 'texture');
   ok('moodboard direction: empty palettes and type lists read as none', mood.direction === 'Industrial' && mood.queries.length === 1);
+  const parts = (a) => Object.keys(V.formatFor('direction', a).schema.properties.moodboard.properties).join();
+  ok('the moodboard direction asks only for what its aspect needs (searches, palettes or pairs), every list bounded', parts('imagery') === 'queries' && parts('texture') === 'queries' && parts('palette') === 'palettes' && parts('type') === 'type' && V.formatFor('direction', 'imagery').schema.properties.moodboard.properties.queries.maxItems === 5);
+  const pal = V.parseDirection({ direction: 'Cool', moodboard: { palettes: [{ name: 'Slate', colors: [{ hex: '#1d2a33', role: 'text' }, { hex: '#f3f5f6', role: 'background' }] }] } }, dInput, 'palette');
+  ok('  and the parser reads the palette-only answer', pal.palettes.length === 1 && pal.queries.length === 0);
+  const unbounded = [];
+  const walk = (sch, path) => {
+    if (!sch || typeof sch !== 'object') return;
+    if (sch.type === 'array' && typeof sch.maxItems !== 'number') unbounded.push(path);
+    for (const [k, v] of Object.entries(sch.properties ?? {})) walk(v, `${path}.${k}`);
+    if (sch.items) walk(sch.items, `${path}[]`);
+    for (const [i, v] of (sch.anyOf ?? []).entries()) walk(v, `${path}|${i}`);
+  };
+  for (const k of V.STRUCTURED_KINDS) walk(V.formatFor(k).schema, k);
+  ok('no list in any schema is open-ended (an open list let one live answer run to its cap)', unbounded.length === 0, J(unbounded));
   // askJson, end to end, through the tracked client and the strict fake
   const quiet = console.warn;
   const quietInfo = console.info;
@@ -850,6 +864,7 @@ console.log('\n=== GPT-6.1 Sol: the Responses API, structured outputs, high effo
   ok('SOCRIAUX_EFFORT=medium: the same call at medium, with medium\'s room', a2.calls[0].params.reasoning.effort === 'medium' && a2.calls[0].params.max_output_tokens === V.MAX_TOKENS['art-direction'] + 8192);
   const a3 = await run(SOL, {}, ['{"questions":[]}']);
   ok('a call with no schema (discovery, generation, refinement): plain JSON on the Responses API', a3.calls[0].params.text.format.type === 'json_object' && J(a3.asked.json) === '{"questions":[]}');
+  ok('  its input says "JSON" itself (the live API refuses JSON mode when only the instructions say it)', /json/i.test(a3.calls[0].params.input[0].content[0].text) && !/json/i.test(a1.calls[0].params.input[0].content[0].text.slice(-60)));
   globalThis.__contractUnavailable = ['gpt-6.1-sol'];
   const a4 = await run(SOL, { format: V.formatFor('art-direction') }, [answer]);
   globalThis.__contractUnavailable = [];

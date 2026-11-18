@@ -177,7 +177,7 @@ console.log('\n=== the Responses API (GPT-6.1 Sol in SocriaUX) ===');
   const logged = [];
   console.warn = (...a) => warned.push(format(...a));
   console.info = (...a) => logged.push(format(...a));
-  const call = { instructions: 'Answer in JSON.', input: [{ role: 'user', content: [{ type: 'input_text', text: 'Three directions.' }] }], max_output_tokens: 1800, temperature: 0.8, text: { format: { type: 'json_object' } }, store: false };
+  const call = { instructions: 'Answer in JSON.', input: [{ role: 'user', content: [{ type: 'input_text', text: 'Three directions, as JSON.' }] }], max_output_tokens: 1800, temperature: 0.8, text: { format: { type: 'json_object' } }, store: false };
   // shaping, purely
   const sol = P.shapeResponsesRequest({ model: 'gpt-6.1-sol', ...call, reasoning: { effort: 'high' } });
   ok('Sol at high: the effort kept, the reasoning room on top of the answer cap, no temperature', sol.reasoning.effort === 'high' && sol.max_output_tokens === 1800 + P.REASONING_ROOM.high && sol.temperature === undefined, J(sol));
@@ -195,6 +195,9 @@ console.log('\n=== the Responses API (GPT-6.1 Sol in SocriaUX) ===');
   const refusedSchema = F.judgeResponses({ ...sol, text: { format: { type: 'json_schema', name: 'x', schema: { type: 'object', additionalProperties: false, required: [], properties: {} }, strict: true } } }).error;
   const eased = P.adaptRefusedResponses({ ...sol, text: { format: { type: 'json_schema', name: 'x', schema: {}, strict: true } } }, refusedSchema);
   ok('a structured format refused: asked again as plain JSON, on the same model, nothing else changed', eased?.text?.format?.type === 'json_object' && eased.model === 'gpt-6.1-sol' && eased.reasoning.effort === 'high', J(eased));
+  const silent = { ...sol, input: [{ role: 'user', content: [{ type: 'input_text', text: 'Three directions.' }] }], text: { format: { type: 'json_schema', name: 'x', schema: {}, strict: true } } };
+  const easedSilent = P.adaptRefusedResponses(silent, refusedSchema);
+  ok('  an input that never said "JSON" gains the word, as plain JSON mode requires (the live API refuses it otherwise)', /json/i.test(JSON.stringify(easedSilent.input)) && !F.judgeResponses({ ...easedSilent, model: 'gpt-6-luna', reasoning: undefined }).error, J(easedSilent.input));
   ok('  and plain JSON refused in turn: asked with no format', P.adaptRefusedResponses(eased, Object.assign(new Error('400 x'), { status: 400, param: 'text.format' }))?.text === undefined);
   const effortRefused = F.judgeResponses({ ...sol, reasoning: { effort: 'none' } }).error;
   ok('an effort the model has not got ("none" on Sol): asked again at low, with room', P.adaptRefusedResponses({ ...sol, reasoning: { effort: 'none' } }, effortRefused)?.reasoning?.effort === 'low');

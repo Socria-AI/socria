@@ -262,6 +262,15 @@ export function shapeResponsesRequest<P extends Params>(params: P, env: Env = {}
   return out as P;
 }
 
+/** The input, saying "JSON" if it did not already: the Responses API's JSON mode refuses an input that never says it. */
+function withJsonWord(input: unknown): unknown {
+  const said = /json/i.test(typeof input === 'string' ? input : JSON.stringify(input ?? ''));
+  if (said) return input;
+  if (typeof input === 'string') return `${input}\n\nAnswer in JSON.`;
+  if (Array.isArray(input)) return [...input, { role: 'user', content: [{ type: 'input_text', text: 'Answer in JSON.' }] }];
+  return input;
+}
+
 /** Never changed by an adaptation of a Responses call: what the call is. */
 const RESPONSES_ESSENTIAL = new Set(['model', 'input', 'instructions', 'stream', 'tools', 'tool_choice', 'max_output_tokens', 'previous_response_id']);
 
@@ -314,6 +323,8 @@ export function adaptRefusedResponses<P extends Params>(params: P, e: unknown): 
       const format = obj(text.format);
       if (format.type === 'json_schema') {
         out.text = { ...text, format: { type: 'json_object' } };
+        // plain JSON mode needs the word in the input itself (the instructions do not count)
+        out.input = withJsonWord(params.input);
         return out as P;
       }
       if (params.text === undefined) return null;

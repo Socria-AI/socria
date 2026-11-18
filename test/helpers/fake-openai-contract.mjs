@@ -39,7 +39,7 @@
 // comes back `status: "incomplete"`); `reasoning.effort` must be one the model
 // has, and a model without reasoning refuses `reasoning`; a temperature needs
 // effort none; `text.format` json_object needs the word JSON in the
-// instructions or input; a strict json_schema must close every object
+// instructions: the real API checks only the input); a strict json_schema must close every object
 // (additionalProperties false, every property required); a model listed in
 // globalThis.__contractNoSchema refuses json_schema. An answer is `output`
 // items (a message with output_text parts) and `usage` in the Responses shape
@@ -156,7 +156,8 @@ export function judgeResponses(p) {
     if (p[k] !== undefined) return { error: apiError(400, `Unsupported parameter: '${k}'.`, { param: k, code: 'unsupported_parameter' }) };
   }
   const format = p.text?.format;
-  if (format?.type === 'json_object' && !/json/i.test(textOfInput(p))) {
+  // the real API looks for the word in the INPUT messages only, never in the instructions (found by the live smoke run)
+  if (format?.type === 'json_object' && !/json/i.test(typeof p.input === 'string' ? p.input : JSON.stringify(p.input ?? ''))) {
     return { error: apiError(400, "Response input messages must contain the word 'json' in some form to use 'text.format' of type 'json_object'.", { param: 'input' }) };
   }
   if (format?.type === 'json_schema') {
