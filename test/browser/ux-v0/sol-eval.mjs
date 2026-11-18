@@ -183,6 +183,8 @@ try {
       current = p.id;
       const out = { project: p.id, setup: setup.label, steps: {} };
       results.push(out);
+      // one project and setup failing (in the harness or the page) is recorded, and the run goes on
+      try {
       const board = boardFor(p);
       const intent = `${p.name}. ${p.brief.objective}`;
       console.log(`\n${p.id} · ${setup.label}`);
@@ -246,7 +248,18 @@ try {
         const cs = getComputedStyle(b);
         return { text: b.textContent.trim(), box: { x: r.x, y: r.y, w: r.width, h: r.height }, styles: { color: cs.color, 'background-color': cs.backgroundColor, 'font-size': cs.fontSize, 'font-weight': cs.fontWeight } };
       });
-      const crop = heroBox ? (await page.screenshot({ clip: { x: Math.max(0, heroBox.box.x - 120), y: Math.max(0, heroBox.box.y - 80), width: Math.min(640, heroBox.box.w + 240), height: Math.min(360, heroBox.box.h + 160) } })).toString('base64') : null;
+      // the button may sit below the first screen: cropped from the whole page, and a crop that fails is left out
+      let crop = null;
+      if (heroBox && heroBox.box.w > 0 && heroBox.box.h > 0) {
+        try {
+          const x = Math.max(0, heroBox.box.x - 120);
+          const y = Math.max(0, heroBox.box.y + (await page.evaluate(() => window.scrollY)) - 80);
+          crop = (await page.screenshot({ fullPage: true, clip: { x, y, width: Math.min(640, heroBox.box.w + 240), height: Math.min(360, heroBox.box.h + 160) } })).toString('base64');
+        } catch {
+          crop = null;
+        }
+      }
+      if (!heroBox) out.steps.critiqueSkipped = 'no primary button on the page';
       await page.setViewportSize({ width: 390, height: 844 });
       await page.screenshot({ path: `${S}sol-eval-${p.id}-${setup.label}-phone.png` });
       out.steps.generation = {
@@ -287,6 +300,11 @@ try {
         const cRaw = await ask(setup, 'critique', V.critiqueSystem(), V.critiqueUser(cIn), { temperature: 0.4, images: crop ? [{ url: `data:image/png;base64,${crop}`, detail: 'high' }] : undefined });
         const g = V.gateReasoning(cRaw, cIn);
         out.steps.critique = { verdict: g.reasoning.verdict, issues: g.reasoning.issues.length, demotedForNoEvidence: g.demoted, questions: g.reasoning.questions.length, read: g.reasoning.read };
+      }
+      } catch (e) {
+        if (e?.budget) throw e;
+        out.error = String(e?.message ?? e).slice(0, 300);
+        console.log(`  harness error: ${out.error}`);
       }
       const mine = calls.filter((c) => c.project === p.id && c.setup === setup.label);
       console.log(`  ${mine.map((c) => `${c.kind}:${c.ok ? 'ok' : c.error ? 'error' : 'unparsed'} ${(c.ms / 1000).toFixed(1)}s`).join(' · ')}`);

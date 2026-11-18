@@ -49,6 +49,8 @@ export interface Asked {
   effort: Effort | 'default';
   /** the answer stopped early: its cap, or a refusal, or the provider's own reason */
   incomplete: string | null;
+  /** a structured answer was cut at its cap and asked again in JSON mode (both calls billed), else null */
+  retried?: string | null;
 }
 
 type Env = Record<string, string | undefined>;
@@ -73,7 +75,7 @@ export async function askJson(openai: OpenAI, ladder: string[], o: AskOptions, e
   const warn = (from: string, to: string, why: string) => console.warn('ux-v0 %s: %s refused (%s); asking %s', o.label, from, why, to);
   const also = o.images?.length ? cannotSee : undefined;
   if (api === 'responses') {
-    const make = (model: string): Promise<any> =>
+    const make = (format: JsonFormat | undefined) => (model: string): Promise<any> =>
       (openai as any).responses.create({
         model,
         instructions: o.system,
@@ -82,22 +84,42 @@ export async function askJson(openai: OpenAI, ladder: string[], o: AskOptions, e
             role: 'user',
             // plain JSON mode on the Responses API needs the word in the INPUT, not only in the instructions
             // (a 400 otherwise, found by the first live run): said once, at the end, where a schema is not given
-            content: [{ type: 'input_text', text: o.format ? o.user : `${o.user}\n\nAnswer with the one JSON object described.` }, ...(o.images ?? []).map((im) => ({ type: 'input_image', image_url: im.url, detail: im.detail }))],
+            content: [{ type: 'input_text', text: format ? o.user : `${o.user}\n\nAnswer with the one JSON object described.` }, ...(o.images ?? []).map((im) => ({ type: 'input_image', image_url: im.url, detail: im.detail }))],
           },
         ],
         // the cap for the answer: the tracked client gives the reasoning its room on top
         max_output_tokens: o.maxTokens,
         temperature: o.temperature ?? 0.5,
         ...(effort ? { reasoning: { effort } } : {}),
-        text: { format: o.format ?? { type: 'json_object' } },
+        text: { format: format ?? { type: 'json_object' } },
         store: false,
       });
-    const { result, model } = await firstAccepted(ladder, make, warn, also);
-    const raw = responseText(result);
-    const refused = (result?.output ?? []).some((item: any) => item?.type === 'message' && (item.content ?? []).some((c: any) => c?.type === 'refusal'));
-    const incomplete = refused ? 'refusal' : result?.status === 'incomplete' ? String(result?.incomplete_details?.reason ?? 'incomplete') : null;
+    const read = (result: any) => {
+      const refused = (result?.output ?? []).some((item: any) => item?.type === 'message' && (item.content ?? []).some((c: any) => c?.type === 'refusal'));
+      const incomplete = refused ? 'refusal' : result?.status === 'incomplete' ? String(result?.incomplete_details?.reason ?? 'incomplete') : null;
+      return { raw: responseText(result), incomplete };
+    };
+    const first = await firstAccepted(ladder, make(o.format), warn, also);
+    let { model } = first;
+    let { raw, incomplete } = read(first.result);
+    let usage = usageOf(model, usageFromResponses(first.result?.usage) as any);
+    let retried: string | null = null;
     if (incomplete) console.warn('ux-v0 %s: %s stopped early (%s)', o.label, model, incomplete);
-    return { json: readJson(raw), raw, usage: usageOf(model, usageFromResponses(result?.usage) as any), model, api, effort: effort ?? 'default', incomplete };
+    // A STRUCTURED ANSWER THAT RAN ON TO ITS CAP. In the live evaluation a strict-schema answer now and then
+    // never closed: it wrote until the cap (about 17,000 tokens, two minutes) with little reasoning, the loop
+    // constrained decoding can fall into. Asked once more in plain JSON mode, on the same model, it answers;
+    // both calls are billed and counted. (Plain JSON mode was not seen to do this.)
+    if (incomplete === 'max_output_tokens' && o.format) {
+      retried = 'structured answer cut at its cap; asked again in JSON mode';
+      console.warn('ux-v0 %s: asking %s again in JSON mode', o.label, model);
+      const again = await firstAccepted([model], make(undefined), warn, also);
+      const second = usageOf(model, usageFromResponses(again.result?.usage) as any);
+      usage = { ...second, input: usage.input + second.input, cached: usage.cached + second.cached, output: usage.output + second.output, cost: usage.cost == null || second.cost == null ? null : usage.cost + second.cost };
+      ({ raw, incomplete } = read(again.result));
+      model = again.model;
+      if (incomplete) console.warn('ux-v0 %s: %s stopped early again (%s)', o.label, model, incomplete);
+    }
+    return { json: readJson(raw), raw, usage, model, api, effort: effort ?? 'default', incomplete, retried };
   }
   const userContent: any = o.images?.length
     ? [{ type: 'text', text: o.user }, ...o.images.map((im) => ({ type: 'image_url', image_url: { url: im.url, detail: im.detail } }))]
@@ -118,5 +140,5 @@ export async function askJson(openai: OpenAI, ladder: string[], o: AskOptions, e
   const raw = (result as any).choices?.[0]?.message?.content ?? '';
   const finish = (result as any).choices?.[0]?.finish_reason;
   const incomplete = finish === 'length' || finish === 'content_filter' ? String(finish) : null;
-  return { json: readJson(raw), raw, usage: usageOf(model, (result as any).usage), model, api, effort: effort ?? 'default', incomplete };
+  return { json: readJson(raw), raw, usage: usageOf(model, (result as any).usage), model, api, effort: effort ?? 'default', incomplete, retried: null };
 }

@@ -878,9 +878,17 @@ console.log('\n=== GPT-6.1 Sol: the Responses API, structured outputs, high effo
   globalThis.__contractNoSchema = [];
   ok('structured outputs refused: plain JSON on Sol, not a step down the ladder', a6.calls.length === 2 && a6.calls.every((c) => c.model === 'gpt-6.1-sol') && a6.calls[1].params.text.format.type === 'json_object' && a6.asked.model === 'gpt-6.1-sol');
   globalThis.__contractReasoning = { ...F.REASONING, high: 18170 };
-  const a7 = await run(SOL, { format: V.formatFor('art-direction') }, [answer]);
+  const a7 = await run(SOL, {}, [answer]);
   globalThis.__contractReasoning = undefined;
-  ok('an answer cut by its cap is said to be incomplete (and does not parse as a whole)', a7.asked.incomplete === 'max_output_tokens' && a7.asked.json === null && warned.some((w) => /stopped early \(max_output_tokens\)/.test(w)), J({ inc: a7.asked.incomplete }));
+  ok('a plain-JSON answer cut by its cap is said to be incomplete (and does not parse as a whole); it is not asked again', a7.calls.length === 1 && a7.asked.retried === null && a7.asked.incomplete === 'max_output_tokens' && a7.asked.json === null && warned.some((w) => /stopped early \(max_output_tokens\)/.test(w)), J({ inc: a7.asked.incomplete }));
+  // the loop seen live: a strict-schema answer that never closes, writing whitespace to its cap
+  globalThis.__contractContent = (p) => (p.text?.format?.type === 'json_schema' ? `{"directions": [${' '.repeat(80000)}` : JSON.stringify(answer));
+  globalThis.__contractCalls = [];
+  const loop = await V.askJson(client, V.socriauxLadder(SOL), { system: V.directSystem(), user: 'Three directions.', maxTokens: V.MAX_TOKENS['art-direction'], label: 'art-direction', format: V.formatFor('art-direction') }, SOL);
+  const loopCalls = globalThis.__contractCalls;
+  globalThis.__contractContent = undefined;
+  ok('a structured answer that runs to its cap is asked once more in JSON mode, on Sol, and the designer gets the answer', loopCalls.length === 2 && loopCalls[0].outcome === 'cut' && loopCalls[1].params.text.format.type === 'json_object' && loopCalls.every((c) => c.model === 'gpt-6.1-sol') && J(loop.json) === J(answer) && loop.incomplete === null && /JSON mode/.test(loop.retried ?? ''), J(loopCalls.map((c) => [c.outcome, c.params.text?.format?.type])));
+  ok('  both calls are billed and counted', loop.usage.output > 11000 && loop.usage.cost > (loop.usage.output * 10) / 1e6 - 1e-9, J(loop.usage));
   const a8 = await run(SOL, { format: V.formatFor('art-direction') }, [{ refusal: 'I can not help with that.' }]);
   ok('a refusal: no JSON, said as a refusal, never read as an answer', a8.asked.incomplete === 'refusal' && a8.asked.json === null && a8.asked.raw === '');
   const a9 = await run(SOL, { images: [{ url: 'data:image/png;base64,AAAA', detail: 'low' }] }, ['{"read":"x"}']);
