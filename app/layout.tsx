@@ -69,16 +69,16 @@ const stix = localFont({
   adjustFontFallback: 'Times New Roman',
 });
 
-// The Socria brandbook's two faces (Version 1, November 2026), tried first on
-// SocriaUX (/ux, /ux-v0) only: Old Standard TT is Socria's voice (the wordmark,
-// headlines, its questions), Geist is the person, the interface and the record.
-// Not preloaded, so no other page downloads them.
-const oldStandard = localFont({
+// The Socria brandbook's two faces (Version 2, November 2026), tried first on
+// SocriaUX (/ux, /ux-v0) only: Cormorant Garamond Medium and medium italic is
+// Socria's voice (the wordmark, headlines, its questions), Geist is the person,
+// the interface and the record. Not preloaded, so no other page downloads them.
+const cormorant = localFont({
   src: [
-    { path: './fonts/OldStandardTT-400.woff2', weight: '400', style: 'normal' },
-    { path: './fonts/OldStandardTT-400-italic.woff2', weight: '400', style: 'italic' },
+    { path: './fonts/CormorantGaramond-500.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/CormorantGaramond-500-italic.woff2', weight: '500', style: 'italic' },
   ],
-  variable: '--font-old-standard',
+  variable: '--font-cormorant',
   display: 'swap',
   preload: false,
   adjustFontFallback: 'Times New Roman',
@@ -114,7 +114,7 @@ export default function RootLayout({
   // configuration note, it is an outage.
   if (!clerkConfigured() && !isProduction()) {
     return (
-      <html lang="en" className={`${serif.variable} ${sans.variable} ${hand.variable} ${stix.variable} ${oldStandard.variable} ${geist.variable}`}>
+      <html lang="en" className={`${serif.variable} ${sans.variable} ${hand.variable} ${stix.variable} ${cormorant.variable} ${geist.variable}`}>
         <body className="paper-bg antialiased">
           <SetupNotice env={currentEnv()} />
         </body>
@@ -186,7 +186,7 @@ export default function RootLayout({
         },
       }}
     >
-      <html lang="en" suppressHydrationWarning className={`${serif.variable} ${sans.variable} ${hand.variable} ${stix.variable} ${oldStandard.variable} ${geist.variable}`}>
+      <html lang="en" suppressHydrationWarning className={`${serif.variable} ${sans.variable} ${hand.variable} ${stix.variable} ${cormorant.variable} ${geist.variable}`}>
         <head>
           {/* THE REVEAL CONTRACT, KEPT WITHOUT JAVASCRIPT.
              *

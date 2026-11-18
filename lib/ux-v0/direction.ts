@@ -247,7 +247,7 @@ export const LANGUAGES: readonly Language[] = [
     blurb: 'paper and ink with flat geometric shapes: a scholarly serif for voice, a precise grotesk for everything operated, pill controls, flat colour fields, no shadows or gradients',
     keywords: ['thoughtful', 'intelligent', 'curious', 'learning', 'education', 'school', 'conversation', 'ideas', 'thinking', 'clarity', 'clear', 'friendly', 'product', 'tool', 'software', 'ai', 'platform', 'question', 'questions', 'reasoning', 'calm', 'honest', 'socratic', 'philosophy', 'study', 'students', 'teachers', 'knowledge', 'collaboration', 'creative', 'humane'],
     traits: ['serif', 'light', 'colourful', 'geometric', 'playful'],
-    display: ['Old Standard TT', 'Instrument Serif', 'Newsreader', 'Fraunces'],
+    display: ['Cormorant Garamond', 'Old Standard TT', 'Instrument Serif', 'Newsreader'],
     body: ['Geist', 'Instrument Sans', 'Inter', 'Hanken Grotesk'],
     mono: ['Geist Mono', 'IBM Plex Mono'],
     palette: 'paper',

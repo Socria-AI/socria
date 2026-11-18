@@ -1,0 +1,1140 @@
+/* components/ux-v0/home.css — the SocriaUX home, hung like a design museum's archive.
+ *
+ * One twelve-column grid runs from the masthead to the colophon, and every
+ * block starts and stops on it. Scale does the work a dashboard does with
+ * boxes: a very large question in Cormorant Garamond against small archival
+ * labels in Geist; strong ink rules open each part, hairlines divide within
+ * it. The works hang as exhibits in an uneven rhythm (a featured work, then
+ * 5|7, 4|4|4, 7|5), each a plate and a wall label; an index lists the same
+ * collection as a catalogue. Brandbook Version 2: paper and ink, deep moss for
+ * the one filled control, one apricot arch for the question, flat colour,
+ * no capitals, nothing that floats here so nothing casts a shadow. Motion is 120 ms for a
+ * hover, 200 ms for an opening, 320 ms for a rearrangement, and none for a
+ * visitor who asks for less.
+ */
+
+.mu {
+  --mu-pad: clamp(20px, 4vw, 64px);
+  --mu-max: 1440px;
+  --mu-gap: clamp(14px, 1.9vw, 28px);
+  --mu-cols: repeat(12, minmax(0, 1fr));
+  position: relative;
+  min-height: 100vh;
+  background-color: var(--sb-paper);
+  color: var(--sb-ink);
+  font-family: var(--sb-ui);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.mu main {
+  display: block;
+}
+
+/* every part sits on the same measure */
+.mu-mast,
+.mu-entrance,
+.mu-steps,
+.mu-collection,
+.mu-colophon {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: calc(var(--mu-max) + 2 * var(--mu-pad));
+  margin-inline: auto;
+  padding-inline: var(--mu-pad);
+}
+
+.mu-vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.mu-skip {
+  position: absolute;
+  top: -60px;
+  left: var(--mu-pad);
+  z-index: 30;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: var(--sb-ink);
+  color: var(--sb-paper);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: top var(--sb-open) var(--sb-ease);
+}
+.mu-skip:focus {
+  top: 12px;
+}
+
+/* the small archival voice: labels, numbers, figures. The brandbook's Label role (Geist 600,
+   13 px) in sentence case with tabular figures: it asks for no capitals, so none are set here */
+.mu-kicker,
+.mu-no,
+.mu-door-k,
+.mu-index-head,
+.mu-examples > span,
+.mu-step-n,
+.mu-order > span {
+  font-family: var(--sb-ui);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── masthead: thin, on the grid ──────────────────────────────────── */
+.mu-mast {
+  display: grid;
+  grid-template-columns: var(--mu-cols);
+  column-gap: var(--mu-gap);
+  align-items: center;
+  min-height: 64px;
+  border-bottom: 1px solid var(--sb-rule);
+}
+.mu-mast-id {
+  grid-column: 1 / span 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.mu-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: inherit;
+  text-decoration: none;
+}
+.mu-mark img {
+  display: block;
+}
+.mu-wordmark {
+  font-family: var(--sb-voice);
+  font-weight: var(--sb-voice-weight);
+  font-size: 23px;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+.mu-product {
+  padding-left: 12px;
+  border-left: 1px solid var(--sb-rule-2);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 18px;
+}
+.mu-nav {
+  grid-column: 5 / span 6;
+  display: flex;
+  gap: clamp(18px, 2.4vw, 36px);
+}
+.mu-nav a {
+  padding: 6px 0;
+  color: var(--sb-ink-70);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 5px;
+  transition: color var(--sb-fast) var(--sb-ease), text-decoration-color var(--sb-fast) var(--sb-ease);
+}
+.mu-nav a:hover {
+  color: var(--sb-ink);
+  text-decoration-color: var(--sb-ink);
+}
+.mu-mast-r {
+  grid-column: 11 / span 2;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ── the entrance: the question, very large ───────────────────────── */
+.mu-entrance {
+  display: grid;
+  grid-template-columns: var(--mu-cols);
+  column-gap: var(--mu-gap);
+  padding-top: clamp(28px, 4vw, 64px);
+}
+.mu-kicker {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: var(--mu-cols);
+  column-gap: var(--mu-gap);
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--sb-ink);
+  color: var(--sb-ink-70);
+}
+.mu-kicker > span:nth-child(1) {
+  grid-column: 1 / span 4;
+  color: var(--sb-ink);
+}
+.mu-kicker > span:nth-child(2) {
+  grid-column: 5 / span 4;
+}
+.mu-kicker-n {
+  grid-column: 9 / span 4;
+  text-align: right;
+}
+
+.mu-question {
+  grid-column: 1 / span 9;
+  grid-row: 2;
+  align-self: end;
+  margin: clamp(28px, 4.5vw, 72px) 0 0;
+  font-family: var(--sb-voice);
+  font-weight: var(--sb-voice-weight);
+  font-size: clamp(54px, 8.4vw, 136px);
+  line-height: 0.92;
+  letter-spacing: -0.028em;
+  text-wrap: balance;
+}
+.mu-question em {
+  font-style: italic;
+  color: var(--sb-moss);
+}
+
+/* Fig. 1: the brandbook's arch, the shape of a question */
+.mu-arch {
+  grid-column: 10 / span 3;
+  grid-row: 2;
+  align-self: end;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: clamp(28px, 4.5vw, 72px);
+}
+.mu-arch-shape {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  max-height: 40vh;
+  border-radius: 999px 999px 0 0;
+  background: var(--sb-apricot);
+  transform-origin: 50% 100%;
+  animation: mu-rise 900ms var(--sb-ease) both;
+}
+.mu-caption {
+  color: var(--sb-ink-70);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.mu-caption b {
+  margin-right: 6px;
+  color: var(--sb-ink);
+  font-weight: 600;
+}
+
+.mu-lede {
+  grid-column: 1 / span 4;
+  grid-row: 3;
+  margin: clamp(32px, 4vw, 56px) 0 0;
+  max-width: 34ch;
+  color: var(--sb-ink-70);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.mu-compose {
+  grid-column: 5 / span 8;
+  grid-row: 3;
+  margin-top: clamp(32px, 4vw, 56px);
+}
+/* (it also carries .v0-intent-line, the hook the browser checks find it by; none of that look) */
+.mu .mu-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 18px;
+  margin: 0;
+  padding: 0 0 12px;
+  border-radius: 0;
+  border-bottom: 1.5px solid var(--sb-ink);
+  background: none;
+  box-shadow: none;
+  transition: border-color var(--sb-fast) var(--sb-ease), box-shadow var(--sb-fast) var(--sb-ease);
+}
+.mu .mu-field:focus-within {
+  border-bottom-color: var(--sb-moss);
+  box-shadow: 0 1.5px 0 0 var(--sb-moss);
+}
+.mu-field textarea {
+  display: block;
+  width: 100%;
+  min-height: 2.8em;
+  padding: 4px 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--sb-ink);
+  font-family: var(--sb-ui);
+  font-size: clamp(18px, 1.55vw, 22px);
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+.mu-field textarea::placeholder {
+  color: var(--sb-ink-45);
+  opacity: 1;
+}
+.mu-field .sb-btn {
+  min-width: 96px;
+}
+.mu-examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 18px;
+  margin: 14px 0 0;
+}
+.mu-examples > span {
+  color: var(--sb-ink-60);
+}
+.mu-example {
+  padding: 5px 0;
+  border: 0;
+  background: none;
+  color: var(--sb-ink-70);
+  font: inherit;
+  font-size: 13.5px;
+  text-decoration: underline;
+  text-decoration-color: var(--sb-rule-2);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  cursor: pointer;
+  transition: color var(--sb-fast) var(--sb-ease), text-decoration-color var(--sb-fast) var(--sb-ease);
+}
+.mu-example:hover {
+  color: var(--sb-ink);
+  text-decoration-color: var(--sb-ink);
+}
+
+/* the second door: bring a design to critique (and drop it here) */
+.mu-door {
+  grid-column: 5 / span 8;
+  grid-row: 4;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'k k'
+    't go'
+    'b go';
+  column-gap: 24px;
+  margin-top: clamp(40px, 5vw, 72px);
+  padding: 18px 0 20px;
+  border-top: 1px solid var(--sb-rule-2);
+  border-bottom: 1px solid var(--sb-rule-2);
+  transition: background-color var(--sb-open) var(--sb-ease), padding var(--sb-open) var(--sb-ease);
+}
+.mu-door.is-over {
+  padding-inline: 18px;
+  background: var(--sb-tint-idea);
+  border-color: var(--sb-moss);
+  outline: 1px dashed var(--sb-moss);
+  outline-offset: -6px;
+}
+.mu-door-k {
+  grid-area: k;
+  margin: 0 0 8px;
+  color: var(--sb-ink-60);
+}
+.mu-door-t {
+  grid-area: t;
+  margin: 0;
+  font-family: var(--sb-voice);
+  font-weight: var(--sb-voice-weight);
+  font-size: clamp(24px, 2.2vw, 30px);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+.mu-door-b {
+  grid-area: b;
+  margin: 6px 0 0;
+  max-width: 56ch;
+  color: var(--sb-ink-70);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.mu-door .sb-link {
+  grid-area: go;
+  align-self: center;
+  white-space: nowrap;
+}
+.mu-error {
+  grid-column: 5 / span 8;
+  grid-row: 5;
+  margin: 16px 0 0;
+}
+
+/* ── the chronology: how a work is made ───────────────────────────── */
+.mu-steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  column-gap: var(--mu-gap);
+  margin: clamp(72px, 9vw, 136px) auto 0;
+  padding-top: 0;
+  list-style: none;
+}
+.mu-steps li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sb-ink);
+}
+.mu-step-n {
+  color: var(--sb-moss);
+}
+.mu-step-t {
+  margin-top: 10px;
+  font-family: var(--sb-voice);
+  font-weight: var(--sb-voice-weight);
+  font-size: 24px;
+  line-height: 1.1;
+}
+.mu-step-d {
+  max-width: 28ch;
+  color: var(--sb-ink-70);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+/* ── the collection ───────────────────────────────────────────────── */
+.mu-collection {
+  margin-top: clamp(96px, 11vw, 176px);
+  padding-bottom: 8px;
+  scroll-margin-top: 24px;
+}
+.mu-collection:focus {
+  outline: none;
+}
+.mu-coll-head {
+  display: grid;
+  grid-template-columns: var(--mu-cols);
+  column-gap: var(--mu-gap);
+  align-items: end;
+  padding-top: 12px;
+  border-top: 1px solid var(--sb-ink);
+}
+.mu-h2 {
+  grid-column: 1 / span 8;
+  margin: clamp(24px, 3vw, 44px) 0 0;
+  font-family: var(--sb-voice);
+  font-weight: var(--sb-voice-weight);
+  font-size: clamp(44px, 5.6vw, 88px);
+  line-height: 0.95;
+  letter-spacing: -0.024em;
+}
+.mu-coll-note {
+  grid-column: 9 / span 4;
+  margin: 0 0 8px;
+  justify-self: end;
+  max-width: 36ch;
+  color: var(--sb-ink-70);
+  font-size: 13.5px;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.mu-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+  margin-top: clamp(28px, 3vw, 44px);
+  padding: 12px 0;
+  border-top: 1px solid var(--sb-rule);
+  border-bottom: 1px solid var(--sb-rule);
+}
+.mu-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 300px;
+  min-width: 200px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--sb-well);
+  transition: box-shadow var(--sb-fast) var(--sb-ease);
+}
+.mu-search:focus-within {
+  box-shadow: inset 0 0 0 1.5px var(--sb-moss);
+}
+.mu-search svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: var(--sb-ink-60);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+.mu-search input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--sb-ink);
+  font: inherit;
+  font-size: 14px;
+}
+.mu-search input::placeholder {
+  color: var(--sb-ink-45);
+  opacity: 1;
+}
+.mu-order {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.mu-order > span {
+  color: var(--sb-ink-60);
+}
+.mu-views {
+  margin-left: auto;
+}
+.mu-count {
+  margin: 0;
+  min-width: 7ch;
+  color: var(--sb-ink-70);
+  font-size: 12.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.mu-empty {
+  padding: clamp(48px, 7vw, 104px) 0 clamp(24px, 3vw, 40px);
+}
+.mu-empty-t {
+  margin: 0;
+  max-width: 22ch;
+  font-family: var(--sb-voice);
+  font-weight: var(--sb-voice-weight);
+  font-size: clamp(30px, 3.2vw, 44px);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+}
+.mu-empty-b {
+  margin: 12px 0 18px;
+  max-width: 46ch;
+  color: var(--sb-ink-70);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.mu-empty .sb-link {
+  margin-top: 6px;
+}
+
+/* the exhibition: plates and wall labels in an uneven hang */
+.mu-exhibits {
+  display: grid;
+  grid-template-columns: var(--mu-cols);
+  column-gap: var(--mu-gap);
+  row-gap: clamp(56px, 6.5vw, 104px);
+  align-items: start;
+  margin: clamp(36px, 4vw, 60px) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.mu-exhibit {
+  position: relative;
+  min-width: 0;
+  animation: mu-hang var(--sb-move) var(--sb-ease) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+.mu-exhibit.s12 {
+  grid-column: 1 / -1;
+}
+.mu-exhibit.s7 {
+  grid-column: span 7;
+}
+.mu-exhibit.s5 {
+  grid-column: span 5;
+}
+.mu-exhibit.s4 {
+  grid-column: span 4;
+}
+/* a 5 beside a 7 hangs lower: the eye walks, it does not scan rows */
+.mu-exhibit.s7 + .mu-exhibit.s5 {
+  margin-top: clamp(40px, 7vw, 112px);
+}
+.mu-exhibit.is-featured {
+  display: grid;
+  grid-template-columns: var(--mu-cols);
+  column-gap: var(--mu-gap);
+  align-items: end;
+}
+.mu-exhibit.is-featured > .mu-plate {
+  grid-column: 1 / span 8;
+}
+.mu-exhibit.is-featured > .mu-label,
+.mu-exhibit.is-featured > .mu-confirm {
+  grid-column: 9 / span 4;
+  margin-top: 0;
+}
+
+.mu-plate {
+  position: relative;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--sb-well);
+  outline: 1px solid var(--sb-rule);
+  outline-offset: -1px;
+  transition: transform var(--sb-move) var(--sb-ease);
+}
+.mu-plate.is-design,
+.mu-plate.is-imported {
+  background: var(--sb-surface);
+}
+.mu-plate-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 0;
+  background: #fff;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+.mu-plate-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 0;
+}
+.mu-studies {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  gap: 3px;
+}
+.mu-studies.n-2 {
+  grid-template-columns: 1fr 1fr;
+}
+.mu-studies.n-3 {
+  grid-template-columns: 3fr 2fr;
+  grid-template-rows: 1fr 1fr;
+}
+.mu-studies.n-3 img:first-child {
+  grid-row: span 2;
+}
+.mu-studies img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: cover;
+}
+.mu-idea {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  padding: clamp(18px, 2.2vw, 32px);
+}
+.mu-idea-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  overflow: hidden;
+  max-width: 24ch;
+  font-family: var(--sb-voice);
+  font-weight: var(--sb-voice-weight);
+  font-style: italic;
+  font-size: clamp(22px, 2.3vw, 34px);
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.mu-exhibit.is-featured .mu-idea-text {
+  max-width: 20ch;
+  font-size: clamp(28px, 3.6vw, 58px);
+  line-height: 1.04;
+}
+.mu-glyph {
+  display: block;
+  flex: none;
+  width: 26px;
+  height: 26px;
+}
+.mu-glyph.g-question {
+  width: 22px;
+  height: 28px;
+  border-radius: 999px 999px 0 0;
+  background: var(--sb-apricot);
+}
+.mu-glyph.g-file {
+  border-radius: 0 100% 0 0;
+  background: var(--sb-lake);
+}
+.mu-glyph.g-idea {
+  border-radius: 50%;
+  background: var(--sb-moss);
+}
+
+/* the wall label */
+.mu-label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'no del'
+    'title title'
+    'meta meta';
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sb-rule-2);
+}
+.mu-no {
+  grid-area: no;
+  margin: 0;
+  color: var(--sb-ink-60);
+}
+.mu-title {
+  grid-area: title;
+  margin: 10px 0 0;
+  max-width: 26ch;
+  font-family: var(--sb-voice);
+  font-weight: var(--sb-voice-weight);
+  font-size: clamp(24px, 2vw, 30px);
+  line-height: 1.08;
+  letter-spacing: -0.012em;
+  text-wrap: balance;
+}
+.mu-title.is-big {
+  font-size: clamp(34px, 3.4vw, 54px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.mu-open {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  transition: text-decoration-color var(--sb-open) var(--sb-ease);
+}
+/* the whole exhibit opens the work; the title is the button that says so */
+.mu-open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.mu-open:focus-visible {
+  outline: none;
+}
+.mu-open:focus-visible::after {
+  outline: 2px solid var(--sb-moss);
+  outline-offset: 8px;
+  border-radius: 2px;
+}
+.mu-meta {
+  grid-area: meta;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 12px 0 0;
+  color: var(--sb-ink-70);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.mu-dates {
+  margin-top: 6px;
+  color: var(--sb-ink-60);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.mu-delete {
+  grid-area: del;
+  position: relative;
+  z-index: 2;
+  align-self: start;
+  margin: -4px 0 0;
+  padding: 4px 0;
+  font-size: 12.5px;
+}
+/* while a work is looked at: the plate lifts, the title is underlined, "Open" appears */
+.mu-exhibit:not(.is-asking):hover .mu-plate,
+.mu-exhibit:not(.is-asking):focus-within .mu-plate {
+  transform: translateY(-4px);
+}
+.mu-exhibit:hover .mu-open,
+.mu-open:focus-visible {
+  text-decoration-color: var(--sb-moss);
+}
+.mu-exhibit .mu-no::after {
+  content: 'Open →';
+  content: 'Open →' / '';
+  margin-left: 12px;
+  color: var(--sb-moss);
+  opacity: 0;
+  transition: opacity var(--sb-fast) var(--sb-ease);
+}
+.mu-exhibit.is-remote .mu-no::after {
+  content: none;
+}
+.mu-exhibit:hover .mu-no::after,
+.mu-exhibit:focus-within .mu-no::after {
+  opacity: 1;
+}
+
+/* deleting is asked on the wall label: in burgundy, "Keep it" focused */
+.mu .mu-confirm {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sb-burgundy);
+}
+.mu .mu-confirm p {
+  max-width: 44ch;
+  margin: 0 0 12px;
+  color: var(--sb-ink);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* the index: the same collection as a catalogue */
+.mu-index {
+  margin: clamp(28px, 3vw, 44px) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.mu-index > li {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 2.4fr) minmax(0, 1.7fr) minmax(0, 1.5fr) 112px 56px;
+  column-gap: var(--mu-gap);
+  align-items: baseline;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--sb-rule);
+}
+.mu-index > .mu-index-head {
+  padding: 0 0 10px;
+  border-bottom-color: var(--sb-ink);
+  color: var(--sb-ink-60);
+}
+.mu-row {
+  position: relative;
+  animation: mu-hang var(--sb-move) var(--sb-ease) both;
+}
+.mu-row.is-asking {
+  display: block;
+}
+.mu-row.is-asking .mu-confirm {
+  margin: 0;
+  padding: 2px 0 4px;
+  border: 0;
+}
+.mu-row-n,
+.mu-row-d {
+  color: var(--sb-ink-60);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.mu-row-d {
+  font-weight: 500;
+}
+.mu-row-open {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sb-ink);
+  font-family: var(--sb-voice);
+  font-weight: var(--sb-voice-weight);
+  font-size: 22px;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  transition: text-decoration-color var(--sb-fast) var(--sb-ease);
+}
+.mu-row-open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.mu-row-open:focus-visible {
+  outline: none;
+}
+.mu-row-open:focus-visible::after {
+  outline: 2px solid var(--sb-moss);
+  outline-offset: -1px;
+}
+.mu-row:hover .mu-row-open {
+  text-decoration-color: var(--sb-moss);
+}
+.mu-row-k,
+.mu-row-s {
+  color: var(--sb-ink-70);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.mu-row .mu-delete {
+  grid-area: auto;
+  justify-self: end;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── colophon ─────────────────────────────────────────────────────── */
+.mu-colophon {
+  display: grid;
+  grid-template-columns: var(--mu-cols);
+  column-gap: var(--mu-gap);
+  row-gap: 16px;
+  align-items: baseline;
+  margin-top: clamp(104px, 12vw, 184px);
+  padding-top: 18px;
+  padding-bottom: 56px;
+  border-top: 1px solid var(--sb-ink);
+}
+.mu-colophon-mark {
+  grid-column: 1 / span 4;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px 12px;
+}
+.mu-tagline {
+  font-family: var(--sb-voice);
+  font-weight: var(--sb-voice-weight);
+  font-style: italic;
+  font-size: 20px;
+  color: var(--sb-moss);
+}
+.mu-colophon > p {
+  grid-column: 5 / span 5;
+  margin: 0;
+  max-width: 48ch;
+  color: var(--sb-ink-70);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.mu-colophon > .mu-colophon-q {
+  grid-column: 10 / span 3;
+  display: flex;
+  justify-content: flex-end;
+  gap: 20px;
+}
+
+/* ── motion ───────────────────────────────────────────────────────── */
+@keyframes mu-hang {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes mu-rise {
+  from {
+    transform: scaleY(0.86);
+    opacity: 0;
+  }
+}
+/* moving between the home and a work: a short cross-fade (V0App starts it) */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 220ms;
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mu *,
+  .mu *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ── narrower screens ─────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .mu-exhibit.s4 {
+    grid-column: span 6;
+  }
+  .mu-exhibit.s5,
+  .mu-exhibit.s7 {
+    grid-column: span 6;
+  }
+  .mu-exhibit.s7 + .mu-exhibit.s5 {
+    margin-top: 0;
+  }
+  .mu-exhibit:not(.is-featured) .mu-plate {
+    aspect-ratio: 4 / 3 !important;
+  }
+  .mu-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    row-gap: 32px;
+  }
+  .mu-index > li {
+    grid-template-columns: 44px minmax(0, 2fr) minmax(0, 1.4fr) 100px 56px;
+  }
+  .mu-row-s,
+  .mu-index-head > span:nth-child(4) {
+    display: none;
+  }
+}
+
+@media (max-width: 820px) {
+  .mu-nav {
+    display: none;
+  }
+  .mu-mast-id {
+    grid-column: 1 / span 8;
+  }
+  .mu-mast-r {
+    grid-column: 9 / span 4;
+  }
+  .mu-entrance > * {
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
+  }
+  .mu-kicker > span:nth-child(1) {
+    grid-column: 1 / span 6;
+  }
+  .mu-kicker > span:nth-child(2) {
+    display: none;
+  }
+  .mu-kicker-n {
+    grid-column: 7 / span 6;
+  }
+  .mu-arch {
+    order: -1;
+    flex-direction: row;
+    align-items: flex-end;
+    margin-top: 36px;
+  }
+  .mu-kicker {
+    order: -2;
+  }
+  .mu-arch-shape {
+    width: 56px;
+    flex: none;
+  }
+  .mu-question {
+    margin-top: 20px;
+  }
+  .mu-lede {
+    max-width: 52ch;
+  }
+  .mu-compose {
+    margin-top: 24px;
+  }
+  .mu-exhibit.is-featured {
+    display: block;
+  }
+  .mu-exhibit.is-featured > .mu-label,
+  .mu-exhibit.is-featured > .mu-confirm {
+    margin-top: 16px;
+  }
+  .mu-coll-head > * {
+    grid-column: 1 / -1;
+  }
+  .mu-coll-note {
+    justify-self: start;
+    margin-top: 14px;
+    text-align: left;
+  }
+  .mu-colophon > *,
+  .mu-colophon > p,
+  .mu-colophon > .mu-colophon-q {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .mu-exhibit.s4,
+  .mu-exhibit.s5,
+  .mu-exhibit.s7 {
+    grid-column: 1 / -1;
+  }
+  .mu-exhibits {
+    row-gap: 48px;
+  }
+  .mu-steps {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0;
+  }
+  .mu-steps li {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    column-gap: 8px;
+    padding: 12px 0 14px;
+    border-top-color: var(--sb-rule-2);
+  }
+  .mu-steps li:first-child {
+    border-top-color: var(--sb-ink);
+  }
+  .mu-step-n {
+    grid-row: span 2;
+    padding-top: 6px;
+  }
+  .mu-step-t {
+    margin-top: 0;
+  }
+  .mu .mu-field {
+    gap: 12px;
+  }
+  .mu-field .sb-btn {
+    min-width: 0;
+  }
+  .mu-door {
+    grid-template-areas:
+      'k'
+      't'
+      'b'
+      'go';
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mu-door .sb-link {
+    justify-self: start;
+    margin-top: 12px;
+  }
+  .mu-search {
+    flex: 1 1 100%;
+  }
+  .mu-views {
+    margin-left: 0;
+  }
+  .mu-index-head {
+    display: none !important;
+  }
+  .mu-index > li {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    row-gap: 2px;
+  }
+  .mu-row-k {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .mu-row-d {
+    grid-column: 2;
+    grid-row: 3;
+  }
+  .mu-row .mu-delete {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}

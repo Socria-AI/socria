@@ -1,15 +1,15 @@
-/* components/ux/ux.css — SocriaUX, in the Socria brandbook (Version 1, November 2026).
+/* components/ux/ux.css — SocriaUX, in the Socria brandbook (Version 2, November 2026).
  *
  * The first SocriaUX, drawn in the brand being tried on /ux and /ux-v0: paper
  * ground, white surfaces instead of outlines, pills for controls, segmented
- * tabs, sentence-case labels, Old Standard for what Socria says and Geist for
+ * tabs, sentence-case labels, Cormorant Garamond for what Socria says and Geist for
  * what is operated. The brand pass at the end of this sheet does the
  * structure; the tokens below carry the colour.
  */
 
 .uxr,
 .uxs {
-  /* the Socria brandbook (Version 1): paper ground, white surfaces, ink words, deep moss for the
+  /* the Socria brandbook (Version 2): paper ground, white surfaces, ink words, deep moss for the
      person and the one filled control; tokens of the old SocriaUX kept as names, pointed at the brand */
   --ux-paper: #faf9f6;
   --ux-panel: #faf9f6;
@@ -40,8 +40,8 @@
   /* only what floats casts a shadow */
   --ux-shadow: none;
   --ux-shadow-up: 0 10px 28px -14px rgba(32, 32, 27, 0.32), 0 2px 6px -3px rgba(32, 32, 27, 0.1);
-  /* Old Standard is Socria's voice; Geist is the person, the interface and the record */
-  --serif: var(--font-old-standard), Georgia, serif;
+  /* Cormorant Garamond Medium is Socria's voice; Geist is the person, the interface and the record */
+  --serif: var(--font-cormorant), 'Cormorant Garamond', Garamond, Georgia, serif;
   --sans: var(--font-geist), system-ui, sans-serif;
   font-family: var(--sans), system-ui, sans-serif;
   color: var(--ux-ink);
@@ -381,8 +381,8 @@ textarea.uxr-input {
   font-weight: 600;
 }
 .uxh-stage-n {
-  font-family: var(--serif, 'Instrument Serif'), Georgia, serif;
-  font-weight: 400;
+  font-family: var(--sans, Inter), system-ui, sans-serif;
+  font-weight: 500;
   font-size: 13.5px;
   color: var(--ux-moss-tone);
   font-variant-numeric: lining-nums;
@@ -866,7 +866,7 @@ textarea.uxr-input {
 }
 .uxc-pop-principle {
   margin: 0 0 10px;
-  font-family: var(--serif, 'Instrument Serif'), Georgia, serif;
+  font-family: var(--sans, Inter), system-ui, sans-serif;
   font-style: italic;
   font-size: 14.5px;
   color: var(--ux-moss-700);
@@ -1207,7 +1207,7 @@ textarea.uxr-input {
 }
 .uxm-from {
   margin: 0 0 10px;
-  font-family: var(--serif, 'Instrument Serif'), Georgia, serif;
+  font-family: var(--sans, Inter), system-ui, sans-serif;
   font-style: italic;
   font-size: 14.5px;
   line-height: 1.4;
@@ -1248,7 +1248,7 @@ textarea.uxr-input {
   font-variant-numeric: tabular-nums;
 }
 .uxl-prompt {
-  font-family: var(--serif, 'Instrument Serif'), Georgia, serif;
+  font-family: var(--sans, Inter), system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.35;
   color: var(--ux-moss-700);
@@ -1564,8 +1564,8 @@ textarea.uxr-input {
 .uxr-prose h3,
 .uxr-prose h4 {
   font-family: var(--serif, 'Instrument Serif'), Georgia, serif;
-  font-weight: 400;
-  font-size: 18px;
+  font-weight: 500;
+  font-size: 20px;
   margin: 14px 0 6px;
 }
 .uxr-prose .socria-ask {
@@ -1590,7 +1590,7 @@ textarea.uxr-input {
   background: transparent;
   font-family: var(--serif, 'Instrument Serif'), Georgia, serif;
   font-style: italic;
-  font-size: 16px;
+  font-size: 19px;
   line-height: 1.35;
   color: var(--ux-moss-700);
   text-align: left;
@@ -1616,7 +1616,7 @@ textarea.uxr-input {
 }
 .uxp-principle-name {
   font-family: var(--serif, 'Instrument Serif'), Georgia, serif;
-  font-size: 16px;
+  font-size: 19px;
   color: var(--ux-ink);
 }
 .uxp-code {
@@ -1868,7 +1868,7 @@ textarea.uxr-input {
   color: var(--ux-ink-60);
 }
 .uxp-finding .uxp-q {
-  font-family: var(--serif, 'Instrument Serif'), Georgia, serif;
+  font-family: var(--sans, Inter), system-ui, sans-serif;
   font-style: italic;
   font-size: 15.5px;
   line-height: 1.4;
@@ -1955,7 +1955,7 @@ textarea.uxr-input {
 .uxp-rnote-text {
   margin: 0 0 5px;
   font-family: var(--serif, 'Instrument Serif'), Georgia, serif;
-  font-size: 16px;
+  font-size: 19px;
   line-height: 1.4;
 }
 .uxp-rnote-meta {
@@ -2063,7 +2063,7 @@ textarea.uxr-input {
 .uxs-hero h1 {
   margin: 12px 0 16px;
   font-family: var(--serif, 'Instrument Serif'), Georgia, serif;
-  font-weight: 400;
+  font-weight: 500;
   font-size: clamp(40px, 6vw, 64px);
   line-height: 1.02;
   letter-spacing: -0.03em;
@@ -2093,7 +2093,7 @@ textarea.uxr-input {
 .uxs-list h2 {
   margin: 0 0 16px;
   font-family: var(--serif, 'Instrument Serif'), Georgia, serif;
-  font-weight: 400;
+  font-weight: 500;
   font-size: 26px;
 }
 .uxs-starts {
@@ -2275,7 +2275,7 @@ textarea.uxr-input {
 }
 
 
-/* ── the brand pass (Socria brandbook, Version 1) ───────────────────
+/* ── the brand pass (Socria brandbook, Version 2) ───────────────────
    Surfaces, not outlines; pills for every control; segmented, not underlined;
    only what floats casts a shadow; sentence case, never letter-spaced capitals. */
 

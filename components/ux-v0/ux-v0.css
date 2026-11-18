@@ -1,11 +1,11 @@
-/* components/ux-v0/ux-v0.css — SocriaUX v0, in the Socria brandbook (Version 1).
+/* components/ux-v0/ux-v0.css — SocriaUX v0, in the Socria brandbook (Version 2).
  *
  * The brand layer (components/brand/socria-brand.css) draws the pills, the
  * segmented tabs, the surfaces, the kind glyphs and the floating composer; this
  * sheet lays out the workspace with its tokens. Paper is the ground, flat and
  * without grain; cards are white surfaces, not outlines; only what floats (the
  * question waiting on you, the composer, the design on its canvas) casts a
- * shadow; Old Standard is Socria's voice and Geist the interface and your
+ * shadow; Cormorant Garamond is Socria's voice and Geist the interface and your
  * words. The design being worked on stays the most saturated thing on screen,
  * except for the question waiting on you.
  */
@@ -222,7 +222,7 @@
 .v0-cell-title {
   margin: 0;
   font-family: var(--sb-voice);
-  font-size: 19px;
+  font-size: 21px;
   line-height: 1.2;
   color: var(--sb-ink);
 }
@@ -271,7 +271,7 @@
 .v0-intent-q {
   margin: 0;
   font-family: var(--sb-voice);
-  font-weight: 400;
+  font-weight: 500;
   font-size: clamp(36px, 5vw, 58px);
   line-height: 1.04;
   letter-spacing: -0.02em;
@@ -306,7 +306,7 @@
   overflow-y: auto;
   padding: 28px clamp(20px, 3vw, 44px) 40px;
 }
-/* the question waiting on you: the one solid apricot surface, floating; Socria speaks in Old Standard */
+/* the question waiting on you: the one solid apricot surface, floating; Socria speaks in Cormorant Garamond */
 .v0-question {
   max-width: 780px;
   margin: 0 auto 30px;
@@ -544,7 +544,7 @@
   margin: 8px 0 18px;
   max-width: 30ch;
   font-family: var(--sb-voice);
-  font-weight: 400;
+  font-weight: 500;
   font-size: clamp(26px, 3vw, 38px);
   line-height: 1.14;
   letter-spacing: -0.01em;
@@ -859,7 +859,7 @@
   margin-right: 4px;
   font-family: var(--sb-voice);
   font-size: 30px;
-  font-weight: 400;
+  font-weight: 500;
   line-height: 1;
   color: var(--sb-ink);
   font-variant-numeric: tabular-nums;
@@ -1154,8 +1154,8 @@
 .v0-verdict {
   font-family: var(--sb-voice);
   font-style: italic;
-  font-weight: 400;
-  font-size: 18px;
+  font-weight: 500;
+  font-size: 20px;
 }
 .v0-verdict.v-works {
   color: var(--sb-moss);
@@ -1205,10 +1205,9 @@
   font-size: 12.5px;
   color: var(--sb-ink-60);
 }
+/* evidence is the record: Geist 500, not Socria's voice */
 .v0-quote {
-  font-family: var(--sb-voice);
-  font-style: italic;
-  font-size: 14.5px;
+  font-weight: 500;
   color: var(--sb-ink-70);
 }
 .v0-principles {
@@ -1396,85 +1395,7 @@
   color: var(--sb-ink-45);
 }
 
-/* ── the home screen ──────────────────────────────────────────────── */
-.v0-landing {
-  max-width: 760px;
-  margin: 0 auto;
-  padding: clamp(40px, 9vh, 104px) 24px 80px;
-  display: flex;
-  flex-direction: column;
-  gap: 48px;
-}
-.v0-way {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 26px 28px 28px;
-  border-radius: 22px;
-  background: var(--sb-surface);
-}
-.v0-way .sb-compose-line {
-  align-self: stretch;
-}
-/* a file held over the Critique way: its surface takes the person's tint */
-.v0-way-drop {
-  transition: background-color var(--sb-open) var(--sb-ease), box-shadow var(--sb-open) var(--sb-ease);
-}
-.v0-way-drop.is-over {
-  background: var(--sb-tint-idea);
-  box-shadow: inset 0 0 0 2px var(--sb-moss-tone);
-}
-.v0-way-title {
-  margin: 0;
-  font-family: var(--sb-voice);
-  font-weight: 400;
-  font-size: clamp(28px, 3.4vw, 38px);
-  line-height: 1.1;
-  letter-spacing: -0.01em;
-}
-.v0-list ul {
-  list-style: none;
-  margin: 8px 0 0;
-  padding: 0;
-}
-.v0-list-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 0;
-}
-/* deleting asks in its row: what goes, then "Delete it" in the one red and "Keep it" focused */
-.v0-confirm {
-  flex: 1;
-  min-width: 0;
-}
-.v0-confirm p {
-  margin: 0 0 10px;
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--sb-ink-60);
-}
-.v0-confirm-acts {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
-}
-.v0-list-open {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
+/* the home screen (the entrance and the collection) is drawn by ./home.css */
 
 /* ── narrower screens ─────────────────────────────────────────────── */
 @media (max-width: 1100px) {

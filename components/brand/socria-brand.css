@@ -1,4 +1,4 @@
-/* components/brand/socria-brand.css — the Socria brandbook (Version 1, November 2026), as code.
+/* components/brand/socria-brand.css — the Socria brandbook (Version 2, November 2026), as code.
  *
  * Tried first on SocriaUX (/ux and /ux-v0) only, everything scoped under `.sb`, so the rest of the
  * product keeps the Logos system until the brand is adopted. What the brandbook asks, in short:
@@ -7,8 +7,9 @@
  *             person (deep moss #354620 for moss text and the one filled control), apricot the
  *             question, lake the evidence, burgundy what Socria adds. Cobalt, plum and ochre are
  *             accents and never lead. Text is ink or paper.
- *   type      two faces. Old Standard TT is Socria's voice (wordmark, headlines, its questions),
- *             18px and up, no bold, italic for the one stressed word. Geist is the person, the
+ *   type      two faces. Cormorant Garamond Medium is Socria's voice (wordmark, headlines, its
+ *             questions), 20px and up, no bold, medium italic for the one word a sentence turns
+ *             on. Geist is the person, the
  *             interface and the record: body 15, your words 500, labels 600 13, evidence 500 12
  *             tabular. Titles tracked −1.5%. Sentence case; headlines end with a full stop.
  *   form      surfaces, not outlines: a card's kind lives in its glyph and its tint. Pills for every
@@ -61,7 +62,9 @@
   --sb-r-card: 16px;
   --sb-r-field: 12px;
 
-  --sb-voice: var(--font-old-standard), 'Old Standard TT', Georgia, serif;
+  --sb-voice: var(--font-cormorant), 'Cormorant Garamond', Garamond, Georgia, serif;
+  /* Cormorant is drawn only at Medium: every voice setting asks for 500 */
+  --sb-voice-weight: 500;
   --sb-ui: var(--font-geist), system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   --sb-fast: 120ms;
@@ -88,25 +91,25 @@
 
 .sb .sb-voice {
   font-family: var(--sb-voice);
-  font-weight: 400;
+  font-weight: var(--sb-voice-weight);
 }
 .sb .sb-display {
   font-family: var(--sb-voice);
-  font-weight: 400;
+  font-weight: var(--sb-voice-weight);
   font-size: 49px;
   line-height: 1.04;
   letter-spacing: -0.015em;
 }
 .sb .sb-title {
   font-family: var(--sb-voice);
-  font-weight: 400;
-  font-size: 19px;
-  line-height: 1.25;
-  letter-spacing: -0.015em;
+  font-weight: var(--sb-voice-weight);
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
 }
 .sb .sb-question {
   font-family: var(--sb-voice);
-  font-weight: 400;
+  font-weight: var(--sb-voice-weight);
   font-size: 28px;
   line-height: 1.15;
   letter-spacing: -0.01em;

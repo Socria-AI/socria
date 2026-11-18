@@ -158,7 +158,7 @@ The copy is hand-written, so the benchmark measures the design system rather tha
 
 **Socria's own pages.** With the brandbook locked:
 
-- The landing page's first direction is *Geometric paper*: Old Standard TT questions, Geist for everything operated, paper ground, deep moss for the one filled control, and flat arch, circle, quarter and diamond shapes in moss and apricot (the engine's second ink for this palette lands on the brand's apricot). There are no gradients or shadows.
+- The landing page's first direction is *Geometric paper*: Old Standard TT questions (brandbook Version 1; Version 2 moved Socria's voice to Cormorant Garamond, now first in that language's list), Geist for everything operated, paper ground, deep moss for the one filled control, and flat arch, circle, quarter and diamond shapes in moss and apricot (the engine's second ink for this palette lands on the brand's apricot). There are no gradients or shadows.
 - The Socria One launch is *Poster*: the same faces at a larger scale, a moss marquee and colour fields.
 
 These are the pages most likely to be used as they stand.

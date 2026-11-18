@@ -397,6 +397,20 @@ export interface ProjectSummary {
   updatedAt: number;
   cards: number;
   hasDesign: boolean;
+  /** what the home's wall label says about it */
+  createdAt: number;
+  /** how far it has come: questions, a brief, a direction, a design (or an imported file) */
+  stage: 'begun' | 'discovery' | 'brief' | 'direction' | 'design' | 'imported';
+  /** versions of the generated design */
+  versions: number;
+  /** a website or an app screen, once there is a brief */
+  pageType: PageType | null;
+  /** an imported file's kind */
+  medium: ArtifactKind | null;
+  /** the art direction the design follows */
+  direction: string;
+  /** up to three kept moodboard thumbnails: the studies behind a work in progress */
+  studies: string[];
 }
 
 // ── normalisers ──────────────────────────────────────────────────────
@@ -854,6 +868,18 @@ export function makeProject(mode: ProjectMode, name: string, now = Date.now()): 
 }
 
 export function summarize(p: DesignProject): ProjectSummary {
+  const imported = p.artifact?.type === 'imported' ? p.artifact : null;
+  const stage: ProjectSummary['stage'] = imported
+    ? 'imported'
+    : p.specs.length
+      ? 'design'
+      : p.direction.options.length && p.brief.approved
+        ? 'direction'
+        : p.brief.doc
+          ? 'brief'
+          : p.intent
+            ? 'discovery'
+            : 'begun';
   return {
     id: p.id,
     name: p.name,
@@ -862,6 +888,16 @@ export function summarize(p: DesignProject): ProjectSummary {
     updatedAt: p.updatedAt,
     cards: p.cards.length,
     hasDesign: !!p.artifact || p.specs.length > 0,
+    createdAt: p.createdAt,
+    stage,
+    versions: p.specs.length,
+    pageType: p.brief.doc?.pageType ?? currentSpec(p)?.pageType ?? null,
+    medium: imported ? imported.kind : null,
+    direction: p.direction.chosen?.name ?? '',
+    studies: p.moodboard.refs
+      .filter((r) => r.state === 'kept' && r.thumb)
+      .slice(0, 3)
+      .map((r) => r.thumb),
   };
 }
 

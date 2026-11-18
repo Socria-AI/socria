@@ -1,18 +1,24 @@
 'use client';
 // components/ux-v0/V0App.tsx — SocriaUX v0 at /ux-v0: two ways in, and the designs kept.
 //
-// Create: say what you want to make. Critique: bring a design. Everything is
+// Create: say what you want to make. Critique: bring a design. The home that
+// offers both and shows the collection is ./Home.tsx; this keeps the state
+// and the actions (begin, open, delete, the account's copies). Everything is
 // kept in this browser first (lib/ux-v0/store.ts) and, for a signed-in
 // designer, follows them to other devices. The open design is in the address
 // (?p=<id>), so a reload or the back button lands where they were.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { makeNonce } from '@/lib/ux-v0/sandbox';
 import { deleteProject, getProject, listProjects, putProject } from '@/lib/ux-v0/store';
 import { makeProject, normalizeProject, type DesignProject, type ProjectSummary } from '@/lib/ux-v0/types';
 import { checkFile } from './files';
+import { Home, type RemoteWork } from './Home';
 import { Workspace } from './Workspace';
 import '@/components/brand/socria-brand.css';
 import './ux-v0.css';
+import './home.css';
 
 const idFromUrl = () => {
   if (typeof window === 'undefined') return null;
@@ -20,24 +26,32 @@ const idFromUrl = () => {
   return v && /^[A-Za-z0-9_-]{1,96}$/.test(v) ? v : null;
 };
 
-const ago = (t: number) => {
-  const s = (Date.now() - t) / 1000;
-  if (s < 3600) return `${Math.max(1, Math.round(s / 60))} min ago`;
-  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
-  return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+/**
+ * Moving between the home and a work: a short cross-fade where the browser
+ * offers view transitions, the plain swap where it does not or where the
+ * visitor has asked for less motion.
+ */
+const passage = (change: () => void) => {
+  type Passage = { ready?: Promise<unknown>; finished?: Promise<unknown>; updateCallbackDone?: Promise<unknown> };
+  const d = document as Document & { startViewTransition?: (cb: () => void) => Passage };
+  if (typeof d.startViewTransition !== 'function' || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return change();
+  try {
+    const t = d.startViewTransition(() => flushSync(change));
+    // a passage cut short by the next one still makes its change; only the fade is skipped
+    for (const p of [t?.ready, t?.finished, t?.updateCallbackDone]) p?.catch(() => undefined);
+  } catch {
+    change();
+  }
 };
 
 export function V0App({ signedIn }: { signedIn: boolean }) {
   const [list, setList] = useState<ProjectSummary[]>([]);
-  const [remote, setRemote] = useState<{ id: string; name: string; updatedAt: number }[]>([]);
+  const [remote, setRemote] = useState<RemoteWork[]>([]);
   const [open, setOpen] = useState<{ p: DesignProject; intent?: string; file?: File | null } | null>(null);
-  const [intent, setIntent] = useState('');
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
-  // the design whose deletion is being asked about: the app's own inline confirm, never the browser's dialog
-  const [deleting, setDeleting] = useState<string | null>(null);
-  const [dropping, setDropping] = useState(false);
-  const fileInput = useRef<HTMLInputElement>(null);
+  // the home's plates show imported pages in the same sealed frames as the workspace
+  const nonce = useMemo(() => makeNonce(), []);
 
   const refresh = useCallback(async () => setList(await listProjects()), []);
 
@@ -57,7 +71,8 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
         }
       }
       if (!p) return setError('That design is not in this browser.');
-      setOpen({ p });
+      const found = p;
+      passage(() => setOpen({ p: found }));
       if (push) window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(id)}`);
     },
     [signedIn]
@@ -96,12 +111,11 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
     setError('');
     const p = makeProject(mode, mode === 'critique' && opts.file ? opts.file.name.replace(/\.[a-z0-9]+$/i, '') : '');
     await putProject(p);
-    setOpen({ p, ...opts });
+    passage(() => setOpen({ p, ...opts }));
     window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(p.id)}`);
   };
 
   const remove = async (s: ProjectSummary) => {
-    setDeleting(null);
     const p = await getProject(s.id);
     const artifactId = p?.artifact?.type === 'imported' ? p.artifact.id : undefined;
     await deleteProject(s.id, artifactId);
@@ -121,7 +135,7 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
         startIntent={open.intent}
         startFile={open.file}
         onExit={() => {
-          setOpen(null);
+          passage(() => setOpen(null));
           refresh();
           window.history.pushState(null, '', '/ux-v0');
         }}
@@ -133,143 +147,17 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
   const elsewhere = remote.filter((r) => !local.has(r.id));
 
   return (
-    <div className="v0 v0-home-page sb">
-      <header className="v0-head">
-        <div className="v0-head-l">
-          <a className="v0-home" href="/">
-            <img src="/socria-mark.png" alt="" width={20} height={20} />
-            <span className="v0-brand">
-              Socria<em>UX</em>
-            </span>
-            <span className="v0-tag">v0</span>
-          </a>
-        </div>
-        <div className="v0-head-r">
-          {signedIn ? (
-            <a className="sb-link is-meta" href="/account">
-              Account
-            </a>
-          ) : (
-            <a className="sb-link is-meta is-strong" href="/sign-in?redirect_url=/ux-v0">
-              Sign in
-            </a>
-          )}
-        </div>
-      </header>
-      <main className="v0-landing">
-        <section className="v0-way">
-          <span className="sb-label">Create</span>
-          <h1 className="v0-intent-q">What do you want to make?</h1>
-          <p className="v0-body">SocriaUX asks before it designs: a few precise questions, a moodboard of real, licensed imagery, and a brief you approve. Then it generates the design — and you question and change it.</p>
-          <div className="sb-compose-line v0-intent-line">
-            <textarea
-              rows={2}
-              value={intent}
-              placeholder="A premium coffee shop website, for…"
-              aria-label="What do you want to make?"
-              onChange={(e) => setIntent(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey && intent.trim()) {
-                  e.preventDefault();
-                  start('create', { intent: intent.trim() });
-                }
-              }}
-            />
-            <button type="button" className="sb-btn is-primary" onClick={() => start('create', { intent: intent.trim() })} disabled={!intent.trim()}>
-              Begin
-            </button>
-          </div>
-        </section>
-        <section
-          className={`v0-way v0-way-drop${dropping ? ' is-over' : ''}`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDropping(true);
-          }}
-          onDragLeave={() => setDropping(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDropping(false);
-            const f = e.dataTransfer.files?.[0];
-            if (f) start('critique', { file: f });
-          }}
-        >
-          <span className="sb-label">Critique</span>
-          <h2 className="v0-way-title">Bring a design to look at closely.</h2>
-          <p className="v0-body">HTML, PNG, JPG or SVG — choose one, or drop it here. Select an element or drag across an area, say what you see, and reason it through.</p>
-          <button type="button" className="sb-link is-go" onClick={() => fileInput.current?.click()}>
-            Choose a file <span className="sb-ar">→</span>
-          </button>
-        </section>
-        {error && (
-          <p className="v0-error-line" role="alert">
-            {error}
-          </p>
-        )}
-        <section className="v0-list" aria-label="Your designs">
-          <span className="sb-label">Your designs</span>
-          {ready && !list.length && !elsewhere.length && <p className="v0-empty">None yet. They are kept in this browser{signedIn ? ' and with your account' : '; sign in to keep them across devices'}.</p>}
-          <ul>
-            {list.map((s) =>
-              deleting === s.id ? (
-                <li key={s.id} className="sb-row v0-list-row">
-                  <div
-                    className="v0-confirm"
-                    role="group"
-                    aria-label={`Delete ${s.name}`}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') (e.stopPropagation(), setDeleting(null));
-                    }}
-                  >
-                    <p>
-                      Delete “{s.name}” and its cards? It goes from this browser{signedIn ? ' and from your account' : ''}, and cannot be brought back.
-                    </p>
-                    <div className="v0-confirm-acts">
-                      <button type="button" className="sb-btn is-sm is-danger is-solid" onClick={() => remove(s)}>
-                        Delete it
-                      </button>
-                      <button type="button" className="sb-btn is-sm" autoFocus onClick={() => setDeleting(null)}>
-                        Keep it
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              ) : (
-                <li key={s.id} className="sb-row v0-list-row">
-                  <button type="button" className="v0-list-open" onClick={() => openById(s.id)}>
-                    <span className="v0-cell-title">{s.name}</span>
-                    <span className="v0-quiet">
-                      {s.mode === 'create' ? 'Create' : 'Critique'} · {s.cards} card{s.cards === 1 ? '' : 's'} · {ago(s.updatedAt)}
-                    </span>
-                  </button>
-                  <button type="button" className="sb-link is-meta" onClick={() => setDeleting(s.id)}>
-                    Delete
-                  </button>
-                </li>
-              )
-            )}
-            {elsewhere.map((s) => (
-              <li key={s.id} className="sb-row v0-list-row">
-                <button type="button" className="v0-list-open" onClick={() => openById(s.id)}>
-                  <span className="v0-cell-title">{s.name}</span>
-                  <span className="v0-quiet">From another device · {ago(s.updatedAt)}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      </main>
-      <input
-        ref={fileInput}
-        type="file"
-        accept=".html,.htm,.png,.jpg,.jpeg,.svg,text/html,image/png,image/jpeg,image/svg+xml"
-        hidden
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) start('critique', { file: f });
-          e.target.value = '';
-        }}
-      />
-    </div>
+    <Home
+      signedIn={signedIn}
+      ready={ready}
+      list={list}
+      elsewhere={elsewhere}
+      error={error}
+      nonce={nonce}
+      onCreate={(intent) => start('create', { intent })}
+      onCritique={(file) => start('critique', { file })}
+      onOpen={(id) => openById(id)}
+      onDelete={remove}
+    />
   );
 }
