@@ -132,6 +132,8 @@ const NEEDS: Partial<Record<Experience, Omit<Requirement, 'authority'>[]>> = {
 /** Requirements the designer's words add to any experience ("a site WITH class booking"). */
 const MENTIONS: readonly { re: RegExp; req: Omit<Requirement, 'authority'> }[] = [
   { re: /\b(book(ing)?|reserv(e|ation)|appointments?)\b/, req: { id: 'req-book', text: 'Book a time', component: 'booking', required: true } },
+  { re: /\b(donat(e|es|ing|ion|ions)|make a gift|give monthly)\b/, req: { id: 'req-donate', text: 'Give a donation', component: 'form', required: true } },
+  { re: /\b(registration|application|enrol(l)?ment|order|request|quote|feedback|survey|rsvp)\s+form\b/, req: { id: 'req-form-named', text: 'Fill in the form', component: 'form', required: true } },
   { re: /\b(contact|enquir(y|e)|get in touch|newsletter|sign[- ]?up)\b/, req: { id: 'req-contact', text: 'Get in touch or sign up', component: 'form', required: false } },
   { re: /\b(pricing|prices|plans|membership)\b/, req: { id: 'req-pricing', text: 'Compare prices or plans', component: 'pricing', required: false } },
   { re: /\b(timetable|schedule|menu|programme|program|line-?up)\b/, req: { id: 'req-schedule', text: 'Read the timetable', component: 'list', required: false } },

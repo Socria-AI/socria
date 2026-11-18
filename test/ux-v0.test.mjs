@@ -1103,5 +1103,46 @@ console.log('\n=== direct edits and locked sections ===');
   else ok('(the contrast finding carries a fix for an unlocked section)', false, J(lowIn(spec).findings));
 }
 
+console.log('\n=== composition: directions that differ in structure ===');
+{
+  const mk = (objective) => {
+    const b = V.normalizeBrief({ pageType: 'website', platform: 'web', objective, audience: 'people', personality: ['calm', 'clear'], visualDirection: 'considered', palette: [], typography: { display: 'Fraunces', body: 'Inter' }, userGoals: ['See the work', 'Get in touch', 'Read the story'] }, new Set());
+    b.intent = V.settleIntent(V.briefWords(b), {});
+    return b;
+  };
+  const cases = {
+    'a booking screen': mk('Booking screen for an already-selected yoga class'),
+    'an architecture studio site': mk('A website for an experimental architecture studio'),
+    'a scientific dashboard': mk('A scientific dashboard for monitoring lab sensor readings'),
+    'a fashion editorial': mk('A luxury fashion editorial magazine story'),
+    'a nonprofit site with a donation form': mk('A website for a children’s nonprofit with a donation form'),
+    'a motion portfolio': mk('A motion design portfolio to show my work'),
+  };
+  for (const [what, b] of Object.entries(cases)) {
+    const dirs = V.proposeDirections({ brief: b });
+    const studies = dirs.map((d) => V.studySpec(d, b, 'Name', []));
+    const dv = V.diversityOf(studies);
+    const flat = V.diversityOf(dirs.map((d) => V.studySpec({ ...d, compose: undefined, order: undefined, lead: undefined, plan: undefined }, b, 'Name', [])));
+    ok(`${what}: three plans, three structures (closest pair ≥ 0.33 apart; 0 without plans)`, new Set(dirs.map((d) => d.plan)).size === 3 && dv.minStructure >= 0.33 && flat.minStructure === 0, J({ plans: dirs.map((d) => d.plan), dv: dv.minStructure, flat: flat.minStructure }));
+  }
+  const dash = cases['a scientific dashboard'];
+  const dd = V.proposeDirections({ brief: dash });
+  const leads = dd.map((d) => V.studySpec(d, dash, 'Lab', []).sections.find((x) => x.kind !== 'app-header')?.kind);
+  ok('a dashboard\'s three directions lead with different things: figures, the table, the trend', new Set(leads).size === 3, J(leads));
+  const fitted = V.fitToIntent(V.normalizeSpec({ title: 'Lab', pageType: 'app-screen', sections: [{ id: 's', kind: 'stat-cards', content: V.sampleFor('stat-cards', dash.intent, dash) }, { id: 't', kind: 'table', content: V.sampleFor('table', dash.intent, dash) }] }, board), dash.intent, { brief: dash, dir: dd.find((d) => d.plan === 'detail-first') });
+  ok('a generated screen takes its direction\'s order', fitted.spec.sections[0].kind === 'table', J(fitted.spec.sections.map((x) => x.kind)));
+  const port = cases['a motion portfolio'];
+  const pf = V.proposeDirections({ brief: port, notes: '' }).find((d) => d.lead === 'gallery') ?? { ...V.proposeDirections({ brief: port })[0], lead: 'gallery', compose: { gallery: 'mosaic' } };
+  const page = V.normalizeSpec({ title: 'Reel', pageType: 'website', sections: [{ id: 'nav', kind: 'nav', content: { brand: 'Reel', links: [] } }, { id: 'hero', kind: 'hero', content: { title: 'Motion, made carefully' } }, { id: 'work', kind: 'gallery', images: ['openverse:a1', 'openverse:a2'], content: {} }] }, board);
+  const led = V.fitToIntent(page, port.intent, { brief: port, dir: pf });
+  ok('a page takes its direction\'s lead: the work before the words', led.spec.sections[1].kind === 'gallery' && led.changes.some((c) => /Opened with the gallery/.test(c)), J(led.spec.sections.map((x) => x.kind)));
+  const noPic = V.fitToIntent(V.normalizeSpec({ title: 'x', pageType: 'website', sections: [{ id: 'hero', kind: 'hero', variant: 'statement', content: { title: 'Hi' } }] }, board), V.readIntent('a website for a studio'), { dir: { ...pf, compose: { hero: 'full-bleed' } } });
+  ok('a layout built around a picture the section lacks falls back, as it always does', noPic.spec.sections[0].variant !== 'full-bleed', noPic.spec.sections[0].variant);
+  ok('a stored direction keeps its plan, order and lead', (() => { const d = V.normalizeDirection(JSON.parse(J(dd[1]))); return d.plan === dd[1].plan && J(d.order) === J(dd[1].order); })());
+  ok('generation is told the order and what leads', V.generateSystem(dash, dd[1]).includes('order of importance: table'));
+  ok('a donation is a required form, and its sample takes no payment', V.requiredComponents(cases['a nonprofit site with a donation form'].intent).includes('form') && /no payment/.test(V.sampleFor('form', cases['a nonprofit site with a donation form'].intent, {}).note));
+  ok('structure is measured apart from tokens', V.structuralDistance({ sections: [{ kind: 'hero', variant: 'poster' }] }, { sections: [{ kind: 'hero', variant: 'poster' }] }) === 0 && V.structuralDistance({ sections: [{ kind: 'hero', variant: 'poster' }, { kind: 'features', variant: 'grid' }] }, { sections: [{ kind: 'features', variant: 'list' }, { kind: 'hero', variant: 'statement' }] }) > 0.5);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

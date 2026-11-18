@@ -30,6 +30,7 @@ import {
   ensureContrast,
   kindDef,
   lookFromTokens,
+  NEEDS_IMAGE,
   normalizeLook,
   normalizeTokens,
   STILL_MOTION,
@@ -533,7 +534,100 @@ export interface ArtDirection {
    * only in colour and type.
    */
   compose?: Record<string, string>;
+  /**
+   * The composition plan this direction follows (PLANS below): what leads, in what order the parts come,
+   * and how each is laid out. Its id, for the diversity measure and the studies.
+   */
+  plan?: string;
+  /** a screen's parts in this direction's order of importance (figures first, the table first…) */
+  order?: string[];
+  /** on a page, the kind of section that leads (the work first, rather than words about it) */
+  lead?: string;
 }
+
+/**
+ * COMPOSITION PLANS. Three directions for the same work differ in structure, not only in colour and type:
+ * what leads, in what order the parts come, and how each is laid out. A plan is a choice of the kinds' own
+ * variants (`compose`), an order for a screen's parts (`order`), and the kind that leads a page (`lead`).
+ * Each direction takes its language's most fitting plan not already taken, so the three are different.
+ */
+export interface Plan {
+  id: string;
+  /** one sentence: how the design is composed, prefixed to the direction's composition */
+  say: string;
+  compose: Record<string, string>;
+  order?: string[];
+  lead?: string;
+  /** a plan built around a picture: offered only when the moodboard has one to place */
+  needsImage?: boolean;
+}
+
+const SITE_PLANS: readonly Plan[] = [
+  { id: 'statement', say: 'Words lead: a typographic statement opens, then the points as a numbered sequence, then one clear action.', compose: { hero: 'statement', features: 'numbered', cta: 'band', form: 'stacked' } },
+  { id: 'image-led', say: 'Pictures lead: a full-bleed photograph opens, then picture and words in alternation.', compose: { hero: 'full-bleed', features: 'columns', split: 'image-left', gallery: 'mosaic', form: 'split' }, needsImage: true },
+  { id: 'index', say: 'An index: an editorial opening, then everything set as one typographic index to read down.', compose: { hero: 'editorial', features: 'index', list: 'simple', form: 'stacked' } },
+  { id: 'poster', say: 'A poster: one huge headline, a giant figure, a statement to act on.', compose: { hero: 'poster', stats: 'giant', cta: 'statement', features: 'list', form: 'split' } },
+  { id: 'side-by-side', say: 'Side by side: the opening split between words and a picture, the points in a grid.', compose: { hero: 'split', features: 'grid', gallery: 'grid', form: 'split' }, needsImage: true },
+  { id: 'centred', say: 'Centred and unhurried: a centred opening, the points as a quiet list, generous space.', compose: { hero: 'centered', features: 'list', cta: 'centered', form: 'split' } },
+];
+const PORTFOLIO_PLANS: readonly Plan[] = [
+  { id: 'work-first', say: 'The work leads: a mosaic of pieces opens the page; the words come after.', compose: { gallery: 'mosaic', hero: 'statement', features: 'grid' }, lead: 'gallery' },
+  { id: 'work-index', say: 'An index of work: an editorial opening, each project an entry in a typographic index.', compose: { hero: 'editorial', features: 'index', gallery: 'strip' } },
+  { id: 'one-piece', say: 'One piece at a time: a full-bleed opening, then the work as a strip to move through.', compose: { hero: 'full-bleed', gallery: 'strip', features: 'list' }, needsImage: true },
+  { id: 'poster', say: 'A poster: the name set huge, the work in a grid beneath.', compose: { hero: 'poster', gallery: 'grid', features: 'numbered' } },
+];
+const EDITORIAL_PLANS: readonly Plan[] = [
+  { id: 'long-read', say: 'A long read: an editorial opening, then the text in one narrow column.', compose: { hero: 'editorial', text: 'narrow', quote: 'pull' } },
+  { id: 'magazine', say: 'A magazine spread: a poster headline, the text in two columns, a large pull quote.', compose: { hero: 'poster', text: 'two-column', quote: 'large' } },
+  { id: 'text-first', say: 'The text leads: the first paragraph opens the page, set large; the rest follows.', compose: { text: 'lead', hero: 'statement', quote: 'pull' }, lead: 'text' },
+];
+const SCREEN_PLANS: readonly Plan[] = [
+  { id: 'figures-first', say: 'Figures first: the key measures in a row, then the trend, then the detail.', compose: { chart: 'line', 'app-nav': 'sidebar' }, order: ['stat-cards', 'chart', 'table'] },
+  { id: 'detail-first', say: 'The detail first: the table leads, for people who work in it; the figures follow as a summary.', compose: { chart: 'bar', 'app-nav': 'topbar' }, order: ['table', 'stat-cards', 'chart'] },
+  { id: 'trend-first', say: 'The trend first: one chart opens the screen, the figures and the detail beneath it.', compose: { chart: 'area', 'app-nav': 'tabbar' }, order: ['chart', 'stat-cards', 'table'] },
+];
+const FORM_PLANS: readonly Plan[] = [
+  { id: 'one-column', say: 'One column: the fields stacked, nothing beside them, the action at the end.', compose: { form: 'stacked' } },
+  { id: 'split', say: 'Split: why it is asked on one side, the fields on the other.', compose: { form: 'split' } },
+];
+
+/** The plans for what is being made; a booking is composed by its own variants below. */
+export function plansFor(kind: string): readonly Plan[] {
+  switch (kind) {
+    case 'portfolio':
+      return PORTFOLIO_PLANS;
+    case 'editorial':
+      return EDITORIAL_PLANS;
+    case 'dashboard':
+    case 'data':
+      return SCREEN_PLANS;
+    case 'form':
+    case 'checkout':
+    case 'flow':
+      return FORM_PLANS;
+    case 'site':
+    case 'interactive':
+      return SITE_PLANS;
+    default:
+      return [];
+  }
+}
+
+/** Each language's plans, most fitting first. */
+const PLAN_AFFINITY: Record<string, readonly string[]> = {
+  broadsheet: ['index', 'long-read', 'work-index', 'detail-first', 'statement', 'one-column'],
+  swiss: ['index', 'figures-first', 'work-index', 'side-by-side', 'one-column', 'magazine'],
+  'quiet-luxury': ['centred', 'image-led', 'one-piece', 'long-read', 'split', 'trend-first'],
+  poster: ['poster', 'statement', 'magazine', 'trend-first', 'work-first', 'split'],
+  craft: ['side-by-side', 'image-led', 'work-first', 'text-first', 'split', 'figures-first'],
+  geometric: ['poster', 'side-by-side', 'work-first', 'figures-first', 'magazine', 'split'],
+  utility: ['index', 'figures-first', 'detail-first', 'one-column', 'statement', 'work-index'],
+  gallery: ['image-led', 'work-first', 'one-piece', 'long-read', 'centred', 'trend-first'],
+  organic: ['image-led', 'centred', 'one-piece', 'text-first', 'split', 'trend-first'],
+  civic: ['statement', 'index', 'one-column', 'figures-first', 'long-read', 'work-index'],
+  night: ['image-led', 'poster', 'one-piece', 'trend-first', 'magazine', 'split'],
+  'retro-print': ['poster', 'index', 'magazine', 'detail-first', 'work-index', 'one-column'],
+};
 
 /** How each language would compose a booking, in order of preference. */
 const BOOKING_AFFINITY: Record<string, readonly string[]> = {
@@ -562,14 +656,50 @@ const BOOKING_SAY: Record<string, string> = {
  * Compositions for the components a design must have, one per direction, as different as the
  * languages allow: each direction takes its most fitting composition not already taken.
  */
-export function composeDirections(dirs: ArtDirection[], components: readonly (string | undefined)[], hasImage: boolean): ArtDirection[] {
-  if (!components.includes('booking')) return dirs;
+export function composeDirections(dirs: ArtDirection[], components: readonly (string | undefined)[], hasImage: boolean, kind = ''): ArtDirection[] {
+  if (components.includes('booking')) {
+    const used = new Set<string>();
+    return dirs.map((d) => {
+      const prefs = (BOOKING_AFFINITY[d.language] ?? ['strip', 'calendar', 'list', 'split']).filter((v) => v !== 'immersive' || hasImage);
+      const pick = prefs.find((v) => !used.has(v)) ?? ['strip', 'calendar', 'list', 'split'].find((v) => !used.has(v)) ?? prefs[0];
+      used.add(pick);
+      return { ...d, plan: `booking-${pick}`, compose: { ...(d.compose ?? {}), booking: pick }, composition: `${BOOKING_SAY[pick]} ${d.composition}`.slice(0, 280) };
+    });
+  }
+  const plans = plansFor(kind).filter((p) => !p.needsImage || hasImage);
+  if (!plans.length) return dirs;
   const used = new Set<string>();
-  return dirs.map((d) => {
-    const prefs = (BOOKING_AFFINITY[d.language] ?? ['strip', 'calendar', 'list', 'split']).filter((v) => v !== 'immersive' || hasImage);
-    const pick = prefs.find((v) => !used.has(v)) ?? ['strip', 'calendar', 'list', 'split'].find((v) => !used.has(v)) ?? prefs[0];
-    used.add(pick);
-    return { ...d, compose: { ...(d.compose ?? {}), booking: pick }, composition: `${BOOKING_SAY[pick]} ${d.composition}`.slice(0, 280) };
+  const planned = dirs.map((d) => {
+    // a plan the designer already has (a direction kept, its composition locked) stays its own
+    const own = d.plan ? plans.find((p) => p.id === d.plan) : null;
+    const prefs = PLAN_AFFINITY[d.language] ?? [];
+    const rank = (p: Plan) => (prefs.includes(p.id) ? prefs.indexOf(p.id) : 100 + plans.indexOf(p));
+    const pick = own ?? [...plans].sort((a, b) => rank(a) - rank(b)).find((p) => !used.has(p.id)) ?? plans[0];
+    used.add(pick.id);
+    return {
+      ...d,
+      plan: pick.id,
+      compose: { ...(d.compose ?? {}), ...pick.compose },
+      ...(pick.order ? { order: [...pick.order] } : {}),
+      ...(pick.lead ? { lead: pick.lead } : {}),
+      composition: `${pick.say} ${d.composition}`.slice(0, 280),
+    };
+  });
+  // no two directions lay the same part out the same way where the kind has another layout to give
+  // (a layout built around a picture only when there is one)
+  const taken = new Map<string, Set<string>>();
+  return planned.map((d) => {
+    const compose = { ...(d.compose ?? {}) };
+    for (const [k, v] of Object.entries(compose)) {
+      const seen = taken.get(k) ?? new Set<string>();
+      if (seen.has(v)) {
+        const alt = (kindDef(k)?.variants ?? []).find((x) => !seen.has(x) && (hasImage || !NEEDS_IMAGE[k]?.[x]));
+        if (alt) compose[k] = alt;
+      }
+      seen.add(compose[k]);
+      taken.set(k, seen);
+    }
+    return { ...d, compose };
   });
 }
 
@@ -1063,6 +1193,7 @@ export function directionDistance(a: ArtDirection, b: ArtDirection): number {
     [3, ne(A.grid, B.grid)],
     // the functional core composed differently is a different design, not a recolour
     [3, ne(JSON.stringify(a.compose ?? {}), JSON.stringify(b.compose ?? {}))],
+    [2, ne(JSON.stringify(a.order ?? []), JSON.stringify(b.order ?? [])) || ne(a.lead ?? '', b.lead ?? '')],
     [1.5, ne(A.align, B.align)],
     [2, ne(A.containers, B.containers)],
     [1.5, ne(A.buttons, B.buttons)],
@@ -1255,7 +1386,8 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
     return { ...locked, id: `dir_${d.language}_${round}_${i}` };
   });
   // the task's own components composed differently in each direction (a booking: calendar, list, split…)
-  return composeDirections(finished, requiredComponents(intentOf(brief)), (brief.references ?? []).length > 0);
+  const intent = intentOf(brief);
+  return composeDirections(finished, requiredComponents(intent), (brief.references ?? []).length > 0, intent.kind);
 }
 
 /** SocriaUX's own choice, when the designer leaves it: the faithful reading. */
@@ -1297,15 +1429,21 @@ export function normalizeDirection(v: unknown): ArtDirection | null {
     look,
     locks: Array.isArray(r.locks) ? [...new Set(r.locks.filter((x: unknown): x is LockGroup => typeof x === 'string' && LOCKS.has(x)))] : [],
     source: r.source === 'model' || r.source === 'person' ? r.source : 'engine',
-    ...composeOf(r.compose),
+    ...composeOf(r.compose, r.plan, r.order, r.lead),
   };
 }
 
-function composeOf(v: unknown): { compose?: Record<string, string> } {
+function composeOf(v: unknown, plan?: unknown, order?: unknown, lead?: unknown): { compose?: Record<string, string>; plan?: string; order?: string[]; lead?: string } {
   const c = o(v);
   const out: Record<string, string> = {};
   for (const [kind, variant] of Object.entries(c)) if (typeof variant === 'string' && kindDef(kind)?.variants.includes(variant)) out[kind] = variant;
-  return Object.keys(out).length ? { compose: out } : {};
+  const ord = Array.isArray(order) ? [...new Set(order.filter((k): k is string => typeof k === 'string' && !!kindDef(k)))].slice(0, 8) : [];
+  return {
+    ...(Object.keys(out).length ? { compose: out } : {}),
+    ...(typeof plan === 'string' && /^[a-z][a-z0-9-]{1,30}$/.test(plan) ? { plan } : {}),
+    ...(ord.length ? { order: ord } : {}),
+    ...(typeof lead === 'string' && kindDef(lead) ? { lead } : {}),
+  };
 }
 
 export function normalizeDirectionState(v: unknown): DirectionState {

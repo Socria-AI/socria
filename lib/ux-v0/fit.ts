@@ -21,6 +21,19 @@ export function sampleFor(component: string, intent: DesignIntent, brief: Brief)
     case 'booking':
       return sampleBooking(intent, brief ?? {});
     case 'form':
+      // a donation: the amount is the designer's to set, and nothing is charged
+      if (intent.requirements.some((r) => r.id === 'req-donate'))
+        return {
+          title: 'Give',
+          intro: '',
+          fields: [
+            { label: 'Amount', type: 'select', placeholder: '', options: ['[Amount 1]', '[Amount 2]', '[Amount 3]', 'Another amount'], required: true },
+            { label: 'Name', type: 'text', placeholder: '', options: [], required: true },
+            { label: 'Email', type: 'email', placeholder: '', options: [], required: true },
+          ],
+          submit: 'Donate',
+          note: 'A prototype: no payment is taken.',
+        };
       return {
         title: intent.kind === 'checkout' ? 'Your details' : 'Send it to us',
         intro: '',
@@ -89,24 +102,40 @@ export function fitToIntent(spec: DesignSpec, intent: DesignIntent, opts: { brie
     sections = sections.filter((s) => s.kind !== 'features' || s.fixed);
     changes.push(`Left out the feature grid: ${intent.kind === 'booking' ? 'a booking screen is the booking' : 'this screen is the task'}, not a pitch.`);
   }
-  // on a task-first screen the task leads: its components come straight after the chrome
+  // on a task-first screen the task leads: its components come straight after the chrome, in the
+  // direction's order of importance (figures first, the table first, the trend first…)
   if (intent.screen) {
     const needed = new Set(requiredComponents(intent));
+    const order = opts.dir?.order ?? [];
+    const rankOf = (k: string) => (order.includes(k) ? order.indexOf(k) : 50);
     const lead = placeOf(sections, true);
     const chrome = sections.slice(0, lead);
     const rest = sections.slice(lead);
-    const first = rest.filter((s) => needed.has(s.kind as any));
-    const others = rest.filter((s) => !needed.has(s.kind as any));
+    const first = rest.filter((s) => needed.has(s.kind as any) || order.includes(s.kind));
+    // a section the designer fixed or locked keeps its place among them
+    if (order.length && !first.some((s) => s.locked)) first.sort((a, b) => rankOf(a.kind) - rankOf(b.kind));
+    const others = rest.filter((s) => !first.includes(s));
     const next = [...chrome, ...first, ...others];
-    if (next.map((s) => s.id).join() !== sections.map((s) => s.id).join()) changes.push('Put the task first: the screen opens on what it is for.');
+    if (next.map((s) => s.id).join() !== sections.map((s) => s.id).join()) changes.push(order.length ? 'Put the task first, in the direction’s order.' : 'Put the task first: the screen opens on what it is for.');
     sections = next;
+  } else if (opts.dir?.lead) {
+    // on a page, what the direction says leads comes straight after the navigation (the work before words about it)
+    const at = sections.findIndex((s) => s.kind === opts.dir!.lead && !s.locked);
+    const to = placeOf(sections, true);
+    if (at > to) {
+      const [lead] = sections.splice(at, 1);
+      sections.splice(to, 0, lead);
+      changes.push(`Opened with the ${kindDef(lead.kind)?.label.toLowerCase() ?? lead.kind}, as the direction leads.`);
+    }
   }
-  // the approved direction's composition for its components, unless the designer fixed one
+  // the approved direction's composition, on the first section of each kind, unless the designer fixed it;
+  // a layout built around a picture the section does not have falls back, as it always does (spec.ts NEEDS_IMAGE)
   for (const [kind, variant] of Object.entries(compose)) {
-    sections = sections.map((s) => {
-      if (s.kind !== kind || s.fixed || s.variant === variant || !kindDef(kind)?.variants.includes(variant)) return s;
-      return { ...s, variant };
-    });
+    const at = sections.findIndex((s) => s.kind === kind);
+    const s = at >= 0 ? sections[at] : null;
+    if (!s || s.fixed || s.variant === variant || !kindDef(kind)?.variants.includes(variant)) continue;
+    const next = normalizeSection({ ...s, variant }, spec.pageType, null, new Set());
+    if (next) sections[at] = { ...next, id: s.id };
   }
   const out: DesignSpec = { ...spec, sections, notes: [...spec.notes, ...changes].slice(-8) };
   return { spec: out, changes };

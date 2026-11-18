@@ -184,7 +184,7 @@ export function generateSystem(brief: DesignBrief, dir: ArtDirection | null = nu
     : "- Tokens: colors {background, surface, text, muted, accent, accentText, line} from the brief's palette roles; fonts {display, body} from the brief's typography; scale compact|comfortable|spacious; radius none|soft|round; style editorial|minimal|bold|warm|technical; imageTreatment natural|muted|warm|mono — all chosen to express the brief's personality and visual direction.";
   return `You are SocriaUX's design generator. Turn the approved brief into a design specification that a renderer draws. You do not write HTML: you choose sections from the library below and write their content${dir ? '' : ', and choose tokens'}.
 ${dir ? `
-${directionBrief(dir, pageType)}${dir.compose ? `\nIts composition for the task: ${Object.entries(dir.compose).map(([k, v]) => `${k} as "${v}"`).join(', ')}.` : ''}
+${directionBrief(dir, pageType)}${dir.compose ? `\nIts composition for the task: ${Object.entries(dir.compose).map(([k, v]) => `${k} as "${v}"`).join(', ')}.` : ''}${dir.order?.length ? `\nIts order of importance: ${dir.order.join(', then ')}.` : ''}${dir.lead ? `\nWhat leads the page, straight after the navigation: the ${dir.lead}.` : ''}
 ${knowledgeBrief(dir.look)}
 ` : ''}
 WHAT IT IS: ${EXPERIENCE_LABEL[intent.kind]}. Task: ${intent.task}.${musts.length ? `\nWHAT IT MUST DO (every one, by id):\n${musts.map((r) => `- ${r.id}: ${r.text}${r.component ? ` (the ${r.component} component)` : ''}`).join('\n')}` : ''}${intent.prohibitions.length ? `\nRULED OUT BY THE DESIGNER: ${intent.prohibitions.join('; ')}.` : ''}

@@ -31,26 +31,38 @@ export function studySpec(d: ArtDirection, brief: DesignBrief, name: string, ref
   const pageType = pageTypeFor(intent, brief.pageType);
   // only a picture marked for the page appears in the page; references only inspire
   const usable = refs.filter((r) => r.state !== 'rejected' && r.media !== 'video' && !r.avoid && r.asContent !== false && (r.provider !== 'upload' || r.asContent === true) && r.url);
-  const img = usable[0] ? [usable[0].id] : [];
+  const imgs = usable.slice(0, 4).map((r) => r.id);
+  const img = imgs.slice(0, 1);
   const board = { refs: [...refs], queries: [], palettes: [], type: [] } as any;
   let sections: unknown[];
   if (intent.screen) {
-    // the screen itself: its required components, in this direction's composition, with sample content
+    // the screen itself: its required components, in this direction's composition and order, with sample content
     const head = intent.kind === 'dashboard' || intent.kind === 'data' || intent.kind === 'app' ? [{ id: 'head', kind: 'app-header', content: { title: name, subtitle: intent.task, actions: [] } }] : [];
-    const parts = requiredComponents(intent).map((c) => ({ id: c, kind: c, variant: (c && d.compose?.[c]) || undefined, images: c === 'booking' && d.compose?.booking === 'immersive' ? img : [], content: c ? sampleFor(c, intent, brief) : null }));
+    const kinds = requiredComponents(intent).filter((c): c is NonNullable<typeof c> => !!c) as string[];
+    // a trend the direction leads with is drawn, so its hierarchy shows
+    if ((intent.kind === 'dashboard' || intent.kind === 'data') && d.order?.includes('chart') && !kinds.includes('chart')) kinds.push('chart');
+    const rank = (k: string) => (d.order?.includes(k) ? d.order.indexOf(k) : 50);
+    const parts = [...kinds].sort((a, b) => rank(a) - rank(b)).map((c) => ({ id: c, kind: c, variant: d.compose?.[c] || undefined, images: c === 'booking' && d.compose?.booking === 'immersive' ? img : [], content: sampleFor(c, intent, brief) }));
     sections = [...head, ...parts];
     if (!sections.length) sections = [{ id: 'head', kind: 'app-header', content: { title: name, subtitle: intent.task, actions: [] } }];
   } else {
     const action = primaryAction(brief, intent);
     const goals = brief.userGoals.slice(0, 3);
-    sections = [
-      { id: 'nav', kind: 'nav', variant: 'minimal', content: { brand: name, links: [], cta: action } },
-      {
-        id: 'hero', kind: 'hero', variant: img.length ? 'split' : 'statement', images: img, tone: 'base', pad: 'm',
-        content: { eyebrow: brief.personality.slice(0, 3).join(' · '), title: brief.objective.split(/[.;]/)[0].slice(0, 90) || name, subtitle: intent.task, primary: action },
-      },
-      goals.length >= 2 ? { id: 'goals', kind: 'features', variant: 'columns', tone: d.look.containers === 'bands' ? 'alt' : 'base', content: { title: 'What people come to do', items: goals.map((g) => ({ title: g, text: '' })) } } : null,
-    ].filter(Boolean);
+    const hero = {
+      id: 'hero', kind: 'hero', variant: d.compose?.hero ?? (img.length ? 'split' : 'statement'), images: img, tone: 'base', pad: 'm',
+      content: { eyebrow: brief.personality.slice(0, 3).join(' · '), title: brief.objective.split(/[.;]/)[0].slice(0, 90) || name, subtitle: intent.task, primary: action },
+    };
+    // the part the direction's plan puts next to (or before) the opening: the work, the text, or the goals
+    const second =
+      (d.lead === 'gallery' || d.compose?.gallery) && imgs.length >= 2
+        ? { id: 'work', kind: 'gallery', variant: d.compose?.gallery ?? 'grid', images: imgs, content: { title: '', caption: '' } }
+        : d.lead === 'text' || d.compose?.text
+          ? { id: 'text', kind: 'text', variant: d.compose?.text ?? 'narrow', content: { paragraphs: [brief.objective || intent.task] } }
+          : goals.length >= 2
+            ? { id: 'goals', kind: 'features', variant: d.compose?.features ?? 'columns', tone: d.look.containers === 'bands' ? 'alt' : 'base', content: { title: 'What people come to do', items: goals.map((g) => ({ title: g, text: '' })) } }
+            : null;
+    const body = second && d.lead === second.kind ? [second, hero] : [hero, second];
+    sections = [{ id: 'nav', kind: 'nav', variant: 'minimal', content: { brand: name, links: [], cta: action } }, ...body].filter(Boolean);
   }
   const spec = normalizeSpec({ title: name, pageType, platform: brief.platform, tokens: d.tokens, look: d.look, sections }, board);
   if (!spec) return null;
