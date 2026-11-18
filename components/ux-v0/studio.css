@@ -2998,3 +2998,195 @@
     display: none;
   }
 }
+
+/* ── layout sketches: the layout question's answers and the brief's layout decisions ──
+ * Grey wireframes, no colour and no style: only the arrangement, with the
+ * designer's own words in it. An open choice is drawn faint, its frame dashed.
+ * A sketch's action turns moss when its answer is the one being pointed at. */
+.ls {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.ls-frame {
+  fill: var(--sb-surface);
+  stroke: var(--sb-rule-2);
+  stroke-width: 1;
+}
+.ls-ink {
+  fill: var(--sb-ink-25);
+}
+.ls-line {
+  fill: var(--sb-rule-2);
+}
+.ls-word {
+  fill: var(--sb-ink-60);
+  font-family: var(--sb-ui);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.ls-over .ls-word {
+  fill: var(--sb-ink);
+}
+.ls-pic rect,
+.ls-block {
+  fill: var(--sb-well);
+}
+.ls-pic path {
+  fill: none;
+  stroke: var(--sb-rule-2);
+  stroke-width: 0.6;
+}
+.ls-card,
+.ls-field,
+.ls-tile {
+  fill: none;
+  stroke: var(--sb-ink-25);
+  stroke-width: 0.8;
+}
+.ls-tile.is-on {
+  fill: var(--sb-ink-25);
+  stroke: none;
+}
+.ls-act {
+  fill: var(--sb-ink-45);
+  transition: fill var(--sb-fast) var(--sb-ease);
+}
+.ls-axis {
+  fill: none;
+  stroke: var(--sb-rule-2);
+  stroke-width: 0.8;
+}
+.ls-chart {
+  fill: none;
+  stroke: var(--sb-ink-45);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.ls-dot {
+  fill: var(--sb-ink-25);
+}
+.ls.is-open {
+  opacity: 0.5;
+}
+.ls.is-open .ls-frame {
+  stroke-dasharray: 3 3;
+}
+
+/* the layout question: each answer a plate with its sketch; "You decide" an open plate beside them */
+.st-sketches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 12px;
+  max-width: 720px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.st-sketch {
+  display: flex;
+  animation: st-arrive var(--sb-move) var(--sb-ease) both;
+  animation-delay: calc(var(--i, 0) * 45ms + 60ms);
+}
+.st-sketch-pick {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 10px 12px;
+  border: 1px solid var(--sb-rule-2);
+  background: var(--sb-paper);
+  color: var(--sb-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--sb-fast) var(--sb-ease), background-color var(--sb-fast) var(--sb-ease), color var(--sb-fast) var(--sb-ease);
+}
+.st-sketch-pick:hover:not(:disabled) {
+  border-color: var(--sb-moss);
+  background: var(--sb-surface);
+  color: var(--sb-moss);
+}
+.st-sketch-pick:focus-visible {
+  outline: 2px solid var(--sb-moss);
+  outline-offset: 2px;
+}
+.st-sketch-pick:hover:not(:disabled) .ls-act,
+.st-sketch-pick:focus-visible .ls-act {
+  fill: var(--sb-moss);
+}
+.st-sketch-pick:hover:not(:disabled) .ls-tile.is-on,
+.st-sketch-pick:focus-visible .ls-tile.is-on {
+  fill: var(--sb-moss-tone);
+}
+.st-sketch-pick:disabled {
+  color: var(--sb-ink-45);
+  cursor: default;
+}
+.st-sketch-label {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 0 6px;
+  align-items: baseline;
+  font-size: 14.5px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.st-sketch-label small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--sb-ink-60);
+}
+.st-sketch.is-yours .st-sketch-pick {
+  border-style: dashed;
+  background: transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  .st-sketch {
+    animation: none;
+  }
+  .st-sketch-pick,
+  .ls-act {
+    transition: none;
+  }
+}
+
+/* the brief: the decisions beside their sketch, then where each came from */
+.st-layout {
+  display: grid;
+  grid-template-columns: minmax(120px, 176px) minmax(0, 1fr);
+  gap: 12px 20px;
+  align-items: start;
+  margin: 2px 0 16px;
+}
+.st-layout-sketch {
+  margin: 0;
+}
+.st-layout-sketch figcaption {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--sb-ink-60);
+}
+.st-layout-specs {
+  margin-top: 0;
+}
+.st-layout-specs .st-spec {
+  flex-basis: 160px;
+}
+.st-layout-said {
+  grid-column: 1 / -1;
+  margin-top: 0;
+}
+@media (max-width: 720px) {
+  .st-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .st-layout-sketch {
+    max-width: 220px;
+  }
+}

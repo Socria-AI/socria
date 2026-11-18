@@ -2,20 +2,55 @@
 // components/ux-v0/SectionEditor.tsx — change the selected part yourself.
 //
 // For an element of a generated design: the words of the exact field it was
-// drawn from, the section's layout (its kind's own variants), its ground, its
-// spacing and its place, or take it out. Every control applies a real patch
+// drawn from, the section's layout (its kind's own variants), how a booking or
+// an opening is set (which side, what proportion, how the times show… only the
+// settings its layout draws), its ground, its spacing and its place, or take
+// it out. Every control applies a real patch
 // (lib/ux-v0/spec.ts applyPatch) as a new version that Undo takes back; none
 // is decoration. A locked section's controls are off until it is unlocked
 // (lib/ux-v0/edit.ts), and a locked section is carried through a new
 // generation, asked about before a model changes it, and never auto-repaired.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fieldLabel, textAt, textPatch } from '@/lib/ux-v0/edit';
-import { PADS, TONES, kindDef, type DesignSpec, type Patch } from '@/lib/ux-v0/spec';
+import { PADS, SHAPE_EFFECTIVE, SHAPE_FIELDS, TONES, kindDef, shapeDefault, type DesignSpec, type Patch } from '@/lib/ux-v0/spec';
 
 const TONE_LABEL: Record<(typeof TONES)[number], string> = { base: 'Page', alt: 'Alternate', accent: 'Accent', accent2: 'Second accent', invert: 'Inverted' };
 const PAD_LABEL: Record<(typeof PADS)[number], string> = { s: 'Tight', m: 'Even', l: 'Generous' };
 const words = (v: string) => v.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
+/** How a booking or an opening is set (lib/ux-v0/spec.ts SHAPE_FIELDS), in words. */
+const SHAPE_LABEL: Record<string, Record<string, string>> = {
+  booking: { side: 'Side', times: 'Times', summary: 'Your choice', ratio: 'Proportion', density: 'Density', align: 'Heading' },
+  hero: { align: 'Alignment', side: 'Words', valign: 'Words sit', measure: 'Line length', scale: 'Headline size', ratio: 'Words’ share' },
+};
+const SHAPE_VALUE: Record<string, string> = { start: 'Left', end: 'Right', tiles: 'Tiles', rows: 'Rows', pills: 'Pills', card: 'Card', inline: 'Plain', bar: 'By the button', airy: 'Airy', even: 'Even', dense: 'Dense', left: 'Left', center: 'Centred', top: 'Top', middle: 'Middle', bottom: 'Bottom' };
+const pct = (v: number) => `${Math.round(v * 100)}%`;
+const shapeShown = (kind: string, k: string, v: number) => (k === 'ratio' ? (kind === 'booking' ? `${pct(v)} · ${pct(1 - v)}` : `${pct(v)} words`) : pct(v));
+
+/** A setting with a range: drawn as it moves, applied once when it is let go (one version, not one per pixel). */
+function ShapeRange({ label, min, max, value, shown, disabled, onCommit }: { label: string; min: number; max: number; value: number; shown: (v: number) => string; disabled: boolean; onCommit: (v: number) => void }) {
+  const [v, setV] = useState(value);
+  const sent = useRef(value);
+  useEffect(() => {
+    setV(value);
+    sent.current = value;
+  }, [value]);
+  const commit = () => {
+    const r = Math.round(v * 100) / 100;
+    if (Math.abs(r - sent.current) < 0.005) return;
+    sent.current = r;
+    onCommit(r);
+  };
+  return (
+    <label className="v0-edit-row v0-edit-range">
+      <span className="v0-edit-l">
+        {label} <span className="v0-quiet">{shown(v)}</span>
+      </span>
+      <input type="range" min={min} max={max} step={0.01} value={v} disabled={disabled} aria-valuetext={shown(v)} onChange={(e) => setV(Number(e.target.value))} onPointerUp={commit} onKeyUp={commit} onBlur={commit} />
+    </label>
+  );
+}
 
 /** The colour each ground is in this design, so the choice is seen, not named only. */
 const groundColour = (spec: DesignSpec, t: (typeof TONES)[number]): string => {
@@ -120,6 +155,29 @@ export function SectionEditor({
           </select>
         </label>
       )}
+
+      {(SHAPE_EFFECTIVE[sec.kind]?.[sec.variant] ?? []).map((k) => {
+        // only the settings this layout draws: the others would change nothing you could see
+        const field = SHAPE_FIELDS[sec.kind]?.[k];
+        const label = SHAPE_LABEL[sec.kind]?.[k] ?? words(k);
+        const cur = sec.shape?.[k] ?? shapeDefault(sec.kind, sec.variant)[k];
+        const set = (v: string | number, said: string) => onPatch({ op: 'shape', sectionId: sec.id, shape: { [k]: v }, summary: `${def.label}: ${label.toLowerCase()} ${said}` }, `the ${name}: ${label.toLowerCase()} ${said}`);
+        if (!field) return null;
+        if (field.t === 'num')
+          return <ShapeRange key={k} label={label} min={field.min} max={field.max} value={typeof cur === 'number' ? cur : (field.min + field.max) / 2} shown={(v) => shapeShown(sec.kind, k, v)} disabled={locked} onCommit={(v) => set(v, shapeShown(sec.kind, k, v))} />;
+        return (
+          <div key={k} className="v0-edit-row" role="group" aria-label={label}>
+            <span className="v0-edit-l">{label}</span>
+            <span className="sb-seg v0-edit-seg">
+              {field.values.map((v) => (
+                <button key={v} type="button" className={`sb-seg-item${cur === v ? ' is-on' : ''}`} aria-pressed={cur === v} disabled={locked} onClick={() => cur !== v && set(v, (SHAPE_VALUE[v] ?? words(v)).toLowerCase())}>
+                  {SHAPE_VALUE[v] ?? words(v)}
+                </button>
+              ))}
+            </span>
+          </div>
+        );
+      })}
 
       <div className="v0-edit-row" role="group" aria-label="Ground">
         <span className="v0-edit-l">Ground</span>

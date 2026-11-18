@@ -2,9 +2,10 @@
 //
 // Drives the real app (model and image libraries scripted in the browser, as workflow-a-create.mjs does; the
 // scripted model answers with the code's own results so the screens are what the routes would return):
-// a booking screen asked for → a question → the Living Brief, opening with "What it is" → three directions,
-// each composing the booking differently → generation → the canvas, with the section editor (layout changed,
-// section locked) and the cost panel. At 1440, 1280, 1024, 768 and 390 px it checks that nothing scrolls
+// a booking screen asked for → a question → the one layout question, answered by its sketch → the Living Brief,
+// opening with "What it is", its layout decisions said with where they came from and one changed → three
+// directions, each composing the booking differently and all keeping what the designer decided → generation →
+// the canvas, with the section editor (a setting and a layout changed, the section locked) and the cost panel. At 1440, 1280, 1024, 768 and 390 px it checks that nothing scrolls
 // sideways and photographs each step for a person to look at. No model call is made.
 //
 //   UXV0_FORWARD=1 UXV0_BASE=http://127.0.0.1:3100 node test/browser/ux-v0/ui-qa.mjs   (against `next start`)
@@ -35,19 +36,25 @@ const LIB = { imagery: [IMG('window', 'imagery', 'Morning light in the studio'),
 const usage = (stage, tier) => ({ model: tier === 'premium' ? 'gpt-6.1-sol' : 'gpt-6-luna', input: 1800, cached: 0, output: 420, cost: tier === 'premium' ? 0.0078 : 0.0004, stage, tier, effort: tier === 'premium' ? 'medium' : 'default' });
 const WORDS = 'Booking screen for my yoga studio: members choose a day and a time for an already-selected class, then confirm.';
 let briefSent = null;
+let turns = 0;
+// as the discover route does: the model's turn, then SocriaUX's own layout question (lib/ux-v0/discovery.ts)
+const turn = (body, result) => ({ ...V.withLayoutQuestion({ queries: [], palettes: [], type: [], note: '', ...result }, { intent: body.intent, questions: V.normalizeDiscovery({ questions: body.questions }).questions, understanding: result.understanding, moodboard: V.normalizeMoodboard(body.moodboard), remark: body.remark ?? '' }), usage: usage('discover', 'economy') });
 await ctx.route('**/api/ux-v0/**', async (r) => {
   const url = r.request().url();
   const body = JSON.parse(r.request().postData() || '{}');
   if (url.endsWith('/discover')) {
-    if (!body.questions?.some((q) => q.answer)) return r.fulfill({ json: { usage: usage('discover', 'economy'), understanding: { summary: 'A booking screen for a small yoga studio.', known: { objective: 'Let members book a time for a class' }, gaps: ['audience'] }, questions: [{ id: 'q_a', topic: 'audience', question: 'Who books here, and on what?', why: 'It decides how much the screen explains.', options: ['Regular members, on their phones', 'New students, on a laptop'], answer: '', delegated: false }], queries: [{ category: 'imagery', query: 'yoga studio morning light' }, { category: 'texture', query: 'linen clay' }, { category: 'composition', query: 'calm grid' }], palettes: [], type: [], ready: false, note: '' } });
-    return r.fulfill({ json: { usage: usage('discover', 'economy'), understanding: { summary: 'A booking screen for regular members of a small yoga studio, mostly on phones.', known: { objective: 'Let members book a time for a class', audience: 'Regular members, on their phones' }, gaps: [] }, questions: [], queries: [], palettes: [], type: [], ready: true, note: 'Enough to write the brief.' } });
+    turns++;
+    if (!body.questions?.some((q) => q.answer)) return r.fulfill({ json: turn(body, { understanding: { summary: 'A booking screen for a small yoga studio.', known: { objective: 'Let members book a time for a class' }, gaps: ['audience'] }, questions: [{ id: 'q_a', topic: 'audience', question: 'Who books here, and on what?', why: 'It decides how much the screen explains.', options: ['Regular members, on their phones', 'New students, on a laptop'], answer: '', delegated: false }], queries: [{ category: 'imagery', query: 'yoga studio morning light' }, { category: 'texture', query: 'linen clay' }, { category: 'composition', query: 'calm grid' }], ready: false }) });
+    return r.fulfill({ json: turn(body, { understanding: { summary: 'A booking screen for regular members of a small yoga studio, mostly on phones.', known: { objective: 'Let members book a time for a class', audience: 'Regular members, on their phones' }, gaps: [] }, questions: [], ready: true, note: 'Enough to write the brief.' }) });
   }
   if (url.endsWith('/images')) return r.fulfill({ json: { results: body.queries.map((q) => ({ ...q, refs: (LIB[q.category] ?? []).filter((x) => !body.seen.includes(x.id)).slice(0, body.per).map((x) => ({ ...x, query: q.query })), provider: 'openverse', error: '' })) } });
   if (url.endsWith('/brief')) {
     const kept = (body.moodboard?.refs ?? []).filter((x) => x.state === 'kept').map((x) => x.id);
     const parsed = V.normalizeBrief({ pageType: 'website', platform: 'web', objective: 'Let regular members book a time for their yoga class in a few taps, and know it is booked.', audience: 'Regular members of a small yoga studio, mostly on their phones between other things', userGoals: ['Choose a day and a time', 'See how many places are left', 'Confirm and get on with the day'], functionalRequirements: ['Full classes cannot be chosen'], personality: ['warm', 'calm', 'unhurried'], visualDirection: 'Warm, earthy, muted terracotta and cream; quiet type; nothing loud', palette: [{ hex: '#f4ede4', role: 'background' }, { hex: '#2b211b', role: 'text' }, { hex: '#b4552d', role: 'accent' }, { hex: '#ffffff', role: 'accent-text' }], typography: { display: 'Fraunces', body: 'Inter', rationale: 'A soft serif over a plain sans.' }, references: kept, openQuestions: [] }, new Set(kept));
     const intent = V.settleIntent(V.designerWords(body.intent, body.questions ?? []), { current: body.current?.intent ?? null });
-    briefSent = { ...parsed, intent, pageType: V.pageTypeFor(intent, parsed.pageType) };
+    const qs = V.normalizeDiscovery({ questions: body.questions }).questions;
+    const layout = V.settleLayout(V.designerWords(body.intent, qs, body.instruction ?? ''), qs, V.normalizeBrief(body.current)?.layout, intent, body.instruction ?? '');
+    briefSent = { ...parsed, intent, pageType: V.pageTypeFor(intent, parsed.pageType), ...(layout ? { layout } : {}) };
     return r.fulfill({ json: { usage: usage(body.action === 'refine' ? 'refine-brief' : 'brief', 'economy'), brief: briefSent, queries: [] } });
   }
   if (url.endsWith('/direct')) {
@@ -102,7 +109,17 @@ await page.waitForTimeout(1200);
 await shootAll('1-questions');
 for (let i = 0; i < 3; i++) await page.locator('.v0-tile .sb-link', { hasText: /^Keep$/ }).first().click().catch(() => {});
 await page.getByRole('button', { name: 'Regular members, on their phones' }).click();
+// the one layout question: what someone sees first, each answer a sketch in the designer's words, and "You decide"
+await page.waitForSelector('.st-sketches', { timeout: 10000 });
+await page.waitForTimeout(600);
+const plates = await page.locator('.st-sketch').allInnerTexts();
+ok('the layout question is answered with sketches: three answers in the designer\'s words, and "You decide"', plates.length === 4 && /The times to choose from/.test(plates[0]) && /The yoga class itself/.test(plates[1]) && /You decide/.test(plates[3]) && (await page.locator('.st-sketch svg.ls').count()) === 4, JSON.stringify(plates));
+ok('…each sketch carries the designer\'s own words', /yoga class/i.test(await page.locator('.st-sketch').nth(1).locator('svg').innerHTML()));
+await shootAll('1b-layout-question');
+const turnsBefore = turns;
+await page.locator('.st-sketch-pick', { hasText: 'The yoga class itself' }).click();
 await page.waitForSelector('text=Enough to write the brief', { timeout: 10000 });
+ok('answering it after the questions were done costs no further turn', turns === turnsBefore, `${turns - turnsBefore} more`);
 await page.getByRole('button', { name: /Write the brief/ }).first().click();
 await page.waitForSelector('#bp-intent', { timeout: 15000 });
 await page.waitForTimeout(800);
@@ -110,11 +127,27 @@ const what = await page.locator('#bp-intent').innerText();
 ok('the brief opens with what is being made: a booking screen, its task and what it must let people do', /What it is/i.test(what) && (await page.locator('#bp-intent select').inputValue()) === 'booking' && /book/i.test(what), what.slice(0, 200));
 await page.locator('#bp-intent').scrollIntoViewIfNeeded();
 await shootAll('2-brief');
+// how it is laid out: the decisions, sketched, each said with where it came from, and one changed
+const lay = page.locator('#bp-layout');
+await lay.scrollIntoViewIfNeeded();
+const said = await lay.locator('.st-layout-said').innerText();
+ok('the brief says what comes first and where it came from (the answer), and what is left open', /What comes first: the yoga class itself, from your answer/.test(said) && /left open/.test(said), said);
+ok('…with its sketch, named for what it shows', /yoga class itself first/.test((await lay.locator('svg.ls').getAttribute('aria-label')) ?? ''));
+await lay.getByLabel('Alignment').selectOption('center');
+await page.waitForTimeout(400);
+ok('alignment set in the brief: said as the designer\'s own', /Alignment: centred, as you set it/.test(await lay.locator('.st-layout-said').innerText()));
+await lay.getByLabel('Alignment').selectOption('');
+await page.waitForTimeout(300);
+ok('"SocriaUX decides" leaves it open again', !/Alignment: centred/.test(await lay.locator('.st-layout-said').innerText()));
+await page.screenshot({ path: `${S}ui-2b-brief-layout-1440.png` });
 await page.getByRole('button', { name: 'Approve and choose a direction' }).click();
 await page.waitForSelector('.v0-dir', { timeout: 15000 });
 await page.waitForTimeout(2500);
 const studies = page.frameLocator('.v0-dir iframe');
 ok('three directions, each with its study', (await page.locator('.v0-dir').count()) === 3);
+const splits = [];
+for (let i = 0; i < 3; i++) splits.push(await page.frameLocator('.v0-dir iframe').nth(i).locator('.bk-split').count());
+ok('…all three keep what the designer decided: the class first (its card beside the times)', splits.every((n) => n === 1), JSON.stringify(splits));
 await shootAll('3-direction');
 await page.locator('.v0-dir').first().getByRole('button', { name: 'Use this direction' }).click();
 await page.waitForSelector('iframe.v0-frame', { timeout: 40000 });
@@ -134,6 +167,23 @@ await page.getByRole('tab', { name: 'Selection' }).click();
 await page.waitForSelector('.v0-edit', { timeout: 8000 });
 ok('the selection rail offers this section to change directly', (await page.locator('.v0-edit').count()) === 1 && (await page.locator('.v0-edit textarea').inputValue()).length > 0);
 await shootAll('5-editor');
+// a setting of how the booking is set: only those its layout draws, applied at once
+const settings = await page.locator('.v0-edit .v0-edit-l').allInnerTexts();
+ok('the editor offers the booking\'s own settings (side, times, your choice, proportion…)', ['Side', 'Times', 'Your choice'].every((x) => settings.some((t) => t.startsWith(x))) && settings.some((t) => t.startsWith('Proportion')), JSON.stringify(settings));
+const timesRow = page.locator('.v0-edit [role="group"][aria-label="Times"]');
+const timesNow = await timesRow.locator('[aria-pressed="true"]').innerText();
+const timesNext = timesNow === 'Rows' ? 'Pills' : 'Rows';
+await timesRow.getByRole('button', { name: timesNext }).click();
+await page.waitForTimeout(1200);
+ok(`a setting applies at once (times as ${timesNext.toLowerCase()}), with Undo`, (await frame.locator(`.sx-booking.sh-times-${timesNext.toLowerCase()}`).count()) === 1 && (await page.getByRole('button', { name: 'Undo' }).count()) > 0);
+const range = page.locator('.v0-edit input[type="range"]').first();
+const ratioBefore = await frame.locator('.sx-booking').getAttribute('style');
+await range.focus();
+await page.keyboard.press('ArrowRight');
+await page.keyboard.press('ArrowRight');
+await page.waitForTimeout(1200);
+ok('a proportion moved by keyboard applies when let go', (await frame.locator('.sx-booking').getAttribute('style')) !== ratioBefore, ratioBefore);
+await page.screenshot({ path: `${S}ui-5b-settings-1440.png` });
 const variantBefore = await page.locator('.v0-edit select').inputValue();
 const options = await page.locator('.v0-edit select option').evaluateAll((os) => os.map((o) => o.value));
 const nextVariant = options.find((v) => v !== variantBefore && v !== 'immersive');

@@ -88,7 +88,7 @@ const spec = V.normalizeSpec(SPEC, board);
   ok('muted text reads at 4.5:1', contrastRatio(t.muted, t.background) >= 4.5, `${t.muted}`);
   ok('…and the adjustments are written down', spec.notes.some((n) => n.includes('darkened')) && spec.notes.some((n) => n.includes('Secondary text')), J(spec.notes));
   const noImg = V.normalizeSpec({ ...SPEC, sections: [{ id: 'h', kind: 'hero', variant: 'full-bleed', content: { title: 'Hi' }, images: [] }] }, board);
-  ok('a variant that needs an image falls back when there is none', noImg.sections[0].variant === 'centered');
+  ok('a variant that needs an image falls back when there is none (to one side, not the centred habit)', noImg.sections[0].variant === 'editorial', noImg.sections[0].variant);
   ok('a section needs its required fields', V.normalizeSpec({ sections: [{ kind: 'hero', content: {} }] }) === null);
   ok('the library describes itself for the model', V.libraryMenu('website').includes('hero (') && !V.libraryMenu('website').includes('stat-cards') && V.libraryMenu('app-screen').includes('stat-cards'));
   ok('placeholders are found', J(V.placeholdersIn(spec).sort()) === J(['[Opening hours]', '[Year]', '[£ price]'].sort()), J(V.placeholdersIn(spec)));
@@ -1126,7 +1126,7 @@ console.log('\n=== composition: directions that differ in structure ===');
     const dirs = V.proposeDirections({ brief: b });
     const studies = dirs.map((d) => V.studySpec(d, b, 'Name', []));
     const dv = V.diversityOf(studies);
-    const flat = V.diversityOf(dirs.map((d) => V.studySpec({ ...d, compose: undefined, order: undefined, lead: undefined, plan: undefined }, b, 'Name', [])));
+    const flat = V.diversityOf(dirs.map((d) => V.studySpec({ ...d, compose: undefined, order: undefined, lead: undefined, plan: undefined, shapes: undefined }, b, 'Name', [])));
     ok(`${what}: three plans, three structures (closest pair ≥ 0.33 apart; 0 without plans)`, new Set(dirs.map((d) => d.plan)).size === 3 && dv.minStructure >= 0.33 && flat.minStructure === 0, J({ plans: dirs.map((d) => d.plan), dv: dv.minStructure, flat: flat.minStructure }));
   }
   const dash = cases['a scientific dashboard'];
@@ -1147,6 +1147,186 @@ console.log('\n=== composition: directions that differ in structure ===');
   ok('generation is told the order and what leads', V.generateSystem(dash, dd[1]).includes('order of importance: table'));
   ok('a donation is a required form, and its sample takes no payment', V.requiredComponents(cases['a nonprofit site with a donation form'].intent).includes('form') && /no payment/.test(V.sampleFor('form', cases['a nonprofit site with a donation form'].intent, {}).note));
   ok('structure is measured apart from tokens', V.structuralDistance({ sections: [{ kind: 'hero', variant: 'poster' }] }, { sections: [{ kind: 'hero', variant: 'poster' }] }) === 0 && V.structuralDistance({ sections: [{ kind: 'hero', variant: 'poster' }, { kind: 'features', variant: 'grid' }] }, { sections: [{ kind: 'features', variant: 'list' }, { kind: 'hero', variant: 'statement' }] }) > 0.5);
+}
+
+
+console.log('\n=== layout: what the designer decides, the one question, the settings each direction varies ===');
+{
+  const mkB = (objective, extra = {}) => {
+    const b = V.normalizeBrief({ pageType: 'website', platform: 'web', objective, audience: 'people', personality: ['calm', 'clear'], visualDirection: 'considered', palette: [], typography: { display: 'Fraunces', body: 'Inter' }, userGoals: ['Book a time', 'See prices'], ...extra }, new Set());
+    b.intent = V.settleIntent(V.briefWords(b), {});
+    return b;
+  };
+  // ── reading the designer's words
+  const r1 = V.readLayout('An asymmetric booking page for a barber, the times first, not centred, lots of white space');
+  ok('words decide: asymmetric, the times first, not centred (a negative is a decision for one side)', r1.values.arrangement === 'asymmetric' && r1.values.lead === 'task' && r1.values.align === 'left' && r1.density === 'spacious', J(r1));
+  ok('…each with the words it was read from', r1.said.align === 'not centred' && /times first/.test(r1.said.lead), J(r1.said));
+  ok('centred is read as centred, no photos as no pictures', V.readLayout('a centred, symmetrical page with no photos').values.align === 'center' && V.readLayout('a centred page with no photos').values.pictures === 'none');
+  ok('words that say nothing about the layout decide nothing', J(V.readLayout('a booking page for a barbershop').values) === '{}');
+
+  // ── the one layout question
+  const words = 'A booking page for a barbershop called Fade & Co where people book a haircut';
+  const lq = V.layoutQuestion(words, [], 5);
+  ok('the layout question asks what someone should see first, with answers for this kind of work', lq && lq.id === V.LAYOUT_QUESTION_ID && lq.topic === 'hierarchy' && lq.options[0] === 'The times to choose from' && lq.options.some((o) => /haircut/.test(o)), J(lq));
+  ok('it is asked once', V.layoutQuestion(words, [lq], 6) === null);
+  ok('never when the words already say what leads', V.layoutQuestion(`${words}, the times first`, [], 7) === null);
+  ok('a dashboard is asked what matters at a glance: figures, the trend, the detail', J(V.layoutQuestion('a dashboard for lab sensor readings', [], 1).options) === J(['The key figures', 'The trend over time', 'The detailed list']));
+  const sk = V.sketchOptions(words);
+  ok('each answer can be drawn: its lead, the kind of work, the subject in the designer\'s words', sk.length === 3 && sk[0].value === 'task' && sk[1].value === 'subject' && sk[0].kind === 'booking' && /haircut/.test(sk[0].subject), J(sk));
+
+  // ── when SocriaUX asks it (discovery.ts withLayoutQuestion)
+  const turn = (questions, answered = [], ready = false) => V.withLayoutQuestion({ understanding: { summary: '', known: {}, gaps: [] }, questions, queries: [], palettes: [], type: [], ready, note: '' }, { intent: words, questions: answered, understanding: { summary: '', known: {}, gaps: [] }, moodboard: V.normalizeMoodboard({}), remark: '' }, 9);
+  const mq = (topic, question) => ({ id: `q_${topic}`, topic, question, why: '', options: [], multi: false, answer: '', skipped: false, askedAt: 1 });
+  const aud = { ...mq('audience', 'Who is it for?'), answer: 'Regulars and walk-ins' };
+  ok('not on the first turn while the model still has its question (who it is for comes first)', turn([mq('audience', 'Who is it for?')]).questions.length === 1);
+  const t2 = turn([mq('brand', 'What should it feel like?')], [aud]);
+  ok('after the first answer, it comes after the model\'s question', t2.questions.length === 2 && t2.questions[1].id === V.LAYOUT_QUESTION_ID, J(t2.questions.map((q) => q.id)));
+  ok('never as a third question in a turn', turn([mq('brand', 'a'), mq('content', 'b')], [aud]).questions.every((q) => q.id !== V.LAYOUT_QUESTION_ID));
+  const t3 = turn([mq('hierarchy', 'What matters most on the page?')], [aud]);
+  ok('a hierarchy question the model wrote gives way to it', t3.questions.length === 1 && t3.questions[0].id === V.LAYOUT_QUESTION_ID, J(t3.questions));
+  const t4 = turn([], [], true);
+  ok('a detailed brief that is ready at once still gets the one question, and stays ready', t4.ready && t4.questions.length === 1 && t4.questions[0].id === V.LAYOUT_QUESTION_ID);
+  ok('once asked, never again', turn([], [aud, { ...lq, answer: 'The times to choose from' }]).questions.length === 0);
+  ok('the model is told not to ask it', /Never ask what should come first/.test(V.discoverSystem()) && !/constraints and hierarchy when they matter/.test(V.discoverSystem()));
+
+  // ── settling the decisions (latest word last)
+  const intentB = V.readIntent(words);
+  const answered = [{ ...lq, answer: 'The times to choose from' }];
+  const s1 = V.settleLayout(`${words}. Asymmetric`, answered, null, intentB);
+  ok('words and the answer settle the decisions, each with where it came from', s1.arrangement === 'asymmetric' && s1.from.arrangement.by === 'words' && s1.lead === 'task' && s1.from.lead.by === 'answer', J(s1));
+  const mine = V.decideLayout(s1, 'align', 'center');
+  ok('what the designer sets in the brief is theirs', mine.align === 'center' && mine.from.align.by === 'designer');
+  const s2 = V.settleLayout(`${words}. Left-aligned and asymmetric`, answered, mine, intentB);
+  ok('…and a rewrite keeps it, whatever the old words say', s2.align === 'center' && s2.from.align.by === 'designer', J(s2));
+  const s3 = V.settleLayout(`${words}. Make it left-aligned`, answered, mine, intentB, 'make it left-aligned');
+  ok('the instruction a rewrite is asked with is the newest word, and can change it', s3.align === 'left' && s3.from.align.by === 'words', J(s3));
+  const open = V.decideLayout(s1, 'arrangement', null);
+  ok('"SocriaUX decides" leaves it open on purpose', !open.arrangement && open.delegated.includes('arrangement'));
+  ok('…and old words do not take it back on a rewrite', !V.settleLayout(`${words}. Asymmetric`, answered, open, intentB)?.arrangement);
+  ok('"You decide" on the layout question leaves what leads open', V.settleLayout(words, [{ ...lq, delegated: true }], null, intentB)?.delegated?.includes('lead'));
+  const kept = V.settleLayout(words, [], { align: 'center', from: { align: { by: 'words', said: 'centred' } } }, intentB);
+  ok('an earlier instruction\'s reading stays when the new words say nothing about it', kept?.align === 'center', J(kept));
+  ok('decisions from anywhere else are cleaned: unknown values and sources dropped', J(V.normalizeLayout({ lead: 'banana', align: 'center', from: { align: { by: 'model', said: 'x' } }, delegated: ['align', 'nope'] })) === J({ align: 'center' }));
+  ok('a brief keeps its layout decisions through storage', V.normalizeBrief({ ...mkB('A booking page'), layout: s1 }, new Set()).layout?.lead === 'task');
+  ok('the generator is told the decisions, and that the rest is its to vary', /THE DESIGNER'S LAYOUT DECISIONS[^\n]*what leads: the times to choose from; arrangement: uneven/.test(V.generateSystem({ ...mkB(words), layout: s1 }, null)), V.layoutBrief(s1, intentB));
+  ok('the brief says where each decision came from, and what is left open', /Arrangement: uneven, from your words/.test(V.layoutSaid(s1, intentB)) && /Alignment, pictures: left open/.test(V.layoutSaid(s1, intentB)), V.layoutSaid(s1, intentB));
+
+  // ── what the decisions allow
+  ok('nothing decided: no centred opening (unless the language centres on purpose)', !V.heroVariantsFor(undefined, true, 'swiss').includes('centered') && V.heroVariantsFor(undefined, true, 'quiet-luxury').includes('centered'));
+  ok('centred decided: the centred opening is allowed', V.heroVariantsFor({ align: 'center' }, true, 'swiss').includes('centered'));
+  ok('no pictures: no opening built around one', V.heroVariantsFor({ pictures: 'none' }, true).every((v) => v !== 'split' && v !== 'full-bleed'));
+  ok('a booking led by what is booked keeps it first (a split with its card)', J(V.bookingVariantsFor({ lead: 'subject' }, true)) === J(['split']));
+  ok('a decision that cannot be met (a picture lead, no picture) does not empty the choice', V.bookingVariantsFor({ lead: 'picture' }, false).length > 0);
+
+  // ── the settings, varied within the language and seeded per project
+  const a = V.shapeFor('booking', 'swiss', undefined, undefined, V.seeded(42));
+  ok('the same seed gives the same settings', J(a) === J(V.shapeFor('booking', 'swiss', undefined, undefined, V.seeded(42))));
+  ok('settings stay within their fields', J(V.normalizeShape('booking', a)) === J(a) && a.ratio >= 0.3 && a.ratio <= 0.4, J(a));
+  const sigs = new Set(Array.from({ length: 20 }, (_, i) => V.shapeSignature('booking', 'split', V.shapeFor('booking', 'swiss', undefined, undefined, V.seeded(i * 7919)))));
+  ok('twenty projects in one language: many different settings (≥ 8 of 20)', sigs.size >= 8, sigs.size);
+  const dec = V.shapeFor('booking', 'swiss', { align: 'center', arrangement: 'split', lead: 'subject' }, 'spacious', V.seeded(3));
+  ok('what is decided holds: the alignment, an even split, the card first, the space', dec.align === 'center' && dec.ratio >= 0.45 && dec.ratio <= 0.55 && dec.summary === 'card' && dec.side === 'start' && dec.density === 'airy', J(dec));
+  ok('uneven decided: an uneven proportion', [1, 2, 3, 4, 5, 6].every((i) => { const r = V.shapeFor('hero', 'night', { arrangement: 'asymmetric' }, undefined, V.seeded(i)).ratio; return r <= 0.38 || r >= 0.56; }));
+  ok('the times first: the choice is not boxed in a card', [1, 2, 3, 4, 5, 6, 7, 8].every((i) => V.shapeFor('booking', 'craft', { lead: 'task' }, undefined, V.seeded(i)).summary !== 'card'));
+
+  // ── directions: decisions honoured in all three, the rest varied, per project
+  const bk = mkB('Booking screen for an already-selected yoga class');
+  const p1 = V.proposeDirections({ brief: bk, salt: 'p_one' });
+  ok('one project draws the same directions every time (in the browser and on the server)', J(p1) === J(V.proposeDirections({ brief: bk, salt: 'p_one' })));
+  const st = (ds, b) => ds.map((d) => V.structureOf(V.studySpec(d, b, 'Name', [])).join('|'));
+  const many = new Set(Array.from({ length: 8 }, (_, i) => st(V.proposeDirections({ brief: bk, salt: `p_${i}` }), bk)).flat());
+  ok('the same brief in eight projects: many different booking structures (≥ 12 of 24)', many.size >= 12, many.size);
+  const subj = V.proposeDirections({ brief: { ...bk, layout: { lead: 'subject' } }, salt: 'p_one' });
+  ok('what leads, decided: every direction keeps the class first (a split with its card)', subj.every((d) => d.compose?.booking === 'split' && d.shapes?.booking?.summary === 'card'), J(subj.map((d) => [d.compose?.booking, d.shapes?.booking])));
+  const site = mkB('A website for an architecture studio', { userGoals: ['See the work'] });
+  const cen = V.proposeDirections({ brief: { ...site, layout: { align: 'center' } }, salt: 'p_two' });
+  ok('centred, decided: every direction\'s opening is centred', cen.every((d) => d.shapes?.hero?.align === 'center'), J(cen.map((d) => d.shapes?.hero)));
+  const plain = V.proposeDirections({ brief: site, salt: 'p_two' });
+  ok('nothing decided: no direction opens centred unless its language centres on purpose', plain.every((d) => d.compose?.hero !== 'centered' || V.ON_PURPOSE[d.language]?.includes('centred')), J(plain.map((d) => [d.language, d.compose?.hero])));
+  ok('a direction keeps its settings through storage', J(V.normalizeDirection(JSON.parse(J(p1[0]))).shapes) === J(p1[0].shapes));
+  ok('a project\'s salt is its id, when it is one', V.saltOf('p_abc-1') === 'p_abc-1' && V.saltOf('../etc') === '' && V.saltOf(7) === '');
+
+  // ── honouring the decisions in a design, whatever was drawn
+  const pageSpec = V.normalizeSpec({ title: 'Studio', pageType: 'website', sections: [{ id: 'nav', kind: 'nav', content: { brand: 'Studio', links: [] } }, { id: 'hero', kind: 'hero', variant: 'split', content: { title: 'Rooms for thinking' }, images: ['openverse:a1'] }, { id: 'work', kind: 'gallery', images: ['openverse:a2', 'openverse:a3'], content: {} }] }, board);
+  const opts = { pageType: 'website', screen: false, needs: [], kind: 'site', language: 'swiss' };
+  const h1 = V.honourLayout(pageSpec.sections, { lead: 'work' }, opts);
+  ok('the work first, decided: the gallery opens the page, and it is said', h1.sections[1].kind === 'gallery' && h1.changes.some((c) => /Opened with the gallery, as you decided/.test(c)), J(h1));
+  const h2 = V.honourLayout(pageSpec.sections, { pictures: 'none' }, opts);
+  const hero2 = h2.sections.find((x) => x.kind === 'hero');
+  ok('no pictures, decided: the opening loses its picture and its split', !hero2.images.length && hero2.variant !== 'split' && h2.changes.some((c) => /pictures out/.test(c)), J(hero2));
+  const lockedHero = pageSpec.sections.map((x) => (x.kind === 'hero' ? { ...x, locked: true } : x));
+  ok('a locked section is left as it is', V.honourLayout(lockedHero, { pictures: 'none', align: 'center' }, opts).sections.find((x) => x.kind === 'hero').images.length === 1);
+  const centred = V.honourLayout([{ ...pageSpec.sections[1], variant: 'editorial', images: [] }], { align: 'center' }, opts).sections[0];
+  ok('centred, decided: the opening is set on the centre', centred.shape?.align === 'center', J(centred));
+  const bkSec = V.normalizeSection({ id: 'b', kind: 'booking', variant: 'split', content: V.sampleFor('booking', bk.intent, bk), shape: { ratio: 0.5 } }, 'app-screen', null, new Set());
+  const uneven = V.honourLayout([bkSec], { arrangement: 'asymmetric' }, { ...opts, pageType: 'app-screen', screen: true, kind: 'booking' }).sections[0];
+  ok('uneven, decided: an even booking split becomes uneven', uneven.shape.ratio <= 0.38, J(uneven.shape));
+  const dashSecs = [{ id: 'h', kind: 'app-header', variant: 'simple', content: { title: 'Lab' } }, { id: 's', kind: 'stat-cards', variant: 'row', content: {} }, { id: 'c', kind: 'chart', variant: 'line', content: {} }, { id: 't', kind: 'table', variant: 'plain', content: {} }];
+  const tr = V.honourLayout(dashSecs, { lead: 'trend' }, { ...opts, pageType: 'app-screen', screen: true, kind: 'dashboard' });
+  ok('the trend first, decided: the chart leads the screen after its header', J(tr.sections.map((x) => x.kind)) === J(['app-header', 'chart', 'stat-cards', 'table']), J(tr.sections.map((x) => x.kind)));
+  ok('nothing decided: nothing changed', V.honourLayout(pageSpec.sections, undefined, opts).changes.length === 0);
+
+  // ── a changed brief carries the decisions into the design in place
+  const before = mkB('A website for an architecture studio');
+  const after = { ...before, layout: V.decideLayout(undefined, 'lead', 'work') };
+  ok('a decision changed in the brief is a change the design can take', V.changedVisualParts(before, after).includes('layout'));
+  ok('where a decision came from alone is not a change', !V.changedVisualParts({ ...before, layout: { lead: 'work', from: { lead: { by: 'answer', said: 'x' } } } }, { ...before, layout: { lead: 'work', from: { lead: { by: 'designer', said: '' } } } }).includes('layout'));
+  const applied = V.briefToDesign({ ...pageSpec, look: pageSpec.look ?? V.lookFromTokens?.(pageSpec.tokens) }, after, ['layout']);
+  ok('…and applying it there opens the page with the work', applied.sections[1].kind === 'gallery', J(applied.sections.map((x) => x.kind)));
+
+  // ── defaults that do not look generated
+  const genSpec = V.normalizeSpec({ title: 'x', pageType: 'website', sections: [{ id: 'hero', kind: 'hero', variant: 'centered', content: { title: 'Hello' } }] }, board);
+  const g1 = V.avoidGeneric(genSpec, { language: 'swiss' });
+  ok('a centred opening nobody chose is set to one side, and it is said', g1.spec.sections[0].variant === 'editorial' && g1.changes.some((c) => /one side/.test(c)));
+  ok('…kept when the designer decided it', V.avoidGeneric(genSpec, { language: 'swiss', decisions: { align: 'center' } }).spec.sections[0].variant === 'centered');
+  ok('…kept when the language centres on purpose', V.avoidGeneric(genSpec, { language: 'quiet-luxury' }).spec.sections[0].variant === 'centered');
+  ok('a fixed section is never touched', V.avoidGeneric({ ...genSpec, sections: [{ ...genSpec.sections[0], fixed: true }] }, { language: 'swiss' }).spec.sections[0].variant === 'centered');
+
+  // ── the settings as a patch, and as the page draws them
+  const withBk = V.normalizeSpec({ title: 'Yoga', pageType: 'app-screen', sections: [{ id: 'b', kind: 'booking', variant: 'split', content: V.sampleFor('booking', bk.intent, bk) }] }, board);
+  const sp = V.applyPatch(withBk, { op: 'shape', sectionId: 'b', shape: { side: 'end', ratio: 0.9, times: 'rows', colour: 'red' }, summary: 'x' });
+  ok('a shape patch sets what was asked, clamped, the rest kept, and marks it the designer\'s', sp.ok && sp.spec.sections[0].shape.side === 'end' && sp.spec.sections[0].shape.ratio === 0.62 && sp.spec.sections[0].shape.times === 'rows' && !('colour' in sp.spec.sections[0].shape) && sp.spec.sections[0].fixed === true, J(sp.spec?.sections[0]));
+  ok('…merged with what was there', V.applyPatch(sp.spec, { op: 'shape', sectionId: 'b', shape: { summary: 'bar' } }).spec.sections[0].shape.side === 'end');
+  ok('a section with no settings refuses one', !V.applyPatch(V.normalizeSpec(SPEC, board), { op: 'shape', sectionId: 'menu', shape: { side: 'end' } }).ok);
+  ok('nothing valid asked: refused', !V.applyPatch(withBk, { op: 'shape', sectionId: 'b', shape: { colour: 'red' } }).ok);
+  const at = V.shapeAttrs({ kind: 'booking', variant: 'split', shape: { side: 'end', ratio: 0.34, times: 'rows' } });
+  ok('the page draws them as classes and proportions', /sh-side-end/.test(at.cls) && /sh-ratio/.test(at.cls) && /sh-times-rows/.test(at.cls) && at.vars.includes('--sh-a:34fr') && at.vars.includes('--sh-b:66fr'), J(at));
+  ok('a setting its layout does not draw is not written', !/sh-side/.test(V.shapeAttrs({ kind: 'booking', variant: 'list', shape: { side: 'end' } }).cls));
+  const barPage = V.renderDesign(V.applyPatch(withBk, { op: 'shape', sectionId: 'b', shape: { summary: 'bar' } }).spec, board.refs);
+  ok('your choice by the button: the summary sits in a bar beside the confirm action', /bk-bar/.test(barPage.html) && parse(barPage.html).querySelector('.bk-bar .bk-choice') !== null);
+
+  // EVERY SETTING DRAWS SOMETHING: for each kind, layout and setting it offers, a non-default value gives the
+  // section a class or variable that a rule of the page's own CSS selects an element with (no decorative controls)
+  const selectorsOf = (css) => [...css.matchAll(/([^{}]+)\{[^{}]*\}/g)].map((m) => m[1].trim()).filter((x) => x && !x.startsWith('@'));
+  const strip = (sel) => sel.replace(/::?[a-z-]+(\([^)]*\))?/g, '').trim();
+  const pick = (k, f, def) => (f.t === 'enum' ? f.values.find((v) => v !== def) : def === f.min ? f.max : f.min);
+  const missing = [];
+  for (const [kind, variants] of Object.entries(V.SHAPE_EFFECTIVE)) {
+    for (const [variant, fields] of Object.entries(variants)) {
+      for (const k of fields) {
+        const f = V.SHAPE_FIELDS[kind][k];
+        const v = pick(k, f, V.shapeDefault(kind, variant)[k]);
+        const content = kind === 'booking' ? V.sampleFor('booking', bk.intent, bk) : { title: 'Rooms for thinking', subtitle: 'An architecture studio.', primary: 'See the work' };
+        const pt = kind === 'booking' ? 'app-screen' : 'website';
+        const sec = { id: 'x', kind, variant, content, images: ['openverse:a1'], shape: { [k]: v } };
+        const sp2 = V.normalizeSpec({ title: 'T', pageType: pt, sections: [sec] }, board);
+        const drawn = sp2?.sections.find((x) => x.kind === kind);
+        if (!drawn || drawn.variant !== variant) { missing.push(`${kind}/${variant}: not drawn as ${variant}`); continue; }
+        const html = V.renderDesign(sp2, board.refs).html;
+        const doc = parse(html);
+        const css = [...doc.querySelectorAll('style')].map((x) => x.textContent).join('\n');
+        const token = f.t === 'enum' ? `sh-${k}-${v}` : k === 'ratio' ? 'sh-ratio' : `sh-${k}`;
+        const hits = selectorsOf(css).flatMap((group) => group.split(',')).map((x) => x.trim()).filter((x) => new RegExp(`\\.${token}(?![\\w-])`).test(x));
+        const works = hits.some((x) => { try { return !!doc.querySelector(strip(x)); } catch { return false; } });
+        if (!works) missing.push(`${kind}/${variant}/${k}=${v} (${hits.length} rules)`);
+      }
+    }
+  }
+  ok('every setting each layout offers draws something on the page', !missing.length, J(missing));
+
+  // ── structure measures the settings too
+  ok('the same layout set differently is a different structure, by how much differs', (() => { const x = V.structuralDistance({ sections: [{ kind: 'booking', variant: 'split', shape: { side: 'start', times: 'tiles' } }] }, { sections: [{ kind: 'booking', variant: 'split', shape: { side: 'end', times: 'tiles' } }] }); return x > 0 && x < 0.5; })());
+  ok('…and a proportion only a hair different is the same', V.structuralDistance({ sections: [{ kind: 'booking', variant: 'split', shape: { ratio: 0.31 } }] }, { sections: [{ kind: 'booking', variant: 'split', shape: { ratio: 0.33 } }] }) === 0);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

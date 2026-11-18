@@ -106,7 +106,7 @@ const lower = (s: string) => ` ${String(s ?? '').toLowerCase().replace(/[’']/g
 
 function subjectOf(n: string): string {
   const m =
-    n.match(/\b(book|reserve)\s+(?:a|an|the|their|your|my)?\s*([a-z]+\s+)?(class|session|table|appointment|room|court|lesson|tour|seat|treatment|visit)\b/) ??
+    n.match(/\b(book|reserve)\s+(?:a|an|the|their|your|my)?\s*([a-z]+\s+)?(class|session|table|appointment|room|court|lesson|tour|seat|treatment|visit|haircut|massage|facial|consultation|fitting|viewing|tasting|call|demo|slot|desk|stay)\b/) ??
     n.match(/\b(for)\s+(?:a|an|the|their|your|my)?\s*(?:already[- ]\w+\s+)?([a-z]+\s+)(class|session|table|appointment|lesson|tour|treatment|visit)\b/) ??
     n.match(/\b(?:for|at)\s+(?:a|an|the|my|our)?\s*([a-z]+)\s+(studio|gym|clinic|salon|restaurant|spa|school|club)\b/);
   if (!m) return '';

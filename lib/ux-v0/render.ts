@@ -26,7 +26,34 @@
 import { contrastRatio } from '../ux/audit';
 import { isDark, mix, rgbOf } from './color';
 import { advanceEm, fontStack, fontStylesheet, hasItalic, knownFont, nearestWeight } from './fonts';
-import { NEEDS_IMAGE, ensureContrast, kindDef, lookFromTokens, type DesignSpec, type DesignTokens, type Look, type Section, type Shape } from './spec';
+import { NEEDS_IMAGE, SHAPE_EFFECTIVE, ensureContrast, kindDef, lookFromTokens, type DesignSpec, type DesignTokens, type Look, type Section, type Shape } from './spec';
+
+/**
+ * A section's shape, as the page draws it: each setting its variant uses becomes a class (sh-side-end,
+ * sh-times-rows…) or a variable (--sh-measure, and --sh-a/--sh-b for the proportion between two columns).
+ */
+export function shapeAttrs(s: Pick<Section, 'kind' | 'variant' | 'shape'>): { cls: string; vars: string } {
+  const sh = s.shape;
+  if (!sh) return { cls: '', vars: '' };
+  const cls: string[] = [];
+  const vars: string[] = [];
+  for (const k of SHAPE_EFFECTIVE[s.kind]?.[s.variant] ?? []) {
+    const v = sh[k];
+    if (v === undefined) continue;
+    if (typeof v === 'number') {
+      if (k === 'ratio') {
+        const a = Math.round(v * 100);
+        cls.push('sh-ratio');
+        vars.push(`--sh-a:${a}fr`, `--sh-b:${100 - a}fr`);
+      } else {
+        // the class says the setting is there, so a design without it draws exactly as it always did
+        cls.push(`sh-${k}`);
+        vars.push(`--sh-${k}:${v}`);
+      }
+    } else cls.push(`sh-${k}-${v}`);
+  }
+  return { cls: cls.length ? ` ${cls.join(' ')}` : '', vars: vars.join(';') };
+}
 import { creditText, type MoodboardRef } from './types';
 import { BEHAVIOR_SOURCE } from './behaviors';
 import { kineticHeadline, motionCss, type MotionMode } from './motion';
@@ -423,7 +450,10 @@ const SECTIONS: Record<string, R> = {
     const H = x.lead ? 'h1' : 'h2';
     const head = `<div class="bk-head">${secNo(x)}${eyebrow(s, c.eyebrow)}<${H} class="h-section bk-title" ${attr(sid, 'title')}>${t(c.title)}</${H}>${c.intro ? `<p class="lede" ${attr(sid, 'intro')}>${t(c.intro)}</p>` : ''}</div>`;
     const details = (c.details as string[]) ?? [];
-    const item = `<div class="bk-item"><p class="bk-kicker">Booking</p><p class="bk-item-name" ${attr(sid, 'item')}>${t(c.item)}</p>${details.length ? `<ul class="bk-details">${details.map((d, i) => `<li ${attr(sid, `details.${i}`)}>${t(d)}</li>`).join('')}</ul>` : ''}<p class="bk-choice" data-ux-bind="choice" aria-live="polite">No time chosen yet</p></div>`;
+    // the summary as a bar: the choice sits with the confirm action, at the end, instead of under the item
+    const bar = s.shape?.summary === 'bar' && (SHAPE_EFFECTIVE.booking[s.variant] ?? []).includes('summary');
+    const choice = `<p class="bk-choice" data-ux-bind="choice" aria-live="polite">No time chosen yet</p>`;
+    const item = `<div class="bk-item"><p class="bk-kicker">Booking</p><p class="bk-item-name" ${attr(sid, 'item')}>${t(c.item)}</p>${details.length ? `<ul class="bk-details">${details.map((d, i) => `<li ${attr(sid, `details.${i}`)}>${t(d)}</li>`).join('')}</ul>` : ''}${bar ? '' : choice}</div>`;
     const dayPicker = list
       ? ''
       : `<fieldset class="bk-days"><legend class="bk-legend">Day</legend><div class="bk-day-row">${days
@@ -444,7 +474,7 @@ const SECTIONS: Record<string, R> = {
         return `<fieldset class="bk-times" data-day="${i}"${!list && i !== firstDay ? ' hidden' : ''}><legend class="bk-legend">${legend}</legend><div class="bk-slot-grid">${slots}</div></fieldset>`;
       })
       .join('');
-    const form = `<form class="bk-form" data-ux-booking-form novalidate>${dayPicker}<div class="bk-times-wrap">${times}</div><p class="bk-error" data-ux-error role="alert" hidden>Choose a time first.</p><div class="bk-actions"><button type="submit" class="btn btn-primary bk-action" data-ux-confirm ${attr(sid, 'action')}>${t(c.action)}</button></div>${c.note ? `<p class="bk-note small muted" ${attr(sid, 'note')}>${t(c.note)}</p>` : ''}</form>`;
+    const form = `<form class="bk-form" data-ux-booking-form novalidate>${dayPicker}<div class="bk-times-wrap">${times}</div><p class="bk-error" data-ux-error role="alert" hidden>Choose a time first.</p><div class="bk-actions${bar ? ' bk-bar' : ''}">${bar ? choice : ''}<button type="submit" class="btn btn-primary bk-action" data-ux-confirm ${attr(sid, 'action')}>${t(c.action)}</button></div>${c.note ? `<p class="bk-note small muted" ${attr(sid, 'note')}>${t(c.note)}</p>` : ''}</form>`;
     const done = `<div class="bk-done" data-ux-done role="status" tabindex="-1" hidden><p class="bk-done-title" ${attr(sid, 'confirmTitle')}>${t(c.confirmTitle || 'Booked')}</p><p class="bk-done-summary" data-ux-bind="summary"></p>${c.confirmText ? `<p class="bk-done-text" ${attr(sid, 'confirmText')}>${t(c.confirmText)}</p>` : ''}<p class="bk-proto small muted">A prototype: no booking was made.</p><button type="button" class="btn btn-secondary bk-change" data-ux-change>Change the time</button></div>`;
     const media = s.variant === 'immersive' && x.im.has(s, 0) ? `<figure class="bk-media">${x.im.img(s, 0, 'bk-img', true)}${x.im.cap(s, 0)}</figure>` : '';
     const body = `<div class="bk-body">${item}<div class="bk-flow">${form}${done}</div></div>`;
@@ -890,7 +920,41 @@ th .th-sort{all:unset;cursor:pointer;display:inline-flex;gap:6px;align-items:cen
 .bk-strip .bk-item{grid-auto-flow:row}@media (min-width:900px){.bk-strip .bk-item{grid-template-columns:auto 1fr;column-gap:24px;align-items:baseline}.bk-strip .bk-kicker{grid-column:1/-1}.bk-strip .bk-choice{grid-column:1/-1}}
 /* immersive: one picture, the picker over it */
 .bk-immersive{position:relative}.bk-media{margin:0}.bk-media img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:var(--r);filter:var(--img)}
-@media (min-width:900px){.bk-immersive{min-height:min(90vh,780px);padding-block:clamp(28px,5vw,64px)}.bk-immersive .bk-media{position:absolute;inset:0}.bk-immersive .bk-media img{height:100%;aspect-ratio:auto;border-radius:0}.bk-immersive .bk-media figcaption{position:absolute;left:16px;bottom:12px;color:#fff;font-size:.75rem}.bk-immersive .bk-panel{position:relative;width:min(100%,600px);margin-left:auto;padding:clamp(24px,3vw,40px);background:var(--bg);border-radius:var(--r);box-shadow:0 24px 64px rgba(0,0,0,.22)}}`);
+@media (min-width:900px){.bk-immersive{min-height:min(90vh,780px);padding-block:clamp(28px,5vw,64px)}.bk-immersive .bk-media{position:absolute;inset:0}.bk-immersive .bk-media img{height:100%;aspect-ratio:auto;border-radius:0}.bk-immersive .bk-media figcaption{position:absolute;left:16px;bottom:12px;max-width:calc(100% - 32px);padding:3px 8px;background:rgba(0,0,0,.6);color:#fff;font-size:.75rem}.bk-immersive .bk-media figcaption .fig-no{color:inherit}.bk-immersive .bk-panel{position:relative;width:min(100%,600px);margin-left:auto;padding:clamp(24px,3vw,40px);background:var(--bg);border-radius:var(--r);box-shadow:0 24px 64px rgba(0,0,0,.22)}}`);
+
+  // ── shapes: each booking and opening as its own settings set it (spec.ts SHAPE_FIELDS). A class only when the
+  // setting is there, so a design without one draws exactly as before; every value keeps 44 px targets.
+  add(`.sh-align-center .bk-head{text-align:center;margin-inline:auto;max-width:760px}.sh-align-center .bk-head .lede{margin-inline:auto}
+.sh-density-airy .bk-panel,.sh-density-airy .bk-body{gap:clamp(28px,4vw,52px)}.sh-density-airy .bk-slot-grid{gap:12px}.sh-density-airy .bk-slot{min-height:68px;padding:14px 18px}.sh-density-airy .bk-day{min-height:72px;padding:12px 18px}
+.sh-density-dense .bk-panel,.sh-density-dense .bk-body{gap:clamp(14px,2vw,20px)}.sh-density-dense .bk-slot-grid{gap:6px}.sh-density-dense .bk-slot{min-height:48px;padding:8px 12px}.sh-density-dense .bk-day{min-height:52px;min-width:76px;padding:8px 12px}.sh-density-dense .bk-times-wrap{margin-top:12px}
+.sh-times-rows .bk-slot-grid{grid-template-columns:1fr;gap:0}
+.sh-times-rows .bk-slot{grid-template-columns:8ch minmax(0,1fr);align-items:baseline;gap:16px;min-height:52px;padding:12px 4px;border:0;border-bottom:1px solid var(--line);border-radius:0;background:none}
+.sh-times-rows .bk-slot:has(input:checked){background:none;color:var(--text);box-shadow:inset 3px 0 0 var(--accent);padding-left:16px}.sh-times-rows .bk-slot:has(input:checked) .bk-status{color:var(--accent-ink);font-weight:600}
+.sh-times-pills .bk-slot-grid{display:flex;flex-wrap:wrap;gap:8px}
+.sh-times-pills .bk-slot{display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:8px 18px;border-radius:999px}.sh-times-pills .bk-time{font-size:1rem}
+.sh-times-tiles.v-list .bk-slot-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,118px),1fr));gap:8px}.sh-times-tiles.v-list .bk-slot{grid-template-columns:none;align-items:start;gap:2px;min-height:58px;padding:10px 14px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.sh-times-pills.v-list .bk-slot{border:1.5px solid var(--line);background:var(--surface)}
+.sh-times-tiles.v-list .bk-time,.sh-times-pills.v-list .bk-time{font-family:inherit;font-size:1.05rem;font-weight:600}
+.sh-times-tiles.v-list .bk-slot:has(input:checked),.sh-times-pills.v-list .bk-slot:has(input:checked){border-color:var(--accent);background:var(--accent);color:var(--on-accent);box-shadow:none}.sh-times-tiles.v-list .bk-slot:has(input:checked){padding-left:14px}.sh-times-pills.v-list .bk-slot:has(input:checked){padding-left:18px}
+.sh-times-tiles.v-list .bk-slot:has(input:checked) .bk-status,.sh-times-pills.v-list .bk-slot:has(input:checked) .bk-status{color:inherit}
+.sh-summary-card .bk-item{padding:clamp(18px,2.4vw,30px);background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.sh-summary-inline .bk-item{padding:0;background:none;border:0;position:static}
+.bk-bar{position:sticky;bottom:12px;z-index:2;justify-content:space-between;padding:10px 10px 10px 20px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}.bk-bar .bk-choice{margin:0;font-weight:600}
+@media (min-width:900px){
+.sh-ratio.v-split .bk-body{grid-template-columns:minmax(0,var(--sh-a)) minmax(0,var(--sh-b))}
+.sh-side-end.v-split .bk-body{grid-template-columns:minmax(0,var(--sh-b,7fr)) minmax(0,var(--sh-a,5fr))}.sh-side-end.v-split .bk-item{order:2}
+.sh-ratio.v-calendar .bk-form{grid-template-columns:minmax(0,var(--sh-b)) minmax(0,var(--sh-a))}
+.sh-side-end.v-calendar .bk-form{grid-template-columns:minmax(0,var(--sh-a,5fr)) minmax(0,var(--sh-b,7fr))}.sh-side-end.v-calendar .bk-days{grid-column:2;grid-row:1/span 4}.sh-side-end.v-calendar .bk-form>:not(.bk-days){grid-column:1}
+.sh-side-start.v-immersive .bk-panel{margin-left:0;margin-right:auto}
+}
+.sh-align-center .hero-text,.sh-align-center .hs-words{text-align:center;margin-inline:auto}.sh-align-center .hero-sub,.sh-align-center .h-hero{margin-inline:auto}.sh-align-center .actions{justify-content:center}.sh-align-center .hs-foot{justify-items:center;text-align:center}
+.sh-measure .hero-text,.sh-measure .hs-words{max-width:calc(var(--sh-measure) * 100%)}
+.sh-scale .h-hero,.sh-scale .hero-poster .h-poster{font-size:min(calc(var(--fs-hero) * var(--sh-scale)),var(--fit-hero,999px))}
+.sh-side-end.v-editorial .hero-text,.sh-side-end.v-full-bleed .hero-text{margin-left:auto}
+.sh-valign-top .hero-bleed{align-items:flex-start}.sh-valign-middle .hero-bleed{align-items:center}
+.sh-valign-top .hero-bleed .wrap::before{inset:0 -100vw -140px;background:linear-gradient(0deg,rgba(0,0,0,0) 0,rgba(0,0,0,.58) 140px,rgba(0,0,0,.68) 100%)}
+.sh-valign-middle .hero-bleed .wrap::before{inset:-80px -100vw;background:linear-gradient(180deg,rgba(0,0,0,0) 0,rgba(0,0,0,.62) 80px,rgba(0,0,0,.62) calc(100% - 80px),rgba(0,0,0,0) 100%)}
+@media (min-width:1100px){.sh-ratio.v-split .hero-split{grid-template-columns:minmax(0,var(--sh-a)) minmax(0,var(--sh-b))}.sh-side-end.v-split .hero-split{grid-template-columns:minmax(0,var(--sh-b,10fr)) minmax(0,var(--sh-a,11fr))}.sh-side-end.v-split .hero-text{order:2}}`);
 
   // one column on a phone, and a column that never grows past the screen: an implicit track would widen to
   // its longest word ("DOWNLOADABLE" in poster capitals), pushing the page sideways; with a zero minimum the
@@ -1044,11 +1108,13 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], op
     if (s.kind === 'hero') heroSeen = true;
     const numbered = look.motifs.includes('numbering') && NUMBERED.has(s.kind) && !app;
     const no = numbered ? String(++counter).padStart(2, '0') : '';
-    const cols = s.kind === 'stats' ? ` style="--cols:${Math.min(4, (s.content.items as unknown[]).length)}"` : '';
+    const sh = shapeAttrs(s);
+    const style = [s.kind === 'stats' ? `--cols:${Math.min(4, (s.content.items as unknown[]).length)}` : '', sh.vars].filter(Boolean).join(';');
+    const cols = style ? ` style="${style}"` : '';
     const tag = s.kind === 'nav' || s.kind === 'footer' || s.kind === 'app-nav' ? 'div' : 'section';
     const tone = s.tone && s.tone !== 'base' ? ` tone-${s.tone}` : '';
     const pad = s.pad && s.pad !== 'm' ? ` pad-${s.pad}` : '';
-    const html = `<${tag} class="sx sx-${s.kind} v-${s.variant}${tone}${pad}" data-ux-section="${esc(s.id)}"${cols}>${fn(s, s.content, { look, first, play, no, turn: turn++, im, app, lead: s.id === leadId })}</${tag}>`;
+    const html = `<${tag} class="sx sx-${s.kind} v-${s.variant}${tone}${pad}${sh.cls}" data-ux-section="${esc(s.id)}"${cols}>${fn(s, s.content, { look, first, play, no, turn: turn++, im, app, lead: s.id === leadId })}</${tag}>`;
     // a running marquee follows the opening statement
     if (!marqueeDone && s.kind === 'hero') {
       marqueeDone = true;

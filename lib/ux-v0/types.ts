@@ -13,6 +13,7 @@
 // safe default. None of them throws. docs/SOCRIAUX-V0.md has the plan.
 
 import { normalizeIntent, type DesignIntent } from './intent';
+import { normalizeLayout, type LayoutDecisions } from './layout';
 import { EMPTY_DIRECTION, normalizeDirectionState, type DirectionState } from './direction';
 import { GRIDS, normalizeMotion, normalizeSpec, type DesignSpec, type Motion } from './spec';
 import { bodyFont, displayFont } from './fonts';
@@ -425,6 +426,8 @@ export interface DesignBrief {
   spec?: BriefSpec;
   /** what is being made (lib/ux-v0/intent.ts): the experience, its task and its requirements, with stable ids */
   intent?: DesignIntent;
+  /** the layout decisions (lib/ux-v0/layout.ts): what leads, the arrangement, the alignment, the pictures; the rest varies */
+  layout?: LayoutDecisions;
   /** optional parts the designer added to the brief */
   parts?: BriefPart[];
 }
@@ -913,6 +916,8 @@ function briefExtras(r: Record<string, any>): Partial<DesignBrief> {
   if (Object.keys(spec).length) out.spec = spec;
   const intent = normalizeIntent(r.intent);
   if (intent) out.intent = intent;
+  const layout = normalizeLayout(r.layout);
+  if (layout) out.layout = layout;
   const parts = strings(r.parts, BRIEF_PARTS.length, 20).filter((x): x is BriefPart => (BRIEF_PARTS as readonly string[]).includes(x));
   if (parts.length) out.parts = [...new Set(parts)];
   return out;

@@ -428,5 +428,52 @@ console.log('\n=== routing: the economy model for questions and the brief, the p
   process.env.SOCRIAUX_ROUTING = 'single';
 }
 
+
+console.log('\n=== the layout: one question, the decisions in the brief, a salt per project ===');
+{
+  const V = await import(pathToFileURL(join(here, '.tmp', 'ux-v0-under-test.mjs')).href);
+  const U = 'user_v0_layout';
+  const intent = 'A booking page for a barbershop where people book a haircut';
+  const aud = { id: 'q_a', topic: 'audience', question: 'Who is it for?', why: '', options: [], multi: false, answer: 'Regulars and walk-ins', skipped: false, askedAt: 1 };
+  const t = await post('discover', { projectId: 'uxv0_l', action: 'turn', intent, questions: [aud], understanding: {}, moodboard: {} }, U, [
+    { understanding: { summary: 's', known: {}, gaps: [] }, questions: [{ topic: 'hierarchy', question: 'What matters most on the page?', why: 'x', options: ['a', 'b'] }, { topic: 'brand', question: 'What should it feel like?', why: 'x', options: ['Calm', 'Loud'] }], ready: false },
+  ]);
+  ok('the model\'s hierarchy question gives way to SocriaUX\'s own layout question, asked after the model\'s other one', t.status === 200 && J(t.json.questions.map((q) => q.topic)) === J(['brand', 'hierarchy']) && t.json.questions[1].id === 'q_layout' && t.json.questions[1].options[0] === 'The times to choose from' && t.json.questions[1].options[1] === 'The haircut itself', J(t.json.questions));
+  ok('…the model was told not to ask it, and it cost nothing extra (one call)', J(t.calls[0].messages).includes('Never ask what should come first') && t.calls.length === 1);
+  const lq = t.json.questions[1];
+  const again = await post('discover', { projectId: 'uxv0_l', action: 'turn', intent, questions: [aud, lq], understanding: {}, moodboard: {} }, U, [{ understanding: { summary: 's', known: {}, gaps: [] }, questions: [], ready: true }]);
+  ok('…and it is never asked twice', again.status === 200 && !again.json.questions.some((q) => q.id === 'q_layout'), J(again.json.questions));
+  const answered = [aud, { ...lq, answer: lq.options[1] }];
+  const b = await post('brief', { projectId: 'uxv0_l', action: 'synthesize', intent: `${intent}. Asymmetric, lots of white space`, questions: answered, moodboard: {} }, U, [
+    { objective: 'Fill the chairs on weekdays.', audience: 'Regulars', palette: [], typography: { display: 'Fraunces', body: 'Inter' }, pageType: 'website', layout: { lead: 'picture', align: 'center', from: { lead: { by: 'designer', said: '' }, align: { by: 'designer', said: '' } } } },
+  ]);
+  const L = b.json?.brief?.layout;
+  ok('the brief settles the layout from the designer\'s words and their answer, each said with where it came from', b.status === 200 && L.lead === 'subject' && L.from.lead.by === 'answer' && L.arrangement === 'asymmetric' && L.from.arrangement.by === 'words', J(L));
+  ok('…never from the model: a layout it wrote is dropped', L.align === undefined, J(L));
+  ok('…and the space the words asked for reaches the spec', b.json.brief.spec?.density === 'spacious', J(b.json.brief?.spec));
+  const mine = { ...b.json.brief, layout: V.decideLayout(L, 'align', 'center') };
+  const rb = await post('brief', { projectId: 'uxv0_l', action: 'refine', intent, questions: answered, current: mine, instruction: 'Warmer colours', moodboard: {} }, U, [{ ...mine, visualDirection: 'Warmer, like late sun.', layout: null }]);
+  ok('a rewrite keeps what the designer set in the brief, and what was read before', rb.status === 200 && rb.json.brief.layout.align === 'center' && rb.json.brief.layout.from.align.by === 'designer' && rb.json.brief.layout.arrangement === 'asymmetric', J(rb.json.brief?.layout));
+  const told = await post('brief', { projectId: 'uxv0_l', action: 'refine', intent, questions: answered, current: mine, instruction: 'Make it left-aligned', moodboard: {} }, U, [{ ...mine, layout: null }]);
+  ok('…unless the instruction itself says otherwise: the newest word', told.status === 200 && told.json.brief.layout.align === 'left' && told.json.brief.layout.from.align.by === 'words', J(told.json.brief?.layout));
+
+  // the project's salt: the server draws exactly the directions the browser drew for this project
+  const brief = b.json.brief;
+  const d = await post('direct', { projectId: 'uxv0_salted', brief, notes: '', avoid: '' }, U, [{ directions: [] }]);
+  const local = V.proposeDirections({ brief: V.normalizeBrief(brief), notes: '', avoid: '', base: null, round: 0, seen: [], board: V.normalizeReading(undefined), salt: 'uxv0_salted' });
+  const sig = (os) => J(os.map((o) => [o.language, o.compose, o.shapes]));
+  ok('the server draws the directions the browser drew for this project: languages, compositions, settings', d.status === 200 && sig(d.json.options) === sig(local), `${sig(d.json.options)} vs ${sig(local)}`);
+  const other = await post('direct', { projectId: 'uxv0_other', brief, notes: '', avoid: '' }, U, [{ directions: [] }]);
+  ok('another project with the same brief is composed differently', other.status === 200 && sig(other.json.options) !== sig(d.json.options));
+  ok('every direction honours the decisions: the haircut first (a split with its card)', d.json.options.every((o) => o.compose?.booking === 'split' && o.shapes?.booking?.summary === 'card'), J(d.json.options.map((o) => [o.compose, o.shapes?.booking])));
+  const g = await post('generate', { projectId: 'uxv0_salted', brief, moodboard: {}, version: 1 }, U, [
+    { title: 'Fade', sections: [{ id: 'b', kind: 'booking', variant: 'list', content: V.sampleFor('booking', V.intentOf(brief), brief) }] },
+  ]);
+  const auto = V.autoDirection(V.normalizeBrief(brief), '', '', 'uxv0_salted');
+  const bk = g.json?.spec?.sections.find((x) => x.kind === 'booking');
+  ok('left to SocriaUX, a generation is composed for this project, and the decisions hold whatever the model drew', g.status === 200 && g.json.artDirection.language === auto.language && bk.variant === 'split' && bk.shape?.summary === 'card', J({ lang: [g.json?.artDirection?.language, auto.language], bk }));
+  ok('…the generator was told the decisions', J(g.calls[0].messages).includes("THE DESIGNER'S LAYOUT DECISIONS"));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

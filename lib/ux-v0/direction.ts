@@ -43,6 +43,8 @@ import {
   type Section,
   type Tone,
 } from './spec';
+import { normalizeShape, SHAPE_FIELDS, type SectionShape } from './spec';
+import { bookingVariantsFor, hashText, heroVariantsFor, orderFor, seeded, shapeFor, type LayoutDecisions } from './layout';
 import type { BriefPart, DesignBrief } from './types';
 import { motionFor, readMotionWords } from './motion';
 import { paletteFromSwatches, type BoardReading } from './references';
@@ -543,6 +545,12 @@ export interface ArtDirection {
   order?: string[];
   /** on a page, the kind of section that leads (the work first, rather than words about it) */
   lead?: string;
+  /**
+   * How this direction sets its booking and its opening (spec.ts SHAPE_FIELDS): which side, what proportion,
+   * how times are shown, how wide and large the words are. The designer's decisions as decided; the rest
+   * drawn per project within the language (lib/ux-v0/layout.ts shapeFor).
+   */
+  shapes?: Record<string, SectionShape>;
 }
 
 /**
@@ -656,50 +664,104 @@ const BOOKING_SAY: Record<string, string> = {
  * Compositions for the components a design must have, one per direction, as different as the
  * languages allow: each direction takes its most fitting composition not already taken.
  */
-export function composeDirections(dirs: ArtDirection[], components: readonly (string | undefined)[], hasImage: boolean, kind = ''): ArtDirection[] {
-  if (components.includes('booking')) {
+export interface ComposeOptions {
+  /** the designer's layout decisions (lib/ux-v0/layout.ts): honoured in every direction */
+  decisions?: LayoutDecisions;
+  /** per project and round: what is left open varies with it, so two projects do not get one layout */
+  seed?: number;
+  /** the space the designer set in the brief (compact, comfortable, spacious), if any */
+  density?: string;
+  /**
+   * a project's own choice among each language's two favourite plans and booking layouts (drawn from the seed),
+   * instead of always its first: set when the directions are drawn for a project (DirectionAsk.salt)
+   */
+  vary?: boolean;
+}
+
+/** The site-like kinds of work, which open with a hero; screens open with their task. */
+const OPENS_WITH_HERO = new Set(['site', 'interactive', 'portfolio', 'editorial']);
+
+export function composeDirections(dirs: ArtDirection[], components: readonly (string | undefined)[], hasImage: boolean, kind = '', opts: ComposeOptions = {}): ArtDirection[] {
+  const dec = opts.decisions;
+  let out = dirs;
+  // for a project, each language's choice between its two favourites; otherwise always its first
+  const rv = seeded(hashText(`${opts.seed ?? 0}|compose`));
+  const choose = <T,>(xs: readonly T[]): T | undefined => (opts.vary && xs.length > 1 && rv() < 0.5 ? xs[1] : xs[0]);
+  // 1 · the page's plan (sites, portfolios, editorial, dashboards, forms), within what the designer decided
+  const plans = plansFor(kind).filter((p) => !p.needsImage || hasImage);
+  if (plans.length) {
     const used = new Set<string>();
-    return dirs.map((d) => {
-      const prefs = (BOOKING_AFFINITY[d.language] ?? ['strip', 'calendar', 'list', 'split']).filter((v) => v !== 'immersive' || hasImage);
-      const pick = prefs.find((v) => !used.has(v)) ?? ['strip', 'calendar', 'list', 'split'].find((v) => !used.has(v)) ?? prefs[0];
-      used.add(pick);
-      return { ...d, plan: `booking-${pick}`, compose: { ...(d.compose ?? {}), booking: pick }, composition: `${BOOKING_SAY[pick]} ${d.composition}`.slice(0, 280) };
+    out = out.map((d) => {
+      const heroes = heroVariantsFor(dec, hasImage, d.language);
+      const fits = (p: Plan) => !p.compose.hero || heroes.includes(p.compose.hero);
+      // a plan the designer already has (a direction kept, its composition locked) stays its own
+      const own = d.plan ? plans.find((p) => p.id === d.plan) : null;
+      const prefs = PLAN_AFFINITY[d.language] ?? [];
+      const rank = (p: Plan) => (fits(p) ? 0 : 1000) + (prefs.includes(p.id) ? prefs.indexOf(p.id) : 100 + plans.indexOf(p));
+      const ranked = [...plans].sort((a, b) => rank(a) - rank(b)).filter((p) => !used.has(p.id));
+      const pick = own ?? choose(ranked.filter((p) => rank(p) < 1000).slice(0, 2)) ?? ranked[0] ?? plans[0];
+      used.add(pick.id);
+      const compose = { ...(d.compose ?? {}), ...pick.compose };
+      // an opening the decisions do not allow becomes the language's own choice among those they do
+      if (compose.hero && !heroes.includes(compose.hero)) compose.hero = (languageOf(d.language)?.prefer.hero ?? []).find((v) => heroes.includes(v)) ?? heroes[0];
+      return {
+        ...d,
+        plan: pick.id,
+        compose,
+        ...(pick.order ? { order: [...pick.order] } : {}),
+        ...(pick.lead ? { lead: pick.lead } : {}),
+        composition: `${pick.say} ${d.composition}`.slice(0, 280),
+      };
     });
   }
-  const plans = plansFor(kind).filter((p) => !p.needsImage || hasImage);
-  if (!plans.length) return dirs;
-  const used = new Set<string>();
-  const planned = dirs.map((d) => {
-    // a plan the designer already has (a direction kept, its composition locked) stays its own
-    const own = d.plan ? plans.find((p) => p.id === d.plan) : null;
-    const prefs = PLAN_AFFINITY[d.language] ?? [];
-    const rank = (p: Plan) => (prefs.includes(p.id) ? prefs.indexOf(p.id) : 100 + plans.indexOf(p));
-    const pick = own ?? [...plans].sort((a, b) => rank(a) - rank(b)).find((p) => !used.has(p.id)) ?? plans[0];
-    used.add(pick.id);
-    return {
-      ...d,
-      plan: pick.id,
-      compose: { ...(d.compose ?? {}), ...pick.compose },
-      ...(pick.order ? { order: [...pick.order] } : {}),
-      ...(pick.lead ? { lead: pick.lead } : {}),
-      composition: `${pick.say} ${d.composition}`.slice(0, 280),
-    };
-  });
-  // no two directions lay the same part out the same way where the kind has another layout to give
-  // (a layout built around a picture only when there is one)
+  // 2 · the booking, wherever the work has one: its composition, within what the designer decided
+  if (components.includes('booking')) {
+    const allowed = bookingVariantsFor(dec, hasImage);
+    const used = new Set<string>();
+    out = out.map((d) => {
+      const prefs = (BOOKING_AFFINITY[d.language] ?? ['strip', 'calendar', 'list', 'split']).filter((v) => allowed.includes(v));
+      const pick = choose(prefs.filter((v) => !used.has(v)).slice(0, 2)) ?? allowed.find((v) => !used.has(v)) ?? prefs[0] ?? allowed[0];
+      used.add(pick);
+      return { ...d, plan: d.plan && plans.length ? d.plan : `booking-${pick}`, compose: { ...(d.compose ?? {}), booking: pick }, composition: `${BOOKING_SAY[pick]} ${d.composition}`.slice(0, 280) };
+    });
+  }
+  // 3 · what the designer decided leads, in every direction
+  if (dec?.lead) {
+    const order = orderFor(dec.lead);
+    const task = components.includes('booking') ? 'booking' : components.includes('form') ? 'form' : null;
+    out = out.map((d) => {
+      if (order && (kind === 'dashboard' || kind === 'data')) return { ...d, order: [...order] };
+      if (kind === 'form' || kind === 'checkout' || kind === 'flow') return { ...d, compose: { ...(d.compose ?? {}), form: dec.lead === 'why' ? 'split' : 'stacked' } };
+      if (!OPENS_WITH_HERO.has(kind)) return d;
+      const lead = dec.lead === 'work' ? 'gallery' : dec.lead === 'text' ? 'text' : dec.lead === 'task' && task ? task : undefined;
+      const { lead: _was, ...rest } = d;
+      return lead ? { ...rest, lead } : rest;
+    });
+  }
+  // 4 · no two directions lay the same part out the same way where the kind has another layout to give and the
+  // decisions allow it (a layout built around a picture only when there is one)
   const taken = new Map<string, Set<string>>();
-  return planned.map((d) => {
+  out = out.map((d) => {
     const compose = { ...(d.compose ?? {}) };
     for (const [k, v] of Object.entries(compose)) {
       const seen = taken.get(k) ?? new Set<string>();
       if (seen.has(v)) {
-        const alt = (kindDef(k)?.variants ?? []).find((x) => !seen.has(x) && (hasImage || !NEEDS_IMAGE[k]?.[x]));
+        const ok = k === 'hero' ? heroVariantsFor(dec, hasImage, d.language) : k === 'booking' ? bookingVariantsFor(dec, hasImage) : kindDef(k)?.variants ?? [];
+        const alt = ok.find((x) => !seen.has(x) && (hasImage || !NEEDS_IMAGE[k]?.[x]));
         if (alt) compose[k] = alt;
       }
       seen.add(compose[k]);
       taken.set(k, seen);
     }
     return { ...d, compose };
+  });
+  // 5 · how each direction sets its booking and its opening: decided as decided, the rest drawn per project
+  return out.map((d, i) => {
+    const r = seeded(hashText(`${opts.seed ?? 0}|${d.language}|${i}`));
+    const shapes: Record<string, SectionShape> = { ...(d.shapes ?? {}) };
+    if (d.compose?.booking) shapes.booking = shapeFor('booking', d.language, dec, opts.density, r);
+    if (OPENS_WITH_HERO.has(kind)) shapes.hero = shapeFor('hero', d.language, dec, opts.density, r);
+    return Object.keys(shapes).length ? { ...d, shapes } : d;
   });
 }
 
@@ -1194,6 +1256,7 @@ export function directionDistance(a: ArtDirection, b: ArtDirection): number {
     // the functional core composed differently is a different design, not a recolour
     [3, ne(JSON.stringify(a.compose ?? {}), JSON.stringify(b.compose ?? {}))],
     [2, ne(JSON.stringify(a.order ?? []), JSON.stringify(b.order ?? [])) || ne(a.lead ?? '', b.lead ?? '')],
+    [1, ne(JSON.stringify(a.shapes ?? {}), JSON.stringify(b.shapes ?? {}))],
     [1.5, ne(A.align, B.align)],
     [2, ne(A.containers, B.containers)],
     [1.5, ne(A.buttons, B.buttons)],
@@ -1311,6 +1374,8 @@ export interface DirectionAsk {
   count?: number;
   /** what the moodboard says (lib/ux-v0/references.ts): the designer's notes on references, colours, motion, composition */
   board?: BoardReading;
+  /** the project, so the same brief in two projects is drawn two ways; open decisions vary with it */
+  salt?: string;
 }
 
 /**
@@ -1328,7 +1393,8 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
   const round = Math.max(0, ask.round ?? 0);
   const count = Math.max(1, Math.min(4, ask.count ?? 3));
   const seen = new Set(ask.seen ?? []);
-  const seed = hash(`${briefText(brief)}|${notes}|${avoid}|${round}`);
+  // the project's own salt: the same brief in another project gets other directions (none, for older callers)
+  const seed = hash(`${briefText(brief)}|${notes}|${avoid}|${round}${ask.salt ? `|${ask.salt}` : ''}`);
   const directives = readDirectives(notes, avoid);
   if (board) {
     // what the references show, where the words did not already say
@@ -1374,7 +1440,9 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
       if (x.adj < -4) continue; // the designer asked to avoid it
       const trial = buildDirection(languageOf(x.id)!, brief, { seed: seed + chosen.length * 7919, faithful: false, directives, usedFonts });
       const dist = Math.min(...chosen.map((c) => directionDistance(c, trial)));
-      const v = wantFit * fitN + (1 - wantFit) * dist;
+      // for a project, a small nudge of its own: of two alternatives nearly as good, projects do not all get the same
+      const nudge = ask.salt ? (seeded(hashText(`${seed}|${x.id}|${chosen.length}`))() - 0.5) * 0.12 : 0;
+      const v = wantFit * fitN + (1 - wantFit) * dist + nudge;
       if (!best || v > best.v) best = { id: x.id, v };
     }
     if (!best) break;
@@ -1387,17 +1455,23 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
   });
   // the task's own components composed differently in each direction (a booking: calendar, list, split…)
   const intent = intentOf(brief);
-  return composeDirections(finished, requiredComponents(intent), (brief.references ?? []).length > 0, intent.kind);
+  return composeDirections(finished, requiredComponents(intent), (brief.references ?? []).length > 0, intent.kind, { decisions: brief.layout, seed, density: brief.spec?.density, vary: !!ask.salt });
 }
 
+/**
+ * A project's salt for the engine: its id, so the same brief in two projects is composed differently, while one
+ * project's directions stay the same each time they are drawn (in the browser and on the server alike).
+ */
+export const saltOf = (id: unknown): string => (typeof id === 'string' && /^[A-Za-z0-9_-]{1,96}$/.test(id) ? id : '');
+
 /** SocriaUX's own choice, when the designer leaves it: the faithful reading. */
-export function autoDirection(brief: DesignBrief, notes = '', avoid = ''): ArtDirection {
-  return proposeDirections({ brief, notes, avoid, count: 1 })[0];
+export function autoDirection(brief: DesignBrief, notes = '', avoid = '', salt = ''): ArtDirection {
+  return proposeDirections({ brief, notes, avoid, count: 1, ...(salt ? { salt } : {}) })[0];
 }
 
 /** A direction revised in words ("darker, more like a bar"), keeping what is locked. */
-export function reviseDirection(base: ArtDirection, brief: DesignBrief, words: string, avoid = ''): ArtDirection {
-  const options = proposeDirections({ brief, notes: words, avoid, base, count: 3 });
+export function reviseDirection(base: ArtDirection, brief: DesignBrief, words: string, avoid = '', salt = ''): ArtDirection {
+  const options = proposeDirections({ brief, notes: words, avoid, base, count: 3, ...(salt ? { salt } : {}) });
   // the language the words point at, or the one closest to where the designer already was
   const fits = fitScores(brief, words, avoid);
   const wanted = options.find((o) => o.language === fits[0].id) ?? options[0];
@@ -1430,7 +1504,18 @@ export function normalizeDirection(v: unknown): ArtDirection | null {
     locks: Array.isArray(r.locks) ? [...new Set(r.locks.filter((x: unknown): x is LockGroup => typeof x === 'string' && LOCKS.has(x)))] : [],
     source: r.source === 'model' || r.source === 'person' ? r.source : 'engine',
     ...composeOf(r.compose, r.plan, r.order, r.lead),
+    ...shapesOf(r.shapes),
   };
+}
+
+function shapesOf(v: unknown): { shapes?: Record<string, SectionShape> } {
+  const r = o(v);
+  const out: Record<string, SectionShape> = {};
+  for (const kind of Object.keys(SHAPE_FIELDS)) {
+    const sh = normalizeShape(kind, r[kind]);
+    if (sh) out[kind] = sh;
+  }
+  return Object.keys(out).length ? { shapes: out } : {};
 }
 
 function composeOf(v: unknown, plan?: unknown, order?: unknown, lead?: unknown): { compose?: Record<string, string>; plan?: string; order?: string[]; lead?: string } {
@@ -1514,7 +1599,9 @@ export function parseDirections(raw: unknown, ask: DirectionAsk, options: readon
     if (lang && lang.id !== d.language && !taken.has(lang.id) && (ask.notes ?? '').trim()) {
       taken.delete(d.language);
       taken.add(lang.id);
-      d = applyLocks({ ...buildDirection(lang, ask.brief, { seed: hash(`${lang.id}|${ask.round ?? 0}`), faithful: false, directives }), id: d.id }, ask.base);
+      // another language, the same composition: what leads and how the parts are laid out stay as drawn
+      const kept = { compose: d.compose, plan: d.plan, order: d.order, lead: d.lead, shapes: d.shapes };
+      d = applyLocks({ ...buildDirection(lang, ask.brief, { seed: hash(`${lang.id}|${ask.round ?? 0}`), faithful: false, directives }), id: d.id, ...Object.fromEntries(Object.entries(kept).filter(([, v]) => v !== undefined)) }, ask.base);
     }
     const typeLocked = d.locks.includes('type');
     const fonts = o(m.fonts);

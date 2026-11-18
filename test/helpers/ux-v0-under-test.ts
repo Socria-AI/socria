@@ -44,3 +44,6 @@ export { BEHAVIOR_SOURCE } from '@/lib/ux-v0/behaviors';
 export * from '@/lib/ux-v0/budget';
 export * from '@/lib/ux-v0/edit';
 export * from '@/lib/ux-v0/structure';
+// the layout: what the designer decided (lead, arrangement, alignment, pictures), the one layout question, and
+// the settings each direction varies within
+export * from '@/lib/ux-v0/layout';

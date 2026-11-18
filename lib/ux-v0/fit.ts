@@ -11,9 +11,10 @@
 
 import type { ArtDirection } from './direction';
 import { intentOf, requiredComponents, sampleBooking, type DesignIntent } from './intent';
-import { kindDef, normalizeSection, type DesignSpec, type Section } from './spec';
+import { avoidGeneric, honourLayout, leadKindFor, orderFor, type LayoutDecisions } from './layout';
+import { kindDef, normalizeSection, normalizeShape, type DesignSpec, type Section } from './spec';
 
-type Brief = Parameters<typeof intentOf>[0] & { objective?: string; audience?: string };
+type Brief = Parameters<typeof intentOf>[0] & { objective?: string; audience?: string; layout?: LayoutDecisions; spec?: { corners?: string; density?: string } };
 
 /** Sample content for a component the design must have, labelled as such. */
 export function sampleFor(component: string, intent: DesignIntent, brief: Brief): Record<string, unknown> | null {
@@ -114,11 +115,14 @@ export function fitToIntent(spec: DesignSpec, intent: DesignIntent, opts: { brie
       changes.push('Added the screen’s header: its name and what it is for.');
     }
   }
+  // what the designer decided about the layout (lib/ux-v0/layout.ts): it holds whatever the direction says
+  const dec = opts.brief?.layout;
+  const decidedLead = leadKindFor(dec, requiredComponents(intent));
   // on a task-first screen the task leads: its components come straight after the chrome, in the
-  // direction's order of importance (figures first, the table first, the trend first…)
+  // direction's order of importance (figures first, the table first, the trend first…), or the designer's
   if (intent.screen) {
     const needed = new Set(requiredComponents(intent));
-    const order = opts.dir?.order ?? [];
+    const order = orderFor(dec?.lead) ?? opts.dir?.order ?? [];
     const rankOf = (k: string) => (order.includes(k) ? order.indexOf(k) : 50);
     const lead = placeOf(sections, true);
     const chrome = sections.slice(0, lead);
@@ -130,14 +134,16 @@ export function fitToIntent(spec: DesignSpec, intent: DesignIntent, opts: { brie
     const next = [...chrome, ...first, ...others];
     if (next.map((s) => s.id).join() !== sections.map((s) => s.id).join()) changes.push(order.length ? 'Put the task first, in the direction’s order.' : 'Put the task first: the screen opens on what it is for.');
     sections = next;
-  } else if (opts.dir?.lead) {
-    // on a page, what the direction says leads comes straight after the navigation (the work before words about it)
-    const at = sections.findIndex((s) => s.kind === opts.dir!.lead && !s.locked);
+  } else if (decidedLead ?? opts.dir?.lead) {
+    // on a page, what leads comes straight after the navigation (the work before words about it); the
+    // designer's decision first, else the direction's
+    const leadKind = decidedLead ?? opts.dir!.lead!;
+    const at = sections.findIndex((s) => s.kind === leadKind && !s.locked);
     const to = placeOf(sections, true);
     if (at > to) {
       const [lead] = sections.splice(at, 1);
       sections.splice(to, 0, lead);
-      changes.push(`Opened with the ${kindDef(lead.kind)?.label.toLowerCase() ?? lead.kind}, as the direction leads.`);
+      changes.push(`Opened with the ${kindDef(lead.kind)?.label.toLowerCase() ?? lead.kind}, as ${decidedLead ? 'you decided' : 'the direction leads'}.`);
     }
   }
   // the approved direction's composition, on the first section of each kind, unless the designer fixed it;
@@ -149,6 +155,26 @@ export function fitToIntent(spec: DesignSpec, intent: DesignIntent, opts: { brie
     const next = normalizeSection({ ...s, variant }, spec.pageType, null, new Set());
     if (next) sections[at] = { ...next, id: s.id };
   }
-  const out: DesignSpec = { ...spec, sections, notes: [...spec.notes, ...changes].slice(-8) };
+  // how the direction sets its booking and its opening (which side, what proportion, how the times show…),
+  // on the first of each, unless the designer fixed it
+  const shapes = opts.dir?.shapes ?? {};
+  for (const kind of ['booking', 'hero']) {
+    const at = sections.findIndex((s) => s.kind === kind);
+    const s = at >= 0 ? sections[at] : null;
+    if (!s || s.fixed || s.locked || !shapes[kind]) continue;
+    const shape = normalizeShape(kind, shapes[kind]);
+    if (shape) sections[at] = { ...s, shape };
+  }
+  // the designer's layout decisions, in code, whatever the model or the direction drew (lib/ux-v0/layout.ts):
+  // no pictures means none, an opening or a booking the decisions rule out becomes one they allow, a decided
+  // alignment and arrangement hold
+  const language = spec.look?.language ?? '';
+  const honoured = honourLayout(sections, dec, { pageType: spec.pageType, screen: intent.screen, needs: requiredComponents(intent), kind: intent.kind, language, compose });
+  sections = honoured.sections;
+  changes.push(...honoured.changes);
+  // and the habits of generated pages, taken out where nobody chose them (lib/ux-v0/layout.ts avoidGeneric)
+  const plain = avoidGeneric({ ...spec, sections }, { decisions: dec, language, surfaceLocked: !!opts.dir?.locks?.includes('surface'), corners: opts.brief?.spec?.corners });
+  changes.push(...plain.changes);
+  const out: DesignSpec = { ...plain.spec, notes: [...spec.notes, ...changes].slice(-8) };
   return { spec: out, changes };
 }

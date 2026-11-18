@@ -9,6 +9,10 @@
 // each pairing will have; type is set live on the palette's own paper with
 // its scale; references and the pictures on the page are kept apart.
 //
+// How it is laid out leads with the designer's layout decisions (what comes
+// first, the arrangement, the alignment, the pictures), sketched, each said
+// with where it came from, and each one theirs to set or leave to SocriaUX.
+//
 // Exact specifications are there for a designer who wants them — type scale,
 // grid, width, density, corners, motion, a contrast target — and every one
 // reaches the look the renderer draws (lib/ux-v0/direction.ts applyBrief).
@@ -25,6 +29,27 @@ import { ASPECT_LABEL, isContent, takenFrom } from '@/lib/ux-v0/references';
 import { GRIDS, MOTION_FEELS, STILL_MOTION, type Motion } from '@/lib/ux-v0/spec';
 import { DECISIONS, PALETTE_ROLES, hex, type BriefPart, type BriefSpec, type Decision, type DesignBrief, type MoodboardRef, type PaletteRole } from '@/lib/ux-v0/types';
 import { EXPERIENCES, EXPERIENCE_LABEL, correctKind, intentOf, pageTypeFor, editRequirements, type DesignIntent, type Experience } from '@/lib/ux-v0/intent';
+import {
+  ALIGN_LABEL,
+  ARRANGEMENTS,
+  ARRANGEMENT_LABEL,
+  LAYOUT_ALIGNS,
+  LAYOUT_KEY_LABEL,
+  LEAD_LABEL,
+  PICTURES_LABEL,
+  PICTURE_ROLES,
+  decideLayout,
+  layoutSaid,
+  layoutValueLabel,
+  leadOptions,
+  sketchContext,
+  type Arrangement,
+  type LayoutAlign,
+  type LayoutKey,
+  type Lead,
+  type PictureRole,
+} from '@/lib/ux-v0/layout';
+import { LayoutSketch, sketchWords } from './LayoutSketch';
 
 interface Props {
   brief: DesignBrief;
@@ -154,12 +179,12 @@ function Status({ part, value, onChange }: { part: BriefPart; value: Decision; o
 }
 
 /** A choice that can also be left to the direction. */
-function Spec<T extends string | number>({ label, value, options, onChange, disabled = false }: { label: string; value: T | undefined; options: [T, string][]; onChange: (v: T | undefined) => void; disabled?: boolean }) {
+function Spec<T extends string | number>({ label, value, options, onChange, disabled = false, empty = 'From the direction' }: { label: string; value: T | undefined; options: [T, string][]; onChange: (v: T | undefined) => void; disabled?: boolean; empty?: string }) {
   return (
     <label className="st-spec">
       <span>{label}</span>
       <select value={value === undefined ? '' : String(value)} disabled={disabled} onChange={(e) => onChange(e.target.value === '' ? undefined : (options.find(([v]) => String(v) === e.target.value)?.[0] as T))} aria-label={label}>
-        <option value="">From the direction</option>
+        <option value="">{empty}</option>
         {options.map(([v, l]) => (
           <option key={String(v)} value={String(v)}>
             {l}
@@ -167,6 +192,47 @@ function Spec<T extends string | number>({ label, value, options, onChange, disa
         ))}
       </select>
     </label>
+  );
+}
+
+/**
+ * HOW IT IS LAID OUT, decided: what comes first, the arrangement, the alignment, the part pictures play. Each is
+ * read from the designer's words or their answer to the layout question, said with where it came from, and
+ * theirs to set or to leave to SocriaUX. What is decided holds in every direction and every generation (and is
+ * carried into a design in place); what is left open, each direction sets its own way (lib/ux-v0/layout.ts).
+ */
+function LayoutDecide({ brief, onChange }: { brief: DesignBrief; onChange: (b: DesignBrief) => void }) {
+  const intent = intentOf(brief);
+  const d = brief.layout;
+  const ctx = sketchContext(intent);
+  const leads: [Lead, string][] = leadOptions(intent).map((o) => [o.value, o.label]);
+  if (d?.lead && !leads.some(([v]) => v === d.lead)) leads.push([d.lead, LEAD_LABEL[d.lead]]);
+  const put = (k: LayoutKey, v: string | undefined) => onChange({ ...brief, layout: decideLayout(d, k, v ?? null) });
+  const first = d?.lead ? layoutValueLabel(intent, 'lead', d.lead).toLowerCase() : '';
+  return (
+    <div className="st-layout">
+      <figure className="st-layout-sketch">
+        <LayoutSketch
+          lead={d?.lead ?? null}
+          kind={ctx.kind}
+          task={ctx.task}
+          subject={ctx.subject}
+          words={ctx.subject ? ctx.subject.charAt(0).toUpperCase() + ctx.subject.slice(1) : sketchWords(brief.objective)}
+          arrangement={d?.arrangement}
+          align={d?.align}
+          pictures={d?.pictures}
+          title={first ? `Sketch of the layout: ${first} first` : 'Sketch of the layout: what comes first is left open'}
+        />
+        <figcaption>{first ? 'A sketch of what you decided' : 'Left open: each direction leads its own way'}</figcaption>
+      </figure>
+      <div className="st-specs st-layout-specs">
+        <Spec label={LAYOUT_KEY_LABEL.lead} value={d?.lead} options={leads} onChange={(v) => put('lead', v)} empty="SocriaUX decides" />
+        <Spec label={LAYOUT_KEY_LABEL.arrangement} value={d?.arrangement} options={ARRANGEMENTS.map((a) => [a, ARRANGEMENT_LABEL[a]] as [Arrangement, string])} onChange={(v) => put('arrangement', v)} empty="SocriaUX decides" />
+        <Spec label={LAYOUT_KEY_LABEL.align} value={d?.align} options={LAYOUT_ALIGNS.map((a) => [a, ALIGN_LABEL[a]] as [LayoutAlign, string])} onChange={(v) => put('align', v)} empty="SocriaUX decides" />
+        <Spec label={LAYOUT_KEY_LABEL.pictures} value={d?.pictures} options={PICTURE_ROLES.map((x) => [x, PICTURES_LABEL[x]] as [PictureRole, string])} onChange={(v) => put('pictures', v)} empty="SocriaUX decides" />
+      </div>
+      <p className="st-why-note st-layout-said">{layoutSaid(d, intent)}</p>
+    </div>
   );
 }
 
@@ -554,15 +620,16 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
             )}
           </section>
 
-          <section className="st-block c-6" id="bp-look" aria-label="How it should look">
+          <section className="st-block c-5" id="bp-look" aria-label="How it should look">
             {head('How it should look')}
             <label className="v0-brief-field">
               <span className="v0-sr">How it should look</span>
               <Prose value={brief.visualDirection} onChange={(v) => set('visualDirection', v)} label="Visual direction" />
             </label>
           </section>
-          <section className="st-block c-6" id="bp-layout" aria-label="How it is laid out">
+          <section className="st-block c-7" id="bp-layout" aria-label="How it is laid out">
             {head('How it is laid out', 'layout')}
+            <LayoutDecide brief={brief} onChange={onChange} />
             <label className="v0-brief-field">
               <span className="v0-sr">How it is laid out</span>
               <Prose value={brief.layoutDirection} onChange={(v) => set('layoutDirection', v)} label="Layout" />

@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BEHAVIOR_SOURCE } from '@/lib/ux-v0/behaviors';
 import { INSPECTOR_SOURCE } from '@/lib/ux-v0/inspector';
 import { renderDesign } from '@/lib/ux-v0/render';
-import { LOCK_LABEL, briefKey, languageOf, lockedChanges, normalizeDirection, proposeDirections, type ArtDirection, type LockGroup } from '@/lib/ux-v0/direction';
+import { LOCK_LABEL, briefKey, languageOf, lockedChanges, normalizeDirection, proposeDirections, saltOf, type ArtDirection, type LockGroup } from '@/lib/ux-v0/direction';
 import { MAX_REVISION_ROUNDS, evaluateDesign, fixesFor, type Evaluation, type Finding } from '@/lib/ux-v0/evaluate';
 import { buildSandboxDoc, makeNonce } from '@/lib/ux-v0/sandbox';
 import { applyPatch, normalizeSpec, placeholdersIn, specDigest, type DesignSpec, type Patch } from '@/lib/ux-v0/spec';
@@ -71,6 +71,8 @@ import { checkFile, fetchOriginal, imageSize, keepOriginal } from './files';
 import { Inspect } from './Inspect';
 import { SectionEditor } from './SectionEditor';
 import { holdLocked, setLocked } from '@/lib/ux-v0/edit';
+import { LAYOUT_QUESTION_ID } from '@/lib/ux-v0/layout';
+import { designerWords } from '@/lib/ux-v0/intent';
 import { elementSelection } from '@/lib/ux-v0/selection';
 import { Moodboard } from './Moodboard';
 import { Stage, type SelectMode, type StageHandle } from './Stage';
@@ -330,6 +332,9 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       const p = current.current;
       const questions = p.discovery.questions.map((q) => (q.id === qid ? { ...q, answer: skipped || delegated ? '' : ans.trim().slice(0, 800), skipped, delegated } : q));
       update((p2) => ({ ...p2, discovery: { ...p2.discovery, questions } }));
+      // the layout question, asked once there was already enough for the brief, needs no further turn: the
+      // brief reads its answer (lib/ux-v0/layout.ts settleLayout), so nothing is spent on it
+      if (qid === LAYOUT_QUESTION_ID && p.discovery.ready) return;
       await discoverTurn({ questions });
     },
     [current, update, discoverTurn]
@@ -492,7 +497,8 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const base = st.options.find((o) => o.locks.length) ?? (st.chosen && st.chosen.locks.length ? st.chosen : null);
     const round = again ? st.round + 1 : st.round;
     const seen = again ? [...new Set([...st.seen, ...st.options.map((o) => o.language)])] : st.seen;
-    return { brief: p.brief.doc!, notes: st.notes, avoid: st.avoid, base, round, seen, board: readBoard(p.moodboard) };
+    // the project's own salt: this brief in another project is composed differently
+    return { brief: p.brief.doc!, notes: st.notes, avoid: st.avoid, base, round, seen, board: readBoard(p.moodboard), salt: saltOf(p.id) };
   };
 
   const proposeDirectionsFor = async (again: boolean) => {
@@ -1197,6 +1203,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                   onDelegate={() => currentQuestion && answer(currentQuestion.id, '', false, true)}
                   onSeeDirections={seeDirections}
                   intent={project.intent}
+                  words={designerWords(project.intent, project.discovery.questions)}
                   board={uiBoard}
                   onPicture={(text: string, refId?: string) => {
                     if (refId) setRef(refId, 'kept');

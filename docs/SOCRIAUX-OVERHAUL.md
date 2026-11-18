@@ -74,6 +74,8 @@ How a plan is chosen and applied:
 
 `structuralDistance` measures how far apart two designs are in structure. It is half the edit distance between their sequences of parts, plus half the share of shared parts laid out differently, and it is reported separately from the token distance.
 
+**Since then:** layouts follow what the designer decides (what comes first, the arrangement, the alignment, the pictures), and what is left open is set per project within each language. See [SOCRIAUX-LAYOUT.md](SOCRIAUX-LAYOUT.md).
+
 ### 5 · Model routing (lib/ux-v0/model.ts)
 
 | Stage | Tier | Default model |

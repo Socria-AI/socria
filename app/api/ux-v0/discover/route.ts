@@ -5,6 +5,7 @@
 // Socratic discovery (lib/ux-v0/discovery.ts): a question or two at a time,
 // never a topic twice, moodboard queries only when the visual direction moved.
 // Text only — no images are sent — so a turn is cheap. Nothing is stored here.
+// The one layout question (what leads) is added here, not written by the model.
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
@@ -17,7 +18,7 @@ import { withMeter } from '@/lib/token-meter';
 import { askRouted } from '@/lib/ux-v0/ask';
 import { budgets } from '@/lib/ux-v0/budget';
 import { formatFor } from '@/lib/ux-v0/schemas';
-import { ASPECTS, directionSystem, directionUser, discoverSystem, discoverUser, parseDirection, parseDiscover, type Aspect, type DiscoverInput } from '@/lib/ux-v0/discovery';
+import { ASPECTS, directionSystem, directionUser, discoverSystem, discoverUser, parseDirection, parseDiscover, withLayoutQuestion, type Aspect, type DiscoverInput } from '@/lib/ux-v0/discovery';
 import { MAX_TOKENS, economyRoute } from '@/lib/ux-v0/model';
 import { bad, failed, noModel, projectIdOf, readBody, signInFirst } from '@/lib/ux-v0/route-kit';
 import { normalizeDiscovery, normalizeMoodboard } from '@/lib/ux-v0/types';
@@ -65,7 +66,8 @@ export const POST = withMeter(async function POST(req: NextRequest) {
     const asked = await askRouted(openai, g.route, { system, user, maxTokens: MAX_TOKENS[kind], temperature: action === 'direction' ? 0.8 : 0.5, label: kind, format: formatFor(kind, aspect), maxRetries: budgets().maxRetries }, economyRoute(kind));
     await recordUsage(userId, projectId, kind, asked.usage, Date.now(), { api: asked.api, downgraded: !!g.downgraded || !!asked.fellBack });
     if (action === 'direction') return NextResponse.json({ ...parseDirection(asked.json, input, aspect), usage: asked.usage, ...noticeOf(g, asked) });
-    return NextResponse.json({ ...parseDiscover(asked.json, input), usage: asked.usage, ...noticeOf(g, asked) });
+    // the one layout question is SocriaUX's own, drawn as sketches from the designer's words (lib/ux-v0/layout.ts)
+    return NextResponse.json({ ...withLayoutQuestion(parseDiscover(asked.json, input), input), usage: asked.usage, ...noticeOf(g, asked) });
   } catch (e) {
     // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure
     const resting = sleepAnswer(e);

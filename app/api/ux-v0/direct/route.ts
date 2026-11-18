@@ -21,7 +21,7 @@ import { withMeter } from '@/lib/token-meter';
 import { askRouted } from '@/lib/ux-v0/ask';
 import { budgets } from '@/lib/ux-v0/budget';
 import { formatFor } from '@/lib/ux-v0/schemas';
-import { directSystem, directUser, normalizeDirection, parseDirections, proposeDirections, type DirectionAsk } from '@/lib/ux-v0/direction';
+import { directSystem, directUser, normalizeDirection, parseDirections, proposeDirections, saltOf, type DirectionAsk } from '@/lib/ux-v0/direction';
 import { MAX_TOKENS, economyRoute } from '@/lib/ux-v0/model';
 import { bad, failed, noModel, projectIdOf, readBody, signInFirst } from '@/lib/ux-v0/route-kit';
 import { normalizeBrief } from '@/lib/ux-v0/types';
@@ -52,6 +52,8 @@ export const POST = withMeter(async function POST(req: NextRequest) {
     round: Number.isFinite(body.round) ? Math.max(0, Math.min(99, Math.round(body.round))) : 0,
     seen: Array.isArray(body.seen) ? body.seen.filter((x: unknown): x is string => typeof x === 'string').slice(0, 24) : [],
     board: normalizeReading(body.board),
+    // the project's own salt, as the browser drew them: the same directions on both sides
+    salt: saltOf(body.projectId),
   };
   const projectId = projectIdOf(body.projectId);
   const options = proposeDirections(ask);

@@ -1339,8 +1339,21 @@
 .v0-edit.is-locked .v0-edit-row:not(.v0-edit-acts) {
   opacity: 0.55;
 }
-.v0-edit :is(button, select, textarea):disabled {
+.v0-edit :is(button, select, textarea, input):disabled {
   cursor: not-allowed;
+}
+/* a setting with a range (a proportion, a line length, a headline size): moss, applied when let go */
+.v0-edit-range input[type='range'] {
+  width: 100%;
+  max-width: 260px;
+  min-height: 28px;
+  margin: 0;
+  accent-color: var(--sb-moss);
+  cursor: pointer;
+}
+.v0-edit-range .v0-quiet {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 /* phones and narrow windows: the work in view gets the whole height (the canvas, the brief, the directions),

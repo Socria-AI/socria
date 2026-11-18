@@ -17,6 +17,7 @@
 
 import { fitToIntent } from './fit';
 import { EXPERIENCE_LABEL, intentOf, pageTypeFor, structureRule } from './intent';
+import { layoutBrief } from './layout';
 import { designFromDirection, directionBrief, LOCK_LABEL, planLayout, type ArtDirection, type LockGroup } from './direction';
 import { normQ, readQueries } from './discovery';
 import { fontMenu } from './fonts';
@@ -194,7 +195,7 @@ ${libraryMenu(pageType)}
 
 Rules:
 ${tokens}
-${structureRule(intent, pageType)}
+${structureRule(intent, pageType)}${layoutBrief(brief.layout, intent) ? `\n- ${layoutBrief(brief.layout, intent)}` : ''}
 - Copy: real, specific to this brief, in ${dir ? 'the voice the direction describes' : "the brand's voice"}. Never lorem ipsum. Headlines short and concrete. Facts you were not given — prices, addresses, dates, numbers, opening hours, people's names — are written as [bracketed placeholders] (e.g. "[Opening hours]", "[£ price]"); never invent them. A testimonial without a real source uses "[Customer name]".
 - Images: only the moodboard ids listed below, in "images" on the sections that take them; prefer landscape for wide slots and portrait for tall ones. If there are none, choose variants that need no image.
 - Every section has a short unique id (lowercase, hyphenated), a kind, a variant, content and images.
@@ -273,6 +274,7 @@ Patch operations (the "op"):
 - "tokens": change design tokens — {"tokens": {"colors": {...}, "fonts": {...}, "scale"|"radius"|"style"|"imageTreatment": ...}} (fonts only from: ${fontMenu()}).
 - "look": change how the page is composed — {"look": {any of: "ratio" (type scale 1.15–1.7), "weight" (100–900), "case" sentence|upper, "emphasis" italic|accent|underline|highlight|none, "label" ${LABELS.join('|')}, "grid" ${GRIDS.join('|')}, "align" left|center, "width" narrow|standard|wide, "containers" ${CONTAINERS.join('|')}, "rules" none|hairline|heavy, "buttons" ${BUTTONS.join('|')}, "motifs" [${MOTIFS.join(', ')}]}}.
 - "tone": set the ground one section sits on, or its spacing — {"sectionId", "tone": ${TONES.join('|')}, "pad": s|m|l}.
+- "shape": how one booking or hero is set, the rest of it kept — {"sectionId", "shape": {…}}. A booking: "side" start|end (where its summary card, day grid or panel sits), "times" tiles|rows|pills, "summary" card|inline|bar (a bar keeps the choice beside the confirm action), "ratio" 0.3–0.62 (the narrower column's share), "density" airy|even|dense, "align" left|center. A hero: "align" left|center, "side" start|end (where the words sit), "valign" top|middle|bottom (over a full picture), "measure" 0.45–1 (how wide the words run), "scale" 0.82–1.25 (the headline's size), "ratio" 0.36–0.64 (the words' share beside a picture).
 - "content": change fields of one section — {"sectionId", "content": {only the fields that change}}.
 - "variant": switch one section's variant — {"sectionId", "variant"}.
 - "images": change which moodboard images one section uses — {"sectionId", "images": [ids]}.

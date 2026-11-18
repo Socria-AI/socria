@@ -9,9 +9,16 @@
 // always there, so the questions never stand between the designer and the
 // work. Earlier answers live in the rail, each one editable, and editing one
 // updates what SocriaUX understands.
+//
+// The one layout question (what someone should see first) is answered with
+// sketches instead: each answer drawn as a grey wireframe carrying the
+// designer's own words, and "You decide" drawn as an open sketch beside them
+// (lib/ux-v0/layout.ts, components/ux-v0/LayoutSketch.tsx).
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { fontStack } from '@/lib/ux-v0/fonts';
+import { LAYOUT_QUESTION_ID, sketchOptions } from '@/lib/ux-v0/layout';
+import { LayoutSketch, sketchWords } from './LayoutSketch';
 import { ASPECT_LABEL, takenFrom } from '@/lib/ux-v0/references';
 import { TOPIC_LABEL, type Discovery, type DiscoveryQuestion, type Moodboard } from '@/lib/ux-v0/types';
 
@@ -32,6 +39,7 @@ export function QuestionBand({
   onDelegate,
   onSeeDirections,
   intent,
+  words,
   board,
   onPicture,
 }: {
@@ -53,12 +61,17 @@ export function QuestionBand({
   /** write the brief from what is known and open the directions (nothing is generated yet) */
   onSeeDirections: () => void;
   intent: string;
+  /** everything the designer has said so far (the intent and their answers), to sketch the layout question in their words */
+  words?: string;
   /** the board, to answer a visual question with a picture, a palette or a type pair */
   board: Moodboard;
   onPicture: (answer: string, refId?: string) => void;
 }) {
   const [chosen, setChosen] = useState<string[]>([]);
   useEffect(() => setChosen([]), [q?.id]);
+  // the layout question's answers, as sketches in the designer's words
+  const layoutQ = q?.id === LAYOUT_QUESTION_ID;
+  const sketches = useMemo(() => (layoutQ ? sketchOptions(words || intent) : []), [layoutQ, words, intent]);
 
   // 1–9 pick a suggested answer, as the numbers beside them say
   useEffect(() => {
@@ -148,7 +161,40 @@ export function QuestionBand({
             </button>
           </p>
         )}
-        {q.options.length > 0 && (
+        {layoutQ && q.options.length > 0 && (
+          <ul className="st-sketches" aria-label="Suggested answers, sketched with your words">
+            {q.options.map((o, i) => {
+              // the answer's own sketch: by its words, else by its place among the answers
+              const sk = sketches.find((x) => x.label === o) ?? (sketches.length === q.options.length ? sketches[i] : null);
+              return (
+                <li key={o} className="st-sketch" style={{ ['--i' as string]: i }}>
+                  <button type="button" className="st-sketch-pick" disabled={!!busy} onClick={() => onAnswer(o)}>
+                    {sk && <LayoutSketch lead={sk.value} kind={sk.kind} task={sk.task} subject={sk.subject} words={sketchWords(intent, sk.subject)} />}
+                    <span className="st-sketch-label">
+                      <span className="st-pick-n" aria-hidden="true">
+                        {i + 1}
+                      </span>
+                      <span>{o}</span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+            <li className="st-sketch is-yours" style={{ ['--i' as string]: q.options.length }}>
+              <button type="button" className="st-sketch-pick" disabled={!!busy} onClick={onDelegate} title="SocriaUX decides this, and will not ask it again">
+                <LayoutSketch lead={null} kind={sketches[0]?.kind} task={sketches[0]?.task} subject={sketches[0]?.subject} words={sketchWords(intent, sketches[0]?.subject)} />
+                <span className="st-sketch-label">
+                  <span className="st-pick-n" aria-hidden="true" />
+                  <span>
+                    You decide
+                    <small>Each direction leads its own way</small>
+                  </span>
+                </span>
+              </button>
+            </li>
+          </ul>
+        )}
+        {!layoutQ && q.options.length > 0 && (
           <ul className="v0-options st-options" aria-label={q.multi ? 'Suggested answers: choose any' : 'Suggested answers'}>
             {q.options.map((o, i) => {
               const on = chosen.includes(o);

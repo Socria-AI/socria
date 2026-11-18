@@ -13,6 +13,8 @@
 //     contrast) are applied, as a new version that can be undone.
 
 import { briefColors } from './direction';
+import { intentOf, requiredComponents } from './intent';
+import { honourLayout, sameLayout } from './layout';
 import { nearestWeight } from './fonts';
 import { ensureContrast, normalizeLook, normalizeTokens, type DesignSpec } from './spec';
 import { BRIEF_PARTS, type BriefPart, type Decision, type DesignBrief, type DiscoveryQuestion, type Topic } from './types';
@@ -109,7 +111,7 @@ export function changedVisualParts(prev: DesignBrief | null, next: DesignBrief):
   const out: BriefPart[] = [];
   if (!same(prev.palette, next.palette)) out.push('colour');
   if (!same(prev.typography.display, next.typography.display) || !same(prev.typography.body, next.typography.body) || !same(a.ratio, b.ratio)) out.push('typography');
-  if (!same(a.density, b.density) || !same(a.grid, b.grid) || !same(a.width, b.width) || !same(a.corners, b.corners)) out.push('layout');
+  if (!same(a.density, b.density) || !same(a.grid, b.grid) || !same(a.width, b.width) || !same(a.corners, b.corners) || !sameLayout(prev.layout, next.layout)) out.push('layout');
   if (!same(a.motion, b.motion)) out.push('motion');
   if (!same(a.contrast, b.contrast)) out.push('accessibility');
   return out;
@@ -118,12 +120,22 @@ export function changedVisualParts(prev: DesignBrief | null, next: DesignBrief):
 /**
  * The brief's visual decisions, applied to a design in place: only the parts
  * named, so a change to the type does not undo a palette the direction chose.
- * Copy and structure are untouched; those need a new generation.
+ * Copy is untouched. The structure changes only as far as the layout
+ * decisions require (what leads, the compositions they allow, how the booking
+ * and the opening are set: lib/ux-v0/layout.ts honourLayout); anything more
+ * needs a new generation.
  */
 export function briefToDesign(spec: DesignSpec, brief: DesignBrief, parts: readonly BriefPart[]): DesignSpec {
   const sp = brief.spec ?? {};
   const notes: string[] = [];
   const has = (p: BriefPart) => parts.includes(p);
+  let sections = spec.sections;
+  if (has('layout') && brief.layout) {
+    const intent = intentOf(brief);
+    const honoured = honourLayout(spec.sections, brief.layout, { pageType: spec.pageType, screen: intent.screen, needs: requiredComponents(intent), kind: intent.kind, language: spec.look?.language ?? '' });
+    sections = honoured.sections;
+    notes.push(...honoured.changes);
+  }
   let colors = { ...spec.tokens.colors };
   if (has('colour') && brief.palette.length) colors = { ...colors, ...briefColors(brief) };
   if (has('accessibility') && sp.contrast === 'AAA') colors = { ...colors, text: ensureContrast(colors.text, colors.background, 7), muted: ensureContrast(colors.muted, colors.background, 7), accentText: ensureContrast(colors.accentText, colors.accent, 7) };
@@ -147,5 +159,5 @@ export function briefToDesign(spec: DesignSpec, brief: DesignBrief, parts: reado
     },
     spec.look
   );
-  return { ...spec, tokens, look, notes: [...spec.notes, ...notes].slice(-8), version: spec.version + 1, reason: `The brief, applied: ${parts.map((p) => PART_LABEL[p].toLowerCase()).join(', ')}`, createdAt: Date.now() };
+  return { ...spec, sections, tokens, look, notes: [...spec.notes, ...notes].slice(-8), version: spec.version + 1, reason: `The brief, applied: ${parts.map((p) => PART_LABEL[p].toLowerCase()).join(', ')}`, createdAt: Date.now() };
 }

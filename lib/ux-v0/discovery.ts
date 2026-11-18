@@ -14,6 +14,8 @@
 // the person has kept so far.
 
 import { fontMenu } from './fonts';
+import { designerWords } from './intent';
+import { layoutQuestion } from './layout';
 import {
   MOOD_CATEGORIES,
   TOPICS,
@@ -63,7 +65,8 @@ const RULES = `Rules for questions:
 - Never ask about a topic already answered, skipped or left to you, and never ask for what the intent or an answer already says. At most two questions per turn, usually one.
 - When the intent is already detailed (it names audience, purpose, look or constraints), ask at most one question, or none: say ready and let the designer see directions.
 - An answer that is "not sure yet" leaves its topic open: do not record it as understood. If it matters, come back to it later in a more concrete form (an example, or answers to choose between); never ask it the same way again.
-- Order: who it is for and what it must achieve first; then brand, visual direction, content and functionality; constraints and hierarchy when they matter.
+- Order: who it is for and what it must achieve first; then brand, visual direction, content and functionality; constraints when they matter.
+- Never ask what should come first, what leads or how it is laid out: SocriaUX asks that itself, once, with sketches. Do not use the topic "hierarchy".
 - Each question gets "why" (one short sentence: why its answer matters to the design) and 2–5 short suggested answers that genuinely differ — not leading, not exhaustive. "multi": true when several answers can apply together.
 - Topics: ${TOPICS.join(', ')}.
 
@@ -193,6 +196,21 @@ export function parseDiscover(raw: unknown, input: DiscoverInput, now = Date.now
     ready: ready || (!questions.length && answered >= 3),
     note: clean(r.note, 300),
   };
+}
+
+/**
+ * The one layout question (lib/ux-v0/layout.ts), asked by SocriaUX itself rather than written by the model:
+ * once; never when the designer's words already say what leads; never before the first answer while the
+ * model still has a question (who it is for comes first); never as a third question in a turn. A question the
+ * model wrote about hierarchy gives way to it: what leads is asked with sketches, or not at all.
+ */
+export function withLayoutQuestion(result: DiscoverResult, input: DiscoverInput, now = Date.now()): DiscoverResult {
+  const questions = result.questions.filter((q) => q.topic !== 'hierarchy');
+  const begun = input.questions.some((q) => q.answer || q.skipped || q.delegated);
+  const settled = input.questions.some((q) => q.topic === 'hierarchy' && (q.answer || q.delegated));
+  const room = begun ? questions.length < 2 : questions.length === 0;
+  const lq = room && !settled ? layoutQuestion(designerWords(input.intent, input.questions, input.remark), input.questions, now) : null;
+  return { ...result, questions: lq ? [...questions, lq] : questions };
 }
 
 export function parseDirection(raw: unknown, input: DiscoverInput, aspect: Aspect): { direction: string; queries: { category: MoodCategory; query: string }[]; palettes: Palette[]; type: TypePair[] } {

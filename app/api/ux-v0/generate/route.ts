@@ -24,7 +24,7 @@ import { withMeter } from '@/lib/token-meter';
 import { askRouted } from '@/lib/ux-v0/ask';
 import { budgets } from '@/lib/ux-v0/budget';
 import { generateSystem, generateUser, parseGenerate } from '@/lib/ux-v0/design';
-import { autoDirection, normalizeDirection, reviseDirection } from '@/lib/ux-v0/direction';
+import { autoDirection, normalizeDirection, reviseDirection, saltOf } from '@/lib/ux-v0/direction';
 import { pingUse } from '@/lib/ux-v0/images-server';
 import { MAX_TOKENS, economyRoute } from '@/lib/ux-v0/model';
 import { bad, failed, noModel, projectIdOf, readBody, signInFirst } from '@/lib/ux-v0/route-kit';
@@ -52,7 +52,9 @@ export const POST = withMeter(async function POST(req: NextRequest) {
   const direction = typeof body.direction === 'string' ? body.direction.trim().slice(0, 400) : '';
   const approved = body.artDirection ? normalizeDirection(body.artDirection) : null;
   // the approved direction; revised in words when the designer asked for a new one; else SocriaUX's own choice
-  const art = approved ? (direction ? reviseDirection(approved, brief, direction) : approved) : direction ? autoDirection(brief, direction) : autoDirection(brief);
+  // (composed for this project: the same brief in another project is laid out differently)
+  const salt = saltOf(body.projectId);
+  const art = approved ? (direction ? reviseDirection(approved, brief, direction, '', salt) : approved) : autoDirection(brief, direction, '', salt);
   const version = Number.isFinite(body.version) ? Math.max(1, Math.round(body.version)) : 1;
   const projectId = projectIdOf(body.projectId);
 

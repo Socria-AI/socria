@@ -101,9 +101,12 @@ export const LIBRARY: readonly KindDef[] = [
 
 export const KINDS = LIBRARY.map((k) => k.kind);
 
-/** The variants drawn around an image, and what each becomes without one. */
+/**
+ * The variants drawn around an image, and what each becomes without one. A hero without its picture becomes
+ * the editorial opening (words set to one side), never the centred one: that is the most common opening there is.
+ */
 export const NEEDS_IMAGE: Record<string, Record<string, string>> = {
-  hero: { split: 'centered', 'full-bleed': 'centered' },
+  hero: { split: 'editorial', 'full-bleed': 'editorial' },
   cta: { image: 'band' },
   quote: { 'with-portrait': 'large' },
   booking: { immersive: 'split' },
@@ -111,6 +114,98 @@ export const NEEDS_IMAGE: Record<string, Record<string, string>> = {
 export type SectionKind = string;
 const DEF = new Map(LIBRARY.map((k) => [k.kind, k]));
 export const kindDef = (kind: string): KindDef | null => DEF.get(kind) ?? null;
+
+// ── shapes: how a section is laid out, beyond its variant ──────────────
+//
+// A variant is the archetype (a booking as a calendar, a hero split around a picture). Its shape is how that
+// archetype is set for this design: which side things sit on, the proportion between columns, how times are
+// shown, how wide and how large the words are. Every value is bounded, so any combination still works at
+// every width (the rendered-page audit checks it). The designer's layout decisions fix some values; the rest
+// vary per project within the direction's visual language (lib/ux-v0/layout.ts).
+
+export type ShapeValue = string | number;
+export type SectionShape = Record<string, ShapeValue>;
+type ShapeField = { t: 'enum'; values: readonly string[] } | { t: 'num'; min: number; max: number };
+
+export const SHAPE_FIELDS: Record<string, Record<string, ShapeField>> = {
+  booking: {
+    side: { t: 'enum', values: ['start', 'end'] },
+    times: { t: 'enum', values: ['tiles', 'rows', 'pills'] },
+    summary: { t: 'enum', values: ['card', 'inline', 'bar'] },
+    ratio: { t: 'num', min: 0.3, max: 0.62 },
+    density: { t: 'enum', values: ['airy', 'even', 'dense'] },
+    align: { t: 'enum', values: ['left', 'center'] },
+  },
+  hero: {
+    align: { t: 'enum', values: ['left', 'center'] },
+    side: { t: 'enum', values: ['start', 'end'] },
+    valign: { t: 'enum', values: ['top', 'middle', 'bottom'] },
+    measure: { t: 'num', min: 0.45, max: 1 },
+    scale: { t: 'num', min: 0.82, max: 1.25 },
+    ratio: { t: 'num', min: 0.36, max: 0.64 },
+  },
+};
+
+/** The settings each variant actually draws: the others would change nothing you could see. */
+export const SHAPE_EFFECTIVE: Record<string, Record<string, readonly string[]>> = {
+  booking: {
+    strip: ['times', 'summary', 'density', 'align'],
+    calendar: ['side', 'ratio', 'times', 'summary', 'density', 'align'],
+    list: ['times', 'summary', 'density', 'align'],
+    split: ['side', 'ratio', 'times', 'summary', 'density', 'align'],
+    immersive: ['side', 'times', 'summary', 'density'],
+  },
+  hero: {
+    centered: ['measure', 'scale'],
+    editorial: ['align', 'side', 'measure', 'scale'],
+    statement: ['align', 'measure', 'scale'],
+    poster: ['scale'],
+    split: ['side', 'ratio', 'scale'],
+    'full-bleed': ['side', 'valign', 'measure', 'scale'],
+  },
+};
+
+/** What each setting is when a section has none: how the renderer draws it without a shape. */
+export const SHAPE_DEFAULT: Record<string, SectionShape> = {
+  booking: { side: 'start', times: 'tiles', summary: 'card', ratio: 0.42, density: 'even', align: 'left' },
+  hero: { align: 'left', side: 'start', valign: 'bottom', measure: 1, scale: 1, ratio: 0.48 },
+};
+/** Where a layout draws a setting otherwise: the immersive booking's panel sits at the end, a list's times are rows. */
+const SHAPE_VARIANT_DEFAULT: Record<string, Record<string, SectionShape>> = { booking: { immersive: { side: 'end' }, list: { times: 'rows' } } };
+
+/** The settings a section of this kind and layout is drawn with when it has none of its own. */
+export function shapeDefault(kind: string, variant: string): SectionShape {
+  return { ...(SHAPE_DEFAULT[kind] ?? {}), ...(SHAPE_VARIANT_DEFAULT[kind]?.[variant] ?? {}) };
+}
+
+/** A shape held to its fields: unknown keys dropped, numbers clamped and rounded. */
+export function normalizeShape(kind: string, v: unknown): SectionShape | undefined {
+  const fields = SHAPE_FIELDS[kind];
+  if (!fields || !v || typeof v !== 'object') return undefined;
+  const out: SectionShape = {};
+  for (const [k, f] of Object.entries(fields)) {
+    const x = (v as Record<string, unknown>)[k];
+    if (f.t === 'enum' && typeof x === 'string' && f.values.includes(x)) out[k] = x;
+    if (f.t === 'num' && typeof x === 'number' && Number.isFinite(x)) out[k] = Math.round(Math.min(f.max, Math.max(f.min, x)) * 100) / 100;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** What a shape draws, as words a structure can be compared by: its effective settings, numbers in three bands. */
+export function shapeSignature(kind: string, variant: string, shape: SectionShape | undefined): string {
+  if (!shape) return '';
+  const keys = SHAPE_EFFECTIVE[kind]?.[variant] ?? [];
+  const band = (k: string, n: number) => {
+    const f = SHAPE_FIELDS[kind]?.[k];
+    if (!f || f.t !== 'num') return String(n);
+    const at = (n - f.min) / (f.max - f.min);
+    return at < 0.34 ? 'low' : at > 0.66 ? 'high' : 'mid';
+  };
+  return keys
+    .filter((k) => shape[k] !== undefined)
+    .map((k) => `${k}=${typeof shape[k] === 'number' ? band(k, shape[k] as number) : shape[k]}`)
+    .join(',');
+}
 
 // ── tokens ───────────────────────────────────────────────────────────
 
@@ -146,6 +241,8 @@ export interface Section {
    * generation carries it over unchanged, and the automatic repairs leave it alone (lib/ux-v0/edit.ts).
    */
   locked?: boolean;
+  /** how this section's variant is set: sides, proportions, how its parts are shown (SHAPE_FIELDS) */
+  shape?: SectionShape;
 }
 
 export interface DesignSpec {
@@ -492,6 +589,8 @@ export function normalizeSection(v: unknown, pageType: PageType, imageIds: Reado
   if ((PADS as readonly string[]).includes(r.pad)) sec.pad = r.pad as Pad;
   if (r.fixed === true) sec.fixed = true;
   if (r.locked === true) (sec.locked = true), (sec.fixed = true);
+  const shape = normalizeShape(def.kind, r.shape);
+  if (shape) sec.shape = shape;
   return sec;
 }
 
@@ -545,8 +644,8 @@ export function normalizeSpec(v: unknown, moodboard?: Moodboard | null): DesignS
 
 // ── patches: iteration that touches only what was asked ───────────────
 
-export type PatchOp = 'tokens' | 'look' | 'content' | 'variant' | 'tone' | 'replace' | 'add' | 'remove' | 'move' | 'images' | 'none';
-export const PATCH_OPS: readonly PatchOp[] = ['tokens', 'look', 'content', 'variant', 'tone', 'replace', 'add', 'remove', 'move', 'images', 'none'];
+export type PatchOp = 'tokens' | 'look' | 'content' | 'variant' | 'tone' | 'shape' | 'replace' | 'add' | 'remove' | 'move' | 'images' | 'none';
+export const PATCH_OPS: readonly PatchOp[] = ['tokens', 'look', 'content', 'variant', 'tone', 'shape', 'replace', 'add', 'remove', 'move', 'images', 'none'];
 
 export interface Patch {
   op: PatchOp;
@@ -561,6 +660,8 @@ export interface Patch {
   after?: string | null;
   to?: number;
   images?: string[];
+  /** a "shape" patch: the settings to change on one section (SHAPE_FIELDS), the others kept */
+  shape?: Record<string, unknown>;
   /** one line: what the change is */
   summary: string;
 }
@@ -571,6 +672,7 @@ export function normalizePatch(v: unknown): Patch {
   return {
     op,
     sectionId: typeof r.sectionId === 'string' ? r.sectionId.slice(0, 48) : undefined,
+    shape: r.shape && typeof r.shape === 'object' ? o(r.shape) : undefined,
     tokens: r.tokens && typeof r.tokens === 'object' ? o(r.tokens) : undefined,
     look: r.look && typeof r.look === 'object' ? o(r.look) : undefined,
     tone: typeof r.tone === 'string' ? r.tone.slice(0, 12) : undefined,
@@ -653,6 +755,16 @@ export function applyPatch(spec: DesignSpec, patchIn: Patch, moodboard?: Moodboa
       const pad = (PADS as readonly string[]).includes(p.pad ?? '') ? (p.pad as Pad) : undefined;
       if (!tone && !pad) return { ok: false, error: 'No tone or spacing to change.' };
       const sec: Section = { ...target!, tone: tone ?? target!.tone, pad: pad ?? target!.pad, fixed: true };
+      return next(spec.sections.map((x, i) => (i === idx ? sec : x)), undefined, undefined, [sec.id]);
+    }
+    case 'shape': {
+      const miss = needTarget();
+      if (miss) return miss;
+      if (!SHAPE_FIELDS[target!.kind]) return { ok: false, error: `${kindDef(target!.kind)?.label ?? 'That section'} has no layout settings to change.` };
+      const asked = normalizeShape(target!.kind, p.shape);
+      if (!asked) return { ok: false, error: 'No layout setting to change.' };
+      // the settings asked for, the rest kept; what the designer set is theirs: the planner leaves it alone
+      const sec: Section = { ...target!, shape: normalizeShape(target!.kind, { ...(target!.shape ?? {}), ...asked }), fixed: true };
       return next(spec.sections.map((x, i) => (i === idx ? sec : x)), undefined, undefined, [sec.id]);
     }
     case 'images': {

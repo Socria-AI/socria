@@ -22,6 +22,8 @@
 
 import { lockedTouched } from './edit';
 import { sampleFor } from './fit';
+// habits some languages use deliberately: the same list the layout defaults read
+import { ON_PURPOSE } from './layout';
 import { primaryAction } from './study';
 import { intentOf, requiredComponents } from './intent';
 import { contrastRatio } from '../ux/audit';
@@ -153,8 +155,6 @@ export interface Signal {
 }
 
 const STOCK_ORDER = ['hero', 'features', 'pricing', 'faq', 'cta'];
-/** habits some languages use deliberately */
-const ON_PURPOSE: Record<string, readonly string[]> = { 'quiet-luxury': ['centred'], organic: ['rounded', 'centred'], craft: ['rounded'] };
 
 /** What makes this page look like every generated page, from its spec and (when measured) its rendering. */
 export function genericSignals(spec: DesignSpec, audit?: PageAudit | null): Signal[] {
