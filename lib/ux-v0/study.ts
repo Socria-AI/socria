@@ -19,10 +19,23 @@ import type { DesignBrief, MoodboardRef } from './types';
 /** The brief's own words for its main action, short, or an honest placeholder. */
 export function primaryAction(brief: Pick<DesignBrief, 'userGoals' | 'functionalRequirements'>, intent = intentOf(brief as any)): string {
   if (intent.requirements.some((r) => r.component === 'booking')) return `Book ${intent.subject ? `a ${intent.subject.split(' ').pop()}` : 'a time'}`;
+  if (intent.requirements.some((r) => r.id === 'req-donate')) return 'Give a donation';
   if (intent.kind === 'portfolio') return 'See the work';
   if (intent.kind === 'editorial') return 'Start reading';
   const goal = [...(brief.userGoals ?? []), ...(brief.functionalRequirements ?? [])].map((g) => g.replace(/[.;:].*$/, '').trim()).find((g) => g.length > 2 && g.length <= 28);
   return goal ? goal.charAt(0).toUpperCase() + goal.slice(1) : '[Primary action]';
+}
+
+/**
+ * A study's headline from the brief's objective: its first clause, without "a website for", cut at a word
+ * (never mid-word) — a sketch of the opening, for the generated copy to replace.
+ */
+export function studyHeadline(objective: string, name: string): string {
+  const first = String(objective ?? '').split(/[.;:—–]|,\s/)[0].replace(/\s+/g, ' ').trim();
+  let t = first.replace(/^(an?|the)\s+(website|site|web ?page|landing page|homepage)\s+(for|about)\s+/i, '');
+  if (t.length > 64) t = t.slice(0, 64).replace(/\s+\S*$/, '');
+  t = t.replace(/[\s,;:–—-]+$/, '');
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : name;
 }
 
 /** A short design in this direction, of the thing being made. */
@@ -50,7 +63,7 @@ export function studySpec(d: ArtDirection, brief: DesignBrief, name: string, ref
     const goals = brief.userGoals.slice(0, 3);
     const hero = {
       id: 'hero', kind: 'hero', variant: d.compose?.hero ?? (img.length ? 'split' : 'statement'), images: img, tone: 'base', pad: 'm',
-      content: { eyebrow: brief.personality.slice(0, 3).join(' · '), title: brief.objective.split(/[.;]/)[0].slice(0, 90) || name, subtitle: intent.task, primary: action },
+      content: { eyebrow: brief.personality.slice(0, 3).join(' · '), title: studyHeadline(brief.objective, name), subtitle: intent.task, primary: action },
     };
     // the part the direction's plan puts next to (or before) the opening: the work, the text, or the goals
     const second =

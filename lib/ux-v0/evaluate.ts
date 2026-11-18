@@ -22,6 +22,7 @@
 
 import { lockedTouched } from './edit';
 import { sampleFor } from './fit';
+import { primaryAction } from './study';
 import { intentOf, requiredComponents } from './intent';
 import { contrastRatio } from '../ux/audit';
 import { isDark } from './color';
@@ -117,7 +118,12 @@ export const CLICHES: readonly [RegExp, string][] = [
   [/\bimagine a world\b/i, 'imagine a world'],
   [/\btake (it|your \w+) to the next level\b/i, 'to the next level'],
   [/\bget started today\b/i, 'get started today'],
+  [/^\s*why (us|choose us)\??\s*$/i, 'why us'],
+  [/\bdiscover something new\b/i, 'discover something new'],
 ];
+
+/** An action label that names nothing: what a button says when nobody decided what it does. */
+export const GENERIC_ACTION = /^(begin|start|start now|get started|learn more|read more|click here|submit|go|explore|discover|discover more|find out more|see more|more|continue)$/i;
 
 export interface Cliche {
   section: string;
@@ -312,7 +318,8 @@ export function evaluateDesign(spec: DesignSpec, audits: { desktop?: PageAudit |
       const limit = vp === 'phone' ? 7 : 4;
       if (h1.lines > limit) add({ kind: 'headline', severity: 'medium', viewport: vp, section: h1.section, message: `The main headline breaks into ${h1.lines} lines on the ${vp}.`, ask: `Shorten the main headline (“${h1.text}”) to fewer than ${Math.max(5, Math.round(h1.text.split(' ').length * 0.6))} words, keeping its meaning.` });
       // 6 · a hierarchy you can see
-      if (vp === 'desktop' && h1.size / a.bodySize < 2.3)
+      // a screen's heading names the screen; a page's leads it: an app screen needs less of a step
+      if (vp === 'desktop' && h1.size / a.bodySize < (spec.pageType === 'app-screen' ? 1.6 : 2.3))
         add({ kind: 'hierarchy', severity: 'medium', viewport: vp, section: h1.section, message: `The main headline is only ${(h1.size / a.bodySize).toFixed(1)}× the body text; the page has little hierarchy.`, fix: { op: 'look', look: { ratio: Math.round(Math.min(1.7, look.ratio + 0.08) * 1000) / 1000 }, summary: 'Type scale stepped up for a clearer hierarchy' } });
     }
     // 7 · lines too long to read
@@ -337,6 +344,29 @@ export function evaluateDesign(spec: DesignSpec, audits: { desktop?: PageAudit |
   const ph = new Set<string>();
   JSON.stringify(spec.sections.map((x) => x.content)).replace(/\[[^\]\n]{2,40}\]/g, (m) => (ph.add(m), m));
   if (ph.size >= 6) add({ kind: 'placeholder', severity: 'low', viewport: 'page', section: '', message: `${ph.size} facts are still placeholders (${[...ph].slice(0, 3).join(', ')}…).` });
+
+  // 11b · an action that names nothing ("Begin", "Read more"): the brief's own action instead, or none
+  const action = ctx.brief ? primaryAction(ctx.brief) : '';
+  for (const sec of spec.sections) {
+    for (const key of ['primary', 'secondary', 'cta'] as const) {
+      const v = sec.content?.[key];
+      if (typeof v !== 'string' || !GENERIC_ACTION.test(v.trim())) continue;
+      const replace = key !== 'secondary' && action && !action.startsWith('[') && action.toLowerCase() !== v.trim().toLowerCase();
+      add({
+        kind: 'fidelity',
+        severity: 'medium',
+        viewport: 'page',
+        section: sec.id,
+        message: `“${v}” does not say what happens (${label(spec, sec.id)}).${replace ? ` The brief’s own action is “${action}”.` : ''}`,
+        fix: replace
+          ? ({ op: 'content', sectionId: sec.id, content: { [key]: action }, summary: `The action says “${action}”, from the brief, not “${v}”` } as Patch)
+          : key === 'secondary'
+            ? ({ op: 'content', sectionId: sec.id, content: { [key]: '' }, summary: `Took out the second action “${v}”, which named nothing` } as Patch)
+            : undefined,
+        ask: replace ? undefined : `Rewrite the action “${v}” so it names what happens.`,
+      });
+    }
+  }
 
   // 12 · fidelity: the approved direction, the brief's decisions and rules, the pictures it may place; and its motion
   functionChecks(spec, audits, ctx, add);

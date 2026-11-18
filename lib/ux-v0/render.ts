@@ -872,7 +872,7 @@ p{max-width:68ch}
 .bk-done-title{font-family:var(--display);font-weight:var(--iw);font-size:var(--fs-h3);line-height:1.15}.bk-done-summary{font-weight:600}.bk-change{justify-self:start;margin-top:6px}
 .bk-done{transition:opacity .32s cubic-bezier(.2,.7,.2,1),transform .32s cubic-bezier(.2,.7,.2,1)}.bk-done.is-arriving{opacity:0;transform:translateY(8px)}
 .fm-done{margin:14px 0 0;font-weight:600}.field.is-invalid :is(input,textarea,select){border-color:var(--accent-ink)}.fm-error{margin:6px 0 0;font-size:.85rem;color:var(--accent-ink);font-weight:600}
-th .th-sort{all:unset;cursor:pointer;display:inline-flex;gap:6px;align-items:center}th .th-sort:focus-visible{outline:2px solid var(--accent-ink);outline-offset:2px}
+th .th-sort{all:unset;cursor:pointer;display:inline-flex;gap:6px;align-items:center;min-height:36px}th .th-sort:focus-visible{outline:2px solid var(--accent-ink);outline-offset:2px}@media (max-width:720px),(pointer:coarse){th .th-sort{min-width:44px;min-height:44px}}
 @media (prefers-reduced-motion:reduce){.bk-day,.bk-slot,.bk-done{transition:none}}
 /* calendar: the days as a grid, the times beside */
 .bk-calendar .bk-day-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,124px),1fr));overflow:visible}.bk-day-label{overflow-wrap:anywhere}

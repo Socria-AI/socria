@@ -48,7 +48,8 @@ export function sampleFor(component: string, intent: DesignIntent, brief: Brief)
     case 'stat-cards':
       return { items: [1, 2, 3].map((i) => ({ label: `[Measure ${i}]`, value: '[Value]', delta: '', trend: 'flat' })) };
     case 'table':
-      return { title: '[Items]', columns: ['[Name]', '[Owner]', '[Status]'], rows: [1, 2, 3, 4].map((i) => ({ cells: [`[Item ${i}]`, '[Owner]'], status: '[Status]' })) };
+      // the status column is the renderer's own ("Status", with its marker): named once
+      return { title: '[Items]', columns: ['[Name]', '[Owner]', 'Status'], rows: [1, 2, 3, 4].map((i) => ({ cells: [`[Item ${i}]`, '[Owner]'], status: '[Status]' })) };
     case 'chart':
       return { title: '[What is measured]', labels: ['[1]', '[2]', '[3]', '[4]', '[5]'], series: [{ name: 'Sample', values: [3, 5, 4, 7, 6] }], note: 'Sample data.' };
     default:
@@ -57,8 +58,11 @@ export function sampleFor(component: string, intent: DesignIntent, brief: Brief)
 }
 
 const CHROME = new Set(['nav', 'app-nav', 'app-header']);
-/** Task-first screens with one job, where marketing sections are filler. */
-const FOCUSED = new Set(['booking', 'checkout', 'form', 'flow']);
+/**
+ * Task-first screens, where a marketing section is filler: one job (a booking, a checkout, a form, a flow),
+ * or the data itself (a dashboard). A "why us" grid of claims has no place on any of them.
+ */
+const FOCUSED = new Set(['booking', 'checkout', 'form', 'flow', 'dashboard', 'data']);
 
 /** Where a required component goes: first after the chrome on a screen; after the opening on a site. */
 function placeOf(sections: readonly Section[], screen: boolean): number {
@@ -101,6 +105,14 @@ export function fitToIntent(spec: DesignSpec, intent: DesignIntent, opts: { brie
   if (FOCUSED.has(intent.kind) && sections.some((s) => s.kind === 'features')) {
     sections = sections.filter((s) => s.kind !== 'features' || s.fixed);
     changes.push(`Left out the feature grid: ${intent.kind === 'booking' ? 'a booking screen is the booking' : 'this screen is the task'}, not a pitch.`);
+  }
+  // a dashboard, a data view or an app screen says what it is: its own header, when it has none
+  if (spec.pageType === 'app-screen' && ['dashboard', 'data', 'app'].includes(intent.kind) && !sections.some((s) => s.kind === 'app-header')) {
+    const head = normalizeSection({ id: 'header', kind: 'app-header', content: { title: spec.title, subtitle: intent.task, actions: [] } }, spec.pageType, null, taken);
+    if (head) {
+      sections.splice(sections.filter((s) => s.kind === 'app-nav').length ? sections.findIndex((s) => s.kind === 'app-nav') + 1 : 0, 0, head);
+      changes.push('Added the screen’s header: its name and what it is for.');
+    }
   }
   // on a task-first screen the task leads: its components come straight after the chrome, in the
   // direction's order of importance (figures first, the table first, the trend first…)
