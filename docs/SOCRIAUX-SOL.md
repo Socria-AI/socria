@@ -42,6 +42,8 @@ The integration goes through the provider layer the whole app already uses. A So
 - **The app:** the router's ladder answers, still on the Responses API: GPT-5.6 Sol, then GPT-6.1 Terra, then GPT-4o (sent without a reasoning setting).
 - **The evaluation:** has no ladder unless `--fallback` is given, so a result reported as Sol is Sol.
 
+**A structured answer that runs on.** Now and then, a strict-schema answer never closes: it writes whitespace until it hits its cap, with little reasoning. `askJson` then asks once more, on the same model, in plain JSON mode, and both calls are billed.
+
 **Not applicable here.** SocriaUX's calls are one buffered JSON answer each, with no tools. The wrapper still handles a streamed Responses call (its usage is read from `response.completed`).
 
 **Images.** Sol is not used to make images, and none are generated. The moodboard's pictures still come from the licensed libraries (Openverse and the others) and the designer's own uploads, as before.
@@ -104,4 +106,45 @@ This environment cannot reach `api.openai.com`: its network policy refuses the h
 - **`test/ux-v0-route.test.mjs` (87 passed):** all seven Starting Fresh steps through the real routes on Sol. Each is one Responses call at high effort with the right format, priced at Sol's rates and recorded. Also: medium on request, the ladder when Sol is refused, and Luna again when unset.
 - **`sol-eval.mjs --dry-run --baseline`:** 126 calls across six projects and three setups, all parsed, with 18 pages drawn and measured. The plumbing works. The numbers are the fake's.
 
-The live creative-quality results belong here once the test has been run against the real API.
+## Live results (18 November 2026)
+
+**What was run.**
+- Six projects, three setups, seven steps each.
+- 124 live calls against the real OpenAI API. Every call was served by the model it was asked of: no fallback.
+- **Cost:** US$1.09 for the full run. The smoke run, the experiments and the two crashed partial runs cost about US$0.70 more.
+
+| | Sol, high | Sol, medium | GPT-6 Luna (today) |
+|---|---|---|---|
+| Calls parsed | 41/41 | 40/41 | 42/42 |
+| Cut at the cap (runaway) | 0 in this run, 3 in earlier runs | 1 (critique) | 0 |
+| Median seconds: questions / brief / art direction / generation / critique | 27 / 45 / 60 / 70 / 40 | 12 / 27 / 32 / 33 / 18 | 3 / 7 / 8 / 8 / 4 |
+| Model time per project | about 4 minutes | about 2.5 minutes | about 35 seconds |
+| Cost per project (seven calls) | US$0.100 | US$0.079 | US$0.002 |
+| Pages generated | 6/6 | 6/6 | 6/6 |
+| Quality / distinctiveness / fidelity | 95.0 / 95.3 / 100 | 97.7 / 96.5 / 100 | 98.8 / 91.5 / 100 |
+| Stock phrases | 0 | 0 | 0 |
+| `[placeholders]` left on the pages | 62 | 45 | 30 |
+| Questions per project | 0.8 | 1.0 | 1.3 |
+| Moodboard notes reaching the brief (of 3) | 3 | 3 | 3 |
+| Generic direction names | 0/18 | 0/18 | 0/18 |
+| Refinements touching only their section | 6/6 | 6/6 | 6/6 |
+
+**What the numbers and the pages say:**
+- **Reliability.** Every step works on Sol through the Responses API. Strict structured outputs are not reliable on their own: in about 60 strict-schema calls across all the runs, 4 ran away to their cap (the moodboard direction twice before its schema was narrowed, the critique twice). In about 70 plain-JSON calls, none did. `askJson` now recovers a cut structured answer by asking again in JSON mode. The research and portfolio re-runs loaded the code from before that change, so the medium critique above is the unrecovered failure.
+- **Speed is the cost of Sol, more than money.** At high effort, the art direction takes about a minute and a generation about 70 seconds. The whole flow is roughly seven times Luna's model time at high, four times at medium. At about US$0.10 per project, Sol costs roughly 50 times Luna.
+- **Differences in the work are modest and mixed:**
+  - **Distinctiveness:** Sol scored higher (95–96 against 91.5).
+  - **Generic defaults:** Sol never fell back to the Fraunces-with-Inter pairing, a generic default; Luna did twice.
+  - **Wording:** Sol's direction names and concepts were more specific ("Room to Reason", "Before the Answer").
+  - **Quality score:** Luna's was slightly higher.
+  - **Placeholders:** Sol left about twice as many. It is more careful not to invent facts, but its pages and app screens read as unfinished: the finance interface is mostly `[Month YYYY]` and `[Owner name]`.
+  - **Interpretation:** Sol read the Socria One announcement as an in-product screen; Luna made a page.
+  - **Looking at the pages:** the 18 pages side by side show no clear visual winner. The direction engine and renderer set most of what is seen, whichever model writes the words. Sol's weakest page was the portfolio at high effort (a name-only hero, then placeholders).
+- **High against medium.** Medium was as good on every measure here, at about 60% of high's time and 80% of its cost.
+
+**Limits of this test.**
+- Every project had the same moodboard (warm café light), and the designer's intent was the project's name and objective only. Most pages are therefore warm and brown, and the dance company's own "dark stage" direction never reached the model.
+- Each case ran once, so differences of a few points are within noise.
+- Taste is not scored.
+
+The full results are in `sol-eval.json` and screenshots written by the harness. Run it again with `--projects` and `--efforts` to look closer.
