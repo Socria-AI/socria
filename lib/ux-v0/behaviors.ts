@@ -114,9 +114,10 @@ export const BEHAVIOR_SOURCE = String.raw`(function () {
   // ── forms ──
   var EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   var PHONE = /^[+()\d][\d\s()+-]{5,}$/;
+  var forms = [];
   function formBehaviour(f) {
-    f.addEventListener('submit', function (e) {
-      e.preventDefault();
+    // each field said beside itself; returns the first one wrong, or null when all is well
+    function check() {
       var bad = null;
       $$(f, '.field').forEach(function (field) {
         var input = $(field, 'input, textarea, select');
@@ -136,6 +137,12 @@ export const BEHAVIOR_SOURCE = String.raw`(function () {
           if (!bad) bad = input;
         } else if (note) { note.remove(); input.removeAttribute('aria-describedby'); }
       });
+      return bad;
+    }
+    forms.push({ root: f, check: check });
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var bad = check();
       if (bad) { bad.focus(); return; }
       var done = $(f, '[data-ux-done]');
       var submit = $(f, '[type=submit]');
@@ -220,8 +227,38 @@ export const BEHAVIOR_SOURCE = String.raw`(function () {
         if (before) before.checked = true;
         b.say();
       }
-      return { index: i, slots: open.length, problems: problems };
-    });
+      return { index: i, kind: 'booking', slots: open.length, problems: problems };
+    }).concat(forms.map(testForm));
   }
-  window.__uxBehaviors = { selfTest: selfTest, bookings: bookings.length };
+  // a form: empty, each required field is said beside it; complete, it is accepted; then back as it was
+  function testForm(fm, i) {
+    var problems = [];
+    var inputs = $$(fm.root, 'input, textarea, select').filter(function (x) { return x.type !== 'hidden' && x.type !== 'submit'; });
+    var saved = inputs.map(function (x) { return x.type === 'checkbox' || x.type === 'radio' ? x.checked : x.value; });
+    var required = inputs.filter(function (x) { return x.required; });
+    inputs.forEach(function (x) {
+      if (x.type === 'checkbox' || x.type === 'radio') x.checked = false;
+      else if (x.tagName === 'SELECT') x.selectedIndex = -1;
+      else x.value = '';
+    });
+    var empty = fm.check();
+    if (required.length && !empty) problems.push('an empty form is accepted');
+    if (required.length && !$(fm.root, '.fm-error')) problems.push('no message beside a missing field');
+    inputs.forEach(function (x) {
+      if (x.type === 'checkbox' || x.type === 'radio') x.checked = true;
+      else if (x.tagName === 'SELECT') { var o = $$(x, 'option').findIndex(function (op) { return !!op.value; }); x.selectedIndex = o < 0 ? 0 : o; }
+      else x.value = x.type === 'email' ? 'name@example.com' : x.type === 'tel' ? '+44 20 7946 0000' : x.type === 'number' ? '1' : x.type === 'date' ? '2030-01-01' : 'Sample';
+    });
+    if (fm.check()) problems.push('a complete form is refused');
+    inputs.forEach(function (x, j) {
+      if (x.type === 'checkbox' || x.type === 'radio') x.checked = saved[j];
+      else x.value = saved[j];
+      x.removeAttribute('aria-invalid');
+      x.removeAttribute('aria-describedby');
+    });
+    $$(fm.root, '.fm-error').forEach(function (n) { n.parentNode.removeChild(n); });
+    $$(fm.root, '.field.is-invalid').forEach(function (n) { n.classList.remove('is-invalid'); });
+    return { index: i, kind: 'form', slots: inputs.length, problems: problems };
+  }
+  window.__uxBehaviors = { selfTest: selfTest, bookings: bookings.length, forms: forms.length };
 })();`;

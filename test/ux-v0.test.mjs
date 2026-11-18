@@ -1000,6 +1000,10 @@ console.log('\n=== what is being made: intent, the booking, the behaviour runtim
   f.dispatchEvent(new fdom.window.Event('submit', { bubbles: true, cancelable: true }));
   const errs = [...f.querySelectorAll('.fm-error')].map((e) => e.textContent);
   ok('a form says each problem beside its field, and sends nothing', errs.includes('This is needed.') && errs.some((e) => /email/i.test(e)) && f.querySelector('[aria-invalid="true"]') !== null && f.querySelector('[data-ux-done]').hidden, J(errs));
+  const typed = f.querySelector('input[type=email]').value;
+  const ft = fdom.window.__uxBehaviors.selfTest();
+  ok('the audit\'s self-test tries the form too: empty is refused with messages, complete is accepted', ft.length === 1 && ft[0].kind === 'form' && !ft[0].problems.length && ft[0].slots >= 3, J(ft));
+  ok('…and leaves it as the person left it: their words, no messages', f.querySelector('input[type=email]').value === typed && !f.querySelector('.fm-error') && !f.querySelector('.is-invalid'));
 
   // directions differ in composition, and the studies show the thing being made
   const dirs = V.proposeDirections({ brief });

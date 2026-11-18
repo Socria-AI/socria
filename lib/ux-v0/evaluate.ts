@@ -49,8 +49,8 @@ export interface PageAudit {
   overflow: { section: string; path: string; by: number; tag: string }[];
   measure: { section: string; path: string; cpl: number }[];
   style: { gradients: number; shadows: number; roundedBoxes: number; trackedCaps: number; centred: number; blocks: number; emoji: number; icons: number; families: Record<string, number> };
-  /** each booking, tried in place by the behaviour runtime: what did not work */
-  behaviors: { index: number; slots: number; problems: string[] }[];
+  /** each booking and form, tried in place by the behaviour runtime: what did not work */
+  behaviors: { index: number; kind: 'booking' | 'form'; slots: number; problems: string[] }[];
 }
 
 const o = (v: unknown): Record<string, any> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, any>) : {});
@@ -82,7 +82,7 @@ export function normalizeAudit(v: unknown): PageAudit | null {
       gradients: n(st.gradients, 0, 1e5), shadows: n(st.shadows, 0, 1e5), roundedBoxes: n(st.roundedBoxes, 0, 1e5), trackedCaps: n(st.trackedCaps, 0, 1e5),
       centred: n(st.centred, 0, 1e5), blocks: n(st.blocks, 0, 1e5), emoji: n(st.emoji, 0, 1e5), icons: n(st.icons, 0, 1e5), families: fam,
     },
-    behaviors: list(r.behaviors, 10, (x) => ({ index: n(x.index, 0, 100), slots: n(x.slots, 0, 1000), problems: (Array.isArray(x.problems) ? x.problems : []).map((p: unknown) => s(p, 120)).filter(Boolean).slice(0, 6) })),
+    behaviors: list(r.behaviors, 10, (x) => ({ index: n(x.index, 0, 100), kind: (x.kind === 'form' ? 'form' : 'booking') as 'booking' | 'form', slots: n(x.slots, 0, 1000), problems: (Array.isArray(x.problems) ? x.problems : []).map((p: unknown) => s(p, 120)).filter(Boolean).slice(0, 6) })),
   };
 }
 
@@ -440,8 +440,8 @@ function functionChecks(spec: DesignSpec, audits: { desktop?: PageAudit | null; 
   }
   for (const b of audits.desktop?.behaviors ?? []) {
     if (!b.problems.length) continue;
-    const sec = spec.sections.filter((x) => x.kind === 'booking')[b.index];
-    add({ kind: 'function', severity: 'high', viewport: 'page', section: sec?.id ?? '', message: `The booking does not work as it should: ${b.problems.join('; ')}.`, manual: true });
+    const sec = spec.sections.filter((x) => x.kind === b.kind)[b.index];
+    add({ kind: 'function', severity: 'high', viewport: 'page', section: sec?.id ?? '', message: `The ${b.kind} does not work as it should: ${b.problems.join('; ')}.`, manual: true });
   }
 }
 
