@@ -1239,3 +1239,106 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* ── this section: changed directly, or locked ───────────────────── */
+.v0-edit {
+  gap: 12px;
+}
+.v0-edit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.v0-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 12px 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sb-well);
+  color: var(--sb-ink-70);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--sb-fast) var(--sb-ease), color var(--sb-fast) var(--sb-ease);
+}
+.v0-lock svg {
+  flex: 0 0 auto;
+}
+.v0-lock:hover {
+  background: var(--sb-well-hover);
+  color: var(--sb-ink);
+}
+.v0-lock.is-on {
+  background: var(--sb-ink);
+  color: var(--sb-paper);
+}
+.v0-lock:focus-visible {
+  outline: 2px solid var(--sb-moss);
+  outline-offset: 2px;
+}
+.v0-edit-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.v0-edit-l {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sb-ink-60);
+}
+.v0-edit-text {
+  font-size: 14px;
+  line-height: 1.45;
+  resize: vertical;
+}
+.v0-edit-text:disabled {
+  background: var(--sb-well);
+  color: var(--sb-ink-60);
+}
+.v0-edit-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.v0-edit-row .v0-select {
+  align-self: flex-start;
+  max-width: 100%;
+}
+.v0-edit-seg {
+  align-self: flex-start;
+  flex-wrap: wrap;
+}
+.v0-edit-seg .sb-seg-item {
+  min-height: 30px;
+  padding: 0 11px;
+}
+.v0-tone-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(32, 32, 27, 0.18);
+}
+.v0-edit-acts {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.v0-edit-remove {
+  margin-left: auto;
+  color: var(--sb-burgundy);
+}
+.v0-edit.is-locked .v0-edit-row:not(.v0-edit-acts) {
+  opacity: 0.55;
+}
+.v0-edit :is(button, select, textarea):disabled {
+  cursor: not-allowed;
+}

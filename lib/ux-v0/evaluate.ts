@@ -20,6 +20,7 @@
 //                      stock phrases. A heuristic, not taste; the reasons are
 //                      listed so a designer can disagree with them.
 
+import { lockedTouched } from './edit';
 import { sampleFor } from './fit';
 import { intentOf, requiredComponents } from './intent';
 import { contrastRatio } from '../ux/audit';
@@ -253,6 +254,12 @@ export function evaluateDesign(spec: DesignSpec, audits: { desktop?: PageAudit |
         findings.push({ ...f, id, fix: undefined, blocked: `It would change ${hit.join(' and ')}, which you locked.` });
         return;
       }
+    }
+    // a section the designer locked is never repaired automatically: the finding is said, the fix left to them
+    const inLocked = !!f.section && !!spec.sections.find((x) => x.id === f.section)?.locked;
+    if ((f.fix && lockedTouched(spec, f.fix).length) || (inLocked && !f.fix && !f.manual)) {
+      findings.push({ ...f, id, fix: undefined, blocked: 'That section is locked, so SocriaUX leaves it to you.' });
+      return;
     }
     findings.push({ ...f, id });
   };

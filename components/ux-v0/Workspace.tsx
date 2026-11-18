@@ -69,6 +69,8 @@ import { addUpload, sampleSwatches, useUploads, withUploads } from './uploads';
 import { Preview } from './Preview';
 import { checkFile, fetchOriginal, imageSize, keepOriginal } from './files';
 import { Inspect } from './Inspect';
+import { SectionEditor } from './SectionEditor';
+import { holdLocked, setLocked } from '@/lib/ux-v0/edit';
 import { elementSelection } from '@/lib/ux-v0/selection';
 import { Moodboard } from './Moodboard';
 import { Stage, type SelectMode, type StageHandle } from './Stage';
@@ -592,8 +594,10 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const r = await post<{ spec: DesignSpec; artDirection?: ArtDirection; placeholders: string[]; usage: Usage; notice?: string }>('/api/ux-v0/generate', { projectId: p.id, brief: p.brief.doc, moodboard: p.moodboard, direction: dir, artDirection: approved, version });
     setBusy(null);
     if (!r.ok) return failed(r);
-    const fresh = normalizeSpec(r.data.spec, current.current.moodboard);
-    if (!fresh) return say('The design that came back did not hold together. Nothing changed; try again.', 'error');
+    const drawn = normalizeSpec(r.data.spec, current.current.moodboard);
+    if (!drawn) return say('The design that came back did not hold together. Nothing changed; try again.', 'error');
+    // what the designer locked comes through a new generation exactly as it was
+    const fresh = holdLocked(drawn, currentSpec(current.current)).spec;
     // before it is shown: drawn at desktop and phone widths, measured, and fixed where no words are needed
     setBusy('Checking it at desktop and phone widths…');
     setChecks({ running: true, ev: null, fixed: [], version: fresh.version });
@@ -729,6 +733,20 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       return i === p.specIndex ? p : { ...p, specIndex: i };
     });
     setSelection(null);
+  };
+
+  /** Lock or unlock one section: a new version (Undo takes it back), kept through generations and repairs. */
+  const lockSection = (id: string, locked: boolean) => {
+    const p = current.current;
+    const s = currentSpec(p);
+    const next = s ? setLocked(s, id, locked) : null;
+    if (!s || !next) return;
+    const v = { ...next, version: s.version + 1 };
+    update((p2) => {
+      const specs = [...p2.specs.slice(0, p2.specIndex + 1), v].slice(-30);
+      return { ...p2, specs, specIndex: specs.length - 1 };
+    });
+    say(locked ? 'Locked. It stays exactly as it is through new generations and repairs, and SocriaUX asks before changing it.' : 'Unlocked. It can be changed again.', 'info', { acts: [{ label: 'Undo', run: () => stepVersion(-1) }] });
   };
 
   // ── critique: cards ─────────────────────────────────────────────────
@@ -1386,6 +1404,9 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                 onRetry={retry}
                 empty={view === 'design' ? 'Select part of the design and say what you see, or ask why. Each comment becomes a card attached to what it is about.' : 'Cards appear here once there is a design to comment on.'}
               />
+            )}
+            {rail === 'selection' && spec && !imported && selection?.element?.ux?.section && spec.sections.some((x) => x.id === selection.element!.ux!.section) && (
+              <SectionEditor spec={spec} sectionId={selection.element.ux.section} path={selection.element.ux.path} onPatch={(pt, label) => applyLocal(pt, label)} onLock={lockSection} />
             )}
             {rail === 'selection' && (
               <Inspect

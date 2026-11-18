@@ -419,6 +419,12 @@ console.log('\n=== routing: the economy model for questions and the brief, the p
   const op = await post('direct', { projectId: P, brief, notes: '', avoid: '' }, 'user_v0_op', [{ directions: [] }]);
   ok('a premium call that could cost more than one operation may: the economy model, and why', op.status === 200 && onLuna(op) && /more than one change may \(US\$0\.01\)/.test(op.json.notice ?? ''), J(op.json?.notice));
   delete process.env.SOCRIAUX_OPERATION_USD;
+  // a section the designer locked on the canvas: a model's change to it is asked about first
+  const lockedSpec = { ...g.json.spec, sections: g.json.spec.sections.map((x) => (x.id === 'hero' ? { ...x, locked: true } : x)) };
+  const ask = await post('refine', { projectId: P, spec: lockedSpec, brief, moodboard: {}, selection: sel, comment: 'Make the headline say mornings' }, 'user_v0_lock', [{ understood: 'x', patch: { op: 'content', sectionId: 'hero', content: { title: 'Mornings' }, summary: 's' } }]);
+  ok('a change to a locked section comes back as a question, with the patch, not applied', ask.status === 200 && /which you locked\. Make the change anyway\?/.test(ask.json.challenge) && J(ask.json.lockedSections) === J(['hero']) && ask.json.applies === true, J({ c: ask.json?.challenge, l: ask.json?.lockedSections }));
+  const forced = await post('refine', { projectId: P, spec: lockedSpec, brief, moodboard: {}, selection: sel, comment: 'Make the headline say mornings', force: true }, 'user_v0_lock', [{ understood: 'x', patch: { op: 'content', sectionId: 'hero', content: { title: 'Mornings' }, summary: 's' } }]);
+  ok('…and, when the designer says to go ahead, it is not asked again', forced.status === 200 && !/locked/.test(forced.json.challenge ?? ''));
   process.env.SOCRIAUX_ROUTING = 'single';
 }
 

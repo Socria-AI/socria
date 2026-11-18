@@ -24,7 +24,8 @@ import { parseRefine, refineSystem, refineUser } from '@/lib/ux-v0/design';
 import { LOCK_GROUPS, LOCK_LABEL, lockedChanges, type LockGroup } from '@/lib/ux-v0/direction';
 import { MAX_TOKENS, economyRoute, refineTier } from '@/lib/ux-v0/model';
 import { bad, failed, noModel, projectIdOf, readBody, signInFirst } from '@/lib/ux-v0/route-kit';
-import { applyPatch, normalizeSpec } from '@/lib/ux-v0/spec';
+import { lockedTouched } from '@/lib/ux-v0/edit';
+import { applyPatch, kindDef, normalizeSpec } from '@/lib/ux-v0/spec';
 import { normalizeBrief, normalizeMoodboard, normalizeSelection } from '@/lib/ux-v0/types';
 import { gate, noticeOf, recordUsage } from '@/lib/ux-v0/usage-server';
 
@@ -71,6 +72,13 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       const what = locked.map((g) => LOCK_LABEL[g].toLowerCase()).join(' and ');
       r.challenge = `This changes the ${what}, which you locked in the art direction. ${r.challenge ? `${r.challenge} ` : ''}Make the change anyway?`.trim();
     }
+    // …and neither is a section the designer locked on the canvas
+    const lockedSections = lockedTouched(spec, r.patch);
+    if (lockedSections.length && !force) {
+      const sec = spec.sections.find((s) => s.id === lockedSections[0]);
+      const what = (sec && kindDef(sec.kind)?.label.toLowerCase()) || 'section';
+      r.challenge = `This changes the ${what}, which you locked. ${r.challenge && !locked.length ? `${r.challenge} ` : ''}Make the change anyway?`.trim();
+    }
     await recordUsage(userId, projectId, 'refine', asked.usage, Date.now(), { api: asked.api, downgraded: !!g.downgraded || !!asked.fellBack });
     const trial = r.patch.op === 'none' ? null : applyPatch(spec, r.patch, moodboard);
     return NextResponse.json({
@@ -80,6 +88,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       regenerate: r.regenerate,
       patch: r.patch,
       locked,
+      lockedSections,
       applies: !!trial?.ok,
       error: trial && !trial.ok ? trial.error : '',
       usage: asked.usage,

@@ -141,6 +141,11 @@ export interface Section {
   pad?: Pad;
   /** chosen by the person (a variant or a tone they set): the layout planner leaves it alone */
   fixed?: boolean;
+  /**
+   * LOCKED by the designer: kept exactly as it is. A model's change to it is asked about first, a new
+   * generation carries it over unchanged, and the automatic repairs leave it alone (lib/ux-v0/edit.ts).
+   */
+  locked?: boolean;
 }
 
 export interface DesignSpec {
@@ -486,6 +491,7 @@ export function normalizeSection(v: unknown, pageType: PageType, imageIds: Reado
   if ((TONES as readonly string[]).includes(r.tone)) sec.tone = r.tone as Tone;
   if ((PADS as readonly string[]).includes(r.pad)) sec.pad = r.pad as Pad;
   if (r.fixed === true) sec.fixed = true;
+  if (r.locked === true) (sec.locked = true), (sec.fixed = true);
   return sec;
 }
 
@@ -596,7 +602,7 @@ export function applyPatch(spec: DesignSpec, patchIn: Patch, moodboard?: Moodboa
     touched,
   });
   // a section the person changed keeps what they chose: the layout planner leaves it alone
-  const held = (sec: Section, from: Section): Section => ({ ...sec, tone: sec.tone ?? from.tone, pad: sec.pad ?? from.pad, fixed: true });
+  const held = (sec: Section, from: Section): Section => ({ ...sec, tone: sec.tone ?? from.tone, pad: sec.pad ?? from.pad, fixed: true, ...(from.locked ? { locked: true } : {}) });
   const needTarget = (): PatchResult | null => (target ? null : { ok: false, error: 'That section is not in the design.' });
 
   switch (p.op) {

@@ -1058,5 +1058,50 @@ console.log('\n=== routing: the model for each stage; budgets ===');
   ok('the automatic repair loop is code, bounded', V.MAX_REVISION_ROUNDS === 2);
 }
 
+console.log('\n=== direct edits and locked sections ===');
+{
+  const spec = V.normalizeSpec({ title: 'Lotus', pageType: 'website', sections: [
+    { id: 'nav', kind: 'nav', content: { brand: 'Lotus', links: ['Classes'] } },
+    { id: 'hero', kind: 'hero', variant: 'statement', tone: 'accent', content: { title: 'Find your flow', subtitle: 'Yoga for everyone', primary: 'Book' } },
+    { id: 'why', kind: 'features', content: { title: 'Why us', items: [{ title: 'Calm', text: 'Quiet rooms' }, { title: 'Warm', text: 'Heated floors' }] } },
+    { id: 'foot', kind: 'footer', content: { brand: 'Lotus' } },
+  ] }, board);
+  const hero = spec.sections.find((x) => x.id === 'hero');
+  const why = spec.sections.find((x) => x.id === 'why');
+  ok('the text a selected element was drawn from is found, with its limit', V.textAt(hero, 'title')?.value === 'Find your flow' && V.textAt(hero, 'title').max > 0 && V.textAt(why, 'items.1.text')?.value === 'Heated floors');
+  ok('…and only text: a list, an index out of range or a made-up path is not', V.textAt(why, 'items') === null && V.textAt(why, 'items.9.title') === null && V.textAt(hero, 'nope') === null);
+  const tp = V.textPatch(why, 'items.1.text', '  Floors   warmed  from below ');
+  const after = V.applyPatch(spec, tp, board);
+  ok('new words land in that one field, tidied, and nothing else changes', after.ok && after.spec.sections.find((x) => x.id === 'why').content.items[1].text === 'Floors warmed from below' && after.spec.sections.find((x) => x.id === 'why').content.items[0].text === 'Quiet rooms' && J(after.spec.sections.find((x) => x.id === 'hero')) === J(hero));
+  ok('unchanged words are no change; words past the limit are cut to it', V.textPatch(hero, 'title', 'Find your flow') === null && V.textPatch(hero, 'title', 'x'.repeat(999)).content.title.length === V.textAt(hero, 'title').max);
+  ok('a field is named for a person', V.fieldLabel('items.1.text') === 'items 2 text');
+  const locked = V.setLocked(spec, 'hero', true);
+  ok('locking marks the section locked and fixed; unlocking clears it', locked.sections.find((x) => x.id === 'hero').locked === true && locked.sections.find((x) => x.id === 'hero').fixed === true && !('locked' in V.setLocked(locked, 'hero', false).sections.find((x) => x.id === 'hero')) && V.setLocked(spec, 'nope', true) === null);
+  ok('a lock survives being stored and read back', V.normalizeSpec(JSON.parse(J(locked)), board).sections.find((x) => x.id === 'hero').locked === true);
+  ok('a change to a locked section is caught; a page-wide or another section\'s change is not', J(V.lockedTouched(locked, { op: 'content', sectionId: 'hero', content: { title: 'x' }, summary: '' })) === J(['hero']) && !V.lockedTouched(locked, { op: 'content', sectionId: 'why', content: {}, summary: '' }).length && !V.lockedTouched(locked, { op: 'tokens', tokens: {}, summary: '' }).length);
+  ok('a model cannot write a lock: it is not a patch it knows', !V.PATCH_OPS.includes('lock') && V.normalizePatch({ op: 'lock', sectionId: 'hero' }).op === 'none');
+  const replaced = V.applyPatch(locked, { op: 'replace', sectionId: 'hero', section: { kind: 'hero', content: { title: 'New' } }, summary: '' }, board);
+  ok('a change the designer agreed to keeps the section locked', replaced.ok && replaced.spec.sections.find((x) => x.id === 'hero').locked === true);
+  // a new generation carries the locked section over unchanged
+  const fresh = V.normalizeSpec({ title: 'Lotus', pageType: 'website', sections: [
+    { id: 'nav', kind: 'nav', content: { brand: 'Lotus', links: ['Book'] } },
+    { id: 'opening', kind: 'hero', variant: 'split', content: { title: 'Something else entirely', primary: 'Go' } },
+    { id: 'foot', kind: 'footer', content: { brand: 'Lotus' } },
+  ] }, board);
+  const held = V.holdLocked(fresh, locked);
+  const h = held.spec.sections.find((x) => x.kind === 'hero');
+  ok('regenerated: the locked hero is exactly as it was, in the new hero\'s place, and said', J(h) === J(locked.sections.find((x) => x.id === 'hero')) && held.spec.sections.filter((x) => x.kind === 'hero').length === 1 && held.spec.sections[1].kind === 'hero' && held.kept.length === 1 && held.spec.notes.some((n) => /locked hero/.test(n)));
+  const noHero = V.normalizeSpec({ title: 'Lotus', pageType: 'website', sections: [{ id: 'nav', kind: 'nav', content: { brand: 'Lotus', links: [] } }, { id: 'foot', kind: 'footer', content: { brand: 'Lotus' } }] }, board);
+  ok('…and put back where it stood when the new design has none', V.holdLocked(noHero, locked).spec.sections[1].id === 'hero');
+  ok('nothing locked: the new design as it came', V.holdLocked(fresh, spec).spec === fresh);
+  // the automatic repairs leave a locked section alone
+  const audit = (o = {}) => V.normalizeAudit({ width: 390, viewport: 844, height: 4000, overflowX: 0, bodySize: 17, sections: [], headings: [], contrast: [], ...o });
+  const lowIn = (s) => V.evaluateDesign(s, { phone: audit({ contrast: [{ section: 'hero', path: 'title', ratio: 2.1, need: 4.5, size: 16, text: 'x' }] }) });
+  const open = lowIn(spec).findings.find((f) => f.section === 'hero' && f.fix);
+  const kept = lowIn(locked).findings.find((f) => f.section === 'hero');
+  if (open) ok('a finding in a locked section is said, but its fix is left to the designer', kept && !kept.fix && /locked/.test(kept.blocked ?? ''), J(kept));
+  else ok('(the contrast finding carries a fix for an unlocked section)', false, J(lowIn(spec).findings));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
