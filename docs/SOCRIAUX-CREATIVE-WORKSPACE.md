@@ -135,13 +135,26 @@ The final run's results are in section 7.
 
 ## 7. Verification
 
-See the final report for this change for the numbers of the last run. What was run:
+Results of the final run, 18 November 2026:
 
-- **Typecheck**: `npx tsc --noEmit -p .`.
-- **Unit tests**: `node test/ux-v0.test.mjs`, now with sections for motion, the moodboard, Direction, the Living Brief, knowledge and refinement, and the dogfooding fixes. Also the full repo suite (`npm test`), including the route tests and the house consistency test.
-- **Browser**: `sections.mjs` (every section kind and variant, every language and ground), `workflow-a-create.mjs`, `workflow-b-critique.mjs`, `checklist.mjs` and `acceptance.mjs` (which runs axe on the workspace) against the running app, with the model and libraries scripted.
-- **Dogfooding**: `dogfood.mjs`, as in section 6. A word broken across two lines is detected from the text's line boxes. To make sure the detector works, it was run against the same headline with the fit removed: it catches the mid-word break, and the playing page's overflow is caught too.
-- **Build**: `next build` with placeholder Clerk keys.
+| Check | Result |
+|---|---|
+| Typecheck, `npx tsc --noEmit -p .` | clean |
+| Unit tests, `test/ux-v0.test.mjs` (motion, moodboard, Direction, Living Brief, knowledge, refinement, the dogfooding fixes) | 319 passed, 0 failed |
+| Route tests, `test/ux-v0-route.test.mjs` | 73 passed, 0 failed |
+| House consistency, `test/ux-consistency.test.mjs` | 51 passed, 0 failed |
+| Repo suite, `npm test` | all 381 suites passed |
+| `sections.mjs`: every section kind and variant, every style, language, palette and ground | 2,120 renders of 53 variants, all clean |
+| `workflow-a-create.mjs`: intent to direction to generation, checks, refine, undo, critique, versions | passed; checks read "100 works · 93 its own · 100 faithful" |
+| `workflow-b-critique.mjs`: sandboxed import, selection, crops, reload | passed (it logs the sandbox blocking the import's script and stylesheet, which is what it tests, and Clerk failing to load with this environment's placeholder key) |
+| `checklist.mjs` | 52 passed, 0 failed |
+| `acceptance.mjs`, with axe on the workspace shell | 33 passed, 0 failed; no serious or critical axe findings |
+| `dogfood.mjs`: 24 cases (section 6) | fidelity 100 in all 24; no sideways scroll on a phone, static or playing; no headline word broken across lines; 7 visual languages and 4 motion feels used; 3–4 distinct looks per project; mean distance between projects' first directions 0.594 |
+| `next build` with placeholder Clerk keys | compiled; `/ux-v0` is 132 kB (255 kB first load) |
+
+A word broken across two lines is detected from the text's line boxes. To make sure that detector works, it was run against the same headline with the fit removed: it catches the mid-word break, and the playing page's 21 px of sideways scroll is caught too. The model and image libraries are scripted in the browser suites, and the dogfood copy is written by hand (section 8).
+
+I looked at the photographs myself: all 24 desktop and phone renders as contact sheets, and the motion mid-arrival. Every fix in section 6 except the first three came from that review or from a measurement it prompted.
 
 ## 8. Limitations
 
