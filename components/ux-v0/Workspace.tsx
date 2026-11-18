@@ -117,6 +117,13 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   );
   const [rail, setRail] = useState<Rail>(() => (initial.mode === 'create' && !currentSpec(initial) ? (initial.brief.doc ? 'questions' : 'brief') : 'reasoning'));
   const [selection, setSelection] = useState<SelectionContext | null>(null);
+  // the section being changed directly: it stays open through each change (a change redraws the page and
+  // clears the canvas selection), until another part is selected or the selection is cleared
+  const [editing, setEditing] = useState<{ sectionId: string; path: string } | null>(null);
+  useEffect(() => {
+    const ux = selection?.element?.ux;
+    if (ux?.section) setEditing({ sectionId: ux.section, path: ux.path });
+  }, [selection]);
   const [activeCard, setActiveCard] = useState<string | null>(null);
   const [mode, setMode] = useState<SelectMode>(imported && imported.kind !== 'html' ? 'area' : 'element');
   const [composeMode, setComposeMode] = useState<ComposeMode>(initial.mode === 'create' ? 'change' : 'ask');
@@ -622,6 +629,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       };
     });
     setSelection(null);
+    setEditing(null);
     setActiveCard(null);
     setView('design');
     setRail('checks');
@@ -1405,13 +1413,13 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                 empty={view === 'design' ? 'Select part of the design and say what you see, or ask why. Each comment becomes a card attached to what it is about.' : 'Cards appear here once there is a design to comment on.'}
               />
             )}
-            {rail === 'selection' && spec && !imported && selection?.element?.ux?.section && spec.sections.some((x) => x.id === selection.element!.ux!.section) && (
-              <SectionEditor spec={spec} sectionId={selection.element.ux.section} path={selection.element.ux.path} onPatch={(pt, label) => applyLocal(pt, label)} onLock={lockSection} />
+            {rail === 'selection' && spec && !imported && editing && spec.sections.some((x) => x.id === editing.sectionId) && (
+              <SectionEditor spec={spec} sectionId={editing.sectionId} path={editing.path} onPatch={(pt, label) => applyLocal(pt, label)} onLock={lockSection} />
             )}
             {rail === 'selection' && (
               <Inspect
                 sel={selection}
-                onClear={() => setSelection(null)}
+                onClear={() => (setSelection(null), setEditing(null))}
                 onStep={
                   selection?.element?.selector && isPage
                     ? async (dir) => {

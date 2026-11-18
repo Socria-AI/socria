@@ -39,8 +39,8 @@ await ctx.route('**/api/ux-v0/**', async (r) => {
   const url = r.request().url();
   const body = JSON.parse(r.request().postData() || '{}');
   if (url.endsWith('/discover')) {
-    if (!body.questions?.some((q) => q.answer)) return r.fulfill({ json: { usage: usage('discover', 'economy'), understanding: { summary: 'A booking screen for a small yoga studio.', known: { objective: 'Let members book a time for a class' }, gaps: ['audience'] }, questions: [{ id: 'q_a', topic: 'audience', question: 'Who books here, and on what?', why: 'It decides how much the screen explains.', options: ['Regular members, on their phones', 'New students, on a laptop'], answer: '', delegated: false }], moodboard: { queries: [{ category: 'imagery', query: 'yoga studio morning light' }, { category: 'texture', query: 'linen clay' }, { category: 'composition', query: 'calm grid' }] }, palettes: [], type: [], ready: false, note: '' } });
-    return r.fulfill({ json: { usage: usage('discover', 'economy'), understanding: { summary: 'A booking screen for regular members of a small yoga studio, mostly on phones.', known: { objective: 'Let members book a time for a class', audience: 'Regular members, on their phones' }, gaps: [] }, questions: [], moodboard: { queries: [] }, palettes: [], type: [], ready: true, note: 'Enough to write the brief.' } });
+    if (!body.questions?.some((q) => q.answer)) return r.fulfill({ json: { usage: usage('discover', 'economy'), understanding: { summary: 'A booking screen for a small yoga studio.', known: { objective: 'Let members book a time for a class' }, gaps: ['audience'] }, questions: [{ id: 'q_a', topic: 'audience', question: 'Who books here, and on what?', why: 'It decides how much the screen explains.', options: ['Regular members, on their phones', 'New students, on a laptop'], answer: '', delegated: false }], queries: [{ category: 'imagery', query: 'yoga studio morning light' }, { category: 'texture', query: 'linen clay' }, { category: 'composition', query: 'calm grid' }], palettes: [], type: [], ready: false, note: '' } });
+    return r.fulfill({ json: { usage: usage('discover', 'economy'), understanding: { summary: 'A booking screen for regular members of a small yoga studio, mostly on phones.', known: { objective: 'Let members book a time for a class', audience: 'Regular members, on their phones' }, gaps: [] }, questions: [], queries: [], palettes: [], type: [], ready: true, note: 'Enough to write the brief.' } });
   }
   if (url.endsWith('/images')) return r.fulfill({ json: { results: body.queries.map((q) => ({ ...q, refs: (LIB[q.category] ?? []).filter((x) => !body.seen.includes(x.id)).slice(0, body.per).map((x) => ({ ...x, query: q.query })), provider: 'openverse', error: '' })) } });
   if (url.endsWith('/brief')) {
@@ -75,6 +75,19 @@ const shootAll = async (name) => {
   for (const w of WIDTHS) {
     const over = await overflowAt(w);
     ok(`${name} at ${w} px: nothing scrolls sideways`, over <= 0, `${over}px`);
+    if (/canvas/.test(name)) {
+      // the design is in view: a stage tall enough to work on, the page fitted across it
+      await page.waitForTimeout(400);
+      const vis = await page.evaluate(() => {
+        const st = document.querySelector('.v0-stage');
+        const fr = document.querySelector('iframe.v0-frame');
+        if (!st || !fr) return null;
+        const s = st.getBoundingClientRect();
+        const f = fr.getBoundingClientRect();
+        return { stageH: Math.round(s.height), stageW: Math.round(s.width), inW: Math.round(Math.max(0, Math.min(s.right, f.right) - Math.max(s.left, f.left))), frameW: Math.round(f.width) };
+      });
+      ok(`${name} at ${w} px: the stage is tall enough, and the design fits across it`, vis && vis.stageH >= 280 && vis.inW >= Math.min(vis.frameW, vis.stageW) - 2, JSON.stringify(vis));
+    }
     await page.screenshot({ path: `${S}ui-${name}-${w}.png` });
   }
   await page.setViewportSize({ width: 1440, height: 900 });

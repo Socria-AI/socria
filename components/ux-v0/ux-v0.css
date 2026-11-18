@@ -1342,3 +1342,24 @@
 .v0-edit :is(button, select, textarea):disabled {
   cursor: not-allowed;
 }
+
+/* phones and narrow windows: the work in view gets the whole height (the canvas, the brief, the directions),
+   and the rail follows below it, reached by scrolling the work area, instead of each squeezed into half */
+@media (max-width: 820px) {
+  .v0-work {
+    display: block;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .v0-main {
+    height: 100%;
+    min-height: 460px;
+  }
+  .v0-rail {
+    max-height: none;
+    min-height: 60vh;
+  }
+  .v0-rail-scroll {
+    overflow: visible;
+  }
+}
