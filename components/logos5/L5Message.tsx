@@ -526,11 +526,11 @@ export function L5Message(p: L5MessageProps) {
 function MapSlice({ cards, onOpen, onOne, onHover }: { cards: SliceCard[]; onOpen: () => void; onOne: (id: string) => void; onHover: (ids: string[] | null) => void }) {
   const { shown, more } = sliceOf(cards);
   return (
-    <div className="l5-slice" role="group" aria-label="What this turn added to your Logic Map">
+    <div className="l5-slice" role="group" aria-label="What this turn added to your Mind Map">
       <div className="l5-slice-head">
-        <span className="l5-slice-k">On your Logic Map</span>
+        <span className="l5-slice-k">On your Mind Map</span>
         <button type="button" className="l5-slice-open" onClick={onOpen}>
-          Open in Logic Map <span aria-hidden="true">→</span>
+          Open in Mind Map <span aria-hidden="true">→</span>
         </button>
       </div>
       <ol className="l5-slice-cards">

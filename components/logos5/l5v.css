@@ -1810,3 +1810,17 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 .l5v-body:not(.is-logic_map) > .l5v-primary:has(> .l5v-acts) > .l5v-primary-in {
   padding-top: 52px;
 }
+
+/* WHERE THE VIEWS SIT (Logos 6, nav-side.ts): the switch after the line's name (left, the default), in the bar's
+   middle (top), or by the global controls (right) — always in the bar, so it never covers the page */
+.l5v-top-sw { flex: none; display: flex; align-items: center; height: 100%; margin-left: 22px; padding-left: 22px; border-left: 1px solid var(--c-rule, rgba(35, 36, 31, 0.12)); }
+.l5v-top-r .l5v-top-sw { margin: 0 18px 0 0; padding: 0 18px 0 0; border-left: 0; border-right: 1px solid var(--c-rule, rgba(35, 36, 31, 0.12)); }
+.logos-root .l5-switch .ls-navmove { align-self: center; margin-left: 4px; }
+.logos-root .l5-switch .ls-navmove-menu { top: 100%; right: 0; margin-top: 6px; }
+/* the switch beside the name or by the global controls: the end keeps its own width, the start takes the rest (the
+   middle is empty), and the name gives way first — L5TopBar puts the switch back in the middle when even that is short.
+   Stated twice: the second outweighs Revision II's three columns (revision2.css loads after this file). */
+.l5v-top:is(.is-sw-left, .is-sw-right) { grid-template-columns: minmax(0, 1fr) 0 auto; }
+.logos-root .l5 .l5v-top:is(.is-sw-left, .is-sw-right):not(.is-narrow) { grid-template-columns: minmax(0, 1fr) 0 auto; }
+.l5v-top-sw { gap: 18px; }
+.l5v-top-sw .l5-tospace { white-space: nowrap; }

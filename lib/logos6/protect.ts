@@ -13,8 +13,14 @@
 
 import { keyOf } from '../map-edit';
 import { mapCaps, type LogosEdge, type LogosNode, type ThinkingMap } from '../logos';
+import { authored } from './graph';
 
-const placed = (n: LogosNode) => !!n.hand || !!n.finding;
+// MIND MAP 2.0: a card the person wrote about (what it means, their notes, tags, sources…) is theirs as much as one
+// they placed — the pass keeps it, and keeps what it carries: where it was put, its tone, its place in the structure.
+// And a line the person confirmed or a line of structure they made is theirs too: the pass cannot drop it, and what
+// a line carries (its id, why it holds, what bears it out, its status) follows it to the pass's own line.
+const placed = (n: LogosNode) => !!n.hand || !!n.finding || authored(n.mind);
+const theirs = (e: LogosEdge) => e.status === 'confirmed' || e.kind === 'structure';
 
 /** The landed map, with what the person placed kept and what the pass cannot know carried over. */
 export function keepPlaced(prev: Pick<ThinkingMap, 'nodes' | 'edges' | 'removed'> | null | undefined, next: ThinkingMap): ThinkingMap {
@@ -35,6 +41,7 @@ export function keepPlaced(prev: Pick<ThinkingMap, 'nodes' | 'edges' | 'removed'
       add.origin = 'socria';
     }
     if (was.evidence?.length && !n.evidence?.length) add.evidence = was.evidence;
+    if (was.mind && !n.mind) add.mind = was.mind;
     if (!Object.keys(add).length) return n;
     changed = true;
     return { ...n, ...add };
@@ -44,15 +51,45 @@ export function keepPlaced(prev: Pick<ThinkingMap, 'nodes' | 'edges' | 'removed'
   const ids = new Set(nodes.map((n) => n.id));
   const keys = new Set(nodes.map((n) => keyOf(n.label)));
   const room = Math.max(0, mapCaps({ ...next, nodes }).nodes - nodes.length);
-  const back = prev.nodes.filter((n) => placed(n) && !ids.has(n.id) && !keys.has(keyOf(n.label)) && !removed.has(keyOf(n.label))).slice(0, room);
-  if (!back.length && !changed) return next;
+  // a card the person built structure with, or drew a confirmed line to, is theirs as well
+  const touched = new Set(prev.edges.filter(theirs).flatMap((e) => [e.from, e.to]));
+  const back = prev.nodes.filter((n) => (placed(n) || touched.has(n.id)) && !ids.has(n.id) && !keys.has(keyOf(n.label)) && !removed.has(keyOf(n.label))).slice(0, room);
   for (const n of back) {
     nodes.push(n);
     ids.add(n.id);
   }
 
-  // and its lines, to whatever is still on the map
-  const edges: LogosEdge[] = [...next.edges];
+  // the cards' ids before and after the pass (a card it kept may have a new id, matched by its words)
+  const byKeyNow = new Map(nodes.map((n) => [keyOf(n.label), n.id]));
+  const now = (id: string) => (ids.has(id) ? id : (() => {
+    const was = prevById.get(id);
+    return was ? byKeyNow.get(keyOf(was.label)) : undefined;
+  })());
+
+  // what a line carries follows it to the pass's own line between the same cards
+  const carried: LogosEdge[] = next.edges.map((e) => {
+    const was = prev.edges.find((p) => now(p.from) === e.from && now(p.to) === e.to && (p.kind === 'structure' ? e.kind === 'structure' : p.relation === e.relation));
+    if (!was) return e;
+    const add: Partial<LogosEdge> = {};
+    for (const k of ['id', 'why', 'evidence', 'status', 'confidence', 'label'] as const) if (was[k] !== undefined && e[k] === undefined) (add as Record<string, unknown>)[k] = was[k];
+    if (!Object.keys(add).length) return e;
+    changed = true;
+    return { ...e, ...add };
+  });
+  // the person's lines the pass dropped, put back between cards still there
+  const edgeCap0 = mapCaps({ ...next, nodes }).edges;
+  for (const p of prev.edges) {
+    if (!theirs(p) || carried.length >= edgeCap0) continue;
+    const from = now(p.from), to = now(p.to);
+    if (!from || !to || from === to) continue;
+    if (carried.some((e) => e.from === from && e.to === to && (p.kind === 'structure' ? e.kind === 'structure' : e.relation === p.relation))) continue;
+    carried.push({ ...p, from, to });
+    changed = true;
+  }
+  if (!back.length && !changed) return next;
+
+  // and the placed cards' lines, to whatever is still on the map
+  const edges: LogosEdge[] = carried;
   const has = (a: string, b: string) => edges.some((e) => (e.from === a && e.to === b) || (e.from === b && e.to === a));
   const backIds = new Set(back.map((n) => n.id));
   const edgeCap = mapCaps({ ...next, nodes }).edges;

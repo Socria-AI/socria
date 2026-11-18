@@ -232,7 +232,7 @@ import { acceptTitle } from '@/lib/logos5/title';
 import { needsMap, routeTurn, tableInReply, turnsSince, type TurnRoute } from '@/lib/runtime/orchestrate';
 import { ideasWanted } from '@/lib/runtime/ideas-wanted';
 import { readVisualAsk, type Scene, type SceneArtifact } from '@/lib/visual/intent';
-import { activeKey, onPage, selection as visSelection, sequence, takeChanges } from '@/components/inline/visual-bus';
+import { activeKey, onPage, select as visSelectBus, selection as visSelection, sequence, takeChanges } from '@/components/inline/visual-bus';
 import type { Hit, IndexDoc } from '@/lib/runtime/representation';
 import { effectSaid, linksOf, turnEffect } from '@/lib/logos5/linking';
 import { L5Message, L5Pending, type L5Effect } from './logos5/L5Message';
@@ -297,7 +297,11 @@ import { compareAsked, compareText, sanitizeCompare, type Disagreement, type Doc
 import { isTheirs, weightOf } from '@/lib/logos6/support';
 import { stateOf } from '@/lib/challenge/challenge';
 import { useThemeGuard } from '@/components/account/ThemePicker';
-import { LENSES, isMadeLens, type LensId, type MadeLens } from '@/lib/logos-layout';
+import { LENSES, ideaLenses, isMadeLens, type LensId, type MadeLens } from '@/lib/logos-layout';
+import { ThinkingCanvas } from '@/components/logos6/ThinkingCanvas';
+import { useNavSide } from '@/components/logos5/nav-side';
+import { NavMover } from '@/components/logos5/NavMover';
+import { canvasLine, nodeVid } from '@/lib/logos6/canvas-visual';
 
 // AR MODE (components/logos5/ARMode.tsx) is fetched when it is opened, never with the page: most people
 // never open it, and nobody should pay for the camera code and the hand geometry in every load of /chat.
@@ -725,6 +729,10 @@ export function LogosApp({
   }, [initialInput]);
   /** the Mind view in place of the map: how this chat connects to everything else */
   const [mindOpen, setMindOpen] = useState(false);
+  // MIND MAP 2.0 (Logos 6): the canvas leads; another drawing of the same map (a flow, a timeline…) when chosen
+  const [drawLens, setDrawLens] = useState<LensId | null>(null);
+  // WHERE THE VIEWS SIT (Logos 6): a rail on the left by default, the top or the right if moved (one choice everywhere)
+  const [navSide, setNavSide] = useNavSide();
   /** this send is onboarding's sentence (no longer a gift: one of the month's conversations like any other) */
   const autoSentRef = useRef(false);
   const [drafts, setDrafts] = useState<Draft[]>([]);
@@ -6285,12 +6293,25 @@ export function LogosApp({
     // "capture: call the landlord" — kept in Quick Capture for later, not sent anywhere
     const kept = LOGOS4.capture ? readCapture(text) : null;
     if (kept) return { said: keepCapture(kept) };
+    // THE MIND MAP, OPEN (Logos 6): "highlight opportunity cost", "focus on the frontier" — shown on the canvas,
+    // here, as a press would; nothing is sent to a model (lib/visual/intent.ts, the canvas's own address)
+    const scene = visualScene();
+    const onCanvas = scene.artifacts.some((a) => a.key.startsWith('map:'));
+    if (onCanvas) {
+      const ask = readVisualAsk(text, scene);
+      if (ask?.kind === 'act' && ask.key.startsWith('map:')) {
+        sequence(ask.key, ask.actions, 'you');
+        return { said: ask.said };
+      }
+    }
     // "select the rent idea": the card in hand, as a press would put it (Point & Ask)
     const sel = readMapSelect(text, mapRef.current);
     if (sel) {
       if ('refused' in sel) return { said: sel.refused };
       setFocus({ kind: 'node', id: sel.node.id });
       touchedRef.current = { id: sel.node.id, label: sel.node.label };
+      // …and on the canvas, when it is open: the same card selected there ("this")
+      if (onCanvas && activeIdRef.current) visSelectBus(`map:${activeIdRef.current}`, nodeVid(sel.node.id));
       return { said: `Selected “${sel.node.label}” — what you ask next is about it.` };
     }
     // their writing, when it is open: an edit said instead of typed
@@ -7345,6 +7366,8 @@ export function LogosApp({
     if (selArt && selPart) note.sel = `${selPart.label} (${selPart.id}) on “${selArt.title}”`;
     const changes = takeChanges();
     if (changes.length) note.changes = changes;
+    // the Mind Map open (it is not in the conversation): its cards by exact id, so a reply can point at one
+    if (scene.artifacts.some((a) => a.type === 'map') && mapRef.current.nodes.length) note.on = canvasLine(mapRef.current, 'open');
     return Object.keys(note).length ? note : undefined;
   }
 
@@ -8593,7 +8616,7 @@ export function LogosApp({
         return { title: 'Conversation' };
       case 'map': {
         const lens = p.config?.lens ? LENSES.find((l) => l.id === p.config!.lens)?.label : null;
-        return { title: 'Logic Map', sub: lens ?? (map.context ? CONTEXT_LABEL[map.context] : undefined) };
+        return { title: 'Mind Map', sub: lens ?? (map.context ? CONTEXT_LABEL[map.context] : undefined) };
       }
       case 'model': {
         const v = p.config?.view && doc ? wsFacts.docs.find((d) => d.id === doc.id)?.views.find((x) => x.id === p.config!.view) : null;
@@ -8951,11 +8974,53 @@ export function LogosApp({
           )}
     </>
   );
+  /**
+   * THE MIND MAP (Logos 6, components/logos6/ThinkingCanvas.tsx): Ideas, Logic and Structure as three ways of working
+   * on the one map. Every change is an edit of the map (editMap), so it is saved, undoable, and the same in the
+   * Everything view and every drawing of it.
+   */
+  const MERGED_LENSES: readonly LensId[] = ['graph', 'structure', 'tensions', 'evidence'];
+  const otherDrawings = ideaLenses(map).filter((l) => !MERGED_LENSES.includes(l));
+  const mindCanvas = (drawingsEl?: ReactNode) => (
+    <ThinkingCanvas
+      key={`tc-${activeId ?? ''}`}
+      map={map}
+      onEdits={(edits) => void editMap(edits)}
+      mapKey={activeId ?? undefined}
+      busy={mapping}
+      readOnly={togetherReadOnly}
+      narrow={narrow}
+      lit={mapLit}
+      onAsk={togetherReadOnly ? undefined : (n) => askAboutNode({ id: n.id })}
+      onAskLine={
+        togetherReadOnly
+          ? undefined
+          : (t) => {
+              setInput(t);
+              focusComposer();
+            }
+      }
+      drawings={drawingsEl}
+    />
+  );
+  const drawingsPicker = otherDrawings.length ? (
+    <label className="tc-drawings">
+      <span className="tc-hint">Also drawn as</span>
+      <select value="" onChange={(e) => e.target.value && setDrawLens(e.target.value as LensId)} aria-label="See the map drawn another way">
+        <option value="">a flow, a timeline…</option>
+        {otherDrawings.map((l) => (
+          <option key={l} value={l}>
+            {LENSES.find((x) => x.id === l)?.label ?? l}
+          </option>
+        ))}
+      </select>
+    </label>
+  ) : null;
   const mapBody = ({ lens, primary, shapes }: { lens?: string; primary: boolean; shapes?: 'ideas' | MadeLens }) => (
     <>
           <header className="lg-panel-head">
             <span className="lg-panel-title">
-              {shapes && shapes !== 'ideas' ? LENSES.find((l) => l.id === shapes)?.label : 'Logic Map'}
+              {shapes && shapes !== 'ideas' ? LENSES.find((l) => l.id === shapes)?.label : 'Mind Map'}
               {/* What kind of thinking this turned out to be — read from the
                   conversation, never chosen from a menu. */}
               {map.context && <em className="lg-panel-context">{CONTEXT_LABEL[map.context]}</em>}
@@ -9092,9 +9157,22 @@ export function LogosApp({
                 }}
               />
             </div>
+          ) : l5 && shapes === 'ideas' && !drawLens && !(lens && !MERGED_LENSES.includes(lens as LensId)) ? (
+            // the person's own thinking: the Mind Map, its three ways of working, the other drawings a step away
+            <div className="lg-mind-canvas">{mindCanvas(drawingsPicker)}</div>
           ) : (
+          <>
+          {l5 && shapes === 'ideas' && (drawLens || lens) && (
+            <p className="lg-drawing-back">
+              <button type="button" className="l5-link is-go" onClick={() => setDrawLens(null)}>
+                <span className="l5-ar" aria-hidden="true">←</span> The Mind Map
+              </button>
+              <span className="tc-hint">The same cards, drawn as {(LENSES.find((x) => x.id === (drawLens ?? lens))?.label ?? 'a drawing').toLowerCase()}.</span>
+            </p>
+          )}
           <ThinkingMap
-            key={`tm-${lens ?? ''}`}
+            key={`tm-${drawLens ?? lens ?? ''}`}
+            {...(l5 && shapes === 'ideas' ? { hide: MERGED_LENSES } : {})}
             emptyNote={mapsLockedNote}
             // where the person put this line of thinking's cards, kept for it
             layoutKey={activeId}
@@ -9118,7 +9196,7 @@ export function LogosApp({
               else next.add(id);
               return next;
             })}
-            initialLens={lens as LensId | undefined}
+            initialLens={(l5 && shapes === 'ideas' && drawLens ? drawLens : lens) as LensId | undefined}
             shapes={shapes}
             workspace={workspaceOn}
             onSelectNode={(id) => {
@@ -9169,6 +9247,7 @@ export function LogosApp({
             // revision). The state lands at once; the save trails the drag.
             onModelEdited={stableModelEdited}
           />
+          </>
           )}
           {primary && (<>
           <ExplorePanel
@@ -10097,7 +10176,7 @@ export function LogosApp({
     { label: 'Sent', state: 'done' as const },
     ...(turnInfo?.headers && turnInfo.sources ? [{ label: `Found ${turnInfo.sources} ${turnInfo.sources === 1 ? 'source' : 'sources'} to check it against`, state: 'done' as const }] : []),
     { label: turnInfo?.headers ? 'Writing the reply' : 'Socria is reading it', state: 'now' as const },
-    ...(mapping ? [{ label: 'Drawing the Logic Map', state: 'now' as const }] : []),
+    ...(mapping ? [{ label: 'Drawing the Mind Map', state: 'now' as const }] : []),
   ];
   /** One message as the conversation draws it — in the thread, and, in one view, in the sheet above the chatbox. */
   const msgEl = (m: Msg, i: number, go?: ReactNode, opts?: { listen?: boolean }) => {
@@ -10649,6 +10728,33 @@ export function LogosApp({
               ideas={sIdeas}
               edges={map.edges}
               ideasFolded={!ideasOn}
+              // MIND MAP 2.0: the Mind Map entry opens the canvas in place; its other drawings open beside
+              mindMap={mindCanvas(
+                otherDrawings.length ? (
+                  <label className="tc-drawings">
+                    <span className="tc-hint">Also drawn as</span>
+                    <select
+                      value=""
+                      aria-label="See the map drawn another way, beside"
+                      onChange={(e) => {
+                        const l = e.target.value as LensId;
+                        if (!l) return;
+                        setDrawLens(l);
+                        openStage();
+                        if (wsLayout && !panelsOf(wsLayout).some((x) => x.type === 'map')) changeLayout(openBeside(wsLayout, { type: 'map' }, wsFacts).layout);
+                        setStudyTab('logic_map');
+                      }}
+                    >
+                      <option value="">a flow, a timeline…</option>
+                      {otherDrawings.map((l) => (
+                        <option key={l} value={l}>
+                          {LENSES.find((x) => x.id === l)?.label ?? l}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : undefined
+              )}
               brought={sBrought}
               made={sMade}
               turns={turns}
@@ -10944,12 +11050,12 @@ export function LogosApp({
             key: 'map',
             lane: 'ideas',
             tone: 'map',
-            kicker: `Logic Map · ${map.nodes.length} ${map.nodes.length === 1 ? 'idea' : 'ideas'}`,
+            kicker: `Mind Map · ${map.nodes.length} ${map.nodes.length === 1 ? 'idea' : 'ideas'}`,
             title: '',
             turn: firstReply,
             preview: mapEl,
             full: () => mapEl,
-            onAsk: () => aim('the Logic Map', 'this line of thinking', map.nodes.slice(0, 10).map((n) => `${n.type}: ${n.label}`)),
+            onAsk: () => aim('the Mind Map', 'this line of thinking', map.nodes.slice(0, 10).map((n) => `${n.type}: ${n.label}`)),
             onOpen: () => openFull('logic_map'),
           });
         }
@@ -11213,6 +11319,7 @@ export function LogosApp({
       )}
     <L5Switch
       label="Views"
+      after={!narrow ? <NavMover side={navSide} onSide={setNavSide} compact /> : undefined}
       value={oneView ? pageFocus : zoomed ? '' : studyTab}
       // on the board the tabs move the camera (each brings its part forward); elsewhere they open the view
       onChange={(v) => (oneView ? moveCamera(v as Viewport) : openFull(v as Viewport))}
@@ -11234,6 +11341,7 @@ export function LogosApp({
       onRail={() => upToMap(() => setL5List(true))}
       railOpen={l5Home && l5List}
       switcher={switchEl}
+      switchSide={navSide}
       onSearch={phone ? undefined : () => setSearchOpen(Date.now())}
       memory={cloud ? <MindButton onOpen={() => setL5Mind(true)} waiting={memWaiting} /> : null}
       presence={

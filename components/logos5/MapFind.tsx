@@ -13,6 +13,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { SCALE_SAID, type Scale } from '@/lib/logos5/scales';
 import { whenShort, type MapFound } from '@/lib/logos5/mapSearch';
+import { latestOf } from '@/lib/session-rail';
 
 const KIND_SAID: Record<MapFound['kind'], string> = { conversation: 'Conversations', subject: 'Subjects', idea: 'Ideas' };
 
@@ -104,6 +105,8 @@ export function MapFind({
     () => (q ? [...results] : recent.map((r) => ({ kind: 'conversation' as const, id: r.id, ids: [r.id], scale: r.scale, inView: r.inView, title: r.title, excerpt: null, at: r.at, where: r.where, chat: r.chat }))),
     [q, results, recent]
   );
+  // the conversation last touched, marked quietly among the recent ones (lib/session-rail.ts latestOf)
+  const latestRecent = useMemo(() => (q ? null : latestOf(recent.map((r) => ({ id: r.id, updatedAt: r.at })))), [q, recent]);
   useEffect(() => setActive(0), [q, open]);
   useEffect(() => {
     if (open) requestAnimationFrame(() => input.current?.focus());
@@ -219,6 +222,7 @@ export function MapFind({
                         <span className="l5f-text">
                           <span className="l5f-title">
                             <Marked text={r.title} q={q} />
+                            {r.kind === 'conversation' && r.id === latestRecent && <span className="l5f-latest" title="Your most recent conversation" aria-label="most recent" />}
                           </span>
                           {r.excerpt && (
                             <span className="l5f-excerpt">

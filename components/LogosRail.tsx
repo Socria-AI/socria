@@ -44,6 +44,7 @@ import { relTime, type LogosSession } from '@/lib/logos-sessions';
 import {
   cleanTitle,
   groupRail,
+  latestOf,
   mergeRail,
   searchRail,
   shouldShowSearch,
@@ -196,6 +197,8 @@ export function LogosRail({
   const railHits = railFiltering ? searchRail(allRail, query, mapsOnly) : allRail.filter((i) => !filed(i));
   const railGroups = groupRail(railHits);
   const railHasMaps = allRail.some((i) => i.nodes > 0);
+  // the conversation last touched, marked quietly (lib/session-rail.ts latestOf)
+  const latestId = useMemo(() => latestOf(allRail), [allRail]);
   const canFile = !!projects && (!!onMoveSession || !!onMoveChat);
 
   const toggleFolder = (id: string) =>
@@ -296,6 +299,7 @@ export function LogosRail({
         >
           {mark}
           <span className="t">{item.title}</span>
+          {item.id === latestId && <span className="s-latest" title="Your most recent conversation" aria-label="most recent" />}
           {count}
         </button>
         {/* Rename and delete belong to the surface that owns the row: a chat's

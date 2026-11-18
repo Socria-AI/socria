@@ -11,9 +11,11 @@
 // arrow keys, and the divider is a separator that takes the arrow keys. Behaviour lives in
 // lib/logos5/views.ts; this file only draws it.
 
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { L5Close } from './L5Chrome';
 import { SIDES, VIEW_LABELS, VIEW_ORDER, clampShare, nearestSide, shareAt, type Side, type Viewport } from '@/lib/logos5/views';
+
+const useBeforePaint = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 const isMac = () => typeof navigator !== 'undefined' && /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent || '');
 
@@ -38,6 +40,7 @@ export function L5TopBar({
   menu,
   account,
   narrow,
+  switchSide = 'top',
 }: {
   /** the label above the name: Project, Study, Line of thinking */
   kind?: string;
@@ -58,9 +61,38 @@ export function L5TopBar({
   menu?: ReactNode;
   account?: ReactNode;
   narrow: boolean;
+  /** Logos 6: where the views sit (components/logos5/nav-side.ts) — after the name (left), the middle (top), or by the global controls (right) */
+  switchSide?: 'left' | 'top' | 'right';
 }) {
+  const want = narrow ? 'top' : switchSide;
+  // Beside the name or by the global controls only while the bar has room for them and the name (at least 140px of it,
+  // or all of a shorter one); otherwise the switch sits in the middle until the bar is as wide as that place needed.
+  const bar = useRef<HTMLElement>(null);
+  const [need, setNeed] = useState(0);
+  const [width, setWidth] = useState(0);
+  const side = want !== 'top' && need > 0 && width < need ? 'top' : want;
+  useEffect(() => setNeed(0), [want, title]);
+  useBeforePaint(() => {
+    const el = bar.current;
+    if (!el || want === 'top') return;
+    const check = () => {
+      const w = el.clientWidth;
+      setWidth(w);
+      if (side !== want) return;
+      const start = el.querySelector<HTMLElement>('.l5v-top-l');
+      const name = el.querySelector<HTMLElement>('.l5v-title');
+      const over = start ? start.scrollWidth - start.clientWidth : 0;
+      const short = name ? Math.min(140, name.scrollWidth) - name.clientWidth : 0;
+      if (over > 1 || short > 1) setNeed(w + Math.max(0, over) + Math.max(0, short) + 8);
+    };
+    check();
+    if (typeof ResizeObserver === 'undefined') return;
+    const watch = new ResizeObserver(check);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [want, side, title]);
   return (
-    <header className={`l5v-top${narrow ? ' is-narrow' : ''}`}>
+    <header ref={bar} className={`l5v-top${narrow ? ' is-narrow' : ''} is-sw-${side}`}>
       <div className="l5v-top-l">
         <button type="button" className="l5v-home" onClick={onHome} aria-label="Back to the Universal Map" title="Your Universal Map">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -85,9 +117,11 @@ export function L5TopBar({
           {kind && !narrow && <span className="l5-label">{kind}</span>}
           {title && <span className="l5v-title">{title}</span>}
         </h1>
+        {side === 'left' && switcher && <div className="l5v-top-sw">{switcher}</div>}
       </div>
-      <div className="l5v-top-c">{switcher}</div>
+      <div className="l5v-top-c">{side === 'top' ? switcher : null}</div>
       <div className="l5v-top-r">
+        {side === 'right' && switcher && <div className="l5v-top-sw">{switcher}</div>}
         {zoom}
         {onSearch && (
           <button type="button" className="l5-link l5v-search" onClick={onSearch} aria-label="Search everything" aria-keyshortcuts="Meta+K Control+K" title="Search everything">

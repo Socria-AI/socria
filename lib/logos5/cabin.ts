@@ -78,7 +78,7 @@ export const CABIN_MIN_K = 0.75;
 /** The dock's places, in order: where you are, and the line of thinking's four views. */
 export const CABIN_PLACES = [
   { id: 'map', label: 'Map', says: 'Every line of thinking' },
-  { id: 'logic_map', label: 'Thinking', says: 'This one’s Logic Map' },
+  { id: 'logic_map', label: 'Thinking', says: 'This one’s Mind Map' },
   { id: 'chat', label: 'Chat', says: 'The conversation' },
   { id: 'artifacts', label: 'Artifacts', says: 'What was made' },
   { id: 'content', label: 'Content', says: 'What you brought' },

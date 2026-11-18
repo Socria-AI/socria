@@ -78,7 +78,7 @@ console.log('\n=== Focus: the app’s sheet ===');
   ok('its sources, with what checking found', /In your sources “districts set budgets once a year” District budgets report, A1\.1 · says otherwise/.test(f));
   ok('findings about it, and what became of them', /Worth checking Runway runs out first\. Decision risk · on your map/.test(f));
   ok('the turn it came from', /Came from “We will launch a paid pilot”/.test(f));
-  ok('one filled control, Challenge it; the rest are words', (m.match(/l5-btn is-primary/g) ?? []).length === 1 && /Challenge it/.test(f) && /Simpler/.test(f) && /Deeper/.test(f) && /Show on the Logic Map/.test(f) && /Copy link/.test(f));
+  ok('one filled control, Challenge it; the rest are words', (m.match(/l5-btn is-primary/g) ?? []).length === 1 && /Challenge it/.test(f) && /Simpler/.test(f) && /Deeper/.test(f) && /Show on the Mind Map/.test(f) && /Copy link/.test(f));
   ok('a dialog, closed by Escape', /role="dialog"/.test(m) && /Escape/.test(read('components/logos6/Focus.tsx')));
   ok('a card no longer there: nothing', html(h(Focus, { ...props, id: 'gone' })) === '');
   ok('no seventh renderer: lists, read through support.ts', /from '@\/lib\/logos6\/support'/.test(read('components/logos6/Focus.tsx')) && !/<svg|canvas/i.test(read('components/logos6/Focus.tsx')));

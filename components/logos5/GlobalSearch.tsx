@@ -24,7 +24,7 @@ const KIND_LABEL: Record<EntityKind, string> = {
   artifact: 'Artifact',
   writing: 'Writing',
   card: 'Card',
-  node: 'Logic Map',
+  node: 'Mind Map',
 };
 
 export function GlobalSearch({

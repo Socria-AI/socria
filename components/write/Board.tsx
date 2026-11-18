@@ -512,7 +512,7 @@ export function Board({
                     {(
                       [
                         ['link-doc', 'Link a passage from your files'],
-                        ['link-node', 'Link an idea on the Logic Map'],
+                        ['link-node', 'Link an idea on the Mind Map'],
                         ['link-card', 'Link another card'],
                         ['develop', 'Develop this — questions, not words'],
                         ['ask', 'Ask about this in the conversation'],

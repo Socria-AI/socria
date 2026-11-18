@@ -239,7 +239,7 @@ export interface L5SwitchItem {
   fresh?: boolean;
 }
 
-export function L5Switch({ items, value, onChange, label, wide = false }: { items: L5SwitchItem[]; value: string; onChange: (id: string) => void; label: string; wide?: boolean }) {
+export function L5Switch({ items, value, onChange, label, wide = false, after }: { items: L5SwitchItem[]; value: string; onChange: (id: string) => void; label: string; wide?: boolean; /** what follows the tabs (Logos 6: the way to move them, components/logos5/NavMover.tsx) */ after?: ReactNode }) {
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
   // the tab that takes the focus: the one chosen, or the first when none is (the canvas, zoomed out)
   const focusId = items.some((it) => it.id === value) ? value : items[0]?.id;
@@ -271,6 +271,7 @@ export function L5Switch({ items, value, onChange, label, wide = false }: { item
           {it.fresh && value !== it.id && <span className="l5-new" aria-label="something new" />}
         </button>
       ))}
+      {after}
     </div>
   );
 }

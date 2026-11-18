@@ -79,7 +79,7 @@ export interface LogosMsg {
    * highlighted, demand shifted), the part they had selected, the changes since they last wrote, a reference that
    * fitted more than one part. Told to Socria with their words; never their words.
    */
-  vis?: { done?: string[]; sel?: string; changes?: string[]; ask?: string; cannot?: string };
+  vis?: { done?: string[]; sel?: string; changes?: string[]; ask?: string; cannot?: string; on?: string };
   /**
    * What Socria's reply did, as the explanation engine planned it (lib/runtime/explain.ts ThreadNote): enum
    * codes for the moves, the rung, the question it left — kept only if the reply really asked it — and the

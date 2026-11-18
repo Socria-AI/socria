@@ -363,3 +363,34 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 .logos-root .ls-hero.is-live > .ls-made-acts { justify-self: start; }
 /* the reply under a made element keeps to words: its Keep and Edit are on the element's card */
 .logos-root .ls-bub.has-hero .ln-keep-row { display: none; }
+
+/* ── WHERE THE VIEWS SIT (Logos 6): a rail on the left by default, the top or the right if moved (nav-side.ts) ── */
+.logos-root .ls.has-nav-left { flex-direction: row; }
+.logos-root .ls.has-nav-right { flex-direction: row-reverse; }
+.logos-root .ls-kinds.is-side-left,
+.logos-root .ls-kinds.is-side-right { flex-direction: column; align-items: stretch; gap: 2px; width: 196px; height: auto; padding: 18px 12px 16px; border-bottom: 0; overflow-x: hidden; overflow-y: auto; }
+.logos-root .ls-kinds:is(.is-side-left, .is-side-right) { position: relative; z-index: 6; background-color: var(--c-paper); padding-bottom: 28px; }
+.logos-root .ls-kinds.is-side-left { border-right: 1px solid var(--c-rule); }
+.logos-root .ls-kinds.is-side-right { border-left: 1px solid var(--c-rule); }
+.logos-root .ls-kinds:is(.is-side-left, .is-side-right) .ls-kd { justify-content: flex-start; gap: 10px; padding: 9px 10px; border-radius: 10px; }
+.logos-root .ls-kinds:is(.is-side-left, .is-side-right) .ls-kd.is-on { box-shadow: inset 3px 0 0 var(--c-moss); background: rgba(var(--c-moss-rgb, 53, 70, 32), 0.08); }
+.logos-root .ls-kinds:is(.is-side-left, .is-side-right) .ls-c { margin-left: auto; }
+.logos-root .ls-kinds:is(.is-side-left, .is-side-right) .ls-sp { flex: 1 1 18px; }
+.logos-root .ls-kinds:is(.is-side-left, .is-side-right) :is(.ls-zoom-keys, .ls-putback, .ls-focus, .ls-logicmap, .ls-page, .ls-navmove) { align-self: flex-start; margin: 4px 6px 0; }
+.logos-root .ls-kinds:is(.is-side-left, .is-side-right) .ls-page { white-space: normal; }
+.logos-root .ls.has-nav-left .ls-chat { left: calc(50% + 98px); width: min(760px, calc(100% - 196px - 48px)); }
+.logos-root .ls.has-nav-right .ls-chat { left: calc(50% - 98px); width: min(760px, calc(100% - 196px - 48px)); }
+.logos-root .ls-navmove { position: relative; align-self: center; }
+.logos-root .ls-navmove-b { font-size: 12.5px; color: var(--c-ink-60); white-space: nowrap; }
+.logos-root .ls-navmove-menu { position: absolute; z-index: 20; display: flex; gap: 4px; padding: 6px; border: 1px solid var(--c-rule); border-radius: 10px; background: var(--c-paper); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); }
+.logos-root .ls-kinds.is-side-top .ls-navmove-menu { top: 100%; right: 0; margin-top: 4px; }
+.logos-root .ls-kinds:is(.is-side-left, .is-side-right) .ls-navmove-menu { bottom: 100%; left: 0; margin-bottom: 4px; }
+.logos-root .ls-navmove-menu button { padding: 5px 10px; border: 1px solid transparent; border-radius: 6px; background: none; font: inherit; font-size: 12.5px; color: var(--c-ink); cursor: pointer; }
+.logos-root .ls-navmove-menu button[aria-pressed='true'] { border-color: var(--c-moss); background: rgba(var(--c-moss-rgb, 53, 70, 32), 0.08); }
+.logos-root .ls-navmove-menu button:focus-visible, .logos-root .ls-navmove-b:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+
+/* ── THE MIND MAP, in place (Logos 6): the same cards, in Ideas, Logic or Structure ── */
+.logos-root .ls.has-mind .ls-canvas, .logos-root .ls.has-mind .ls-feed { display: none; }
+.logos-root .ls-mind { position: relative; flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding-bottom: 112px; }
+.logos-root .ls-mind > .tc { flex: 1; }
+.logos-root .ls-mind.is-phone { padding-bottom: 140px; }

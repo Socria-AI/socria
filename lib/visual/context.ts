@@ -30,6 +30,8 @@ export interface VisNote {
   ask?: string;
   /** understood, but not something the picture can show */
   cannot?: string;
+  /** what they are looking at that the conversation does not hold: the Mind Map open, its cards by exact id */
+  on?: string;
 }
 
 const clip = (v: unknown, n: number) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n) : '');
@@ -43,8 +45,9 @@ export function sanitizeVisNote(raw: unknown): VisNote | undefined {
   const done = list(r.done), changes = list(r.changes);
   if (done.length) out.done = done;
   if (changes.length) out.changes = changes;
-  const sel = clip(r.sel, 160), ask = clip(r.ask, 240), cannot = clip(r.cannot, 220);
+  const sel = clip(r.sel, 160), ask = clip(r.ask, 240), cannot = clip(r.cannot, 220), on = clip(r.on, 900);
   if (sel) out.sel = sel;
+  if (on) out.on = on;
   if (ask) out.ask = ask;
   if (cannot) out.cannot = cannot;
   return Object.keys(out).length ? out : undefined;
@@ -58,6 +61,7 @@ export function visNoteLine(n: VisNote): string {
     n.changes?.length ? `Changed since they last wrote: ${n.changes.join(' ')}` : '',
     n.ask ? `Their words fit more than one part (${n.ask}): ask which, in one short line, naming them — do not pick one.` : '',
     n.cannot ? `They asked for something the picture cannot show: ${n.cannot} Say so plainly; do not pretend it was shown.` : '',
+    n.on ? `${n.on} — point at a card with [its words](vis:focus/node:…) using these ids.` : '',
   ].filter(Boolean);
   return parts.length ? `[On screen — ${parts.join(' ')}]` : '';
 }

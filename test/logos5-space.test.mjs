@@ -129,8 +129,8 @@ const props = (over = {}) => ({
   ...over,
 });
 const wide = html(h(S.L5Space, props()));
-ok('the row brings a kind forward: Everything, Ideas, Files, Artifacts, Words (the names the views use) — buttons, not tabs', /class="ls-kinds"/.test(wide) && ['Everything', 'Ideas', 'Files', 'Artifacts', 'Words'].every((k) => wide.includes(`>${k}`)) && !/role="tab"/.test(wide) && /aria-pressed="true"/.test(wide));
-ok('  with counts: 6 ideas, 1 file, 1 artifact, 3 turns', /Ideas<span class="ls-c">6<\/span>/.test(wide) && /Files<span class="ls-c">1<\/span>/.test(wide) && /Artifacts<span class="ls-c">1<\/span>/.test(wide) && /Words<span class="ls-c">3 turns<\/span>/.test(wide));
+ok('the row brings a kind forward: Everything, Mind Map, Files, Artifacts, Words (the names the views use) — buttons, not tabs; a rail on the left by default', /class="ls-kinds is-side-left"/.test(wide) && ['Everything', 'Mind Map', 'Files', 'Artifacts', 'Words'].every((k) => wide.includes(`>${k}`)) && !/role="tab"/.test(wide) && /aria-pressed="true"/.test(wide));
+ok('  with counts: 6 ideas, 1 file, 1 artifact, 3 turns', /Mind Map<span class="ls-c">6<\/span>/.test(wide) && /Files<span class="ls-c">1<\/span>/.test(wide) && /Artifacts<span class="ls-c">1<\/span>/.test(wide) && /Words<span class="ls-c">3 turns<\/span>/.test(wide));
 ok('each kind its own card: ideas, a file with its folded corner, something made, the open idea', /class="ls-idea/.test(wide) && /class="ls-file"/.test(wide) && /class="ls-made"/.test(wide) && /class="ls-open"/.test(wide));
 ok('  Revision V: cards say what they are by glyph and colour, not by kind words or turn tags', !/<span class="ls-tn">turn ii<\/span>/.test(wide) && /class="ls-t"><span class="ls-k-g"/.test(wide) && /class="ls-t ls-tt">Payslip, October\.pdf/.test(wide));
 ok('  the open idea is the idea and what was made for it; Socria’s reply is its own bubble under it', /<h2 class="ls-stmt">[\s\S]*?A flatshare at £750<\/h2>/.test(wide) && /class="ls-bub has-tail[^"]*"[^>]*aria-label="Socria’s reply"/.test(wide) && /class="ls-bub-who"[\s\S]*?Socria/.test(wide) && /class="ls-bub[^"]*"[\s\S]*?class="reply"/.test(wide) && !/<b>You<\/b>/.test(wide));
@@ -143,7 +143,7 @@ ok('the chatbox at the foot, with no "Answering" line over it', /class="ls-chat"
   const folded = html(h(S.L5Space, props({ ideasFolded: true })));
   ok('folded: no idea is drawn on the space, and no line between ideas', !/class="ls-idea/.test(folded) && !/class="ls-open"/.test(folded), folded.slice(0, 200));
   ok('  what was said, brought and made still is: the reply, the file, the artifact', /class="reply"/.test(folded) && /class="ls-file"/.test(folded) && /class="ls-made"/.test(folded));
-  ok('  the ideas are a press away: "Ideas" keeps its count, marked folded, saying what it does', /class="ls-kd is-folded"[^>]*title="Show the ideas on the space"[^>]*>[\s\S]*?Ideas<span class="ls-c">6<\/span>/.test(folded), (folded.match(/<button[^>]*data-kind="ideas"[\s\S]*?<\/button>/) || [''])[0]);
+  ok('  the ideas are a press away: "Mind Map" keeps its count, marked folded, saying what it does', /class="ls-kd is-folded"[^>]*title="Show the ideas on the space"[^>]*>[\s\S]*?Mind Map<span class="ls-c">6<\/span>/.test(folded), (folded.match(/<button[^>]*data-kind="ideas"[\s\S]*?<\/button>/) || [''])[0]);
   ok('  unfolded, the space is as it was', html(h(S.L5Space, props({ ideasFolded: false }))) === wide);
   ok('  a conversation with no ideas yet has nothing to fold', !/is-folded/.test(html(h(S.L5Space, props({ ideasFolded: true, ideas: [], edges: [] })))));
   const css = read('components/logos5/space.css');
@@ -157,7 +157,7 @@ ok('the conversation as a page, a press away', /Read as a conversation/.test(wid
 ok('a reply with no idea yet is Socria’s bubble alone', (() => { const x = html(h(S.L5Space, props({ openId: null }))); return /class="ls-bub(?: has-earlier)?"/.test(x) && !/class="ls-open"/.test(x); })());
 const phone = html(h(S.L5Space, props({ narrow: true })));
 ok('a phone: one column — the open idea, what was made from it, what it comes from, then all the ideas', /ls is-phone/.test(phone) && /Made from it/.test(phone) && /It comes from/.test(phone) && /See all 6 ideas/.test(phone) && !/ls-cols/.test(phone));
-ok('  the chatbox at its foot; the row still there', /class="ls-chat"/.test(phone) && /class="ls-kinds"/.test(phone));
+ok('  the chatbox at its foot; the row still there (at the top: a phone has no room for a rail)', /class="ls-chat"/.test(phone) && /class="ls-kinds is-side-top"/.test(phone));
 
 console.log('\n=== wiring: LogosApp ===');
 const app = read('components/LogosApp.tsx');
@@ -181,7 +181,7 @@ const v4 = html(h(S.L5Space, props({ openId: 'save', openTurn: 2 })));
 ok('the row is the legend: each kind button says its kind', ['all', 'ideas', 'brought', 'made', 'words'].every((k) => v4.includes(`data-kind="${k}"`)));
 ok('  every idea has a tone and its node glyph in its head', /data-tone="question"/.test(v4) && /data-tone="given"/.test(v4) && /data-tone="yours"/.test(v4) && /class="ls-k-g"[^>]*><svg class="lg-node-glyph"/.test(v4));
 ok('  the open idea’s statement carries its glyph; nothing circled', /<h2 class="ls-stmt"><span class="ls-k-g"[\s\S]*?Save £300 a month<\/h2>/.test(v4) && !/pathLength="1"[^>]*><\/path><\/svg><\/span><\/h2>/.test(v4));
-ok('arriving: the space opens settling, each card numbered in reading order, the lines after the last card', /class="ls is-all is-arriving"/.test(v4) && /--ls-base:/.test(v4) && /--i:0/.test(v4) && /--i:1/.test(v4));
+ok('arriving: the space opens settling, each card numbered in reading order, the lines after the last card', /class="ls is-all has-nav-left is-arriving"/.test(v4) && /--ls-base:/.test(v4) && /--i:0/.test(v4) && /--i:1/.test(v4));
 ok('  the phone keeps its column (no arrival)', !/is-arriving/.test(html(h(S.L5Space, props({ narrow: true })))));
 const css4 = read('components/logos5/space-colour.css');
 ok('the stylesheet: tones, slate files, vermilion made, the gold question panel, lines by kind, the arrival, reduced motion', /\[data-tone='question'\]/.test(css4) && /\.ls-file \{[^}]*--ls-tint-slate/.test(css4) && /\.ls-made \.ls-k \{ color: var\(--ls-verm-ink\)/.test(css4) && /\.ls-open \.socria-asks \{/.test(css4) && /\.ls-ln\.is-read path/.test(css4) && /@keyframes ls-draw/.test(css4) && /prefers-reduced-motion/.test(css4));

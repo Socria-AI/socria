@@ -303,6 +303,53 @@ export interface LogosNode {
    * against them found. Pointers only — the text stays in their browser.
    */
   evidence?: NodeEvidence[];
+  /**
+   * MIND MAP 2.0 (Logos 6, lib/logos6/graph.ts): what a card carries beyond its label — what it means, why it
+   * matters, the person's notes, tags, sources, assumptions, properties, how it looks, where it was put in each way
+   * of working, its place in the structure. All optional: a card can be its title and nothing else. What Socria
+   * offered about it is kept apart (`ai`) and always said as Socria's.
+   */
+  mind?: NodeMind;
+}
+
+/** The tones a card can be given (never meaning by colour alone: a tone is the person's own grouping). */
+export const MIND_TONES = ['moss', 'sky', 'amber', 'rose', 'violet', 'slate'] as const;
+export type MindTone = (typeof MIND_TONES)[number];
+
+/** What a card carries beyond its label (LogosNode.mind). */
+export interface NodeMind {
+  /** a line under the title */
+  subtitle?: string;
+  /** what it means, in a sentence or two */
+  meaning?: string;
+  /** why it matters */
+  why?: string;
+  /** the person's own notes */
+  notes?: string;
+  tags?: string[];
+  /** where it comes from: a title, and an address when there is one */
+  sources?: { title: string; url?: string }[];
+  /** what it takes for granted */
+  assumptions?: string[];
+  /** their own fields: "Chapter" → "2" */
+  props?: { k: string; v: string }[];
+  tone?: MindTone;
+  shape?: 'card' | 'pill' | 'note';
+  /** where the person put it: in Ideas (i) and in Logic (l); Structure is laid out from the tree */
+  pos?: { i?: [number, number]; l?: [number, number] };
+  /** its place among its siblings in Structure */
+  order?: number;
+  /** its branch folded in Structure */
+  folded?: true;
+  /** put at the top level of Structure by hand: no parent is inferred for it */
+  top?: true;
+  /** the card's detailed explanation (LogosNode.detail) was written by the person, not read by the map pass */
+  detailYours?: true;
+  /** what Socria offered about it, kept apart from what the person wrote */
+  ai?: { meaning?: string; why?: string };
+  /** when it was made and last changed (ms) */
+  made?: number;
+  edited?: number;
 }
 
 /** A kept finding, on its card (lib/challenge/challenge.ts). */
@@ -379,6 +426,21 @@ export interface LogosEdge {
    * subject's own terms.
    */
   label?: string;
+  /** STABLE IDENTITY (Logos 6): kept through edits; derived from its ends and kind where absent (lib/logos6/graph.ts) */
+  id?: string;
+  /**
+   * A LINE OF STRUCTURE, not of meaning (Logos 6): `from` sits inside `to` ("Derivatives" in "Calculus"), set by the
+   * person in Structure. Relation part_of. A semantic line between the same two cards is a different line.
+   */
+  kind?: 'structure';
+  /** why the two connect, in a sentence */
+  why?: string;
+  /** what bears it out: short quotes or notes */
+  evidence?: string[];
+  /** 'confirmed' by the person, or 'suggested' by Socria; absent: read from the conversation by the map pass */
+  status?: 'confirmed' | 'suggested';
+  /** how sure Socria is of a suggestion, 0–1 */
+  confidence?: number;
 }
 
 export interface ThinkingMap {
@@ -685,6 +747,85 @@ export function mapCaps(map: { context?: unknown; building?: unknown; nodes?: un
  */
 const DIRECTED: ReadonlySet<LogosRelation> = new Set<LogosRelation>(['transforms_to', 'implies', 'precedes', 'leads_to', 'applies_to', 'causes', 'inhibits', 'is_a', 'flows_to', 'becomes']);
 
+// ── Mind Map 2.0: what a card and a line carry, cleaned (Logos 6) ────
+
+const mindStr = (v: unknown, n: number) => (typeof v === 'string' ? v.replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '').replace(/[ \t]+/g, ' ').trim().slice(0, n) : '');
+const mindLine = (v: unknown, n: number) => mindStr(v, n).replace(/\s+/g, ' ');
+const finiteIn = (v: unknown, lo: number, hi: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : null);
+const point = (v: unknown): [number, number] | undefined => {
+  if (!Array.isArray(v) || v.length !== 2) return undefined;
+  const x = finiteIn(v[0], -20000, 20000), y = finiteIn(v[1], -20000, 20000);
+  return x === null || y === null ? undefined : [Math.round(x), Math.round(y)];
+};
+
+/** What a card carries beyond its label, as it came from anywhere: shaped, clipped, nothing unknown kept. */
+export function sanitizeNodeMind(raw: unknown): NodeMind | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const r = raw as Record<string, unknown>;
+  const out: NodeMind = {};
+  const subtitle = mindLine(r.subtitle, 90), meaning = mindStr(r.meaning, 400), why = mindStr(r.why, 400), notes = mindStr(r.notes, 2000);
+  if (subtitle) out.subtitle = subtitle;
+  if (meaning) out.meaning = meaning;
+  if (why) out.why = why;
+  if (notes) out.notes = notes;
+  const tags = [...new Set((Array.isArray(r.tags) ? r.tags : []).map((t) => mindLine(t, 24).toLowerCase().replace(/^#/, '')).filter(Boolean))].slice(0, 8);
+  if (tags.length) out.tags = tags;
+  const sources = (Array.isArray(r.sources) ? r.sources : [])
+    .map((s) => {
+      const o = s && typeof s === 'object' ? (s as Record<string, unknown>) : {};
+      const title = mindLine(o.title, 140);
+      const url = typeof o.url === 'string' && /^https?:\/\/[^\s<>"]{3,500}$/.test(o.url.trim()) ? o.url.trim() : '';
+      return title ? { title, ...(url ? { url } : {}) } : null;
+    })
+    .filter((s): s is { title: string; url?: string } => !!s)
+    .slice(0, 6);
+  if (sources.length) out.sources = sources;
+  const assumptions = (Array.isArray(r.assumptions) ? r.assumptions : []).map((a) => mindLine(a, 200)).filter(Boolean).slice(0, 6);
+  if (assumptions.length) out.assumptions = assumptions;
+  const props = (Array.isArray(r.props) ? r.props : [])
+    .map((p) => {
+      const o = p && typeof p === 'object' ? (p as Record<string, unknown>) : {};
+      const k = mindLine(o.k, 32), v = mindLine(o.v, 160);
+      return k && v ? { k, v } : null;
+    })
+    .filter((p): p is { k: string; v: string } => !!p)
+    .slice(0, 8);
+  if (props.length) out.props = props;
+  if (MIND_TONES.includes(r.tone as MindTone)) out.tone = r.tone as MindTone;
+  if (r.shape === 'card' || r.shape === 'pill' || r.shape === 'note') out.shape = r.shape;
+  const pos = r.pos && typeof r.pos === 'object' ? (r.pos as Record<string, unknown>) : null;
+  const pi = point(pos?.i), pl = point(pos?.l);
+  if (pi || pl) out.pos = { ...(pi ? { i: pi } : {}), ...(pl ? { l: pl } : {}) };
+  const order = finiteIn(r.order, -100000, 100000);
+  if (order !== null) out.order = order;
+  if (r.folded === true) out.folded = true;
+  if (r.top === true) out.top = true;
+  if (r.detailYours === true) out.detailYours = true;
+  const ai = r.ai && typeof r.ai === 'object' ? (r.ai as Record<string, unknown>) : null;
+  const aiMeaning = mindStr(ai?.meaning, 400), aiWhy = mindStr(ai?.why, 400);
+  if (aiMeaning || aiWhy) out.ai = { ...(aiMeaning ? { meaning: aiMeaning } : {}), ...(aiWhy ? { why: aiWhy } : {}) };
+  const made = finiteIn(r.made, 0, 1e13), edited = finiteIn(r.edited, 0, 1e13);
+  if (made !== null) out.made = Math.round(made);
+  if (edited !== null) out.edited = Math.round(edited);
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** A line's identity, structure flag, explanation, evidence and status, cleaned. */
+export function sanitizeEdgeExtra(raw: unknown): Pick<LogosEdge, 'id' | 'kind' | 'why' | 'evidence' | 'status' | 'confidence'> {
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const out: Pick<LogosEdge, 'id' | 'kind' | 'why' | 'evidence' | 'status' | 'confidence'> = {};
+  if (typeof r.id === 'string' && /^[A-Za-z0-9_:>~.-]{1,64}$/.test(r.id)) out.id = r.id;
+  if (r.kind === 'structure') out.kind = 'structure';
+  const why = mindStr(r.why, 400);
+  if (why) out.why = why;
+  const evidence = (Array.isArray(r.evidence) ? r.evidence : []).map((x) => mindLine(x, 240)).filter(Boolean).slice(0, 4);
+  if (evidence.length) out.evidence = evidence;
+  if (r.status === 'confirmed' || r.status === 'suggested') out.status = r.status;
+  const c = finiteIn(r.confidence, 0, 1);
+  if (c !== null && out.status === 'suggested') out.confidence = Math.round(c * 100) / 100;
+  return out;
+}
+
 export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap {
   if (!raw || typeof raw !== 'object') return { ...EMPTY_MAP };
 
@@ -737,6 +878,7 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
       const detail = str(n?.detail, MAX_DETAIL);
       const finding = sanitizeNodeFinding(n?.finding);
       const evidence = sanitizeNodeEvidence(n?.evidence);
+      const mind = sanitizeNodeMind(n?.mind);
       return {
         id,
         type,
@@ -759,6 +901,7 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
         ...(finding && origin === 'socria' ? { finding } : {}),
         ...(n?.hand === true ? { hand: true as const } : {}),
         ...(evidence ? { evidence } : {}),
+        ...(mind ? { mind } : {}),
       };
     })
     .filter((n: LogosNode | null): n is LogosNode => {
@@ -791,7 +934,10 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
       const op = str(e?.op, MAX_OP);
       const when = str(e?.when, MAX_WHEN);
       const label = str(e?.label, MAX_EDGE_LABEL);
-      return { from, to, relation, strength, ...(op ? { op } : {}), ...(when ? { when } : {}), ...(label ? { label } : {}) };
+      const extra = sanitizeEdgeExtra(e);
+      // a line of structure is always "sits inside"
+      const rel: LogosRelation = extra.kind === 'structure' ? 'part_of' : relation;
+      return { from, to, relation: rel, strength, ...(op ? { op } : {}), ...(when ? { when } : {}), ...(label ? { label } : {}), ...extra };
     })
     .filter((e: LogosEdge | null): e is LogosEdge => {
       // Drop dangling edges — they'd render as lines into empty space.
@@ -800,11 +946,14 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
       // transforms_to is directional and ordered, so two opposite ones are
       // distinct; other relations are keyed order-independent.
       const key =
-        // A sequence can loop back, and a detail applies one way: both are
-        // directional, so A→B and B→A are two different edges.
-        DIRECTED.has(e.relation)
-          ? `${e.from}>${e.to}:${e.relation}`
-          : [e.from, e.to].sort().join('~') + e.relation;
+        // A line of structure is one-way and is not a line of meaning between the same two cards.
+        e.kind === 'structure'
+          ? `${e.from}>${e.to}:structure`
+          : // A sequence can loop back, and a detail applies one way: both are
+            // directional, so A→B and B→A are two different edges.
+            DIRECTED.has(e.relation)
+            ? `${e.from}>${e.to}:${e.relation}`
+            : [e.from, e.to].sort().join('~') + e.relation;
       if (edgeSeen.has(key)) return false;
       edgeSeen.add(key);
       return true;

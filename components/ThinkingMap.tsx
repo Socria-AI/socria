@@ -229,6 +229,7 @@ export function ThinkingMap({
   linked,
   reveal,
   shapes,
+  hide,
   fitMax = FIT_MAX,
   fitMinK,
   emptyNote,
@@ -376,6 +377,11 @@ export function ThinkingMap({
    * drawn on that lens alone. Unset, every lens the map can draw.
    */
   shapes?: 'ideas' | MadeLens;
+  /**
+   * Logos 6: lenses not offered here because the Mind Map (components/logos6/ThinkingCanvas.tsx) is them — its
+   * Ideas, Logic and Structure are the graph, the tensions, the evidence and the structure of the same map.
+   */
+  hide?: readonly LensId[];
 }) {
   /** a canvas of cards, which pans, zooms and drags — every lens but those that draw themselves */
   const isCanvasLens = (l: LensId) => drawsCards(l) && !(workspace && l === 'structure');
@@ -1097,10 +1103,11 @@ export function ThinkingMap({
     return true;
   };
 
-  const lenses = useMemo(
-    () => (shapes === 'ideas' ? ideaLenses(map) : shapes ? availableLenses(map, { workspace }).filter((l) => l === shapes) : availableLenses(map, { workspace })),
-    [map, workspace, shapes]
-  );
+  const lenses = useMemo(() => {
+    const all = shapes === 'ideas' ? ideaLenses(map) : shapes ? availableLenses(map, { workspace }).filter((l) => l === shapes) : availableLenses(map, { workspace });
+    const kept = hide?.length ? all.filter((l) => !hide.includes(l)) : all;
+    return kept.length ? kept : all;
+  }, [map, workspace, shapes, hide?.join()]);
 
 
   // The lens this map leads with — the signature view for what it holds,

@@ -35,7 +35,9 @@ export const VIEW_LABELS: Record<Viewport, string> = {
   // Logos 5: the view is called Files — what you brought; its id stays 'content'
   content: 'Files',
   artifacts: 'Artifacts',
-  logic_map: 'Logic Map',
+  // Logos 6: Ideas, the Logic Map and Structure are one canvas, the Mind Map (components/logos6/ThinkingCanvas.tsx);
+  // its id stays 'logic_map'
+  logic_map: 'Mind Map',
 };
 
 /** What can be open beside the view: another of the four views. */
@@ -46,7 +48,7 @@ export const SPLIT_NAMES: Record<BesideId, string> = {
   chat: 'Conversation',
   content: 'Files',
   artifacts: 'Artifacts',
-  logic_map: 'Logic Map',
+  logic_map: 'Mind Map',
 };
 
 export interface Screen {

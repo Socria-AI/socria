@@ -129,7 +129,7 @@ const ViewsDemo = (
       <span>Conversation</span>
       <span>Files</span>
       <span>Artifacts</span>
-      <span>Logic Map</span>
+      <span>Mind Map</span>
       <i className="sg-tabline" />
     </div>
     <div className="sg-panes" aria-hidden="true">
@@ -287,7 +287,7 @@ const SearchDemo = (
         ['“…rent is most of it — three times the next cost…”', 'Conversation'],
         ['lease-terms.pdf · the clause on renewal', 'Files'],
         ['Monthly costs · a chart', 'Artifacts'],
-        ['Rent is fixed', 'Logic Map'],
+        ['Rent is fixed', 'Mind Map'],
       ].map(([t, w], i) => (
         <li key={t} className="sg-in" style={at(0.9 + i * 0.12)}>
           <span>{t}</span>
