@@ -451,6 +451,24 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     }));
   };
 
+  /** Swap one direction for one the engine has not shown yet; the other two, and any locks, stay. No model call. */
+  const replaceDirection = (id: string) => {
+    const p = current.current;
+    if (!p.brief.doc) return;
+    const st = p.direction;
+    const shown = [...new Set([...st.seen, ...st.options.map((o) => o.language)])];
+    const [fresh] = proposeDirections({ ...directionAsk(p, false), count: 1, round: st.round + 1, seen: shown });
+    if (!fresh) return;
+    update((p2) => ({
+      ...p2,
+      direction: {
+        ...p2.direction,
+        options: p2.direction.options.map((o) => (o.id === id ? { ...fresh, id: `${fresh.id}_${Date.now().toString(36)}` } : o)),
+        seen: [...new Set([...p2.direction.seen, fresh.language])].slice(-24),
+      },
+    }));
+  };
+
   const openDirection = () => {
     const p = current.current;
     if (!p.brief.doc) return;
@@ -1099,6 +1117,8 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                 onApprove={approveDirection}
                 onAuto={() => project.direction.options[0] && approveDirection(project.direction.options[0])}
                 onBack={() => setView('brief')}
+                onReplace={replaceDirection}
+                nonce={nonce}
               />
             )}
 

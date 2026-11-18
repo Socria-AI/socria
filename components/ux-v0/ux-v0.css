@@ -395,7 +395,7 @@
 }
 .v0-direct-own,
 .v0-direct-grid {
-  max-width: 1320px;
+  max-width: 1120px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -413,58 +413,7 @@
   gap: 10px 18px;
   padding: 4px 0 22px;
 }
-.v0-direct-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 22px;
-  align-items: start;
-}
-.v0-dir {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  border-radius: var(--sb-r-card);
-  background: var(--sb-surface);
-  box-shadow: 0 0 0 1px var(--sb-rule);
-  overflow: hidden;
-}
-.v0-dir-preview {
-  position: relative;
-  aspect-ratio: 4 / 3;
-  overflow: hidden;
-  background: var(--sb-well);
-  border-bottom: 1px solid var(--sb-rule);
-}
-/* the specimen is drawn at 1280 px and scaled to the tile: what is chosen is what will be drawn */
-.v0-dir-preview iframe {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 1280px;
-  height: 960px;
-  border: 0;
-  transform-origin: 0 0;
-  transform: scale(var(--dir-scale, 0.31));
-  pointer-events: none;
-}
-.v0-dir-text {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 18px 20px 20px;
-}
-.v0-dir-text .v0-cell-title {
-  font-size: 22px;
-}
-.v0-dir-facts {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.v0-dir-swatches {
-  display: flex;
-  gap: 6px;
-}
+/* the boards themselves are drawn by ./studio.css (.dp-*) */
 .v0-dir-locks {
   color: var(--sb-moss);
 }
