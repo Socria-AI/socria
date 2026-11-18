@@ -677,5 +677,37 @@ console.log('\n=== the moodboard as art direction ===');
   ok('a picture that only inspires cannot reach the page, even if the model places it', spec.sections[0].images.length === 0);
 }
 
+console.log('\n=== the Living Brief as a specification ===');
+{
+  const base = { pageType: 'website', platform: 'web', objective: 'Bring neighbours in on weekday mornings', audience: 'Neighbours', personality: ['warm', 'exact'], visualDirection: 'paper and roast', palette: [{ name: 'Paper', hex: '#f4efe6', role: 'background' }, { name: 'Roast', hex: '#221c17', role: 'text' }, { name: 'Walnut', hex: '#8a5a3c', role: 'accent' }, { name: 'Ash', hex: '#8b8178', role: 'muted' }], typography: { display: 'Fraunces', body: 'Inter' } };
+  const prev = V.normalizeBrief({ ...base, decisions: { audience: 'locked', personality: 'approved', colour: 'delegated', nonsense: 'locked' }, spec: { ratio: 9, grid: 'swiss', motion: { feel: 'calm' }, contrast: 'AAA' }, rules: ['no animation'] }, new Set());
+  ok('decisions, rules and exact specs are normalised and bounded', prev.decisions.audience === 'locked' && !('nonsense' in prev.decisions) && prev.spec.ratio === 1.618 && prev.spec.grid === 'swiss' && prev.spec.motion.feel === 'calm' && prev.rules[0] === 'no animation');
+  const next = V.normalizeBrief({ ...base, audience: 'Commuters in a hurry', personality: ['loud'] }, new Set());
+  const m = V.mergeDecided(next, prev);
+  ok('a revised brief keeps a locked part word for word', m.brief.audience === 'Neighbours' && m.kept.includes('audience'), m.brief.audience);
+  ok('an approved part the model changed is kept as changed, and reopened', J(m.brief.personality) === J(['loud']) && m.reopened.includes('personality') && !m.brief.decisions.personality);
+  ok('statuses, specs and rules carry over a revision', m.brief.decisions.colour === 'delegated' && m.brief.spec.grid === 'swiss' && m.brief.rules[0] === 'no animation');
+  ok('a delegated question becomes a delegated part', J(V.delegatedParts([{ topic: 'visual', delegated: true }, { topic: 'audience', delegated: false }])) === J({ colour: 'delegated', typography: 'delegated', imagery: 'delegated' }));
+  const locked = V.normalizeBrief({ ...base, decisions: { colour: 'locked', motion: 'locked' }, spec: { motion: V.MOTION_PRESETS.kinetic } }, new Set());
+  const dirs = V.proposeDirections({ brief: locked });
+  ok('a locked palette is in every direction, and locked there', dirs.every((d) => d.tokens.colors.background === '#f4efe6' && d.locks.includes('palette')));
+  ok('a locked motion is in every direction, and locked there', dirs.every((d) => d.look.motion.feel === 'kinetic' && d.locks.includes('motion')));
+  const pref = V.normalizeBrief({ ...base, spec: { grid: 'poster' } }, new Set());
+  const pd = V.proposeDirections({ brief: pref });
+  ok('an exact spec that is not locked shapes the faithful reading only', pd[0].look.grid === 'poster' && pd.slice(1).some((d) => d.look.grid !== 'poster'), pd.map((d) => d.look.grid).join(','));
+  const deleg = V.normalizeBrief({ ...base, typography: { display: 'Fraunces', body: 'Inter' }, decisions: { typography: 'delegated' } }, new Set());
+  ok('delegated type frees the faithful reading from the brief’s faces', V.proposeDirections({ brief: deleg })[0].tokens.fonts.display !== 'Fraunces' || V.languageOf(V.proposeDirections({ brief: deleg })[0].language).display[0] === 'Fraunces');
+  const aaa = V.normalizeBrief({ ...base, spec: { contrast: 'AAA' } }, new Set());
+  ok('AAA lifts every text colour to 7:1 in every direction', V.proposeDirections({ brief: aaa }).every((d) => V.ensureContrast(d.tokens.colors.text, d.tokens.colors.background, 7) === d.tokens.colors.text && V.ensureContrast(d.tokens.colors.muted, d.tokens.colors.background, 7) === d.tokens.colors.muted));
+  const ruled = V.normalizeBrief({ ...base, rules: ['no animation'] }, new Set());
+  ok('a rule is read for every direction', V.proposeDirections({ brief: ruled }).every((d) => d.look.motion.feel === 'still'));
+  ok('a changed spec, status or rule asks for new directions', V.briefKey(pref) !== V.briefKey(V.normalizeBrief(base, new Set())) && V.briefKey(ruled) !== V.briefKey(V.normalizeBrief(base, new Set())));
+  const b2 = V.normalizeBrief({ ...base, typography: { display: 'Archivo', body: 'Inter' }, spec: { grid: 'swiss', motion: V.MOTION_PRESETS.lively } }, new Set());
+  ok('the visual parts that changed are found', J(V.changedVisualParts(V.normalizeBrief(base, new Set()), b2)) === J(['typography', 'layout', 'motion']));
+  const spec = V.normalizeSpec({ ...SPEC, look: dirs[0].look }, board);
+  const applied = V.briefToDesign(spec, b2, ['typography', 'motion']);
+  ok('only the parts named reach the design: type and motion change, colour and grid do not', applied.tokens.fonts.display === 'Archivo' && applied.look.motion.feel === 'lively' && J(applied.tokens.colors) === J(spec.tokens.colors) && applied.look.grid === spec.look.grid && applied.version === spec.version + 1);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

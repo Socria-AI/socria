@@ -42,7 +42,7 @@ import {
   type Section,
   type Tone,
 } from './spec';
-import type { DesignBrief } from './types';
+import type { BriefPart, DesignBrief } from './types';
 import { motionFor, readMotionWords } from './motion';
 import { paletteFromSwatches, type BoardReading } from './references';
 
@@ -546,7 +546,50 @@ export const EMPTY_DIRECTION: DirectionState = { options: [], chosen: null, appr
 
 /** A short fingerprint of a brief, to know when directions were made for an older one. */
 export function briefKey(b: DesignBrief): string {
-  return hash(JSON.stringify([b.objective, b.audience, b.personality, b.visualDirection, b.layoutDirection, b.palette, b.typography, b.pageType])).toString(36);
+  return hash(JSON.stringify([b.objective, b.audience, b.personality, b.visualDirection, b.layoutDirection, b.palette, b.typography, b.pageType, b.decisions ?? null, b.spec ?? null, b.rules ?? null])).toString(36);
+}
+
+/** A brief part, and the direction group it governs. */
+export const PART_GROUP: Partial<Record<BriefPart, LockGroup>> = { colour: 'palette', typography: 'type', layout: 'layout', imagery: 'imagery', motion: 'motion' };
+
+/**
+ * The brief's own decisions, on a direction. A part the designer locked is
+ * applied to every option and locked there, so asking again, regenerating and
+ * refining keep it. An exact specification they set but did not lock shapes the
+ * faithful reading only: the other options explore around it. A delegated part
+ * leaves the engine free. AAA contrast lifts every text colour to 7:1.
+ */
+export function applyBrief(dir: ArtDirection, brief: DesignBrief, faithful: boolean): ArtDirection {
+  const dec = brief.decisions ?? {};
+  const sp = brief.spec ?? {};
+  const out: ArtDirection = { ...dir, tokens: { ...dir.tokens, colors: { ...dir.tokens.colors }, fonts: { ...dir.tokens.fonts } }, look: { ...dir.look }, locks: [...dir.locks] };
+  const lock = (g: LockGroup) => {
+    if (!out.locks.includes(g)) out.locks.push(g);
+  };
+  const use = (part: BriefPart) => dec[part] === 'locked' || (faithful && dec[part] !== 'delegated');
+  if (dec.colour === 'locked' && brief.palette.length) {
+    out.tokens.colors = { ...briefColors(brief) };
+    lock('palette');
+  }
+  if (dec.typography === 'locked') {
+    out.tokens.fonts = { display: brief.typography.display, body: brief.typography.body };
+    out.look.weight = nearestWeight(brief.typography.display, out.look.weight);
+    lock('type');
+  }
+  if (sp.ratio && use('typography')) out.look.ratio = sp.ratio;
+  if (sp.density && use('layout')) out.tokens.scale = sp.density;
+  if (sp.grid && use('layout')) out.look.grid = sp.grid;
+  if (sp.width && use('layout')) out.look.width = sp.width;
+  if (sp.corners && use('layout')) out.tokens.radius = sp.corners;
+  if (dec.layout === 'locked' && (sp.density || sp.grid || sp.width)) lock('layout');
+  if (dec.layout === 'locked' && sp.corners) lock('surface');
+  if (sp.motion && use('motion')) out.look.motion = { ...sp.motion };
+  if (dec.motion === 'locked' && sp.motion) lock('motion');
+  if (sp.contrast === 'AAA') {
+    const c = out.tokens.colors;
+    out.tokens.colors = { ...c, text: ensureContrast(c.text, c.background, 7), muted: ensureContrast(c.muted, c.background, 7), accentText: ensureContrast(c.accentText, c.accent, 7) };
+  }
+  return out;
 }
 
 // ── helpers ──────────────────────────────────────────────────────────
@@ -834,13 +877,16 @@ export function buildDirection(lang: Language, brief: DesignBrief, opt: BuildOpt
   if (d.dark === false && strategy === 'dark') strategy = 'paper';
   const base = { ...briefColors(brief), ...(opt.baseColors ?? {}) };
   if (d.accent) base.accent = d.accent;
-  let colors = (f && d.dark === undefined) || opt.baseColors ? { ...base, accentText: base.accentText } : paletteFor(strategy, base);
+  // the faithful reading keeps the brief's palette and type, unless the designer left them to SocriaUX
+  const keepColours = f && brief.decisions?.colour !== 'delegated';
+  const keepType = f && brief.decisions?.typography !== 'delegated';
+  let colors = (keepColours && d.dark === undefined) || opt.baseColors ? { ...base, accentText: base.accentText } : paletteFor(strategy, base);
   if (f && d.dark === true && !isDark(colors.background)) colors = paletteFor('dark', base);
   // type
   const used = opt.usedFonts ?? new Set<string>();
   const wantSerif = d.serif;
-  let display = f ? brief.typography.display : fontFor(lang.display, r, false, used, wantSerif);
-  let body = f ? brief.typography.body : fontFor(lang.body, r, false, new Set([display]), undefined);
+  let display = keepType ? brief.typography.display : fontFor(lang.display, r, false, used, wantSerif);
+  let body = keepType ? brief.typography.body : fontFor(lang.body, r, false, new Set([display]), undefined);
   if (f && wantSerif !== undefined && (knownFont(display)?.kind === 'serif') !== wantSerif) display = fontFor(lang.display, r, true, new Set(), wantSerif);
   if (d.fonts.length) {
     display = d.fonts[0];
@@ -1083,7 +1129,8 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
   const { brief } = ask;
   const board = ask.board;
   // the designer's own words: their notes for the direction, then what they wrote on their references
-  const notes = [ask.notes ?? '', board?.words ?? ''].filter(Boolean).join('. ');
+  // the brief's rules are hard: read for every option, like the designer's own notes
+  const notes = [ask.notes ?? '', board?.words ?? '', (brief.rules ?? []).join('. ')].filter(Boolean).join('. ');
   const avoid = [ask.avoid ?? '', board?.avoid ?? ''].filter(Boolean).join('. ');
   const round = Math.max(0, ask.round ?? 0);
   const count = Math.max(1, Math.min(4, ask.count ?? 3));
@@ -1142,7 +1189,7 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
     chosen.push(make(best.id, false));
   }
   return chosen.map((d, i) => {
-    const locked = applyLocks(d, ask.base);
+    const locked = applyLocks(applyBrief(d, brief, i === 0 && round === 0), ask.base);
     return { ...locked, id: `dir_${d.language}_${round}_${i}` };
   });
 }

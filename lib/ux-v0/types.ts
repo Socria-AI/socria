@@ -13,7 +13,7 @@
 // safe default. None of them throws. docs/SOCRIAUX-V0.md has the plan.
 
 import { EMPTY_DIRECTION, normalizeDirectionState, type DirectionState } from './direction';
-import { normalizeSpec, type DesignSpec } from './spec';
+import { GRIDS, normalizeMotion, normalizeSpec, type DesignSpec, type Motion } from './spec';
 import { bodyFont, displayFont } from './fonts';
 
 // ── small helpers ────────────────────────────────────────────────────
@@ -342,6 +342,8 @@ export interface DiscoveryQuestion {
   multi: boolean;
   answer: string;
   skipped: boolean;
+  /** left to SocriaUX: "you decide" */
+  delegated?: boolean;
   askedAt: number;
 }
 
@@ -366,6 +368,32 @@ export const PALETTE_ROLES: readonly PaletteRole[] = ['background', 'surface', '
 export type PageType = 'website' | 'app-screen';
 export type Platform = 'web' | 'mobile';
 
+// ── the brief as a creative specification ────────────────────────────
+
+/** The parts of a brief a decision can be made about. */
+export const BRIEF_PARTS = ['audience', 'experience', 'personality', 'colour', 'typography', 'layout', 'imagery', 'motion', 'function', 'accessibility', 'responsive', 'rules'] as const;
+export type BriefPart = (typeof BRIEF_PARTS)[number];
+/**
+ * Where a decision stands. Proposed: SocriaUX suggested it. Approved: the
+ * designer agrees (and the model is told so). Locked: a rule, applied to every
+ * direction and never changed by SocriaUX. Delegated: SocriaUX decides.
+ */
+export const DECISIONS = ['proposed', 'approved', 'locked', 'delegated'] as const;
+export type Decision = (typeof DECISIONS)[number];
+
+/** Exact specifications, for a designer who wants them. Each one reaches the look the renderer draws. */
+export interface BriefSpec {
+  /** the modular type scale: each step is this times the one below */
+  ratio?: number;
+  density?: 'compact' | 'comfortable' | 'spacious';
+  grid?: (typeof GRIDS)[number];
+  width?: 'narrow' | 'standard' | 'wide';
+  corners?: 'none' | 'soft' | 'round';
+  motion?: Motion;
+  /** the contrast every text must reach: AA 4.5:1, AAA 7:1 */
+  contrast?: 'AA' | 'AAA';
+}
+
 export interface DesignBrief {
   objective: string;
   audience: string;
@@ -381,6 +409,17 @@ export interface DesignBrief {
   openQuestions: string[];
   pageType: PageType;
   platform: Platform;
+  /** how it should feel to use, in a sentence */
+  experience?: string;
+  /** where each decision stands */
+  decisions?: Partial<Record<BriefPart, Decision>>;
+  /** hard rules the design must follow; everything else is a preference */
+  rules?: string[];
+  accessibility?: string[];
+  responsive?: string[];
+  spec?: BriefSpec;
+  /** optional parts the designer added to the brief */
+  parts?: BriefPart[];
 }
 
 // ── usage ────────────────────────────────────────────────────────────
@@ -756,6 +795,7 @@ export function normalizeQuestion(v: unknown): DiscoveryQuestion | null {
     multi: r.multi === true,
     answer: str(r.answer, LIMITS.answer).trim(),
     skipped: r.skipped === true,
+    ...(r.delegated === true ? { delegated: true } : {}),
     askedAt: time(r.askedAt, Date.now()),
   };
 }
@@ -810,7 +850,36 @@ export function normalizeBrief(v: unknown, keptRefIds?: ReadonlySet<string>): De
     openQuestions: strings(r.openQuestions, 6, 200),
     pageType: oneOf(r.pageType, ['website', 'app-screen'] as const, 'website'),
     platform: oneOf(r.platform, ['web', 'mobile'] as const, 'web'),
+    ...briefExtras(r),
   };
+}
+
+/** The specification parts of a brief, kept only where they say something. */
+function briefExtras(r: Record<string, any>): Partial<DesignBrief> {
+  const out: Partial<DesignBrief> = {};
+  const experience = clean(r.experience, 400);
+  if (experience) out.experience = experience;
+  const d = obj(r.decisions);
+  const decisions: Partial<Record<BriefPart, Decision>> = {};
+  for (const k of BRIEF_PARTS) if ((DECISIONS as readonly string[]).includes(d[k]) && d[k] !== 'proposed') decisions[k] = d[k];
+  if (Object.keys(decisions).length) out.decisions = decisions;
+  for (const k of ['rules', 'accessibility', 'responsive'] as const) {
+    const xs = strings(r[k], 12, 240);
+    if (xs.length) out[k] = xs;
+  }
+  const sp = obj(r.spec);
+  const spec: BriefSpec = {};
+  if (typeof sp.ratio === 'number' && Number.isFinite(sp.ratio)) spec.ratio = Math.round(Math.max(1.125, Math.min(1.618, sp.ratio)) * 1000) / 1000;
+  if (['compact', 'comfortable', 'spacious'].includes(sp.density)) spec.density = sp.density;
+  if ((GRIDS as readonly string[]).includes(sp.grid)) spec.grid = sp.grid;
+  if (['narrow', 'standard', 'wide'].includes(sp.width)) spec.width = sp.width;
+  if (['none', 'soft', 'round'].includes(sp.corners)) spec.corners = sp.corners;
+  if (sp.motion && typeof sp.motion === 'object') spec.motion = normalizeMotion(sp.motion);
+  if (sp.contrast === 'AA' || sp.contrast === 'AAA') spec.contrast = sp.contrast;
+  if (Object.keys(spec).length) out.spec = spec;
+  const parts = strings(r.parts, BRIEF_PARTS.length, 20).filter((x): x is BriefPart => (BRIEF_PARTS as readonly string[]).includes(x));
+  if (parts.length) out.parts = [...new Set(parts)];
+  return out;
 }
 
 export function normalizeArtifact(v: unknown): Artifact | null {

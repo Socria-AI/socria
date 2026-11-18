@@ -27,3 +27,5 @@ export { AUDIT_SOURCE } from '@/lib/ux-v0/audit-source';
 export * from '@/lib/ux-v0/motion';
 // the moodboard as art direction: reading notes and boards, content and inspiration
 export * from '@/lib/ux-v0/references';
+// the Living Brief's rules: decided stays decided, delegation, applying the brief to a design
+export * from '@/lib/ux-v0/brief';

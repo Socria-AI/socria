@@ -35,6 +35,23 @@ import {
 
 const VOICE = 'Voice: plain, calm, precise. No emoji, no exclamation marks, no hype words ("powerful", "seamless", "revolutionary").';
 
+/** What the designer decided, said plainly: rules are not preferences, and delegated parts are the model's. */
+function briefDecisions(b: DesignBrief): string {
+  const dec = Object.entries(b.decisions ?? {});
+  const rules = b.rules ?? [];
+  if (!dec.length && !rules.length && !b.accessibility?.length && !b.responsive?.length) return '';
+  const by = (k: string) => dec.filter(([, v]) => v === k).map(([p]) => p);
+  return [
+    rules.length ? `RULES (non-negotiable: never break one, whatever else asks): ${rules.join('; ')}.` : '',
+    by('locked').length || by('approved').length ? `DECIDED BY THE DESIGNER (follow exactly): ${[...by('locked'), ...by('approved')].join(', ')}.` : '',
+    by('delegated').length ? `LEFT TO YOU (decide well, and say what you chose in the copy's voice, not in notes): ${by('delegated').join(', ')}.` : '',
+    b.accessibility?.length ? `ACCESSIBILITY: ${b.accessibility.join('; ')}.` : '',
+    b.responsive?.length ? `ON SMALLER SCREENS: ${b.responsive.join('; ')}.` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 /** Pictures the design may place: the ones the designer marked as content. */
 function keptRefs(m: Moodboard): string {
   const kept = contentRefs(m);
@@ -94,7 +111,11 @@ The brief:
 - functionalRequirements: what it must do (sections, forms, flows).
 - references: ids of the pictures marked for the page that the design should show (only ids listed under PICTURES MARKED FOR THE PAGE; an empty list when none are). Inspiring references shape the other fields: say in visualDirection and layoutDirection what is taken from them.
 - openQuestions: what is still undecided.
-- pageType: "website" or "app-screen"; platform: "web" or "mobile".${
+- experience: how it should feel to use, in one sentence (optional).
+- rules: ONLY constraints the designer stated as musts or nevers ("no animation", "must work without images"), each short; omit otherwise.
+- accessibility, responsive: short notes, only where the designer or the audience makes them matter (optional).
+- pageType: "website" or "app-screen"; platform: "web" or "mobile".
+${refining ? 'Parts the designer approved or locked (in "decisions") stay exactly as they are; "delegated" parts are yours to decide.\n' : ''}${
     refining
       ? `
 - moodboardQueries: ONLY when this change moves the visual direction (light, imagery, texture, mood): 1–3 searches for licensed photo libraries that show the new direction, each {"category": "imagery|texture|composition", "query": "two or three words, a concrete subject first"}, none repeating a search already used. Otherwise [].`
@@ -176,6 +197,7 @@ Respond with ONE JSON object: {"title": "...", "pageType": "${brief.pageType}", 
 export function generateUser(input: GenerateInput): string {
   return [
     `THE APPROVED BRIEF:\n${JSON.stringify(input.brief)}`,
+    briefDecisions(input.brief),
     `PICTURES YOU MAY PLACE (id, category, subject, orientation):\n${keptRefs(input.moodboard)}`,
     inspiration(input.moodboard),
     input.direction ? `A NEW DIRECTION THE DESIGNER ASKED FOR: “${input.direction}”` : '',

@@ -31,6 +31,7 @@ import {
   uid,
   type CardTurn,
   type DesignBrief,
+  type BriefPart,
   type DesignProject,
   type DiscoveryQuestion,
   type ImportedArtifact,
@@ -56,6 +57,7 @@ import { Composer, type ComposeMode } from './Composer';
 import { QuestionBand, QuestionsRail } from './Discovery';
 import { LivingBrief } from './LivingBrief';
 import { isContent, readBoard } from '@/lib/ux-v0/references';
+import { PART_LABEL, briefToDesign, changedVisualParts, delegatedParts, mergeDecided } from '@/lib/ux-v0/brief';
 import { addUpload, sampleSwatches, useUploads, withUploads } from './uploads';
 import { Preview } from './Preview';
 import { checkFile, fetchOriginal, imageSize, keepOriginal } from './files';
@@ -124,6 +126,8 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const [dirNote, setDirNote] = useState('');
   // the design in a real viewport, its motion playing
   const [previewing, setPreviewing] = useState(false);
+  // visual parts of the brief changed since the design was drawn: what "Apply to the design" would carry over
+  const [briefEdits, setBriefEdits] = useState<BriefPart[]>([]);
   const stage = useRef<StageHandle>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const nonce = useMemo(() => makeNonce(), []);
@@ -264,9 +268,12 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       setBusy(null);
       if (!r.ok) return failed(r);
       const d = r.data;
+      // never ask again about a topic already answered or left to SocriaUX
+      const settled = new Set(p.discovery.questions.filter((q) => (q.answer && !/^(not sure|unsure|don't know|no idea)/i.test(q.answer)) || q.delegated).map((q) => q.topic));
+      const fresh = d.questions.filter((q) => !settled.has(q.topic));
       update((p2) => ({
         ...p2,
-        discovery: { questions: [...p2.discovery.questions, ...d.questions].slice(-24), understanding: d.understanding, ready: d.ready, note: d.note },
+        discovery: { questions: [...p2.discovery.questions, ...fresh].slice(-24), understanding: d.understanding, ready: d.ready || (!fresh.length && d.questions.length > 0), note: d.note },
         moodboard: { ...p2.moodboard, palettes: [...p2.moodboard.palettes, ...d.palettes].slice(-12), type: [...p2.moodboard.type, ...d.type].slice(-12) },
         usage: addUsage(p2.usage, d.usage),
       }));
@@ -287,12 +294,12 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     [update, discoverTurn]
   );
 
-  const currentQuestion = project.discovery.questions.find((q) => !q.answer && !q.skipped) ?? null;
+  const currentQuestion = project.discovery.questions.find((q) => !q.answer && !q.skipped && !q.delegated) ?? null;
 
   const answer = useCallback(
-    async (qid: string, ans: string, skipped = false) => {
+    async (qid: string, ans: string, skipped = false, delegated = false) => {
       const p = current.current;
-      const questions = p.discovery.questions.map((q) => (q.id === qid ? { ...q, answer: skipped ? '' : ans.trim().slice(0, 800), skipped } : q));
+      const questions = p.discovery.questions.map((q) => (q.id === qid ? { ...q, answer: skipped || delegated ? '' : ans.trim().slice(0, 800), skipped, delegated } : q));
       update((p2) => ({ ...p2, discovery: { ...p2.discovery, questions } }));
       await discoverTurn({ questions });
     },
@@ -392,16 +399,48 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     });
     setBusy(null);
     if (!r.ok) return failed(r);
-    update((p2) => ({ ...p2, brief: { doc: r.data.brief, approved: false, version: p2.brief.version + 1 }, usage: addUsage(p2.usage, r.data.usage) }));
+    // what the designer decided stays decided: locked parts keep their words, a changed approved part is reopened
+    const merged = refining
+      ? mergeDecided(r.data.brief, p.brief.doc)
+      : { brief: { ...r.data.brief, ...(Object.keys(delegatedParts(p.discovery.questions)).length ? { decisions: { ...delegatedParts(p.discovery.questions), ...(r.data.brief.decisions ?? {}) } } : {}) }, kept: [], reopened: [] };
+    update((p2) => ({ ...p2, brief: { doc: merged.brief, approved: false, version: p2.brief.version + 1 }, usage: addUsage(p2.usage, r.data.usage) }));
+    setBriefEdits((e) => [...new Set([...e, ...changedVisualParts(p.brief.doc, merged.brief)])]);
     setView('brief');
     if (!refining) return;
-    say('The brief was changed as you asked. Check it, then approve.');
+    const keptNote = merged.kept.length ? ` Kept as you locked them: ${merged.kept.map((x) => PART_LABEL[x].toLowerCase()).join(', ')}.` : '';
+    const reopenNote = merged.reopened.length ? ` Changed after you approved them, so they need your approval again: ${merged.reopened.map((x) => PART_LABEL[x].toLowerCase()).join(', ')}.` : '';
+    say(`The brief was changed as you asked. Check it, then approve.${keptNote}${reopenNote}`);
     // the visual direction moved: the board follows, with images to keep or remove
     const qs = r.data.queries ?? [];
     if (qs.length) {
       const got = await fetchImages(qs, 4);
       if (got.length) say(`The brief was changed, and its visual direction moved: ${got.length} new image${got.length === 1 ? '' : 's'} on the moodboard to keep or remove.`, 'info', { acts: [{ label: 'See the moodboard', run: () => setView('discovery') }] });
     }
+  };
+
+  /** The brief's changed visual parts, carried into the design in place: a new version, no regeneration. */
+  const applyBriefToDesign = () => {
+    const p = current.current;
+    const doc = p.brief.doc;
+    const s = currentSpec(p);
+    if (!doc || !s || !briefEdits.length) return;
+    const next = briefToDesign(s, doc, briefEdits);
+    update((p2) => {
+      const specs = [...p2.specs.slice(0, p2.specIndex + 1), next].slice(-30);
+      const chosen = p2.direction.chosen ? { ...p2.direction.chosen, tokens: next.tokens, look: next.look, source: 'person' as const } : p2.direction.chosen;
+      return { ...p2, specs, specIndex: specs.length - 1, direction: { ...p2.direction, chosen }, brief: { ...p2.brief, approved: true } };
+    });
+    const what = briefEdits.map((x) => PART_LABEL[x].toLowerCase()).join(', ');
+    setBriefEdits([]);
+    say(`Applied to the design without redrawing it: ${what}.`, 'info', { acts: [{ label: 'See it', run: () => setView('design'), strong: true }, { label: 'Undo', run: () => stepVersion(-1) }] });
+  };
+
+  /** From the questions: write the brief from what is known and open the directions, with nothing generated yet. */
+  const seeDirections = async () => {
+    await writeBrief();
+    await new Promise((r) => setTimeout(r, 0));
+    if (!current.current.brief.doc) return;
+    openDirection();
   };
 
   /** From anywhere in the questions: write the brief from what is known, approve it, and design
@@ -1045,13 +1084,21 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
               <div className="v0-discovery">
                 <QuestionBand
                   q={currentQuestion}
-                  n={project.discovery.questions.filter((q) => q.answer || q.skipped).length + 1}
+                  n={project.discovery.questions.filter((q) => q.answer || q.skipped || q.delegated).length + 1}
                   busy={busy}
                   ready={project.discovery.ready}
                   answered={project.discovery.questions.filter((q) => q.answer).length}
                   note={project.discovery.note}
                   onAnswer={(a) => currentQuestion && answer(currentQuestion.id, a)}
                   onSkip={() => currentQuestion && answer(currentQuestion.id, '', true)}
+                  onDelegate={() => currentQuestion && answer(currentQuestion.id, '', false, true)}
+                  onSeeDirections={seeDirections}
+                  intent={project.intent}
+                  board={uiBoard}
+                  onPicture={(text: string, refId?: string) => {
+                    if (refId) setRef(refId, 'kept');
+                    if (currentQuestion) answer(currentQuestion.id, text);
+                  }}
                   onBrief={() => writeBrief()}
                   onCombine={(o) => {
                     setText((t) => (t.trim() ? `${t.trim().replace(/[;,.]$/, '')}; ${o}` : o));
@@ -1092,7 +1139,13 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                 refs={uiRefs}
                 busy={busy}
                 hasDesign={!!spec}
-                onChange={(b) => update((p) => ({ ...p, brief: { ...p.brief, doc: b, approved: false } }))}
+                onChange={(b) => {
+                  const before = current.current.brief.doc;
+                  if (spec) setBriefEdits((e) => [...new Set([...e, ...changedVisualParts(before, b)])]);
+                  update((p) => ({ ...p, brief: { ...p.brief, doc: b, approved: false } }));
+                }}
+                edited={spec ? briefEdits : []}
+                onApplyToDesign={applyBriefToDesign}
                 onApprove={openDirection}
                 onSkip={() => {
                   update((p) => ({ ...p, brief: { ...p.brief, approved: true } }));

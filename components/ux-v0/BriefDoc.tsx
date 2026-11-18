@@ -1,22 +1,29 @@
 'use client';
-// components/ux-v0/BriefDoc.tsx — the Living Brief: the designer's decisions, as a curated board.
+// components/ux-v0/BriefDoc.tsx — the Living Brief: the designer's creative specification, as a document.
 //
-// Not a specification form. The objective is the headline; around it, the
-// decisions hang as blocks on one grid, each with a small label and its kind's
-// glyph: who it is for, what they come to do, its personality as words, the
-// palette as swatches (with the contrast each pairing will have on the page),
-// the typefaces set live, the references kept from the moodboard, how it
-// should look and be laid out, what it must do, and what is still open.
-// Everything is written over in place, with no model call; "Refine" in the
-// composer asks SocriaUX to change it in words. Approving locks the version a
-// design is generated from, and leads to the art direction, or straight to a
-// design in the direction SocriaUX chooses.
+// Laid out like a studio's brand guidelines rather than a form: the objective
+// as the headline, a numbered contents line, and the decisions hung on one
+// grid, each with its kind's glyph and where it stands (suggested, approved,
+// locked as a rule, or left to SocriaUX). Text is typeset until it is edited.
+// The palette is a row of swatches to lift and re-colour, with the contrast
+// each pairing will have; type is set live on the palette's own paper with
+// its scale; references and the pictures on the page are kept apart.
+//
+// Exact specifications are there for a designer who wants them — type scale,
+// grid, width, density, corners, motion, a contrast target — and every one
+// reaches the look the renderer draws (lib/ux-v0/direction.ts applyBrief).
+// Optional parts (experience, motion, accessibility, smaller screens, rules)
+// appear when a project needs them. Once a design exists, the visual parts
+// changed here can be applied to it in place, without redrawing it.
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { contrastRatio } from '@/lib/ux/audit';
+import { DECISION_LABEL, PART_LABEL } from '@/lib/ux-v0/brief';
 import { FONTS, fontStack, fontStylesheet } from '@/lib/ux-v0/fonts';
-import { PALETTE_ROLES, hex, type DesignBrief, type MoodboardRef, type PaletteRole } from '@/lib/ux-v0/types';
+import { HEADLINE_LABEL, MOTION_LABEL, describeMotion, motionFor } from '@/lib/ux-v0/motion';
 import { ASPECT_LABEL, isContent, takenFrom } from '@/lib/ux-v0/references';
+import { GRIDS, MOTION_FEELS, STILL_MOTION, type Motion } from '@/lib/ux-v0/spec';
+import { DECISIONS, PALETTE_ROLES, hex, type BriefPart, type BriefSpec, type Decision, type DesignBrief, type MoodboardRef, type PaletteRole } from '@/lib/ux-v0/types';
 
 interface Props {
   brief: DesignBrief;
@@ -31,9 +38,24 @@ interface Props {
   /** approve and generate at once, in the direction SocriaUX chooses (or the one already chosen) */
   onSkip: () => void;
   onBack: () => void;
+  /** visual parts changed since the design was drawn */
+  edited: BriefPart[];
+  /** carry them into the design in place */
+  onApplyToDesign: () => void;
 }
 
 const ROLE_LABEL: Record<PaletteRole, string> = { background: 'Background', surface: 'Surface', text: 'Text', muted: 'Muted text', accent: 'Accent', 'accent-text': 'On accent', line: 'Lines' };
+const GRID_LABEL: Record<string, string> = { stack: 'Stacked', editorial: 'Editorial side column', swiss: 'Strict columns', centered: 'Centred', asymmetric: 'Asymmetric', poster: 'Poster', modular: 'Modular cells' };
+const RATIOS: [number, string][] = [
+  [1.125, 'Very quiet, 1.125'],
+  [1.2, 'Quiet, 1.2'],
+  [1.25, 'Measured, 1.25'],
+  [1.333, 'Balanced, 1.333'],
+  [1.414, 'Pronounced, 1.414'],
+  [1.5, 'Dramatic, 1.5'],
+  [1.618, 'Poster, 1.618'],
+];
+const OPTIONAL: BriefPart[] = ['experience', 'motion', 'accessibility', 'responsive', 'rules'];
 
 /** Text that is typeset until it is edited: a textarea that grows with what it holds. */
 function Prose({ value, onChange, label, big = false, placeholder }: { value: string; onChange: (v: string) => void; label: string; big?: boolean; placeholder?: string }) {
@@ -44,18 +66,7 @@ function Prose({ value, onChange, label, big = false, placeholder }: { value: st
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
   }, [value]);
-  return (
-    <textarea
-      ref={ref}
-      className={`st-prose${big ? ' is-big' : ''}`}
-      rows={1}
-      value={value}
-      placeholder={placeholder}
-      aria-label={label}
-      spellCheck
-      onChange={(e) => onChange(e.target.value)}
-    />
-  );
+  return <textarea ref={ref} className={`st-prose${big ? ' is-big' : ''}`} rows={1} value={value} placeholder={placeholder} aria-label={label} spellCheck onChange={(e) => onChange(e.target.value)} />;
 }
 
 /** A short list, one line each: add with Enter, take away with ×. */
@@ -83,17 +94,7 @@ function Lines({ items, onChange, label, add, numbered = false }: { items: strin
           </li>
         ))}
       </ol>
-      <input
-        className="st-lines-add"
-        value={draft}
-        placeholder={add}
-        aria-label={add}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') (e.preventDefault(), commit());
-        }}
-      />
+      <input className="st-lines-add" value={draft} placeholder={add} aria-label={add} onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), commit())} />
     </div>
   );
 }
@@ -138,34 +139,72 @@ function Words({ items, onChange }: { items: string[]; onChange: (v: string[]) =
   );
 }
 
-/** One decision on the board: a small label with its kind, then the decision itself. */
-function Block({ label, kind, className = '', children, note, field = false }: { label: string; kind?: 'idea' | 'question' | 'file' | 'objection' | 'made'; className?: string; children: React.ReactNode; note?: string; field?: boolean }) {
-  const head = (
-    <span className="st-block-label">
-      {kind && <span className={`st-glyph g-${kind} is-sm`} aria-hidden="true" />}
-      <span className="sb-label">{label}</span>
-      {note && <span className="st-block-note">{note}</span>}
-    </span>
-  );
-  // a block holding one piece of text is its label: clicking the label edits it
-  if (field) {
-    return (
-      <label className={`v0-brief-field st-block ${className}`}>
-        {head}
-        {children}
-      </label>
-    );
-  }
+/** Where a decision stands, set in the block's own label line. */
+function Status({ part, value, onChange }: { part: BriefPart; value: Decision; onChange: (d: Decision) => void }) {
   return (
-    <section className={`st-block ${className}`} aria-label={label}>
-      {head}
-      {children}
-    </section>
+    <select className={`st-status s-${value}`} value={value} onChange={(e) => onChange(e.target.value as Decision)} aria-label={`${PART_LABEL[part]}: where it stands`} title="Suggested · Approved · Locked as a rule · SocriaUX decides">
+      {DECISIONS.map((d) => (
+        <option key={d} value={d}>
+          {DECISION_LABEL[d]}
+        </option>
+      ))}
+    </select>
   );
 }
 
-export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onChange, onApprove, onSkip, onBack }: Props) {
+/** A choice that can also be left to the direction. */
+function Spec<T extends string | number>({ label, value, options, onChange, disabled = false }: { label: string; value: T | undefined; options: [T, string][]; onChange: (v: T | undefined) => void; disabled?: boolean }) {
+  return (
+    <label className="st-spec">
+      <span>{label}</span>
+      <select value={value === undefined ? '' : String(value)} disabled={disabled} onChange={(e) => onChange(e.target.value === '' ? undefined : (options.find(([v]) => String(v) === e.target.value)?.[0] as T))} aria-label={label}>
+        <option value="">From the direction</option>
+        {options.map(([v, l]) => (
+          <option key={String(v)} value={String(v)}>
+            {l}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onChange, onApprove, onSkip, onBack, edited, onApplyToDesign }: Props) {
   const set = <K extends keyof DesignBrief>(k: K, v: DesignBrief[K]) => onChange({ ...brief, [k]: v });
+  const sp = brief.spec ?? {};
+  const setSpec = <K extends keyof BriefSpec>(k: K, v: BriefSpec[K] | undefined) => {
+    const next: BriefSpec = { ...sp };
+    if (v === undefined) delete next[k];
+    else next[k] = v;
+    onChange({ ...brief, spec: Object.keys(next).length ? next : undefined });
+  };
+  const decision = (p: BriefPart): Decision => brief.decisions?.[p] ?? 'proposed';
+  const decide = (p: BriefPart, d: Decision) => {
+    const next = { ...(brief.decisions ?? {}) };
+    if (d === 'proposed') delete next[p];
+    else next[p] = d;
+    onChange({ ...brief, decisions: Object.keys(next).length ? next : undefined });
+  };
+  const parts = brief.parts ?? [];
+  const has: Record<string, boolean> = {
+    experience: !!brief.experience || parts.includes('experience'),
+    motion: !!sp.motion || parts.includes('motion'),
+    accessibility: !!(brief.accessibility?.length || sp.contrast) || parts.includes('accessibility'),
+    responsive: !!brief.responsive?.length || parts.includes('responsive'),
+    rules: !!brief.rules?.length || parts.includes('rules'),
+  };
+  const addPart = (p: BriefPart) => onChange({ ...brief, parts: [...new Set([...parts, p])] });
+  const dropPart = (p: BriefPart) => {
+    const next: DesignBrief = { ...brief, parts: parts.filter((x) => x !== p) };
+    if (p === 'experience') delete next.experience;
+    if (p === 'motion') next.spec = (({ motion, ...rest }) => (Object.keys(rest).length ? rest : undefined))(sp);
+    if (p === 'accessibility') (delete next.accessibility, (next.spec = (({ contrast, ...rest }) => (Object.keys(rest).length ? rest : undefined))(next.spec ?? {})));
+    if (p === 'responsive') delete next.responsive;
+    if (p === 'rules') delete next.rules;
+    if (!next.parts?.length) delete next.parts;
+    onChange(next);
+  };
+
   const href = useMemo(() => fontStylesheet([brief.typography.display, brief.typography.body]), [brief.typography.display, brief.typography.body]);
   useEffect(() => {
     if (!href || document.querySelector(`link[data-v0-fonts="${CSS.escape(href)}"]`)) return;
@@ -175,13 +214,14 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
     l.dataset.v0Fonts = href;
     document.head.appendChild(l);
   }, [href]);
+
   const role = (r: PaletteRole) => brief.palette.find((p) => p.role === r)?.hex;
+  const need = sp.contrast === 'AAA' ? 7 : 4.5;
   const checks: { label: string; a?: string; b?: string; need: number }[] = [
-    { label: 'Text on background', a: role('text'), b: role('background'), need: 4.5 },
-    { label: 'Muted text', a: role('muted'), b: role('background'), need: 4.5 },
-    { label: 'Button text', a: role('accent-text'), b: role('accent'), need: 4.5 },
+    { label: 'Text on background', a: role('text'), b: role('background'), need },
+    { label: 'Muted text', a: role('muted'), b: role('background'), need },
+    { label: 'Button text', a: role('accent-text'), b: role('accent'), need },
   ];
-  // pictures marked for the page, and the references that only inspire
   const content = refs.filter(isContent);
   const inspiring = refs.filter((r) => r.state === 'kept' && !r.avoid && !isContent(r));
   const inBrief = content.filter((r) => brief.references.includes(r.id)).length;
@@ -190,6 +230,42 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
   const bg = role('background') ?? '#ffffff';
   const fg = role('text') ?? '#111111';
   const accent = role('accent') ?? fg;
+  const ratio = sp.ratio ?? 1.333;
+  const sizes = [3, 2, 1, 0].map((k) => Math.round(17 * Math.pow(ratio, k)));
+  const m: Motion | undefined = sp.motion;
+  const counts = DECISIONS.filter((d) => d !== 'proposed').map((d) => [d, Object.values(brief.decisions ?? {}).filter((x) => x === d).length] as const).filter(([, n]) => n > 0);
+
+  // the contents: every part on the board, numbered as it hangs
+  const sections: [string, string][] = [
+    ['audience', 'Audience'],
+    ['goals', 'What they come to do'],
+    ['personality', 'Personality'],
+    ['colour', 'Colour'],
+    ['type', 'Typography'],
+    ['pictures', 'Pictures'],
+    ['look', 'Look'],
+    ['layout', 'Layout'],
+    ...(has.motion ? ([['motion', 'Motion']] as [string, string][]) : []),
+    ...(has.accessibility ? ([['accessibility', 'Accessibility']] as [string, string][]) : []),
+    ['must', 'Must do'],
+    ['open', 'Still open'],
+    ...(has.rules ? ([['rules', 'Rules']] as [string, string][]) : []),
+    ...(has.responsive ? ([['responsive', 'Smaller screens']] as [string, string][]) : []),
+    ['format', 'Format'],
+  ];
+  const head = (label: string, part?: BriefPart, kind?: string, note?: string, removable?: BriefPart) => (
+    <span className="st-block-label">
+      {kind && <span className={`st-glyph g-${kind} is-sm`} aria-hidden="true" />}
+      <span className="sb-label">{label}</span>
+      {note && <span className="st-block-note">{note}</span>}
+      {part && <Status part={part} value={decision(part)} onChange={(d) => decide(part, d)} />}
+      {removable && (
+        <button type="button" className="st-drop" onClick={() => dropPart(removable)} aria-label={`Take ${PART_LABEL[removable].toLowerCase()} out of the brief`} title="Take it out of the brief">
+          ×
+        </button>
+      )}
+    </span>
+  );
 
   return (
     <div className="v0-brief st-brief">
@@ -198,6 +274,7 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
           <span className="st-brief-kicker">The brief</span>
           <span>Version {version}</span>
           <span className={approved ? 'is-approved' : ''}>{approved ? 'Approved' : 'Draft, yours to change'}</span>
+          {counts.length > 0 && <span className="st-brief-counts">{counts.map(([d, n]) => `${n} ${d === 'delegated' ? 'left to SocriaUX' : DECISION_LABEL[d].toLowerCase()}`).join(' · ')}</span>}
         </p>
         <div className="st-brief-acts">
           {approved && hasDesign ? (
@@ -222,27 +299,63 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
         </div>
       </header>
 
-      <div className="st-brief-page">
-        <label className="v0-brief-field st-objective">
-          <span className="st-block-label">
-            <span className="st-glyph g-idea is-sm" aria-hidden="true" />
-            <span className="sb-label">Objective</span>
+      {hasDesign && edited.length > 0 && (
+        <div className="st-apply" role="status">
+          <span>
+            The design follows an earlier brief. Changed since: <b>{edited.map((p) => PART_LABEL[p].toLowerCase()).join(', ')}</b>.
           </span>
-          <Prose value={brief.objective} onChange={(v) => set('objective', v)} label="Objective" big />
-        </label>
+          <button type="button" className="sb-btn is-sm is-primary" onClick={onApplyToDesign} disabled={!!busy}>
+            Apply to the design
+          </button>
+          <span className="st-apply-note">In place, as a new version you can undo; nothing is redrawn.</span>
+        </div>
+      )}
+
+      <div className="st-brief-page">
+        <div className="st-objective">
+          <label className="v0-brief-field">
+            <span className="st-block-label">
+              <span className="st-glyph g-idea is-sm" aria-hidden="true" />
+              <span className="sb-label">Objective</span>
+            </span>
+            <Prose value={brief.objective} onChange={(v) => set('objective', v)} label="Objective" big />
+          </label>
+          {has.experience && (
+            <div className="st-experience">
+              {head('How it should feel', 'experience', undefined, undefined, 'experience')}
+              <Prose value={brief.experience ?? ''} onChange={(v) => set('experience', v)} label="How it should feel" placeholder="“Like walking into a quiet gallery on a Sunday morning”" />
+            </div>
+          )}
+        </div>
+
+        <nav className="st-contents" aria-label="Contents of the brief">
+          {sections.map(([id, label], i) => (
+            <a key={id} href={`#bp-${id}`}>
+              <span>{String(i + 1).padStart(2, '0')}</span>
+              {label}
+            </a>
+          ))}
+        </nav>
 
         <div className="st-board">
-          <Block label="Audience" kind="idea" className="c-5" field>
-            <Prose value={brief.audience} onChange={(v) => set('audience', v)} label="Audience" />
-          </Block>
-          <Block label="What they come to do" className="c-4">
+          <section className="st-block c-5" id="bp-audience" aria-label="Audience">
+            {head('Audience', 'audience', 'idea')}
+            <label className="v0-brief-field">
+              <span className="v0-sr">Audience</span>
+              <Prose value={brief.audience} onChange={(v) => set('audience', v)} label="Audience" />
+            </label>
+          </section>
+          <section className="st-block c-4" id="bp-goals" aria-label="What they come to do">
+            {head('What they come to do')}
             <Lines items={brief.userGoals} onChange={(v) => set('userGoals', v)} label="Goal" add="Add something they come to do" numbered />
-          </Block>
-          <Block label="Personality" className="c-3">
+          </section>
+          <section className="st-block c-3" id="bp-personality" aria-label="Personality">
+            {head('Personality', 'personality')}
             <Words items={brief.personality} onChange={(v) => set('personality', v)} />
-          </Block>
+          </section>
 
-          <Block label="Palette" className="c-12 st-palette" note={brief.palette.length ? `${brief.palette.length} colours` : undefined}>
+          <section className="st-block c-12 st-palette" id="bp-colour" aria-label="Palette">
+            {head('Palette', 'colour', undefined, brief.palette.length ? `${brief.palette.length} colours` : undefined)}
             <ul className="st-swatches">
               {brief.palette.map((c, i) => {
                 const light = contrastRatio('#111111', c.hex) > contrastRatio('#ffffff', c.hex);
@@ -288,14 +401,15 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
                     </span>
                     <span className="st-contrast-l">{ch.label}</span>
                     <span className="st-contrast-v">{r.toFixed(1)}:1</span>
-                    <span className="st-contrast-p">{ok ? 'Reads well' : `Below ${ch.need}:1`}</span>
+                    <span className="st-contrast-p">{ok ? `Meets ${sp.contrast === 'AAA' ? 'AAA' : 'AA'}` : `Below ${ch.need}:1`}</span>
                   </li>
                 );
               })}
             </ul>
-          </Block>
+          </section>
 
-          <Block label="Typography" className="c-5 st-typeblock">
+          <section className="st-block c-5 st-typeblock" id="bp-type" aria-label="Typography">
+            {head('Typography', 'typography')}
             <div className="st-specimen" style={{ background: bg, color: fg }}>
               <p className="st-specimen-d" style={{ fontFamily: fontStack(brief.typography.display) }}>
                 {sample}
@@ -323,10 +437,22 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
                 </select>
               </label>
             </div>
+            <div className="st-specs">
+              <Spec label="Scale" value={sp.ratio} options={RATIOS} onChange={(v) => setSpec('ratio', v)} />
+            </div>
+            <ul className="st-sizes" aria-label="The type scale at a 17 px body">
+              {sizes.map((px, i) => (
+                <li key={px}>
+                  <span>{['Display', 'Heading', 'Subheading', 'Body'][i]}</span>
+                  <b>{px} px</b>
+                </li>
+              ))}
+            </ul>
             {brief.typography.rationale && <p className="st-why-note">{brief.typography.rationale}</p>}
-          </Block>
+          </section>
 
-          <Block label="Pictures on the page" kind="file" className="c-7" note={content.length ? `${inBrief} of ${content.length} in the brief` : undefined}>
+          <section className="st-block c-7" id="bp-pictures" aria-label="Pictures on the page">
+            {head('Pictures on the page', 'imagery', 'file', content.length ? `${inBrief} of ${content.length} in the brief` : undefined)}
             {!content.length && <p className="st-none">No picture is marked for the page, so the design will be typographic, or carried by shape and colour. To place a picture, open its notes on the moodboard and choose “Use the picture on the page”.</p>}
             {content.length > 0 && (
               <ul className="st-refs">
@@ -334,13 +460,7 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
                   const on = brief.references.includes(r.id);
                   return (
                     <li key={r.id}>
-                      <button
-                        type="button"
-                        className={`v0-ref st-ref${on ? ' is-on' : ''}`}
-                        aria-pressed={on}
-                        title={`${on ? 'In the brief' : 'Not in the brief'}: ${r.attribution}`}
-                        onClick={() => set('references', on ? brief.references.filter((x) => x !== r.id) : [...brief.references, r.id])}
-                      >
+                      <button type="button" className={`v0-ref st-ref${on ? ' is-on' : ''}`} aria-pressed={on} title={`${on ? 'In the brief' : 'Not in the brief'}: ${r.attribution}`} onClick={() => set('references', on ? brief.references.filter((x) => x !== r.id) : [...brief.references, r.id])}>
                         <img src={r.thumb || r.url} alt={r.title || 'Picture'} loading="lazy" referrerPolicy="no-referrer" />
                         <span className="st-ref-mark" aria-hidden="true">
                           {on ? 'In the brief' : 'Left out'}
@@ -371,23 +491,78 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
                 </ul>
               </div>
             )}
-          </Block>
+          </section>
 
-          <Block label="How it should look" className="c-6" field>
-            <Prose value={brief.visualDirection} onChange={(v) => set('visualDirection', v)} label="Visual direction" />
-          </Block>
-          <Block label="How it is laid out" className="c-6" field>
-            <Prose value={brief.layoutDirection} onChange={(v) => set('layoutDirection', v)} label="Layout" />
-          </Block>
+          <section className="st-block c-6" id="bp-look" aria-label="How it should look">
+            {head('How it should look')}
+            <label className="v0-brief-field">
+              <span className="v0-sr">How it should look</span>
+              <Prose value={brief.visualDirection} onChange={(v) => set('visualDirection', v)} label="Visual direction" />
+            </label>
+          </section>
+          <section className="st-block c-6" id="bp-layout" aria-label="How it is laid out">
+            {head('How it is laid out', 'layout')}
+            <label className="v0-brief-field">
+              <span className="v0-sr">How it is laid out</span>
+              <Prose value={brief.layoutDirection} onChange={(v) => set('layoutDirection', v)} label="Layout" />
+            </label>
+            <div className="st-specs">
+              <Spec label="Grid" value={sp.grid} options={GRIDS.map((g) => [g, GRID_LABEL[g]] as [typeof g, string])} onChange={(v) => setSpec('grid', v)} />
+              <Spec label="Width" value={sp.width} options={[['narrow', 'Narrow'], ['standard', 'Standard'], ['wide', 'Wide']]} onChange={(v) => setSpec('width', v)} />
+              <Spec label="Space" value={sp.density} options={[['compact', 'Compact'], ['comfortable', 'Comfortable'], ['spacious', 'Spacious']]} onChange={(v) => setSpec('density', v)} />
+              <Spec label="Corners" value={sp.corners} options={[['none', 'Square'], ['soft', 'Soft'], ['round', 'Round']]} onChange={(v) => setSpec('corners', v)} />
+            </div>
+          </section>
 
-          <Block label="What it must do" kind="made" className="c-6">
+          {has.motion && (
+            <section className="st-block c-6" id="bp-motion" aria-label="Motion">
+              {head('Motion', 'motion', undefined, undefined, 'motion')}
+              <div className="st-specs">
+                <Spec label="How it moves" value={m?.feel} options={MOTION_FEELS.map((f) => [f, MOTION_LABEL[f]] as [Motion['feel'], string])} onChange={(v) => setSpec('motion', v === undefined ? undefined : v === 'still' ? { ...STILL_MOTION } : motionFor(v))} />
+                <Spec label="Headline" value={m && m.feel !== 'still' ? m.headline : undefined} disabled={!m || m.feel === 'still'} options={(['none', 'fade', 'mask', 'words', 'letters'] as const).map((h) => [h, HEADLINE_LABEL[h]] as [Motion['headline'], string])} onChange={(v) => m && setSpec('motion', { ...m, headline: v ?? motionFor(m.feel).headline })} />
+                <Spec label="Parallax" value={m && m.feel !== 'still' ? m.parallax : undefined} disabled={!m || m.feel === 'still'} options={[[0, 'None'], [1, 'Gentle'], [2, 'Clear'], [3, 'Deep']]} onChange={(v) => m && setSpec('motion', { ...m, parallax: v ?? motionFor(m.feel).parallax })} />
+              </div>
+              <p className="st-why-note">{m ? describeMotion(m) : 'The direction’s own motion. Set it here to decide it yourself; locking it keeps it in every direction.'}</p>
+            </section>
+          )}
+          {has.accessibility && (
+            <section className="st-block c-6" id="bp-accessibility" aria-label="Accessibility">
+              {head('Accessibility', 'accessibility', undefined, undefined, 'accessibility')}
+              <div className="st-specs">
+                <Spec label="Contrast" value={sp.contrast} options={[['AA', 'AA: 4.5:1'], ['AAA', 'AAA: 7:1']]} onChange={(v) => setSpec('contrast', v)} />
+              </div>
+              <Lines items={brief.accessibility ?? []} onChange={(v) => set('accessibility', v.length ? v : undefined)} label="Accessibility note" add="Add a need: “large text for older readers”" />
+              <p className="st-why-note">Always: every text is checked on its own ground, and motion has a reduced-motion alternative.</p>
+            </section>
+          )}
+
+          <section className="st-block c-6" id="bp-must" aria-label="What it must do">
+            {head('What it must do', 'function', 'made')}
             <Lines items={brief.functionalRequirements} onChange={(v) => set('functionalRequirements', v)} label="Requirement" add="Add something it must do" />
-          </Block>
-          <Block label="Still open" kind="question" className="c-6 st-open" note={brief.openQuestions.length ? 'answered later, or with placeholders' : undefined}>
+          </section>
+          <section className="st-block c-6 st-open" id="bp-open" aria-label="Still open">
+            {head('Still open', undefined, 'question', brief.openQuestions.length ? 'answered later, or with placeholders' : undefined)}
             {brief.openQuestions.length ? <Lines items={brief.openQuestions} onChange={(v) => set('openQuestions', v)} label="Open question" add="Add something still open" /> : <p className="st-none">Nothing left open.</p>}
-          </Block>
+          </section>
 
-          <Block label="Format" className="c-12 st-format">
+          {has.rules && (
+            <section className="st-block c-6 st-rules" id="bp-rules" aria-label="Rules">
+              {head('Rules it must follow', 'rules', 'objection', 'never broken', 'rules')}
+              <Lines items={brief.rules ?? []} onChange={(v) => set('rules', v.length ? v : undefined)} label="Rule" add="Add a rule: “no animation”, “no photographs of people”" />
+              <p className="st-why-note">Everything else in the brief is a preference. A rule is read for every direction and given to SocriaUX as non-negotiable.</p>
+            </section>
+          )}
+          {has.responsive && (
+            <section className="st-block c-6" id="bp-responsive" aria-label="Smaller screens">
+              {head('On smaller screens', 'responsive', undefined, undefined, 'responsive')}
+              <Lines items={brief.responsive ?? []} onChange={(v) => set('responsive', v.length ? v : undefined)} label="Note for smaller screens" add="Add one: “booking stays one tap away on a phone”" />
+            </section>
+          )}
+
+          <section className="st-block c-12 st-format" id="bp-format" aria-label="Format">
+            <span className="st-block-label">
+              <span className="sb-label">Format</span>
+            </span>
             <span className="sb-seg is-tight" role="radiogroup" aria-label="Kind of design">
               {(
                 [
@@ -412,8 +587,19 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
                 </button>
               ))}
             </span>
-          </Block>
+          </section>
         </div>
+
+        {OPTIONAL.some((p) => !has[p]) && (
+          <div className="st-addparts">
+            <span>Add to the brief</span>
+            {OPTIONAL.filter((p) => !has[p]).map((p) => (
+              <button key={p} type="button" className="st-addpart" onClick={() => addPart(p)}>
+                + {PART_LABEL[p]}
+              </button>
+            ))}
+          </div>
+        )}
 
         <footer className="st-brief-foot">
           <button type="button" className="sb-link is-meta" onClick={onBack}>
