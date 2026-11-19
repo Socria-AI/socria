@@ -1145,6 +1145,23 @@ create table if not exists ux_v0_calls (
 create index if not exists ux_v0_calls_user_day_idx on ux_v0_calls (user_id, day);
 create index if not exists ux_v0_calls_project_idx on ux_v0_calls (user_id, project_id);
 
+-- Each call's operation record (lib/ux-v0/telemetry.ts) and the designer's organisation (a Clerk organisation:
+-- a club, a class, a studio), for diagnostics and organisation budgets (SOCRIAUX_ORG_DAILY_USD,
+-- SOCRIAUX_ORG_MONTHLY_USD). Added to an existing table in place; the app writes rows without these columns
+-- until they exist, and holds no organisation budget until org_id does.
+alter table ux_v0_calls add column if not exists org_id text;
+alter table ux_v0_calls add column if not exists operation_id text;
+alter table ux_v0_calls add column if not exists operation text;
+alter table ux_v0_calls add column if not exists outcome text;
+alter table ux_v0_calls add column if not exists retries integer not null default 0;
+alter table ux_v0_calls add column if not exists reasoning_tokens bigint not null default 0;
+alter table ux_v0_calls add column if not exists queued_ms integer;
+alter table ux_v0_calls add column if not exists ttft_ms integer;
+alter table ux_v0_calls add column if not exists model_ms integer;
+alter table ux_v0_calls add column if not exists total_ms integer;
+alter table ux_v0_calls add column if not exists cancelled boolean not null default false;
+create index if not exists ux_v0_calls_org_day_idx on ux_v0_calls (org_id, day) where org_id is not null;
+
 -- ── Socria events: RSVP and attendance ─────────────────────────────────
 --
 -- events: one row per event, edited by Socria admins. A date is shown on the

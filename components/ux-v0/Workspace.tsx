@@ -54,7 +54,10 @@ import {
   STAGE_LABEL,
 } from '@/lib/ux-v0/types';
 import { interleave, searchOpenverse } from '@/lib/ux-v0/image-search';
-import { post } from './api';
+import { operationId, post, type ApiResult, type CallTiming, type Progress } from './api';
+import { readQuickEdit } from '@/lib/ux-v0/quick-edit';
+import { offSystem } from '@/lib/ux-v0/design-system';
+import { warnBefore, type BudgetSeen } from '@/lib/ux-v0/estimates';
 import { BriefDoc } from './BriefDoc';
 import { CardsRail } from './Cards';
 import { DirectionBoard } from './DirectionBoard';
@@ -70,7 +73,7 @@ import { Preview } from './Preview';
 import { checkFile, fetchOriginal, imageSize, keepOriginal } from './files';
 import { Inspect } from './Inspect';
 import { SectionEditor } from './SectionEditor';
-import { holdLocked, setLocked } from '@/lib/ux-v0/edit';
+import { holdLocked, lockedTouched, setLocked } from '@/lib/ux-v0/edit';
 import { LAYOUT_QUESTION_ID } from '@/lib/ux-v0/layout';
 import { designerWords } from '@/lib/ux-v0/intent';
 import { elementSelection } from '@/lib/ux-v0/selection';
@@ -79,6 +82,71 @@ import { Stage, type SelectMode, type StageHandle } from './Stage';
 import { SAVE_WORDS, useV0Project } from './useV0Project';
 
 type View = 'intent' | 'import' | 'discovery' | 'brief' | 'direction' | 'design';
+
+/** A model operation in progress, as the working strip shows it: only what the server has said happened. */
+interface Work {
+  kind: string;
+  label: string;
+  op: string;
+  startedAt: number;
+  phase: 'sending' | 'accepted' | NonNullable<Progress['phase']>;
+  model?: string;
+  tier?: string;
+  chars?: number;
+  ctl: AbortController;
+}
+
+/** Where an operation has got, in words: each phase only once the server has said it. */
+export function phaseWords(w: Pick<Work, 'phase' | 'model' | 'tier' | 'chars'>): string {
+  const m = w.model ? `${w.model}${w.tier === 'premium' ? ' (premium)' : ''}` : 'the model';
+  switch (w.phase) {
+    case 'sending':
+      return 'Sending';
+    case 'accepted':
+      return 'Received';
+    case 'checking':
+      return 'Checking the budgets';
+    case 'asked':
+      return `Asked ${m}`;
+    case 'thinking':
+      return `${m.charAt(0).toUpperCase()}${m.slice(1)} is thinking`;
+    case 'writing':
+      return `Writing: ${(w.chars ?? 0).toLocaleString()} characters`;
+    case 'fallback':
+      return `Too slow; asked ${m} instead`;
+    case 'finishing':
+      return 'Checking the answer';
+    default:
+      return 'Working';
+  }
+}
+
+/** The operations running: what each is doing, for how long so far, and a way to stop it. */
+function WorkStrip({ work }: { work: Work[] }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+  return (
+    <div className="v0-workstrip" role="group" aria-label="Working">
+      {work.map((w) => (
+        <div key={w.op} className="v0-workstrip-row">
+          <span className="v0-workstrip-dot" aria-hidden="true" />
+          <span className="v0-workstrip-what" role="status">
+            {w.label} · <span className="v0-workstrip-phase">{phaseWords(w)}</span>
+          </span>
+          <span className="v0-workstrip-time" aria-hidden="true">
+            {Math.max(0, Math.round((now - w.startedAt) / 1000))} s
+          </span>
+          <button type="button" className="sb-link is-meta v0-workstrip-stop" onClick={() => w.ctl.abort()}>
+            Cancel
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
 type Rail = 'brief' | 'questions' | 'reasoning' | 'selection' | 'checks' | 'history' | 'file';
 
 /** What the last look at the drawn design found, and what it fixed on its own. */
@@ -132,6 +200,13 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const [text, setText] = useState('');
   const [intentText, setIntentText] = useState(startIntent ?? '');
   const [busy, setBusy] = useState<string | null>(null);
+  // the model operations running now: what each is, how far it has got (as the server said, never guessed), and its cancel
+  const [work, setWork] = useState<Work[]>([]);
+  const running = useRef(new Map<string, Work>());
+  // what the browser measured of each call (its round trip beside the server's record), for the diagnostics
+  const [calls, setCalls] = useState<CallTiming[]>([]);
+  // what is spent of each budget, as the last answer said: to ask before a premium step that might not fit
+  const budgetSeen = useRef<BudgetSeen | null>(null);
   const [imgBusy, setImgBusy] = useState<string | null>(null);
   const [imgError, setImgError] = useState('');
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -164,12 +239,47 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     window.addEventListener('ux-v0-notice', heard);
     return () => window.removeEventListener('ux-v0-notice', heard);
   }, [say]);
+  useEffect(() => {
+    const timed = (e: Event) => setCalls((c) => [...c, (e as CustomEvent<CallTiming>).detail].slice(-30));
+    const budget = (e: Event) => (budgetSeen.current = (e as CustomEvent<BudgetSeen>).detail ?? null);
+    window.addEventListener('ux-v0-telemetry', timed);
+    window.addEventListener('ux-v0-budget', budget);
+    return () => {
+      window.removeEventListener('ux-v0-telemetry', timed);
+      window.removeEventListener('ux-v0-budget', budget);
+    };
+  }, []);
   // what a screen reader hears: each selection as it is made, or why a step went nowhere
   const [stepNote, setStepNote] = useState('');
   // missing linked files are mentioned once per file opened; the full list is under File
   const missingSaid = useRef<string | null>(null);
   useEffect(() => setStepNote(''), [selection?.id]);
-  const failed = useCallback((r: { error: string; signIn?: boolean }) => say(r.error, 'error', { signIn: r.signIn }), [say]);
+  const failed = useCallback((r: { error: string; signIn?: boolean; cancelled?: boolean }) => say(r.error, r.cancelled ? 'info' : 'error', { signIn: r.signIn }), [say]);
+
+  /**
+   * One model operation: once (a second press while it runs does nothing), cancellable, named for the server
+   * (so a retry of the same action is answered once), with its progress shown as the server reports it.
+   * Null when the same operation is already running — unless `latestWins`, when the one running is cancelled
+   * and this one asked instead (asking for other directions while the last ones are still being written).
+   */
+  const runOp = useCallback(async <T,>(kind: string, label: string, path: string, body: unknown, latestWins = false): Promise<ApiResult<T> | null> => {
+    const already = running.current.get(kind);
+    if (already && !latestWins) return null;
+    if (already) already.ctl.abort();
+    const ctl = new AbortController();
+    const op = operationId(kind);
+    const w: Work = { kind, label, op, startedAt: Date.now(), phase: 'sending', ctl };
+    running.current.set(kind, w);
+    setWork((ws) => [...ws, w]);
+    const heard = (p: Progress) =>
+      setWork((ws) => ws.map((x) => (x.op !== op ? x : { ...x, phase: p.type === 'accepted' ? 'accepted' : p.phase ?? x.phase, model: p.model ?? x.model, tier: p.tier ?? x.tier, chars: p.chars ?? x.chars })));
+    try {
+      return await post<T>(path, body, { signal: ctl.signal, operationId: op, onProgress: heard });
+    } finally {
+      if (running.current.get(kind)?.op === op) running.current.delete(kind);
+      setWork((ws) => ws.filter((x) => x.op !== op));
+    }
+  }, []);
 
   // ── the imported file, from this browser (or the account) ─────────────
   useEffect(() => {
@@ -278,7 +388,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     async (over: { intent?: string; questions?: DiscoveryQuestion[]; remark?: string } = {}) => {
       const p = current.current;
       setBusy('Thinking about what to ask next…');
-      const r = await post<{
+      const r = await runOp<{
         understanding: Understanding;
         questions: DiscoveryQuestion[];
         queries: { category: MoodCategory; query: string }[];
@@ -287,7 +397,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
         ready: boolean;
         note: string;
         usage: Usage;
-      }>('/api/ux-v0/discover', {
+      }>('discover', 'Thinking about what to ask next', '/api/ux-v0/discover', {
         projectId: p.id,
         action: 'turn',
         intent: over.intent ?? p.intent,
@@ -297,6 +407,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
         remark: over.remark ?? '',
       });
       setBusy(null);
+      if (!r) return;
       if (!r.ok) return failed(r);
       const d = r.data;
       // never ask again about a topic already answered or left to SocriaUX
@@ -310,7 +421,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       }));
       if (d.queries.length) await fetchImages(d.queries, 6);
     },
-    [current, update, failed, fetchImages]
+    [current, update, failed, fetchImages, runOp]
   );
 
   const begin = useCallback(
@@ -399,7 +510,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const direction = async (aspect: Aspect) => {
     const p = current.current;
     setImgBusy('Finding another direction…');
-    const r = await post<{ direction: string; queries: { category: MoodCategory; query: string }[]; palettes: Palette[]; type: TypePair[]; usage: Usage }>('/api/ux-v0/discover', {
+    const r = await runOp<{ direction: string; queries: { category: MoodCategory; query: string }[]; palettes: Palette[]; type: TypePair[]; usage: Usage }>('direction', 'Finding another direction', '/api/ux-v0/discover', {
       projectId: p.id,
       action: 'direction',
       aspect,
@@ -409,6 +520,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       moodboard: p.moodboard,
     });
     setImgBusy(null);
+    if (!r) return;
     if (!r.ok) return setImgError(r.error);
     const d = r.data;
     update((p2) => ({ ...p2, moodboard: { ...p2.moodboard, palettes: [...p2.moodboard.palettes, ...d.palettes].slice(-12), type: [...p2.moodboard.type, ...d.type].slice(-12) }, usage: addUsage(p2.usage, d.usage) }));
@@ -421,7 +533,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const p = current.current;
     const refining = !!instruction && !!p.brief.doc;
     setBusy(refining ? 'Changing the brief…' : 'Writing the brief…');
-    const r = await post<{ brief: DesignBrief; queries?: { category: MoodCategory; query: string }[]; usage: Usage }>('/api/ux-v0/brief', {
+    const r = await runOp<{ brief: DesignBrief; queries?: { category: MoodCategory; query: string }[]; usage: Usage }>('brief', refining ? 'Changing the brief' : 'Writing the brief', '/api/ux-v0/brief', {
       projectId: p.id,
       action: refining ? 'refine' : 'synthesize',
       intent: p.intent,
@@ -432,6 +544,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       instruction,
     });
     setBusy(null);
+    if (!r) return;
     if (!r.ok) return failed(r);
     // what the designer decided stays decided: locked parts keep their words, a changed approved part is reopened
     const merged = refining
@@ -508,7 +621,10 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const options = proposeDirections(ask);
     update((p2) => ({ ...p2, direction: { ...p2.direction, options, round: ask.round, seen: [...new Set([...ask.seen, ...options.map((o) => o.language)])].slice(-24), forBrief: briefKey(p.brief.doc!) } }));
     setDirNote('Writing each direction for this brand…');
-    const r = await post<{ options: ArtDirection[]; usage: Usage }>('/api/ux-v0/direct', { projectId: p.id, ...ask, base: ask.base });
+    const r = await runOp<{ options: ArtDirection[]; usage: Usage }>('direct', 'Writing each direction for this brand', '/api/ux-v0/direct', { projectId: p.id, ...ask, base: ask.base }, true);
+    if (!r) return;
+    // replaced by a newer ask (its own note follows), or cancelled by the designer
+    if (!r.ok && r.cancelled) return current.current.direction.round === ask.round ? setDirNote('Drawn by SocriaUX’s direction engine. The written concepts were cancelled.') : undefined;
     if (!r.ok) return setDirNote(r.signIn ? 'Drawn by SocriaUX’s direction engine. Sign in for concepts written for this brand.' : 'Drawn by SocriaUX’s direction engine; the written concepts could not be fetched just now.');
     setDirNote('');
     // a direction the designer has already changed stays theirs
@@ -598,14 +714,23 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   };
 
   // ── generating and changing the design ──────────────────────────────
-  const generate = async (dir = '', art: ArtDirection | null = null) => {
+  const generate = async (dir = '', art: ArtDirection | null = null, confirmed = false): Promise<void> => {
     const p = current.current;
     if (!p.brief.doc) return;
     const approved = art ?? (p.direction.approved ? p.direction.chosen : null);
-    setBusy(approved ? `Designing in the “${approved.name}” direction…` : 'Designing from the brief…');
+    // before a premium step that a budget might not hold: the measured cost, the limit, what is left — the designer decides
+    const warn = !confirmed ? warnBefore('generate', budgetSeen.current) : null;
+    if (warn) {
+      say(`${warn} Design it anyway?`, 'info', { acts: [{ label: 'Design it', run: () => void generate(dir, art, true), strong: true }, { label: 'Not now', run: () => setNotice(null) }] });
+      return;
+    }
+    const label = approved ? `Designing in the “${approved.name}” direction` : 'Designing from the brief';
+    setBusy(`${label}…`);
     const version = (p.specs[p.specs.length - 1]?.version ?? 0) + 1;
-    const r = await post<{ spec: DesignSpec; artDirection?: ArtDirection; placeholders: string[]; usage: Usage; notice?: string }>('/api/ux-v0/generate', { projectId: p.id, brief: p.brief.doc, moodboard: p.moodboard, direction: dir, artDirection: approved, version });
+    const r = await runOp<{ spec: DesignSpec; artDirection?: ArtDirection; placeholders: string[]; usage: Usage; notice?: string }>('generate', label, '/api/ux-v0/generate', { projectId: p.id, brief: p.brief.doc, moodboard: p.moodboard, direction: dir, artDirection: approved, version });
     setBusy(null);
+    if (!r) return;
+    // a failed or cancelled generation leaves the design on the canvas exactly as it was
     if (!r.ok) return failed(r);
     const drawn = normalizeSpec(r.data.spec, current.current.moodboard);
     if (!drawn) return say('The design that came back did not hold together. Nothing changed; try again.', 'error');
@@ -701,14 +826,42 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const p = current.current;
     const s = currentSpec(p);
     if (!s) return;
-    // the everyday ways of asking for one change are done at once, in code, keeping everything else
+    const imported = !!p.artifact?.type?.startsWith('imported');
+    // the everyday small changes (a colour, a typeface, the corners, new words, the headline's size) are read in
+    // code and done at once — no model, nothing regenerated — asked about first when they touch what the designer
+    // locked, leave their design system, or would make text hard to read (lib/ux-v0/quick-edit.ts)
+    const qe = !imported ? readQuickEdit(comment, s, selection) : null;
+    if (qe && !qe.patches.length) return say(`Nothing to change: ${qe.label}.`, 'info');
+    if (qe) {
+      const locks = p.direction.chosen?.locks ?? [];
+      const hit = [...new Set(qe.patches.flatMap((pt) => lockedChanges(s, pt, locks)))];
+      const sectionsHit = qe.patches.flatMap((pt) => lockedTouched(s, pt));
+      const ds = p.brief.doc?.system;
+      const outside = ds ? [...new Set(qe.patches.flatMap((pt) => offSystem(pt, ds)))] : [];
+      const concerns = [
+        hit.length ? `This changes the ${hit.map((g) => LOCK_LABEL[g].toLowerCase()).join(' and ')}, which you locked in the art direction.` : '',
+        outside.length && ds ? `This uses ${outside.join(' and ')}, which ${outside.length > 1 ? 'are' : 'is'} not in your design system (${ds.name}).` : '',
+        sectionsHit.length ? 'This changes a section you locked.' : '',
+        qe.concern ? qe.concern.replace(/\s*Make the change anyway\?$/, '') : '',
+      ].filter(Boolean);
+      if (concerns.length)
+        return say(`${concerns.join(' ')} Make the change anyway?`, 'info', {
+          acts: [
+            { label: 'Apply anyway', run: () => (applyLocal(qe.patches, qe.label), undefined), strong: true },
+            { label: 'Keep it as it is', run: () => setNotice(null) },
+          ],
+        });
+      applyLocal(qe.patches, qe.label);
+      return;
+    }
+    // the everyday ways of asking for one change of the look are done at once, in code, keeping everything else
     const quick = readAdjust(comment);
-    if (quick.length && !p.artifact?.type?.startsWith('imported')) {
+    if (quick.length && !imported) {
       adjustDesign(quick);
       return;
     }
     setBusy('Working out the change…');
-    const r = await post<{ understood: string; challenge: string; question: string; regenerate: string; patch: Patch; applies: boolean; locked?: LockGroup[]; error: string; usage: Usage }>('/api/ux-v0/refine', {
+    const r = await runOp<{ understood: string; challenge: string; question: string; regenerate: string; patch: Patch; applies: boolean; locked?: LockGroup[]; error: string; usage: Usage }>('refine', 'Working out the change', '/api/ux-v0/refine', {
       projectId: p.id,
       brief: p.brief.doc,
       spec: s,
@@ -719,6 +872,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       locks: p.direction.chosen?.locks ?? [],
     });
     setBusy(null);
+    if (!r) return;
     if (!r.ok) return failed(r);
     const d = r.data;
     update((p2) => ({ ...p2, usage: addUsage(p2.usage, d.usage) }));
@@ -775,7 +929,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       const sectionId = sel.element?.ux?.section || sel.region?.elements.find((e) => e.ux)?.ux?.section || '';
       const section = s && sectionId ? JSON.stringify(s.sections.find((x) => x.id === sectionId) ?? '').slice(0, 1200) : '';
       setPendingTurn(turn.id);
-      const r = await post<{ reasoning: Reasoning; artifactSummary: string | null; usage: Usage }>('/api/ux-v0/critique', {
+      const r = await runOp<{ reasoning: Reasoning; artifactSummary: string | null; usage: Usage }>(`critique:${cardId}`, 'Reading the design', '/api/ux-v0/critique', {
         projectId: p.id,
         selection: sel,
         comment: turn.comment,
@@ -789,6 +943,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
         thumb,
       });
       setPendingTurn(null);
+      if (!r) return;
       update((p2) => ({
         ...p2,
         cards: p2.cards.map((c) =>
@@ -801,7 +956,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       }));
       if (!r.ok && r.signIn) failed(r);
     },
-    [current, update, failed]
+    [current, update, failed, runOp]
   );
 
   const comment = async (words: string) => {
@@ -1047,7 +1202,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
           </nav>
         )}
         <div className="v0-head-r">
-          {project.usage.calls > 0 && <CostPanel usage={project.usage} note={spendNote} />}
+          {project.usage.calls > 0 && <CostPanel usage={project.usage} note={spendNote} calls={calls} />}
           <span className={`v0-save s-${save}`} role="status">
             {SAVE_WORDS[save]}
           </span>
@@ -1342,6 +1497,8 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
               </button>
             </div>
           )}
+
+          {work.length > 0 && <WorkStrip work={work} />}
 
           {showComposer && (
             <Composer
@@ -1701,7 +1858,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
 const STAGE_ORDER: readonly CallKind[] = ['discover', 'direction', 'brief', 'refine-brief', 'art-direction', 'generate', 'refine', 'critique'];
 
 /** What the project has cost, by stage, as the provider reported it; and per accepted (downloaded) design. */
-function CostPanel({ usage, note }: { usage: UsageTotals; note: string }) {
+function CostPanel({ usage, note, calls }: { usage: UsageTotals; note: string; calls: CallTiming[] }) {
   const by = usage.byStage ?? {};
   const staged = STAGE_ORDER.filter((k) => by[k]?.calls);
   const counted = staged.reduce((n, k) => n + (by[k]?.calls ?? 0), 0);
@@ -1743,7 +1900,68 @@ function CostPanel({ usage, note }: { usage: UsageTotals; note: string }) {
         )}
         <p className="v0-cost-l">{per != null ? `Per accepted design: US$${per.toFixed(4)} (${accepted} downloaded).` : 'Cost per accepted design appears once you download a design.'}</p>
         {note && <p className="v0-cost-l is-note">{note}</p>}
+        {(usage.reasoning || usage.cached) && (
+          <p className="v0-cost-l">
+            Of {usage.output.toLocaleString()} tokens written, {(usage.reasoning ?? 0).toLocaleString()} were the model’s reasoning (billed, never shown); of {usage.input.toLocaleString()} read, {(usage.cached ?? 0).toLocaleString()} came from the provider’s cache (billed at its cached price).
+          </p>
+        )}
+        {calls.some((c) => c.record) && <Diagnostics calls={calls} />}
       </div>
+    </details>
+  );
+}
+
+const secs = (ms: number | null | undefined) => (ms == null ? '—' : (ms / 1000).toFixed(1));
+
+/** The last calls, each as the server recorded it and the browser measured it: where the time and the money went. */
+function Diagnostics({ calls }: { calls: CallTiming[] }) {
+  const rows = calls.filter((c) => c.record).slice(-12).reverse();
+  return (
+    <details className="v0-diag">
+      <summary className="sb-link is-meta">Diagnostics: the last {rows.length} call{rows.length === 1 ? '' : 's'}</summary>
+      <table className="v0-cost-table v0-diag-table">
+        <thead>
+          <tr>
+            <th scope="col">Stage</th>
+            <th scope="col">Model</th>
+            <th scope="col" title="tokens read (from the cache) / written (reasoning)">Tokens</th>
+            <th scope="col">US$</th>
+            <th scope="col" title="before the model was asked: checks and budgets">Queue s</th>
+            <th scope="col" title="from asking the model to its first output">First s</th>
+            <th scope="col" title="the model, every attempt included">Model s</th>
+            <th scope="col" title="the network and the platform: the browser's round trip less the server's own time">Net s</th>
+            <th scope="col">Total s</th>
+            <th scope="col">How it ended</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((c, i) => {
+            const r = c.record!;
+            return (
+              <tr key={`${r.op}-${i}`}>
+                <th scope="row">{r.stage}</th>
+                <td>{r.model ? `${r.model}${r.tier === 'premium' ? ' ★' : ''}` : '—'}</td>
+                <td>
+                  {r.input.toLocaleString()}
+                  {r.cached ? ` (${r.cached.toLocaleString()})` : ''} / {r.output.toLocaleString()}
+                  {r.reasoning ? ` (${r.reasoning.toLocaleString()})` : ''}
+                </td>
+                <td>{r.cost == null ? '—' : r.cost.toFixed(4)}</td>
+                <td>{secs(r.queuedMs)}</td>
+                <td>{secs(r.ttftMs)}</td>
+                <td>{secs(r.modelMs)}</td>
+                <td>{secs(c.networkMs)}</td>
+                <td>{secs(c.clientMs)}</td>
+                <td>
+                  {r.outcome}
+                  {r.retries ? ` · ${r.retries} retr${r.retries === 1 ? 'y' : 'ies'}` : ''}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <p className="v0-cost-l">★ the premium model. Times are seconds. Tokens: read (from the cache) / written (reasoning). Nothing here is a prompt or anything you wrote.</p>
     </details>
   );
 }

@@ -37,6 +37,10 @@ const usage = (stage, tier) => ({ model: tier === 'premium' ? 'gpt-6.1-sol' : 'g
 const WORDS = 'Booking screen for my yoga studio: members choose a day and a time for an already-selected class, then confirm.';
 let briefSent = null;
 let turns = 0;
+// what reached the model routes, for the checks that none did (an edit done in code) or only one did (a double-click)
+const hits = { generate: 0, refine: 0 };
+// an operation record as the route sends it (lib/ux-v0/stage-server.ts): numbers and labels only
+const record = (stage, model, tier, totalMs) => V.normalizeRecord({ op: `op_${stage}_${Date.now().toString(36)}`, stage, operation: stage, provider: 'openai', model, api: tier === 'premium' ? 'responses' : 'chat', tier, effort: tier === 'premium' ? 'medium' : 'default', input: 3300, cached: 2000, output: 1400, reasoning: tier === 'premium' ? 1000 : 0, cost: tier === 'premium' ? 0.0213 : 0.0007, startedAt: Date.now(), queuedMs: 140, ttftMs: Math.round(totalMs * 0.8), modelMs: totalMs - 160, totalMs, retries: 0, outcome: 'ok', cancelled: false });
 // as the discover route does: the model's turn, then SocriaUX's own layout question (lib/ux-v0/discovery.ts)
 const turn = (body, result) => ({ ...V.withLayoutQuestion({ queries: [], palettes: [], type: [], note: '', ...result }, { intent: body.intent, questions: V.normalizeDiscovery({ questions: body.questions }).questions, understanding: result.understanding, moodboard: V.normalizeMoodboard(body.moodboard), remark: body.remark ?? '' }), usage: usage('discover', 'economy') });
 await ctx.route('**/api/ux-v0/**', async (r) => {
@@ -65,13 +69,22 @@ await ctx.route('**/api/ux-v0/**', async (r) => {
     return r.fulfill({ json: { usage: usage('art-direction', 'premium'), options: V.proposeDirections(ask) } });
   }
   if (url.endsWith('/generate')) {
+    hits.generate++;
+    // a generation takes a moment, so the working strip (and a second press) can be seen
+    await new Promise((res) => setTimeout(res, 1500));
     // what the route makes of the answer that caused the original failure: a landing page about the studio
     const brief = V.normalizeBrief(body.brief) ?? briefSent;
     const board = V.normalizeMoodboard(body.moodboard);
     const art = body.artDirection ? V.normalizeDirection(body.artDirection) : V.autoDirection(brief);
     const bad = { title: 'Lotus Yoga', sections: [{ id: 'nav', kind: 'nav', content: { brand: 'Lotus', links: ['About'], cta: 'Begin' } }, { id: 'hero', kind: 'hero', content: { title: 'Find your flow', primary: 'Begin', secondary: 'Read more' } }, { id: 'why', kind: 'features', content: { title: 'Why us', items: [{ title: 'Calm', text: 'x' }, { title: 'Warm', text: 'y' }] } }, { id: 'foot', kind: 'footer', content: { brand: 'Lotus' } }] };
     const spec = V.parseGenerate(bad, brief, board, body.version ?? 1, `Generated in the “${art.name}” direction`, art);
-    return r.fulfill({ json: { usage: usage('generate', 'premium'), artDirection: art, spec, placeholders: V.placeholdersIn(spec) } });
+    return r.fulfill({ json: { usage: usage('generate', 'premium'), artDirection: art, spec, placeholders: V.placeholdersIn(spec), telemetry: record('generate', 'gpt-6.1-sol', 'premium', 31300) } });
+  }
+  if (url.endsWith('/refine')) {
+    // a change only the model can read: slow enough to be cancelled
+    hits.refine++;
+    await new Promise((res) => setTimeout(res, 6000));
+    return r.fulfill({ json: { understood: 'A more editorial layout.', challenge: '', question: '', regenerate: '', patch: { op: 'none', summary: '' }, applies: false, error: '', usage: usage('refine', 'premium'), telemetry: record('refine', 'gpt-6.1-sol', 'premium', 6000) } }).catch(() => {});
   }
   return r.fallback();
 });
@@ -168,8 +181,13 @@ const chips = await page.locator('.ad-plan').evaluateAll((els) => els.map((el) =
 ok('…built within the design system: its accent and its ground among every direction’s named colours', chips.length === 3 && chips.every((xs) => xs.includes('rgb(15, 118, 110)') && xs.includes('rgb(248, 250, 252)')), JSON.stringify(chips));
 await page.locator('.ad-plan').first().screenshot({ path: `${S}ui-3b-plan-1440.png` });
 await shootAll('3-direction');
-await page.locator('.v0-dir').first().getByRole('button', { name: 'Use this direction' }).click();
+await page.locator('.v0-dir').first().getByRole('button', { name: 'Use this direction' }).dblclick();
+await page.waitForSelector('.v0-workstrip', { timeout: 4000 }).catch(() => {});
+const strip = (await page.locator('.v0-workstrip').count()) ? await page.locator('.v0-workstrip').innerText() : '';
+ok('the working strip appears at once: what is happening, how long so far, and a way to cancel it', /Designing in the “/.test(strip) && /\d+ s/.test(strip) && (await page.locator('.v0-workstrip').getByRole('button', { name: 'Cancel' }).count()) === 1, strip);
+await page.locator('.v0-workstrip').screenshot({ path: `${S}ui-3c-working-1440.png` }).catch(() => {});
 await page.waitForSelector('iframe.v0-frame', { timeout: 40000 });
+ok('"Use this direction" pressed twice: one generation asked for', hits.generate === 1, hits.generate);
 await page.waitForTimeout(3500);
 const fr = () => page.frames().find((f) => f.url() === 'about:srcdoc' && f.parentFrame() === page.mainFrame());
 const frame = page.frameLocator('iframe.v0-frame');
@@ -222,6 +240,39 @@ await page.waitForTimeout(400);
 const cost = await page.locator('.v0-cost-panel').innerText();
 ok('the cost panel shows each stage, premium calls and the per-design line', /Generation/.test(cost) && /Art direction/.test(cost) && /Questions/.test(cost) && /accepted design/.test(cost), cost);
 await page.screenshot({ path: `${S}ui-7-cost-1440.png` });
+await page.locator('.v0-diag > summary').click();
+await page.waitForTimeout(300);
+const diag = await page.locator('.v0-diag').innerText();
+ok('the diagnostics list each call as the server recorded it and the browser measured it: model, tokens (cached, reasoning), times, how it ended', /generate/.test(diag) && /gpt-6\.1-sol/.test(diag) && /\(2,000\)/.test(diag) && /\(1,000\)/.test(diag) && /31\.\d/.test(diag) && /ok/.test(diag), diag.slice(0, 400));
+await page.locator('.v0-cost-panel').screenshot({ path: `${S}ui-7b-diagnostics-1440.png` }).catch(() => {});
+await page.locator('.v0-cost > summary').click();
+// an everyday edit: done in code, no model asked — here asked about first, since black is not in the design system
+await page.keyboard.press('Escape');
+const composer = page.locator('.v0-composer textarea, .v0-compose textarea').first();
+await composer.fill('Change the button color to black');
+const refineBefore = hits.refine;
+const quickT0 = Date.now();
+await composer.press('Enter');
+await page.waitForSelector('.v0-notice', { timeout: 4000 }).catch(() => {});
+const quickNotice = await page.locator('.v0-notice').innerText().catch(() => '');
+ok('"change the button colour to black": read in code, no model asked, and asked about first (black is not in the design system)', hits.refine === refineBefore && /not in your design system \(Tidewater\)/.test(quickNotice) && (await page.getByRole('button', { name: 'Apply anyway' }).count()) === 1, quickNotice);
+await page.getByRole('button', { name: 'Apply anyway' }).click();
+await page.waitForTimeout(900);
+const black = await frame.locator('[data-ux-confirm]').evaluate((e) => getComputedStyle(e).backgroundColor);
+ok(`…applied at once (${Date.now() - quickT0} ms from Enter, the question included), the action now black, with Undo`, black === 'rgb(0, 0, 0)' && (await page.getByRole('button', { name: 'Undo' }).count()) > 0, black);
+await page.screenshot({ path: `${S}ui-8-quick-edit-1440.png` });
+// a change only the model can read, cancelled: the model is stopped and the canvas is exactly as it was
+const versionBefore = await page.locator('.v0-version, [data-version]').first().innerText().catch(() => '');
+const htmlBefore = await frame.locator('body').innerHTML();
+await composer.fill('Rework the whole layout so it reads as an editorial report');
+await composer.press('Enter');
+await page.waitForSelector('.v0-workstrip', { timeout: 4000 });
+ok('a change that needs the model shows the working strip', /Working out the change/.test(await page.locator('.v0-workstrip').innerText()));
+await page.locator('.v0-workstrip').getByRole('button', { name: 'Cancel' }).click();
+await page.waitForTimeout(500);
+const cancelNotice = await page.locator('.v0-notice').innerText().catch(() => '');
+ok('cancelled: said plainly, the strip gone, and the design exactly as it was', /Cancelled\. Nothing changed\./.test(cancelNotice) && (await page.locator('.v0-workstrip').count()) === 0 && (await frame.locator('body').innerHTML()) === htmlBefore && (await page.locator('.v0-version, [data-version]').first().innerText().catch(() => '')) === versionBefore, cancelNotice);
+await page.screenshot({ path: `${S}ui-9-cancelled-1440.png` });
 ok('no errors in the page', !errs.length, errs.join(' | '));
 await b.close();
 console.log(`\nui qa: ${pass} passed, ${fail} failed (screenshots in ${S})`);

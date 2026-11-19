@@ -195,9 +195,14 @@ export interface Reasoning {
 
 export interface Usage {
   model: string;
+  /** every input token billed, the cached ones included */
   input: number;
+  /** of `input`, the ones the provider read from its prompt cache (billed at its cached price) */
   cached: number;
+  /** every output token billed, the reasoning included */
   output: number;
+  /** of `output`, the ones spent reasoning, when the provider says (never shown to anyone, but billed) */
+  reasoning?: number;
   /** US$; null when the model has no published price */
   cost: number | null;
   /** the stage and tier the call was routed to, and its reasoning effort (lib/ux-v0/model.ts routeFor) */
@@ -465,6 +470,9 @@ export interface UsageTotals {
   input: number;
   output: number;
   cost: number;
+  /** of `input`, read from the provider's prompt cache; of `output`, spent reasoning (measured, when reported) */
+  cached?: number;
+  reasoning?: number;
   /** what each stage cost: the questions, the brief, art direction, generation… (measured) */
   byStage?: Partial<Record<CallKind, StageSpend>>;
   /** the design versions the designer accepted by downloading them: cost per accepted design is cost / accepted */
@@ -670,6 +678,7 @@ export function normalizeUsage(v: unknown): Usage | null {
     input: num(r.input, 0, 1e8, 0),
     cached: num(r.cached, 0, 1e8, 0),
     output: num(r.output, 0, 1e8, 0),
+    ...(typeof r.reasoning === 'number' && r.reasoning > 0 ? { reasoning: num(r.reasoning, 0, 1e8, 0) } : {}),
     cost: typeof r.cost === 'number' && Number.isFinite(r.cost) && r.cost >= 0 ? r.cost : null,
     ...((CALL_KINDS as readonly string[]).includes(r.stage as string) ? { stage: r.stage as CallKind } : {}),
     ...(r.tier === 'economy' || r.tier === 'premium' ? { tier: r.tier } : {}),
@@ -952,6 +961,8 @@ export function normalizeArtifact(v: unknown): Artifact | null {
 const usageTotals = (v: unknown): UsageTotals => {
   const r = obj(v);
   const out: UsageTotals = { calls: num(r.calls, 0, 1e7, 0), input: num(r.input, 0, 1e12, 0), output: num(r.output, 0, 1e12, 0), cost: num(r.cost, 0, 1e7, 0) };
+  if (num(r.cached, 0, 1e12, 0)) out.cached = num(r.cached, 0, 1e12, 0);
+  if (num(r.reasoning, 0, 1e12, 0)) out.reasoning = num(r.reasoning, 0, 1e12, 0);
   const by: Partial<Record<CallKind, StageSpend>> = {};
   for (const [k, x] of Object.entries(obj(r.byStage))) {
     if (!(CALL_KINDS as readonly string[]).includes(k)) continue;
@@ -1081,6 +1092,8 @@ export function addUsage(t: UsageTotals, u: Usage | null): UsageTotals {
   if (!u) return t;
   const round = (n: number) => Math.round(n * 1e6) / 1e6;
   const out: UsageTotals = { ...t, calls: t.calls + 1, input: t.input + u.input, output: t.output + u.output, cost: round(t.cost + (u.cost ?? 0)) };
+  if (u.cached) out.cached = (t.cached ?? 0) + u.cached;
+  if (u.reasoning) out.reasoning = (t.reasoning ?? 0) + u.reasoning;
   if (u.stage) {
     const was = t.byStage?.[u.stage] ?? { calls: 0, cost: 0, premium: 0 };
     out.byStage = { ...(t.byStage ?? {}), [u.stage]: { calls: was.calls + 1, cost: round(was.cost + (u.cost ?? 0)), premium: was.premium + (u.tier === 'premium' ? 1 : 0) } };

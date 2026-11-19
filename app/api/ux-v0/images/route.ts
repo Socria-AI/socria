@@ -22,7 +22,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   const { userId } = auth();
   if (!userId) return signInFirst();
-  const limited = await enforceRateLimit(req, userId, 'aux');
+  const limited = await enforceRateLimit(req, userId, 'uxsync');
   if (limited) return limited;
   const body = await readBody(req, 200_000);
   if (!body) return bad('Which images?');

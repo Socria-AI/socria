@@ -9,102 +9,101 @@
 // the concern, so "apply anyway" needs no second call. A change to something
 // the designer locked in the art direction is always such a concern: it is
 // checked here in code (lockedChanges), not left to the model to notice.
+//
+// The everyday small changes (a colour, a typeface, the corners, new words for
+// a field, the headline's size) are read in code first (lib/ux-v0/quick-edit.ts)
+// and answered at once, with no model and no charge; the browser does the same
+// before it ever calls here. Everything else is one model call, run by
+// lib/ux-v0/stage-server.ts. Nothing here regenerates the page.
 
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
-import { auth } from '@clerk/nextjs/server';
-import { tracked } from '@/lib/openai-usage';
-import { enforceRateLimit } from '@/lib/rate-limit';
-import { resolvePlanForRequest } from '@/lib/socria-one-server';
-import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
 import { withMeter } from '@/lib/token-meter';
-import { askRouted } from '@/lib/ux-v0/ask';
-import { budgets } from '@/lib/ux-v0/budget';
 import { parseRefine, refineSystem, refineUser } from '@/lib/ux-v0/design';
 import { LOCK_GROUPS, LOCK_LABEL, lockedChanges, type LockGroup } from '@/lib/ux-v0/direction';
-import { MAX_TOKENS, economyRoute, refineTier } from '@/lib/ux-v0/model';
-import { bad, failed, noModel, projectIdOf, readBody, signInFirst } from '@/lib/ux-v0/route-kit';
+import { MAX_TOKENS, refineTier } from '@/lib/ux-v0/model';
+import { bad, projectIdOf, readBodyPrinted } from '@/lib/ux-v0/route-kit';
 import { lockedTouched } from '@/lib/ux-v0/edit';
 import { offSystem } from '@/lib/ux-v0/design-system';
-import { applyPatch, kindDef, normalizeSpec } from '@/lib/ux-v0/spec';
-import { normalizeBrief, normalizeMoodboard, normalizeSelection } from '@/lib/ux-v0/types';
-import { gate, noticeOf, recordUsage } from '@/lib/ux-v0/usage-server';
+import { readQuickEdit } from '@/lib/ux-v0/quick-edit';
+import { applyPatch, kindDef, normalizeSpec, type DesignSpec, type Patch } from '@/lib/ux-v0/spec';
+import { admit, refuse, respondOnce, runStage } from '@/lib/ux-v0/stage-server';
+import { normalizeBrief, normalizeMoodboard, normalizeSelection, type DesignBrief, type Moodboard } from '@/lib/ux-v0/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
+/** A patch's concerns before it is applied: what the designer locked, their design system, a locked section. */
+function concerns(spec: DesignSpec, patch: Patch, locks: LockGroup[], brief: DesignBrief | null, force: boolean, challenge: string) {
+  const locked = lockedChanges(spec, patch, locks);
+  let said = challenge;
+  if (locked.length && !force) {
+    const what = locked.map((g) => LOCK_LABEL[g].toLowerCase()).join(' and ');
+    said = `This changes the ${what}, which you locked in the art direction. ${said ? `${said} ` : ''}Make the change anyway?`.trim();
+  }
+  // a change that takes the design outside the designer's design system is asked about first, like a lock
+  const ds = brief?.system;
+  const outside = ds ? offSystem(patch, ds) : [];
+  if (outside.length && !force) said = `This uses ${outside.join(' and ')}, which ${outside.length > 1 ? 'are' : 'is'} not in your design system (${ds!.name}). ${said ? `${said} ` : ''}Make the change anyway?`.trim();
+  // …and neither is a section the designer locked on the canvas
+  const lockedSections = lockedTouched(spec, patch);
+  if (lockedSections.length && !force) {
+    const sec = spec.sections.find((s) => s.id === lockedSections[0]);
+    const what = (sec && kindDef(sec.kind)?.label.toLowerCase()) || 'section';
+    said = `This changes the ${what}, which you locked. ${said && !locked.length ? `${said} ` : ''}Make the change anyway?`.trim();
+  }
+  return { locked, lockedSections, challenge: said };
+}
+
+function trialOf(spec: DesignSpec, patch: Patch, moodboard: Moodboard) {
+  const trial = patch.op === 'none' ? null : applyPatch(spec, patch, moodboard);
+  return { applies: !!trial?.ok, error: trial && !trial.ok ? trial.error : '' };
+}
 
 export const POST = withMeter(async function POST(req: NextRequest) {
-  const { userId } = auth();
-  if (!userId) return signInFirst();
-  const limited = await enforceRateLimit(req, userId, 'aux');
-  if (limited) return limited;
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return noModel();
+  const a = await admit(req);
+  if (!a.ok) return a.res;
 
-  const body = await readBody(req, 600_000);
+  const { body, print } = await readBodyPrinted(req, 600_000);
   const moodboard = normalizeMoodboard(body?.moodboard);
   const spec = normalizeSpec(body?.spec, moodboard);
   const comment = typeof body?.comment === 'string' ? body.comment.trim().slice(0, 2000) : '';
-  if (!body || !spec || !comment) return bad('A design and a comment are needed.');
+  if (!body || !spec || !comment) return refuse(req, bad('A design and a comment are needed.'));
   const selection = body.selection ? normalizeSelection({ ...body.selection, crop: null }) : null;
   const force = body.force === true;
   const locks: LockGroup[] = Array.isArray(body.locks) ? [...new Set(body.locks.filter((x: unknown): x is LockGroup => typeof x === 'string' && (LOCK_GROUPS as readonly string[]).includes(x)))] : [];
-  const projectId = projectIdOf(body.projectId);
+  const brief = normalizeBrief(body.brief);
+  const stream = /application\/x-ndjson/.test(req.headers.get('accept') ?? '');
 
-  const system = refineSystem();
-  const user = refineUser({ brief: normalizeBrief(body.brief), spec, moodboard, selection, comment, force, locks });
+  // the everyday small changes: read in code, answered at once — no model, no charge, nothing regenerated
+  const quick = readQuickEdit(comment, spec, selection);
+  if (quick && quick.patches.length === 0) {
+    // already so: nothing to change, and no model asked to find that out
+    const said = `Nothing to change: ${quick.label}.`;
+    const out = { understood: said, challenge: '', question: '', regenerate: '', patch: { op: 'none', summary: '' }, locked: [], lockedSections: [], applies: false, error: said, usage: null, complexity: { tier: null, why: 'done in code: nothing to change' }, deterministic: true };
+    return stream ? respondOnce(true, { status: 200, body: out }) : NextResponse.json(out);
+  }
+  if (quick && quick.patches.length === 1) {
+    const patch = quick.patches[0];
+    const c = concerns(spec, patch, locks, brief, force, force ? '' : quick.concern ?? '');
+    const t = trialOf(spec, patch, moodboard);
+    const out = { understood: quick.label.charAt(0).toUpperCase() + quick.label.slice(1), challenge: c.challenge, question: '', regenerate: '', patch, locked: c.locked, lockedSections: c.lockedSections, applies: t.applies, error: t.error, usage: null, complexity: { tier: null, why: 'done in code: a small change SocriaUX reads exactly' }, deterministic: true };
+    return stream ? respondOnce(true, { status: 200, body: out }) : NextResponse.json(out);
+  }
+
   // a small change to the selected part is economy work; a change to the whole, its structure or its feel is premium
   const complexity = refineTier(comment, selection);
-  const g = await gate(userId, projectId, 'refine', system.length + user.length, { tier: complexity.tier });
-  if (!g.ok) return NextResponse.json({ error: g.error, limit: true }, { status: 429 });
-
-  const plan = await resolvePlanForRequest(req, userId);
-  const sleep = await sleepGate(req, userId, plan);
-  if (sleep.refuse) return sleep.refuse;
-  if (sleep.meter) meterFor(sleep.meter);
-
-  const openai = tracked(new OpenAI({ apiKey }), 'ux-v0/refine');
-  try {
-    const asked = await askRouted(openai, g.route, { system, user, maxTokens: MAX_TOKENS.refine, temperature: 0.4, label: 'refine', maxRetries: budgets().maxRetries }, economyRoute('refine'));
-    const r = parseRefine(asked.json, force);
-    // a locked decision is never changed silently: the designer is asked first
-    const locked = lockedChanges(spec, r.patch, locks);
-    if (locked.length && !force) {
-      const what = locked.map((g) => LOCK_LABEL[g].toLowerCase()).join(' and ');
-      r.challenge = `This changes the ${what}, which you locked in the art direction. ${r.challenge ? `${r.challenge} ` : ''}Make the change anyway?`.trim();
-    }
-    // …and neither is a section the designer locked on the canvas
-    // a change that takes the design outside the designer's design system is asked about first, like a lock
-    const ds = normalizeBrief(body.brief)?.system;
-    const outside = ds ? offSystem(r.patch, ds) : [];
-    if (outside.length && !force) r.challenge = `This uses ${outside.join(' and ')}, which ${outside.length > 1 ? 'are' : 'is'} not in your design system (${ds!.name}). ${r.challenge ? `${r.challenge} ` : ''}Make the change anyway?`.trim();
-    const lockedSections = lockedTouched(spec, r.patch);
-    if (lockedSections.length && !force) {
-      const sec = spec.sections.find((s) => s.id === lockedSections[0]);
-      const what = (sec && kindDef(sec.kind)?.label.toLowerCase()) || 'section';
-      r.challenge = `This changes the ${what}, which you locked. ${r.challenge && !locked.length ? `${r.challenge} ` : ''}Make the change anyway?`.trim();
-    }
-    await recordUsage(userId, projectId, 'refine', asked.usage, Date.now(), { api: asked.api, downgraded: !!g.downgraded || !!asked.fellBack });
-    const trial = r.patch.op === 'none' ? null : applyPatch(spec, r.patch, moodboard);
-    return NextResponse.json({
-      understood: r.understood,
-      challenge: r.challenge,
-      question: r.question,
-      regenerate: r.regenerate,
-      patch: r.patch,
-      locked,
-      lockedSections,
-      applies: !!trial?.ok,
-      error: trial && !trial.ok ? trial.error : '',
-      usage: asked.usage,
-      complexity: { tier: g.route.tier, why: complexity.why },
-      ...noticeOf(g, asked),
-    });
-  } catch (e) {
-    // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure
-    const resting = sleepAnswer(e);
-    if (resting) return resting;
-    console.error('ux-v0 refine failed:', e instanceof Error ? e.message : e);
-    return failed();
-  }
+  return runStage(req, { userId: a.userId, orgId: a.orgId, projectId: projectIdOf(body.projectId), fingerprint: print }, {
+    stage: 'refine',
+    operation: 'patch',
+    label: 'ux-v0/refine',
+    prompt: { system: refineSystem(), user: refineUser({ brief, spec, moodboard, selection, comment, force, locks }), maxTokens: MAX_TOKENS.refine, temperature: 0.4, tier: complexity.tier },
+    finish: (asked) => {
+      const r = parseRefine(asked.json, force);
+      // a locked decision, the design system, a locked section: never changed silently — the designer is asked first
+      const c = concerns(spec, r.patch, locks, brief, force, r.challenge);
+      const t = trialOf(spec, r.patch, moodboard);
+      return { body: { understood: r.understood, challenge: c.challenge, question: r.question, regenerate: r.regenerate, patch: r.patch, locked: c.locked, lockedSections: c.lockedSections, applies: t.applies, error: t.error, complexity: { tier: asked.tier ?? complexity.tier, why: complexity.why } } };
+    },
+  });
 });

@@ -23,11 +23,19 @@
 //
 // LEGACY. SOCRIAUX_MODEL, when set, runs EVERY stage on that one model exactly
 // as before routing existed, with SOCRIAUX_API and SOCRIAUX_EFFORT (default:
-// high for GPT-6.1 Sol, the model's own otherwise). Unset it to route.
+// medium for GPT-6.1 Sol — the live evaluation found medium as good as high at
+// about 60% of the time and 80% of the cost, and high's generation took 53 s at
+// the median and up to 77 s, past a route's 60 s; the model's own otherwise).
+// Unset it to route: it puts the questions and the brief on Sol too, at about
+// four times the model time of routing (test/browser/ux-v0/perf-bench.mjs).
+//
+//   SOCRIAUX_REASONING_ROOM   the most reasoning tokens a call may spend above its answer's cap (default:
+//                             half the shared room for its effort, e.g. 4,096 at medium; the most any call
+//                             spent in the live run was 1,919 at medium and 3,355 at high, answer included)
 //
 // Server-side only: no request can name a model, an API, a tier or an effort.
 
-import { EFFORTS, type Effort } from '../model-params';
+import { EFFORTS, REASONING_ROOM, effortFor, type Effort } from '../model-params';
 import { LADDERS, costOf } from '../model-router';
 import type { CallKind, Usage } from './types';
 
@@ -56,7 +64,19 @@ export function socriauxApi(env: Env = process.env): Api {
 export function socriauxEffort(env: Env = process.env): Effort | undefined {
   const v = (env.SOCRIAUX_EFFORT ?? '').trim().toLowerCase();
   if ((EFFORTS as readonly string[]).includes(v)) return v as Effort;
-  return IS_SOL.test(socriauxModel(env)) ? 'high' : undefined;
+  return IS_SOL.test(socriauxModel(env)) ? 'medium' : undefined;
+}
+
+/**
+ * The reasoning room a SocriaUX call is given above its answer's cap: SOCRIAUX_REASONING_ROOM when set, else
+ * half the room the shared shaper gives that effort (lib/model-params.ts REASONING_ROOM). It bounds a runaway
+ * answer (one strict-schema critique in the live run wrote 9,592 tokens over 140 s) while leaving more than
+ * twice the most any normal call used.
+ */
+export function reasoningRoomFor(model: string, effort: Effort | undefined, env: Env = process.env): number {
+  const set = parseInt(env.SOCRIAUX_REASONING_ROOM ?? '', 10);
+  if (Number.isFinite(set) && set >= 0) return Math.min(set, 65_536);
+  return Math.round(REASONING_ROOM[effortFor(model, effort, env)] / 2);
 }
 
 /** What SocriaUX is running on, in one line for the logs and the evaluation. */
@@ -169,6 +189,22 @@ export function refineTier(comment: string, selection: { element?: { ux?: { sect
   return { tier: 'premium', why: 'an open change to the selected part' };
 }
 
+/**
+ * Whether a critique needs the premium model, in code, from what was asked: a short question about one selected
+ * part (is this clear, why does this feel off, what would make it stronger) is read well by the economy model;
+ * a question about the whole design, its structure or its art direction, a long one, or one about an image of a
+ * whole page is premium. SOCRIAUX_TIER_CRITIQUE overrides it either way.
+ */
+export function critiqueTier(comment: string, selection: { type?: string; element?: unknown; region?: unknown } | null | undefined, wholeImage = false): { tier: Tier; why: string } {
+  const c = String(comment ?? '').toLowerCase();
+  const whole = /\b(whole|entire|overall|every(thing| section| page)|the page|the design|the layout|the structure|hierarchy|composition|art direction|flow|journey|brand|strategy|accessib|compare|alternatives?|rethink|redesign)\b/;
+  if (wholeImage) return { tier: 'premium', why: 'an image of a whole design' };
+  if (!selection || !(selection.element || selection.region)) return { tier: 'premium', why: 'no part selected' };
+  if (c.length > 240) return { tier: 'premium', why: 'a long question' };
+  if (whole.test(c)) return { tier: 'premium', why: 'a question about the whole design' };
+  return { tier: 'economy', why: 'a short question about the selected part' };
+}
+
 const intEnv = (v: string | undefined, fallback: number) => {
   const n = parseInt(v ?? '', 10);
   return Number.isFinite(n) && n > 0 ? n : fallback;
@@ -191,10 +227,15 @@ export const MAX_TOKENS: Record<CallKind, number> = {
   critique: 1400,
 };
 
-/** A completion's usage, as the provider reported it, priced. */
-export function usageOf(model: string, u: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } } | null | undefined): Usage {
+/**
+ * A completion's usage, as the provider reported it, priced. Input includes the cached tokens (priced at the
+ * cached rate) and output includes the reasoning tokens (billed as output): both are kept apart as well, so
+ * what is shown is never mistaken for what is billed.
+ */
+export function usageOf(model: string, u: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number | null } | null; completion_tokens_details?: { reasoning_tokens?: number | null } | null } | null | undefined): Usage {
   const input = Math.max(0, u?.prompt_tokens ?? 0);
   const output = Math.max(0, u?.completion_tokens ?? 0);
   const cached = Math.max(0, Math.min(input, u?.prompt_tokens_details?.cached_tokens ?? 0));
-  return { model, input, cached, output, cost: costOf(model, { input, cached, output }) };
+  const reasoning = Math.max(0, Math.min(output, u?.completion_tokens_details?.reasoning_tokens ?? 0));
+  return { model, input, cached, output, ...(reasoning ? { reasoning } : {}), cost: costOf(model, { input, cached, output }) };
 }

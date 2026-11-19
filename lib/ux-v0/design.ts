@@ -181,35 +181,47 @@ const NOT_GENERIC = `Avoid the generic generated page:
 - Structure is information: numbering, eyebrows and dividers only where they say something true (number steps only when the order matters).
 - When no section in the library draws the arrangement the design needs (an opening at an uneven proportion, a figure set against the words, three unequal columns), compose it from pieces: a "compose" section. Keep it simple: two or three levels, words that say something, one title. When the direction's composition says it is composed from pieces, open with a compose section.`;
 
+/**
+ * The generator's instructions. They open with what is the same for every project of this kind of page — the
+ * role, the library, the rules that always hold, the knowledge against generic pages and the voice — and only
+ * then say what this project is. A provider reads a long prefix it has seen before from its prompt cache (at a
+ * tenth of the price on GPT-6.1 Sol, and sooner): with the project first, two projects shared almost nothing
+ * (58 tokens of about 3,300, test/browser/ux-v0/perf-bench.mjs); with it last, they share the whole first part.
+ */
 export function generateSystem(brief: DesignBrief, dir: ArtDirection | null = null): string {
   // WHAT IS BEING MADE decides the structure, not a page type: a booking screen is the booking itself
   const intent = intentOf(brief);
   const pageType = pageTypeFor(intent, brief.pageType);
   const musts = intent.requirements.filter((r) => r.required);
   const tokens = dir
-    ? '- Tokens and the look are already decided by the approved art direction below: do not write "tokens".'
+    ? '- Tokens and the look are already decided by the approved art direction above: do not write "tokens".'
     : "- Tokens: colors {background, surface, text, muted, accent, accentText, line} from the brief's palette roles; fonts {display, body} from the brief's typography; scale compact|comfortable|spacious; radius none|soft|round; style editorial|minimal|bold|warm|technical; imageTreatment natural|muted|warm|mono — all chosen to express the brief's personality and visual direction.";
-  return `You are SocriaUX's design generator. Turn the approved brief into a design specification that a renderer draws. You do not write HTML: you choose sections from the library below and write their content${dir ? '' : ', and choose tokens'}.
+  const shared = `You are SocriaUX's design generator. Turn the approved brief into a design specification that a renderer draws. You do not write HTML: you choose sections from the library below and write their content (and the tokens, only when no art direction is given).
+
+THE LIBRARY (only these kinds, variants and fields; * marks required):
+${libraryMenu(pageType)}
+
+Rules that always hold:
+- Copy: real, specific to this brief, in the voice the art direction describes (with none, the brand's voice). Never lorem ipsum. Headlines short and concrete. Facts you were not given — prices, addresses, dates, numbers, opening hours, people's names — are written as [bracketed placeholders] (e.g. "[Opening hours]", "[£ price]"); never invent them. A testimonial without a real source uses "[Customer name]".
+- Images: only the moodboard ids listed below, in "images" on the sections that take them; prefer landscape for wide slots and portrait for tall ones. If there are none, choose variants that need no image.
+- Every section has a short unique id (lowercase, hyphenated), a kind, a variant, content and images.
+
+${NOT_GENERIC}
+
+${VOICE}`;
+  const project = `THIS PROJECT
 ${dir ? `
 ${directionBrief(dir, pageType)}${dir.compose ? `\nIts composition for the task: ${Object.entries(dir.compose).map(([k, v]) => `${k} as "${v}"`).join(', ')}.` : ''}${dir.order?.length ? `\nIts order of importance: ${dir.order.join(', then ')}.` : ''}${dir.lead ? `\nWhat leads the page, straight after the navigation: the ${dir.lead}.` : ''}
 ${knowledgeBrief(dir.look)}
 ` : ''}
 WHAT IT IS: ${EXPERIENCE_LABEL[intent.kind]}. Task: ${intent.task}.${musts.length ? `\nWHAT IT MUST DO (every one, by id):\n${musts.map((r) => `- ${r.id}: ${r.text}${r.component ? ` (the ${r.component} component)` : ''}`).join('\n')}` : ''}${intent.prohibitions.length ? `\nRULED OUT BY THE DESIGNER: ${intent.prohibitions.join('; ')}.` : ''}
 
-THE LIBRARY (only these kinds, variants and fields; * marks required):
-${libraryMenu(pageType)}
-
-Rules:
+Rules for this project:
 ${tokens}
 ${structureRule(intent, pageType)}${layoutBrief(brief.layout, intent) ? `\n- ${layoutBrief(brief.layout, intent)}` : ''}
-- Copy: real, specific to this brief, in ${dir ? 'the voice the direction describes' : "the brand's voice"}. Never lorem ipsum. Headlines short and concrete. Facts you were not given — prices, addresses, dates, numbers, opening hours, people's names — are written as [bracketed placeholders] (e.g. "[Opening hours]", "[£ price]"); never invent them. A testimonial without a real source uses "[Customer name]".
-- Images: only the moodboard ids listed below, in "images" on the sections that take them; prefer landscape for wide slots and portrait for tall ones. If there are none, choose variants that need no image.
-- Every section has a short unique id (lowercase, hyphenated), a kind, a variant, content and images.
 
-${NOT_GENERIC}
-
-${VOICE}
 Respond with ONE JSON object: {"title": "...", "pageType": "${pageType}", "platform": "${brief.platform}", ${dir ? '' : '"tokens": {...}, '}"sections": [{"id": "...", "kind": "...", "variant": "...", "content": {...}, "images": ["..."]}]}`;
+  return `${shared}\n\n${project}`;
 }
 
 export function generateUser(input: GenerateInput): string {

@@ -56,3 +56,7 @@ export * from '@/lib/ux-v0/design-system';
 export { repoTarget, pickFiles, fetchSystemFiles } from '@/lib/ux-v0/design-system-server';
 // layout pieces: a section composed from stacks, grids in proportion, boxes, text, figures, pictures
 export * from '@/lib/ux-v0/compose';
+// performance and reliability: everyday edits in code, each operation's record, the measured estimates
+export * from '@/lib/ux-v0/quick-edit';
+export * from '@/lib/ux-v0/telemetry';
+export * from '@/lib/ux-v0/estimates';

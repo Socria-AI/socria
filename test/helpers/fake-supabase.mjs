@@ -41,6 +41,15 @@ const UNIQUE = {
 const collides = (t, row, all) =>
   (UNIQUE[t] ?? []).some((cols) => cols.every((c) => row[c] !== null && row[c] !== undefined) && all.some((r) => cols.every((c) => r[c] === row[c])));
 
+// One round trip to the database. For the performance benchmark (test/browser/ux-v0/perf-bench.mjs):
+// globalThis.__dbLatencyMs delays each query and rpc as a network round trip would, and
+// globalThis.__dbTrips counts them. Unset, a query resolves in a microtask, as it always did.
+const trip = () => {
+  globalThis.__dbTrips = (globalThis.__dbTrips ?? 0) + 1;
+  const ms = Number(globalThis.__dbLatencyMs) || 0;
+  return ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve();
+};
+
 export const db = {
   tables: {},
   /** table -> Set of columns the table DOES NOT have, to simulate an old schema */
@@ -161,7 +170,7 @@ class Query {
   limit(n) { this._limit = n; return this; }
   maybeSingle() { this._single = true; return this; }
   single() { this._single = true; return this; }
-  then(res, rej) { return Promise.resolve().then(() => this.run()).then(res, rej); }
+  then(res, rej) { return trip().then(() => this.run()).then(res, rej); }
 
   run() {
     const t = this.table;
@@ -283,8 +292,10 @@ const UNMETERED = {
 
 const client = {
   from: (t) => new Query(t),
-  rpc: async (name, args) =>
-    typeof db.rpcs?.[name] === 'function' ? db.rpcs[name](args ?? {}) : UNMETERED[name] ? UNMETERED[name](args ?? {}) : { data: null, error: null },
+  rpc: async (name, args) => {
+    await trip();
+    return typeof db.rpcs?.[name] === 'function' ? db.rpcs[name](args ?? {}) : UNMETERED[name] ? UNMETERED[name](args ?? {}) : { data: null, error: null };
+  },
 };
 
 export function supabaseAdmin() {

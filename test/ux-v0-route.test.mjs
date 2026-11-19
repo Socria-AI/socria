@@ -235,7 +235,9 @@ console.log('\n=== art direction ===');
   const spec = g.json.spec;
   const locked = await post('refine', { projectId: 'uxv0_d', spec, moodboard, comment: 'Make the accent pink', locks: ['palette'] }, B, [{ understood: 'Pink accent', patch: { op: 'tokens', tokens: { colors: { accent: '#ff3399' } }, summary: 'Pink' } }]);
   ok('a change to a locked decision is never made silently: SocriaUX asks first', locked.status === 200 && /locked/.test(locked.json.challenge) && J(locked.json.locked) === J(['palette']) && locked.json.applies, J(locked.json));
-  ok('…and the model was told what is locked', J(locked.calls[0].messages).includes('LOCKED IN THE ART DIRECTION'));
+  ok('…even when the change is one SocriaUX makes in code, with no model asked and nothing charged', locked.json.deterministic === true && locked.calls.length === 0 && locked.json.usage === null && locked.json.patch.tokens.colors.accent === '#db2777', J(locked.json));
+  const lockedOpen = await post('refine', { projectId: 'uxv0_d', spec, moodboard, comment: 'Give the accent a more confident, saturated feel', locks: ['palette'] }, B, [{ understood: 'A more confident accent', patch: { op: 'tokens', tokens: { colors: { accent: '#ff3399' } }, summary: 'A stronger accent' } }]);
+  ok('…and a change only the model can read is asked of it, told what is locked', lockedOpen.calls.length === 1 && J(lockedOpen.calls[0].messages).includes('LOCKED IN THE ART DIRECTION') && /locked/.test(lockedOpen.json.challenge), J(lockedOpen.json));
   const forced = await post('refine', { projectId: 'uxv0_d', spec, moodboard, comment: 'Make the accent pink', locks: ['palette'], force: true }, B, [{ understood: 'Pink accent', patch: { op: 'tokens', tokens: { colors: { accent: '#ff3399' } }, summary: 'Pink' } }]);
   ok('…once the designer says yes, it is made', forced.json.challenge === '' && forced.json.applies);
   const free = await post('refine', { projectId: 'uxv0_d', spec, moodboard, comment: 'Use heavier rules', locks: ['palette'] }, B, [{ understood: 'Heavier rules', patch: { op: 'look', look: { rules: 'heavy' }, summary: 'Heavy rules' } }]);
@@ -328,7 +330,9 @@ console.log('\n=== GPT-6.1 Sol through every route (the Responses API) ===');
   steps.push(['critique', c, 'socriaux_critique']);
   for (const [what, out, fmt] of steps) {
     const p = sent(out);
-    ok(`${what}: 200, one Responses call to Sol at effort high, ${fmt}, not stored`, out.status === 200 && out.calls.length === 1 && onResponses(p) && p.model === 'gpt-6.1-sol' && p.reasoning?.effort === 'high' && p.temperature === undefined && formatOf(p) === fmt, J({ status: out.status, n: out.calls.length, model: p.model, effort: p.reasoning?.effort, fmt: formatOf(p), err: out.json?.error }));
+    // (the legacy one-model setting runs Sol at medium unless SOCRIAUX_EFFORT says otherwise: the live evaluation found
+    // medium as good as high at about 60% of the time, and high's generations ran past a route's 60 seconds)
+    ok(`${what}: 200, one Responses call to Sol at effort medium, ${fmt}, not stored`, out.status === 200 && out.calls.length === 1 && onResponses(p) && p.model === 'gpt-6.1-sol' && p.reasoning?.effort === 'medium' && p.temperature === undefined && formatOf(p) === fmt, J({ status: out.status, n: out.calls.length, model: p.model, effort: p.reasoning?.effort, fmt: formatOf(p), err: out.json?.error }));
   }
   ok('the work comes through: a question, palettes, a brief and its searches, three directions, a spec, a patch, a reading', q.json.questions.length === 1 && md.json.palettes.length === 1 && J(b.json.brief.references) === J(['openverse:k1']) && rb.json.queries.length === 1 && d.json.options.length === 3 && d.json.options[0].name === 'Long table mornings' && g.json.spec.sections.length === 3 && r.json.applies === true && c.json.reasoning.read.length > 0);
   ok('the critique sends its crop and thumbnail as input images, high and low detail', J(sent(c).input[0].content.filter((x) => x.type === 'input_image').map((x) => x.detail)) === J(['high', 'low']));
@@ -363,7 +367,7 @@ console.log('\n=== routing: the economy model for questions and the brief, the p
   ok('the brief: the economy model', b.status === 200 && onLuna(b));
   const d = await post('direct', { projectId: P, brief, notes: '', avoid: '' }, U, [{ directions: [] }]);
   ok('art direction: the premium model (GPT-6.1 Sol) at medium effort, on the Responses API', d.status === 200 && onSol(d), J(d.calls[0]?.model));
-  ok('  with a time limit, so a slow answer leaves room for another', globalThis.__logosOptions.at(-1)?.timeout === 45000);
+  ok('  with a time limit inside the operation\'s deadline, so a slow answer leaves the economy model its time, and a signal that can stop it', globalThis.__logosOptions.at(-1)?.timeout === 40000 && !!globalThis.__logosOptions.at(-1)?.signal, J(globalThis.__logosOptions.at(-1)));
   const g = await post('generate', { projectId: P, brief, moodboard: {}, version: 1 }, U, [spec]);
   ok('generation: the premium model', g.status === 200 && onSol(g));
   ok('  its usage says the stage, the tier and the effort', g.json.usage.stage === 'generate' && g.json.usage.tier === 'premium' && g.json.usage.effort === 'medium' && g.json.usage.model === 'gpt-6.1-sol', J(g.json.usage));
@@ -372,9 +376,12 @@ console.log('\n=== routing: the economy model for questions and the brief, the p
   const big = await post('refine', { projectId: P, spec: g.json.spec, brief, moodboard: {}, selection: sel, comment: 'Rethink the whole hierarchy so it feels more editorial' }, U, [{ understood: 'x', patch: { op: 'none' } }]);
   ok('a change to the structure or the feel: the premium model', big.status === 200 && onSol(big) && big.json.complexity.tier === 'premium', J(big.json.complexity));
   const c = await post('critique', { projectId: P, selection: elementSel, comment: 'Is this CTA prominent enough?', kind: 'generated', name: 'Halcyon' }, U, [REASONING]);
-  ok('critique: the premium model', c.status === 200 && onSol(c));
+  ok('critique: a short question about the selected part, the economy model, and it says why', c.status === 200 && onLuna(c) && c.json.complexity?.tier === 'economy', J(c.json.complexity));
+  const cw = await post('critique', { projectId: P, selection: elementSel, comment: 'Does the whole page hierarchy work for a first-time visitor?', kind: 'generated', name: 'Halcyon' }, U, [REASONING]);
+  ok('critique: a question about the whole design, the premium model', cw.status === 200 && onSol(cw) && cw.json.complexity?.tier === 'premium', J(cw.json.complexity));
   const logged = db.rows('ux_v0_calls').filter((r) => r.user_id === U);
-  ok('every call is logged with its stage, tier, model, effort, API and measured cost', logged.length === 7 && J(logged.map((r) => `${r.stage}:${r.tier}:${r.model}`)) === J(['discover:economy:gpt-6-luna', 'brief:economy:gpt-6-luna', 'art-direction:premium:gpt-6.1-sol', 'generate:premium:gpt-6.1-sol', 'refine:economy:gpt-6-luna', 'refine:premium:gpt-6.1-sol', 'critique:premium:gpt-6.1-sol']) && logged.every((r) => typeof r.cost_usd === 'number' && r.input_tokens === 1200) && logged[2].api === 'responses' && logged[2].effort === 'medium' && logged[0].api === 'chat', J(logged.map((r) => [r.stage, r.tier, r.model, r.api, r.effort])));
+  ok('every call is logged with its stage, tier, model, effort, API and measured cost', logged.length === 8 && J(logged.map((r) => `${r.stage}:${r.tier}:${r.model}`)) === J(['discover:economy:gpt-6-luna', 'brief:economy:gpt-6-luna', 'art-direction:premium:gpt-6.1-sol', 'generate:premium:gpt-6.1-sol', 'refine:economy:gpt-6-luna', 'refine:premium:gpt-6.1-sol', 'critique:economy:gpt-6-luna', 'critique:premium:gpt-6.1-sol']) && logged.every((r) => typeof r.cost_usd === 'number' && r.input_tokens === 1200) && logged[2].api === 'responses' && logged[2].effort === 'medium' && logged[0].api === 'chat', J(logged.map((r) => [r.stage, r.tier, r.model, r.api, r.effort])));
+  ok('…each with its operation record: how it ended, its retries, its times, its reasoning tokens', logged.every((r) => r.outcome === 'ok' && r.retries === 0 && typeof r.total_ms === 'number' && typeof r.queued_ms === 'number' && r.cancelled === false && typeof r.operation_id === 'string' && typeof r.reasoning_tokens === 'number'), J(logged.map((r) => [r.outcome, r.retries, r.total_ms, r.operation_id])));
 
   // configured, server-side
   process.env.SOCRIAUX_PREMIUM_MODEL = 'gpt-6-luna';
@@ -398,7 +405,7 @@ console.log('\n=== routing: the economy model for questions and the brief, the p
   globalThis.__logosSlow = ['gpt-6.1-sol'];
   const slow = await post('generate', { projectId: P, brief, moodboard: {}, version: 3 }, 'user_v0_route3', [spec]);
   globalThis.__logosSlow = [];
-  ok('a premium call past its time limit: Luna answers in the same request, and the designer is told', slow.status === 200 && slow.calls.map((p) => p.model).join() === 'gpt-6.1-sol,gpt-6-luna' && /gave no answer in 45 seconds/.test(slow.json.notice ?? '') && slow.json.usage.model === 'gpt-6-luna', J({ calls: slow.calls.map((p) => p.model), notice: slow.json?.notice }));
+  ok('a premium call past its time limit: Luna answers in the same request, and the designer is told', slow.status === 200 && slow.calls.map((p) => p.model).join() === 'gpt-6.1-sol,gpt-6-luna' && /gave no answer in 40 seconds/.test(slow.json.notice ?? '') && slow.json.usage.model === 'gpt-6-luna', J({ calls: slow.calls.map((p) => p.model), notice: slow.json?.notice }));
   globalThis.__logosScript = [];
 
   // budgets: measured spend from ux_v0_usage, the call's worst case estimated
@@ -506,6 +513,194 @@ console.log('\n=== the designer’s design system, from GitHub, kept through a r
   const spec = V.normalizeSpec({ title: 'Studio', pageType: 'website', tokens: { colors: { background: '#fafaf9', surface: '#ffffff', text: '#1c1917', muted: '#57534e', accent: '#c2410c', accentText: '#ffffff', line: '#e7e5e4' }, fonts: { display: 'Instrument Serif', body: 'Inter' }, scale: 'comfortable', radius: 'round', style: 'editorial', imageTreatment: 'natural' }, sections: [{ id: 'hero', kind: 'hero', variant: 'editorial', content: { title: 'Rooms for thinking' } }] }, { refs: [] });
   const ch = await post('refine', { projectId: 'uxv0_ds', spec, brief: within, moodboard: {}, comment: 'Make the accent purple' }, U, [{ understood: 'Purple accent', patch: { op: 'tokens', tokens: { colors: { accent: '#7c3aed' } }, summary: 'Purple' } }]);
   ok('a change that leaves the design system is asked about first, with the patch', ch.status === 200 && /not in your design system \(Acme\)/.test(ch.json.challenge) && ch.json.applies === true, J(ch.json?.challenge));
+}
+
+console.log('\n=== one operation, on a deadline, streamed, cancellable, recorded (lib/ux-v0/stage-server.ts) ===');
+{
+  delete process.env.SOCRIAUX_ROUTING;
+  delete process.env.SOCRIAUX_MODEL;
+  process.env.SOCRIAUX_DAILY_CALLS = '500';
+  const V = await import(pathToFileURL(join(here, '.tmp', 'ux-v0-under-test.mjs')).href);
+  const U = 'user_v0_ops';
+  globalThis.__users[U] = { firstName: 'Op', emails: ['op@example.com'] };
+  process.env.SOCRIA_ONE_USER_IDS = `${process.env.SOCRIA_ONE_USER_IDS},${U},user_v0_ops2`;
+  const turnAnswer = { understanding: { summary: 's', known: {}, gaps: [] }, questions: [{ topic: 'audience', question: 'Who?', why: 'w', options: ['A', 'B'] }], ready: false };
+  const turnBody = (n = 0) => ({ projectId: 'uxv0_ops', action: 'turn', intent: `A coffee shop website ${n}`, questions: [], understanding: {}, moodboard: {} });
+  /** a request as the browser sends it, its raw response */
+  const send = (route, body, uid, { headers = {}, signal } = {}) => {
+    globalThis.__uid = uid;
+    return R[route].POST(new NextRequest(`http://localhost/api/ux-v0/${route}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: J(body), ...(signal ? { signal } : {}) }));
+  };
+  /** a streamed answer, read line by line: every event, and when each arrived */
+  const readNd = async (res) => {
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    const events = [];
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, i).trim();
+        buf = buf.slice(i + 1);
+        if (line) events.push({ ...JSON.parse(line), at: Date.now() });
+      }
+    }
+    return events;
+  };
+  const ND = { accept: 'application/x-ndjson, application/json' };
+  globalThis.__logosUsage = { prompt_tokens: 1200, completion_tokens: 300, completion_tokens_details: { reasoning_tokens: 120 } };
+
+  // streamed: accepted at once, progress as it happens, then the same answer the JSON route gives
+  globalThis.__logosScript = [turnAnswer];
+  globalThis.__logosCalls = [];
+  const res = await send('discover', turnBody(1), U, { headers: ND });
+  ok('a browser that asks for progress gets a stream of JSON lines', /application\/x-ndjson/.test(res.headers.get('content-type') ?? ''), res.headers.get('content-type'));
+  const evs = await readNd(res);
+  const result = evs.find((e) => e.type === 'result');
+  ok('…its first line is "accepted", before any check or model call', evs[0]?.type === 'accepted' && typeof evs[0].op === 'string', J(evs.map((e) => e.type)));
+  ok('…then honest progress: checking, the model asked (which, and its tier), writing (so many characters), finishing', ['checking', 'asked', 'writing', 'finishing'].every((ph) => evs.some((e) => e.type === 'progress' && e.phase === ph)) && evs.find((e) => e.phase === 'asked').model === 'gpt-6-luna', J(evs.filter((e) => e.type === 'progress').map((e) => e.phase)));
+  ok('…then the result: the same answer, its usage, and its operation record', result?.status === 200 && result.body.questions.length >= 1 && result.body.usage.model === 'gpt-6-luna' && result.body.telemetry?.outcome === 'ok' && result.body.telemetry.stage === 'discover', J(result).slice(0, 300));
+  ok('…the record holds numbers and labels only: times, tokens (reasoning apart), retries — no prompt, no words of the designer', result.body.telemetry.reasoning === 120 && result.body.telemetry.input === 1200 && result.body.telemetry.retries === 0 && typeof result.body.telemetry.ttftMs === 'number' && typeof result.body.telemetry.queuedMs === 'number' && !J(result.body.telemetry).includes('coffee'), J(result.body.telemetry));
+  ok('…and the call was streamed from the model, with its prompt-cache key and a bounded reasoning room', globalThis.__logosCalls[0]?.stream === true && /^socria-ux-v0-/.test(globalThis.__logosCalls[0]?.prompt_cache_key ?? '') && !('reasoning_room' in globalThis.__logosCalls[0]), J(Object.keys(globalThis.__logosCalls[0] ?? {})));
+
+  // the same action twice (a double-click): one model call, the same answer for both
+  globalThis.__logosScript = [turnAnswer, turnAnswer];
+  globalThis.__logosCalls = [];
+  const op = { 'x-operation-id': 'op_double_click_1' };
+  const [d1, d2] = await Promise.all([send('discover', turnBody(2), U, { headers: op }), send('discover', turnBody(2), U, { headers: op })]);
+  const [j1, j2] = [await d1.json(), await d2.json()];
+  ok('the same action sent twice at once: one model call, and both get its answer', globalThis.__logosCalls.length === 1 && d1.status === 200 && d2.status === 200 && J(j1.questions) === J(j2.questions), J({ calls: globalThis.__logosCalls.length, s: [d1.status, d2.status] }));
+  ok('…the second says it was answered once (no tokens of its own)', [j1, j2].some((j) => j.telemetry.outcome === 'coalesced' && j.telemetry.input === 0), J([j1.telemetry.outcome, j2.telemetry.outcome]));
+  globalThis.__logosCalls = [];
+  const again = await send('discover', turnBody(2), U, { headers: op });
+  ok('…and again a moment later (a network retry of a finished action): its answer, still no second call', again.status === 200 && globalThis.__logosCalls.length === 0 && (await again.json()).telemetry.outcome === 'coalesced');
+  // unnamed identical requests overlapping: one call
+  globalThis.__logosScript = [turnAnswer, turnAnswer];
+  globalThis.__logosCalls = [];
+  const [u1, u2] = await Promise.all([send('discover', turnBody(3), U), send('discover', turnBody(3), U)]);
+  ok('an identical request without a name, while the first is still running: one call', globalThis.__logosCalls.length === 1 && u1.status === 200 && u2.status === 200, globalThis.__logosCalls.length);
+  // a failure is never reused: trying again tries again
+  globalThis.__logosScript = [new Error('boom'), turnAnswer];
+  globalThis.__logosCalls = [];
+  const opF = { 'x-operation-id': 'op_failed_then_retried' };
+  const f1 = await send('discover', turnBody(4), U, { headers: opF });
+  const f2 = await send('discover', turnBody(4), U, { headers: opF });
+  ok('a failed action is not kept: the same action again really asks again', f1.status === 502 && f2.status === 200 && globalThis.__logosCalls.length === 2, J([f1.status, f2.status, globalThis.__logosCalls.length]));
+
+  // enough at once, not more: a person's operations, and the instance's
+  globalThis.__logosHang = ['gpt-6-luna'];
+  process.env.SOCRIAUX_USER_CONCURRENCY = '2';
+  globalThis.__logosCalls = [];
+  const ctls = [new AbortController(), new AbortController()];
+  const held = [send('discover', turnBody(5), U, { signal: ctls[0].signal }), send('discover', turnBody(6), U, { signal: ctls[1].signal })];
+  await new Promise((r) => setTimeout(r, 30));
+  const third = await send('discover', turnBody(7), U);
+  const tj = await third.json();
+  ok('past a person\'s limit of operations at once: refused at once, saying why and when to try again — no model call', third.status === 429 && tj.busy === true && tj.retryAfter > 0 && globalThis.__logosCalls.length === 2, J({ s: third.status, j: tj }));
+  ctls.forEach((c) => c.abort());
+  const heldOut = await Promise.all(held);
+  ok('…cancelling the two running stops their model calls, and each says it was cancelled', heldOut.every((r) => r.status === 499), J(heldOut.map((r) => r.status)));
+  const heldJson = await Promise.all(heldOut.map((r) => r.json()));
+  ok('…recorded as cancelled', heldJson.every((j) => j.cancelled === true && j.telemetry.outcome === 'cancelled' && j.telemetry.cancelled === true), J(heldJson.map((j) => j.telemetry?.outcome)));
+  delete process.env.SOCRIAUX_USER_CONCURRENCY;
+  process.env.SOCRIAUX_MAX_CONCURRENT = '1';
+  const ctl = new AbortController();
+  const one = send('discover', turnBody(8), U, { signal: ctl.signal });
+  await new Promise((r) => setTimeout(r, 30));
+  const other = await send('discover', turnBody(9), 'user_v0_ops2');
+  ok('past the instance\'s limit (a workshop setting): another designer is asked to try again in a few seconds', other.status === 503 && (await other.json()).busy === true);
+  ctl.abort();
+  await one;
+  delete process.env.SOCRIAUX_MAX_CONCURRENT;
+
+  // a stalled provider: SocriaUX answers within its deadline, never a platform timeout
+  process.env.SOCRIAUX_ROUTE_BUDGET_MS = '5000';
+  const t0 = Date.now();
+  const stalled = await send('discover', turnBody(10), U, { headers: ND });
+  const sev = await readNd(stalled);
+  const sres = sev.find((e) => e.type === 'result');
+  const took = Date.now() - t0;
+  ok('a provider that never answers: SocriaUX itself answers by its deadline, with a 504 that says nothing changed', sres?.status === 504 && sres.body.timeout === true && /Nothing changed/.test(sres.body.error) && took < 7000 && took >= 4500, J({ took, s: sres?.status, e: sres?.body?.error }));
+  ok('…and while it waited, the browser heard that it was still thinking or checking (not silence)', sev.filter((e) => e.type === 'progress').length >= 2, J(sev.map((e) => e.phase ?? e.type)));
+  globalThis.__logosHang = [];
+  delete process.env.SOCRIAUX_ROUTE_BUDGET_MS;
+
+  // the provider's rate limit, said as itself with when to try again
+  globalThis.__logosScript = [Object.assign(new Error('Rate limit reached for requests'), { status: 429, headers: { 'retry-after': '7' } }), Object.assign(new Error('Rate limit reached'), { status: 429 }), Object.assign(new Error('Rate limit reached'), { status: 429 })];
+  const rl = await send('discover', turnBody(11), U);
+  const rlj = await rl.json();
+  ok('the provider\'s rate limit: a 503 that says so, nothing changed, and when to try again', rl.status === 503 && rlj.providerLimit === true && rlj.retryAfter > 0 && /Nothing changed/.test(rlj.error), J({ s: rl.status, j: rlj }));
+
+  // an organisation's budget, summed across its members
+  process.env.SOCRIAUX_ORG_DAILY_USD = '0.5';
+  db.rows('ux_v0_calls').push({ user_id: 'someone_else', project_id: 'p', at: Date.now(), day: new Date().toISOString().slice(0, 10), stage: 'generate', tier: 'premium', model: 'gpt-6.1-sol', api: 'responses', effort: 'medium', input_tokens: 0, cached_tokens: 0, output_tokens: 0, cost_usd: 0.6, downgraded: false, org_id: 'org_ux_club' });
+  globalThis.__orgId = 'org_ux_club';
+  globalThis.__logosScript = [turnAnswer];
+  const orgOut = await send('discover', turnBody(12), U);
+  const orgJ = await orgOut.json();
+  ok('an organisation over its daily budget: its members are told, before any model is asked', orgOut.status === 429 && /organisation/.test(orgJ.error) && orgJ.limit === true, J(orgJ));
+  globalThis.__orgId = 'org_other';
+  globalThis.__logosScript = [turnAnswer];
+  const orgOk = await send('discover', turnBody(13), U);
+  ok('…another organisation is not', orgOk.status === 200);
+  const mine = db.rows('ux_v0_calls').filter((r) => r.user_id === U).at(-1);
+  ok('…and each call is recorded with its organisation, for the sum', mine?.org_id === 'org_other', J(mine));
+  globalThis.__orgId = null;
+  delete process.env.SOCRIAUX_ORG_DAILY_USD;
+
+  // a database from before the telemetry columns: calls are still logged, without them
+  db.missing.ux_v0_calls = new Set(['operation_id', 'outcome', 'retries', 'reasoning_tokens', 'queued_ms', 'ttft_ms', 'model_ms', 'total_ms', 'cancelled', 'operation']);
+  const before = db.rows('ux_v0_calls').length;
+  globalThis.__logosScript = [turnAnswer];
+  const oldDb = await send('discover', turnBody(14), U);
+  ok('a database without the telemetry columns yet: the call still answers, and is still logged', oldDb.status === 200 && db.rows('ux_v0_calls').length === before + 1, J({ s: oldDb.status, n: db.rows('ux_v0_calls').length - before }));
+  delete db.missing.ux_v0_calls;
+
+  // the budget the browser sees, to warn before an expensive step
+  globalThis.__logosScript = [turnAnswer];
+  const bj = await (await send('discover', turnBody(15), U)).json();
+  ok('every answer says what is spent of each budget, and the limits, for a warning before an expensive step', typeof bj.budget?.day?.spent === 'number' && bj.budget.day.limit > 0 && typeof bj.budget.project.limit === 'number', J(bj.budget));
+
+  // SocriaUX's saves have their own rate limit: a busy session's syncs never use up its model calls
+  delete process.env.RATE_LIMIT_DISABLED;
+  const RU = 'user_v0_rl';
+  globalThis.__users[RU] = { firstName: 'Rl', emails: ['rl@example.com'] };
+  let refusedSync = 0;
+  for (let i = 0; i < 45; i++) if ((await post('projects', null, RU, [], 'GET')).status === 429) refusedSync++;
+  globalThis.__logosScript = [turnAnswer];
+  const afterSyncs = await send('discover', turnBody(16), RU);
+  ok('45 project reads in a minute (more than the old shared limit of 40) are not refused, and a model call after them still answers', refusedSync === 0 && afterSyncs.status === 200, J({ refusedSync, s: afterSyncs.status }));
+  process.env.RATE_LIMIT_DISABLED = '1';
+
+  // unusual use is flagged in the logs, once, the person hashed; nothing is blocked by it
+  process.env.SOCRIAUX_UNUSUAL_CALLS = '3';
+  const UU = 'user_v0_unusual_person';
+  globalThis.__users[UU] = { firstName: 'Un', emails: ['un@example.com'] };
+  process.env.SOCRIA_ONE_USER_IDS = `${process.env.SOCRIA_ONE_USER_IDS},${UU}`;
+  const warned = [];
+  const quietWarn = console.warn;
+  const { format } = await import('node:util');
+  console.warn = (...a) => warned.push(format(...a));
+  const statuses = [];
+  for (let i = 0; i < 6; i++) {
+    globalThis.__logosScript = [turnAnswer];
+    statuses.push((await send('discover', turnBody(100 + i), UU)).status);
+  }
+  console.warn = quietWarn;
+  const unusual = warned.filter((w) => w.includes('[ux-v0 unusual]'));
+  ok('a burst of calls past the unusual-use line: flagged once in the logs, the person hashed, nothing refused', unusual.length === 1 && !unusual[0].includes(UU) && /calls_10m=4/.test(unusual[0]) && statuses.every((x) => x === 200), J({ unusual, statuses }));
+  delete process.env.SOCRIAUX_UNUSUAL_CALLS;
+
+  // a quick edit that would make text hard to read is asked about first, not applied silently
+  const sp = V.normalizeSpec({ title: 'Studio', pageType: 'website', tokens: { colors: { background: '#ffffff', surface: '#ffffff', text: '#111111', muted: '#555555', accent: '#1d4ed8', accentText: '#ffffff', line: '#e5e5e5' }, fonts: { display: 'Fraunces', body: 'Inter' }, scale: 'comfortable', radius: 'soft', style: 'editorial', imageTreatment: 'natural' }, sections: [{ id: 'hero', kind: 'hero', variant: 'editorial', content: { title: 'Rooms for thinking', primary: 'Visit' } }] }, { refs: [] });
+  globalThis.__logosCalls = [];
+  const grey = await post('refine', { projectId: 'uxv0_q', spec: sp, moodboard: {}, comment: 'Make the text light grey' }, U, []);
+  ok('quick edit: light grey text on white is asked about (its contrast said), with the patch ready — and no model was asked', grey.status === 200 && /contrast of 1\.\d:1/.test(grey.json.challenge) && grey.json.applies === true && grey.json.deterministic === true && grey.calls.length === 0, J(grey.json));
+  const btn = await post('refine', { projectId: 'uxv0_q', spec: sp, moodboard: {}, selection: { ...elementSel, element: { ...capture, ux: { section: 'hero', path: 'primary' } } }, comment: 'Change the button color to black' }, U, []);
+  ok('quick edit: the button colour to black, its words kept readable on it, at once', btn.json.deterministic === true && btn.json.patch.tokens.colors.accent === '#000000' && btn.json.patch.tokens.colors.accentText === '#ffffff' && btn.json.challenge === '' && btn.calls.length === 0, J(btn.json));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -806,8 +806,10 @@ console.log('\n=== GPT-6.1 Sol: the Responses API, structured outputs, high effo
   // which model, which API, which effort
   ok('by default: GPT-6 Luna on Chat Completions at its own effort, exactly as before', V.socriauxModel({}) === 'gpt-6-luna' && V.socriauxApi({}) === 'chat' && V.socriauxEffort({}) === undefined);
   const SOL = { SOCRIAUX_MODEL: 'gpt-6.1-sol' };
-  ok('SOCRIAUX_MODEL=gpt-6.1-sol: the Responses API at effort high', V.socriauxApi(SOL) === 'responses' && V.socriauxEffort(SOL) === 'high' && V.socriauxLadder(SOL)[0] === 'gpt-6.1-sol');
-  ok('SOCRIAUX_EFFORT=medium for comparison; a word it does not know leaves high', V.socriauxEffort({ ...SOL, SOCRIAUX_EFFORT: 'medium' }) === 'medium' && V.socriauxEffort({ ...SOL, SOCRIAUX_EFFORT: 'turbo' }) === 'high');
+  // Sol at high, asked for by name: the setting the live evaluation compared (its default is medium now)
+  const SOL_HIGH = { ...SOL, SOCRIAUX_EFFORT: 'high' };
+  ok('SOCRIAUX_MODEL=gpt-6.1-sol: the Responses API at effort medium (as good as high in the live evaluation, in about 60% of the time)', V.socriauxApi(SOL) === 'responses' && V.socriauxEffort(SOL) === 'medium' && V.socriauxLadder(SOL)[0] === 'gpt-6.1-sol');
+  ok('SOCRIAUX_EFFORT=high to compare; a word it does not know leaves medium', V.socriauxEffort(SOL_HIGH) === 'high' && V.socriauxEffort({ ...SOL, SOCRIAUX_EFFORT: 'turbo' }) === 'medium');
   ok('SOCRIAUX_API=chat puts Sol on Chat Completions; responses puts any model on the Responses API', V.socriauxApi({ ...SOL, SOCRIAUX_API: 'chat' }) === 'chat' && V.socriauxApi({ SOCRIAUX_API: 'responses' }) === 'responses');
   ok('a malformed model id is ignored: Luna', V.socriauxModel({ SOCRIAUX_MODEL: 'gpt 6; drop' }) === 'gpt-6-luna');
   // the schemas
@@ -860,14 +862,16 @@ console.log('\n=== GPT-6.1 Sol: the Responses API, structured outputs, high effo
     return { asked, calls: globalThis.__contractCalls };
   };
   const answer = { directions: [{ candidate: 1, language: 'broadsheet', name: 'Morning ledger', concept: 'c', rationale: ['r'], voice: 'v', composition: 'c', imagery: 'i', avoid: ['a'], fonts: null }] };
-  const a1 = await run(SOL, { format: V.formatFor('art-direction') }, [answer]);
+  const a1 = await run(SOL_HIGH, { format: V.formatFor('art-direction') }, [answer]);
   const sent = a1.calls[0]?.params ?? {};
   ok('Sol: one Responses call, instructions + input, effort high, a strict schema, not stored', a1.calls.length === 1 && a1.calls[0].api === 'responses' && sent.model === 'gpt-6.1-sol' && sent.instructions === V.directSystem() && sent.input[0].content[0].type === 'input_text' && sent.reasoning.effort === 'high' && sent.text.format.type === 'json_schema' && sent.text.format.strict === true && sent.store === false, J({ ...sent, instructions: '…', text: sent.text?.format?.type }));
   ok('  its answer cap leaves room to think at high, and no temperature is sent (Sol refuses one)', sent.max_output_tokens === V.MAX_TOKENS['art-direction'] + 16384 && sent.temperature === undefined);
   ok('  the answer is read (no output_text from the raw API: read from the message parts)', J(a1.asked.json) === J(answer) && a1.asked.api === 'responses' && a1.asked.effort === 'high' && a1.asked.incomplete === null);
   ok('  and priced at Sol\'s rates, reasoning billed as output', a1.asked.usage.model === 'gpt-6.1-sol' && a1.asked.usage.output >= 7000 && Math.abs(a1.asked.usage.cost - (a1.asked.usage.input * 2 + a1.asked.usage.output * 10) / 1e6) < 1e-9, J(a1.asked.usage));
-  const a2 = await run({ ...SOL, SOCRIAUX_EFFORT: 'medium' }, { format: V.formatFor('art-direction') }, [answer]);
-  ok('SOCRIAUX_EFFORT=medium: the same call at medium, with medium\'s room', a2.calls[0].params.reasoning.effort === 'medium' && a2.calls[0].params.max_output_tokens === V.MAX_TOKENS['art-direction'] + 8192);
+  const a2 = await run(SOL, { format: V.formatFor('art-direction') }, [answer]);
+  ok('by default: the same call at medium, with medium\'s room', a2.calls[0].params.reasoning.effort === 'medium' && a2.calls[0].params.max_output_tokens === V.MAX_TOKENS['art-direction'] + 8192);
+  const a2b = await run(SOL, { format: V.formatFor('art-direction'), reasoningRoom: 4096 }, [answer]);
+  ok('a route\'s call bounds the reasoning\'s room (half the shared room at medium), and the bound itself never reaches the provider', a2b.calls[0].params.max_output_tokens === V.MAX_TOKENS['art-direction'] + 4096 && !('reasoning_room' in a2b.calls[0].params) && V.reasoningRoomFor('gpt-6.1-sol', 'medium', {}) === 4096 && V.reasoningRoomFor('gpt-6.1-sol', 'high', {}) === 8192 && V.reasoningRoomFor('gpt-6.1-sol', 'medium', { SOCRIAUX_REASONING_ROOM: '2000' }) === 2000, J(a2b.calls[0].params));
   const a3 = await run(SOL, {}, ['{"questions":[]}']);
   ok('a call with no schema (discovery, generation, refinement): plain JSON on the Responses API', a3.calls[0].params.text.format.type === 'json_object' && J(a3.asked.json) === '{"questions":[]}');
   ok('  its input says "JSON" itself (the live API refuses JSON mode when only the instructions say it)', /json/i.test(a3.calls[0].params.input[0].content[0].text) && !/json/i.test(a1.calls[0].params.input[0].content[0].text.slice(-60)));
@@ -884,13 +888,13 @@ console.log('\n=== GPT-6.1 Sol: the Responses API, structured outputs, high effo
   globalThis.__contractNoSchema = [];
   ok('structured outputs refused: plain JSON on Sol, not a step down the ladder', a6.calls.length === 2 && a6.calls.every((c) => c.model === 'gpt-6.1-sol') && a6.calls[1].params.text.format.type === 'json_object' && a6.asked.model === 'gpt-6.1-sol');
   globalThis.__contractReasoning = { ...F.REASONING, high: 18170 };
-  const a7 = await run(SOL, {}, [answer]);
+  const a7 = await run(SOL_HIGH, {}, [answer]);
   globalThis.__contractReasoning = undefined;
   ok('a plain-JSON answer cut by its cap is said to be incomplete (and does not parse as a whole); it is not asked again', a7.calls.length === 1 && a7.asked.retried === null && a7.asked.incomplete === 'max_output_tokens' && a7.asked.json === null && warned.some((w) => /stopped early \(max_output_tokens\)/.test(w)), J({ inc: a7.asked.incomplete }));
   // the loop seen live: a strict-schema answer that never closes, writing whitespace to its cap
   globalThis.__contractContent = (p) => (p.text?.format?.type === 'json_schema' ? `{"directions": [${' '.repeat(80000)}` : JSON.stringify(answer));
   globalThis.__contractCalls = [];
-  const loop = await V.askJson(client, V.socriauxLadder(SOL), { system: V.directSystem(), user: 'Three directions.', maxTokens: V.MAX_TOKENS['art-direction'], label: 'art-direction', format: V.formatFor('art-direction') }, SOL);
+  const loop = await V.askJson(client, V.socriauxLadder(SOL_HIGH), { system: V.directSystem(), user: 'Three directions.', maxTokens: V.MAX_TOKENS['art-direction'], label: 'art-direction', format: V.formatFor('art-direction') }, SOL_HIGH);
   const loopCalls = globalThis.__contractCalls;
   globalThis.__contractContent = undefined;
   ok('a structured answer that runs to its cap is asked once more in JSON mode, on Sol, and the designer gets the answer', loopCalls.length === 2 && loopCalls[0].outcome === 'cut' && loopCalls[1].params.text.format.type === 'json_object' && loopCalls.every((c) => c.model === 'gpt-6.1-sol') && J(loop.json) === J(answer) && loop.incomplete === null && /JSON mode/.test(loop.retried ?? ''), J(loopCalls.map((c) => [c.outcome, c.params.text?.format?.type])));
@@ -1045,7 +1049,7 @@ console.log('\n=== routing: the model for each stage; budgets ===');
   ok('the premium tier on Sol: the Responses API at medium effort; the economy tier on Luna: Chat Completions at its own', R('generate').api === 'responses' && R('generate').effort === 'medium' && R('discover').api === 'chat' && R('discover').effort === undefined);
   ok('a complex refinement asks for premium; a tier set for the stage overrides it', R('refine', {}, { tier: 'premium' }).tier === 'premium' && R('refine', { SOCRIAUX_TIER_REFINE: 'economy' }, { tier: 'premium' }).tier === 'economy');
   ok('SOCRIAUX_ROUTING=single: everything on the economy model', V.routingTable({ SOCRIAUX_ROUTING: 'single' }).every((r) => r.model === 'gpt-6-luna' && r.source === 'single'));
-  ok('legacy SOCRIAUX_MODEL: every stage on it, with its old effort (Sol at high)', V.routingTable({ SOCRIAUX_MODEL: 'gpt-6.1-sol' }).every((r) => r.model === 'gpt-6.1-sol' && r.effort === 'high' && r.api === 'responses' && r.source === 'legacy'));
+  ok('legacy SOCRIAUX_MODEL: every stage on it, at medium unless SOCRIAUX_EFFORT says otherwise', V.routingTable({ SOCRIAUX_MODEL: 'gpt-6.1-sol' }).every((r) => r.model === 'gpt-6.1-sol' && r.effort === 'medium' && r.api === 'responses' && r.source === 'legacy') && V.routingTable({ SOCRIAUX_MODEL: 'gpt-6.1-sol', SOCRIAUX_EFFORT: 'high' }).every((r) => r.effort === 'high'));
   ok('tiers, efforts and single stages are configured, never asked for by a request', R('art-direction', { SOCRIAUX_PREMIUM_MODEL: 'gpt-6.1-terra', SOCRIAUX_PREMIUM_EFFORT: 'low' }).model === 'gpt-6.1-terra' && R('art-direction', { SOCRIAUX_PREMIUM_EFFORT: 'high' }).effort === 'high' && R('critique', { SOCRIAUX_MODEL_CRITIQUE: 'gpt-4o-mini' }).model === 'gpt-4o-mini' && R('critique', { SOCRIAUX_MODEL_CRITIQUE: 'rm -rf /' }).model === 'gpt-6.1-sol');
   ok('a stage on the economy tier for fallbacks and budgets', V.economyRoute('generate', {}).model === 'gpt-6-luna' && V.economyRoute('generate', {}).tier === 'economy');
   // refinement complexity, in code
@@ -1556,6 +1560,58 @@ console.log('\n=== the designer’s design system: read, built within, checked a
   ok('…a file larger than its listing said is not read (each file is capped as it arrives)', huge.status === 502 && !huge.files, J(huge));
 }
 
+
+const contrastOf = (a, b) => {
+  const lum = (h) => { const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
+  return (x + 0.05) / (y + 0.05);
+};
+console.log('\n=== the everyday small edits, in code; each operation recorded; estimates as measured ===');
+{
+  const sp = V.normalizeSpec({ title: 'Studio', pageType: 'website', tokens: { colors: { background: '#fafaf9', surface: '#fafaf9', text: '#1c1917', muted: '#57534e', accent: '#c2410c', accentText: '#ffffff', line: '#e7e5e4' }, fonts: { display: 'Fraunces', body: 'Inter' }, scale: 'comfortable', radius: 'soft', style: 'editorial', imageTreatment: 'natural' }, sections: [{ id: 'nav', kind: 'nav', content: { brand: 'Studio', links: ['Work'] } }, { id: 'hero', kind: 'hero', variant: 'editorial', content: { title: 'Rooms for thinking', subtitle: 'An architecture studio.', primary: 'See the work' } }, { id: 'feat', kind: 'features', variant: 'columns', content: { title: 'What we do', items: [{ title: 'Houses', text: 'x' }, { title: 'Libraries', text: 'y' }] } }, { id: 'f', kind: 'footer', content: { brand: 'Studio' } }] }, board);
+  const btn = { element: { ux: { section: 'hero', path: 'primary' }, tag: 'a' } };
+  const title = { element: { ux: { section: 'hero', path: 'title' }, tag: 'h1' } };
+  const applied = (q) => q && q.patches.reduce((cur, p) => (cur && V.applyPatch(cur, p, board).ok ? V.applyPatch(cur, p, board).spec : null), sp);
+  const q1 = V.readQuickEdit('Change the button color to black', sp, btn);
+  ok('"change the button colour to black": the accent, its words kept readable on it, one patch, in code', q1?.kind === 'colour' && q1.patches.length === 1 && applied(q1)?.tokens.colors.accent === '#000000' && applied(q1)?.tokens.colors.accentText === '#ffffff', J(q1));
+  ok('…"make it navy" with a button selected means the button', V.readQuickEdit('make it navy', sp, btn)?.patches[0].tokens.colors.accent === '#1f2a44');
+  const q2 = V.readQuickEdit('Use a dark grey background', sp, null);
+  ok('"a dark grey background": the background, as one tokens patch', q2?.kind === 'colour' && q2.patches.length === 1 && applied(q2)?.tokens.colors.background === '#374151', J(q2));
+  const bg = applied(q2);
+  ok('…its text and quiet text reach 4.5:1 on the new ground', bg && contrastOf(bg.tokens.colors.text, bg.tokens.colors.background) >= 4.5 && contrastOf(bg.tokens.colors.muted, bg.tokens.colors.background) >= 4.5 && /readable/.test(q2.label), J({ t: bg?.tokens.colors, l: q2?.label }));
+  const grey = V.readQuickEdit('Make the text light grey', sp, null);
+  ok('text that would be hard to read is asked about first, its contrast said', /contrast of 1\.\d:1/.test(grey?.concern ?? ''), J(grey));
+  const q3 = V.readQuickEdit('Change the headline to "Where the sea comes in"', sp, title);
+  ok('new words in quotes for the selected field: exactly them, nothing else changed', applied(q3)?.sections.find((x) => x.id === 'hero').content.title === 'Where the sea comes in' && J(applied(q3)?.sections.find((x) => x.id === 'feat')) === J(sp.sections.find((x) => x.id === 'feat')), J(q3));
+  ok('…and without a selection, "the headline" means the opening\'s title', applied(V.readQuickEdit('Make the headline say "Rooms that think"', sp, null))?.sections.find((x) => x.id === 'hero').content.title === 'Rooms that think');
+  const q4 = V.readQuickEdit('Use Source Serif 4 for the headlines', sp, null);
+  ok('a typeface on SocriaUX\'s list for the headlines', applied(q4)?.tokens.fonts.display === 'Source Serif 4' && applied(q4)?.tokens.fonts.body === 'Inter', J(q4));
+  ok('…one not on the list, or no word for which text, goes to the model', V.readQuickEdit('Use Comic Neue for the headlines', sp, null) === null && V.readQuickEdit('Use Source Serif 4', sp, null) === null);
+  const already = V.readQuickEdit('Use Fraunces for the headlines', sp, null);
+  ok('…and one already there is said to be, with nothing to change and no model asked', already && already.patches.length === 0 && /already in Fraunces/.test(already.label) && V.readQuickEdit('make the buttons #c2410c', sp, null)?.patches.length === 0 && V.readQuickEdit('softer corners', sp, null)?.patches.length === 0, J(already));
+  ok('rounder and square corners', applied(V.readQuickEdit('Make the corners rounder', sp, null))?.tokens.radius === 'round' && applied(V.readQuickEdit('square corners please', sp, null))?.tokens.radius === 'none');
+  const q5 = V.readQuickEdit('Make the headline bigger', sp, title);
+  ok('a bigger headline: the opening\'s own size setting, one step', applied(q5)?.sections.find((x) => x.id === 'hero').shape?.scale === 1.1, J(applied(q5)?.sections.find((x) => x.id === 'hero').shape));
+  ok('more space around the selected section; removing it', applied(V.readQuickEdit('more space around this section', sp, { element: { ux: { section: 'feat', path: 'title' } } }))?.sections.find((x) => x.id === 'feat').pad === 'l' && !applied(V.readQuickEdit('remove this', sp, { element: { ux: { section: 'feat', path: 'title' } } }))?.sections.some((x) => x.id === 'feat'));
+  ok('what is not certain goes to the model: two changes at once, two colours, a part it cannot name, a feeling', ['Make the buttons black and the background white', 'make the hero blue', 'make it feel more premium', 'Rework the layout', 'change the button to black and white'].every((w) => V.readQuickEdit(w, sp, null) === null));
+  ok('nothing at all without a design', V.readQuickEdit('Change the button color to black', null, btn) === null);
+  ok('colours by value too', V.colourIn('to #1a2b3c please')?.hex === '#1a2b3c' && V.colourIn('rgb(10, 20, 30)')?.hex === '#0a141e' && V.colourIn('off-white')?.hex === '#f7f5f0');
+
+  // the operation record: numbers and labels only
+  const rec = V.normalizeRecord({ op: 'op_1234567890', stage: 'generate', operation: 'generate', provider: 'openai', model: 'gpt-6.1-sol', api: 'responses', tier: 'premium', effort: 'medium', input: 3300, cached: 2600, output: 1500, reasoning: 1100, cost: 0.0213, startedAt: 1, queuedMs: 120, ttftMs: 24000, modelMs: 31000, totalMs: 31300, retries: 0, outcome: 'ok', cancelled: false, note: 'fine', prompt: 'SECRET PROMPT TEXT' });
+  ok('an operation record keeps its numbers and labels, and nothing else (a prompt sent along is dropped)', rec && rec.cached === 2600 && rec.reasoning === 1100 && rec.ttftMs === 24000 && !J(rec).includes('SECRET'), J(rec));
+  const line = V.logLine(rec, 'user_secret_id', 'project_secret');
+  ok('its log line: times, tokens, money and outcome; the person and project hashed, never named', /stage=generate/.test(line) && /cached=2600/.test(line) && /ttft=24000/.test(line) && !line.includes('user_secret_id') && !line.includes('project_secret'), line);
+  const sum = V.summarizeRecords([rec, { ...rec, cost: 0.001, stage: 'discover', totalMs: 3000, ttftMs: 900 }, { ...rec, outcome: 'timeout', cost: null, totalMs: 55000 }]);
+  ok('records summed per stage, the most expensive first, failures counted', sum[0].stage === 'generate' && sum[0].calls === 2 && sum[0].failures === 1 && sum[1].stage === 'discover', J(sum));
+
+  // the estimates and the warning before a premium step
+  ok('the measured estimate for a stage: Sol at medium, Sol at high, Luna, and nothing for a model not measured', V.estimateFor('generate', 'gpt-6.1-sol', 'medium').usd === 0.0212 && V.estimateFor('generate', 'gpt-6.1-sol', 'high').seconds === 52.9 && V.estimateFor('generate', 'gpt-6-luna').usd === 0.0007 && V.estimateFor('generate', 'gpt-4o') === null);
+  const plenty = { day: { spent: 0.2, limit: 2 }, month: { spent: 1, limit: 20 }, project: { spent: 0.5, limit: 5 }, operationLimit: 0.4, warnAt: 0.8 };
+  const tight = { ...plenty, project: { spent: 4.97, limit: 5 } };
+  ok('a premium step is asked about only when a budget is nearly out: the measured cost, the limit for one call, what is left', V.warnBefore('generate', plenty) === null && /about US\$0\.021 \(measured\).*US\$0\.40.*US\$0\.030 of this project’s budget/.test(V.warnBefore('generate', tight) ?? ''), V.warnBefore('generate', tight));
+  ok('critique routed by what is asked: a short question about the selection is economy; the whole design, a long question, an image of a page, premium', V.critiqueTier('Is this button clear enough?', { element: {} }).tier === 'economy' && V.critiqueTier('Does the whole page hierarchy work?', { element: {} }).tier === 'premium' && V.critiqueTier('Is this clear?', null).tier === 'premium' && V.critiqueTier('Is this clear?', { element: {} }, true).tier === 'premium');
+}
 
 console.log('\n=== layout pieces: a section composed from stacks, grids and proportions ===');
 {

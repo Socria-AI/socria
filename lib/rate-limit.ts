@@ -130,7 +130,14 @@ function clientId(req: NextRequest, userId: string | null): { id: string; authed
 // document with thirty pictures opened on a new device reads thirty at once,
 // and a pasted page can bring a dozen; each is a storage read or write, never
 // a model.
-type Kind = 'chat' | 'aux' | 'room' | 'count' | 'code' | 'rsvp' | 'staff' | 'voice' | 'capture' | 'media' | 'enter';
+// 'uxmodel' is SocriaUX's model calls (the questions, the brief, art direction, generation, a change, a
+// critique): their own pool, so a designer's work never waits behind Logos's background passes, nor they
+// behind it. A designer at full pace makes a few a minute; twenty is headroom, and a script is stopped.
+// 'uxsync' is SocriaUX's bookkeeping: the project saved to the account a moment after each change, the
+// moodboard's image searches, a design system read from GitHub. It was in 'aux' with the model calls, so a
+// busy session's saves could use up the minute and a model call would be refused for it — a demo that
+// "felt broken" for no reason of its own. Cheap writes and reads, in bursts.
+type Kind = 'chat' | 'aux' | 'room' | 'count' | 'code' | 'rsvp' | 'staff' | 'voice' | 'capture' | 'media' | 'enter' | 'uxmodel' | 'uxsync';
 const LIMITS: Record<Kind, { authed: { minute: number; day: number }; anon: { minute: number; day: number } }> = {
   chat: { authed: { minute: 20, day: 400 }, anon: { minute: 8, day: 80 } },
   aux: { authed: { minute: 40, day: 1200 }, anon: { minute: 20, day: 300 } },
@@ -146,6 +153,8 @@ const LIMITS: Record<Kind, { authed: { minute: number; day: number }; anon: { mi
   capture: { authed: { minute: 60, day: 2000 }, anon: { minute: 10, day: 100 } },
   media: { authed: { minute: 120, day: 5000 }, anon: { minute: 5, day: 50 } },
   enter: { authed: { minute: 60, day: 2000 }, anon: { minute: 60, day: 2000 } },
+  uxmodel: { authed: { minute: 20, day: 800 }, anon: { minute: 5, day: 30 } },
+  uxsync: { authed: { minute: 90, day: 6000 }, anon: { minute: 10, day: 200 } },
 };
 
 function tooMany(r: RLResult): NextResponse {

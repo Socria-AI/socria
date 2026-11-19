@@ -76,6 +76,8 @@ How a plan is chosen and applied:
 
 **Since then:** layouts follow what the designer decides (what comes first, the arrangement, the alignment, the pictures), and what is left open is set per project within each language. See [SOCRIAUX-LAYOUT.md](SOCRIAUX-LAYOUT.md).
 
+**Speed, cost and reliability:** every model stage now runs once, on a deadline inside its route's limit, streamed, cancellable and recorded; small edits are done in code; the generator's prompt is cache-friendly. See [SOCRIAUX-PERFORMANCE.md](SOCRIAUX-PERFORMANCE.md).
+
 **And then:** four methods against the generated look: the looks generated pages share, detected and kept out unless asked for; a plan for every direction, critiqued before anyone sees it; building within the designer's own design system; and sections composed from layout pieces. See [SOCRIAUX-CRAFT.md](SOCRIAUX-CRAFT.md).
 
 ### 5 · Model routing (lib/ux-v0/model.ts)

@@ -11,6 +11,9 @@
 //   SOCRIAUX_MONTHLY_USD     per person per calendar month   (default 20.00)
 //   SOCRIAUX_PROJECT_USD     per project, all time           (default 5.00)
 //   SOCRIAUX_OPERATION_USD   the most one call may cost      (default 0.40)
+//   SOCRIAUX_ORG_DAILY_USD   per organisation (a Clerk organisation: a club, a class, a studio) per UTC day
+//                            (default 0: no organisation limit)
+//   SOCRIAUX_ORG_MONTHLY_USD per organisation per calendar month (default 0: none)
 //   SOCRIAUX_WARN_AT         the share of a budget at which the designer is told (default 0.8)
 //   SOCRIAUX_MAX_RETRIES     asking again when a structured answer is cut at its cap (default 1; 0 to never)
 //
@@ -34,6 +37,9 @@ export interface Budgets {
   monthlyUsd: number;
   projectUsd: number;
   operationUsd: number;
+  /** the organisation's limits, 0 for none */
+  orgDailyUsd: number;
+  orgMonthlyUsd: number;
   warnAt: number;
   maxRetries: number;
 }
@@ -51,6 +57,8 @@ export function budgets(env: Env = process.env): Budgets {
     monthlyUsd: usd(env.SOCRIAUX_MONTHLY_USD, 20),
     projectUsd: usd(env.SOCRIAUX_PROJECT_USD, 5),
     operationUsd: usd(env.SOCRIAUX_OPERATION_USD, 0.4),
+    orgDailyUsd: usd(env.SOCRIAUX_ORG_DAILY_USD, 0),
+    orgMonthlyUsd: usd(env.SOCRIAUX_ORG_MONTHLY_USD, 0),
     warnAt: Number.isFinite(warn) && warn > 0 && warn <= 1 ? warn : 0.8,
     maxRetries: Number.isFinite(retries) ? Math.max(0, Math.min(2, retries)) : 1,
   };
@@ -73,6 +81,8 @@ export interface Spent {
   day: number;
   month: number;
   project: number;
+  /** what the person's organisation has spent today and this month, when they work in one */
+  org?: { day: number; month: number } | null;
 }
 
 export type BudgetDecision =
@@ -90,13 +100,21 @@ export function decide(route: Route, inputChars: number, spent: Spent, b: Budget
     spent.day >= b.dailyUsd ? `today’s SocriaUX budget (${money(b.dailyUsd)}) is spent; it resets at midnight UTC` : '',
     spent.month >= b.monthlyUsd ? `this month’s SocriaUX budget (${money(b.monthlyUsd)}) is spent` : '',
     spent.project >= b.projectUsd ? `this project’s budget (${money(b.projectUsd)}) is spent` : '',
+    spent.org && b.orgDailyUsd > 0 && spent.org.day >= b.orgDailyUsd ? `your organisation’s SocriaUX budget for today (${money(b.orgDailyUsd)}) is spent; it resets at midnight UTC` : '',
+    spent.org && b.orgMonthlyUsd > 0 && spent.org.month >= b.orgMonthlyUsd ? `your organisation’s SocriaUX budget for this month (${money(b.orgMonthlyUsd)}) is spent` : '',
   ].filter(Boolean);
   if (over.length) return { ok: false, error: `${over[0].charAt(0).toUpperCase()}${over[0].slice(1)}. Your work is saved.` };
   let chosen = route;
   let downgraded: string | null = null;
   let estimate = worstCost(route, inputChars, images);
   if (route.tier === 'premium' && estimate != null) {
-    const room = Math.min(b.dailyUsd - spent.day, b.monthlyUsd - spent.month, b.projectUsd - spent.project);
+    const room = Math.min(
+      b.dailyUsd - spent.day,
+      b.monthlyUsd - spent.month,
+      b.projectUsd - spent.project,
+      spent.org && b.orgDailyUsd > 0 ? b.orgDailyUsd - spent.org.day : Infinity,
+      spent.org && b.orgMonthlyUsd > 0 ? b.orgMonthlyUsd - spent.org.month : Infinity
+    );
     const why = estimate > b.operationUsd ? `it could cost up to ${money(estimate)}, more than one change may (${money(b.operationUsd)})` : estimate > room ? `it could take the budget past its limit (${money(room)} left)` : '';
     if (why) {
       const economy = economyRoute(route.stage, env);

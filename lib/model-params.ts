@@ -98,7 +98,10 @@ export function effortFor(model: string, asked?: unknown, env: Env = {}): Effort
  * A call, as the model it goes to takes it. Returns the same object when
  * nothing changes (a classic model, or a call already written for its model).
  */
-export function shapeRequest<P extends Params>(params: P, env: Env = {}): P {
+export function shapeRequest<P extends Params>(raw: P, env: Env = {}): P {
+  // `reasoning_room` is the caller's own bound on the reasoning's room (lib/ux-v0/ask.ts); it never reaches the provider
+  const room = typeof raw?.reasoning_room === 'number' && raw.reasoning_room >= 0 ? raw.reasoning_room : null;
+  const params = (room !== null || 'reasoning_room' in (raw ?? {}) ? (({ reasoning_room: _r, ...rest }) => (void _r, rest))(raw as Params) : raw) as P;
   const model = String(params?.model ?? '');
   const t = traitsOf(model);
   if (t.family === 'classic') {
@@ -114,7 +117,7 @@ export function shapeRequest<P extends Params>(params: P, env: Env = {}): P {
   // the cap the call wrote was for the answer: the reasoning gets room of its own on top
   if (typeof params.max_tokens === 'number') {
     delete out.max_tokens;
-    out.max_completion_tokens = Math.round(params.max_tokens) + REASONING_ROOM[effort];
+    out.max_completion_tokens = Math.round(params.max_tokens) + Math.min(REASONING_ROOM[effort], room ?? Infinity);
   }
   // a temperature (or any sampling setting) is accepted only with reasoning off
   if (effort !== 'none') for (const k of SAMPLING) delete out[k];
@@ -249,6 +252,9 @@ export function shapeResponsesRequest<P extends Params>(params: P, env: Env = {}
   const model = String(params?.model ?? '');
   const t = traitsOf(model);
   const out: Params = { ...params };
+  // the caller's own bound on the reasoning's room (lib/ux-v0/ask.ts): read here, never sent
+  const room = typeof params?.reasoning_room === 'number' && params.reasoning_room >= 0 ? params.reasoning_room : null;
+  delete out.reasoning_room;
   const reasoning = obj(params.reasoning);
   if (t.family === 'classic') {
     // a model without reasoning refuses the setting: the rest of the call is as it was
@@ -257,7 +263,7 @@ export function shapeResponsesRequest<P extends Params>(params: P, env: Env = {}
   }
   const effort = effortFor(model, reasoning.effort, env);
   out.reasoning = { ...reasoning, effort };
-  if (typeof params.max_output_tokens === 'number') out.max_output_tokens = Math.round(params.max_output_tokens) + REASONING_ROOM[effort];
+  if (typeof params.max_output_tokens === 'number') out.max_output_tokens = Math.round(params.max_output_tokens) + Math.min(REASONING_ROOM[effort], room ?? Infinity);
   if (effort !== 'none') for (const k of SAMPLING) delete out[k];
   return out as P;
 }
