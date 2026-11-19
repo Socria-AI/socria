@@ -743,3 +743,103 @@
   cursor: default;
   opacity: 0.5;
 }
+
+/* other compositions for one part: alternatives that differ in structure, drawn small */
+.v0-explore {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sb-line, rgba(0, 0, 0, 0.12));
+}
+.v0-nudges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.v0-nudge {
+  font: inherit;
+  font-size: 12px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--sb-line, rgba(0, 0, 0, 0.18));
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.v0-nudge.is-on {
+  background: var(--sb-ink);
+  border-color: var(--sb-ink);
+  color: var(--sb-paper);
+}
+.v0-nudge:focus-visible,
+.v0-alt-pick input:focus-visible {
+  outline: 2px solid var(--sb-moss);
+  outline-offset: 2px;
+}
+.v0-alts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+.v0-alt {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--sb-line, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+}
+.v0-alt.is-picked {
+  border-color: var(--sb-ink);
+}
+.v0-alt-frame {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--sb-well);
+}
+.v0-alt-frame iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+.v0-alt-label {
+  margin: 0;
+  font-weight: 600;
+  font-size: 13px;
+}
+.v0-alt-diff {
+  margin: 0;
+  padding-left: 1.1em;
+  font-size: 12px;
+  color: var(--sb-muted, #555);
+}
+.v0-alt-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.v0-alt-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  min-height: 32px;
+}
+
+/* a direction's shapes, drawn small on its card */
+.ad-form-strip {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  margin: 8px 0 4px;
+  color: var(--sb-ink);
+}

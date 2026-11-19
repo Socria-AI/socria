@@ -18,10 +18,10 @@
 import { fitToIntent } from './fit';
 import { EXPERIENCE_LABEL, intentOf, pageTypeFor, structureRule } from './intent';
 import { layoutBrief } from './layout';
-import { holdArrangement } from './arrange';
+import { holdArrangement, holdStrategy } from './arrange';
 import { tellsRule } from './tells';
 import { systemBrief } from './design-system';
-import { designFromDirection, directionBrief, LOCK_LABEL, planLayout, type ArtDirection, type LockGroup } from './direction';
+import { designFromDirection, directionBrief, formed, LOCK_LABEL, planLayout, type ArtDirection, type LockGroup } from './direction';
 import { dnaBrief, type CreativeDNA } from './dna';
 import { normQ, readQueries } from './discovery';
 import { fontMenu } from './fonts';
@@ -192,7 +192,9 @@ const NOT_GENERIC = `Avoid the generic generated page:
  * tenth of the price on GPT-6.1 Sol, and sooner): with the project first, two projects shared almost nothing
  * (58 tokens of about 3,300, test/browser/ux-v0/perf-bench.mjs); with it last, they share the whole first part.
  */
-export function generateSystem(brief: DesignBrief, dir: ArtDirection | null = null): string {
+export function generateSystem(brief: DesignBrief, dir0: ArtDirection | null = null): string {
+  // the direction with its shapes and its compositional strategy, as the page will be held to them
+  const dir = dir0 ? formed(dir0, brief) : null;
   // WHAT IS BEING MADE decides the structure, not a page type: a booking screen is the booking itself
   const intent = intentOf(brief);
   const pageType = pageTypeFor(intent, brief.pageType);
@@ -247,7 +249,8 @@ export function generateUser(input: GenerateInput): string {
  * the look are the direction's (whatever the model wrote), and the page is
  * planned for rhythm (direction.ts planLayout).
  */
-export function parseGenerate(raw: unknown, brief: DesignBrief, moodboard: Moodboard, version: number, reason: string, dir: ArtDirection | null = null): DesignSpec | null {
+export function parseGenerate(raw: unknown, brief: DesignBrief, moodboard: Moodboard, version: number, reason: string, dir0: ArtDirection | null = null): DesignSpec | null {
+  const dir = dir0 ? formed(dir0, brief) : null;
   const r = obj(raw);
   const intent = intentOf(brief);
   const pageType = pageTypeFor(intent, brief.pageType);
@@ -257,7 +260,8 @@ export function parseGenerate(raw: unknown, brief: DesignBrief, moodboard: Moodb
     const { tokens, look } = designFromDirection(dir);
     const spec = normalizeSpec({ ...r, tokens, look, pageType, platform: brief.platform, version, reason, createdAt: Date.now() }, moodboard);
     const fitted = fit(spec ? planLayout(spec) : null);
-    return fitted ? holdArrangement(fitted, dir, moodboard) : null;
+    // the opening the reading asked for, then the parts the strategy composes, held whatever the model wrote
+    return fitted ? holdStrategy(holdArrangement(fitted, dir, moodboard), dir, moodboard) : null;
   }
   const pal = Object.fromEntries(brief.palette.map((p) => [p.role, p.hex]));
   const t = obj(r.tokens);

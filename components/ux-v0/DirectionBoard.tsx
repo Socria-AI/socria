@@ -34,6 +34,8 @@ import { takenFrom } from '@/lib/ux-v0/references';
 import { renderDesign } from '@/lib/ux-v0/render';
 import { buildSandboxDoc } from '@/lib/ux-v0/sandbox';
 import { studySpec } from '@/lib/ux-v0/study';
+import { describeForm, figureFor, type FormSystem } from '@/lib/ux-v0/form';
+import { shapeRings, smoothShape, svgPath } from '@/lib/ux-v0/shape';
 import { BUTTONS, CONTAINERS, FRAMES, GRIDS, MOTIFS, MOTION_FEELS, STILL_MOTION, TREATMENTS, normalizeSpec, type DesignSpec, type Look, type Motion } from '@/lib/ux-v0/spec';
 import type { DesignBrief, MoodboardRef } from '@/lib/ux-v0/types';
 import { dnaValues, type CreativeDNA } from '@/lib/ux-v0/dna';
@@ -95,6 +97,19 @@ const ARRANGE: Record<string, 'type' | 'picture' | 'system'> = {
 
 /** A short design in the direction, of the thing being made (lib/ux-v0/study.ts). */
 const specimenSpec = (d: ArtDirection, brief: DesignBrief, name: string, refs: MoodboardRef[]) => studySpec(d, brief, name, refs);
+
+/** A direction's shape system, drawn: a picture's mask, a mass, an echo and a section edge, in its own figures. */
+function FormStrip({ form }: { form: FormSystem }) {
+  const roles = ['mask', 'mass', 'echo', 'edge'] as const;
+  return (
+    <svg className="ad-form-strip" viewBox="0 0 440 100" role="img" aria-label={`Its shapes: ${describeForm(form)}`}>
+      {roles.map((role, i) => {
+        const r = figureFor(form, role, i);
+        return <path key={role} transform={`translate(${i * 112 + 4} 4) scale(0.92)`} d={svgPath(shapeRings(r), smoothShape(r))} fill="currentColor" fillRule="evenodd" opacity={role === 'echo' ? 0.55 : 1} />;
+      })}
+    </svg>
+  );
+}
 
 /** A study: the specimen drawn at a width and scaled to its box. */
 function Study({ html, width, label, ratio }: { html: string; width: number; label: string; ratio: number }) {
@@ -473,6 +488,21 @@ function Spread({ d, n, total, p, onPreview }: { d: ArtDirection; n: number; tot
                 <li key={i}>{x}</li>
               ))}
               {d.arrange && <li>The opening: {d.arrange === 'layered' ? 'its words layered over its picture' : d.arrange === 'overlap' ? 'its title crossing its picture' : 'its title set off-axis'}</li>}
+            </ul>
+          </details>
+        )}
+        {d.look.form && (
+          <details className="v0-dir-more ad-form">
+            <summary className="sb-link is-meta">Its shapes and composition</summary>
+            <FormStrip form={d.look.form} />
+            <p className="v0-quiet">{describeForm(d.look.form)}</p>
+            <ul className="v0-plain">
+              {(d.formSaid ?? []).map((x, i) => (
+                <li key={`f${i}`}>{x}</li>
+              ))}
+              {(d.strategy?.said ?? []).map((x, i) => (
+                <li key={`s${i}`}>{x}</li>
+              ))}
             </ul>
           </details>
         )}

@@ -19,7 +19,7 @@ import { MOTION_RUNTIME } from '@/lib/ux-v0/motion-runtime';
 import { SCENE_RUNTIME } from '@/lib/ux-v0/scene-runtime';
 import { INSPECTOR_SOURCE } from '@/lib/ux-v0/inspector';
 import { renderDesign } from '@/lib/ux-v0/render';
-import { LOCK_LABEL, briefKey, combineDirections, languageOf, lockedChanges, normalizeDirection, proposeDirections, saltOf, type ArtDirection, type LockGroup } from '@/lib/ux-v0/direction';
+import { LOCK_LABEL, briefKey, combineDirections, formed, languageOf, lockedChanges, normalizeDirection, proposeDirections, saltOf, type ArtDirection, type LockGroup } from '@/lib/ux-v0/direction';
 import { MAX_REVISION_ROUNDS, evaluateDesign, fixesFor, type Evaluation, type Finding } from '@/lib/ux-v0/evaluate';
 import { buildSandboxDoc, makeNonce } from '@/lib/ux-v0/sandbox';
 import { applyPatch, kindDef, lookFromTokens, normalizeSpec, placeholdersIn, specDigest, type DesignSpec, type Motion, type Patch } from '@/lib/ux-v0/spec';
@@ -76,7 +76,7 @@ import { Preview } from './Preview';
 import { checkFile, fetchOriginal, imageSize, keepOriginal } from './files';
 import { Inspect } from './Inspect';
 import { SectionEditor } from './SectionEditor';
-import { holdLocked, lockedTouched, setLocked } from '@/lib/ux-v0/edit';
+import { heldTouched, holdLocked, lockedTouched, setHeld, setLocked } from '@/lib/ux-v0/edit';
 import { LAYOUT_QUESTION_ID } from '@/lib/ux-v0/layout';
 import { designerWords } from '@/lib/ux-v0/intent';
 import { elementSelection } from '@/lib/ux-v0/selection';
@@ -172,6 +172,16 @@ interface Checks {
   version: number;
   /** the page as measured at desktop width: what the originality audit reads of the rendered page */
   audit?: PageAudit | null;
+}
+
+/**
+ * What a reference's measured DNA is kept against, so it is measured once and again only when its picture changes: an
+ * upload by its id, a picture SocriaUX made by its recipe (it has no address of its own: it is drawn from the recipe),
+ * any other by its address. A picture with nothing to key it would be measured again on every change of the board.
+ */
+function measuredAs(r: MoodboardRef): string {
+  // kept as the measurement keeps it (lib/ux-v0/ref-dna.ts: at most 120 characters), or a long address never matches
+  return (r.provider === 'upload' ? r.id : r.provider === 'socriaux' ? r.providerId || r.id : r.thumb || r.url).slice(0, 120);
 }
 
 /** What the Creative DNA is read from: the brief, the moodboard, the kind of work, the designer's first words. */
@@ -558,7 +568,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const measureRef = async (r: MoodboardRef) => {
     const ui = uiRefs.find((x) => x.id === r.id) ?? r;
     const src = ui.thumb || ui.url;
-    const of = r.provider === 'upload' ? r.id : r.thumb || r.url;
+    const of = measuredAs(r);
     if (!src || measuringNow.current.has(r.id)) return;
     measuringNow.current.add(r.id);
     setMeasuring((m) => ({ ...m, [r.id]: { state: 'measuring' } }));
@@ -572,7 +582,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   // each kept reference (and each one to steer away from) measured once, again only when its picture changed
   useEffect(() => {
     if (project.mode !== 'create') return;
-    const todo = project.moodboard.refs.filter((r) => (r.state === 'kept' || r.avoid) && !measuring[r.id] && r.dna?.of !== (r.provider === 'upload' ? r.id : r.thumb || r.url));
+    const todo = project.moodboard.refs.filter((r) => (r.state === 'kept' || r.avoid) && !measuring[r.id] && r.dna?.of !== measuredAs(r));
     if (!todo.length) return;
     let stop = false;
     (async () => {
@@ -666,7 +676,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     if (!s || !sec || sec.locked) return;
     const def = kindDef(sec.kind);
     const seed = (Date.now() + sectionId.length * 7919) % 2147483647;
-    const proc: ProcSpec = { kind, seed, ratio: ratioFor(sec.kind, sec.variant), palette: paletteOf(s.tokens, (s.look ?? lookFromTokens(s.tokens)).accent2) };
+    const proc: ProcSpec = { kind, seed, ratio: ratioFor(sec.kind, sec.variant), palette: paletteOf(s.tokens, (s.look ?? lookFromTokens(s.tokens)).accent2), ...((kind === 'form' || kind === 'pattern') && s.look?.form ? { form: s.look.form } : {}) };
     const ref = normalizeRef(procRef(proc, `Art for the ${(def?.label ?? 'part').toLowerCase()}: ${PROC_SAYS[kind]}, in this design’s own colours`, PROC_LABEL[kind]));
     if (!ref) return;
     const board = { ...p.moodboard, refs: [ref, ...p.moodboard.refs.filter((r) => r.id !== ref.id)] };
@@ -1069,6 +1079,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const locks = p.direction.chosen?.locks ?? [];
     const hit = [...new Set(patches.flatMap((pt) => lockedChanges(s, pt, locks)))];
     const sectionsHit = patches.flatMap((pt) => lockedTouched(s, pt));
+    const heldHit = patches.flatMap((pt) => heldTouched(s, pt));
     const ds = p.brief.doc?.system;
     const outside = ds ? [...new Set(patches.flatMap((pt) => offSystem(pt, ds)))] : [];
     const moved = dnaMovedBy(s, patches);
@@ -1077,6 +1088,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       moved.length ? `This moves the ${dnaNames(moved)} away from where you locked it in the Creative DNA.` : '',
       outside.length && ds ? `This uses ${outside.join(' and ')}, which ${outside.length > 1 ? 'are' : 'is'} not in your design system (${ds.name}).` : '',
       sectionsHit.length ? 'This changes a section you locked.' : '',
+      heldHit.length ? 'This changes a composition you approved.' : '',
       concern,
     ].filter(Boolean);
     if (concerns.length)
@@ -1175,6 +1187,22 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     });
     setSelection(null);
   };
+
+  /** Hold or release a composed part's approved composition: a new version (Undo takes it back). */
+  const holdSection = (id: string, held: boolean) => {
+    const p = current.current;
+    const s = currentSpec(p);
+    const next = s ? setHeld(s, id, held) : null;
+    if (!s || !next) return;
+    const v = { ...next, version: s.version + 1 };
+    update((p2) => {
+      const specs = [...p2.specs.slice(0, p2.specIndex + 1), v].slice(-30);
+      return { ...p2, specs, specIndex: specs.length - 1 };
+    });
+    say(held ? 'Composition approved. Its arrangement is held: its words and pictures can still change, and SocriaUX asks before rearranging it.' : 'Released. Its composition can be changed again.', 'info', { acts: [{ label: 'Undo', run: () => stepVersion(-1) }] });
+  };
+  /** An arrangement the designer set aside: not proposed again in this project. */
+  const rejectComposition = (signature: string) => update((p2) => ({ ...p2, compositions: { rejected: [...new Set([...(p2.compositions?.rejected ?? []), signature])].slice(-60) } }));
 
   /** Lock or unlock one section: a new version (Undo takes it back), kept through generations and repairs. */
   const lockSection = (id: string, locked: boolean) => {
@@ -1900,7 +1928,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
               />
             )}
             {rail === 'selection' && spec && !imported && editing && spec.sections.some((x) => x.id === editing.sectionId) && (
-              <SectionEditor spec={spec} sectionId={editing.sectionId} path={editing.path} onPatch={(pt, label) => applyLocal(pt, label)} onLock={lockSection} onMakeArt={makeArt} imageGen={imageGen} onPhotograph={(id) => photograph(id)} viewport={project.viewport} refs={project.moodboard.refs} onFocus={(id, x, y) => updateRef(id, { focus: { x, y } })} />
+              <SectionEditor spec={spec} sectionId={editing.sectionId} path={editing.path} onPatch={(pt, label) => applyLocal(pt, label)} onLock={lockSection} onMakeArt={makeArt} imageGen={imageGen} onPhotograph={(id) => photograph(id)} viewport={project.viewport} refs={project.moodboard.refs} onFocus={(id, x, y) => updateRef(id, { focus: { x, y } })} strategy={project.direction.chosen && project.brief.doc ? formed(project.direction.chosen, project.brief.doc).strategy : null} rejected={project.compositions?.rejected ?? []} onHold={holdSection} onReject={rejectComposition} />
             )}
             {rail === 'selection' && (
               <Inspect

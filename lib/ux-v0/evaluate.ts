@@ -33,7 +33,7 @@ import { tellsOf, unaskedTells, type LookProfile, type Tell, type TellHit } from
 import { colourFieldFor, decidedMoves, loudMoves, oneMoment, quietRatio, showsDetail, SIGNATURE_LABEL, unevenRatio, type Signature } from './plan';
 import { conformance } from './design-system';
 import { knownFont } from './fonts';
-import { holdArrangement } from './arrange';
+import { holdArrangement, holdStrategy } from './arrange';
 import { creativeWords } from './direction';
 import { readCreative, readingBreaches, readingIsEmpty } from './interpret';
 import { whyFor } from './knowledge';
@@ -639,6 +639,21 @@ function fidelityChecks(spec: DesignSpec, ctx: FidelityContext, add: (f: Omit<Fi
       const sec = held.sections[i];
       add({ kind: 'fidelity', severity: 'medium', viewport: 'page', section: sec.id, message: `The opening is a standard hero; the direction composes it ${dir.arrange === 'layered' ? 'with its words layered over its picture' : dir.arrange === 'overlap' ? 'with its title crossing its picture' : 'off-axis'}.`, fix: { op: 'replace', sectionId: sec.id, section: { kind: sec.kind, variant: sec.variant, content: sec.content, images: sec.images }, summary: 'The opening composed as the direction asks' }, restore: true });
     } else kept.push('the opening’s arrangement');
+  }
+  // the direction's compositional strategy: the parts it composes, its navigation, pictures cut to its shapes
+  if (dir?.strategy && spec.pageType === 'website') {
+    const held = holdStrategy(spec, dir, ctx.board ?? null);
+    const lost = spec.sections.map((x, j) => [x, held.sections[j]] as const).filter(([x, h]) => h && h.id === x.id && J0(h) !== J0(x) && h.kind === 'compose' && x.kind !== 'compose');
+    for (const [x, h] of lost.slice(0, 2))
+      add({ kind: 'fidelity', severity: 'medium', viewport: 'page', section: x.id, message: `The ${kindDef(x.kind)?.label.toLowerCase() ?? 'part'} is a stock layout; the direction’s strategy composes it from its own content.`, fix: { op: 'replace', sectionId: x.id, section: { kind: h.kind, variant: h.variant, content: h.content, images: h.images }, summary: 'Composed as the direction’s strategy asks' }, restore: true });
+    const nav = spec.sections.find((x) => x.kind === 'nav');
+    const heldNav = held.sections.find((x) => x.kind === 'nav');
+    if (nav && heldNav && heldNav.variant !== nav.variant && !nav.locked)
+      add({ kind: 'fidelity', severity: 'low', viewport: 'page', section: nav.id, message: `The navigation is a plain bar; the direction sets it ${dir.strategy.nav === 'index' ? 'as an index of the page’s chapters' : dir.strategy.nav === 'rail' ? 'upright at the left edge' : 'as a menu'}.`, fix: { op: 'variant', sectionId: nav.id, variant: heldNav.variant, summary: 'The navigation as the direction sets it' }, restore: true });
+    const cut = dir.strategy.images === 'shaped' || dir.strategy.images === 'fragmented';
+    if (cut && dir.look.frame === 'shaped' && look.frame !== 'shaped' && !dir.locks.includes('imagery'))
+      add({ kind: 'fidelity', severity: 'low', viewport: 'page', section: '', message: 'The pictures are framed plainly; the direction cuts them to its shapes.', fix: { op: 'look', look: { frame: 'shaped', ...(look.form ? {} : { form: dir.look.form }) }, summary: 'Pictures cut to the direction’s shapes' }, restore: true });
+    if (!lost.length) kept.push('the composition’s strategy');
   }
   if (dir) {
     // the direction's colours as a page would normalise them, so contrast fixes are not mistaken for drift

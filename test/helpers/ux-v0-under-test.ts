@@ -78,3 +78,9 @@ export { imageGenConfig, sizeFor, imagePrice, imagePrompt, checkImage, generateI
 // the creative reading: qualities, refusals, tensions, influences and restrictions, as execution
 export * from '@/lib/ux-v0/interpret';
 export { holdArrangement } from '@/lib/ux-v0/arrange';
+// the shape grammar, the shape systems derived from directions, the compositional strategy and the composer
+export * from '@/lib/ux-v0/shape';
+export * from '@/lib/ux-v0/form';
+export * from '@/lib/ux-v0/strategy';
+export * from '@/lib/ux-v0/composer';
+export { holdStrategy, strategyHeld } from '@/lib/ux-v0/arrange';

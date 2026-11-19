@@ -10,6 +10,8 @@
 //   orbit     orbits and bodies, drawn as a diagram                           (science, astronomy, precision)
 //   grain     a ground with grain and a pool of light                         (texture behind type, mood)
 //   render    an object shaded as a product shot: a vessel or a bottle        (a product with no photograph yet)
+//   form      a composition of the design's own shapes (lib/ux-v0/form.ts): a mass, its echoes, a cut, an outline
+//   pattern   a repeat of the design's own figures, set as regularly or as loosely as its system is ordered
 //
 // The same seed draws the same picture, so a project stores only the recipe (kind, seed, ratio, palette) and
 // the picture is drawn wherever it is shown. Each one is a moodboard reference of provider "socriaux": kept,
@@ -19,12 +21,15 @@
 // Photographic generation by an image model is a separate, server-side pathway (lib/ux-v0/image-gen-server.ts),
 // off unless it is configured and paid for: nothing here calls a model.
 
-export const PROC_KINDS = ['field', 'contour', 'lattice', 'orbit', 'grain', 'render'] as const;
+import { figureFor, normalizeForm, deriveForm, type FormSystem } from './form';
+import { shapeRings, smoothShape, svgPath } from './shape';
+
+export const PROC_KINDS = ['field', 'contour', 'lattice', 'orbit', 'grain', 'render', 'form', 'pattern'] as const;
 export type ProcKind = (typeof PROC_KINDS)[number];
 export const PROC_RATIOS = ['1:1', '4:3', '3:4', '3:2', '16:9'] as const;
 export type ProcRatio = (typeof PROC_RATIOS)[number];
 
-export const PROC_LABEL: Record<ProcKind, string> = { field: 'Abstract field', contour: 'Contour lines', lattice: 'Lattice', orbit: 'Orbits', grain: 'Grain and light', render: 'Object render' };
+export const PROC_LABEL: Record<ProcKind, string> = { field: 'Abstract field', contour: 'Contour lines', lattice: 'Lattice', orbit: 'Orbits', grain: 'Grain and light', render: 'Object render', form: 'Its own shapes', pattern: 'A pattern of its shapes' };
 export const PROC_SAYS: Record<ProcKind, string> = {
   field: 'planes and arcs set on a grid',
   contour: 'topographic line work',
@@ -32,6 +37,8 @@ export const PROC_SAYS: Record<ProcKind, string> = {
   orbit: 'orbits and bodies drawn as a diagram',
   grain: 'a ground with grain and a pool of light',
   render: 'an object shaded as a product shot',
+  form: 'a composition of the design’s own shapes',
+  pattern: 'a repeat of the design’s own figures',
 };
 
 export interface ProcSpec {
@@ -40,6 +47,8 @@ export interface ProcSpec {
   ratio: ProcRatio;
   /** the design's colours: ground, ink, accent, and optionally a second ink and a muted tone */
   palette: string[];
+  /** the design's shape system, for the kinds drawn in its own shapes (form, pattern) */
+  form?: FormSystem;
 }
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -55,6 +64,7 @@ export function normalizeProc(v: unknown): ProcSpec | null {
     seed: typeof r.seed === 'number' && Number.isFinite(r.seed) ? Math.abs(Math.round(r.seed)) % 2147483647 : 1,
     ratio: (PROC_RATIOS as readonly string[]).includes(r.ratio as string) ? (r.ratio as ProcRatio) : '4:3',
     palette,
+    ...((f) => (f && (kind === 'form' || kind === 'pattern') ? { form: f } : {}))(normalizeForm(r.form)),
   };
 }
 
@@ -156,6 +166,47 @@ export function proceduralSvg(p: ProcSpec): string {
     defs.push(`<filter id="g" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="${p.seed % 997}" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .55 0"/></filter><filter id="b"><feGaussianBlur stdDeviation="${f1(Math.min(W, H) * 0.12)}"/></filter>`);
     parts.push(`<circle cx="${f1(W * (0.3 + R() * 0.4))}" cy="${f1(H * (0.3 + R() * 0.4))}" r="${f1(Math.min(W, H) * 0.32)}" fill="${accent}" opacity=".55" filter="url(#b)"/>`);
     parts.push(`<rect width="${W}" height="${H}" filter="url(#g)" opacity=".42"/>`);
+  } else if (p.kind === 'form' || p.kind === 'pattern') {
+    // the design's own shapes (lib/ux-v0/form.ts); a recipe without a system takes a neutral one of its seed
+    const f = p.form ?? deriveForm({ seed: p.seed }).form;
+    const inks = [accent, ink, second, muted];
+    const place = (d: string, x: number, y: number, w: number, h: number, fill: string, extra = '') => `<path transform="translate(${f1(x)} ${f1(y)}) scale(${f1(w / 100)} ${f1(h / 100)})" d="${d}" fill="${fill}" fill-rule="evenodd"${extra}/>`;
+    if (p.kind === 'form') {
+      // a mass, set off-centre; its echoes behind and beside it; a cut of the ground across its edge; one outline
+      const m = figureFor(f, 'mass', p.seed % 97, 'art');
+      const mw = W * (0.42 + R() * 0.22);
+      const mh = H * (0.5 + R() * 0.3);
+      const mx = W * (0.08 + R() * (0.9 - 0.42 - 0.08));
+      const my = H * (0.1 + R() * 0.25);
+      const depth = Math.max(1, Math.round(f.depth / 34));
+      for (let i = depth; i >= 1; i--) {
+        const e = figureFor(f, 'echo', p.seed % 89 + i, 'art');
+        const k = 0.45 + R() * 0.35;
+        parts.push(place(svgPath(shapeRings(e), smoothShape(e)), mx + (R() - 0.3) * mw * 0.9, my + (R() - 0.3) * mh * 0.8, mw * k, mh * k, inks[(i + 1) % inks.length], ' opacity=".92"'));
+      }
+      parts.push(place(svgPath(shapeRings(m), smoothShape(m)), mx, my, mw, mh, accent));
+      const c = figureFor(f, 'cut', p.seed % 83, 'art');
+      parts.push(place(svgPath(shapeRings(c), smoothShape(c)), mx + mw * (0.55 + R() * 0.3), my + mh * (0.1 + R() * 0.5), mw * 0.36, mh * 0.36, ground));
+      const o = figureFor(f, 'echo', p.seed % 71 + 7, 'art');
+      parts.push(place(svgPath(shapeRings(o), smoothShape(o)), W * (0.05 + R() * 0.55), H * (0.08 + R() * 0.5), W * 0.38, H * 0.42, 'none', ` stroke="${ink}" stroke-width="2" vector-effect="non-scaling-stroke"`));
+    } else {
+      // a repeat: as many cells as the system is dense, set on a grid as regular as it is ordered, turned as it is kinetic
+      const cols = 5 + Math.round((f.energy / 100) * 4);
+      const rows = Math.max(3, Math.round((cols * H) / W));
+      const cw = W / cols;
+      const ch = H / rows;
+      const jitter = (100 - f.order) / 100;
+      for (let r0 = 0; r0 < rows; r0++)
+        for (let c0 = 0; c0 < cols; c0++) {
+          const k = r0 * cols + c0;
+          const e = figureFor(f, k % 3 === 0 ? 'mass' : 'echo', k % 7, 'pattern');
+          const s = 0.62 + (R() - 0.5) * jitter * 0.5;
+          const x = c0 * cw + cw * (1 - s) / 2 + (R() - 0.5) * jitter * cw * 0.35;
+          const y = r0 * ch + ch * (1 - s) / 2 + (R() - 0.5) * jitter * ch * 0.35;
+          const turn = ((R() - 0.5) * f.energy * 1.2).toFixed(0);
+          parts.push(`<g transform="rotate(${turn} ${f1(x + (cw * s) / 2)} ${f1(y + (ch * s) / 2)})">${place(svgPath(shapeRings(e), smoothShape(e)), x, y, cw * s, ch * s, (r0 + c0) % 4 === 0 ? accent : inks[1 + ((r0 * 3 + c0) % 3)])}</g>`);
+        }
+    }
   } else {
     // render: a turned object, lit from the left, on a shadow
     const vessel = R() < 0.5;
@@ -190,7 +241,7 @@ export function proceduralUri(p: ProcSpec): string {
 /** A recipe's stable id: the same recipe is the same picture, so it is stored once. */
 export function procId(p: ProcSpec): string {
   let h = 0x811c9dc5;
-  for (const ch of `${p.kind}|${p.seed}|${p.ratio}|${p.palette.join(',')}`) {
+  for (const ch of `${p.kind}|${p.seed}|${p.ratio}|${p.palette.join(',')}${p.form ? `|${JSON.stringify(p.form)}` : ''}`) {
     h ^= ch.codePointAt(0)!;
     h = Math.imul(h, 0x01000193) >>> 0;
   }

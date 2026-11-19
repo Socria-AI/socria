@@ -506,7 +506,8 @@ const RANGES: Record<string, Range> = {
   night: { align: ['left'], density: ['even', 'airy'], times: ['tiles', 'pills'], summary: ['bar', 'card'], ratio: [0.4, 0.6], measure: [0.6, 0.85], scale: [1, 1.2], valign: ['bottom', 'middle'] },
   'retro-print': { align: ['left'], density: ['dense', 'even'], times: ['pills', 'tiles'], summary: ['card', 'bar'], ratio: [0.36, 0.52], measure: [0.7, 0.95], scale: [1.05, 1.22], valign: ['top', 'bottom'] },
   brutal: { align: ['left'], density: ['dense', 'even'], times: ['rows', 'tiles'], summary: ['inline', 'bar'], ratio: [0.34, 0.5], measure: [0.75, 1], scale: [1.08, 1.25], valign: ['top', 'bottom'] },
-  cinema: { align: ['left', 'center'], density: ['airy'], times: ['pills', 'tiles'], summary: ['bar', 'inline'], ratio: [0.4, 0.6], measure: [0.5, 0.75], scale: [1, 1.2], valign: ['bottom', 'middle'] },
+  // a programme of screenings reads as rows as naturally as pills: the widescreen language keeps a range of its own
+  cinema: { align: ['left', 'center'], density: ['airy', 'even'], times: ['pills', 'tiles', 'rows'], summary: ['bar', 'inline'], ratio: [0.4, 0.6], measure: [0.5, 0.75], scale: [1, 1.2], valign: ['bottom', 'middle'] },
   future: { align: ['left'], density: ['even', 'dense'], times: ['tiles', 'rows'], summary: ['bar', 'card'], ratio: [0.36, 0.54], measure: [0.6, 0.85], scale: [0.95, 1.15], valign: ['top', 'middle'] },
   industrial: { align: ['left'], density: ['dense', 'even'], times: ['rows', 'tiles'], summary: ['card', 'inline'], ratio: [0.36, 0.5], measure: [0.65, 0.9], scale: [0.95, 1.12], valign: ['top', 'middle'] },
   maximal: { align: ['left'], density: ['dense', 'even'], times: ['pills', 'tiles'], summary: ['card', 'bar'], ratio: [0.38, 0.56], measure: [0.7, 1], scale: [1.1, 1.25], valign: ['bottom', 'top'] },

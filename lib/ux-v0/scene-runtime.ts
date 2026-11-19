@@ -7,7 +7,9 @@
 // editor for every design to serve the few that have a scene.
 //
 //   objects    procedural geometry: a vessel and a bottle turned on a lathe, a sphere, a torus, a ring, a torus
-//              knot, a monolith — each built in code, smooth-shaded
+//              knot, a monolith — each built in code, smooth-shaded — and a FORM: a supershape (the spherical
+//              product of two superformulas) whose numbers the renderer derives from the design's own shape system,
+//              twisted as much as the system is kinetic, so each design's object is its own
 //   materials  matte, satin, gloss, metal: a key light, a fill, a rim, a highlight, gamma
 //   camera     the object turns slowly; a pointer drag or the arrow keys turn it; the page's scroll turns it a
 //              little as the section passes; a configurator on the page recolours it (the ux-config event)
@@ -129,7 +131,48 @@ export const SCENE_RUNTIME = String.raw`(function () {
     });
     return mesh(pos, nor, idx);
   }
+  // a supershape: r(θ) = (|cos(mθ/4)|^n2 + |sin(mθ/4)|^n3)^(-1/n1), one across the equator and one pole to pole,
+  // its normals from its own grid; the numbers come from data-form ("m n1 n2 n3 m2 n4 n5 n6 twist")
+  function sf(t, m, n1, n2, n3) {
+    var v = Math.pow(Math.abs(Math.cos((m * t) / 4)), n2) + Math.pow(Math.abs(Math.sin((m * t) / 4)), n3);
+    return v > 1e-9 ? Math.min(6, Math.pow(v, -1 / n1)) : 6;
+  }
+  function supershape(k) {
+    var U = 96, Vn = 48, pts = [], max = 0, pos = [], nor = [], idx = [];
+    for (var j = 0; j <= Vn; j++) {
+      var phi = -Math.PI / 2 + (j / Vn) * Math.PI, r2 = sf(phi, k[4], k[5], k[6], k[7]);
+      for (var i = 0; i <= U; i++) {
+        var th = -Math.PI + (i / U) * TAU, r1 = sf(th, k[0], k[1], k[2], k[3]);
+        var x = r1 * Math.cos(th) * r2 * Math.cos(phi), z = r1 * Math.sin(th) * r2 * Math.cos(phi), y = r2 * Math.sin(phi);
+        var tw = k[8] * y;
+        var p = [x * Math.cos(tw) - z * Math.sin(tw), y, x * Math.sin(tw) + z * Math.cos(tw)];
+        max = Math.max(max, Math.sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]));
+        pts.push(p);
+      }
+    }
+    var s = 0.98 / (max || 1);
+    function at(i, j) { return pts[Math.max(0, Math.min(Vn, j)) * (U + 1) + ((i + U) % U)]; }
+    for (j = 0; j <= Vn; j++) for (i = 0; i <= U; i++) {
+      var a = at(i + 1, j), b = at(i - 1, j), c = at(i, j + 1), d = at(i, j - 1);
+      var t1 = [a[0] - b[0], a[1] - b[1], a[2] - b[2]], t2 = [c[0] - d[0], c[1] - d[1], c[2] - d[2]];
+      var n = [t1[1] * t2[2] - t1[2] * t2[1], t1[2] * t2[0] - t1[0] * t2[2], t1[0] * t2[1] - t1[1] * t2[0]];
+      var l = Math.sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]) || 1, q = at(i, j);
+      // outward: the normal points away from the centre
+      var o = n[0] * q[0] + n[1] * q[1] + n[2] * q[2] < 0 ? -1 : 1;
+      pos.push(q[0] * s, q[1] * s, q[2] * s);
+      nor.push((o * n[0]) / l, (o * n[1]) / l, (o * n[2]) / l);
+    }
+    for (j = 0; j < Vn; j++) for (i = 0; i < U; i++) {
+      var p0 = j * (U + 1) + i, p1 = p0 + U + 1;
+      idx.push(p0, p0 + 1, p1, p0 + 1, p1 + 1, p1);
+    }
+    return mesh(pos, nor, idx);
+  }
   var MODELS = {
+    form: function (el) {
+      var k = (el && el.getAttribute('data-form') || '6 2 3 3 2 2 2 2 0').split(/\s+/).map(Number);
+      return supershape(k.length === 9 && k.every(isFinite) ? k : [6, 2, 3, 3, 2, 2, 2, 2, 0]);
+    },
     vessel: function () { return lathe([[0, -1], [0.5, -1], [0.6, -0.9], [0.7, -0.45], [0.68, 0.05], [0.5, 0.48], [0.3, 0.74], [0.27, 0.92], [0.33, 1]], 56); },
     bottle: function () { return lathe([[0, -1.05], [0.42, -1.05], [0.46, -0.98], [0.47, 0.25], [0.4, 0.45], [0.17, 0.62], [0.15, 0.95], [0.18, 1.05], [0, 1.05]], 56); },
     sphere: function () { return sphere(0.95); },
@@ -171,7 +214,7 @@ export const SCENE_RUNTIME = String.raw`(function () {
     gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { report.fallback++; return null; }
     gl.useProgram(prog);
-    var geo = (MODELS[el.getAttribute('data-model')] || MODELS.vessel)();
+    var geo = (MODELS[el.getAttribute('data-model')] || MODELS.vessel)(el);
     function buf(target, data) { var b = gl.createBuffer(); gl.bindBuffer(target, b); gl.bufferData(target, data, gl.STATIC_DRAW); return b; }
     var bp = buf(gl.ARRAY_BUFFER, geo.pos), bn = buf(gl.ARRAY_BUFFER, geo.nor);
     buf(gl.ELEMENT_ARRAY_BUFFER, geo.idx);

@@ -17,6 +17,8 @@ import { fieldLabel, textAt, textPatch } from '@/lib/ux-v0/edit';
 import { BREAKPOINTS, BREAKPOINT_LABEL, PADS, SHAPE_EFFECTIVE, SHAPE_FIELDS, TONES, describeResponsive, kindDef, shapeDefault, stacksPicture, type Breakpoint, type BreakpointRule, type DesignSpec, type Patch, type Section } from '@/lib/ux-v0/spec';
 import type { Piece } from '@/lib/ux-v0/compose';
 import type { MoodboardRef } from '@/lib/ux-v0/types';
+import { CompositionExplorer } from './CompositionExplorer';
+import type { CompositionStrategy } from '@/lib/ux-v0/strategy';
 
 const TONE_LABEL: Record<(typeof TONES)[number], string> = { base: 'Page', alt: 'Alternate', accent: 'Accent', accent2: 'Second accent', invert: 'Inverted' };
 const PAD_LABEL: Record<(typeof PADS)[number], string> = { s: 'Tight', m: 'Even', l: 'Generous' };
@@ -165,6 +167,10 @@ export function SectionEditor({
   viewport,
   refs,
   onFocus,
+  strategy,
+  rejected,
+  onHold,
+  onReject,
 }: {
   spec: DesignSpec;
   sectionId: string;
@@ -181,6 +187,11 @@ export function SectionEditor({
   /** the moodboard's pictures, and setting where a picture's subject is (kept with the picture) */
   refs?: readonly MoodboardRef[];
   onFocus?: (refId: string, x: number, y: number) => void;
+  /** exploring other compositions for this part: the direction's strategy, what was set aside, holding one */
+  strategy?: CompositionStrategy | null;
+  rejected?: readonly string[];
+  onHold?: (sectionId: string, held: boolean) => void;
+  onReject?: (signature: string) => void;
 }) {
   const idx = spec.sections.findIndex((s) => s.id === sectionId);
   const sec = idx >= 0 ? spec.sections[idx] : null;
@@ -367,6 +378,7 @@ export function SectionEditor({
       {onFocus && refs && sec.images.length > 0 && <FocalPoint refId={sec.images[0]} refs={refs} locked={locked} onFocus={onFocus} />}
 
       <WidthRules sec={sec} label={def.label} name={name} locked={locked} viewport={viewport} onPatch={onPatch} />
+      {!locked && onHold && onReject && <CompositionExplorer spec={spec} sec={sec} refs={refs ?? []} strategy={strategy} rejected={rejected ?? []} onPatch={onPatch} onHold={onHold} onReject={onReject} />}
 
       <div className="v0-edit-row v0-edit-acts" role="group" aria-label="Its place">
         <button type="button" className="sb-link is-meta" disabled={locked || idx === 0} onClick={() => onPatch({ op: 'move', sectionId: sec.id, to: idx - 1, summary: `Moved the ${name} up` }, `the ${name} moved up`)}>

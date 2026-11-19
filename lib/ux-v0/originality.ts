@@ -8,6 +8,13 @@
 // finding, with one targeted change that answers it (a patch: a variant, a token, a look setting, a list of
 // links drawn from the page's own sections) — applied as one version Undo takes back, never a regeneration.
 //
+// The habits generated pages fall into are read too: pill buttons, three equal columns, one arrangement repeated down
+// the page, circles as decoration, gradient grounds, one typographic voice throughout, and the familiar generated
+// looks (lib/ux-v0/tells.ts). Each is allowed where the direction justifies it — the design's own shape system
+// (lib/ux-v0/form.ts) justifies its own shapes, a radial system its circles, a comparison of plans its columns — and
+// a fix never swaps one habit for another: a part set as three cards is recomposed from its own content by the
+// direction's compositional strategy (lib/ux-v0/composer.ts), not turned into a different stock layout.
+//
 // It is one pass of arithmetic over the spec (and the rendered page's audit, when there is one): no model is
 // asked, nothing loops. It scores four things, each 0–100:
 //
@@ -26,8 +33,13 @@ import { tellsOf, type LookProfile } from './tells';
 import { sequenceLike, signatureLike, signatureOf, type DesignSignature } from './signature';
 export { sequenceLike, signatureLike, signatureOf, type DesignSignature } from './signature';
 import type { DesignBrief } from './types';
+import { composeSignature, type Piece } from './compose';
+import { blocksOf, composeBlocks } from './composer';
+import { FORM_TRAITS, type FormSystem } from './form';
+import { readCreative } from './interpret';
+import { strategyFor } from './strategy';
 
-export const PATTERNS = ['centred-hero', 'bento-grid', 'rounded-cards', 'saas-template', 'purple-gradient', 'glass', 'recycled-nav', 'generic-type', 'decoration', 'repetition'] as const;
+export const PATTERNS = ['centred-hero', 'bento-grid', 'rounded-cards', 'saas-template', 'purple-gradient', 'glass', 'recycled-nav', 'generic-type', 'decoration', 'repetition', 'pill-buttons', 'three-columns', 'same-arrangement', 'circles', 'gradient-ground', 'flat-type', 'generated-look'] as const;
 export type Pattern = (typeof PATTERNS)[number];
 
 export const PATTERN_LABEL: Record<Pattern, string> = {
@@ -41,6 +53,13 @@ export const PATTERN_LABEL: Record<Pattern, string> = {
   'generic-type': 'Generic typography',
   decoration: 'Decoration without meaning',
   repetition: 'Repeats an earlier design',
+  'pill-buttons': 'Pill buttons',
+  'three-columns': 'Three equal columns',
+  'same-arrangement': 'One arrangement, repeated',
+  circles: 'Circles as decoration',
+  'gradient-ground': 'Gradient grounds',
+  'flat-type': 'One typographic voice throughout',
+  'generated-look': 'A familiar generated look',
 };
 
 /** How much each pattern, unjustified, costs distinctiveness. */
@@ -55,6 +74,13 @@ const WEIGHT: Record<Pattern, number> = {
   'generic-type': 12,
   decoration: 8,
   repetition: 16,
+  'pill-buttons': 6,
+  'three-columns': 9,
+  'same-arrangement': 9,
+  circles: 7,
+  'gradient-ground': 8,
+  'flat-type': 8,
+  'generated-look': 8,
 };
 
 export interface OriginalityFinding {
@@ -264,11 +290,14 @@ export function auditOriginality(input: OriginalityInput): Originality {
     // expressive by what the brief, the references or the designer said (not by a prior for the kind of work)
     const expressive = v.restraint >= 62 && !!dna?.dims.restraint && dna.dims.restraint.source !== 'kind';
     const asked = says(w, /\b(playful|illustrat|shapes?|geometric|ornament|decorat|icons?|emoji)\b/);
-    const signature = /shape|circle|arch|blob|geometr/i.test(spec.notes.join(' '));
+    const signature = /shape|circle|arch|blob|geometr/i.test(spec.notes.join(' ')) || formMoved(spec.look.form);
     const fix: Patch[] = [];
     if (shapes && !locks.has('motifs')) fix.push({ op: 'look', look: { motifs: spec.look.motifs.filter((m) => m !== 'shapes'), shapes: [] }, summary: 'Originality: ornament without a reason taken off' });
     add({ pattern: 'decoration', detail: [shapes ? 'decorative shapes' : '', emoji ? `${emoji} emoji` : '', icons >= 4 ? `${icons} icons used as ornament` : ''].filter(Boolean).join(', ').replace(/^./, (c) => c.toUpperCase()) + '.', justified: asked || expressive || signature, because: asked ? 'your words ask for it' : signature ? 'it is the direction’s signature' : expressive ? `your Creative DNA is expressive (${dnaOwn('restraint') ? 'as you set it' : 'read from your brief and references'})` : undefined, ...(fix.length ? { fix, fixLabel: 'Take the ornament off' } : {}) });
   }
+
+  // 11–17 · the habits: pills, equal columns, an arrangement repeated, circles, gradients, a flat voice, generated looks
+  findings.push(...habits({ spec, w, v, dna, locks, kind, screen, audit, brief, words: input.words ?? '' }));
 
   // 10 · repetition of the designer's earlier designs
   const sig = signatureOf(spec, input.project ?? '');
@@ -366,3 +395,119 @@ function shiftOut(hex: string): string {
   };
   return `#${[f(0), f(8), f(4)].map((x) => x.toString(16).padStart(2, '0')).join('')}`;
 }
+
+/** Whether a shape system was moved by its direction (a neutral one justifies nothing). */
+function formMoved(f: FormSystem | undefined): boolean {
+  return !!f && FORM_TRAITS.some((k) => Math.abs(f[k] - 50) >= 14);
+}
+
+interface HabitContext {
+  spec: DesignSpec;
+  /** the words, lower-cased, padded */
+  w: string;
+  v: Record<string, number>;
+  dna: CreativeDNA | null;
+  locks: Set<string>;
+  kind: string;
+  screen: boolean;
+  audit?: PageAudit | null;
+  brief: DesignBrief | null;
+  words: string;
+}
+
+/** A part recomposed from its own content by the design's strategy: the fix for a stock layout that is not another stock layout. */
+function recomposed(c: HabitContext, s: Section, k: number, summary: string): Patch | null {
+  const form = c.spec.look.form;
+  const b = blocksOf(s);
+  if (!form || !b || s.locked || s.held) return null;
+  const words = `${c.words} ${[c.brief?.visualDirection, c.brief?.layoutDirection, (c.brief?.personality ?? []).join(' ')].filter(Boolean).join(' ')}`;
+  const st = strategyFor({ form, dna: c.v, reading: readCreative(words), words, look: { grid: c.spec.look.grid, frame: c.spec.look.frame, motionFeel: c.spec.look.motion?.feel }, kind: c.kind, screen: c.screen, seed: form.seed });
+  const comp = composeBlocks(b, { ...st, recompose: Math.max(1, st.recompose) }, form, { salt: s.id, k });
+  return { op: 'replace', sectionId: s.id, section: { id: s.id, kind: 'compose', variant: 'free', images: s.images, ...(s.tone ? { tone: s.tone } : {}), ...(s.pad ? { pad: s.pad } : {}), content: { root: comp.root, ...(comp.span ? { span: comp.span } : {}) } } as unknown as Section, summary: `${summary}: ${comp.label}` };
+}
+
+/** The habits generated pages fall into, each with what justifies it here and the one change that answers it. */
+function habits(c: HabitContext): OriginalityFinding[] {
+  const { spec, w, v, locks } = c;
+  const out: OriginalityFinding[] = [];
+  const add = (f: Omit<OriginalityFinding, 'label' | 'weight'>) => out.push({ ...f, label: PATTERN_LABEL[f.pattern], weight: WEIGHT[f.pattern] });
+  const says = (re: RegExp) => re.test(w);
+  const form = spec.look.form;
+
+  // pill buttons: allowed where the design's own forms are round, or the words ask for soft, friendly things
+  if (spec.look.buttons === 'pill') {
+    const asked = says(/\b(playful|friendly|soft|rounded|round|bubbly|pill)\b/) || c.brief?.spec?.corners === 'round';
+    const own = !!form && form.curvature >= 70;
+    const to = form && form.orthogonal >= 55 ? 'block' : form && form.curvature >= 55 ? 'outline' : 'underline';
+    add({ pattern: 'pill-buttons', detail: 'Every action is a pill, the button generated pages default to.', justified: asked || own, because: asked ? 'your words ask for soft, rounded forms' : own ? 'the design’s own shapes are fluid' : undefined, ...(!locks.has('surface') ? { fix: [{ op: 'look', look: { buttons: to }, summary: `Originality: ${to} buttons, of the design’s own shapes` } as Patch], fixLabel: 'Give the actions their own form' } : {}) });
+  }
+
+  // three equal columns: a comparison may want them; three points set as three cards are a habit
+  const equal3 = spec.sections.filter((s) => (s.kind === 'features' && ['grid', 'columns'].includes(s.variant) && Array.isArray(s.content.items) && s.content.items.length === 3) || (s.kind === 'compose' && /grid\((\d+):\1:\1\)/.test(composeSignature(s.content.root as Piece))));
+  if (equal3.length) {
+    const asked = says(/\b(three columns|3 columns|side by side|comparison|compare)\b/);
+    const s = equal3[0];
+    const fix = !locks.has('layout') ? recomposed(c, s, 1, 'Originality: the three points composed from their own content') : null;
+    add({ pattern: 'three-columns', detail: `${equal3.length === 1 ? 'A part is' : `${equal3.length} parts are`} set as three equal columns.`, justified: asked, because: asked ? 'your words ask for a comparison side by side' : undefined, ...(fix ? { fix: [fix], fixLabel: 'Compose it from its own content' } : !locks.has('layout') && s.kind === 'features' && !s.locked ? { fix: [{ op: 'variant', sectionId: s.id, variant: v.typography >= 55 ? 'index' : 'numbered', summary: 'Originality: the points as a list of their own' } as Patch], fixLabel: 'Set the points as a list' } : {}) });
+  }
+
+  // one arrangement repeated down the page (two parts drawn the same way, wherever they stand)
+  const arrangement = (s: Section) => (s.kind === 'compose' ? `compose:${composeSignature(s.content.root as Piece)}` : `${s.kind}/${s.variant}`);
+  const counted = spec.sections.filter((s) => !['nav', 'footer', 'cta', 'logos', 'booking', 'form', 'pricing'].includes(s.kind));
+  const seen = new Map<string, Section>();
+  let twin: [Section, Section] | null = null;
+  for (const s of counted) {
+    const a = arrangement(s);
+    if (seen.has(a)) {
+      twin = [seen.get(a)!, s];
+      break;
+    }
+    seen.set(a, s);
+  }
+  if (twin) {
+    const fix = !locks.has('layout') ? recomposed(c, twin[1], 2, 'Originality: the second of two like parts composed another way') : null;
+    add({ pattern: 'same-arrangement', detail: `Two parts are drawn the same way (${kindDef(twin[0].kind)?.label.toLowerCase() ?? 'parts'}, ${twin[0].kind === 'compose' ? 'the same composition' : `the ${twin[0].variant} layout`}).`, justified: false, ...(fix ? { fix: [fix], fixLabel: 'Compose the second another way' } : {}) });
+  }
+
+  // circles as decoration: a radial system draws them by right; elsewhere they are the generated page's ornament
+  const legacyCircles = spec.look.motifs.includes('shapes') && !form && spec.look.shapes.filter((x) => x === 'circle').length > 0;
+  const circleFrame = spec.look.frame === 'circle';
+  const ringShapes = spec.sections.filter((s) => s.kind === 'compose').flatMap((s) => (JSON.stringify(s.content.root).match(/"t":"shape","form":\{"kind":"rings"/g) ?? [])).length;
+  if (legacyCircles || circleFrame || ringShapes >= 2) {
+    const own = !!form && form.radial >= 60;
+    const asked = says(/\b(circles?|circular|orbits?|radial|round|dots?|ripples?)\b/);
+    const fix: Patch[] = [];
+    if (!locks.has('motifs') && legacyCircles) fix.push({ op: 'look', look: { shapes: spec.look.shapes.filter((x) => x !== 'circle') }, summary: 'Originality: circles taken out of the ornament' } as Patch);
+    if (!locks.has('imagery') && circleFrame) fix.push({ op: 'look', look: { frame: form ? 'shaped' : 'plain' }, summary: form ? 'Originality: pictures cut to the design’s own shapes, not circles' : 'Originality: pictures shown whole, not in circles' } as Patch);
+    add({ pattern: 'circles', detail: [legacyCircles ? 'circles in the ornament' : '', circleFrame ? 'pictures in circles' : '', ringShapes >= 2 ? `${ringShapes} ring shapes` : ''].filter(Boolean).join(', ').replace(/^./, (ch) => ch.toUpperCase()) + '.', justified: own || asked, because: own ? 'the design’s shapes are radial (its direction asked for them)' : asked ? 'your words ask for circles' : undefined, ...(fix.length ? { fix, fixLabel: 'Take the circles out' } : {}) });
+  }
+
+  // gradient grounds (the purple tell is read on its own): measured on the drawn page
+  const gradients = c.audit?.style.gradients ?? 0;
+  if (gradients >= 2) {
+    const asked = says(/\b(gradients?|glow|aurora|sunset|haze|ombr)/);
+    add({ pattern: 'gradient-ground', detail: `${gradients} gradient grounds on the drawn page.`, justified: asked, because: asked ? 'your words ask for gradients' : undefined, ...(spec.look.accent2 && !locks.has('palette') ? { fix: [{ op: 'look', look: { accent2: '' }, summary: 'Originality: one ink, no gradient' } as Patch], fixLabel: 'One ink' } : {}) });
+  }
+
+  // one typographic voice: every part's title the same size, no display moment anywhere
+  const display = spec.sections.some((s) => (s.kind === 'hero' && ['statement', 'poster'].includes(s.variant)) || (s.kind === 'stats' && s.variant === 'giant') || (s.kind === 'quote' && s.variant !== 'with-portrait') || (s.kind === 'compose' && /"size":"(xl|giant)"/.test(JSON.stringify(s.content.root))));
+  if (!display && spec.look.ratio < 1.3 && spec.sections.length >= 5 && !c.screen) {
+    const functional = (c.kind === 'dashboard' || c.kind === 'data' || c.kind === 'app') || v.typography <= 32;
+    add({ pattern: 'flat-type', detail: `Every part speaks at one size, on a ${spec.look.ratio.toFixed(2)} scale with no display moment.`, justified: functional, because: functional ? 'a working interface with functional typography' : undefined, ...(!locks.has('type') ? { fix: [{ op: 'look', look: { ratio: Math.max(spec.look.ratio, 1.36), rhythm: 'dramatic' }, summary: 'Originality: more contrast between headline and text, and a rhythm with peaks' } as Patch], fixLabel: 'Give the type a hierarchy' } : {}) });
+  }
+
+  // the familiar generated looks (the purple gradient is its own pattern): allowed where the words ask for them
+  const profile: LookProfile = { colors: { background: spec.tokens.colors.background, accent: spec.tokens.colors.accent }, fonts: { display: spec.tokens.fonts.display }, radius: spec.tokens.radius, look: { align: spec.look.align, grid: spec.look.grid, containers: spec.look.containers, rules: spec.look.rules, motifs: spec.look.motifs, accent2: spec.look.accent2 }, sections: spec.sections, style: c.audit?.style ?? null };
+  const looks = tellsOf(profile).filter((t) => t.tell !== 'purple-blue-gradient');
+  if (looks.length) {
+    const owned = c.brief?.decisions?.colour === 'locked' || c.brief?.decisions?.colour === 'approved' || !!c.brief?.system;
+    const fix: Patch[] = [];
+    if (looks.some((t) => t.tell === 'rounded-everything') && !locks.has('surface')) fix.push({ op: 'tokens', tokens: { radius: 'soft' }, summary: 'Originality: quieter corners' } as Patch);
+    if (looks.some((t) => t.tell === 'all-centred') && !locks.has('layout')) fix.push({ op: 'look', look: { align: 'left' }, summary: 'Originality: set to one side' } as Patch);
+    const colour = looks.every((t) => COLOUR_LOOKS.has(t.tell));
+    add({ pattern: 'generated-look', detail: `${looks.map((t) => t.label).join('; ').replace(/^./, (ch) => ch.toUpperCase())}.`, justified: colour && owned, because: colour && owned ? 'the palette and type are yours' : undefined, ...(fix.length ? { fix, fixLabel: 'Leave the generated look' } : {}) });
+  }
+  return out;
+}
+
+const COLOUR_LOOKS = new Set<string>(['cream-serif-terracotta', 'black-acid-pop']);

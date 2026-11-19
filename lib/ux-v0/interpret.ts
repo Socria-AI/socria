@@ -322,39 +322,47 @@ export function applyReading<D extends Readable>(d: D, r: CreativeReading | null
   const look: Look = { ...d.look, motifs: [...d.look.motifs] };
   const tokens: DesignTokens = { ...d.tokens, colors: { ...d.tokens.colors }, fonts: { ...d.tokens.fonts } };
   const applied: string[] = [];
+  // the other directions read the same words their own way: they keep what the words ask outright (a steeper scale,
+  // the motion, the spacing, the ground's warmth, everything refused) and interpret the rest in their own language
+  const alt = !!opts.ownGrid;
   if (!locked('type') && !opts.keepType) {
     if (ex.look.ratio && ex.look.ratio > look.ratio) look.ratio = ex.look.ratio;
-    if (ex.look.weight) look.weight = ex.look.weight;
-    if (ex.look.tracking) look.tracking = ex.look.tracking;
-    if (ex.look.label) look.label = ex.look.label;
+    if (ex.look.weight && !alt) look.weight = ex.look.weight;
+    if (ex.look.tracking && !alt) look.tracking = ex.look.tracking;
+    if (ex.look.label && !alt) look.label = ex.look.label;
     if (ex.forbid.uppercase && look.case === 'upper') look.case = 'sentence';
   }
   if (!locked('layout')) {
     if (ex.look.grid && !opts.ownGrid) look.grid = ex.look.grid;
     if (ex.look.align && !opts.ownGrid) look.align = ex.look.align;
-    if (ex.look.width) look.width = ex.look.width;
-    if (ex.look.rhythm) look.rhythm = ex.look.rhythm;
+    if (ex.look.width && !alt) look.width = ex.look.width;
+    if (ex.look.rhythm && !alt) look.rhythm = ex.look.rhythm;
     if (ex.tokens.scale) tokens.scale = ex.tokens.scale;
     if (ex.forbid.grids.includes(look.grid)) look.grid = look.grid === 'centered' ? 'asymmetric' : 'editorial';
     if (ex.forbid.grids.includes('centered')) look.align = 'left';
   }
   if (!locked('surface')) {
-    if (ex.look.containers) look.containers = ex.look.containers;
-    if (ex.look.rules) look.rules = ex.look.rules;
-    if (ex.tokens.radius) tokens.radius = ex.tokens.radius;
+    if (ex.look.containers && !alt) look.containers = ex.look.containers;
+    if (ex.look.rules && !alt) look.rules = ex.look.rules;
+    if (ex.tokens.radius && !alt) tokens.radius = ex.tokens.radius;
     if (ex.forbid.containers.includes(look.containers)) look.containers = 'open';
     if (ex.forbid.radius.includes(tokens.radius)) tokens.radius = 'none';
   }
-  if (!locked('imagery')) {
+  if (!locked('imagery') && !alt) {
     if (ex.look.frame) look.frame = ex.look.frame;
     if (ex.tokens.imageTreatment) tokens.imageTreatment = ex.tokens.imageTreatment;
   }
   if (!locked('motifs')) {
-    look.motifs = [...new Set([...look.motifs.filter((m) => !ex.motifs.drop.includes(m)), ...(ex.motifs.add as Look['motifs'])])].slice(0, 4) as Look['motifs'];
+    look.motifs = [...new Set([...look.motifs.filter((m) => !ex.motifs.drop.includes(m)), ...((alt ? [] : ex.motifs.add) as Look['motifs'])])].slice(0, 4) as Look['motifs'];
   }
   if (!locked('motion') && (ex.feel || Object.keys(ex.motion).length || ex.forbid.motion)) {
-    const base = ex.feel && opts.presets?.[ex.feel] ? { ...opts.presets[ex.feel] } : { ...look.motion };
-    look.motion = ex.forbid.motion && opts.presets?.still ? { ...opts.presets.still } : ({ ...base, ...ex.motion } as Motion);
+    // another direction moves toward the words' motion by a step rather than copying it (motion refused is refused)
+    const FEELS = ['still', 'calm', 'measured', 'lively', 'kinetic'] as const;
+    const own = FEELS.indexOf(look.motion.feel);
+    const want = ex.feel ? FEELS.indexOf(ex.feel) : -1;
+    const feel = alt && !ex.forbid.motion && want >= 0 && own >= 0 ? (Math.abs(own - want) <= 1 ? look.motion.feel : FEELS[own + Math.sign(want - own)]) : ex.feel;
+    const base = feel && opts.presets?.[feel] ? { ...opts.presets[feel] } : { ...look.motion };
+    look.motion = ex.forbid.motion && opts.presets?.still ? { ...opts.presets.still } : ({ ...base, ...(alt ? {} : ex.motion) } as Motion);
   }
   if (!locked('palette') && !opts.keepColours && ex.warmth) {
     tokens.colors.background = temper(tokens.colors.background, ex.warmth);

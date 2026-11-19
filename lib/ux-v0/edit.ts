@@ -15,9 +15,15 @@
 //   - the designer's own controls for it are off until they unlock it.
 // Only the designer sets or clears a lock (setLocked): it is not a patch a
 // model can write, so no answer from a model can unlock anything.
+//
+// HELD COMPOSITIONS. A composed part whose composition the designer approved
+// (setHeld; lib/ux-v0/composer.ts) keeps where things stand: its words, its
+// pictures, its ground and its per-width rules can change, but a change to its
+// arrangement is asked about first (heldTouched), a new generation carries it
+// over (holdLocked) and the strategy and the repairs leave it alone.
 
 import { kindDef, type DesignSpec, type Patch, type Section } from './spec';
-import { treeTextAt } from './compose';
+import { composeSignature, normalizeCompose, treeTextAt, type Piece } from './compose';
 
 const isIndex = (x: string) => /^\d{1,3}$/.test(x);
 
@@ -92,6 +98,37 @@ export function setLocked(spec: DesignSpec, sectionId: string, locked: boolean):
   };
 }
 
+/** Hold, or release, the composition of a composed part. */
+export function setHeld(spec: DesignSpec, sectionId: string, held: boolean): DesignSpec | null {
+  const sec = spec.sections.find((s) => s.id === sectionId);
+  if (!sec || (held && sec.kind !== 'compose')) return null;
+  return {
+    ...spec,
+    sections: spec.sections.map((s) => {
+      if (s.id !== sectionId) return s;
+      if (held) return { ...s, held: true, fixed: true };
+      const { held: _gone, ...rest } = s;
+      return rest;
+    }),
+  };
+}
+
+/**
+ * The held compositions a patch would change: replacing or removing the part, another variant, or a tree that places
+ * things otherwise (words changed in place keep the arrangement, and pass).
+ */
+export function heldTouched(spec: DesignSpec, patch: Patch): string[] {
+  if (!patch.sectionId) return [];
+  const sec = spec.sections.find((s) => s.id === patch.sectionId);
+  if (!sec?.held) return [];
+  if (['variant', 'shape', 'story', 'replace', 'remove'].includes(patch.op)) return [sec.id];
+  if (patch.op === 'content' && patch.content && 'root' in patch.content) {
+    const next = normalizeCompose(patch.content.root);
+    if (!next || composeSignature(next) !== composeSignature(sec.content.root as Piece)) return [sec.id];
+  }
+  return [];
+}
+
 /** The locked sections a patch would change: asked about before it is applied. */
 export function lockedTouched(spec: DesignSpec, patch: Patch): string[] {
   if (!patch.sectionId || !['content', 'variant', 'tone', 'shape', 'responsive', 'story', 'images', 'replace', 'remove', 'move'].includes(patch.op)) return [];
@@ -104,7 +141,7 @@ export function lockedTouched(spec: DesignSpec, patch: Patch): string[] {
  * section of the same id (or, failing that, the same kind), else where it stood. Each is said in the notes.
  */
 export function holdLocked(next: DesignSpec, previous: DesignSpec | null | undefined): { spec: DesignSpec; kept: string[] } {
-  const locked = (previous?.sections ?? []).filter((s) => s.locked);
+  const locked = (previous?.sections ?? []).filter((s) => s.locked || s.held);
   if (!locked.length) return { spec: next, kept: [] };
   let sections = [...next.sections];
   const used = new Set<string>();
@@ -123,7 +160,7 @@ export function holdLocked(next: DesignSpec, previous: DesignSpec | null | undef
       sections.splice(Math.min(Math.max(0, was), sections.length), 0, keep);
     }
     used.add(keep.id);
-    kept.push(`Kept the locked ${def.label.toLowerCase()} exactly as it was.`);
+    kept.push(L.locked ? `Kept the locked ${def.label.toLowerCase()} exactly as it was.` : 'Kept the composition you approved exactly as it was.');
   }
   // nothing else may share a kept section's id
   const seen = new Set<string>();

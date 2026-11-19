@@ -102,6 +102,8 @@ export interface BoardReading {
   serif?: boolean;
   grid?: Look['grid'];
   density?: 'airy' | 'dense';
+  /** the pictures SocriaUX made for the moodboard, by kind (contour, orbit, lattice…): they lean the design's shapes */
+  art?: string[];
   /** how many references were read, of which key */
   read: number;
   keys: number;
@@ -159,6 +161,8 @@ export function readBoard(board: Moodboard | null | undefined): BoardReading {
     keys: liked.filter((r) => r.key).length,
     said,
   };
+  const art = [...new Set(board.refs.filter((r) => r.provider === 'socriaux' && r.state !== 'rejected' && r.proc).map((r) => String(r.proc!.kind)))];
+  if (art.length) out.art = art.slice(0, 6);
   const mo = readMotionWords(motionText || all);
   if (mo.feel) out.motion = mo.feel;
   if (mo.parallax !== undefined) out.parallax = mo.parallax;
@@ -198,6 +202,7 @@ export function normalizeReading(v: unknown): BoardReading | undefined {
     ...(typeof r.serif === 'boolean' ? { serif: r.serif } : {}),
     ...(grids.includes(r.grid as string) ? { grid: r.grid as Look['grid'] } : {}),
     ...(r.density === 'airy' || r.density === 'dense' ? { density: r.density } : {}),
+    ...(Array.isArray(r.art) ? { art: r.art.filter((x): x is string => typeof x === 'string' && /^[a-z]{2,16}$/.test(x)).slice(0, 6) } : {}),
     read: typeof r.read === 'number' ? Math.max(0, Math.min(200, Math.round(r.read))) : 0,
     keys: typeof r.keys === 'number' ? Math.max(0, Math.min(200, Math.round(r.keys))) : 0,
     said: Array.isArray(r.said) ? r.said.map((x) => str(x, 120)).filter(Boolean).slice(0, 8) : [],

@@ -25,7 +25,7 @@ import { parseRefine, refineSystem, refineUser } from '@/lib/ux-v0/design';
 import { LOCK_GROUPS, LOCK_LABEL, lockedChanges, type LockGroup } from '@/lib/ux-v0/direction';
 import { MAX_TOKENS, refineTier } from '@/lib/ux-v0/model';
 import { bad, projectIdOf, readBodyPrinted } from '@/lib/ux-v0/route-kit';
-import { lockedTouched } from '@/lib/ux-v0/edit';
+import { heldTouched, lockedTouched } from '@/lib/ux-v0/edit';
 import { offSystem } from '@/lib/ux-v0/design-system';
 import { readQuickEdit } from '@/lib/ux-v0/quick-edit';
 import { DNA_META, lockedDnaMoves, normalizeDNA, type CreativeDNA } from '@/lib/ux-v0/dna';
@@ -63,7 +63,10 @@ function concerns(spec: DesignSpec, patch: Patch, locks: LockGroup[], brief: Des
     const what = (sec && kindDef(sec.kind)?.label.toLowerCase()) || 'section';
     said = `This changes the ${what}, which you locked. ${said && !locked.length ? `${said} ` : ''}Make the change anyway?`.trim();
   }
-  return { locked, lockedSections, dnaMoved, challenge: said };
+  // …nor a composition the designer approved
+  const held = heldTouched(spec, patch);
+  if (held.length && !force && !lockedSections.length) said = `This changes the composition you approved. ${said ? `${said} ` : ''}Make the change anyway?`.trim();
+  return { locked, lockedSections: [...lockedSections, ...held], dnaMoved, challenge: said };
 }
 
 function trialOf(spec: DesignSpec, patch: Patch, moodboard: Moodboard) {

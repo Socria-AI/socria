@@ -53,6 +53,8 @@ import { intentOf, requiredComponents } from './intent';
 import { askedTells, tellsOf, unaskedTells, type Tell } from './tells';
 import { normalizeDesignPlan, planBrief, plannedDirection, SIGNATURES, type DesignPlan, type PlanContext, type Signature } from './plan';
 import { applyReading, readCreative, readingIsEmpty, type CreativeReading, type OpeningArrange } from './interpret';
+import { deriveForm, describeForm } from './form';
+import { normalizeStrategy, strategyBrief, strategyFor, type CompositionStrategy } from './strategy';
 import { MOTION_PRESETS } from './motion';
 
 // ── the visual languages ─────────────────────────────────────────────
@@ -732,6 +734,10 @@ export interface ArtDirection {
   arrange?: OpeningArrange;
   /** parts given a whole screen, pictures run edge to edge, titles at display size */
   frame?: { tall?: boolean; bleed?: boolean; display?: 'xl' | 'giant' };
+  /** why its shapes are what they are (lib/ux-v0/form.ts): each trait that moved, with what moved it */
+  formSaid?: string[];
+  /** how it composes, decided before anything is generated (lib/ux-v0/strategy.ts) */
+  strategy?: CompositionStrategy;
 }
 
 /** The words of a brief that say what the work should feel like: its personality first, the most specific last. */
@@ -1636,7 +1642,7 @@ export function applyLocks(to: ArtDirection, from: ArtDirection | null | undefin
 const TOKEN_GROUP: Record<string, LockGroup> = { colors: 'palette', fonts: 'type', scale: 'layout', radius: 'surface', imageTreatment: 'imagery', style: 'surface' };
 const LOOK_GROUP: Record<string, LockGroup> = {
   accent2: 'palette', ratio: 'type', weight: 'type', case: 'type', tracking: 'type', emphasis: 'type', label: 'type', mono: 'type',
-  grid: 'layout', align: 'layout', width: 'layout', rhythm: 'layout', containers: 'surface', rules: 'surface', buttons: 'surface', frame: 'imagery', motifs: 'motifs', shapes: 'motifs', motion: 'motion',
+  grid: 'layout', align: 'layout', width: 'layout', rhythm: 'layout', containers: 'surface', rules: 'surface', buttons: 'surface', frame: 'imagery', motifs: 'motifs', shapes: 'motifs', form: 'motifs', edges: 'motifs', motion: 'motion',
 };
 
 /** The locked groups a patch would change: a change to any of them waits for the designer. */
@@ -1808,7 +1814,10 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
   // what the designer's own words ask for, as execution (lib/ux-v0/interpret.ts): every direction carries it,
   // within what is locked; they differ in everything it leaves open
   // (the brief first, then what was written on the references, then the notes for this direction: the last said wins)
-  const reading = readCreative(creativeWords(brief, [board?.words ?? '', (brief.rules ?? []).join('. '), ask.notes ?? ''].filter(Boolean).join('. ')), avoid);
+  const readingWords = creativeWords(brief, [board?.words ?? '', (brief.rules ?? []).join('. '), ask.notes ?? ''].filter(Boolean).join('. '));
+  const typeLocked = !!ask.dna?.dims.typography?.locked;
+  const layoutLocked = !!ask.dna?.dims.composition?.locked;
+  const reading = readCreative(readingWords, avoid);
   const chosen: ArtDirection[] = [];
   const usedFonts = new Set<string>();
   const usedIds = new Set<string>();
@@ -1871,7 +1880,9 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
     // (where the DNA narrows the grids, each direction takes one the others have not)
     const shaped0 = ask.dna ? withDNA(locked, brief, slots[Math.min(i, 3)], i === 0 && round === 0, 'look', i, grids) : locked;
     const faithful = i === 0 && round === 0 && !mixed;
-    const shaped = withReading(shaped0, reading, { keepColours: !!brief.system || (faithful && brief.decisions?.colour !== 'delegated'), keepType: !!brief.system || (faithful && brief.decisions?.typography !== 'delegated'), ownGrid: i > 0 });
+    // what the designer locked in the Creative DNA holds against the reading too: locked typography keeps its type,
+    // a locked composition its grid
+    const shaped = withReading(shaped0, reading, { keepColours: !!brief.system || (faithful && brief.decisions?.colour !== 'delegated'), keepType: !!brief.system || typeLocked || (faithful && brief.decisions?.typography !== 'delegated'), ownGrid: i > 0 || layoutLocked });
     grids.push(shaped.look.grid);
     return { ...shaped, id: `dir_${d.language}_${round}_${i}` };
   });
@@ -1891,10 +1902,92 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
     const { arrange: _own, ...rest0 } = planned;
     // the plan's critique may quiet a direction, but not below what the designer's own words asked of the type
     const wantRatio = reading.execution.look.ratio;
-    const typeFree = !planned.locks.includes('type') && !brief.system && !(i === 0 && round === 0 && !mixed && brief.decisions?.typography !== 'delegated');
+    const typeFree = !planned.locks.includes('type') && !brief.system && !typeLocked && !(i === 0 && round === 0 && !mixed && brief.decisions?.typography !== 'delegated');
     const rest = wantRatio && typeFree && rest0.look.ratio < wantRatio ? { ...rest0, look: { ...rest0.look, ratio: wantRatio } } : rest0;
-    return { ...rest, ...(d.reading ? { reading: d.reading } : {}), ...(arrange ? { arrange } : {}), ...(d.frame ? { frame: d.frame } : {}) };
+    // display sizes are the type's: a locked typography keeps its own
+    const frame = d.frame && typeLocked ? (({ display: _d, ...f }) => f)(d.frame) : d.frame;
+    const out: ArtDirection = { ...rest, ...(d.reading ? { reading: d.reading } : {}), ...(arrange ? { arrange } : {}), ...(frame && Object.keys(frame).length ? { frame } : {}) };
+    // …and its shapes and its composition, decided from all of the above before anything is generated
+    return withForm(out, { brief, words: readingWords, reading, art: board?.art ?? [], system: !!brief.system, salt: `${seed}|${i}` });
   });
+}
+
+/** What a direction's shapes and composition are derived from, besides the direction itself. */
+export interface FormContext {
+  brief: Pick<DesignBrief, 'personality' | 'objective' | 'visualDirection' | 'layoutDirection' | 'pageType' | 'functionalRequirements' | 'userGoals'>;
+  /** the designer's words, as the creative reading read them */
+  words: string;
+  reading?: CreativeReading | null;
+  /** pictures SocriaUX made for the moodboard, by kind */
+  art?: readonly string[];
+  /** the designer builds within their own design system: its frames and edges are theirs, not the strategy's */
+  system?: boolean;
+  salt?: string;
+}
+
+/**
+ * A direction with its shape system (lib/ux-v0/form.ts) and its compositional strategy (lib/ux-v0/strategy.ts),
+ * derived in that order from what it already holds — its words as read, its look, its Creative DNA, the moodboard's
+ * made pictures — and written into its look where the renderer draws them: the system itself, pictures cut to it
+ * when the strategy shapes them, and shaped edges. A group the designer locked keeps what it had.
+ */
+export function withForm(d: ArtDirection, ctx: FormContext): ArtDirection {
+  const reading = ctx.reading ?? readCreative(ctx.words);
+  const intent = intentOf(ctx.brief as DesignBrief);
+  const keepMotifs = d.locks.includes('motifs') && !!d.look.form;
+  const derived = keepMotifs
+    ? { form: d.look.form!, said: d.formSaid ?? [] }
+    : deriveForm({
+        reading,
+        words: ctx.words,
+        radius: d.tokens.radius,
+        grid: d.look.grid,
+        containers: d.look.containers,
+        frame: d.look.frame,
+        shapes: d.look.shapes,
+        motifs: d.look.motifs,
+        dna: d.dna,
+        art: ctx.art,
+        seed: hash(`${d.id}|${d.language}|${ctx.salt ?? ''}|form`),
+      });
+  const form = derived.form;
+  const strategy = strategyFor({
+    form,
+    dna: d.dna,
+    reading,
+    words: ctx.words,
+    look: { grid: d.look.grid, frame: d.look.frame, buttons: d.look.buttons, motifs: d.look.motifs, motionFeel: d.look.motion?.feel },
+    kind: intent.kind,
+    screen: !!intent.screen,
+    arrange: d.arrange,
+    seed: hash(`${d.id}|${d.language}|${ctx.salt ?? ''}|strategy`),
+  });
+  // pictures cut to the shapes wherever the designer has not decided their frame: the language's default frame gives
+  // way to what the designer's words asked of the shapes
+  const frameFree = !ctx.system && !d.locks.includes('imagery') && d.designPlan?.signature !== 'framed-picture';
+  const frame = (strategy.images === 'shaped' || strategy.images === 'fragmented') && frameFree ? 'shaped' : d.look.frame;
+  const edges = strategy.edges && !ctx.system && !d.locks.includes('motifs') ? ('shaped' as const) : d.look.edges;
+  return {
+    ...d,
+    look: { ...d.look, form, frame, ...(edges ? { edges } : {}) },
+    formSaid: derived.said,
+    strategy,
+    ...(strategy.said.length ? { composition: `${d.composition.replace(/\.$/, '')}. ${strategy.said[0]}`.slice(0, 280) } : {}),
+  };
+}
+
+/**
+ * A direction as generation needs it: with its shapes and its strategy. One made before they existed, or written by a
+ * model, gains them here, from the brief's own words — the same way every time, so the prompt and the page agree.
+ */
+export function formed(d: ArtDirection, brief: DesignBrief): ArtDirection {
+  if (d.strategy && d.look.form) return d;
+  return withForm(d, { brief, words: creativeWords(brief, (brief.rules ?? []).join('. ')), system: !!brief.system, salt: 'formed' });
+}
+
+/** A direction's shapes in a line, for the board and the brief. */
+export function formLine(d: Pick<ArtDirection, 'look'>): string {
+  return d.look.form ? describeForm(d.look.form) : '';
 }
 
 /**
@@ -2059,6 +2152,8 @@ export function normalizeDirection(v: unknown): ArtDirection | null {
     ...((plan) => (plan ? { designPlan: plan } : {}))(normalizeDesignPlan(r.designPlan)),
     ...dnaOfStored(r),
     ...readingOfStored(r),
+    ...((st) => (st ? { strategy: st } : {}))(normalizeStrategy(r.strategy)),
+    ...(strs(r.formSaid, 240, 8).length ? { formSaid: strs(r.formSaid, 240, 8) } : {}),
   };
 }
 
@@ -2242,6 +2337,7 @@ export function directionBrief(dir: ArtDirection, pageType: 'website' | 'app-scr
     motionBrief(L.motion),
     planBrief(dir.designPlan),
     readingLines(dir),
+    dir.strategy && pageType === 'website' ? strategyBrief(dir.strategy, dir.look.form) : '',
   ]
     .filter(Boolean)
     .join('\n');

@@ -431,7 +431,7 @@ export function loudMoves(spec: { sections: DesignSpec['sections']; look?: Look 
   const hero = spec.sections.find((s) => s.kind === 'hero');
   if (hero && (hero.variant === 'poster' || hero.variant === 'statement' || Number(hero.shape?.scale ?? 1) >= 1.15)) out.add('giant-type');
   const composed = spec.sections.filter((s) => s.kind === 'compose').map((s) => JSON.stringify(s.content?.root ?? {}));
-  if (spec.sections.some((s) => s.tone === 'accent' || s.tone === 'accent2') || composed.some((j) => /"tone":"(accent|invert)"/.test(j))) out.add('colour-field');
+  if (spec.sections.some((s) => s.tone === 'accent' || s.tone === 'accent2') || composed.some((j) => /"t":"box","tone":"(accent|invert)"/.test(j))) out.add('colour-field');
   if (spec.sections.some((s) => (s.kind === 'hero' && s.variant === 'full-bleed') || (s.kind === 'booking' && s.variant === 'immersive') || (s.kind === 'cta' && s.variant === 'image'))) out.add('full-bleed-picture');
   if (spec.sections.some((s) => s.kind === 'stats' && s.variant === 'giant') || composed.some((j) => /"t":"figure"/.test(j))) out.add('oversized-figure');
   if (spec.sections.some((s) => ((s.kind === 'hero' && s.variant === 'split') || (s.kind === 'booking' && (s.variant === 'split' || s.variant === 'calendar'))) && sharplyUneven(s.shape?.ratio))) out.add('uneven-split');

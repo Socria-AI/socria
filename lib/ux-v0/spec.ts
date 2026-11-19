@@ -16,6 +16,7 @@
 
 import { contrastRatio } from '../ux/audit';
 import { normalizeCompose } from './compose';
+import { normalizeForm, type FormSystem } from './form';
 import { bodyFont, displayFont, knownFont } from './fonts';
 import type { Moodboard, PageType, Platform } from './types';
 
@@ -52,13 +53,14 @@ export interface KindDef {
 
 const BOTH: readonly PageType[] = ['website', 'app-screen'];
 /** the objects a scene can draw (lib/ux-v0/scene-runtime.ts), and the materials it shades them in */
-export const SCENE_MODELS = ['vessel', 'bottle', 'sphere', 'torus', 'ring', 'knot', 'monolith'] as const;
+/** 'form' is a sculptural form built from the design's own shape system (a supershape: lib/ux-v0/scene-runtime.ts) */
+export const SCENE_MODELS = ['vessel', 'bottle', 'sphere', 'torus', 'ring', 'knot', 'monolith', 'form'] as const;
 export const SCENE_MATERIALS = ['matte', 'satin', 'gloss', 'metal'] as const;
 const WEB: readonly PageType[] = ['website'];
 const APP: readonly PageType[] = ['app-screen'];
 
 export const LIBRARY: readonly KindDef[] = [
-  { kind: 'nav', label: 'Navigation', pages: WEB, variants: ['inline', 'centered', 'minimal', 'menu'], images: [0, 0], note: 'top bar: brand, up to 6 links, optional button; menu keeps the bar to the brand and a Menu button that opens the links full-screen (on a phone every variant does)',
+  { kind: 'nav', label: 'Navigation', pages: WEB, variants: ['inline', 'centered', 'minimal', 'menu', 'index', 'rail'], images: [0, 0], note: 'top bar: brand, up to 6 links (each goes to the part of the page it names), optional button; menu keeps the bar to the brand and a Menu button that opens the links full-screen (on a phone every variant does); index numbers the links as chapters; rail stands the navigation upright at the left edge on wide screens',
     fields: { brand: T(40, true), links: TS(24, 0, 6), cta: T(30) } },
   { kind: 'hero', label: 'Hero', pages: WEB, variants: ['split', 'centered', 'full-bleed', 'editorial', 'statement', 'poster'], images: [0, 1], note: 'the opening statement; full-bleed and split want an image; statement is type alone, very large; poster is huge type with an image set against it',
     fields: { eyebrow: T(48), title: T(120, true), subtitle: T(320), primary: T(30), secondary: T(30), note: T(140) } },
@@ -261,6 +263,12 @@ export interface Section {
   responsive?: Responsive;
   /** a sequence of points the designer chose to tell as the page's pinned story (one section at most) */
   story?: true;
+  /**
+   * A composed part whose COMPOSITION the designer approved (lib/ux-v0/composer.ts): where things stand is held —
+   * its words, pictures, ground and per-width rules can still change; a change to its arrangement is asked about
+   * first, a new generation carries it over, the automatic repairs and the strategy leave it alone.
+   */
+  held?: true;
 }
 
 export interface DesignSpec {
@@ -363,7 +371,9 @@ export const LABELS = ['caps', 'sentence', 'mono', 'rule', 'quiet'] as const;
 export const CONTAINERS = ['open', 'ruled', 'cards', 'bands', 'framed'] as const;
 export const RULES = ['none', 'hairline', 'heavy'] as const;
 export const BUTTONS = ['solid', 'pill', 'outline', 'underline', 'block', 'offset'] as const;
-export const FRAMES = ['plain', 'inset', 'arch', 'circle', 'offset'] as const;
+export const FRAMES = ['plain', 'inset', 'arch', 'circle', 'offset', 'shaped'] as const;
+/** where grounds of different tones meet: a straight line, or an edge cut from the design's shapes */
+export const EDGES = ['straight', 'shaped'] as const;
 export const MOTIFS = ['numbering', 'shapes', 'marquee', 'captions', 'big-numerals', 'pull-quote', 'icons'] as const;
 export const SHAPES = ['circle', 'arch', 'square', 'quarter', 'diamond', 'blob'] as const;
 export const TONES = ['base', 'alt', 'accent', 'accent2', 'invert'] as const;
@@ -557,6 +567,13 @@ export interface Look {
   accent2: string;
   /** how it moves */
   motion: Motion;
+  /**
+   * The design's shape system (lib/ux-v0/form.ts), derived from its direction: the shapes its pictures are cut to
+   * when the frame is "shaped", its section edges, its motif's marks. None on a design made before it existed.
+   */
+  form?: FormSystem;
+  /** where grounds of different tones meet */
+  edges?: (typeof EDGES)[number];
 }
 
 /** The renderer as it was before looks: what an older spec is drawn with. */
@@ -615,6 +632,9 @@ export function normalizeLook(v: unknown, base: Look): Look {
     shapes: list(r.shapes, SHAPES, base.shapes),
     accent2: r.accent2 === '' ? '' : hx(r.accent2, base.accent2 || '') ,
     motion: normalizeMotion(r.motion, base.motion ?? STILL_MOTION),
+    // a system written as null is taken away; one not mentioned is kept
+    ...(r.form === null ? {} : normalizeForm(r.form) ?? base.form ? { form: normalizeForm(r.form) ?? base.form } : {}),
+    ...((EDGES as readonly string[]).includes(r.edges as string) ? (r.edges === 'shaped' ? { edges: 'shaped' as const } : {}) : base.edges === 'shaped' && r.edges === undefined ? { edges: 'shaped' as const } : {}),
   };
 }
 
@@ -709,6 +729,7 @@ export function normalizeSection(v: unknown, pageType: PageType, imageIds: Reado
   const responsive = normalizeResponsive(r.responsive);
   if (responsive) sec.responsive = responsive;
   if (r.story === true && def.kind === 'features') sec.story = true;
+  if (r.held === true && def.kind === 'compose') (sec.held = true), (sec.fixed = true);
   return sec;
 }
 
@@ -990,7 +1011,7 @@ function describeField(f: Field): string {
         .map(([k, x]) => `${k}: ${describeField(x)}`)
         .join(', ')}}] ${f.n[0]}–${f.n[1]}${f.req ? '*' : ''}`;
     case 'tree':
-      return 'one piece* — {"t":"stack","dir":"row|col","gap":"s|m|l","align":"start|center|end|stretch","children":[pieces],"pin":true to hold a column in view while the one beside it scrolls} | {"t":"grid","cols":[2–4 whole numbers 1–12: the columns\' proportion, e.g. [5,7]],"gap","align","children":[pieces]} | {"t":"box","tone":"base|alt|accent|invert","pad":"s|m|l","children":[pieces]} | {"t":"layer","place":"top-start|top|top-end|start|center|end|bottom-start|bottom|bottom-end","inset":"s|m|l","children":[the ground first (a picture or a box), then what sits over it]} | {"t":"field","rows":"s|m|l" (row height),"children":[pieces, each with "cell":[first column 1–12, columns spanned, first row 1–8, rows spanned]]} — a field places pieces by hand on twelve columns: they may overlap, sit off-axis, leave columns empty; words that meet a picture are drawn above it on a plate | {"t":"text","role":"eyebrow|title|heading|lead|body|caption|quote","text","size":"l|xl|giant" (a title, heading or quote at display size),"align":"center|end","over":"lines" (a title that crosses a picture, set line by line on strips of the ground)} | {"t":"figure","value","label"} | {"t":"image","at":its index in this section\'s images,"ratio":"1:1|4:3|3:2|16:9|21:9|3:4|2:3","fill":true to fill its cell} | {"t":"button","label","style":"primary|secondary|link"} | {"t":"list","items":[…],"marker":"none|number|rule"} | {"t":"rule"}; at most 4 levels deep and 48 pieces; one title';
+      return 'one piece* — {"t":"stack","dir":"row|col","gap":"s|m|l","align":"start|center|end|stretch","children":[pieces],"pin":true to hold a column in view while the one beside it scrolls} | {"t":"grid","cols":[2–4 whole numbers 1–12: the columns\' proportion, e.g. [5,7]],"gap","align","children":[pieces]} | {"t":"box","tone":"base|alt|accent|invert","pad":"s|m|l","children":[pieces]} | {"t":"layer","place":"top-start|top|top-end|start|center|end|bottom-start|bottom|bottom-end","inset":"s|m|l","children":[the ground first (a picture or a box), then what sits over it]} | {"t":"field","rows":"s|m|l" (row height),"children":[pieces, each with "cell":[first column 1–12, columns spanned, first row 1–8, rows spanned]]} — a field places pieces by hand on twelve columns: they may overlap, sit off-axis, leave columns empty; words that meet a picture are drawn above it on a plate | {"t":"text","role":"eyebrow|title|heading|lead|body|caption|quote","text","size":"l|xl|giant" (a title, heading or quote at display size),"align":"center|end","over":"lines" (a title that crosses a picture, set line by line on strips of the ground),"orient":"vertical" (short words standing upright),"rotate":−12…12 (degrees, not running text),"stroke":true (outline, display sizes),"vary":"weight" (its weight sweeps as it passes)} | {"t":"figure","value","label","stroke":true} | {"t":"image","at":its index in this section\'s images,"ratio":"1:1|4:3|3:2|16:9|21:9|3:4|2:3","fill":true to fill its cell,"mask":SHAPE (the picture cut to it),"fragments":SHAPE (the picture broken by its cuts),"morph":true (arrives as a plain frame that becomes its mask)} | {"t":"shape","form":SHAPE,"tone":"accent|ink|tint|line|ground|accent2","z":"under|over" (beneath pictures, or over them as a cut),"ratio","keep":true (kept on phones)} | {"t":"flow","side":"start|end","form":SHAPE,"at":a picture cut to the shape (optional),"tone","children":[words that wrap around the shape]} | {"t":"button","label","style":"primary|secondary|link"} | {"t":"list","items":[…],"marker":"none|number|rule"} | {"t":"rule"}; SHAPE = {"kind":"poly|organic|super|stepped|radial|rings|shards|arc|custom","n":2–24 (corners, lobes, rays, rings, cuts or steps),"irregular":0–100,"curve":0–100,"turn":−180…180,"cut":0–100 (a void, notch or gap),"warp":0–100,"mirror":true,"seed":any whole number, or for custom "points":[[x,y]…] or "path":"M… (lines and curves, no arcs)" in a 0–100 box}; at most 4 levels deep and 48 pieces (a field 12 children); one title';
   }
 }
 

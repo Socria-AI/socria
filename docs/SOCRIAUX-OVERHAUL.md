@@ -92,6 +92,25 @@ How a plan is chosen and applied:
 
 See [SOCRIAUX-PRODUCTION-ENGINE.md](SOCRIAUX-PRODUCTION-ENGINE.md).
 
+**The creative ceiling:**
+- the designer's words read as qualities, refusals, tensions, influences and restrictions, applied in code and held;
+- composition primitives: layers, a hand-placed twelve-column field, display type, edge-to-edge and whole-screen parts;
+- five more languages and 74 typefaces;
+- a working menu on phones, focal points and crops, the story as a choice.
+
+See [SOCRIAUX-CREATIVE-CEILING.md](SOCRIAUX-CREATIVE-CEILING.md).
+
+**Visual originality:**
+- shapes constructed from parameters, not picked from a set: nine constructions, custom paths, masks, fragments, wraps
+  and edges;
+- each direction's shape system derived from its words, look, DNA and moodboard;
+- a compositional strategy decided before generation and held after it (the parts it composes rebuilt from their own
+  content by five placement logics);
+- the habits generated pages fall into, read and answered without swapping one habit for another;
+- compositions explored, combined, set aside and held on the canvas.
+
+See [SOCRIAUX-VISUAL-ORIGINALITY.md](SOCRIAUX-VISUAL-ORIGINALITY.md).
+
 ### 5 · Model routing (lib/ux-v0/model.ts)
 
 | Stage | Tier | Default model |

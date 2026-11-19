@@ -1843,7 +1843,7 @@ console.log('\n=== layout pieces: a section composed from stacks, grids and prop
   const ceramics = mkB('A website for a ceramics studio selling hand-thrown bowls');
   const o = V.auditOriginality({ spec: generic, brief: ceramics });
   const flagged = o.findings.filter((f) => !f.justified).map((f) => f.pattern).sort();
-  ok('a generic page is read for what generated pages do by habit', J(flagged) === J(['centred-hero', 'decoration', 'generic-type', 'purple-gradient', 'recycled-nav', 'rounded-cards', 'saas-template']), J(flagged));
+  ok('a generic page is read for what generated pages do by habit', J(flagged) === J(['centred-hero', 'decoration', 'generated-look', 'generic-type', 'pill-buttons', 'purple-gradient', 'recycled-nav', 'rounded-cards', 'saas-template']), J(flagged));
   ok('…each with a targeted change, and four scores within 0–100', o.findings.every((f) => f.fix?.length) && Object.values(o.scores).every((x) => x >= 0 && x <= 100) && o.scores.distinctiveness < 50);
   let fixed = generic;
   for (const p of V.originalityFixes(o)) { const r = V.applyPatch(fixed, p, null); if (r.ok) fixed = r.spec; }
@@ -2221,7 +2221,8 @@ console.log('\n=== layout pieces: a section composed from stacks, grids and prop
   ok('the generator is told the reading: each decision, what it asks of the sections, and that the opening is composed', (() => { const t = V.generateSystem(hb, hd[0]); return t.includes('THE CREATIVE READING') && /without the coldness/.test(t) && /Open with a composed section, not a library hero/.test(t) && /"field"/.test(t); })());
   const mon = mkb({ objective: 'A site for a concert hall by an architecture studio', visualDirection: 'An architectural experience that feels monumental, restrained, cinematic, and museum-like.' });
   const md = V.proposeDirections({ brief: mon, salt: 'p2' });
-  ok('"monumental… cinematic" reaches the direction: spacious, a steep scale, slow calm movement, captions and no ornament, whole-screen frames', md.every((d) => d.tokens.scale === 'spacious' && d.look.ratio >= 1.5 && d.look.motion.feel === 'calm' && d.look.motion.duration === 1100 && !d.look.motifs.includes('icons') && !d.look.motifs.includes('shapes') && d.frame?.tall && d.frame.display === 'giant') && md[0].arrange === 'layered', J(md.map((d) => [d.tokens.scale, d.look.ratio, d.look.motion.feel, d.look.motifs, d.arrange])));
+  ok('"monumental… cinematic" reaches the direction: spacious, a steep scale, slow calm movement, captions and no ornament, whole-screen frames', md[0].tokens.scale === 'spacious' && md[0].look.ratio >= 1.5 && md[0].look.motion.feel === 'calm' && md[0].look.motion.duration === 1100 && md[0].look.motifs.includes('captions') && md.every((d) => !d.look.motifs.includes('icons') && !d.look.motifs.includes('shapes') && d.frame?.tall && d.frame.display === 'giant') && md[0].arrange === 'layered', J(md.map((d) => [d.tokens.scale, d.look.ratio, d.look.motion.feel, d.look.motifs, d.arrange])));
+  ok('…the other directions read the same words their own way: what is asked outright kept (space, a steep scale, nothing refused), the motion a step toward calm at most', md.slice(1).every((d) => d.tokens.scale === 'spacious' && d.look.ratio >= 1.5 && ['still', 'calm', 'measured'].includes(d.look.motion.feel)), J(md.map((d) => [d.tokens.scale, d.look.ratio, d.look.motion.feel])));
   // …and it is held in code after generation, whatever the model wrote
   const heroOnly = { title: 'Hall', sections: [{ id: 'nav', kind: 'nav', content: { brand: 'Hall', links: ['Programme', 'Visit'] } }, { id: 'hero', kind: 'hero', variant: 'centered', content: { eyebrow: 'Bergen', title: 'A hall cut from one pour', subtitle: 'Daylight enters once, from above.', primary: 'See the programme' }, images: ['openverse:a1'] }, { id: 'f', kind: 'footer', content: { brand: 'Hall' } }] };
   const gen = V.parseGenerate(heroOnly, mon, cboard, 1, 'r', md[0]);
@@ -2279,6 +2280,144 @@ console.log('\n=== layout pieces: a section composed from stacks, grids and prop
   ok('"slow down the transitions" is done in code: the design’s own motion, longer, nothing else', slow?.kind === 'motion' && slow.patches[0].op === 'look' && slow.patches[0].look.motion.duration > kinSpec.look.motion.duration && slow.patches[0].look.motion.feel === 'kinetic' && V.readQuickEdit('make the animations faster', kinSpec, null).patches[0].look.motion.duration < kinSpec.look.motion.duration);
   ok('  "remove the parallax" too; on a still design there is no motion to change, so it is the model’s to read', V.readQuickEdit('remove the parallax', kinSpec, null).patches[0].look.motion.parallax === 0 && V.readQuickEdit('slow down the transitions', fs, null) === null);
   ok('  "crop the picture tall on phones" for the part selected', V.readQuickEdit('crop the picture tall on phones', fs, { element: { ux: { section: 'hero', path: 'title' } } })?.patches[0].rule.crop === 'tall');
+}
+
+console.log('\n=== visual originality: shapes constructed, systems derived, compositions decided and held ===');
+{
+  // ── the shape grammar
+  const kinds = ['poly', 'organic', 'super', 'stepped', 'radial', 'rings', 'shards', 'arc', 'edge'];
+  const drawn = kinds.map((kind, i) => V.normalizeRecipe({ kind, seed: 9 + i, n: 5, irregular: 40, curve: 50, turn: 10, cut: 40, warp: 20 }));
+  const inBox = (rings) => rings.every((r) => r.every(([x, y]) => x >= 0 && x <= 100 && y >= 0 && y <= 100));
+  ok('every construction draws: closed rings in a 0–100 box, from parameters', drawn.every((r) => r && V.shapeRings(r).length >= 1 && inBox(V.shapeRings(r))), J(drawn.map((r) => r?.kind)));
+  ok('…a single-ring shape always has the same number of points, so any two can morph', drawn.filter((r) => V.shapeRings(r).length === 1).every((r) => V.shapeRings(r)[0].length === V.RING_POINTS));
+  ok('…deterministic: the same recipe is the same shape; another seed is another shape', J(V.shapeRings(drawn[0])) === J(V.shapeRings(V.normalizeRecipe({ ...drawn[0] }))) && J(V.shapeRings(drawn[0])) !== J(V.shapeRings({ ...drawn[0], seed: 10 })));
+  ok('…held to its ranges; an unknown construction draws nothing', V.normalizeRecipe({ kind: 'poly', n: 99, irregular: 400, turn: 999 }).n === 24 && V.normalizeRecipe({ kind: 'poly', irregular: 400 }).irregular === 100 && V.normalizeRecipe({ kind: 'turtle' }) === null);
+  const custom = V.normalizeRecipe({ kind: 'custom', path: 'M10 90 C 10 10, 90 10, 90 50 S 40 90, 10 90 Z M 60 40 L 70 40 L 70 50 Z' });
+  ok('custom outlines: a path of lines and curves is parsed into points (a hole stays a hole); arcs and junk are refused', V.shapeRings(custom).length === 2 && V.normalizeRecipe({ kind: 'custom', path: 'M0 0 A 10 10 0 0 1 50 50 Z' }) === null && V.normalizeRecipe({ kind: 'custom', path: 'M0 0 L 50 50 <script>' }) === null && V.normalizeRecipe({ kind: 'custom', points: [[0, 0], [100, 0], [50, 100]] }).points.length === 3);
+  const rings = V.shapeRings(V.normalizeRecipe({ kind: 'rings', seed: 3, n: 3 }));
+  ok('a shape with voids is one clip-path polygon under the even-odd rule; a single ring is plain', V.clipPolygon(rings).startsWith('polygon(evenodd,') && !V.clipPolygon(V.shapeRings(drawn[0])).includes('evenodd') && V.outsidePolygon(rings).startsWith('polygon('));
+  const from = V.morphFrom(V.shapeRings(drawn[1]));
+  ok('a shape can grow from its plain frame: the same points carried out to the box’s edge', !!from && (from.match(/%/g) ?? []).length === V.RING_POINTS * 2 && V.morphFrom(rings) === null);
+  ok('how much of its box a shape keeps is measured (a picture cut to a thin star is no picture)', V.fillRatio(V.shapeRings(V.normalizeRecipe({ kind: 'custom', points: [[0, 0], [100, 0], [100, 100], [0, 100]] }))) > 0.95 && V.fillRatio(V.shapeRings(V.normalizeRecipe({ kind: 'arc', seed: 2, irregular: 80 }))) < 0.4);
+  const pieces = V.fragmentPieces(V.normalizeRecipe({ kind: 'shards', seed: 4, n: 3, cut: 50 }));
+  ok('a picture broken into fragments: each piece its clip-path and how far it is pulled out', pieces.length >= 2 && pieces.every((x) => x.clip.startsWith('polygon(') && Number.isFinite(x.dx) && Number.isFinite(x.dy)));
+  ok('a section edge keeps its depth in pixels at any size: calc() of a depth the page sets', /calc\(var\(--edge-d\) \* [\d.]+\)/.test(V.edgeClip(V.normalizeRecipe({ kind: 'edge', seed: 2, curve: 80 }))));
+
+  // ── shape systems, derived from the direction (not chosen from styles)
+  const sys = (words, radius, grid, dna, seed) => V.deriveForm({ reading: V.readCreative(words), words, radius, grid, dna, seed });
+  const arch = sys('architectural, structural, concrete, restrained, precise', 'none', 'swiss', { composition: 55, restraint: 35, typography: 70 }, 1);
+  const fash = sys('fluid, sensual, luxurious, cinematic, draped silk', 'soft', 'editorial', { composition: 60, restraint: 60 }, 2);
+  const lab = sys('precise, scientific, data, orbit diagrams, calm', 'none', 'modular', { composition: 30, information: 80 }, 3);
+  const art = sys('experimental, fragmented, collage, raw, abstract', 'none', 'asymmetric', { composition: 88, restraint: 80 }, 4);
+  ok('the words, the look and the DNA move a system’s traits: structure, fluidity, radiality, fragments', arch.form.orthogonal >= 70 && arch.form.curvature <= 30 && fash.form.curvature >= 70 && lab.form.radial >= 70 && art.form.fragment >= 70, J([arch.form, fash.form, lab.form, art.form]));
+  ok('…and each trait says what moved it, in the designer’s own words', arch.said.some((x) => /“architectural”/.test(x)) && fash.said.some((x) => /“fluid”|“luxurious”/.test(x)));
+  ok('…a refused form word pushes the other way (“nothing fragmented”)', sys('organic and warm, nothing fragmented', 'soft', 'editorial', {}, 5).form.fragment < 50);
+  ok('each system draws with its own vocabulary of constructions', V.vocabulary(arch.form)[0].kind === 'stepped' && V.vocabulary(fash.form)[0].kind === 'organic' && ['rings', 'radial'].includes(V.vocabulary(lab.form)[0].kind) && V.vocabulary(art.form)[0].kind === 'shards', J([arch, fash, lab, art].map((x) => V.vocabulary(x.form))));
+  const masks = [0, 1, 2, 3, 4].map((k) => V.figureFor(fash.form, 'mask', k));
+  ok('a picture’s mask keeps most of the picture; the places of one page differ, as one family', masks.every((m) => V.fillRatio(V.shapeRings(m)) >= 0.55) && new Set(masks.map((m) => V.shapeKey(m))).size === 5, J(masks.map((m) => m.kind)));
+  ok('a calm system cuts no picture to rays', [0, 1, 2, 3, 4, 5].every((k) => V.figureFor(lab.form, 'mask', k).kind !== 'radial'));
+  ok('the system in words, for the designer and the generator', /stepped/i.test(V.describeForm(arch.form)) && /organic/i.test(V.describeForm(fash.form)));
+
+  // ── the compositional strategy, decided before generation
+  const strat = (f, words, dna, extra = {}) => V.strategyFor({ form: f, dna, reading: V.readCreative(words), words, look: { grid: 'editorial', frame: 'plain' }, seed: 7, ...extra });
+  const sArch = strat(arch.form, 'architectural, structural, monumental, restrained', { composition: 60, typography: 70 });
+  const sArt = strat(art.form, 'experimental, fragmented, collage, raw', { composition: 88, restraint: 80, typography: 70 });
+  const sPlain = strat(V.deriveForm({ seed: 9 }).form, '', {});
+  ok('two identities compose by different logics, each said with its reason', sArch.axis !== sArt.axis && sArch.said[0].startsWith('Composed') && sArt.ranked.length === 5, J([sArch.axis, sArt.axis]));
+  ok('…type as structure where the words are monumental; pictures broken where the system is fragmented', sArch.type.role === 'structural' && sArt.images === 'fragmented');
+  ok('a design nobody said anything about stays simple: nothing recomposed, nothing cut, a plain bar', sPlain.recompose === 0 && sPlain.images === 'plain' && sPlain.nav === 'bar' && !sPlain.edges);
+  ok('a working screen composes for use', strat(arch.form, 'architectural', {}, { screen: true }).type.role === 'functional' && strat(arch.form, 'architectural', {}, { screen: true }).recompose === 0);
+  ok('a stored strategy comes back whole', J(V.normalizeStrategy(JSON.parse(J(sArt)))) === J(sArt));
+  ok('the generator is told the strategy and the shapes, as a direction to compose within', /COMPOSITION STRATEGY/.test(V.strategyBrief(sArt, art.form)) && /never a grid of cards or three equal columns/.test(V.strategyBrief(sArt, art.form)) && /"kind":"shards"/.test(V.strategyBrief(sArt, art.form)));
+
+  // ── the composer: a part rebuilt from its own content
+  const feat = { id: 'f', kind: 'features', variant: 'grid', images: [], content: { title: 'How the work is made', intro: 'Three steps, in order.', items: [{ title: 'Listen', text: 'To the place.' }, { title: 'Frame', text: 'One idea.' }, { title: 'Make', text: 'By hand.' }, { title: 'Live', text: 'A week of use.' }] } };
+  const blocks = V.blocksOf(feat);
+  ok('a part’s content read for composing: its title, its points, its pictures', blocks.title === 'How the work is made' && blocks.items.length === 4 && V.blocksOf({ id: 'b', kind: 'booking', variant: 'list', images: [], content: {} }) === null);
+  const comps = V.AXES.map((axis) => V.composeBlocks(blocks, { ...sArt, recompose: 2 }, art.form, { salt: 'f', axis }));
+  const wordsOverlap = (c) => { const cells = c.root.cells.filter((_, i) => ['text', 'stack', 'list', 'figure', 'button', 'flow'].includes(c.root.children[i].t)); return cells.some((a, i) => cells.some((b, j) => j > i && a.col < b.col + b.span && b.col < a.col + a.span && a.row < b.row + b.rows && b.row < a.row + a.rows)); };
+  ok('five logics place the same content five ways; words never land on words', new Set(comps.map((c) => V.composeSignature(c.root))).size === 5 && comps.every((c) => c.root.t === 'field' && !wordsOverlap(c)), J(comps.map((c) => c.axis)));
+  ok('…every piece of the content is placed, and in reading order', comps.every((c) => J(c.root.children.flatMap(function texts(p) { return p.t === 'text' ? [p.text] : p.children ? p.children.flatMap(texts) : []; }).filter((t) => ['Listen', 'Frame', 'Make', 'Live'].includes(t))) === J(['Listen', 'Frame', 'Make', 'Live'])));
+  ok('…deterministic, and normalised as a composed section would be', J(V.composeBlocks(blocks, sArt, art.form, { salt: 'f' }).root) === J(V.composeBlocks(blocks, sArt, art.form, { salt: 'f' }).root) && V.normalizeCompose(comps[0].root) !== null);
+  const alts = V.alternativesFor(blocks, sArt, art.form, { salt: 'f', count: 3, signatureOf: V.composeSignature });
+  const altsAgain = V.alternativesFor(blocks, sArt, art.form, { salt: 'f', count: 3, rejected: [V.composeSignature(alts[0].root)], signatureOf: V.composeSignature });
+  ok('exploring: alternatives that differ in structure, each saying how; one set aside is not proposed again', alts.length === 3 && new Set(alts.map((a) => V.composeSignature(a.root))).size === 3 && alts.every((a) => a.differs.length) && !altsAgain.some((a) => V.composeSignature(a.root) === V.composeSignature(alts[0].root)));
+  const combined = V.combineAlternatives(blocks, sArt, art.form, alts[0], alts[1], { salt: 'f' });
+  ok('…two combined: where the first places things, with the second’s treatments', combined.axis === alts[0].axis && J(combined.treatments) === J(alts[1].treatments));
+  ok('…nudges move the next round (calmer: no turn, a stricter grid)', V.nudged(sArt, art.form, ['calmer']).st.type.rotate === 0 && V.nudged(sArt, art.form, ['calmer']).st.grid === 'strict');
+  const back = V.blocksOfTree(comps[1].root, 0);
+  ok('a composed part reads its content back, so it can be explored again', back.title === 'How the work is made' && back.items.length === 4);
+
+  // ── held in code after generation; approved compositions held against later changes
+  const dir0 = V.proposeDirections({ brief: V.normalizeBrief({ pageType: 'website', objective: 'A portfolio for an experimental artist working in collage', personality: ['raw', 'daring'], visualDirection: 'Experimental and fragmented: collage, torn and cut-up, abstract and off-grid, layered with depth.', palette: [], typography: { display: '', body: '' } }, new Set()), salt: 'orig-test' });
+  ok('every proposed direction carries its own shape system and strategy', dir0.every((d) => d.look.form && d.strategy && d.formSaid) && new Set(dir0.map((d) => J(d.look.form))).size === 3);
+  const d = dir0[0];
+  const page = { title: 'Ines', sections: [{ id: 'nav', kind: 'nav', variant: 'inline', content: { brand: 'Ines', links: ['Work', 'Studio'] } }, { id: 'hero', kind: 'hero', variant: 'centered', content: { title: 'Things broken on purpose', subtitle: 'Collage and print.' } }, feat, { id: 'q', kind: 'quote', variant: 'large', content: { quote: 'They listened.', author: 'Ana' } }, { id: 'g', kind: 'gallery', variant: 'grid', images: [board.refs[0].id, board.refs[1].id], content: { title: 'Work' } }, { id: 'foot', kind: 'footer', variant: 'simple', content: { brand: 'Ines', columns: [] } }] };
+  const gen = V.parseGenerate(page, V.normalizeBrief({ pageType: 'website', objective: 'A portfolio', palette: [], typography: { display: '', body: '' } }, new Set()), board, 1, 'r', d);
+  const composedNow = gen.sections.filter((x) => x.kind === 'compose').length;
+  ok('the strategy is held whatever the model wrote: parts recomposed from their own content; the gallery kept as it works', composedNow >= Math.min(2, d.strategy.recompose) && gen.sections.find((x) => x.id === 'g')?.kind === 'gallery' && gen.notes.some((n) => /composed as the strategy asks/.test(n)), J(gen.sections.map((x) => x.kind)));
+  const lockedPage = V.parseGenerate({ ...page, sections: page.sections.map((x) => (x.id === 'f' ? { ...x, locked: true } : x)) }, V.normalizeBrief({ pageType: 'website', objective: 'A portfolio', palette: [], typography: { display: '', body: '' } }, new Set()), board, 1, 'r', d);
+  ok('…a locked part is left exactly as it is', lockedPage.sections.find((x) => x.id === 'f').kind === 'features');
+  const someCompose = gen.sections.find((x) => x.kind === 'compose' && x.id !== 'hero');
+  const heldSpec = V.setHeld(gen, someCompose.id, true);
+  const words = JSON.parse(J(someCompose.content.root));
+  (function rename(p) { if (p.t === 'text' && p.role === 'title') p.text = 'New words'; (p.children ?? []).forEach(rename); })(words);
+  ok('an approved composition is held: a change to its arrangement is asked about, new words are not', heldSpec.sections.find((x) => x.id === someCompose.id).held === true && V.heldTouched(heldSpec, { op: 'replace', sectionId: someCompose.id, section: {} }).length === 1 && V.heldTouched(heldSpec, { op: 'content', sectionId: someCompose.id, content: { root: words } }).length === 0 && V.heldTouched(heldSpec, { op: 'content', sectionId: someCompose.id, content: { root: { t: 'stack', dir: 'col', gap: 'm', align: 'start', children: [{ t: 'text', role: 'title', text: 'x' }] } } }).length === 1);
+  ok('…and a new generation carries it over', V.holdLocked(V.parseGenerate(page, V.normalizeBrief({ pageType: 'website', objective: 'A portfolio', palette: [], typography: { display: '', body: '' } }, new Set()), board, 2, 'r', d), heldSpec).spec.sections.some((x) => x.id === someCompose.id && x.held));
+  ok('the generator is told the strategy for a website', /COMPOSITION STRATEGY/.test(V.generateSystem(V.normalizeBrief({ pageType: 'website', objective: 'A portfolio', palette: [], typography: { display: '', body: '' } }, new Set()), d)));
+  ok('a direction made before systems existed gains one, the same way every time', (() => { const { strategy: _s, formSaid: _f, ...old } = d; const bare = { ...old, look: { ...old.look, form: undefined } }; const b0 = V.normalizeBrief({ pageType: 'website', objective: 'A portfolio', palette: [], typography: { display: '', body: '' } }, new Set()); const a1 = V.formed(bare, b0); return !!a1.strategy && !!a1.look.form && J(a1.look.form) === J(V.formed(bare, b0).look.form); })());
+
+  // ── drawn: masks, fragments, planes, wraps, type treatments, edges, navigation that goes somewhere
+  const tokens = { colors: { background: '#f3f1ec', surface: '#ffffff', text: '#161616', muted: '#5a5a5a', accent: '#9c3a1d', accentText: '#ffffff', line: '#cfccc4' }, fonts: { display: 'Archivo', body: 'Inter' }, scale: 'comfortable', radius: 'none', style: 'minimal', imageTreatment: 'natural' };
+  const mk = (sections, look = {}) => V.normalizeSpec({ title: 'D', pageType: 'website', tokens, look: { ...V.lookFromTokens(tokens), form: art.form, ...look }, sections }, board);
+  const drawnSpec = mk([
+    { id: 'nav', kind: 'nav', variant: 'index', content: { brand: 'D', links: ['Work', 'Method'] } },
+    { id: 'c', kind: 'compose', content: { root: { t: 'field', rows: 's', children: [
+      { t: 'text', role: 'eyebrow', text: 'Method', orient: 'vertical', cell: [1, 1, 1, 3] },
+      { t: 'text', role: 'title', text: 'Method', size: 'xl', rotate: 30, cell: [2, 8, 1, 1] },
+      { t: 'image', at: 0, ratio: '4:3', fill: true, mask: { kind: 'organic', n: 3, curve: 90 }, morph: true, cell: [8, 5, 2, 3] },
+      { t: 'image', at: 1, ratio: '4:3', fragments: { kind: 'poly', n: 3, cut: 40 }, cell: [1, 6, 5, 2] },
+      { t: 'shape', form: { kind: 'stepped', n: 3 }, tone: 'tint', z: 'under', cell: [2, 6, 1, 4] },
+      { t: 'shape', form: { kind: 'rings', n: 3 }, tone: 'line', z: 'over', cell: [10, 2, 5, 2] },
+      { t: 'figure', value: '14', label: 'years', stroke: true, cell: [8, 3, 6, 2] },
+      { t: 'flow', side: 'end', form: { kind: 'super', n: 4, curve: 90 }, children: [{ t: 'text', role: 'body', text: 'Words that wrap around a shape, line by line, close to its edge but never under it.' }], cell: [2, 6, 7, 2] },
+    ] } }, images: [board.refs[0].id, board.refs[1].id] },
+    { id: 'm', kind: 'features', variant: 'list', tone: 'alt', content: { title: 'Method', items: [{ title: 'A', text: 'a' }, { title: 'B', text: 'b' }] } },
+    { id: 'w', kind: 'gallery', variant: 'grid', images: board.refs.map((r) => r.id), content: { title: 'Work' } },
+  ], { frame: 'shaped', edges: 'shaped' });
+  const html = V.renderDesign(drawnSpec, board.refs).html;
+  ok('a picture cut to a shape (as a clip-path the motion can grow it into); a picture in fragments, each carrying its part', /class="cp-im cp-shaped" [^>]*style="--cp-clip:polygon\(/.test(html) && /--cp-from:polygon\(/.test(html) && (html.match(/class="cp-frag-p"/g) ?? []).length >= 1 && /class="cp-img cp-r-4x3 cp-frag"/.test(html));
+  ok('planes in the design’s shapes, beneath or over; an outline drawn as a line; ornament steps aside on a phone', /class="cp-shape cp-t-tint" style="--cp-clip:polygon\(/.test(html) && /<svg class="cp-shape cp-t-line"/.test(html) && /cp-z-under cp-orn/.test(html) && /\.cp-cell\.cp-orn\{display:none\}/.test(html));
+  ok('type in the structure: a label standing upright, a turn held to 12°, numerals in outline, words wrapping a shape', /class="eyebrow cp-vert"/.test(html) && /--rot:12deg/.test(html) && /cp-fig-v cp-stroke/.test(html) && /class="cp-float cp-float-end[^"]*" style="shape-outside:polygon\(/.test(html));
+  ok('…and on a phone, upright words lie flat and turns are halved', /\.cp-vert\{writing-mode:horizontal-tb;rotate:none\}/.test(html) && /\.cp-rot\{rotate:calc\(var\(--rot\) \* \.5\)\}/.test(html));
+  ok('grounds of another tone meet along an edge of the design’s shapes; the library’s pictures cut to its shapes', /class="sx sx-features v-list tone-alt[^"]* sx-edge[^"]*"[^>]*style="[^"]*--edge-clip:polygon\(/.test(html) && /class="g-img cp-shaped"/.test(html));
+  ok('the navigation goes to the parts it names, numbered as an index', /href="#s-c"|href="#s-m"/.test(html) && /id="s-(c|m)"/.test(html) && /\.v-index \.nav-links a::before\{content:counter\(nx,decimal-leading-zero\)/.test(html) && /href="#s-w"/.test(html));
+  ok('nothing is marked for arrival on the canvas; where the page plays, the shapes grow and the fragments gather', !/data-mo-in/.test(html) && /data-mo-in=""/.test(V.renderDesign(drawnSpec, board.refs, { motion: 'play' }).html.replace(/<style[\s\S]*?<\/style>/g, '')) === (drawnSpec.look.motion.feel !== 'still'));
+  const thin = V.normalizeCompose({ t: 'image', at: 0, ratio: '1:1', mask: { kind: 'arc', irregular: 90 } });
+  ok('the pieces are held to their shape: a mask that would leave too little of the picture is refused; long words do not stand upright', !thin.mask && V.normalizeCompose({ t: 'text', role: 'title', text: 'A title far too long to stand upright on the edge', orient: 'vertical' }).orient === undefined && V.normalizeCompose({ t: 'text', role: 'title', text: 'x', stroke: true }).stroke === undefined);
+
+  // ── the habits, read and answered without swapping one habit for another
+  const habitSpec = mk([
+    { id: 'nav', kind: 'nav', variant: 'inline', content: { brand: 'D', links: ['Work'] } },
+    { id: 'h', kind: 'hero', variant: 'split', content: { title: 'D', primary: 'Go' } },
+    feat0(),
+    { ...feat0(), id: 'f2' },
+    { id: 'foot', kind: 'footer', variant: 'simple', content: { brand: 'D', columns: [] } },
+  ], { buttons: 'pill' });
+  function feat0() { return { id: 'f1', kind: 'features', variant: 'grid', content: { title: 'Three', items: [{ title: 'A', text: 'a' }, { title: 'B', text: 'b' }, { title: 'C', text: 'c' }] } }; }
+  const o = V.auditOriginality({ spec: habitSpec, brief: null });
+  const by = (p) => o.findings.find((f) => f.pattern === p);
+  ok('pill buttons, three equal columns and one arrangement repeated are read as habits', !by('pill-buttons').justified && !by('three-columns').justified && !by('same-arrangement').justified, J(o.findings.map((f) => [f.pattern, f.justified])));
+  const fixed = V.originalityFixes(o, ['three-columns']).reduce((s, p) => { const r = V.applyPatch(s, p, board); return r.ok ? r.spec : s; }, habitSpec);
+  ok('…three cards are recomposed from their own content by the strategy, not turned into another stock layout', fixed.sections.find((x) => x.id === 'f1').kind === 'compose' && V.blocksOfTree(fixed.sections.find((x) => x.id === 'f1').content.root, 0).items.length === 3);
+  const fluid = V.auditOriginality({ spec: { ...habitSpec, look: { ...habitSpec.look, form: { ...fash.form, curvature: 90 } } }, brief: null });
+  ok('…a habit the direction justifies is allowed, and says why (round buttons on a fluid system)', fluid.findings.find((f) => f.pattern === 'pill-buttons').justified && /fluid/.test(fluid.findings.find((f) => f.pattern === 'pill-buttons').because));
+
+  // ── pictures and objects in the design's own shape language
+  const pf = V.normalizeProc({ kind: 'form', seed: 3, ratio: '4:3', palette: ['#f2efe8', '#1c1b18', '#b4532a'], form: arch.form });
+  const pp = V.normalizeProc({ kind: 'pattern', seed: 3, ratio: '4:3', palette: ['#f2efe8', '#1c1b18', '#b4532a'], form: fash.form });
+  ok('made pictures in the design’s own shapes: a composition of them, and a repeat', pf.form && /<path transform="translate/.test(V.proceduralSvg(pf)) && (V.proceduralSvg(pp).match(/<path /g) ?? []).length >= 20 && V.procId(pf) !== V.procId({ ...pf, form: fash.form }));
+  ok('a sculptural form from the system: a block for right angles, ribs for a radial one, twisted as it is kinetic', V.superOf(arch.form).startsWith('4 ') && Number(V.superOf({ ...lab.form, orthogonal: 40, energy: 90 }).split(' ')[8]) > 0 && Number(V.superOf({ ...lab.form, orthogonal: 40 }).split(' ')[0]) >= 8 && /data-form="[\d. ]+"/.test(V.renderDesign(mk([{ id: 's', kind: 'scene', variant: 'stage', content: { title: 'Form', model: 'form' } }]), []).html));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

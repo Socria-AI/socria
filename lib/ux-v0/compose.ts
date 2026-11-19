@@ -18,6 +18,14 @@
 //   field    a twelve-column field on which each piece is placed by hand: its first column, how many it spans,
 //            its row and how many rows — pieces may overlap, sit off-axis, leave columns empty; the arrangement
 //            is the designer's or the model's own, not one of a list
+//   shape    a plane cut to a shape constructed for the design (lib/ux-v0/shape.ts): a mass behind a title, an
+//            echo of a picture's silhouette, a cut across an edge — in the accent, the ink, a tint of the ground,
+//            an outline, or the ground itself (a cutout), beneath pictures or over them
+//   flow     words that wrap around a shape (CSS shape-outside), the shape a plane or a picture cut to it
+//
+// A picture can be cut to a shape (its mask), broken into fragments of itself, and can arrive as a plain frame that
+// becomes its shape. Words can stand vertical, turn a few degrees, be set in outline at display size, or sweep their
+// weight as they pass (a variable face).
 //
 // A title or heading can be set at display size (l, xl, giant) and aligned; a column can be pinned while the one
 // beside it scrolls past; a picture can fill its cell. Where words placed on a field overlap a picture they are
@@ -32,7 +40,9 @@
 // The engine composes openings from pieces too (composedOpening), its proportions and order drawn per
 // project, so a direction can lay a page out in a way no fixed variant does.
 
-export const PIECES = ['stack', 'grid', 'box', 'text', 'figure', 'image', 'button', 'list', 'rule', 'layer', 'field'] as const;
+import { fillRatio, normalizeRecipe, shapeRings, shapeSeed, figureSignature, type ShapeRecipe } from './shape';
+
+export const PIECES = ['stack', 'grid', 'box', 'text', 'figure', 'image', 'button', 'list', 'rule', 'layer', 'field', 'shape', 'flow'] as const;
 export type PieceKind = (typeof PIECES)[number];
 export const TEXT_ROLES = ['eyebrow', 'title', 'heading', 'lead', 'body', 'caption', 'quote'] as const;
 export type TextRole = (typeof TEXT_ROLES)[number];
@@ -44,6 +54,11 @@ export const PLACES = ['top-start', 'top', 'top-end', 'start', 'center', 'end', 
 export type Place = (typeof PLACES)[number];
 export const TEXT_SIZES = ['l', 'xl', 'giant'] as const;
 export const TEXT_ALIGNS = ['center', 'end'] as const;
+/** what a shape is painted in: the accent, the ink, a tint of the ground, an outline, the ground itself (a cutout), the second ink */
+export const SHAPE_TONES = ['accent', 'ink', 'tint', 'line', 'ground', 'accent2'] as const;
+export type ShapeTone = (typeof SHAPE_TONES)[number];
+/** tones words cannot be read on without a plate of the ground */
+const OPAQUE_TONES: readonly ShapeTone[] = ['accent', 'ink', 'accent2'];
 /** where a piece sits on a field: its first column (1–12), the columns it spans, its first row (1–8), the rows it spans */
 export interface Cell {
   col: number;
@@ -56,9 +71,40 @@ export type Piece =
   | { t: 'stack'; dir: 'row' | 'col'; gap: (typeof GAPS)[number]; align: (typeof PIECE_ALIGNS)[number]; children: Piece[]; /** held in view while the column beside it scrolls */ pin?: true }
   | { t: 'grid'; cols: number[]; gap: (typeof GAPS)[number]; align: (typeof PIECE_ALIGNS)[number]; children: Piece[] }
   | { t: 'box'; tone: (typeof BOX_TONES)[number]; pad: (typeof GAPS)[number]; children: Piece[] }
-  | { t: 'text'; role: TextRole; text: string; /** a title or heading at display size */ size?: (typeof TEXT_SIZES)[number]; align?: (typeof TEXT_ALIGNS)[number]; /** over a picture on a field: set line by line on strips of the ground, the picture showing between, rather than on one plate (a title only) */ over?: 'lines' }
-  | { t: 'figure'; value: string; label: string }
-  | { t: 'image'; at: number; ratio: (typeof RATIOS)[number]; /** fills the place it is given (a layer's ground, a field's cell) rather than keeping its ratio */ fill?: true }
+  | {
+      t: 'text';
+      role: TextRole;
+      text: string;
+      /** a title or heading at display size */
+      size?: (typeof TEXT_SIZES)[number];
+      align?: (typeof TEXT_ALIGNS)[number];
+      /** over a picture on a field: set line by line on strips of the ground, the picture showing between, rather than on one plate (a title only) */
+      over?: 'lines';
+      /** set vertically, read from the foot up (short words only: a label, a caption, a short title) */
+      orient?: 'vertical';
+      /** turned a few degrees, −12 … 12 */
+      rotate?: number;
+      /** set in outline (display sizes only) */
+      stroke?: true;
+      /** its weight sweeps as it passes through the screen (a variable face) */
+      vary?: 'weight';
+    }
+  | { t: 'figure'; value: string; label: string; stroke?: true }
+  | {
+      t: 'image';
+      at: number;
+      ratio: (typeof RATIOS)[number];
+      /** fills the place it is given (a layer's ground, a field's cell) rather than keeping its ratio */
+      fill?: true;
+      /** cut to a shape */
+      mask?: ShapeRecipe;
+      /** broken into the fragments of this shape (shards), pulled apart */
+      fragments?: ShapeRecipe;
+      /** arrives as a plain frame that becomes its mask */
+      morph?: true;
+    }
+  | { t: 'shape'; form: ShapeRecipe; tone: ShapeTone; /** beneath pictures, or over them (a cut, an overlap) */ z: 'under' | 'over'; ratio?: (typeof RATIOS)[number]; /** grows into its shape as it arrives */ morph?: true; /** kept on phones (otherwise an ornament there) */ keep?: true }
+  | { t: 'flow'; side: 'start' | 'end'; form: ShapeRecipe; /** a picture cut to the shape; else the shape in its tone */ at?: number; tone: ShapeTone; children: Piece[] }
   | { t: 'button'; label: string; style: 'primary' | 'secondary' | 'link' }
   | { t: 'list'; items: string[]; marker: 'none' | 'number' | 'rule' }
   | { t: 'rule' }
@@ -70,6 +116,10 @@ export const TEXT_MAX: Record<TextRole, number> = { eyebrow: 48, title: 120, hea
 const MAX_DEPTH = 4;
 const MAX_PIECES = 48;
 const MAX_CHILDREN = 8;
+/** a field places more, each where it is put */
+const MAX_FIELD_CHILDREN = 12;
+/** words short enough to stand vertical, by role */
+const VERTICAL_MAX: Partial<Record<TextRole, number>> = { eyebrow: 48, caption: 60, heading: 40, title: 28 };
 
 const o = (v: unknown): Record<string, any> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, any>) : {});
 const str = (v: unknown, n: number) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
@@ -89,8 +139,10 @@ function cellOf(v: unknown, i: number): Cell {
 }
 
 const hasText = (p: Piece): boolean => p.t === 'text' || p.t === 'figure' || p.t === 'list' || p.t === 'button' || ('children' in p && p.children.some(hasText));
-/** A piece that is a picture or a ground of its own: what words must never be hidden behind. */
-const isMedia = (p: Piece): boolean => p.t === 'image' || p.t === 'box' || (p.t === 'layer' && isMedia(p.children[0])) || (p.t === 'stack' && p.children.every(isMedia));
+/** A piece that is a picture, a shape or a ground of its own: what words must never be hidden behind. */
+const isMedia = (p: Piece): boolean => p.t === 'image' || p.t === 'box' || p.t === 'shape' || (p.t === 'layer' && isMedia(p.children[0])) || (p.t === 'stack' && p.children.every(isMedia));
+/** A piece words cannot be read on without a plate: a picture, or a shape in an opaque ink. */
+const needsPlate = (p: Piece): boolean => p.t === 'image' || (p.t === 'shape' && OPAQUE_TONES.includes(p.tone)) || (p.t === 'layer' && needsPlate(p.children[0])) || (p.t === 'stack' && p.children.some(needsPlate));
 const meet = (a: Cell, b: Cell) => a.col < b.col + b.span && b.col < a.col + a.span && a.row < b.row + b.rows && b.row < a.row + a.rows;
 
 /**
@@ -101,7 +153,7 @@ const meet = (a: Cell, b: Cell) => a.col < b.col + b.span && b.col < a.col + a.s
 export function fieldLayers(f: Extract<Piece, { t: 'field' }>): { media: boolean; over: boolean; lines: boolean }[] {
   return f.children.map((ch, i) => {
     const media = isMedia(ch);
-    const over = !media && hasText(ch) && f.children.some((x, j) => j !== i && isMedia(x) && x.t !== 'box' && meet(f.cells[i], f.cells[j]));
+    const over = !media && hasText(ch) && f.children.some((x, j) => j !== i && needsPlate(x) && meet(f.cells[i], f.cells[j]));
     return { media, over, lines: over && ch.t === 'text' && ch.over === 'lines' };
   });
 }
@@ -113,6 +165,19 @@ export function overlapsIn(p: Piece): boolean {
   return 'children' in p && p.children.some(overlapsIn);
 }
 
+/**
+ * A shape as written, held to its ranges. A recipe written without a seed takes one from where it stands, so two
+ * shapes the model wrote alike are still two shapes; a picture's mask must keep enough of the picture to show it.
+ */
+function recipeOf(v: unknown, where: string, minFill = 0): ShapeRecipe | undefined {
+  const r = o(v);
+  if (!Object.keys(r).length) return undefined;
+  const seeded = typeof r.seed === 'number' && Number.isFinite(r.seed) ? r : { ...r, seed: shapeSeed('piece', where, JSON.stringify(r).slice(0, 240)) };
+  const s = normalizeRecipe(seeded);
+  if (!s) return undefined;
+  return minFill > 0 && fillRatio(shapeRings(s)) < minFill ? undefined : s;
+}
+
 /** A tree of pieces held to its shape, or null when nothing in it can be drawn. */
 export function normalizeCompose(v: unknown): Piece | null {
   let count = 0;
@@ -122,19 +187,30 @@ export function normalizeCompose(v: unknown): Piece | null {
     const r = o(raw);
     const t = r.t ?? r.type;
     count++;
+    const here = String(count);
     switch (t) {
       case 'stack':
       case 'grid':
       case 'box':
       case 'layer':
-      case 'field': {
+      case 'field':
+      case 'flow': {
         if (depth >= MAX_DEPTH) return null;
-        const raws: unknown[] = (Array.isArray(r.children) ? r.children : []).slice(0, MAX_CHILDREN);
+        const raws: unknown[] = (Array.isArray(r.children) ? r.children : []).slice(0, t === 'field' ? MAX_FIELD_CHILDREN : MAX_CHILDREN);
         // each child with where it was written to sit (a field's cells are kept beside its children)
         const kept = raws.map((c) => [walk(c, depth + 1), c] as const).filter((x): x is readonly [Piece, unknown] => !!x[0]);
         const children = kept.map((x) => x[0]);
         if (!children.length) return null;
         if (t === 'layer') return children.length > 1 ? { t, place: one(PLACES, r.place, 'bottom-start'), inset: one(GAPS, r.inset, 'm'), children: children.slice(0, 4) } : children[0];
+        if (t === 'flow') {
+          // words wrapping a shape: without a shape that keeps enough of its box to wrap, they are a column
+          const form = recipeOf(r.form ?? r.shape, here, 0.4);
+          const words = children.filter(hasText);
+          if (!words.length) return null;
+          if (!form) return { t: 'stack', dir: 'col', gap: 'm', align: 'start', children: words };
+          const at = Math.round(Number(r.at));
+          return { t, side: r.side === 'end' ? 'end' : 'start', form, ...(Number.isFinite(at) && at >= 0 && at <= 5 ? { at } : {}), tone: one(SHAPE_TONES, r.tone, 'accent'), children: words };
+        }
         if (t === 'field') {
           const storedCells: unknown[] = Array.isArray(r.cells) ? r.cells : [];
           const cells = kept.map(([, raw], i) => cellOf(o(raw).cell ?? storedCells[i], i));
@@ -156,15 +232,48 @@ export function normalizeCompose(v: unknown): Piece | null {
         const display = role === 'title' || role === 'heading' || role === 'quote';
         const size = display && (TEXT_SIZES as readonly string[]).includes(r.size) ? { size: r.size as (typeof TEXT_SIZES)[number] } : {};
         const align = (TEXT_ALIGNS as readonly string[]).includes(r.align) ? { align: r.align as (typeof TEXT_ALIGNS)[number] } : {};
-        return text ? { t, role, text, ...size, ...align, ...((r.over === 'lines' || r.over === 'blend') && role === 'title' ? { over: 'lines' as const } : {}) } : null;
+        if (!text) return null;
+        // vertical only for words short enough to stand; turned only a little, and never running text
+        const vertical = r.orient === 'vertical' && text.length <= (VERTICAL_MAX[role] ?? 0) ? { orient: 'vertical' as const } : {};
+        const turn = Math.round(Number(r.rotate));
+        const rotate = !vertical.orient && Number.isFinite(turn) && turn !== 0 && role !== 'body' && role !== 'lead' ? { rotate: Math.max(-12, Math.min(12, turn)) } : {};
+        // an outline is for display sizes, where its strokes are thick enough to read
+        const stroke = r.stroke === true && display && (size.size === 'xl' || size.size === 'giant') ? { stroke: true as const } : {};
+        const vary = r.vary === 'weight' && (role === 'title' || role === 'heading') ? { vary: 'weight' as const } : {};
+        return { t, role, text, ...size, ...align, ...((r.over === 'lines' || r.over === 'blend') && role === 'title' ? { over: 'lines' as const } : {}), ...vertical, ...rotate, ...stroke, ...vary };
       }
       case 'figure': {
         const value = str(r.value, 16);
-        return value ? { t, value, label: str(r.label, 60) } : null;
+        return value ? { t, value, label: str(r.label, 60), ...(r.stroke === true ? { stroke: true as const } : {}) } : null;
       }
       case 'image': {
         const at = Math.round(Number(r.at ?? 0));
-        return Number.isFinite(at) && at >= 0 && at <= 5 ? { t, at, ratio: one(RATIOS, r.ratio, '4:3'), ...(r.fill === true ? { fill: true as const } : {}) } : null;
+        if (!(Number.isFinite(at) && at >= 0 && at <= 5)) return null;
+        const mask = recipeOf(r.mask, `${here}m`, 0.35);
+        // fragments are shards whatever construction was named: a picture is broken by cuts, not by rings
+        const frag = recipeOf(r.fragments && typeof r.fragments === 'object' ? { ...o(r.fragments), kind: 'shards' } : r.fragments === true ? { kind: 'shards', n: 3, cut: 40 } : null, `${here}f`);
+        return {
+          t,
+          at,
+          ratio: one(RATIOS, r.ratio, '4:3'),
+          ...(r.fill === true ? { fill: true as const } : {}),
+          ...(mask && !frag ? { mask } : {}),
+          ...(frag ? { fragments: { ...frag, n: Math.max(2, Math.min(5, frag.n)) } } : {}),
+          ...(r.morph === true && mask && !frag ? { morph: true as const } : {}),
+        };
+      }
+      case 'shape': {
+        const form = recipeOf(r.form ?? r.shape, here);
+        if (!form) return null;
+        return {
+          t,
+          form,
+          tone: one(SHAPE_TONES, r.tone, 'tint'),
+          z: r.z === 'over' ? 'over' : 'under',
+          ...((RATIOS as readonly string[]).includes(r.ratio) ? { ratio: r.ratio as (typeof RATIOS)[number] } : {}),
+          ...(r.morph === true ? { morph: true as const } : {}),
+          ...(r.keep === true ? { keep: true as const } : {}),
+        };
       }
       case 'button': {
         const label = str(r.label, 40);
@@ -186,7 +295,16 @@ export function normalizeCompose(v: unknown): Piece | null {
 /** Every picture index a tree draws. */
 export function imagesIn(p: Piece): number[] {
   if (p.t === 'image') return [p.at];
+  if (p.t === 'flow') return [...(p.at !== undefined ? [p.at] : []), ...p.children.flatMap(imagesIn)];
   return 'children' in p ? p.children.flatMap(imagesIn) : [];
+}
+
+/** Every shape a tree draws (planes, masks, fragments, wraps): for the repetition measures. */
+export function shapesIn(p: Piece): ShapeRecipe[] {
+  if (p.t === 'shape') return [p.form];
+  if (p.t === 'image') return [...(p.mask ? [p.mask] : []), ...(p.fragments ? [p.fragments] : [])];
+  if (p.t === 'flow') return [p.form, ...p.children.flatMap(shapesIn)];
+  return 'children' in p ? p.children.flatMap(shapesIn) : [];
 }
 
 /** A tree's structure, for the diversity measure: its pieces and proportions (lib/ux-v0/structure.ts). */
@@ -202,10 +320,14 @@ export function composeSignature(p: Piece): string {
       return `layer-${p.place}[${p.children.map(composeSignature).join(',')}]`;
     case 'field':
       return `field[${p.children.map((c, i) => `${p.cells[i].col}+${p.cells[i].span}@${p.cells[i].row}:${composeSignature(c)}`).join(',')}]`;
+    case 'flow':
+      return `flow-${p.side}~${figureSignature(p.form)}[${p.children.map(composeSignature).join(',')}]`;
     case 'text':
-      return p.size ? `${p.role}-${p.size}` : p.role;
+      return `${p.size ? `${p.role}-${p.size}` : p.role}${p.orient ? '|v' : ''}${p.rotate ? '|r' : ''}${p.stroke ? '|o' : ''}`;
     case 'image':
-      return `img${p.ratio.replace(':', 'x')}`;
+      return `img${p.ratio.replace(':', 'x')}${p.mask ? `~${figureSignature(p.mask)}` : ''}${p.fragments ? '#frag' : ''}`;
+    case 'shape':
+      return `shape-${p.tone}~${figureSignature(p.form)}`;
     default:
       return p.t;
   }

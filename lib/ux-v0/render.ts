@@ -28,6 +28,8 @@ import { isDark, mix, rgbOf } from './color';
 import { advanceEm, fontStack, fontStylesheet, hasItalic, knownFont, nearestWeight } from './fonts';
 import { BREAKPOINTS, BREAKPOINT_QUERY, NEEDS_IMAGE, SCENE_MATERIALS, SCENE_MODELS, SHAPE_EFFECTIVE, ensureContrast, kindDef, lookFromTokens, type DesignSpec, type DesignTokens, type Look, type Section, type Shape } from './spec';
 import { fieldLayers, type Piece } from './compose';
+import { clipPolygon, edgeClip, fragmentPieces, morphFrom, outsidePolygon, shapeRings, smoothShape, svgPath, type ShapeRecipe } from './shape';
+import { figureFor, type FormSystem } from './form';
 
 /**
  * A section's shape, as the page draws it: each setting its variant uses becomes a class (sh-side-end,
@@ -246,19 +248,37 @@ const groundVars = (g: Ground) => `--bg:${g.bg};--text:${g.text};--muted:${g.mut
 
 // ── images ───────────────────────────────────────────────────────────
 
+/** The pictures of the library's own layouts a "shaped" frame cuts to the design's shapes (not a full-bleed ground). */
+const SHAPED_FRAMES = new Set(['media-img', 'g-img', 'portrait', 'cfg-img']);
+
 class Images {
   used = new Map<string, MoodboardRef>();
   figures = 0;
-  constructor(private refs: Map<string, MoodboardRef>, private captions: boolean) {}
-  img(section: Section, i: number, cls: string, eager = false): string {
+  /** pictures cut to the design's frame so far: each takes its own shape of the one family */
+  private shapedCount = 0;
+  constructor(private refs: Map<string, MoodboardRef>, private captions: boolean, private frameForm: FormSystem | null = null) {}
+  /** `shape`: the piece's own mask, which wins over the design's frame */
+  img(section: Section, i: number, cls: string, eager = false, shape: ShapeRecipe | null = null): string {
     const id = section.images[i];
     const ref = id ? this.refs.get(id) : undefined;
     if (!ref) return `<div class="${cls} img-missing" ${attr(section.id, `images.${i}`)} role="img" aria-label="Image to come"></div>`;
     this.used.set(ref.id, ref);
     const alt = ref.title && !/^(untitled|image|photo)$/i.test(ref.title) ? ref.title : '';
     // its subject stays in view however the layout crops it (whole percentages, checked where the picture is kept)
-    const focus = ref.focus ? ` style="object-position:${ref.focus.x}% ${ref.focus.y}%"` : '';
-    return `<img class="${cls}" src="${esc(ref.url)}" alt="${esc(alt)}"${focus} ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" referrerpolicy="no-referrer" ${attr(section.id, `images.${i}`)}>`;
+    const focus = ref.focus ? `object-position:${ref.focus.x}% ${ref.focus.y}%` : '';
+    // cut to a shape: the piece's own, or one of the design's frame (lib/ux-v0/form.ts), which can arrive as a plain
+    // frame and become its shape (the clip-path the motion runtime moves between)
+    const cut = shape ?? (this.frameForm && SHAPED_FRAMES.has(cls) ? figureFor(this.frameForm, 'mask', this.shapedCount++, cls) : null);
+    const rings = cut ? shapeRings(cut) : null;
+    const from = rings ? morphFrom(rings) : null;
+    const style = [focus, rings ? `--cp-clip:${clipPolygon(rings)}` : '', from ? `--cp-from:${from}` : ''].filter(Boolean).join(';');
+    return `<img class="${cls}${rings ? ' cp-shaped' : ''}" src="${esc(ref.url)}" alt="${esc(alt)}"${style ? ` style="${style}"` : ''} ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" referrerpolicy="no-referrer" ${attr(section.id, `images.${i}`)}>`;
+  }
+  /** A picture's address and where its subject is, for drawing it in fragments; null when it cannot be (no picture, an address CSS cannot carry). */
+  source(section: Section, i: number): { url: string; pos: string } | null {
+    const ref = this.refs.get(section.images[i] ?? '');
+    if (!ref || !/^(https:|data:image\/)/.test(ref.url) || /["\\\n\r]/.test(ref.url)) return null;
+    return { url: ref.url, pos: ref.focus ? `${ref.focus.x}% ${ref.focus.y}%` : '50% 50%' };
   }
   /** a caption for a picture, when the look captions them: "Fig. 2 — Morning counter" */
   cap(section: Section, i: number): string {
@@ -281,6 +301,33 @@ const SCENE_PROFILES: Record<string, [number, number][]> = {
   vessel: [[0, -1], [0.5, -1], [0.6, -0.9], [0.7, -0.45], [0.68, 0.05], [0.5, 0.48], [0.3, 0.74], [0.27, 0.92], [0.33, 1]],
   bottle: [[0, -1.05], [0.42, -1.05], [0.46, -0.98], [0.47, 0.25], [0.4, 0.45], [0.17, 0.62], [0.15, 0.95], [0.18, 1.05], [0, 1.05]],
 };
+/**
+ * A design's sculptural form, as the numbers of a supershape (lib/ux-v0/scene-runtime.ts): its symmetry from how
+ * ordered and radial its shapes are, its fullness from how curved, its corners from how orthogonal, its asymmetry
+ * from how fragmented, its twist from how kinetic. A design with no system gets a calm, rounded form.
+ */
+export function superOf(f: FormSystem | undefined): string {
+  if (!f) return '6 2 3 3 2 2 2 2 0';
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const twist = (k: number) => r2(Math.max(0, ((f.energy - 45) / 55) * k));
+  // right angles: a slab, a block with eased edges (a superquadric), split a little where the system is fragmented
+  if (f.orthogonal >= 62) {
+    const n = r2(4 + f.orthogonal / 10);
+    const n2 = r2(n * (1 + f.fragment / 200));
+    return [4, n, n2, n2, 4, n, n2, n2, twist(0.6)].join(' ');
+  }
+  // radial: ribs about its axis, as many as it is radial, turned as it is kinetic
+  if (f.radial >= 60) {
+    const m = 8 + Math.round((f.radial - 60) / 10) * 2;
+    const n2 = r2(1 + f.orthogonal / 50);
+    return [m, r2(2 + f.curvature / 25), n2, r2(n2 * (1 + f.fragment / 100)), 2, r2(2 + f.curvature / 50), 2, 2, twist(1.4)].join(' ');
+  }
+  // otherwise lobed and soft as it is curved, uneven as it is fragmented
+  const m = f.curvature >= 60 ? 3 + (f.seed % 3) : 5;
+  const n2 = r2(1 + ((100 - f.curvature) / 100) * 1.5);
+  return [m, r2(0.8 + (f.curvature / 100) * 2.4), n2, r2(n2 * (1 + f.fragment / 150)), 2, r2(1.2 + (f.curvature / 100) * 2), 1.6, 1.6, twist(1.2)].join(' ');
+}
+
 export function scenePoster(model: string): string {
   const cx = 100;
   const cy = 100;
@@ -314,7 +361,25 @@ const SHAPE_SVG: Record<Shape, (x: number, y: number, s: number, fill: string) =
 
 /** A small composition of the look's shapes in its inks; `turn` varies it per place. */
 function shapeArt(look: Look, turn: number, cls = 'art'): string {
-  if (!look.motifs.includes('shapes') || !look.shapes.length) return '';
+  if (!look.motifs.includes('shapes')) return '';
+  if (look.form) {
+    // the design's own shapes (lib/ux-v0/form.ts): a mass and its echoes, in its inks, never the same twice on a page
+    const inks = ['var(--ink1)', 'var(--ink2)', 'var(--ink3)'];
+    const at: [number, number, number][] = [
+      [0, 0, 1.3],
+      [118, 22, 1.0],
+      [24, 128, 0.95],
+      [128, 132, 0.86],
+    ];
+    const marks = at
+      .map(([x, y, k], i) => {
+        const r = figureFor(look.form!, i === 0 ? 'mass' : 'echo', turn * 4 + i, 'art');
+        return `<path transform="translate(${x} ${y}) scale(${k})" d="${svgPath(shapeRings(r), smoothShape(r))}" fill="${inks[(i + turn) % 3]}" fill-rule="evenodd"/>`;
+      })
+      .join('');
+    return `<div class="${cls}" aria-hidden="true"><svg viewBox="0 0 240 240" focusable="false">${marks}</svg></div>`;
+  }
+  if (!look.shapes.length) return '';
   const inks = ['var(--ink1)', 'var(--ink2)', 'var(--ink3)'];
   const cells: [number, number][] = [
     [0, 0],
@@ -348,6 +413,10 @@ interface Ctx {
   no: string;
   turn: number;
   im: Images;
+  /** where each of the navigation's links goes: a part of this page, or nowhere yet */
+  hrefs?: string[];
+  /** the display face's weight range, when it is variable (a sweep of weight needs one) */
+  weights?: [number, number] | null;
 }
 
 type R = (s: Section, c: Record<string, any>, x: Ctx) => string;
@@ -365,12 +434,13 @@ const actions = (s: Section, c: Record<string, any>, a = 'primary', b = 'seconda
 const num = (i: number) => String(i + 1).padStart(2, '0');
 
 const SECTIONS: Record<string, R> = {
-  nav: (s, c) => {
-    const links = (c.links as string[]).map((l, i) => `<li><a href="#" ${attr(s.id, `links.${i}`)}>${t(l)}</a></li>`).join('');
+  nav: (s, c, x) => {
+    const href = (i: number) => esc(x.hrefs?.[i] ?? '#');
+    const links = (c.links as string[]).map((l, i) => `<li><a href="${href(i)}" ${attr(s.id, `links.${i}`)}>${t(l)}</a></li>`).join('');
     // where the links are not shown in the bar (on a phone; always, in the "menu" variant) a Menu button opens them
     // full-screen. The button appears only once SocriaUX's behaviour runtime has bound it (lib/ux-v0/behaviors.ts), so a
     // page without scripts never shows a control that does nothing
-    const big = (c.links as string[]).map((l) => `<li><a href="#">${t(l)}</a></li>`).join('');
+    const big = (c.links as string[]).map((l, i) => `<li><a href="${href(i)}">${t(l)}</a></li>`).join('');
     const menu = links
       ? `<button type="button" class="nav-menu" data-ux-menu aria-expanded="false" aria-controls="${esc(s.id)}-menu" hidden>Menu</button><div class="nav-over" id="${esc(s.id)}-menu" data-ux-menu-panel role="dialog" aria-modal="true" aria-label="Menu" hidden><button type="button" class="nav-close" data-ux-menu-close>Close</button><ul class="nav-over-links">${big}</ul>${c.cta ? `<a class="btn btn-primary" href="#">${t(c.cta)}</a>` : ''}</div>`
       : '';
@@ -451,22 +521,55 @@ const SECTIONS: Record<string, R> = {
           return `<div class="cp-box ${p.tone === 'base' ? 'cp-tone-base' : `tone-${p.tone}`} cp-pad-${p.pad}">${p.children.map((ch, i) => piece(ch, `${path}.children.${i}`)).join('')}</div>`;
         case 'text': {
           const a = attr(s.id, `${path}.text`);
-          const set = `${p.size ? ` cp-sz-${p.size}` : ''}${p.align ? ` cp-ta-${p.align}` : ''}`;
+          // a sweep of weight only where the face is variable: a static face would jump between its weights
+          const vary = p.vary && x.weights ? ' cp-vary' : '';
+          const set = `${p.size ? ` cp-sz-${p.size}` : ''}${p.align ? ` cp-ta-${p.align}` : ''}${p.orient ? ' cp-vert' : ''}${p.rotate ? ' cp-rot' : ''}${p.stroke ? ' cp-stroke' : ''}${vary}`;
+          const vars = [p.rotate ? `--rot:${p.rotate}deg` : '', vary && x.weights ? `--vw0:${x.weights[0]};--vw1:${x.weights[1]}` : ''].filter(Boolean).join(';');
+          const st = vars ? ` style="${vars}"` : '';
           // the page's opening (no hero before it): its title is the page's h1
           // set on strips of the ground: the words ride above every strip, so a strip never clips the line before it
           const ink = p.over === 'lines' ? `<span class="cp-ink">${t(p.text)}</span>` : t(p.text);
-          if (p.role === 'title') return x.first || x.lead ? `<h1 class="h-hero cp-title${set}" ${a}>${ink}</h1>` : `<h2 class="h-section cp-title${set}" ${a}>${ink}</h2>`;
-          if (p.role === 'heading') return `<h3 class="h-item cp-heading${set}" ${a}>${t(p.text)}</h3>`;
-          if (p.role === 'eyebrow') return `<p class="eyebrow" ${a}>${t(p.text)}</p>`;
-          if (p.role === 'lead') return `<p class="body-lg cp-lead${set}" ${a}>${t(p.text)}</p>`;
-          if (p.role === 'caption') return `<p class="small cp-caption" ${a}>${t(p.text)}</p>`;
-          if (p.role === 'quote') return `<blockquote class="cp-quote${set}" ${a}><p>${t(p.text)}</p></blockquote>`;
-          return `<p class="cp-body${set}" ${a}>${t(p.text)}</p>`;
+          if (p.role === 'title') return x.first || x.lead ? `<h1 class="h-hero cp-title${set}"${st} ${a}>${ink}</h1>` : `<h2 class="h-section cp-title${set}"${st} ${a}>${ink}</h2>`;
+          if (p.role === 'heading') return `<h3 class="h-item cp-heading${set}"${st} ${a}>${t(p.text)}</h3>`;
+          if (p.role === 'eyebrow') return `<p class="eyebrow${set}"${st} ${a}>${t(p.text)}</p>`;
+          if (p.role === 'lead') return `<p class="body-lg cp-lead${set}"${st} ${a}>${t(p.text)}</p>`;
+          if (p.role === 'caption') return `<p class="small cp-caption${set}"${st} ${a}>${t(p.text)}</p>`;
+          if (p.role === 'quote') return `<blockquote class="cp-quote${set}"${st} ${a}><p>${t(p.text)}</p></blockquote>`;
+          return `<p class="cp-body${set}"${st} ${a}>${t(p.text)}</p>`;
         }
         case 'figure':
-          return `<div class="cp-figure"><span class="cp-fig-v" ${attr(s.id, `${path}.value`)}>${t(p.value)}</span>${p.label ? `<span class="cp-fig-l" ${attr(s.id, `${path}.label`)}>${t(p.label)}</span>` : ''}</div>`;
-        case 'image':
-          return x.im.has(s, p.at) ? `<figure class="cp-img cp-r-${p.ratio.replace(':', 'x')}${p.fill ? ' cp-fill' : ''}">${x.im.img(s, p.at, 'cp-im', !!(x.first || x.lead))}${x.im.cap(s, p.at)}</figure>` : '';
+          return `<div class="cp-figure"><span class="cp-fig-v${p.stroke ? ' cp-stroke' : ''}" ${attr(s.id, `${path}.value`)}>${t(p.value)}</span>${p.label ? `<span class="cp-fig-l" ${attr(s.id, `${path}.label`)}>${t(p.label)}</span>` : ''}</div>`;
+        case 'image': {
+          if (!x.im.has(s, p.at)) return '';
+          const base = `cp-img cp-r-${p.ratio.replace(':', 'x')}${p.fill ? ' cp-fill' : ''}`;
+          const src = p.fragments ? x.im.source(s, p.at) : null;
+          if (p.fragments && src) {
+            // the picture in pieces: the first piece is the picture itself (its words for a reader), the others its
+            // own pixels again, each cut to its piece and carried out with it
+            const pieces = fragmentPieces(p.fragments);
+            const one = (i: number) => `--cp-clip:${pieces[i].clip};--dx:${pieces[i].dx}%;--dy:${pieces[i].dy}%;--rt:${pieces[i].turn}deg`;
+            const first = x.im.img(s, p.at, 'cp-im cp-frag-p', !!(x.first || x.lead)).replace('<img class="', `<img style="${one(0)}" class="`);
+            const rest = pieces.slice(1).map((_, k) => `<span class="cp-frag-p" style="${one(k + 1)}" aria-hidden="true"></span>`).join('');
+            return `<figure class="${base} cp-frag" style="--src:url(&quot;${esc(src.url)}&quot;);--pos:${src.pos}"${x.play ? ' data-mo-in=""' : ''}>${first}${rest}${x.im.cap(s, p.at)}</figure>`;
+          }
+          return `<figure class="${base}${p.mask ? ' cp-masked' : ''}"${p.mask && p.morph && x.play ? ' data-mo-in=""' : ''}>${x.im.img(s, p.at, 'cp-im', !!(x.first || x.lead), p.mask ?? null)}${x.im.cap(s, p.at)}</figure>`;
+        }
+        case 'shape': {
+          const rings = shapeRings(p.form);
+          const ratio = p.ratio ? ` cp-sr-${p.ratio.replace(':', 'x')}` : '';
+          if (p.tone === 'line')
+            return `<svg class="cp-shape cp-t-line${ratio}" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="${svgPath(rings, smoothShape(p.form))}" fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>`;
+          const from = p.morph ? morphFrom(rings) : null;
+          return `<div class="cp-shape cp-t-${p.tone}${ratio}${from ? ' cp-morph' : ''}" style="--cp-clip:${clipPolygon(rings)}${from ? `;--cp-from:${from}` : ''}"${from && x.play ? ' data-mo-in=""' : ''} aria-hidden="true"></div>`;
+        }
+        case 'flow': {
+          // words wrapping a shape: the float is the shape (a plane in its tone, or a picture cut to it) and the
+          // words run along its edge (shape-outside), on any width
+          const rings = shapeRings(p.form);
+          const pic = p.at !== undefined && x.im.has(s, p.at) ? x.im.img(s, p.at, 'cp-flow-img', false, p.form) : '';
+          const float = `<div class="cp-float cp-float-${p.side}${pic ? '' : ` cp-t-${p.tone}`}" style="shape-outside:${outsidePolygon(rings)};--cp-clip:${clipPolygon(rings)}"${pic ? '' : ' aria-hidden="true"'}>${pic}</div>`;
+          return `<div class="cp-flow">${float}${p.children.map((ch, i) => piece(ch, `${path}.children.${i}`)).join('')}</div>`;
+        }
         case 'button':
           return p.style === 'link' ? `<a class="cp-link" href="#" ${attr(s.id, `${path}.label`)}>${t(p.label)}</a>` : btn(s, `${path}.label`, p.label, p.style);
         case 'list': {
@@ -486,7 +589,15 @@ const SECTIONS: Record<string, R> = {
         }
         case 'field': {
           const how = fieldLayers(p);
-          return `<div class="cp-field cp-rows-${p.rows}">${p.children.map((ch, i) => { const k = p.cells[i]; const h = how[i]; return `<div class="cp-cell${h.media ? ' cp-media' : ''}${h.over ? (h.lines ? ' cp-lines' : ' cp-plate') : ''}" style="--c:${k.col};--s:${k.span};--r:${k.row};--rs:${k.rows}">${piece(ch, `${path}.children.${i}`)}</div>`; }).join('')}</div>`;
+          return `<div class="cp-field cp-rows-${p.rows}">${p.children
+            .map((ch, i) => {
+              const k = p.cells[i];
+              const h = how[i];
+              // a shape lies beneath the pictures or over them; one that is ornament steps aside on a phone
+              const z = ch.t === 'shape' ? ` cp-z-${ch.z}${ch.keep ? '' : ' cp-orn'}` : '';
+              return `<div class="cp-cell${h.media ? ' cp-media' : ''}${z}${h.over ? (h.lines ? ' cp-lines' : ' cp-plate') : ''}" style="--c:${k.col};--s:${k.span};--r:${k.row};--rs:${k.rows}">${piece(ch, `${path}.children.${i}`)}</div>`;
+            })
+            .join('')}</div>`;
         }
       }
     };
@@ -591,7 +702,8 @@ const SECTIONS: Record<string, R> = {
     const h = x.lead ? 'h1' : 'h2';
     const text = `<div class="sc-text">${eyebrow(s, c.eyebrow)}<${h} class="h-section" ${attr(s.id, 'title')}>${t(c.title)}</${h}>${c.text ? `<p class="body-lg" ${attr(s.id, 'text')}>${t(c.text)}</p>` : ''}${c.action ? `<div class="actions">${btn(s, 'action', c.action, 'primary')}</div>` : ''}</div>`;
     const said = `${plain(String(c.title ?? ''))}: a ${model} in ${material}, shown in three dimensions. Drag it, or use the arrow keys, to turn it.`;
-    const figure = `<figure class="sc-fig"><div class="scene" data-ux-scene data-model="${model}" data-material="${material}"${color ? ` data-color="${color}"` : ''} role="img" aria-label="${esc(said)}" tabindex="0"${color ? ` style="--scene:${color}"` : ''}><canvas class="sc-canvas"></canvas>${scenePoster(model)}</div>${c.caption ? `<figcaption class="small muted fig-cap" ${attr(s.id, 'caption')}>${t(c.caption)}</figcaption>` : ''}</figure>`;
+    const formAttr = model === 'form' ? ` data-form="${superOf(x.look.form)}"` : '';
+    const figure = `<figure class="sc-fig"><div class="scene" data-ux-scene data-model="${model}"${formAttr} data-material="${material}"${color ? ` data-color="${color}"` : ''} role="img" aria-label="${esc(said)}" tabindex="0"${color ? ` style="--scene:${color}"` : ''}><canvas class="sc-canvas"></canvas>${scenePoster(model)}</div>${c.caption ? `<figcaption class="small muted fig-cap" ${attr(s.id, 'caption')}>${t(c.caption)}</figcaption>` : ''}</figure>`;
     return `<div class="wrap sc sc-${s.variant}">${s.variant === 'stage' ? figure + text : text + figure}</div>`;
   },
   configurator: (s, c, x) => {
@@ -983,6 +1095,8 @@ p{max-width:68ch}
 .nav-over{position:fixed;inset:0;z-index:60;background:var(--bg);color:var(--text);display:grid;align-content:center;justify-items:start;gap:clamp(20px,4vh,40px);padding:clamp(24px,8vw,96px);overflow:auto}.nav-over[hidden]{display:none}
 .nav-over-links{list-style:none;margin:0;padding:0;display:grid;gap:clamp(6px,1.6vh,18px)}.nav-over-links a{font-family:var(--display);font-size:clamp(2rem,7vw,4.6rem);line-height:1.05;color:inherit;text-decoration:none;display:inline-flex;min-height:48px;align-items:center}.nav-over-links a:hover,.nav-over-links a:focus-visible{text-decoration:underline;text-underline-offset:.12em}
 .nav-close{position:absolute;top:clamp(16px,4vw,32px);right:clamp(16px,4vw,32px);font:inherit;font-weight:600;min-height:44px;padding:0 14px;border:var(--rule-w,1px) solid currentColor;border-radius:var(--r-pill,999px);background:transparent;color:inherit;cursor:pointer}
+.v-index .nav-links,.v-index .nav-over-links{counter-reset:nx}.v-index .nav-links li,.v-index .nav-over-links li{counter-increment:nx}.v-index .nav-links a::before{content:counter(nx,decimal-leading-zero);font-family:ui-monospace,Menlo,monospace;font-size:.72em;margin-right:.55em;color:var(--accent-ink)}.v-index .nav-over-links a::before{content:counter(nx,decimal-leading-zero);font-family:ui-monospace,Menlo,monospace;font-size:.32em;margin-right:.7em;align-self:flex-start;padding-top:.5em}
+@media (min-width:1100px){.sx-nav.v-rail{position:fixed;left:0;top:0;bottom:0;width:var(--rail-w,92px);z-index:40;background:var(--bg);border-right:var(--rule-w,1px) solid var(--line);padding:0;overflow:hidden}.sx-nav.v-rail .nav-in{width:100%;height:100%;flex-direction:column;align-items:center;justify-content:space-between;gap:20px;padding:26px 0;margin:0}.sx-nav.v-rail .brand,.sx-nav.v-rail .nav-links,.sx-nav.v-rail .nav-in>.btn{writing-mode:vertical-rl}.sx-nav.v-rail .nav-links{margin:0;gap:14px}.sx-nav.v-rail .nav-links a{min-height:44px;min-width:44px}.sx-nav.v-rail .nav-in>.btn{margin:0;padding:16px 0;min-height:0;min-width:44px}body:has(.sx-nav.v-rail){padding-left:var(--rail-w,92px)}}
 .nav-in .btn{min-height:44px;padding:0 18px;font-size:.92rem}.nav-in .brand{display:inline-flex;align-items:center;min-height:44px;min-width:44px}.v-inline .nav-in .btn,.v-minimal .nav-in .btn{margin-left:auto}.v-inline .nav-links~.btn{margin-left:0}
 .foot{display:grid;gap:36px}.foot ul{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:4px}.foot a{display:inline-flex;align-items:center;min-height:44px;min-width:44px;text-decoration:none;color:var(--muted)}@media (min-width:760px){.foot a{min-height:32px}}.foot a:hover{color:var(--text)}
 .foot-cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}.foot-title{margin:0;font-weight:600;font-size:.9rem}.legal{margin:0}
@@ -1166,11 +1280,24 @@ th .th-sort{all:unset;cursor:pointer;display:inline-flex;gap:6px;align-items:cen
 .cp-pin{position:sticky;top:clamp(16px,6vh,72px);align-self:start}
 .cp-field{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));column-gap:clamp(12px,1.6vw,28px);row-gap:clamp(8px,1.2vw,20px);grid-auto-rows:minmax(var(--cp-row,72px),auto)}
 .cp-rows-s{--cp-row:clamp(28px,4vw,56px)}.cp-rows-m{--cp-row:clamp(44px,6.5vw,96px)}.cp-rows-l{--cp-row:clamp(64px,10vw,150px)}
-.cp-cell{grid-column:var(--c)/span var(--s);grid-row:var(--r)/span var(--rs);min-width:0;z-index:2;align-self:start;container-type:inline-size}.cp-cell.cp-media{z-index:1;align-self:stretch}
+.cp-cell{grid-column:var(--c)/span var(--s);grid-row:var(--r)/span var(--rs);min-width:0;z-index:3;align-self:start;container-type:inline-size}.cp-cell.cp-media{z-index:1;align-self:stretch}.cp-cell.cp-z-under{z-index:0}.cp-cell.cp-z-over{z-index:2}
 .cp-cell.cp-media>.cp-img{height:100%}.cp-cell.cp-media>.cp-fill img{min-height:0}
 .cp-plate{background:var(--bg);color:var(--text);padding:clamp(12px,1.8vw,26px);align-self:end}
 .cp-lines{align-self:center}.cp .cp-lines>.cp-title{display:inline;background:var(--bg);color:var(--text);padding:.08em .14em;line-height:1.1;-webkit-box-decoration-break:clone;box-decoration-break:clone}
-@media (max-width:899px){.cp-field{display:flex;flex-direction:column;gap:clamp(16px,4vw,28px)}.cp-field>.cp-cell{align-self:stretch}.cp-plate{padding:0;background:none}.cp-ink{position:relative}.cp .cp-lines>.cp-title{display:block;background:none;padding:0;line-height:1.02}.cp-pin{position:static}.cp-cell.cp-media>.cp-fill img{min-height:0;aspect-ratio:4/3}
+.sx-compose{overflow-x:clip}
+img.cp-shaped{clip-path:var(--cp-clip);border-radius:0}
+.cp-shape{display:block;width:100%;height:100%;min-height:var(--cp-row,140px);clip-path:var(--cp-clip)}
+.cp-t-accent{background:var(--accent)}.cp-t-ink{background:var(--text)}.cp-t-accent2{background:var(--accent2,var(--accent))}.cp-t-tint{background:color-mix(in srgb,var(--text) 9%,var(--bg))}.cp-t-ground{background:var(--bg)}
+svg.cp-shape.cp-t-line{clip-path:none;color:var(--text);overflow:visible;background:none}
+.cp-sr-1x1{aspect-ratio:1/1}.cp-sr-4x3{aspect-ratio:4/3}.cp-sr-3x2{aspect-ratio:3/2}.cp-sr-16x9{aspect-ratio:16/9}.cp-sr-3x4{aspect-ratio:3/4}.cp-sr-2x3{aspect-ratio:2/3}.cp-sr-21x9{aspect-ratio:21/9}[class*=cp-sr-].cp-shape{height:auto;min-height:0}
+.cp-frag{position:relative;display:grid}.cp-frag>.cp-frag-p{grid-area:1/1;display:block;width:100%;height:100%;clip-path:var(--cp-clip);translate:var(--dx) var(--dy);rotate:var(--rt,0deg);object-fit:cover;border-radius:0}.cp-frag>span.cp-frag-p{background:var(--src) var(--pos,50% 50%)/cover no-repeat}.cp-frag>figcaption{grid-area:2/1}
+.cp-vert{writing-mode:vertical-rl;rotate:180deg;max-width:none;max-height:none;justify-self:start}
+.cp-rot{rotate:var(--rot)}
+.cp-stroke{color:transparent;-webkit-text-stroke:max(1.5px,.022em) var(--text)}@supports not (-webkit-text-stroke:1px){.cp-stroke{color:var(--text)}}
+.cp-flow{display:flow-root}.cp-flow>*{max-width:none}.cp-flow>p+p{margin-top:.9em}
+.cp-float{float:left;width:clamp(120px,40%,440px);aspect-ratio:1;shape-margin:clamp(10px,1.4vw,22px);margin:4px clamp(16px,2.2vw,30px) 12px 0}.cp-float-end{float:right;margin:4px 0 12px clamp(16px,2.2vw,30px)}.cp-float:not(:has(img)){clip-path:var(--cp-clip)}.cp-float img{display:block;width:100%;height:100%;object-fit:cover}
+.sx-edge{--edge-d:clamp(22px,4.5vw,64px);margin-top:calc(-1 * var(--edge-d));border-top:var(--edge-d) solid transparent;clip-path:var(--edge-clip);position:relative;z-index:1}
+@media (max-width:899px){.cp-field{display:flex;flex-direction:column;gap:clamp(16px,4vw,28px)}.cp-field>.cp-cell{align-self:stretch}.cp-cell.cp-orn{display:none}.cp-field .cp-shape:not([class*=cp-sr-]){min-height:clamp(72px,26vw,180px)}.cp-vert{writing-mode:horizontal-tb;rotate:none}.cp-rot{rotate:calc(var(--rot) * .5)}.cp-frag>.cp-frag-p{translate:calc(var(--dx) * .5) calc(var(--dy) * .5)}.cp-plate{padding:0;background:none}.cp-ink{position:relative}.cp .cp-lines>.cp-title{display:block;background:none;padding:0;line-height:1.02}.cp-pin{position:static}.cp-cell.cp-media>.cp-fill img{min-height:0;aspect-ratio:4/3}
 .cp-span-bleed>.cp-field>.cp-cell:not(.cp-media),.cp-span-bleed>.cp-grid>*:not(.cp-img),.cp-span-bleed>.cp-stack>*:not(.cp-img){padding-inline:20px}.cp-ta-end{text-align:left;margin-left:0}}
 @media (max-width:720px){.cp-layer .cp-over{max-width:100%}.cp-at-end>.cp-over,.cp-at-top-end>.cp-over,.cp-at-bottom-end>.cp-over{text-align:left;justify-self:start}}`);
   add(`.sh-align-center .bk-head{text-align:center;margin-inline:auto;max-width:760px}.sh-align-center .bk-head .lede{margin-inline:auto}
@@ -1348,13 +1475,64 @@ function marqueeWords(spec: DesignSpec): string[] {
   return words.length ? words : [spec.title];
 }
 
+/**
+ * How the design's shapes move, where the page plays (each waits for the motion runtime, body.mo-ready, which does
+ * not run under reduced motion): a picture's plain frame becoming its shape, a shape growing into itself, fragments
+ * gathering to their places, a display title sweeping its weight as it passes (a variable face).
+ */
+const SHAPE_MOTION_CSS = `.mo-ready [data-mo-in] img.cp-shaped,.mo-ready .cp-shape.cp-morph{transition:clip-path calc(var(--mo-d,600ms) * 2) var(--mo-e,ease)}.mo-ready [data-mo-in]:not(.is-in) img.cp-shaped,.mo-ready .cp-shape.cp-morph[data-mo-in]:not(.is-in){clip-path:var(--cp-from,var(--cp-clip))}
+.mo-ready .cp-frag[data-mo-in]>.cp-frag-p{transition:translate calc(var(--mo-d,600ms) * 1.8) var(--mo-e,ease),opacity var(--mo-d,600ms) var(--mo-e,ease)}.mo-ready .cp-frag[data-mo-in]:not(.is-in)>.cp-frag-p{translate:calc(var(--dx) * 4) calc(var(--dy) * 4);opacity:0}
+@keyframes cp-vary{from{font-weight:var(--vw0)}to{font-weight:var(--vw1)}}@media (prefers-reduced-motion:no-preference){@supports (animation-timeline:view()){.mo-ready .cp-vary{animation:cp-vary linear both;animation-timeline:view();animation-range:entry 10% cover 55%}}}`;
+
+/** The anchor a part of the page is given when a link goes to it. */
+const anchorId = (id: string) => `s-${id}`;
+
+/** Words a link may say for a part of the page that does not use them itself. */
+const LINK_KINDS: readonly [RegExp, readonly string[]][] = [
+  [/^(work|projects?|portfolio|selected|case studies|index)$/, ['gallery', 'compose', 'features']],
+  [/^(studio|about|practice|who|story|us|the house|atelier)$/, ['split', 'text', 'quote', 'compose']],
+  [/^(contact|write|enquire|enquiries|get in touch|hello)$/, ['form', 'cta', 'footer']],
+  [/^(journal|news|notes|writing|read|essays?|issue)$/, ['text', 'features', 'compose']],
+  [/^(shop|store|buy|products?|collection|pricing|prices|plans)$/, ['pricing', 'configurator', 'gallery']],
+  [/^(visit|book|booking|reserve|reservations?|hours|tickets?)$/, ['booking', 'form', 'cta']],
+  [/^(menu|food|drinks)$/, ['pricing', 'features', 'text']],
+];
+
+/**
+ * Where each of the navigation's links goes: the part of this page it names — by the part's own words (its eyebrow,
+ * its title), else by what kind of part answers that word — or nowhere ("#") when the page has no such part.
+ */
+function linkTargets(spec: DesignSpec): { hrefs: string[]; ids: Set<string> } {
+  const nav = spec.sections.find((s) => s.kind === 'nav');
+  const links = Array.isArray(nav?.content.links) ? (nav!.content.links as unknown[]).filter((x): x is string => typeof x === 'string') : [];
+  const parts = spec.sections.filter((s) => s.kind !== 'nav');
+  const words = (s: Section) => [s.content.eyebrow, s.content.title, kindDef(s.kind)?.label].filter((x): x is string => typeof x === 'string').join(' ').toLowerCase();
+  const ids = new Set<string>();
+  const hrefs = links.map((l) => {
+    const w = l.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+    if (!w) return '#';
+    const own = parts.find((s) => s.kind !== 'footer' && new RegExp(`\\b${w.split(' ')[0]}`).test(words(s)));
+    const kinds = LINK_KINDS.find(([re]) => re.test(w))?.[1] ?? [];
+    const target = own ?? kinds.map((k) => parts.find((s) => s.kind === k)).find(Boolean);
+    if (!target) return '#';
+    ids.add(target.id);
+    return `#${anchorId(target.id)}`;
+  });
+  return { hrefs, ids };
+}
+
 /** Draw a spec. `refs`: the project's moodboard references. */
 export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], opts: RenderOptions = {}): Rendered {
   const look = spec.look ?? lookFromTokens(spec.tokens);
   const mode: MotionMode = opts.motion ?? 'static';
   const play = mode === 'play' && (look.motion?.feel ?? 'still') !== 'still';
   // a picture SocriaUX made is drawn from its recipe here, wherever the page is shown (lib/ux-v0/assets.ts)
-  const im = new Images(new Map(refs.filter((r) => r.state !== 'rejected').map((r) => [r.id, r.provider === 'socriaux' && r.proc && !r.url ? { ...r, url: proceduralUri(r.proc) } : r])), look.motifs.includes('captions'));
+  const im = new Images(new Map(refs.filter((r) => r.state !== 'rejected').map((r) => [r.id, r.provider === 'socriaux' && r.proc && !r.url ? { ...r, url: proceduralUri(r.proc) } : r])), look.motifs.includes('captions'), look.frame === 'shaped' && look.form ? look.form : null);
+  // the navigation's links go to the parts of the page they name; those parts are given an anchor
+  const targets = linkTargets(spec);
+  const display = knownFont(spec.tokens.fonts.display);
+  const weights: [number, number] | null = display?.variable && display.weights.length === 2 ? [display.weights[0], display.weights[1]] : null;
+  let prevKind = '';
   const app = spec.pageType === 'app-screen';
   let heroSeen = false;
   // the screen's leading heading: the first content section, when no hero or screen header leads
@@ -1372,11 +1550,15 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], op
     const no = numbered ? String(++counter).padStart(2, '0') : '';
     const sh = shapeAttrs(s);
     const style = [s.kind === 'stats' ? `--cols:${Math.min(4, (s.content.items as unknown[]).length)}` : '', sh.vars].filter(Boolean).join(';');
-    const cols = style ? ` style="${style}"` : '';
     const tag = s.kind === 'nav' || s.kind === 'footer' || s.kind === 'app-nav' ? 'div' : 'section';
     const tone = s.tone && s.tone !== 'base' ? ` tone-${s.tone}` : '';
     const pad = s.pad && s.pad !== 'm' ? ` pad-${s.pad}` : '';
-    const html = `<${tag} class="sx sx-${s.kind} v-${s.variant}${tone}${pad}${sh.cls}${responsiveClasses(s)}" data-ux-section="${esc(s.id)}"${cols}>${fn(s, s.content, { look, first, play, no, turn: turn++, im, app, lead: s.id === leadId })}</${tag}>`;
+    // a ground of another tone meets the one above it along an edge of the design's shapes (not after the bar)
+    const edged = look.edges === 'shaped' && look.form && tag === 'section' && !!tone && !app && prevKind !== '' && prevKind !== 'nav';
+    prevKind = s.kind;
+    const styleAll = [style, edged ? `--edge-clip:${edgeClip(figureFor(look.form!, 'edge', counter + turn, s.id))}` : ''].filter(Boolean).join(';');
+    const anchor = targets.ids.has(s.id) ? ` id="${esc(anchorId(s.id))}"` : '';
+    const html = `<${tag}${anchor} class="sx sx-${s.kind} v-${s.variant}${tone}${pad}${edged ? ' sx-edge' : ''}${sh.cls}${responsiveClasses(s)}" data-ux-section="${esc(s.id)}"${styleAll ? ` style="${styleAll}"` : ''}>${fn(s, s.content, { look, first, play, no, turn: turn++, im, app, lead: s.id === leadId, hrefs: s.kind === 'nav' ? targets.hrefs : undefined, weights })}</${tag}>`;
     // a running marquee follows the opening statement
     if (!marqueeDone && s.kind === 'hero') {
       marqueeDone = true;
@@ -1436,7 +1618,7 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], op
   if (marks.draw) body = body.replace(/<svg class="chart"/g, '<svg data-mo-in="" class="chart"').replace(/<polyline class="line /g, '<polyline pathLength="1" class="mo-draw line ');
 
   const fonts = fontStylesheet([spec.tokens.fonts.display, spec.tokens.fonts.body, ...(look.label === 'mono' ? [look.mono] : [])]);
-  const style = [css(spec.tokens, look, headlinesOf(spec)), motionCss(look, mode, { app }), responsiveCss(spec.sections)].filter(Boolean).join('\n');
+  const style = [css(spec.tokens, look, headlinesOf(spec)), motionCss(look, mode, { app }), play ? SHAPE_MOTION_CSS : '', responsiveCss(spec.sections)].filter(Boolean).join('\n');
   const html = `<!doctype html>
 <html lang="en">
 <head>

@@ -516,6 +516,8 @@ export interface DesignProject {
   /** generated designs: every version, newest last; specIndex is the one shown */
   specs: DesignSpec[];
   specIndex: number;
+  /** compositions the designer set aside while exploring (their arrangement signatures): not proposed again */
+  compositions?: { rejected: string[] };
   artifact: Artifact | null;
   cards: ReasoningCard[];
   usage: UsageTotals;
@@ -1089,6 +1091,11 @@ export function normalizeProject(v: unknown, opts: { forSync?: boolean } = {}): 
     ...((dna) => (dna && Object.keys(dna.dims).length ? { dna } : {}))(normalizeDNA(r.dna)),
     specs,
     specIndex: specs.length ? num(r.specIndex, 0, specs.length - 1, specs.length - 1) : -1,
+    ...((rej) => (rej.length ? { compositions: { rejected: rej } } : {}))(
+      arr(obj(r.compositions).rejected)
+        .filter((x): x is string => typeof x === 'string' && x.length <= 2000)
+        .slice(-60),
+    ),
     artifact: normalizeArtifact(r.artifact),
     cards,
     usage: usageTotals(r.usage),
