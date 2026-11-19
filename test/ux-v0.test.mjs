@@ -1552,6 +1552,8 @@ console.log('\n=== the designer’s design system: read, built within, checked a
   const missing = await V.fetchSystemFiles(V.repoTarget('acme/nope'), async () => new Response('', { status: 404 }));
   const limited = await V.fetchSystemFiles(V.repoTarget('acme/busy'), async () => new Response('', { status: 403 }));
   ok('…a missing or private repository, and GitHub’s rate limit, each said plainly', /not found, or it is private/.test(missing.error) && limited.status === 429 && /limiting/.test(limited.error));
+  const huge = await V.fetchSystemFiles(V.repoTarget('acme/huge'), async (url) => (url.startsWith('https://api.github.com/') ? new Response(J({ tree: [{ path: 'tokens.css', type: 'blob', size: 500 }] }), { status: 200 }) : new Response('x'.repeat(400_000), { status: 200 })));
+  ok('…a file larger than its listing said is not read (each file is capped as it arrives)', huge.status === 502 && !huge.files, J(huge));
 }
 
 

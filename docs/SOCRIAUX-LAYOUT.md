@@ -105,8 +105,8 @@ The layout benchmark is offline and makes no model calls:
 
 | Measure | Result |
 |---|---|
-| 20 booking briefs, 60 directions | **46 distinct booking structures**; 5 when the same directions are measured without settings or project salt; the most repeated structure appears 3× |
-| One brief in 20 projects, 60 directions | **42 distinct structures**; of 190 pairs of projects, 17 share the first direction's structure and none share all three |
+| 20 booking briefs, 60 directions | **47 distinct booking structures** (46 when this was first built); 7 when the same directions are measured without settings or project salt; the most repeated structure appears 3× |
+| One brief in 20 projects, 60 directions | **40 distinct structures** (42 when this was first built; see below); of 190 pairs of projects, 12 share the first direction's structure (17 before) and none share all three |
 | Decisions held | 60 of 60 directions for each of: the class first, the times first, centred, uneven, no pictures; 30 of 30 for a site with the work first and centred |
 | Where nothing was decided | 0 centred openings nobody chose (of 30); 0 rounded cards everywhere |
 | In a browser | 60 booking studies at 1280 and 390 px: nothing scrolls sideways, every text reads on its ground, every booking passes its self-test (choose, confirm, change) |
@@ -117,7 +117,8 @@ While building it, the benchmark found a real fault. The immersive booking's pho
 
 ## Limits
 
-- **46, not the 50 aimed for.** A booking screen is one component, and each language keeps a narrow range on purpose, so this is near what settings alone can give. More variety would need new layouts, not wider ranges.
+- **One brief in 20 projects fell from 42 to 40 distinct structures** when each direction gained a plan with one bold move ([SOCRIAUX-CRAFT.md](SOCRIAUX-CRAFT.md)). A split that is not a direction's move is kept from being sharply uneven, so fewer proportions are possible. The bar is 40. Fewer pairs of projects now open with the same structure (12, from 17).
+- **47, not the 50 aimed for.** A booking screen is one component, and each language keeps a narrow range on purpose, so this is near what settings alone can give. More variety would need new layouts, not wider ranges.
 - **The first direction keeps the brief's colours and type.** It is the faithful reading, so two projects with the same brief look alike in colour and type when the brief sets them. They differ in layout and settings.
 - **Settings exist only for the booking and the opening.** Other kinds vary by layout and order only.
 - **The sketches are diagrams, not previews.** They show what a decision means. The design itself is drawn by the renderer.
@@ -132,3 +133,5 @@ node -e "import('./test/helpers/build.mjs').then((m) => m.buildAll())"
 ```bash
 UXV0_OUT=/tmp/layout node test/browser/ux-v0/layout-bench.mjs
 ```
+
+**Since then:** every direction states a plan with one bold move and a detail only its subject has; the looks generated pages share are kept out unless asked for; a designer's design system can be built within; and openings can be composed from layout pieces. A layout the designer decided counts as the plan's one bold move. See [SOCRIAUX-CRAFT.md](SOCRIAUX-CRAFT.md).

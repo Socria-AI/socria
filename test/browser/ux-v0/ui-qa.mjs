@@ -146,7 +146,7 @@ await page.screenshot({ path: `${S}ui-2b-brief-layout-1440.png` });
 // the designer's own design system, from its files (read in the browser), built within from here on
 const sys = page.locator('#bp-system');
 await sys.scrollIntoViewIfNeeded();
-ok('the brief offers to build within the designer’s own design system (files, or a GitHub repository)', /Design system/.test(await sys.innerText()) && (await sys.locator('input[type="file"]').count()) === 1 && (await sys.getByRole('button', { name: 'Read from GitHub' }).count()) === 1);
+ok('the brief offers to build within the designer’s own design system (files, or a GitHub repository)', /design system/i.test(await sys.innerText()) && (await sys.locator('input[type="file"]').count()) === 1 && (await sys.getByRole('button', { name: 'Read from GitHub' }).count()) === 1);
 const TOKENS = ':root { --color-primary: #0f766e; --color-background: #f8fafc; --color-surface: #ffffff; --color-text: #0f172a; --color-muted: #475569; --color-border: #cbd5e1; --font-heading: "Söhne Breit", sans-serif; --font-body: Inter, sans-serif; --radius-md: 6px; }';
 await sys.locator('input[type="file"]').setInputFiles([{ name: 'tokens.css', mimeType: 'text/css', buffer: Buffer.from(TOKENS) }, { name: 'README.md', mimeType: 'text/markdown', buffer: Buffer.from('# Tidewater\n\n## Rules\n- Never use more than one accent per screen\n') }]);
 await page.waitForSelector('#bp-system.is-on', { timeout: 8000 });

@@ -224,7 +224,7 @@ const md = [
   `${report.at} · no model calls · ${pass} passed, ${fail} failed`,
   '',
   `- Looks generated pages share: ${report.looks.directions} directions in ${report.looks.languages} languages; ${report.looks.unasked} show one nobody asked for; the engine moved ${report.looks.movedOff} off one.`,
-  `- Plans: ${report.plans.whole} of ${report.plans.directions} state a whole plan; ${report.plans.withSubjectDetail} found a detail only their subject has; ${report.plans.drawable} have a move they can draw; ${report.plans.oneLoudMoveOrFewer} of ${report.plans.studies} studies make one loud move at most.`,
+  `- Plans: ${report.plans.whole} of ${report.plans.directions} state a whole plan; ${report.plans.withSubjectDetail} found a detail only their subject has; ${report.plans.drawable} have a move they can draw; ${report.plans.oneLoudMoveOrFewer} of ${report.plans.studies} studies make one loud move at most, and ${report.plans.showTheirMove} show their own.`,
   `- Design system (${report.designSystem.name}): ${report.designSystem.keptSystem} of ${report.designSystem.directions} directions keep it; ${report.designSystem.conforming} studies pass the check against it.`,
   `- Layout pieces: ${report.pieces.composed} of ${report.pieces.siteDirections} site directions open with a composed section; ${report.pieces.distinctComposedOpenings} different composed openings (${report.pieces.distinctOpenings} openings in all).`,
   `- In a browser: ${report.browser.studies} studies at 1280 and 390 px; ${report.browser.sideways} scroll sideways, ${report.browser.lowContrast} with text below contrast, ${report.browser.renderedTells} showing a generated look, ${report.browser.composedWithoutH1} composed openings without an h1.`,
