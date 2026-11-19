@@ -14,7 +14,17 @@
 //   form      required fields and email/phone formats are checked on submit,
 //             each error said beside its field; a valid form shows that it was
 //             "sent", again said to be a prototype.
-//   table     column headers sort the rows (ascending, then descending).
+//   table     column headers sort the rows (ascending, then descending); a table of six rows or more
+//             filters its rows as you type.
+//   gallery   each picture opens large: previous, next, Escape and the arrow keys, focus returned on close.
+//   filters   a gallery's kinds of picture, a menu's groups: one at a time, or all.
+//   chart     each series can be shown or hidden (one always stays); each reading says its value.
+//   configurator  options chosen in place: the total and the choice said as they change, a finish's
+//             colour shown (and sent to a 3D scene on the page); the action says plainly that it is a
+//             prototype and nothing was ordered.
+//
+// A state change (a filter, a configuration) passes through the View Transitions API where the browser has it
+// and the visitor has not asked for reduced motion: the page changes as one movement, not a jump.
 //
 // Nothing here reaches the network, storage or the page around the frame (the
 // frame has none of them to reach). Motion respects prefers-reduced-motion.
@@ -183,9 +193,226 @@ export const BEHAVIOR_SOURCE = String.raw`(function () {
     });
   }
 
+  // ── a state change as one movement, where the browser can and the visitor has not asked for stillness ──
+  function vt(f) {
+    if (!reduce && document.startViewTransition) { try { document.startViewTransition(f); return; } catch (e) { /* drawn at once below */ } }
+    f();
+  }
+
+  // ── filters: a gallery's kinds of picture, a menu's groups ──
+  function filters(group) {
+    var root = group.parentNode;
+    var chips = $$(group, '[data-ux-filter]');
+    var items = $$(root, '[data-tag]');
+    if (chips.length < 2 || !items.length) return null;
+    function show(tag, instant) {
+      function draw() {
+        chips.forEach(function (c) { c.setAttribute('aria-pressed', c.getAttribute('data-ux-filter') === tag ? 'true' : 'false'); });
+        items.forEach(function (it) { it.hidden = !!tag && it.getAttribute('data-tag') !== tag; });
+      }
+      if (instant) draw(); else vt(draw);
+    }
+    chips.forEach(function (c) { c.addEventListener('click', function () { show(c.getAttribute('data-ux-filter') || ''); }); });
+    return { root: root, chips: chips, items: items, show: show };
+  }
+
+  // ── a picture opened large ──
+  var lb = null;
+  function lightbox() {
+    if (lb) return lb;
+    var el = document.createElement('div');
+    el.className = 'ux-lb';
+    el.hidden = true;
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-label', 'The picture, large');
+    el.innerHTML = '<img alt=""><div class="ux-lb-bar"><button type="button" data-lb="prev">Previous</button><span data-lb="count" aria-live="polite"></span><span><button type="button" data-lb="next">Next</button> <button type="button" data-lb="close">Close</button></span></div>';
+    document.body.appendChild(el);
+    var img = $(el, 'img');
+    var count = $(el, '[data-lb="count"]');
+    var list = [], at = 0, back = null;
+    function draw() {
+      var src = $(list[at], 'img');
+      img.src = src ? (src.currentSrc || src.src) : '';
+      img.alt = src ? src.alt : '';
+      count.textContent = (at + 1) + ' of ' + list.length;
+    }
+    function open(items, i) { list = items; at = i; back = document.activeElement; draw(); el.hidden = false; $(el, '[data-lb="close"]').focus(); }
+    function close() { el.hidden = true; if (back && back.focus) back.focus(); }
+    function step(d) { if (!list.length) return; at = (at + d + list.length) % list.length; draw(); }
+    el.addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-lb]');
+      if (!b) { if (ev.target === el) close(); return; }
+      var k = b.getAttribute('data-lb');
+      if (k === 'close') close(); else if (k === 'prev') step(-1); else if (k === 'next') step(1);
+    });
+    el.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape') close(); else if (ev.key === 'ArrowRight') step(1); else if (ev.key === 'ArrowLeft') step(-1);
+    });
+    lb = { el: el, open: open, close: close, step: step, at: function () { return at; } };
+    return lb;
+  }
+  function gallery(root) {
+    var figs = $$(root, '[data-ux-open]').filter(function (f) { return !!$(f, 'img'); });
+    if (!figs.length) return null;
+    figs.forEach(function (f) {
+      f.setAttribute('tabindex', '0');
+      f.setAttribute('role', 'button');
+      f.setAttribute('aria-label', 'Open the picture large');
+      function go() { var shown = figs.filter(function (x) { return !x.hidden; }); lightbox().open(shown, Math.max(0, shown.indexOf(f))); }
+      f.addEventListener('click', go);
+      f.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(); } });
+    });
+    return { root: root, figs: figs };
+  }
+
+  // ── a chart's series, shown or hidden (one always stays) ──
+  function legend(root) {
+    var card = root.parentNode;
+    var svg = card && $(card, 'svg.chart');
+    var btns = $$(root, '[data-ux-series]');
+    if (!svg || btns.length < 2) return null;
+    function toggle(b) {
+      var on = b.getAttribute('aria-pressed') !== 'false';
+      if (on && btns.filter(function (x) { return x.getAttribute('aria-pressed') !== 'false'; }).length <= 1) return false;
+      b.setAttribute('aria-pressed', on ? 'false' : 'true');
+      $$(svg, '.s' + b.getAttribute('data-ux-series')).forEach(function (m) { m.classList.toggle('is-off', on); });
+      return true;
+    }
+    btns.forEach(function (b) { b.addEventListener('click', function () { toggle(b); }); });
+    return { root: root, btns: btns, svg: svg, toggle: toggle };
+  }
+
+  // ── a table's rows, filtered as you type ──
+  function tableFilter(input) {
+    var card = input.closest('.table-card');
+    var body = card && $(card, 'tbody');
+    if (!body) return null;
+    function run() {
+      var q = input.value.trim().toLowerCase();
+      $$(body, 'tr').forEach(function (r) { r.hidden = !!q && text(r).toLowerCase().indexOf(q) < 0; });
+    }
+    input.addEventListener('input', run);
+    return { input: input, body: body, run: run };
+  }
+
+  // ── a configurator ──
+  function configurator(root) {
+    var form = $(root, '[data-ux-config-form]');
+    var total = $(root, '[data-ux-config-total]');
+    var choice = $(root, '[data-ux-config-choice]');
+    var done = $(root, '[data-ux-config-done]');
+    var said = $(root, '[data-ux-config-said]');
+    if (!form || !total) return null;
+    var base = parseFloat(total.getAttribute('data-base')) || 0;
+    var cur = total.getAttribute('data-cur') || '';
+    function picked() { return $$(form, 'input[type=radio]:checked'); }
+    function update() {
+      var p = picked();
+      var sum = base + p.reduce(function (a, r) { return a + (parseFloat(r.getAttribute('data-price')) || 0); }, 0);
+      total.textContent = cur + (Math.round(sum * 100) / 100).toLocaleString('en-GB');
+      if (choice) choice.textContent = p.map(function (r) { return r.getAttribute('data-label'); }).join(' · ');
+      var sw = p.map(function (r) { return r.getAttribute('data-swatch'); }).filter(Boolean)[0];
+      if (sw) {
+        root.style.setProperty('--cfg', sw);
+        try { document.dispatchEvent(new CustomEvent('ux-config', { detail: { swatch: sw } })); } catch (e) { /* an old browser: the swatch still shows */ }
+      }
+      if (done) done.hidden = true;
+      return sum;
+    }
+    form.addEventListener('change', function () { vt(update); });
+    form.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      if (said) said.textContent = (choice ? choice.textContent : '') + ', ' + total.textContent;
+      if (done) { done.hidden = false; done.focus(); }
+    });
+    return { root: root, form: form, update: update, total: total, choice: choice, done: done };
+  }
+
   var bookings = $$(document, '[data-ux-booking]').filter(fresh).map(booking).filter(Boolean);
   $$(document, 'form[data-ux-form]').filter(fresh).forEach(formBehaviour);
   $$(document, '.table-card table').filter(fresh).forEach(tableBehaviour);
+  var filterSets = $$(document, '[data-ux-filters]').filter(fresh).map(filters).filter(Boolean);
+  var galleries = $$(document, '[data-ux-gallery]').filter(fresh).map(gallery).filter(Boolean);
+  var legends = $$(document, '[data-ux-legend]').filter(fresh).map(legend).filter(Boolean);
+  var tableFilters = $$(document, '[data-ux-table-filter]').filter(fresh).map(tableFilter).filter(Boolean);
+  var configs = $$(document, '[data-ux-config]').filter(fresh).map(configurator).filter(Boolean);
+
+  // the audit's look at whether each interactive part works, in place, and back as it was
+  function selfTestInteractive() {
+    var out = [];
+    galleries.forEach(function (g, i) {
+      var p = [];
+      var L = lightbox();
+      g.figs[0].click();
+      if (L.el.hidden) p.push('a picture does not open large');
+      else {
+        L.step(1);
+        if (g.figs.length > 1 && L.at() !== 1) p.push('next does not move on');
+        L.close();
+        if (!L.el.hidden) p.push('the large picture does not close');
+      }
+      out.push({ kind: 'gallery', index: i, items: g.figs.length, problems: p });
+    });
+    filterSets.forEach(function (f, i) {
+      var p = [];
+      var tag = f.chips[1].getAttribute('data-ux-filter');
+      f.show(tag, true);
+      var shown = f.items.filter(function (x) { return !x.hidden; });
+      if (!shown.length) p.push('a filter shows nothing');
+      if (shown.some(function (x) { return x.getAttribute('data-tag') !== tag; })) p.push('a filter shows other kinds');
+      f.show('', true);
+      if (f.items.some(function (x) { return x.hidden; })) p.push('"All" does not show everything');
+      out.push({ kind: 'filter', index: i, items: f.items.length, problems: p });
+    });
+    legends.forEach(function (l, i) {
+      var p = [];
+      var b = l.btns[1];
+      l.toggle(b);
+      var hidden = $$(l.svg, '.s1').every(function (m) { return m.classList.contains('is-off'); });
+      if (!hidden) p.push('hiding a series leaves it drawn');
+      l.toggle(b);
+      if ($$(l.svg, '.is-off').length) p.push('a series shown again stays hidden');
+      l.btns.forEach(function (x, k) { if (k > 0 && x.getAttribute('aria-pressed') !== 'false') l.toggle(x); });
+      if (l.toggle(l.btns[0])) p.push('every series can be hidden');
+      l.btns.forEach(function (x) { if (x.getAttribute('aria-pressed') === 'false') l.toggle(x); });
+      out.push({ kind: 'chart', index: i, items: l.btns.length, problems: p });
+    });
+    tableFilters.forEach(function (t, i) {
+      var p = [];
+      var rows = $$(t.body, 'tr');
+      var probe = text(rows[rows.length - 1].children[0]);
+      t.input.value = probe;
+      t.run();
+      var shown = rows.filter(function (r) { return !r.hidden; });
+      if (!shown.length) p.push('filtering by a row’s own words hides it');
+      if (shown.length === rows.length && rows.length > 1 && rows.some(function (r) { return text(r).toLowerCase().indexOf(probe.toLowerCase()) < 0; })) p.push('filtering hides nothing');
+      t.input.value = '';
+      t.run();
+      if (rows.some(function (r) { return r.hidden; })) p.push('clearing the filter does not show every row');
+      out.push({ kind: 'table', index: i, items: rows.length, problems: p });
+    });
+    configs.forEach(function (c, i) {
+      var p = [];
+      var before = picked(c);
+      var start = c.update();
+      var groups = $$(c.form, 'fieldset');
+      groups.forEach(function (g) { var opts = $$(g, 'input[type=radio]'); opts[opts.length - 1].checked = true; });
+      var after = c.update();
+      var priced = $$(c.form, 'input[data-price]').some(function (r) { return parseFloat(r.getAttribute('data-price')) > 0; });
+      if (priced && after === start && groups.some(function (g) { var o = $$(g, 'input'); return o[0].getAttribute('data-price') !== o[o.length - 1].getAttribute('data-price'); })) p.push('the total does not change with the choice');
+      var labels = groups.map(function (g) { var o = $$(g, 'input'); return o[o.length - 1].getAttribute('data-label'); });
+      if (c.choice && labels.some(function (l) { return c.choice.textContent.indexOf(l) < 0; })) p.push('the choice is not said');
+      c.form.dispatchEvent(new Event('submit', { cancelable: true }));
+      if (c.done && c.done.hidden) p.push('the action shows nothing');
+      else if (c.done && !/prototype/i.test(c.done.textContent)) p.push('the action does not say it is a prototype');
+      before.forEach(function (r) { r.checked = true; });
+      c.update();
+      out.push({ kind: 'configurator', index: i, items: groups.length, problems: p });
+    });
+    return out;
+  }
+  function picked(c) { return $$(c.form, 'input[type=radio]:checked'); }
 
   // the audit's look at whether each booking works: choose, confirm, see it, and back as it was
   function selfTest() {
@@ -260,5 +487,5 @@ export const BEHAVIOR_SOURCE = String.raw`(function () {
     $$(fm.root, '.field.is-invalid').forEach(function (n) { n.classList.remove('is-invalid'); });
     return { index: i, kind: 'form', slots: inputs.length, problems: problems };
   }
-  window.__uxBehaviors = { selfTest: selfTest, bookings: bookings.length, forms: forms.length };
+  window.__uxBehaviors = { selfTest: selfTest, selfTestInteractive: selfTestInteractive, bookings: bookings.length, forms: forms.length, galleries: galleries.length, filters: filterSets.length, charts: legends.length, tables: tableFilters.length, configurators: configs.length };
 })();`;

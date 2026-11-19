@@ -26,7 +26,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { contrastRatio } from '@/lib/ux/audit';
-import { LOCK_LABEL, languageOf, type ArtDirection, type DirectionState, type LockGroup } from '@/lib/ux-v0/direction';
+import { LOCK_GROUPS, LOCK_LABEL, languageOf, type ArtDirection, type DirectionState, type LockGroup } from '@/lib/ux-v0/direction';
 import type { DesignPlan } from '@/lib/ux-v0/plan';
 import { FONTS, fontStack, fontStylesheet, nearestWeight } from '@/lib/ux-v0/fonts';
 import { EASE_CURVE, HEADLINE_LABEL, MOTION_LABEL, describeMotion, motionFor, stepMotion } from '@/lib/ux-v0/motion';
@@ -59,6 +59,8 @@ interface Props {
   onBack: () => void;
   /** swap one direction for another the engine has not shown, keeping the other two */
   onReplace: (id: string) => void;
+  /** one direction as the base, what is named taken whole from another: a new direction beside the others */
+  onCombine?: (baseId: string, fromId: string, groups: LockGroup[]) => void;
   /** the project's Creative DNA, which each direction leans from */
   dna?: CreativeDNA | null;
   onOpenDna?: () => void;
@@ -679,6 +681,75 @@ function Spread({ d, n, total, p, onPreview }: { d: ArtDirection; n: number; tot
 }
 
 /** The directions side by side, row by row: where each made its own choice, and where they agree. */
+/**
+ * Combine two directions: keep one, take whole groups from another (its colours, its type, its layout…). The
+ * combination is made in code (lib/ux-v0/direction.ts combineDirections) and joins the others as a direction of
+ * its own, to compare and approve like them; what was taken is locked, as the designer's decision.
+ */
+function Combine({ options, busy, onCombine }: { options: ArtDirection[]; busy: boolean; onCombine: (baseId: string, fromId: string, groups: LockGroup[]) => void }) {
+  const [base, setBase] = useState(options[0]?.id ?? '');
+  const [from, setFrom] = useState(options[1]?.id ?? '');
+  const [groups, setGroups] = useState<LockGroup[]>([]);
+  // directions come and go (asked again, swapped): the choice follows what is there
+  useEffect(() => {
+    if (!options.some((o) => o.id === base)) setBase(options[0]?.id ?? '');
+    if (!options.some((o) => o.id === from) || from === base) setFrom(options.find((o) => o.id !== (options.some((x) => x.id === base) ? base : options[0]?.id))?.id ?? '');
+  }, [options, base, from]);
+  const b = options.find((o) => o.id === base);
+  const f = options.find((o) => o.id === from);
+  const ready = !!b && !!f && b.id !== f.id && groups.length > 0;
+  const toggle = (g: LockGroup, on: boolean) => setGroups((gs) => (on ? [...new Set([...gs, g])] : gs.filter((x) => x !== g)));
+  return (
+    <details className="ad-combine">
+      <summary>
+        <span className="sb-label">Combine two</span>
+        <span className="v0-quiet">Keep one direction and take whole parts of another: its colours, its type, its layout…</span>
+      </summary>
+      <div className="ad-combine-body">
+        <label className="ad-combine-pick">
+          <span className="v0-quiet">Keep</span>
+          <select className="v0-select" value={base} onChange={(e) => setBase(e.target.value)}>
+            {options.map((o, i) => (
+              <option key={o.id} value={o.id}>
+                {String(i + 1).padStart(2, '0')} · {o.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="ad-combine-pick">
+          <span className="v0-quiet">and take from</span>
+          <select className="v0-select" value={from} onChange={(e) => setFrom(e.target.value)}>
+            {options
+              .filter((o) => o.id !== base)
+              .map((o) => (
+                <option key={o.id} value={o.id}>
+                  {String(options.indexOf(o) + 1).padStart(2, '0')} · {o.name}
+                </option>
+              ))}
+          </select>
+        </label>
+        <fieldset className="ad-combine-groups">
+          <legend className="v0-quiet">its</legend>
+          {LOCK_GROUPS.map((g) => (
+            <label key={g} className={`mp-toggle${groups.includes(g) ? ' is-on' : ''}`}>
+              <input type="checkbox" checked={groups.includes(g)} onChange={(e) => toggle(g, e.target.checked)} />
+              {LOCK_LABEL[g]}
+            </label>
+          ))}
+        </fieldset>
+        <button type="button" className="sb-btn" disabled={busy || !ready} onClick={() => ready && (onCombine(base, from, groups), setGroups([]))}>
+          Combine them
+        </button>
+        {b && f && groups.length > 0 && (
+          <p className="v0-quiet">
+            {b.name}, with the {groups.map((g) => LOCK_LABEL[g].toLowerCase()).join(', ')} of {f.name}. It joins the others; approve it to design with it.
+          </p>
+        )}
+      </div>
+    </details>
+  );
+}
+
 function Compare({ options, brief, dna }: { options: ArtDirection[]; brief: DesignBrief; dna?: CreativeDNA | null }) {
   const c = useMemo(() => compareDirections(options), [options]);
   const because = useMemo(() => sharedBecause(c, { locks: [...new Set(options.flatMap((d) => d.locks))], dna, system: !!brief.system, decided: brief.layout ?? null }), [c, options, dna, brief]);
@@ -783,6 +854,7 @@ export function DirectionBoard(p: Props) {
       )}
 
       {state.options.length > 1 && <Compare options={state.options} brief={p.brief} dna={p.dna} />}
+      {state.options.length > 1 && p.onCombine && <Combine options={state.options} busy={!!p.busy} onCombine={p.onCombine} />}
 
       {state.options.length > 1 && (
         <nav className="ad-index" aria-label="The directions">

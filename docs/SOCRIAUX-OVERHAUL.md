@@ -82,6 +82,16 @@ How a plan is chosen and applied:
 
 **And then:** four methods against the generated look: the looks generated pages share, detected and kept out unless asked for; a plan for every direction, critiqued before anyone sees it; building within the designer's own design system; and sections composed from layout pieces. See [SOCRIAUX-CRAFT.md](SOCRIAUX-CRAFT.md).
 
+**The production engine:**
+- motion that tells a story (a scrubbed opening, a pinned sequence, pictures arriving, magnetic and tilting responses, lines drawing), inert under reduced motion;
+- pictures made in code for the parts that ask for one, with provenance and a reason, and a separate image-model pathway that is off unless configured;
+- galleries, filters, chart keys, table filters and a configurator that work, and a 3D object drawn with WebGL;
+- rules for tablets and phones, a Type panel, and combining two directions;
+- the complexity of a generation read in code to choose its model, and the cost of each accepted design split into text, pictures, attempts and time;
+- checks at three widths that try every interactive part.
+
+See [SOCRIAUX-PRODUCTION-ENGINE.md](SOCRIAUX-PRODUCTION-ENGINE.md).
+
 ### 5 · Model routing (lib/ux-v0/model.ts)
 
 | Stage | Tier | Default model |

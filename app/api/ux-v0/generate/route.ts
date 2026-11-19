@@ -1,5 +1,5 @@
 // app/api/ux-v0/generate/route.ts
-// POST { brief, moodboard, artDirection?, direction?, version, dna? } → { spec, artDirection, placeholders, dnaHeld }
+// POST { brief, moodboard, artDirection?, direction?, version, dna? } → { spec, artDirection, placeholders, dnaHeld, complexity }
 //
 // The approved brief becomes a DesignSpec (lib/ux-v0/design.ts, spec.ts): tokens
 // and sections from the library, real copy, moodboard images only. The client
@@ -25,10 +25,10 @@ import { NextRequest } from 'next/server';
 import { withMeter } from '@/lib/token-meter';
 import { generateSystem, generateUser, parseGenerate } from '@/lib/ux-v0/design';
 import { autoDirection, languageOf, normalizeDirection, reviseDirection, saltOf } from '@/lib/ux-v0/direction';
-import { fitDNA, normalizeDNA } from '@/lib/ux-v0/dna';
+import { dnaValues, fitDNA, normalizeDNA } from '@/lib/ux-v0/dna';
 import { pingUse } from '@/lib/ux-v0/images-server';
-import { pageTypeFor, intentOf } from '@/lib/ux-v0/intent';
-import { MAX_TOKENS } from '@/lib/ux-v0/model';
+import { briefWords, intentOf, pageTypeFor, requiredComponents } from '@/lib/ux-v0/intent';
+import { MAX_TOKENS, generationComplexity } from '@/lib/ux-v0/model';
 import { bad, projectIdOf, readBodyPrinted } from '@/lib/ux-v0/route-kit';
 import { applyPatch, placeholdersIn, type DesignSpec } from '@/lib/ux-v0/spec';
 import { admit, refuse, runStage } from '@/lib/ux-v0/stage-server';
@@ -55,7 +55,19 @@ export const POST = withMeter(async function POST(req: NextRequest) {
   const dna = normalizeDNA(body.dna) ?? null;
   const art = approved ? (direction ? reviseDirection(approved, brief, direction, '', salt, dna) : approved) : autoDirection(brief, direction, '', salt, dna);
   const version = Number.isFinite(body.version) ? Math.max(1, Math.round(body.version)) : 1;
-  const pageType = pageTypeFor(intentOf(brief), brief.pageType);
+  const intent = intentOf(brief);
+  const pageType = pageTypeFor(intent, brief.pageType);
+  // how demanding this page is, read in code: advanced work always on the premium model; simple work on the
+  // economy one only where the deployment opted in (lib/ux-v0/model.ts generationComplexity)
+  const complexity = generationComplexity({
+    kind: intent.kind,
+    required: requiredComponents(intent).filter((c): c is NonNullable<typeof c> => !!c),
+    words: `${briefWords(brief)} ${direction}`,
+    motion: art.look.motion?.feel ?? 'still',
+    references: kept.size,
+    system: !!brief.system,
+    dna: dna ? dnaValues(dna) : null,
+  });
 
   return runStage(req, { userId: a.userId, orgId: a.orgId, projectId: projectIdOf(body.projectId), fingerprint: print }, {
     stage: 'generate',
@@ -63,7 +75,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
     label: 'ux-v0/generate',
     // the generator's prompt opens with what every project at this kind of page shares, so a provider can read it
     // from its cache (lib/ux-v0/design.ts generateSystem)
-    prompt: { system: generateSystem(brief, art), user: generateUser({ brief, moodboard, direction, dna }), maxTokens: MAX_TOKENS.generate, temperature: 0.6, cacheScope: `${pageType}:${art ? 'directed' : 'free'}` },
+    prompt: { system: generateSystem(brief, art), user: generateUser({ brief, moodboard, direction, dna }), maxTokens: MAX_TOKENS.generate, temperature: 0.6, cacheScope: `${pageType}:${art ? 'directed' : 'free'}`, tier: complexity.tier },
     finish: (asked) => {
       const made = parseGenerate(asked.json, brief, moodboard, version, direction ? `Generated again: ${direction}` : `Generated in the “${art.name}” direction`, art);
       if (!made) return { status: 502, body: { error: 'The model’s design did not hold together. Nothing changed; try again.' } };
@@ -73,7 +85,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
         return r.ok ? r.spec : null;
       }, { lang: languageOf(art.language) ?? null, kind: intentOf(brief).kind, hasImages: (brief.references ?? []).length > 0, locks: art.locks, keepColours: art.locks.includes('palette') || !!brief.system, keepType: art.locks.includes('type') || !!brief.system });
       const spec = held.spec;
-      return { body: { spec, artDirection: art, placeholders: placeholdersIn(spec), dnaHeld: held.held } };
+      return { body: { spec, artDirection: art, placeholders: placeholdersIn(spec), dnaHeld: held.held, complexity } };
     },
     // Unsplash asks to be told when a photo is used in a design: after the design is on its way
     after: async (answer) => {

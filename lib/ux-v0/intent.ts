@@ -55,7 +55,7 @@ export interface Requirement {
   id: string;
   text: string;
   /** the component that satisfies it, when one does */
-  component?: 'booking' | 'form' | 'table' | 'chart' | 'stat-cards' | 'gallery' | 'list' | 'pricing' | 'faq';
+  component?: 'booking' | 'form' | 'table' | 'chart' | 'stat-cards' | 'gallery' | 'list' | 'pricing' | 'faq' | 'scene' | 'configurator';
   authority: Authority;
   required: boolean;
 }
@@ -91,6 +91,8 @@ const RULES: readonly Rule[] = [
   { kind: 'form', re: /\b(sign[- ]?up|signup|registration|application|enrol?ment|intake|contact|feedback)\s+(form|screen|page)\b|\b(survey|questionnaire)\b/, weight: 5, say: 'a form' },
   { kind: 'flow', re: /\b(multi[- ]?step|wizard|onboarding (flow|screens?)|step[- ]by[- ]step|workflow|multi[- ]screen)\b/, weight: 5, say: 'a multi-step flow' },
   { kind: 'data', re: /\b(data visuali[sz]ation|research visuali[sz]ation|interactive (chart|map)|data explorer|visuali[sz]e (the )?data)\b/, weight: 5, say: 'a data visualisation' },
+  // a research or data interface said in its own words: exploring readings, comparing over time, a time series
+  { kind: 'data', re: /\b(research (interface|tool|portal|platform|database)|data (portal|tool|interface)|explore (the |their |its )?(data|readings|measurements|records|results|observations)|time[- ]series|(station|sensor|field|lab) (readings|measurements|data)|compare (\w+ ){1,3}(over|across) (a|the) (decade|years?|time|stations?|sites?|samples?))\b/, weight: 5, say: 'a data interface' },
   { kind: 'app', re: /\b(app screen|mobile app|application screen|in-app|settings screen|profile screen|inbox|screen for)\b/, weight: 3, say: 'an app screen' },
   { kind: 'portfolio', re: /\bportfolio\b/, weight: 5, say: 'a portfolio' },
   { kind: 'editorial', re: /\b(magazine|editorial|journal|publication|lookbook|zine|long-?read|article)\b/, weight: 4, say: 'an editorial publication' },
@@ -131,7 +133,13 @@ const NEEDS: Partial<Record<Experience, Omit<Requirement, 'authority'>[]>> = {
 
 /** Requirements the designer's words add to any experience ("a site WITH class booking"). */
 const MENTIONS: readonly { re: RegExp; req: Omit<Requirement, 'authority'> }[] = [
-  { re: /\b(book(ing)?|reserv(e|ation)|appointments?)\b/, req: { id: 'req-book', text: 'Book a time', component: 'booking', required: true } },
+  // a booking is of a time; "reserve one" (a product, a pre-order) is not one
+  { re: /\b(book(s|ed|ing|ings)?|appointments?)\b|\breserv(e|es|ed|ing|ations?)\b(?!\s+(one|yours|it|them|now|your own|a pair|the (first|product|piece|object|model)))/, req: { id: 'req-book', text: 'Book a time', component: 'booking', required: true } },
+  // records to look through: the table that holds them
+  { re: /\b(inspect|browse|filter|search|look through) (the |each |every |their |its )?([\w']+ )?(readings|records|log|logs|entries|rows|measurements|observations)\b/, req: { id: 'req-records', text: 'Look through the records', component: 'table', required: true } },
+  // 3D and configuring: only when the words ask for them, never as a default for "premium" or "immersive" alone
+  { re: /\b(3d|three[- ]dimensional|in three dimensions|360(°| degrees?)? view|turn (it|the product|the object) (in|by) (the|your) hand|webgl|rotat(e|able) (the )?(product|object|model))\b/, req: { id: 'req-3d', text: 'Turn the object in three dimensions', component: 'scene', required: true } },
+  { re: /\b(configurat(or|ion)|configure|customi[sz]e (it|yours?|the (product|object|chair|bag|piece))|choose (a|the|its) (finish|colou?r|size|material|glaze|fabric)|build your own)\b/, req: { id: 'req-configure', text: 'Configure the product and see the total', component: 'configurator', required: true } },
   { re: /\b(donat(e|es|ing|ion|ions)|make a gift|give monthly)\b/, req: { id: 'req-donate', text: 'Give a donation', component: 'form', required: true } },
   { re: /\b(registration|application|enrol(l)?ment|order|request|quote|feedback|survey|rsvp)\s+form\b/, req: { id: 'req-form-named', text: 'Fill in the form', component: 'form', required: true } },
   { re: /\b(contact|enquir(y|e)|get in touch|newsletter|sign[- ]?up)\b/, req: { id: 'req-contact', text: 'Get in touch or sign up', component: 'form', required: false } },
@@ -181,7 +189,14 @@ export function readIntent(words: string, opts: { override?: Experience | null; 
   for (const r of NEEDS[kind] ?? []) add(r, source === 'words' || source === 'designer' ? 'designer' : 'socriaux');
   // what the designer mentioned besides (a site that must also take bookings) — but never the
   // product a site is about ("a website promoting a booking app" does not take bookings itself)
-  if (!ABOUT.test(n) || kind !== 'site') for (const m of MENTIONS) if (m.re.test(n)) add(m.req, 'designer');
+  // "the reservation" of a product to configure or pre-order is not the booking of a time: without a time, a
+  // date, a session or a table anywhere in the words, and with a product to turn or configure, it is not read as one
+  const productReserve =
+    !/\b(book(ing)?|appointments?)\b/.test(n) &&
+    /\breserv/.test(n) &&
+    !/\b(times?|dates?|slots?|days?|sessions?|tables?|class(es)?|nights?|stays?|rooms?|seats?|courts?|lessons?|tours?|visits?)\b/.test(n) &&
+    (MENTIONS.some((m) => (m.req.id === 'req-3d' || m.req.id === 'req-configure') && m.re.test(n)) || /\b(pre-?orders?|products?)\b/.test(n));
+  if (!ABOUT.test(n) || kind !== 'site') for (const m of MENTIONS) if (m.re.test(n) && !(productReserve && m.req.id === 'req-book')) add(m.req, 'designer');
   const prohibitions: string[] = [];
   for (const m of n.matchAll(PROHIBIT)) {
     const p = m[1].trim();
@@ -239,7 +254,7 @@ export function normalizeIntent(v: unknown): DesignIntent | null {
     const id = o && typeof o.id === 'string' && /^req-[a-z0-9-]{1,40}$/.test(o.id) ? o.id : null;
     const text = str(o?.text, 200);
     if (!id || !text || reqs.some((x) => x.id === id)) continue;
-    const component = ['booking', 'form', 'table', 'chart', 'stat-cards', 'gallery', 'list', 'pricing', 'faq'].includes(o?.component as string) ? (o!.component as Requirement['component']) : undefined;
+    const component = ['booking', 'form', 'table', 'chart', 'stat-cards', 'gallery', 'list', 'pricing', 'faq', 'scene', 'configurator'].includes(o?.component as string) ? (o!.component as Requirement['component']) : undefined;
     reqs.push({ id, text, ...(component ? { component } : {}), authority: o?.authority === 'designer' ? 'designer' : 'socriaux', required: o?.required !== false });
   }
   return {

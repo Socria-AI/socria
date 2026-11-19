@@ -44,6 +44,9 @@ const hang = (opts) =>
     signal?.addEventListener?.('abort', () => (clearTimeout(t), stop()), { once: true });
   });
 
+// a 1×1 PNG: what the fake image model answers unless a test scripts something else (globalThis.__imagesScript)
+const TINY_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
 export default class OpenAI {
   constructor() {
     this.responses = {
@@ -71,6 +74,17 @@ export default class OpenAI {
           })();
         }
         return res;
+      },
+    };
+    // the Images API: one picture per call, recorded like any other call
+    this.images = {
+      generate: async (p, opts = {}) => {
+        const g = globalThis;
+        (g.__logosCalls ??= []).push({ images: p });
+        const next = (g.__imagesScript ?? []).shift();
+        if (next instanceof Error) throw next;
+        if (opts.signal?.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+        return { created: 1, data: [{ b64_json: typeof next === 'string' ? next : TINY_PNG }] };
       },
     };
     this.chat = {

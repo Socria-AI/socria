@@ -51,6 +51,9 @@ export interface KindDef {
 }
 
 const BOTH: readonly PageType[] = ['website', 'app-screen'];
+/** the objects a scene can draw (lib/ux-v0/scene-runtime.ts), and the materials it shades them in */
+export const SCENE_MODELS = ['vessel', 'bottle', 'sphere', 'torus', 'ring', 'knot', 'monolith'] as const;
+export const SCENE_MATERIALS = ['matte', 'satin', 'gloss', 'metal'] as const;
 const WEB: readonly PageType[] = ['website'];
 const APP: readonly PageType[] = ['app-screen'];
 
@@ -63,8 +66,8 @@ export const LIBRARY: readonly KindDef[] = [
     fields: { eyebrow: T(48), title: T(110), intro: T(320), items: { t: 'list', n: [2, 8], req: true, item: { title: T(60, true), text: T(240), icon: { t: 'enum', values: ICONS } } } } },
   { kind: 'split', label: 'Image and text', pages: WEB, variants: ['image-left', 'image-right'], images: [0, 1], note: 'a story beside one image',
     fields: { eyebrow: T(48), title: T(110, true), text: T(600), bullets: TS(110, 0, 6), cta: T(30) } },
-  { kind: 'gallery', label: 'Gallery', pages: WEB, variants: ['grid', 'mosaic', 'strip'], images: [2, 8], note: '2–8 moodboard images',
-    fields: { eyebrow: T(48), title: T(110), caption: T(220) } },
+  { kind: 'gallery', label: 'Gallery', pages: WEB, variants: ['grid', 'mosaic', 'strip'], images: [2, 8], note: '2–8 moodboard images; opens each picture large; tags (one per picture, in order) add filters when there are two or more kinds',
+    fields: { eyebrow: T(48), title: T(110), caption: T(220), tags: TS(24, 0, 8) } },
   { kind: 'quote', label: 'Quote', pages: WEB, variants: ['large', 'with-portrait', 'pull'], images: [0, 1], note: 'one testimonial or statement; pull is a large left-set pull quote',
     fields: { quote: T(420, true), author: T(60, true), role: T(90) } },
   { kind: 'stats', label: 'Figures', pages: WEB, variants: ['row', 'band', 'giant'], images: [0, 0], note: '2–6 figures; giant sets them as huge numerals; unknown figures are [bracketed placeholders]',
@@ -81,6 +84,12 @@ export const LIBRARY: readonly KindDef[] = [
     fields: { title: T(110), items: { t: 'list', n: [2, 10], req: true, item: { q: T(150, true), a: T(520, true) } } } },
   { kind: 'cta', label: 'Call to action', pages: WEB, variants: ['band', 'centered', 'image', 'statement'], images: [0, 1], note: 'one decisive invitation; statement is a very large headline with no box',
     fields: { title: T(120, true), text: T(280), primary: T(30, true), secondary: T(30) } },
+  { kind: 'scene', label: '3D scene', pages: BOTH, variants: ['object', 'stage', 'backdrop'], images: [0, 0],
+    note: 'a 3D object drawn in the page and turned by hand (drag, arrow keys), shaded in a material, recoloured by a configurator on the page. Only when the brief asks for 3D, a product to look at from every side, or an immersive experience; never as decoration. object: the object beside its words; stage: the object large, its words after it; backdrop: the object turning slowly behind the words',
+    fields: { eyebrow: T(48), title: T(110, true), text: T(280), model: { t: 'enum', values: SCENE_MODELS }, material: { t: 'enum', values: SCENE_MATERIALS }, color: T(9), caption: T(160), action: T(40) } },
+  { kind: 'configurator', label: 'Configurator', pages: BOTH, variants: ['panel', 'split'], images: [0, 1],
+    note: 'a product configured in place: groups of options (a finish with its colour as swatch "#rrggbb", a size…), each with an optional price; the total and the choice update as you choose; one action. A prototype: it says plainly that nothing is ordered',
+    fields: { eyebrow: T(48), title: T(110, true), intro: T(240), groups: { t: 'list', n: [1, 4], req: true, item: { name: T(40, true), options: { t: 'list', n: [2, 6], req: true, item: { label: T(40, true), price: T(18), swatch: T(9) } } } }, base: T(18), action: T(40, true), note: T(200) } },
   { kind: 'form', label: 'Form', pages: BOTH, variants: ['stacked', 'split'], images: [0, 0], note: 'every field has a visible label',
     fields: { title: T(110, true), intro: T(320), fields: { t: 'list', n: [1, 10], req: true, item: { label: T(48, true), type: { t: 'enum', values: ['text', 'email', 'tel', 'textarea', 'select', 'checkbox', 'date', 'number'] }, placeholder: T(60), options: TS(40, 0, 8), required: { t: 'bool' } } }, submit: T(30, true), note: T(180) } },
   { kind: 'booking', label: 'Booking', pages: BOTH, variants: ['strip', 'calendar', 'list', 'split', 'immersive'], images: [0, 1],
@@ -248,6 +257,8 @@ export interface Section {
   locked?: boolean;
   /** how this section's variant is set: sides, proportions, how its parts are shown (SHAPE_FIELDS) */
   shape?: SectionShape;
+  /** what the designer set apart for tablets or phones: hidden there, aligned, spaced, its picture's place */
+  responsive?: Responsive;
 }
 
 export interface DesignSpec {
@@ -356,6 +367,72 @@ export const SHAPES = ['circle', 'arch', 'square', 'quarter', 'diamond', 'blob']
 export const TONES = ['base', 'alt', 'accent', 'accent2', 'invert'] as const;
 export const PADS = ['s', 'm', 'l'] as const;
 
+// ── a part set apart at a width: what the designer changed for tablets or phones ──
+// The page is designed at the desktop width and every layout reflows on its own; these are the designer's own
+// decisions at the narrower widths, kept with the section and written by the renderer as media queries. Tablet is
+// 760–1099 px and phone up to 759 px: the widths the renderer's own layouts already change at.
+export const BREAKPOINTS = ['tablet', 'mobile'] as const;
+export type Breakpoint = (typeof BREAKPOINTS)[number];
+export const BREAKPOINT_LABEL: Record<Breakpoint, string> = { tablet: 'On tablets', mobile: 'On phones' };
+export const BREAKPOINT_QUERY: Record<Breakpoint, string> = { tablet: '(min-width:760px) and (max-width:1099px)', mobile: '(max-width:759px)' };
+export const BP_ALIGNS = ['start', 'center'] as const;
+export const BP_MEDIA = ['first', 'last'] as const;
+export const BP_TYPES = ['s', 'l'] as const;
+export interface BreakpointRule {
+  /** not shown at this width */
+  hide?: boolean;
+  /** its words set to the left, or centred, here */
+  align?: (typeof BP_ALIGNS)[number];
+  /** its share of space here */
+  pad?: Pad;
+  /** where its picture sits once its parts stack: before the words, or after them */
+  media?: (typeof BP_MEDIA)[number];
+  /** its headings set smaller, or larger, here */
+  type?: (typeof BP_TYPES)[number];
+}
+export type Responsive = Partial<Record<Breakpoint, BreakpointRule>>;
+
+/** A part's rules at each width, kept only where something is set. */
+export function normalizeResponsive(v: unknown): Responsive | undefined {
+  const r = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, any>) : {};
+  const out: Responsive = {};
+  for (const bp of BREAKPOINTS) {
+    const x = r[bp] && typeof r[bp] === 'object' && !Array.isArray(r[bp]) ? (r[bp] as Record<string, unknown>) : null;
+    if (!x) continue;
+    const rule: BreakpointRule = {};
+    if (x.hide === true) rule.hide = true;
+    if ((BP_ALIGNS as readonly string[]).includes(x.align as string)) rule.align = x.align as BreakpointRule['align'];
+    if ((PADS as readonly string[]).includes(x.pad as string)) rule.pad = x.pad as Pad;
+    if ((BP_MEDIA as readonly string[]).includes(x.media as string)) rule.media = x.media as BreakpointRule['media'];
+    if ((BP_TYPES as readonly string[]).includes(x.type as string)) rule.type = x.type as BreakpointRule['type'];
+    if (Object.keys(rule).length) out[bp] = rule;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Whether a part has a picture beside its words, one that stacks above or below them as the width narrows. */
+export function stacksPicture(sec: Pick<Section, 'kind' | 'images'>): boolean {
+  return ['hero', 'split', 'cta', 'configurator', 'scene', 'booking', 'quote'].includes(sec.kind) && (sec.images.length > 0 || sec.kind === 'scene' || sec.kind === 'configurator');
+}
+
+/** What a part's rules say, in words, for the editor and a version's summary. */
+export function describeResponsive(r: Responsive | undefined): string[] {
+  const out: string[] = [];
+  for (const bp of BREAKPOINTS) {
+    const x = r?.[bp];
+    if (!x) continue;
+    const said = [
+      x.hide ? 'hidden' : '',
+      x.align ? (x.align === 'center' ? 'centred' : 'set left') : '',
+      x.pad ? `${{ s: 'tight', m: 'even', l: 'generous' }[x.pad]} spacing` : '',
+      x.media ? `picture ${x.media === 'first' ? 'before' : 'after'} the words` : '',
+      x.type ? `headings ${x.type === 's' ? 'smaller' : 'larger'}` : '',
+    ].filter(Boolean);
+    if (said.length) out.push(`${BREAKPOINT_LABEL[bp]}: ${said.join(', ')}`);
+  }
+  return out;
+}
+
 // ── motion: how the page moves, as part of its look ──────────────────
 // Written by the renderer as CSS only (lib/ux-v0/motion.ts): no scripts, so it
 // plays in the sealed preview and in the exported page alike, and every rule
@@ -370,6 +447,10 @@ export const HOVERS = ['none', 'lift', 'underline', 'invert', 'zoom'] as const;
 export const EASES = ['gentle', 'out', 'expo', 'snap', 'linear'] as const;
 /** how coloured sections arrive */
 export const SECTION_MOTIONS = ['none', 'wipe', 'expand'] as const;
+/** how pictures arrive as they scroll in: as they are, through a mask, or settling from a larger scale */
+export const MEDIA_MOTIONS = ['none', 'mask', 'scale'] as const;
+/** what follows a fine pointer: nothing, pictures and cards tilting toward it */
+export const CURSORS = ['none', 'tilt'] as const;
 
 export interface Motion {
   feel: (typeof MOTION_FEELS)[number];
@@ -390,10 +471,23 @@ export interface Motion {
   sections: (typeof SECTION_MOTIONS)[number];
   /** the navigation stays and condenses as the page scrolls */
   nav: boolean;
+  /**
+   * The scripted layer (lib/ux-v0/motion-runtime.ts), where the page plays (preview, export): the opening
+   * transformed by the scroll (0 none, 1 gentle, 2 pronounced); one sequence of points pinned and told step by
+   * step as the page scrolls; pictures arriving through a mask or settling in scale; buttons drawn toward a
+   * fine pointer; pictures and cards tilting toward it; line art drawing itself. All of it is off under
+   * prefers-reduced-motion, and none of it on phones except the arrivals.
+   */
+  scrub?: number;
+  story?: boolean;
+  media?: (typeof MEDIA_MOTIONS)[number];
+  magnetic?: boolean;
+  cursor?: (typeof CURSORS)[number];
+  draw?: boolean;
 }
 
 /** No motion: what older designs, and anything that asks for stillness, are drawn with. */
-export const STILL_MOTION: Motion = { feel: 'still', duration: 0, stagger: 0, distance: 0, ease: 'out', entrance: 'none', headline: 'none', scroll: false, parallax: 0, hover: 'none', sections: 'none', nav: false };
+export const STILL_MOTION: Motion = { feel: 'still', duration: 0, stagger: 0, distance: 0, ease: 'out', entrance: 'none', headline: 'none', scroll: false, parallax: 0, hover: 'none', sections: 'none', nav: false, scrub: 0, story: false, media: 'none', magnetic: false, cursor: 'none', draw: false };
 
 export function normalizeMotion(v: unknown, base: Motion = STILL_MOTION): Motion {
   const r = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
@@ -412,6 +506,12 @@ export function normalizeMotion(v: unknown, base: Motion = STILL_MOTION): Motion
     hover: p(r.hover, HOVERS, base.hover),
     sections: p(r.sections, SECTION_MOTIONS, base.sections),
     nav: typeof r.nav === 'boolean' ? r.nav : base.nav,
+    scrub: n(r.scrub, 0, 2, base.scrub ?? 0),
+    story: typeof r.story === 'boolean' ? r.story : base.story ?? false,
+    media: p(r.media, MEDIA_MOTIONS, base.media ?? 'none'),
+    magnetic: typeof r.magnetic === 'boolean' ? r.magnetic : base.magnetic ?? false,
+    cursor: p(r.cursor, CURSORS, base.cursor ?? 'none'),
+    draw: typeof r.draw === 'boolean' ? r.draw : base.draw ?? false,
   };
 }
 
@@ -599,6 +699,8 @@ export function normalizeSection(v: unknown, pageType: PageType, imageIds: Reado
   if (r.locked === true) (sec.locked = true), (sec.fixed = true);
   const shape = normalizeShape(def.kind, r.shape);
   if (shape) sec.shape = shape;
+  const responsive = normalizeResponsive(r.responsive);
+  if (responsive) sec.responsive = responsive;
   return sec;
 }
 
@@ -652,8 +754,8 @@ export function normalizeSpec(v: unknown, moodboard?: Moodboard | null): DesignS
 
 // ── patches: iteration that touches only what was asked ───────────────
 
-export type PatchOp = 'tokens' | 'look' | 'content' | 'variant' | 'tone' | 'shape' | 'replace' | 'add' | 'remove' | 'move' | 'images' | 'none';
-export const PATCH_OPS: readonly PatchOp[] = ['tokens', 'look', 'content', 'variant', 'tone', 'shape', 'replace', 'add', 'remove', 'move', 'images', 'none'];
+export type PatchOp = 'tokens' | 'look' | 'content' | 'variant' | 'tone' | 'shape' | 'responsive' | 'replace' | 'add' | 'remove' | 'move' | 'images' | 'none';
+export const PATCH_OPS: readonly PatchOp[] = ['tokens', 'look', 'content', 'variant', 'tone', 'shape', 'responsive', 'replace', 'add', 'remove', 'move', 'images', 'none'];
 
 export interface Patch {
   op: PatchOp;
@@ -670,6 +772,9 @@ export interface Patch {
   images?: string[];
   /** a "shape" patch: the settings to change on one section (SHAPE_FIELDS), the others kept */
   shape?: Record<string, unknown>;
+  /** a "responsive" patch: the width it is for, and the rules to set there (null or false clears one) */
+  breakpoint?: Breakpoint;
+  rule?: Record<string, unknown>;
   /** one line: what the change is */
   summary: string;
 }
@@ -691,6 +796,8 @@ export function normalizePatch(v: unknown): Patch {
     after: typeof r.after === 'string' ? r.after.slice(0, 48) : r.after === null ? null : undefined,
     to: typeof r.to === 'number' && Number.isFinite(r.to) ? Math.round(r.to) : undefined,
     images: Array.isArray(r.images) ? r.images.filter((x: unknown): x is string => typeof x === 'string').slice(0, 8) : undefined,
+    breakpoint: (BREAKPOINTS as readonly string[]).includes(r.breakpoint) ? (r.breakpoint as Breakpoint) : r.breakpoint === 'phone' ? 'mobile' : undefined,
+    rule: r.rule && typeof r.rule === 'object' && !Array.isArray(r.rule) ? o(r.rule) : undefined,
     summary: s(r.summary, 200),
   };
 }
@@ -773,6 +880,27 @@ export function applyPatch(spec: DesignSpec, patchIn: Patch, moodboard?: Moodboa
       if (!asked) return { ok: false, error: 'No layout setting to change.' };
       // the settings asked for, the rest kept; what the designer set is theirs: the planner leaves it alone
       const sec: Section = { ...target!, shape: normalizeShape(target!.kind, { ...(target!.shape ?? {}), ...asked }), fixed: true };
+      return next(spec.sections.map((x, i) => (i === idx ? sec : x)), undefined, undefined, [sec.id]);
+    }
+    case 'responsive': {
+      const miss = needTarget();
+      if (miss) return miss;
+      if (!p.breakpoint) return { ok: false, error: 'Which width is this for: tablets or phones?' };
+      if (!p.rule || !Object.keys(p.rule).length) return { ok: false, error: 'Nothing to set at that width.' };
+      // the rules asked for, the others at that width kept; null, false or "" takes one back to the desktop's
+      const merged: Record<string, unknown> = { ...(target!.responsive?.[p.breakpoint] ?? {}) };
+      for (const [k, v] of Object.entries(p.rule)) {
+        if (v === null || v === false || v === '') delete merged[k];
+        else merged[k] = v;
+      }
+      const asked = normalizeResponsive({ [p.breakpoint]: p.rule })?.[p.breakpoint] ?? {};
+      const cleared = Object.values(p.rule).some((v) => v === null || v === false || v === '');
+      if (!Object.keys(asked).length && !cleared) return { ok: false, error: 'That is not something a part can be set to at that width.' };
+      const responsive = normalizeResponsive({ ...(target!.responsive ?? {}), [p.breakpoint]: merged });
+      // the desktop width always shows it: a part not wanted anywhere is taken out, not hidden
+      const sec: Section = { ...target!, fixed: true };
+      if (responsive) sec.responsive = responsive;
+      else delete sec.responsive;
       return next(spec.sections.map((x, i) => (i === idx ? sec : x)), undefined, undefined, [sec.id]);
     }
     case 'images': {

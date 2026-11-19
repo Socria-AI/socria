@@ -56,6 +56,14 @@ export interface PageAudit {
   style: { gradients: number; shadows: number; roundedBoxes: number; trackedCaps: number; centred: number; blocks: number; emoji: number; icons: number; rails: number; families: Record<string, number>; /** frosted, backdrop-blurred panels (imported designs; the renderer never draws them) */ blurs?: number };
   /** each booking and form, tried in place by the behaviour runtime: what did not work */
   behaviors: { index: number; kind: 'booking' | 'form'; slots: number; problems: string[] }[];
+  /** each gallery, filter, chart key, table filter and configurator, tried in place: what did not work */
+  interactive?: { kind: string; index: number; items: number; problems: string[] }[];
+  /** each 3D scene: drawn (its centre read back), or the drawn silhouette standing in where WebGL is not */
+  scenes?: { index: number; webgl: boolean; drawn: boolean; problems: string[] }[];
+  /** scripts that failed on the page, in the browser's words */
+  errors?: string[];
+  /** what the page weighs: characters of markup, pictures, pictures far larger than shown, characters inlined */
+  weight?: { html: number; images: number; oversized: number; inline: number };
 }
 
 const o = (v: unknown): Record<string, any> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, any>) : {});
@@ -88,6 +96,10 @@ export function normalizeAudit(v: unknown): PageAudit | null {
       centred: n(st.centred, 0, 1e5), blocks: n(st.blocks, 0, 1e5), emoji: n(st.emoji, 0, 1e5), icons: n(st.icons, 0, 1e5), rails: n(st.rails, 0, 1e5), blurs: n(st.blurs, 0, 1e5), families: fam,
     },
     behaviors: list(r.behaviors, 10, (x) => ({ index: n(x.index, 0, 100), kind: (x.kind === 'form' ? 'form' : 'booking') as 'booking' | 'form', slots: n(x.slots, 0, 1000), problems: (Array.isArray(x.problems) ? x.problems : []).map((p: unknown) => s(p, 120)).filter(Boolean).slice(0, 6) })),
+    interactive: list(r.interactive, 20, (x) => ({ kind: s(x.kind, 16), index: n(x.index, 0, 100), items: n(x.items, 0, 10000), problems: (Array.isArray(x.problems) ? x.problems : []).map((p: unknown) => s(p, 120)).filter(Boolean).slice(0, 6) })),
+    scenes: list(r.scenes, 6, (x) => ({ index: n(x.index, 0, 100), webgl: x.webgl === true, drawn: x.drawn === true, problems: (Array.isArray(x.problems) ? x.problems : []).map((p: unknown) => s(p, 120)).filter(Boolean).slice(0, 4) })),
+    errors: (Array.isArray(r.errors) ? r.errors : []).map((e: unknown) => s(e, 120)).filter(Boolean).slice(0, 5),
+    weight: ((w) => ({ html: n(w.html, 0, 1e9), images: n(w.images, 0, 1e5), oversized: n(w.oversized, 0, 1e5), inline: n(w.inline, 0, 1e9) }))(o(r.weight)),
   };
 }
 
@@ -270,9 +282,9 @@ export type Severity = 'high' | 'medium' | 'low';
 
 export interface Finding {
   id: string;
-  kind: 'overflow' | 'contrast' | 'target' | 'image' | 'hierarchy' | 'headline' | 'measure' | 'rhythm' | 'cliche' | 'length' | 'placeholder' | 'generic' | 'fidelity' | 'motion' | 'function';
+  kind: 'overflow' | 'contrast' | 'target' | 'image' | 'hierarchy' | 'headline' | 'measure' | 'rhythm' | 'cliche' | 'length' | 'placeholder' | 'generic' | 'fidelity' | 'motion' | 'function' | 'performance';
   severity: Severity;
-  viewport: 'desktop' | 'phone' | 'page';
+  viewport: 'desktop' | 'tablet' | 'phone' | 'page';
   section: string;
   message: string;
   /** a deterministic change that fixes it, when there is one and nothing locked stands in the way */
@@ -323,7 +335,7 @@ export interface FidelityContext {
   board?: Moodboard | null;
 }
 
-export function evaluateDesign(spec: DesignSpec, audits: { desktop?: PageAudit | null; phone?: PageAudit | null }, locks: readonly LockGroup[] = [], ctx: FidelityContext = {}): Evaluation {
+export function evaluateDesign(spec: DesignSpec, audits: { desktop?: PageAudit | null; tablet?: PageAudit | null; phone?: PageAudit | null }, locks: readonly LockGroup[] = [], ctx: FidelityContext = {}): Evaluation {
   const findings: Finding[] = [];
   const add = (f0: Omit<Finding, 'id'>) => {
     const f = { ...f0, why: f0.why ?? whyFor(f0.kind) };
@@ -348,7 +360,15 @@ export function evaluateDesign(spec: DesignSpec, audits: { desktop?: PageAudit |
   const look = spec.look ?? lookFromTokens(spec.tokens);
 
   const seenImages = new Set<string>();
-  for (const [vp, a] of [['desktop', audits.desktop], ['phone', audits.phone]] as const) {
+  // the tablet says only what is new at its width: what the desktop or the phone already found is not counted twice
+  const seenIn = (pick: (a: PageAudit) => { section: string; path: string }[], x: { section: string; path: string }) => [audits.desktop, audits.phone].some((a) => !!a && pick(a).some((y) => y.section === x.section && y.path === x.path));
+  const t0 = audits.tablet;
+  const sideways = (audits.desktop?.overflowX ?? 0) > 2 || (audits.phone?.overflowX ?? 0) > 2;
+  const tablet: PageAudit | null = t0
+    ? { ...t0, overflowX: sideways ? 0 : t0.overflowX, overflow: t0.overflow.filter((x) => !seenIn((a) => a.overflow, x)), contrast: t0.contrast.filter((x) => !seenIn((a) => a.contrast, x)), targets: t0.targets.filter((x) => !seenIn((a) => a.targets, x)), measure: t0.measure.filter((x) => !seenIn((a) => a.measure, x)), images: [] }
+    : null;
+  const phoneLong = (audits.phone?.headings.find((h) => h.level === 1)?.lines ?? 0) > 7;
+  for (const [vp, a] of [['desktop', audits.desktop], ['tablet', tablet], ['phone', audits.phone]] as const) {
     if (!a) continue;
     // 1 · nothing wider than the screen
     for (const ov of a.overflow) {
@@ -357,7 +377,7 @@ export function evaluateDesign(spec: DesignSpec, audits: { desktop?: PageAudit |
       const big = sec?.kind === 'hero' || /^h[12]$/.test(ov.tag);
       add({
         kind: 'overflow', severity: 'high', viewport: vp, section: ov.section,
-        message: `${label(spec, ov.section)} runs ${ov.by}px past the edge of the ${vp === 'phone' ? 'phone' : 'screen'}${ov.tag ? ` (a ${ov.tag})` : ''}.`,
+        message: `${label(spec, ov.section)} runs ${ov.by}px past the edge of the ${vp === 'desktop' ? 'screen' : vp}${ov.tag ? ` (a ${ov.tag})` : ''}.`,
         fix: big && look.ratio > 1.26 ? { op: 'look', look: { ratio: Math.round((look.ratio - 0.08) * 1000) / 1000 }, summary: 'Type scale stepped down so the headline fits the phone' } : sec && !sec.fixed && safe && sec.variant !== safe ? { op: 'variant', sectionId: sec.id, variant: safe, summary: `${kindDef(sec.kind)?.label} set as ${safe} so it fits the phone` } : undefined,
       });
     }
@@ -375,8 +395,8 @@ export function evaluateDesign(spec: DesignSpec, audits: { desktop?: PageAudit |
         fix: sec && sec.tone && sec.tone !== 'base' && !sec.fixed ? { op: 'tone', sectionId: sec.id, tone: 'base', summary: `${kindDef(sec.kind)?.label} moved to the page’s own ground so its text reads` } : undefined,
       });
     }
-    // 3 · targets a thumb can hit (phone only: a mouse is precise)
-    if (vp === 'phone') for (const tg of a.targets.slice(0, 6)) add({ kind: 'target', severity: 'medium', viewport: vp, section: tg.section, message: `“${tg.text || 'A control'}” is ${tg.w}×${tg.h}px; a thumb needs 44×44.` });
+    // 3 · targets a thumb can hit (phones and tablets: a mouse is precise)
+    if (vp !== 'desktop') for (const tg of a.targets.slice(0, vp === 'phone' ? 6 : 3)) add({ kind: 'target', severity: 'medium', viewport: vp, section: tg.section, message: `“${tg.text || 'A control'}” is ${tg.w}×${tg.h}px; a thumb needs 44×44.` });
     // 4 · pictures that did not arrive
     for (const im of a.images.filter((x) => !x.ok && !seenImages.has(`${x.section}|${x.path}`))) {
       seenImages.add(`${im.section}|${im.path}`);
@@ -390,8 +410,8 @@ export function evaluateDesign(spec: DesignSpec, audits: { desktop?: PageAudit |
     // 5 · a headline that has become a paragraph
     const h1 = a.headings.find((h) => h.level === 1);
     if (h1) {
-      const limit = vp === 'phone' ? 7 : 4;
-      if (h1.lines > limit) add({ kind: 'headline', severity: 'medium', viewport: vp, section: h1.section, message: `The main headline breaks into ${h1.lines} lines on the ${vp}.`, ask: `Shorten the main headline (“${h1.text}”) to fewer than ${Math.max(5, Math.round(h1.text.split(' ').length * 0.6))} words, keeping its meaning.` });
+      const limit = vp === 'phone' ? 7 : vp === 'tablet' ? 5 : 4;
+      if (h1.lines > limit && !(vp === 'tablet' && phoneLong)) add({ kind: 'headline', severity: 'medium', viewport: vp, section: h1.section, message: `The main headline breaks into ${h1.lines} lines on the ${vp}.`, ask: `Shorten the main headline (“${h1.text}”) to fewer than ${Math.max(5, Math.round(h1.text.split(' ').length * 0.6))} words, keeping its meaning.` });
       // 6 · a hierarchy you can see
       // a screen's heading names the screen; a page's leads it: an app screen needs less of a step
       if (vp === 'desktop' && h1.size / a.bodySize < (spec.pageType === 'app-screen' ? 1.6 : 2.3))
@@ -529,7 +549,7 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stri
  * (choose a time, confirm, see the confirmation, go back). A missing component is added by its fix,
  * with sample content; one that does not work is reported plainly.
  */
-function functionChecks(spec: DesignSpec, audits: { desktop?: PageAudit | null; phone?: PageAudit | null }, ctx: FidelityContext, add: (f: Omit<Finding, 'id'>) => void): void {
+function functionChecks(spec: DesignSpec, audits: { desktop?: PageAudit | null; tablet?: PageAudit | null; phone?: PageAudit | null }, ctx: FidelityContext, add: (f: Omit<Finding, 'id'>) => void): void {
   if (ctx.brief) {
     const intent = intentOf(ctx.brief);
     for (const component of requiredComponents(intent)) {
@@ -555,6 +575,28 @@ function functionChecks(spec: DesignSpec, audits: { desktop?: PageAudit | null; 
     const sec = spec.sections.filter((x) => x.kind === b.kind)[b.index];
     add({ kind: 'function', severity: 'high', viewport: 'page', section: sec?.id ?? '', message: `The ${b.kind} does not work as it should: ${b.problems.join('; ')}.`, manual: true });
   }
+  // the interactive parts, tried in place: a gallery that does not open, a filter that shows nothing, a chart key
+  // that hides nothing, a table filter that hides everything, a configurator whose total does not follow
+  const SAID: Record<string, [string, string]> = { gallery: ['gallery', 'gallery'], chart: ['chart', 'chart'], table: ['table', 'table'], configurator: ['configurator', 'configurator'], filter: ['filter', ''], page: ['page', ''] };
+  for (const it of audits.desktop?.interactive ?? []) {
+    if (!it.problems.length) continue;
+    const [name, kind] = SAID[it.kind] ?? [it.kind, ''];
+    const sec = kind ? spec.sections.filter((x) => x.kind === kind)[it.index] : undefined;
+    add({ kind: 'function', severity: 'high', viewport: 'page', section: sec?.id ?? '', message: `The ${name} does not work as it should: ${it.problems.join('; ')}.`, manual: true });
+  }
+  // a 3D scene where WebGL ran but nothing was drawn (no WebGL is not a fault: its silhouette stands in, as made)
+  for (const sc of audits.desktop?.scenes ?? []) {
+    if (!sc.webgl || sc.drawn) continue;
+    const sec = spec.sections.filter((x) => x.kind === 'scene')[sc.index];
+    add({ kind: 'function', severity: 'high', viewport: 'page', section: sec?.id ?? '', message: `The 3D scene ran but drew nothing${sc.problems.length ? `: ${sc.problems.join('; ')}` : ''}.`, manual: true });
+  }
+  // a script that failed on the page, at any width, said once
+  const errs = [...new Set([audits.desktop, audits.tablet, audits.phone].flatMap((a) => a?.errors ?? []))];
+  if (errs.length) add({ kind: 'function', severity: 'high', viewport: 'page', section: '', message: `A script failed on the page: ${errs.slice(0, 2).join('; ')}.`, manual: true });
+  // what the page weighs: pictures far larger than they are shown, and markup that has grown heavy
+  const wt = audits.desktop?.weight;
+  if (wt && wt.oversized > 0) add({ kind: 'performance', severity: 'low', viewport: 'desktop', section: '', message: `${wt.oversized} picture${wt.oversized === 1 ? ' is' : 's are'} more than three times larger than ${wt.oversized === 1 ? 'it is' : 'they are'} shown: the page loads more than it uses.` });
+  if (wt && wt.html > 600_000) add({ kind: 'performance', severity: 'medium', viewport: 'page', section: '', message: `The page is ${Math.round(wt.html / 1000)} KB of markup${wt.inline > 200_000 ? `, ${Math.round(wt.inline / 1000)} KB of it pictures written into the page` : ''}: it will be slow to arrive.` });
 }
 
 function fidelityChecks(spec: DesignSpec, ctx: FidelityContext, add: (f: Omit<Finding, 'id'>) => void): string[] {

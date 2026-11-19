@@ -11,6 +11,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { describeMotion, MOTION_LABEL } from '@/lib/ux-v0/motion';
 import { renderDesign } from '@/lib/ux-v0/render';
 import { BEHAVIOR_SOURCE } from '@/lib/ux-v0/behaviors';
+import { MOTION_RUNTIME } from '@/lib/ux-v0/motion-runtime';
+import { SCENE_RUNTIME } from '@/lib/ux-v0/scene-runtime';
 import { buildSandboxDoc } from '@/lib/ux-v0/sandbox';
 import { STILL_MOTION, type DesignSpec } from '@/lib/ux-v0/spec';
 import type { MoodboardRef } from '@/lib/ux-v0/types';
@@ -44,7 +46,9 @@ export function Preview({ spec, refs, nonce, title, onClose }: { spec: DesignSpe
 
   const doc = useMemo(() => {
     const html = renderDesign(spec, refs, { motion: reduced ? 'reduced' : 'play' }).html;
-    return buildSandboxDoc(html, { parse: (h) => new DOMParser().parseFromString(h, 'text/html'), runScripts: false, nonce, inspector: BEHAVIOR_SOURCE }).doc;
+    // SocriaUX's own runtimes run here by nonce (the page's own content never carries a script): the booking and
+    // forms work, and the scripted layer of the motion plays as it would in the exported page
+    return buildSandboxDoc(html, { parse: (h) => new DOMParser().parseFromString(h, 'text/html'), runScripts: false, nonce, inspector: `${BEHAVIOR_SOURCE}\n${MOTION_RUNTIME}${spec.sections.some((x) => x.kind === 'scene') ? `\n${SCENE_RUNTIME}` : ''}` }).doc;
   }, [spec, refs, reduced, nonce]);
 
   const W = DEVICES[device].w;
@@ -83,7 +87,7 @@ export function Preview({ spec, refs, nonce, title, onClose }: { spec: DesignSpe
             key={`${run}-${device}-${reduced}`}
             className="pv-frame"
             title={`${title}, ${DEVICES[device].label.toLowerCase()} preview`}
-            sandbox=""
+            sandbox="allow-scripts"
             srcDoc={doc}
             style={{ width: W, height: H, transform: `scale(${scale})` }}
           />

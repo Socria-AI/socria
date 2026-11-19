@@ -26,7 +26,7 @@
 import { contrastRatio } from '../ux/audit';
 import { isDark, mix, rgbOf } from './color';
 import { advanceEm, fontStack, fontStylesheet, hasItalic, knownFont, nearestWeight } from './fonts';
-import { NEEDS_IMAGE, SHAPE_EFFECTIVE, ensureContrast, kindDef, lookFromTokens, type DesignSpec, type DesignTokens, type Look, type Section, type Shape } from './spec';
+import { BREAKPOINTS, BREAKPOINT_QUERY, NEEDS_IMAGE, SCENE_MATERIALS, SCENE_MODELS, SHAPE_EFFECTIVE, ensureContrast, kindDef, lookFromTokens, type DesignSpec, type DesignTokens, type Look, type Section, type Shape } from './spec';
 import type { Piece } from './compose';
 
 /**
@@ -57,7 +57,10 @@ export function shapeAttrs(s: Pick<Section, 'kind' | 'variant' | 'shape'>): { cl
 }
 import { creditText, type MoodboardRef } from './types';
 import { BEHAVIOR_SOURCE } from './behaviors';
-import { kineticHeadline, motionCss, type MotionMode } from './motion';
+import { kineticHeadline, motionCss, scriptedMarks, type MotionMode } from './motion';
+import { MOTION_RUNTIME } from './motion-runtime';
+import { SCENE_RUNTIME } from './scene-runtime';
+import { proceduralUri } from './assets';
 
 export interface Credit {
   id: string;
@@ -270,6 +273,31 @@ class Images {
   }
 }
 
+// ── a scene's silhouette: what stands in for the 3D object where it cannot be drawn ──
+
+const SCENE_PROFILES: Record<string, [number, number][]> = {
+  vessel: [[0, -1], [0.5, -1], [0.6, -0.9], [0.7, -0.45], [0.68, 0.05], [0.5, 0.48], [0.3, 0.74], [0.27, 0.92], [0.33, 1]],
+  bottle: [[0, -1.05], [0.42, -1.05], [0.46, -0.98], [0.47, 0.25], [0.4, 0.45], [0.17, 0.62], [0.15, 0.95], [0.18, 1.05], [0, 1.05]],
+};
+export function scenePoster(model: string): string {
+  const cx = 100;
+  const cy = 100;
+  const k = 78;
+  let mark: string;
+  const prof = SCENE_PROFILES[model];
+  if (prof) {
+    const right = prof.map(([r, y]) => `${(cx + r * k).toFixed(1)},${(cy - y * k).toFixed(1)}`);
+    const left = [...prof].reverse().map(([r, y]) => `${(cx - r * k).toFixed(1)},${(cy - y * k).toFixed(1)}`);
+    mark = `<polygon points="${[...right, ...left].join(' ')}" fill="currentColor"/><polygon points="${prof.map(([r, y]) => `${(cx - r * k * 0.55).toFixed(1)},${(cy - y * k).toFixed(1)}`).join(' ')} ${[...prof].reverse().map(([r, y]) => `${(cx - r * k * 0.2).toFixed(1)},${(cy - y * k).toFixed(1)}`).join(' ')}" fill="#fff" opacity=".16"/>`;
+  } else if (model === 'torus' || model === 'ring') {
+    const w = model === 'ring' ? 0.12 : 0.34;
+    mark = `<path fill="currentColor" fill-rule="evenodd" d="M${cx - 80} ${cy}a80 34 0 1 0 160 0a80 34 0 1 0 -160 0ZM${cx - 80 * (1 - w)} ${cy}a${(80 * (1 - w)).toFixed(1)} ${(34 * (1 - w * 1.6)).toFixed(1)} 0 1 0 ${(160 * (1 - w)).toFixed(1)} 0a${(80 * (1 - w)).toFixed(1)} ${(34 * (1 - w * 1.6)).toFixed(1)} 0 1 0 -${(160 * (1 - w)).toFixed(1)} 0Z"/>`;
+  } else if (model === 'monolith') mark = `<rect x="${cx - 24}" y="${cy - 74}" width="48" height="148" fill="currentColor"/><rect x="${cx - 24}" y="${cy - 74}" width="14" height="148" fill="#fff" opacity=".16"/>`;
+  else if (model === 'knot') mark = `<circle cx="${cx}" cy="${cy}" r="62" fill="none" stroke="currentColor" stroke-width="22"/><circle cx="${cx}" cy="${cy}" r="30" fill="none" stroke="currentColor" stroke-width="14" opacity=".7"/>`;
+  else mark = `<circle cx="${cx}" cy="${cy}" r="70" fill="currentColor"/><ellipse cx="${cx - 26}" cy="${cy - 30}" rx="22" ry="14" fill="#fff" opacity=".22"/>`;
+  return `<svg class="sc-poster" viewBox="0 0 200 200" aria-hidden="true" focusable="false">${mark}</svg>`;
+}
+
 // ── shapes: flat geometry, for looks that use it ──────────────────────
 
 const SHAPE_SVG: Record<Shape, (x: number, y: number, s: number, fill: string) => string> = {
@@ -382,9 +410,12 @@ const SECTIONS: Record<string, R> = {
   },
   gallery: (s, c, x) => {
     const { im } = x;
-    const imgs = s.images.map((_, i) => `<figure class="g-item">${im.img(s, i, 'g-img')}${im.cap(s, i)}</figure>`).join('');
+    const tags = (Array.isArray(c.tags) ? (c.tags as string[]) : []).slice(0, s.images.length);
+    const kinds = [...new Set(tags.filter(Boolean).map((g) => String(g).trim()))];
+    const filters = kinds.length >= 2 ? `<div class="ux-chips" role="group" aria-label="Show" data-ux-filters><button type="button" class="ux-chip" aria-pressed="true" data-ux-filter="">All</button>${kinds.map((k) => `<button type="button" class="ux-chip" aria-pressed="false" data-ux-filter="${esc(k)}">${esc(k)}</button>`).join('')}</div>` : '';
+    const imgs = s.images.map((_, i) => `<figure class="g-item"${tags[i] ? ` data-tag="${esc(String(tags[i]).trim())}"` : ''} data-ux-open="">${im.img(s, i, 'g-img')}${im.cap(s, i)}</figure>`).join('');
     const h = head(s, c, x);
-    return `<div class="wrap${h ? ' has-head' : ''}">${h}<div class="g-body"><div class="gallery g-${s.variant} n-${Math.min(8, s.images.length)}">${imgs}</div>${c.caption ? `<p class="small muted caption" ${attr(s.id, 'caption')}>${t(c.caption)}</p>` : ''}</div></div>`;
+    return `<div class="wrap${h ? ' has-head' : ''}" data-ux-gallery>${h}${filters}<div class="g-body"><div class="gallery g-${s.variant} n-${Math.min(8, s.images.length)}">${imgs}</div>${c.caption ? `<p class="small muted caption" ${attr(s.id, 'caption')}>${t(c.caption)}</p>` : ''}</div></div>`;
   },
   quote: (s, c, x) =>
     `<div class="wrap quote q-${s.variant}">${s.variant === 'with-portrait' && x.im.has(s, 0) ? `<div class="q-portrait">${x.im.img(s, 0, 'portrait')}</div>` : ''}<figure><blockquote ${attr(s.id, 'quote')}><p>${t(c.quote)}</p></blockquote><figcaption><span class="q-author" ${attr(s.id, 'author')}>${t(c.author)}</span>${c.role ? `<span class="q-role muted" ${attr(s.id, 'role')}>${t(c.role)}</span>` : ''}</figcaption></figure></div>`,
@@ -449,10 +480,12 @@ const SECTIONS: Record<string, R> = {
   },
   list: (s, c, x) => {
     const h = head(s, c, x);
-    return `<div class="wrap${h ? ' has-head' : ''}">${h}<div class="lists l-${s.variant} n-${Math.min(3, (c.groups as any[]).length)}">${(c.groups as any[])
+    const named = (c.groups as any[]).map((g) => String(g.title ?? '').trim()).filter(Boolean);
+    const filters = named.length >= 3 && named.length === (c.groups as any[]).length ? `<div class="ux-chips" role="group" aria-label="Show" data-ux-filters><button type="button" class="ux-chip" aria-pressed="true" data-ux-filter="">All</button>${named.map((k) => `<button type="button" class="ux-chip" aria-pressed="false" data-ux-filter="${esc(k)}">${esc(k)}</button>`).join('')}</div>` : '';
+    return `<div class="wrap${h ? ' has-head' : ''}">${h}${filters}<div class="lists l-${s.variant} n-${Math.min(3, (c.groups as any[]).length)}">${(c.groups as any[])
       .map(
         (g, gi) =>
-          `<div class="list-group">${g.title ? `<h3 class="h-item" ${attr(s.id, `groups.${gi}.title`)}>${t(g.title)}</h3>` : ''}<ul>${(g.items as any[])
+          `<div class="list-group"${g.title ? ` data-tag="${esc(String(g.title).trim())}"` : ''}>${g.title ? `<h3 class="h-item" ${attr(s.id, `groups.${gi}.title`)}>${t(g.title)}</h3>` : ''}<ul>${(g.items as any[])
             .map(
               (it, ii) =>
                 `<li class="list-item"><div class="li-main"><span class="li-name" ${attr(s.id, `groups.${gi}.items.${ii}.name`)}>${t(it.name)}</span>${it.meta ? `<span class="li-meta muted" ${attr(s.id, `groups.${gi}.items.${ii}.meta`)}>${t(it.meta)}</span>` : ''}</div>${it.price ? `<span class="li-price" ${attr(s.id, `groups.${gi}.items.${ii}.price`)}>${t(it.price)}</span>` : ''}${it.text ? `<p class="li-text muted" ${attr(s.id, `groups.${gi}.items.${ii}.text`)}>${t(it.text)}</p>` : ''}</li>`
@@ -523,6 +556,44 @@ const SECTIONS: Record<string, R> = {
     const body = `<div class="bk-body">${item}<div class="bk-flow">${form}${done}</div></div>`;
     return `<div class="${x.app ? '' : 'wrap '}bk bk-${s.variant}" data-ux-booking>${media}<div class="bk-panel">${head}${body}</div></div>`;
   },
+  // a 3D object drawn in the page by the scene runtime (lib/ux-v0/scene-runtime.ts); its silhouette, drawn here,
+  // stands in wherever scripts or WebGL are not (the direction studies, an old browser), so the page is complete
+  scene: (s, c, x) => {
+    const model = (SCENE_MODELS as readonly string[]).includes(c.model) ? (c.model as string) : 'vessel';
+    const material = (SCENE_MATERIALS as readonly string[]).includes(c.material) ? (c.material as string) : 'satin';
+    const color = typeof c.color === 'string' && /^#[0-9a-f]{6}$/i.test(c.color.trim()) ? c.color.trim() : '';
+    const h = x.lead ? 'h1' : 'h2';
+    const text = `<div class="sc-text">${eyebrow(s, c.eyebrow)}<${h} class="h-section" ${attr(s.id, 'title')}>${t(c.title)}</${h}>${c.text ? `<p class="body-lg" ${attr(s.id, 'text')}>${t(c.text)}</p>` : ''}${c.action ? `<div class="actions">${btn(s, 'action', c.action, 'primary')}</div>` : ''}</div>`;
+    const said = `${plain(String(c.title ?? ''))}: a ${model} in ${material}, shown in three dimensions. Drag it, or use the arrow keys, to turn it.`;
+    const figure = `<figure class="sc-fig"><div class="scene" data-ux-scene data-model="${model}" data-material="${material}"${color ? ` data-color="${color}"` : ''} role="img" aria-label="${esc(said)}" tabindex="0"${color ? ` style="--scene:${color}"` : ''}><canvas class="sc-canvas"></canvas>${scenePoster(model)}</div>${c.caption ? `<figcaption class="small muted fig-cap" ${attr(s.id, 'caption')}>${t(c.caption)}</figcaption>` : ''}</figure>`;
+    return `<div class="wrap sc sc-${s.variant}">${s.variant === 'stage' ? figure + text : text + figure}</div>`;
+  },
+  configurator: (s, c, x) => {
+    const h = head(s, c, x);
+    const num = (v: unknown) => {
+      const m = String(v ?? '').replace(/[^\d.,-]/g, '').replace(/,(?=\d{3}\b)/g, '').replace(',', '.');
+      const n = parseFloat(m);
+      return Number.isFinite(n) ? n : 0;
+    };
+    const cur = (String(c.base ?? '').match(/[^\d\s.,-]+/) ?? [String((c.groups as any[]).flatMap((g) => g.options).find((o: any) => o.price)?.price ?? '').match(/[^\d\s.,+-]+/)?.[0] ?? ''])[0];
+    const swatch = (v: unknown) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v.trim()) ? v.trim() : '');
+    const groups = (c.groups as any[])
+      .map(
+        (g, gi) =>
+          `<fieldset class="cfg-group"><legend class="cfg-legend" ${attr(s.id, `groups.${gi}.name`)}>${t(g.name)}</legend><div class="cfg-opts">${(g.options as any[])
+            .map((o, oi) => {
+              const sw = swatch(o.swatch);
+              return `<label class="cfg-opt"><input type="radio" name="${esc(s.id)}-g${gi}" value="${oi}" data-price="${num(o.price)}" data-label="${esc(String(o.label))}"${sw ? ` data-swatch="${sw}"` : ''}${oi === 0 ? ' checked' : ''}><span class="cfg-o-l">${sw ? `<i class="cfg-dot" style="background:${sw}" aria-hidden="true"></i>` : ''}<span ${attr(s.id, `groups.${gi}.options.${oi}.label`)}>${t(o.label)}</span></span>${o.price ? `<span class="cfg-o-p" ${attr(s.id, `groups.${gi}.options.${oi}.price`)}>${t(o.price)}</span>` : ''}</label>`;
+            })
+            .join('')}</div></fieldset>`
+      )
+      .join('');
+    const first = (c.groups as any[]).map((g) => g.options[0]);
+    const total = num(c.base) + first.reduce((a, o) => a + num(o.price), 0);
+    const firstSwatch = first.map((o) => swatch(o.swatch)).find(Boolean) ?? '';
+    const media = x.im.has(s, 0) ? x.im.img(s, 0, 'cfg-img') : `<div class="cfg-swatch" aria-hidden="true"></div>`;
+    return `<div class="wrap${h ? ' has-head' : ''}">${h}<div class="cfg cfg-${s.variant}" data-ux-config${firstSwatch ? ` style="--cfg:${firstSwatch}"` : ''}><div class="cfg-preview">${media}</div><form class="cfg-form" data-ux-config-form novalidate>${groups}<div class="cfg-sum" role="status" aria-live="polite"><span class="cfg-choice" data-ux-config-choice>${esc(first.map((o) => String(o.label)).join(' · '))}</span><b class="cfg-total" data-ux-config-total data-base="${num(c.base)}" data-cur="${esc(cur)}">${esc(cur)}${total.toLocaleString('en-GB')}</b></div><div class="actions"><button type="submit" class="btn btn-primary" data-ux-config-go ${attr(s.id, 'action')}>${t(c.action)}</button></div><p class="small cfg-done" data-ux-config-done hidden tabindex="-1">A prototype: nothing was ordered. Your choice: <span data-ux-config-said></span>.</p>${c.note ? `<p class="small muted" ${attr(s.id, 'note')}>${t(c.note)}</p>` : ''}</form></div></div>`;
+  },
   form: (s, c, x) => {
     const fields = (c.fields as any[])
       .map((f, i) => {
@@ -570,7 +641,8 @@ const SECTIONS: Record<string, R> = {
     const statusCol = hasStatus ? cols.findIndex((h) => /^\s*status\s*$/i.test(String(h))) : -1;
     const extra = hasStatus && statusCol < 0;
     const pill = (r: any, i: number) => (r.status ? `<span class="status" ${attr(s.id, `rows.${i}.status`)}><span class="dot" aria-hidden="true"></span>${t(r.status)}</span>` : '');
-    return `<div class="card table-card">${c.title ? `<h2 class="h-card" ${attr(s.id, 'title')}>${t(c.title)}</h2>` : ''}<div class="table-scroll"><table><thead><tr>${cols.map((h, i) => `<th scope="col" ${attr(s.id, `columns.${i}`)}>${t(h)}</th>`).join('')}${extra ? '<th scope="col">Status</th>' : ''}</tr></thead><tbody>${rows
+    const find = rows.length >= 6 ? `<input class="ux-find" type="search" placeholder="Filter the rows" aria-label="Filter the rows of ${plain(String(c.title || 'the table'))}" data-ux-table-filter>` : '';
+    return `<div class="card table-card">${c.title ? `<h2 class="h-card" ${attr(s.id, 'title')}>${t(c.title)}</h2>` : ''}${find}<div class="table-scroll"><table><thead><tr>${cols.map((h, i) => `<th scope="col" ${attr(s.id, `columns.${i}`)}>${t(h)}</th>`).join('')}${extra ? '<th scope="col">Status</th>' : ''}</tr></thead><tbody>${rows
       .map(
         (r, i) =>
           `<tr>${cols
@@ -617,7 +689,8 @@ function chartSvg(s: Section, c: Record<string, any>): string {
         se.values
           .map((v, i) => {
             const bx = pad.l + groupW * i + groupW * 0.18 + barW * k;
-            return `<rect class="bar s${k}" x="${bx.toFixed(1)}" y="${y(Math.max(0, v)).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.abs(y(v) - y(0)).toFixed(1)}" rx="2"/>`;
+            // each bar says its value where a pointer or a screen reader rests on it
+            return `<rect class="bar s${k}" x="${bx.toFixed(1)}" y="${y(Math.max(0, v)).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.abs(y(v) - y(0)).toFixed(1)}" rx="2"><title>${esc(`${se.name}, ${labels[i]}: ${v}`)}</title></rect>`;
           })
           .join('')
       )
@@ -629,15 +702,67 @@ function chartSvg(s: Section, c: Record<string, any>): string {
       .map((se, k) => {
         const pts = se.values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
         const area = s.variant === 'area' && k === 0 ? `<polygon class="area s${k}" points="${x(0).toFixed(1)},${y(min).toFixed(1)} ${pts} ${x(se.values.length - 1).toFixed(1)},${y(min).toFixed(1)}"/>` : '';
-        return `${area}<polyline class="line s${k}${k > 0 ? ' cmp' : ''}" points="${pts}"/>`;
+        // each reading is a point that says its value where a pointer rests on it
+        const dots = se.values.length <= 24 ? se.values.map((v, i) => `<circle class="pt s${k}" cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3.5"><title>${esc(`${se.name}, ${labels[i]}: ${v}`)}</title></circle>`).join('') : '';
+        return `<g class="series s${k}">${area}<polyline class="line s${k}${k > 0 ? ' cmp' : ''}" points="${pts}"/>${dots}</g>`;
       })
       .reverse()
       .join('');
   }
   const summary = series.map((se) => `${se.name}: ${se.values.map((v, i) => `${labels[i]} ${v}`).join(', ')}`).join('; ');
   // the key draws each series as it is drawn: a swatch for the filled subject, a dashed line for a comparison
-  const legend = series.length > 1 ? `<ul class="legend">${series.map((se, k) => `<li><span class="key s${k}${k > 0 && s.variant !== 'bar' ? ' key-line' : ''}" aria-hidden="true"></span>${esc(se.name)}</li>`).join('')}</ul>` : '';
+  // …and, with more than one series, each can be shown or hidden (the behaviour runtime)
+  const legend = series.length > 1 ? `<ul class="legend" data-ux-legend>${series.map((se, k) => `<li><button type="button" class="lg-btn" aria-pressed="true" data-ux-series="${k}"><span class="key s${k}${k > 0 && s.variant !== 'bar' ? ' key-line' : ''}" aria-hidden="true"></span>${esc(se.name)}</button></li>`).join('')}</ul>` : '';
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${plain(`${c.title}. ${summary}`)}" ${attr(s.id, 'series')}>${grid}${marks}${xl}</svg>${legend}`;
+}
+
+// ── a part set apart at a width (lib/ux-v0/spec.ts Responsive) ─────────
+// One class per rule on the section ("rs-m-hide", "rs-t-center"…), and the rules written once each, only for what
+// the page uses, at the end of the stylesheet so they are the last word at their width. Names, never values,
+// reach the CSS: a rule is one of a fixed few.
+
+const BP_SHORT = { tablet: 't', mobile: 'm' } as const;
+const RS_MEDIA = '.split-media,.hero-media,.hp-media,.cta-media,.cfg-preview,.sc-fig,.bk-media,.q-portrait';
+const RS_TEXT = 'h1,h2,h3,h4,p,blockquote,figcaption,.eyebrow,.sec-no';
+
+function responsiveClasses(s: Section): string {
+  const r = s.responsive;
+  if (!r) return '';
+  const out: string[] = [];
+  for (const bp of BREAKPOINTS) {
+    const x = r[bp];
+    if (!x) continue;
+    const b = BP_SHORT[bp];
+    if (x.hide) out.push(`rs-${b}-hide`);
+    if (x.align) out.push(`rs-${b}-${x.align}`);
+    if (x.pad) out.push(`rs-${b}-pad-${x.pad}`);
+    if (x.media) out.push(`rs-${b}-media-${x.media}`);
+    if (x.type) out.push(`rs-${b}-type-${x.type}`);
+  }
+  return out.length ? ` ${out.join(' ')}` : '';
+}
+
+export function responsiveCss(sections: readonly Section[]): string {
+  const used = new Set(sections.flatMap((s) => responsiveClasses(s).trim().split(' ').filter(Boolean)));
+  if (!used.size) return '';
+  const out: string[] = [];
+  for (const bp of BREAKPOINTS) {
+    const b = BP_SHORT[bp];
+    const rules: string[] = [];
+    const has = (c: string) => used.has(`rs-${b}-${c}`);
+    if (has('hide')) rules.push(`.sx.rs-${b}-hide{display:none!important}`);
+    if (has('center')) rules.push(`.sx.rs-${b}-center,.sx.rs-${b}-center :is(${RS_TEXT}){text-align:center}.sx.rs-${b}-center :is(${RS_TEXT}){margin-inline:auto}.sx.rs-${b}-center :is(.actions,.ticks,.ux-chips,.legend){justify-content:center}.sx.rs-${b}-center :is(.hero-text,.split-text,.sc-text,.cta-text){align-items:center}`);
+    if (has('start')) rules.push(`.sx.rs-${b}-start,.sx.rs-${b}-start :is(${RS_TEXT}){text-align:start}.sx.rs-${b}-start :is(${RS_TEXT}){margin-inline:0}.sx.rs-${b}-start :is(.actions,.ticks,.ux-chips,.legend){justify-content:flex-start}.sx.rs-${b}-start :is(.hero-text,.split-text,.sc-text,.cta-text){align-items:flex-start}`);
+    if (has('pad-s')) rules.push(`.sx.rs-${b}-pad-s{padding-block:calc(var(--space) * .55)}`);
+    if (has('pad-m')) rules.push(`.sx.rs-${b}-pad-m{padding-block:var(--space)}`);
+    if (has('pad-l')) rules.push(`.sx.rs-${b}-pad-l{padding-block:calc(var(--space) * 1.25)}`);
+    if (has('media-first')) rules.push(`.sx.rs-${b}-media-first :is(${RS_MEDIA}){order:-1}`);
+    if (has('media-last')) rules.push(`.sx.rs-${b}-media-last :is(${RS_MEDIA}){order:9}`);
+    if (has('type-s')) rules.push(`.sx.rs-${b}-type-s .h-hero{font-size:calc(min(var(--fs-hero),var(--fit-hero,999px)) * .82)}.sx.rs-${b}-type-s .h-section{font-size:calc(min(var(--fs-h2),var(--fit-h2,999px)) * .85)}`);
+    if (has('type-l')) rules.push(`.sx.rs-${b}-type-l .h-hero{font-size:calc(min(var(--fs-hero),var(--fit-hero,999px)) * 1.12)}.sx.rs-${b}-type-l .h-section{font-size:calc(min(var(--fs-h2),var(--fit-h2,999px)) * 1.12)}`);
+    if (rules.length) out.push(`@media ${BREAKPOINT_QUERY[bp]}{${rules.join('')}}`);
+  }
+  return out.join('\n');
 }
 
 // ── the stylesheet ───────────────────────────────────────────────────
@@ -1107,6 +1232,18 @@ th .th-sort{all:unset;cursor:pointer;display:inline-flex;gap:6px;align-items:cen
 .line.s0,.line.s1,.line.s2{fill:none}.chart .cmp{stroke-dasharray:6 5;stroke-width:2}.key-line{width:16px;height:0;background:none!important;border-top:2px dashed var(--muted);border-radius:0;vertical-align:middle}.key-line.s2{border-top-color:var(--text)}.legend{display:flex;gap:16px;list-style:none;margin:10px 0 0;padding:0;font-size:.85rem;color:var(--muted)}.key{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
 .table-scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:.94rem}th{text-align:left;font-weight:600;color:var(--muted);font-size:.82rem;padding:10px 12px;border-bottom:1px solid var(--line)}td{padding:12px;border-bottom:1px solid var(--line)}
 .status{display:inline-flex;align-items:center;gap:6px}.status .dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+/* interactions (lib/ux-v0/behaviors.ts): filters, the picture opened large, a chart's series and readings, a table's filter, a configurator */
+.ux-chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 20px}.ux-chip{font:inherit;font-size:.86rem;min-height:36px;padding:6px 14px;border:1px solid var(--line);border-radius:var(--r-pill,999px);background:transparent;color:var(--text);cursor:pointer}.ux-chip[aria-pressed=true]{background:var(--text);color:var(--bg);border-color:var(--text)}.ux-chip:focus-visible,.lg-btn:focus-visible,.cfg-opt input:focus-visible+span{outline:2px solid var(--accent-ink);outline-offset:2px}
+[data-ux-open]{cursor:zoom-in}.g-item[hidden],.list-group[hidden]{display:none!important}
+.ux-lb{position:fixed;inset:0;z-index:80;display:grid;grid-template-rows:1fr auto;gap:12px;padding:clamp(12px,4vw,40px);background:color-mix(in srgb,var(--bg) 94%,transparent)}.ux-lb[hidden]{display:none}.ux-lb img{width:100%;height:100%;max-height:78vh;object-fit:contain}.ux-lb-bar{display:flex;align-items:center;gap:12px;justify-content:space-between;color:var(--text);font-size:.9rem}.ux-lb-bar button{font:inherit;padding:8px 14px;border:1px solid var(--line);border-radius:var(--r-pill,999px);background:var(--bg);color:var(--text);cursor:pointer}
+.lg-btn{font:inherit;display:inline-flex;align-items:center;min-height:32px;padding:0;border:0;background:none;color:inherit;cursor:pointer}.lg-btn[aria-pressed=false]{opacity:.45;text-decoration:line-through}.chart .is-off{display:none}.chart .pt{stroke:var(--surface);stroke-width:1.5}
+.ux-find{font:inherit;font-size:.9rem;width:min(320px,100%);min-height:40px;margin:0 0 12px;padding:8px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);color:var(--text)}tr[hidden]{display:none}
+@media (max-width:1099px){.ux-chip,.lg-btn,.ux-find{min-height:44px}.lg-btn{padding:0 4px}}
+.cfg{display:grid;gap:clamp(20px,4vw,48px);grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}.cfg-panel{grid-template-columns:minmax(0,1fr)}.cfg-preview{position:relative;min-height:240px;border-radius:var(--r);overflow:hidden;background:var(--surface);border:1px solid var(--line)}.cfg-swatch{position:absolute;inset:18%;border-radius:var(--r);background:var(--cfg,var(--accent));transition:background .4s}.cfg-img{width:100%;height:100%;object-fit:cover;display:block}.cfg-form{display:grid;gap:18px}.cfg-group{border:0;margin:0;padding:0}.cfg-legend{font-weight:600;margin:0 0 8px;padding:0}.cfg-opts{display:flex;flex-wrap:wrap;gap:8px}.cfg-opt{position:relative;display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--line);border-radius:var(--r);cursor:pointer}.cfg-opt input{position:absolute;opacity:0;width:1px;height:1px}.cfg-opt:has(input:checked){border-color:var(--text);box-shadow:inset 0 0 0 1px var(--text)}.cfg-o-l{display:inline-flex;align-items:center;gap:8px}.cfg-dot{width:14px;height:14px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.2)}.cfg-o-p{color:var(--muted);font-size:.86rem}.cfg-sum{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding-top:12px;border-top:1px solid var(--line)}.cfg-total{font-size:1.4rem}.cfg-done{padding:10px 14px;border:1px solid var(--line);border-radius:var(--r)}
+@media (max-width:760px){.cfg{grid-template-columns:minmax(0,1fr)}}
+.sc{display:grid;gap:clamp(24px,4vw,56px);align-items:center;grid-template-columns:minmax(0,5fr) minmax(0,7fr)}.sc-stage{grid-template-columns:minmax(0,1fr)}.sc-stage .scene{aspect-ratio:16/9}.sc-backdrop{position:relative;grid-template-columns:minmax(0,1fr);min-height:70vh;align-content:center}.sc-backdrop .sc-fig{position:absolute;inset:0}.sc-backdrop .scene{height:100%;aspect-ratio:auto}.sc-backdrop .sc-text{position:relative;z-index:1;max-width:44ch;pointer-events:none}.sc-backdrop .sc-text .actions{pointer-events:auto}
+.sc-fig{margin:0}.scene{position:relative;width:100%;aspect-ratio:1/1;color:var(--scene,var(--accent))}.scene:focus-visible{outline:2px solid var(--accent-ink);outline-offset:4px}.sc-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:pan-y}.sc-canvas:active{cursor:grabbing}.sc-poster{position:absolute;inset:8%;width:84%;height:84%}.sc-live .sc-poster{display:none}
+@media (max-width:760px){.sc{grid-template-columns:minmax(0,1fr)}.sc-backdrop{min-height:56vh}}
 .feed{list-style:none;margin:0;padding:0;display:grid}.feed li{padding:12px 0;border-bottom:1px solid var(--line)}.feed p{margin:0}.feed-title{font-weight:600}
 .img-missing{background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--line) 60%,transparent) 0 10px,transparent 10px 20px);min-height:200px;border-radius:var(--r)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}`);
@@ -1156,7 +1293,8 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], op
   const look = spec.look ?? lookFromTokens(spec.tokens);
   const mode: MotionMode = opts.motion ?? 'static';
   const play = mode === 'play' && (look.motion?.feel ?? 'still') !== 'still';
-  const im = new Images(new Map(refs.filter((r) => r.state !== 'rejected').map((r) => [r.id, r])), look.motifs.includes('captions'));
+  // a picture SocriaUX made is drawn from its recipe here, wherever the page is shown (lib/ux-v0/assets.ts)
+  const im = new Images(new Map(refs.filter((r) => r.state !== 'rejected').map((r) => [r.id, r.provider === 'socriaux' && r.proc && !r.url ? { ...r, url: proceduralUri(r.proc) } : r])), look.motifs.includes('captions'));
   const app = spec.pageType === 'app-screen';
   let heroSeen = false;
   // the screen's leading heading: the first content section, when no hero or screen header leads
@@ -1178,7 +1316,7 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], op
     const tag = s.kind === 'nav' || s.kind === 'footer' || s.kind === 'app-nav' ? 'div' : 'section';
     const tone = s.tone && s.tone !== 'base' ? ` tone-${s.tone}` : '';
     const pad = s.pad && s.pad !== 'm' ? ` pad-${s.pad}` : '';
-    const html = `<${tag} class="sx sx-${s.kind} v-${s.variant}${tone}${pad}${sh.cls}" data-ux-section="${esc(s.id)}"${cols}>${fn(s, s.content, { look, first, play, no, turn: turn++, im, app, lead: s.id === leadId })}</${tag}>`;
+    const html = `<${tag} class="sx sx-${s.kind} v-${s.variant}${tone}${pad}${sh.cls}${responsiveClasses(s)}" data-ux-section="${esc(s.id)}"${cols}>${fn(s, s.content, { look, first, play, no, turn: turn++, im, app, lead: s.id === leadId })}</${tag}>`;
     // a running marquee follows the opening statement
     if (!marqueeDone && s.kind === 'hero') {
       marqueeDone = true;
@@ -1190,7 +1328,7 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], op
     return html;
   });
   // the designer's own pictures need no credit on the page
-  const credits = [...im.used.values()].filter((r) => r.provider !== 'upload').map(creditLine);
+  const credits = [...im.used.values()].filter((r) => r.provider !== 'upload' && r.provider !== 'socriaux').map(creditLine);
   const creditHtml = credits.length
     ? `<p class="credits">Images: ${credits.map((c) => (c.url ? `<a href="${esc(c.url)}" rel="noreferrer">${esc(c.text)}</a>` : esc(c.text))).join(' · ')}</p>`
     : '';
@@ -1215,8 +1353,28 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], op
     body = `${duotoneFilter(darkInk, lightInk)}\n${body}`;
   }
 
+  // the scripted layer of the motion (lib/ux-v0/motion-runtime.ts), where the page plays: one sequence of points
+  // pinned as a story, pictures arriving as they come into view, pictures that tilt, a chart's line drawing itself
+  const marks = play ? scriptedMarks(look.motion) : { body: '', story: false, media: false, tilt: false, draw: false };
+  if (marks.story && !app) {
+    const story = spec.sections.find((x, i) => i > 0 && x.kind === 'features' && Array.isArray(x.content.items) && (x.content.items as unknown[]).length >= 3 && (x.content.items as unknown[]).length <= 6);
+    if (story) {
+      const at = `data-ux-section="${esc(story.id)}"`;
+      const i0 = body.indexOf(at);
+      const open = i0 >= 0 ? body.lastIndexOf('<section class="', i0) : -1;
+      const end = i0 >= 0 ? body.indexOf('</section>', i0) : -1;
+      if (open >= 0 && end > i0) {
+        const sec = body.slice(open, end).replace('<section class="', '<section class="mo-story ').replace(/<li class="feature">/g, '<li class="feature" data-mo-step="">');
+        body = body.slice(0, open) + sec + body.slice(end);
+      }
+    }
+  }
+  if (marks.media) body = body.replace(/<figure class="(g-item|split-media|cta-media|hp-media)/g, '<figure data-mo-in="" class="$1');
+  if (marks.tilt) body = body.replace(/<figure (data-mo-in="" )?class="(g-item|split-media)/g, (_m, a = '', c) => `<figure ${a}data-mo-tilt="" class="${c}`);
+  if (marks.draw) body = body.replace(/<svg class="chart"/g, '<svg data-mo-in="" class="chart"').replace(/<polyline class="line /g, '<polyline pathLength="1" class="mo-draw line ');
+
   const fonts = fontStylesheet([spec.tokens.fonts.display, spec.tokens.fonts.body, ...(look.label === 'mono' ? [look.mono] : [])]);
-  const style = [css(spec.tokens, look, headlinesOf(spec)), motionCss(look, mode, { app })].filter(Boolean).join('\n');
+  const style = [css(spec.tokens, look, headlinesOf(spec)), motionCss(look, mode, { app }), responsiveCss(spec.sections)].filter(Boolean).join('\n');
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -1226,8 +1384,8 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], op
 ${fonts ? `<link rel="stylesheet" href="${esc(fonts)}">` : ''}
 <style>${style}</style>
 </head>
-<body class="s-${spec.tokens.style} look-${esc(look.language)} grid-${look.grid}${look.motion && look.motion.feel !== 'still' ? ` mo mo-${look.motion.feel}` : ''}">
-${body}${opts.runtime ? `\n<script>${BEHAVIOR_SOURCE}</script>` : ''}
+<body class="s-${spec.tokens.style} look-${esc(look.language)} grid-${look.grid}${look.motion && look.motion.feel !== 'still' ? ` mo mo-${look.motion.feel}` : ''}"${marks.body}>
+${body}${opts.runtime ? `\n<script>${BEHAVIOR_SOURCE}</script>\n<script>${MOTION_RUNTIME}</script>${spec.sections.some((x) => x.kind === 'scene') ? `\n<script>${SCENE_RUNTIME}</script>` : ''}` : ''}
 </body>
 </html>`;
   return { html, css: style, credits };

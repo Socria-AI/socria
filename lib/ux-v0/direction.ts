@@ -46,7 +46,7 @@ import {
 import { normalizeShape, SHAPE_FIELDS, type SectionShape } from './spec';
 import { bookingVariantsFor, hashText, heroVariantsFor, orderFor, seeded, shapeFor, type LayoutDecisions } from './layout';
 import type { BriefPart, DesignBrief } from './types';
-import { BOOKING_DNA, DNA_KEYS, DNA_META, LANGUAGE_DNA, PLAN_DNA, affinity, dnaDirectives, dnaSay, divergentDNA, holdToDNA, shapeByDNA, type CreativeDNA, type DnaKey, type DnaVector } from './dna';
+import { BOOKING_DNA, DNA_KEYS, DNA_META, LANGUAGE_DNA, PLAN_DNA, affinity, dnaDirectives, dnaOfDirection, dnaSay, divergentDNA, holdToDNA, shapeByDNA, type CreativeDNA, type DnaKey, type DnaVector } from './dna';
 import { motionFor, readMotionWords } from './motion';
 import { paletteFromSwatches, type BoardReading } from './references';
 import { intentOf, requiredComponents } from './intent';
@@ -1442,6 +1442,43 @@ export function lockedChanges(spec: DesignSpec, patch: Patch, locks: readonly Lo
     }
   }
   return [...hit];
+}
+
+/**
+ * Two directions combined: one kept as the base, the groups named taken whole from the other — its colours, its
+ * type, its layout (and the structure it gives the design: what leads, in what order, how each part is set), its
+ * surfaces, its pictures, its motifs, its motion, its voice. What was taken is the designer's decision, so it is
+ * locked; what the base kept stays as it was, its own locks with it. The result is read back like any direction
+ * (normalizeDirection: faces, ranges, a readable palette) and its Creative DNA read again from what it now is.
+ * Its plan is not carried: the base's plan named colours and type it may no longer have.
+ */
+export function combineDirections(base: ArtDirection, from: ArtDirection, groups: readonly LockGroup[]): ArtDirection | null {
+  const take = new Set(groups.filter((g): g is LockGroup => (LOCK_GROUPS as readonly string[]).includes(g)));
+  if (!take.size || base.id === from.id) return null;
+  const tokens: Record<string, unknown> = { ...base.tokens, colors: { ...base.tokens.colors }, fonts: { ...base.tokens.fonts } };
+  for (const [k, g] of Object.entries(TOKEN_GROUP)) if (take.has(g)) tokens[k] = JSON.parse(JSON.stringify((from.tokens as unknown as Record<string, unknown>)[k] ?? null)) ?? tokens[k];
+  const look: Record<string, unknown> = { ...base.look };
+  for (const [k, g] of Object.entries(LOOK_GROUP)) if (take.has(g) && (from.look as unknown as Record<string, unknown>)[k] !== undefined) look[k] = JSON.parse(JSON.stringify((from.look as unknown as Record<string, unknown>)[k]));
+  const taken = LOCK_GROUPS.filter((g) => take.has(g));
+  const said = taken.map((g) => LOCK_LABEL[g].toLowerCase());
+  const list = said.length > 1 ? `${said.slice(0, -1).join(', ')} and ${said[said.length - 1]}` : said[0];
+  const { designPlan: _plan, ...rest } = base;
+  const combined = normalizeDirection({
+    ...rest,
+    id: `${base.id}_x_${from.id}`.replace(/[^a-z0-9_-]/gi, '').slice(0, 64),
+    name: `${base.name} × ${from.name}`,
+    tokens,
+    look,
+    ...(take.has('layout') ? { compose: from.compose, plan: from.plan, order: from.order, lead: from.lead, shapes: from.shapes, composition: from.composition } : {}),
+    ...(take.has('imagery') ? { imagery: from.imagery } : {}),
+    ...(take.has('voice') ? { voice: from.voice } : {}),
+    rationale: [`Combined by hand: the ${list} of ${from.name}.`, ...base.rationale.slice(0, 3)],
+    locks: [...new Set([...base.locks.filter((g) => !take.has(g)), ...taken])],
+    source: 'person',
+  });
+  if (!combined) return null;
+  // said on the board where a direction's lean is: combined by hand, and what was taken from which
+  return { ...combined, dna: dnaOfDirection(combined), dnaLean: 'combined by hand', dnaSaid: [`the ${list} of ${from.name}, on ${base.name}`] };
 }
 
 /** The tokens and look a design takes from its direction. */

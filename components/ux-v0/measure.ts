@@ -10,6 +10,7 @@
 // answers, or after `timeout` with nothing.
 
 import { BEHAVIOR_SOURCE } from '@/lib/ux-v0/behaviors';
+import { SCENE_RUNTIME } from '@/lib/ux-v0/scene-runtime';
 import { INSPECTOR_SOURCE } from '@/lib/ux-v0/inspector';
 import { normalizeAudit, type PageAudit } from '@/lib/ux-v0/evaluate';
 import { buildSandboxDoc } from '@/lib/ux-v0/sandbox';
@@ -24,8 +25,10 @@ export function measurePage(html: string, width: number, height: number, nonce: 
     frame.className = 'v0-measure';
     frame.style.cssText = `position:fixed;left:-${width + 4000}px;top:0;width:${width}px;height:${height}px;border:0;opacity:0;pointer-events:none`;
     const parse = (s: string) => new DOMParser().parseFromString(s, 'text/html');
-    // measured with its behaviours, so the audit can try them (lib/ux-v0/behaviors.ts selfTest)
-    frame.srcdoc = buildSandboxDoc(html, { parse, runScripts: false, nonce, inspector: `${INSPECTOR_SOURCE}\n${BEHAVIOR_SOURCE}` }).doc;
+    // measured with its behaviours, so the audit can try them (lib/ux-v0/behaviors.ts selfTest); with the 3D
+    // runtime where the page has a scene, so the audit can see whether it was drawn (lib/ux-v0/scene-runtime.ts)
+    const scene = html.includes('data-ux-scene') ? `\n${SCENE_RUNTIME}` : '';
+    frame.srcdoc = buildSandboxDoc(html, { parse, runScripts: false, nonce, inspector: `${INSPECTOR_SOURCE}\n${BEHAVIOR_SOURCE}${scene}` }).doc;
     const id = Math.random().toString(36).slice(2);
     let done = false;
     let ask: number | undefined;

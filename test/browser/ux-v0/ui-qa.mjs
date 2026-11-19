@@ -210,6 +210,16 @@ const chips = await page.locator('.ad-plan').evaluateAll((els) => els.map((el) =
 ok('…built within the design system: its accent and its ground among every direction’s named colours', chips.length === 3 && chips.every((xs) => xs.includes('rgb(15, 118, 110)') && xs.includes('rgb(248, 250, 252)')), JSON.stringify(chips));
 await page.locator('.ad-plan').first().screenshot({ path: `${S}ui-3b-plan-1440.png` });
 await shootAll('3-direction');
+// combining two: keep the first, take the second's type and motion — a direction of its own, beside the others
+await page.locator('.ad-combine > summary').click();
+const combine = page.locator('.ad-combine');
+await combine.locator('label', { hasText: /^Type$/ }).click();
+await combine.locator('label', { hasText: /^Motion$/ }).click();
+await combine.getByRole('button', { name: 'Combine them' }).click();
+await page.waitForTimeout(800);
+const dirNames = await page.locator('.v0-dir').evaluateAll((els) => els.map((e) => e.innerText.split('\n').slice(0, 3).join(' ')));
+ok('combining two directions makes a fourth beside them, named for both, its type and motion the second’s', (await page.locator('.v0-dir').count()) === 4 && dirNames.some((t) => / × /.test(t)) && /Combined by hand — the type and motion of/i.test(await page.locator('.v0-dir').nth(1).locator('.ad-dna-text').innerText()), JSON.stringify(dirNames).slice(0, 400));
+await page.locator('.ad-combine').screenshot({ path: `${S}ui-3d-combine-1440.png` }).catch(() => {});
 await page.locator('.v0-dir').first().getByRole('button', { name: 'Use this direction' }).dblclick();
 await page.waitForSelector('.v0-workstrip', { timeout: 4000 }).catch(() => {});
 const strip = (await page.locator('.v0-workstrip').count()) ? await page.locator('.v0-workstrip').innerText() : '';
@@ -266,6 +276,14 @@ const nextVariant = options.find((v) => v !== variantBefore && v !== 'immersive'
 await page.locator('.v0-edit select').selectOption(nextVariant);
 await page.waitForTimeout(1500);
 ok(`a layout change applies at once (${variantBefore} → ${nextVariant}), with Undo`, (await frame.locator(`.bk-${nextVariant}`).count()) === 1 && (await page.getByRole('button', { name: 'Undo' }).count()) > 0);
+// at other widths: a decision for phones, applied as a version, the desktop as it was
+const bp = page.locator('.v0-edit-bp');
+ok('the editor has the part’s rules at other widths', (await bp.count()) === 1 && /At other widths/.test(await bp.innerText()));
+await bp.getByRole('radio', { name: 'Phone' }).click();
+await bp.locator('[role="group"][aria-label="Words"]').getByRole('button', { name: 'Centred' }).click();
+await page.waitForTimeout(1200);
+ok('a rule for phones applies as a version, said beside the controls; the desktop untouched', /On phones: centred/.test(await page.locator('.v0-edit-bp').innerText()) && (await frame.locator('.sx-booking.rs-m-center').count()) === 1 && (await frame.locator('.sx-booking').evaluate((e) => getComputedStyle(e).textAlign)) !== 'center' && (await page.getByRole('button', { name: 'Undo' }).count()) > 0, await page.locator('.v0-edit-bp').innerText());
+await page.locator('.v0-edit-bp').screenshot({ path: `${S}ui-5c-widths-1440.png` }).catch(() => {});
 await page.locator('.v0-lock').click();
 await page.waitForTimeout(800);
 ok('locking the section: said, and its controls are off', (await page.locator('.v0-lock').getAttribute('aria-pressed')) === 'true' && (await page.locator('.v0-edit select').isDisabled()));
@@ -298,6 +316,19 @@ await page.waitForTimeout(900);
 const black = await frame.locator('[data-ux-confirm]').evaluate((e) => getComputedStyle(e).backgroundColor);
 ok(`…applied at once (${Date.now() - quickT0} ms from Enter, the question included), the action now black, with Undo`, black === 'rgb(0, 0, 0)' && (await page.getByRole('button', { name: 'Undo' }).count()) > 0, black);
 await page.screenshot({ path: `${S}ui-8-quick-edit-1440.png` });
+// the Type panel: headlines in capitals, a real look patch — asked about first when the type is kept or locked
+await page.locator('details.v0-adjust > summary', { hasText: /^Type$/ }).click();
+const typePanel = page.locator('.tp');
+const typeLabels = await typePanel.locator('.mp-l').allInnerTexts();
+ok('the Type panel offers the faces, the case, the tracking and the scale', (await typePanel.count()) === 1 && ['Headlines', 'Text', 'Case', 'Tracking', 'Scale'].every((l) => typeLabels.includes(l)) && (await typePanel.locator('select').count()) >= 2, JSON.stringify(typeLabels));
+await typePanel.locator('[role="group"][aria-label="Case"]').getByRole('button', { name: 'Capitals' }).click();
+await page.waitForTimeout(500);
+if (await page.getByRole('button', { name: 'Apply anyway' }).count()) await page.getByRole('button', { name: 'Apply anyway' }).click();
+await page.waitForTimeout(1200);
+const caps = await frame.locator('.h-section, .h-hero').first().evaluate((e) => getComputedStyle(e).textTransform);
+ok('headlines set in capitals from the Type panel, with Undo', caps === 'uppercase' && (await page.getByRole('button', { name: 'Undo' }).count()) > 0, caps);
+await page.locator('.tp').screenshot({ path: `${S}ui-8b-type-1440.png` }).catch(() => {});
+await page.locator('details.v0-adjust > summary', { hasText: /^Type$/ }).click();
 // a change only the model can read, cancelled: the model is stopped and the canvas is exactly as it was
 const versionBefore = await page.locator('.v0-version, [data-version]').first().innerText().catch(() => '');
 const htmlBefore = await frame.locator('body').innerHTML();

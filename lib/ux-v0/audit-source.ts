@@ -61,6 +61,11 @@ export const AUDIT_SOURCE = String.raw`(function () {
     while (n && n !== document.body) { var cs = getComputedStyle(n); if (/(auto|scroll|hidden|clip)/.test(cs.overflowX)) return true; n = n.parentElement; }
     return false;
   }
+  // a script that fails on the page is a finding, not a silence: collected from the moment the inspector runs
+  // (before SocriaUX's runtimes); a picture that fails to load is an image finding, not an error here
+  var errors = [];
+  window.addEventListener('error', function (e) { if (errors.length < 5 && e && e.message) errors.push(String(e.message).slice(0, 120)); });
+  window.addEventListener('unhandledrejection', function (e) { if (errors.length < 5) errors.push(('a promise failed: ' + String(e && e.reason && (e.reason.message || e.reason) || '')).slice(0, 120)); });
   window.__uxv0Audit = function () {
     var de = document.documentElement;
     var W = de.clientWidth;
@@ -152,6 +157,24 @@ export const AUDIT_SOURCE = String.raw`(function () {
     out.style = st;
     // whether its components work: SocriaUX's behaviour runtime tries each booking in place (lib/ux-v0/behaviors.ts)
     try { out.behaviors = window.__uxBehaviors && window.__uxBehaviors.selfTest ? window.__uxBehaviors.selfTest() : []; } catch (e) { out.behaviors = [{ index: 0, slots: 0, problems: ['the behaviour check failed: ' + String(e && e.message || e).slice(0, 80)] }]; }
+    // …and every gallery, filter, chart key, table filter and configurator, tried in place and put back
+    try { out.interactive = window.__uxBehaviors && window.__uxBehaviors.selfTestInteractive ? window.__uxBehaviors.selfTestInteractive() : []; } catch (e) { out.interactive = [{ kind: 'page', index: 0, items: 0, problems: ['the interaction check failed: ' + String(e && e.message || e).slice(0, 80)] }]; }
+    // …and each 3D scene: drawn (its centre pixel read back), or its drawn silhouette standing in
+    try { out.scenes = window.__uxScene && window.__uxScene.selfTest ? window.__uxScene.selfTest() : []; } catch (e) { out.scenes = [{ index: 0, webgl: true, drawn: false, problems: ['the scene check failed: ' + String(e && e.message || e).slice(0, 80)] }]; }
+    out.errors = errors.slice();
+    // what the page weighs: its markup, its pictures, and pictures far larger than they are shown (a vector
+    // drawing has no size to waste, so it is not counted)
+    var dpr = window.devicePixelRatio || 1, over = 0, inline = 0, imgs = [], all = document.images;
+    // (the large view the gallery opens shows a picture the page already has: it weighs nothing more)
+    for (var q0 = 0; q0 < all.length; q0++) if (!(all[q0].closest && all[q0].closest('.ux-lb'))) imgs.push(all[q0]);
+    for (var q = 0; q < imgs.length; q++) {
+      var im = imgs[q], src = im.currentSrc || im.src || '';
+      if (/^data:/.test(src)) inline += src.length;
+      if (/^data:image\/svg|\.svg(\?|$)/i.test(src)) continue;
+      var shown = im.getBoundingClientRect().width;
+      if (im.naturalWidth > 2000 && shown > 0 && im.naturalWidth > shown * dpr * 3) over++;
+    }
+    out.weight = { html: de.outerHTML.length, images: imgs.length, oversized: over, inline: inline };
     return out;
   };
 })();`;

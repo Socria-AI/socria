@@ -403,12 +403,14 @@
 .ad-dna-text b {
   font-weight: 600;
 }
-.ad-compare {
+.ad-compare,
+.ad-combine {
   max-width: 1120px;
   margin: 14px auto 0;
   border-top: 1px solid var(--sb-rule);
 }
-.ad-compare > summary {
+.ad-compare > summary,
+.ad-combine > summary {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -417,10 +419,12 @@
   cursor: pointer;
   list-style: none;
 }
-.ad-compare > summary::-webkit-details-marker {
+.ad-compare > summary::-webkit-details-marker,
+.ad-combine > summary::-webkit-details-marker {
   display: none;
 }
-.ad-compare > summary::after {
+.ad-compare > summary::after,
+.ad-combine > summary::after {
   content: 'Compare';
   margin-left: auto;
   font-size: 13px;
@@ -428,7 +432,8 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.ad-compare[open] > summary::after {
+.ad-compare[open] > summary::after,
+.ad-combine[open] > summary::after {
   content: 'Close';
 }
 .ad-compare-note {
@@ -575,4 +580,136 @@
   .dna-range input[type='range']::-webkit-slider-thumb {
     transition: none;
   }
+}
+
+/* ── the canvas's motion panel ───────────────────────────────────── */
+.v0-motion-panel {
+  width: min(440px, 92vw);
+}
+.mp {
+  display: grid;
+  gap: 10px;
+}
+.mp-row {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.mp-row .sb-seg {
+  grid-column: 2 / 4;
+  justify-self: start;
+  flex-wrap: wrap;
+}
+.mp-row .v0-select {
+  grid-column: 2 / 4;
+}
+.mp-l {
+  font-weight: 600;
+  color: var(--sb-ink-70);
+}
+.mp-v {
+  min-width: 56px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--sb-ink-60);
+}
+.mp-row input[type='range'] {
+  width: 100%;
+  accent-color: var(--sb-ink);
+}
+.mp-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 4px;
+}
+.mp-toggle {
+  padding: 4px 11px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sb-well);
+  color: var(--sb-ink-70);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.mp-toggle.is-on {
+  background: var(--sb-ink);
+  color: var(--sb-paper);
+}
+.mp-toggle:focus-visible {
+  outline: 2px solid var(--sb-moss);
+  outline-offset: 2px;
+}
+
+/* the section editor's made-art choices */
+.v0-edit-arts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 4px 0 6px;
+}
+
+/* the section editor's rules at other widths */
+.v0-edit-bp {
+  display: grid;
+  gap: 2px;
+  margin: 6px 0 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--sb-rule);
+}
+.v0-edit-bp-said {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+}
+
+/* combining two directions */
+.ad-combine > summary::after {
+  content: 'Combine';
+}
+.ad-combine-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 4px 2px 10px;
+}
+.ad-combine-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ad-combine-groups {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.ad-combine-groups legend {
+  float: left;
+  margin-right: 4px;
+  padding: 0;
+}
+.ad-combine-groups .mp-toggle {
+  display: inline-flex;
+  align-items: center;
+}
+.ad-combine-groups .mp-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.ad-combine-groups .mp-toggle:focus-within {
+  outline: 2px solid var(--sb-moss);
+  outline-offset: 2px;
+}
+.ad-combine-body > .v0-quiet {
+  flex-basis: 100%;
+  margin: 0;
 }

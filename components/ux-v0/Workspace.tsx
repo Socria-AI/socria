@@ -6,7 +6,7 @@
 // generated design you inspect, question and change — with an art-direction
 // step between the brief and the design (three visual languages to take,
 // change, lock or leave to SocriaUX), and every generation drawn offscreen at
-// desktop and phone widths, measured, and revised in at most two rounds
+// desktop, tablet and phone widths, measured, and revised in at most two rounds
 // before it is shown (the Checks tab says what was found). In Critique: a file you
 // bring → the design on the canvas → an element or an area selected → a
 // comment → a reasoning card attached to it. The rail holds what supports the
@@ -15,12 +15,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BEHAVIOR_SOURCE } from '@/lib/ux-v0/behaviors';
+import { MOTION_RUNTIME } from '@/lib/ux-v0/motion-runtime';
+import { SCENE_RUNTIME } from '@/lib/ux-v0/scene-runtime';
 import { INSPECTOR_SOURCE } from '@/lib/ux-v0/inspector';
 import { renderDesign } from '@/lib/ux-v0/render';
-import { LOCK_LABEL, briefKey, languageOf, lockedChanges, normalizeDirection, proposeDirections, saltOf, type ArtDirection, type LockGroup } from '@/lib/ux-v0/direction';
+import { LOCK_LABEL, briefKey, combineDirections, languageOf, lockedChanges, normalizeDirection, proposeDirections, saltOf, type ArtDirection, type LockGroup } from '@/lib/ux-v0/direction';
 import { MAX_REVISION_ROUNDS, evaluateDesign, fixesFor, type Evaluation, type Finding } from '@/lib/ux-v0/evaluate';
 import { buildSandboxDoc, makeNonce } from '@/lib/ux-v0/sandbox';
-import { applyPatch, normalizeSpec, placeholdersIn, specDigest, type DesignSpec, type Patch } from '@/lib/ux-v0/spec';
+import { applyPatch, kindDef, lookFromTokens, normalizeSpec, placeholdersIn, specDigest, type DesignSpec, type Motion, type Patch } from '@/lib/ux-v0/spec';
 import { getArtifact, putArtifact } from '@/lib/ux-v0/store';
 import type { Aspect } from '@/lib/ux-v0/discovery';
 import {
@@ -28,6 +30,7 @@ import {
   acceptDesign,
   addUsage,
   costPerAccepted,
+  acceptedEconomics,
   currentSpec,
   fileId,
   normalizeRef,
@@ -78,6 +81,9 @@ import { LAYOUT_QUESTION_ID } from '@/lib/ux-v0/layout';
 import { designerWords } from '@/lib/ux-v0/intent';
 import { elementSelection } from '@/lib/ux-v0/selection';
 import { Moodboard } from './Moodboard';
+import { MotionPanel } from './MotionPanel';
+import { TypePanel } from './TypePanel';
+import { PROC_LABEL, PROC_SAYS, paletteOf, procRef, ratioFor, type ProcKind, type ProcSpec } from '@/lib/ux-v0/assets';
 import { DnaStudio, type Measuring } from './DnaStudio';
 import { DnaGlyph, dnaWords } from './DnaParts';
 import { measureReference } from './ref-dna-loader';
@@ -372,7 +378,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const doc = useMemo(() => {
     const parse = (s: string) => new DOMParser().parseFromString(s, 'text/html');
     // a generated design: the inspector, and SocriaUX's own behaviour runtime (never the model's code)
-    if (rendered && !imported) return buildSandboxDoc(rendered.html, { parse, runScripts: false, nonce, inspector: `${INSPECTOR_SOURCE}\n${BEHAVIOR_SOURCE}` }).doc;
+    if (rendered && !imported) return buildSandboxDoc(rendered.html, { parse, runScripts: false, nonce, inspector: `${INSPECTOR_SOURCE}\n${BEHAVIOR_SOURCE}\n${MOTION_RUNTIME}${spec?.sections.some((x) => x.kind === 'scene') ? `\n${SCENE_RUNTIME}` : ''}` }).doc;
     if (imported?.kind === 'html' && fileHtml !== null) return buildSandboxDoc(fileHtml, { parse, runScripts: imported.runScripts, nonce, inspector: INSPECTOR_SOURCE }).doc;
     return null;
   }, [rendered, imported, fileHtml, nonce]);
@@ -591,6 +597,112 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     return lockedDnaMoves(s, t, dna);
   };
   const dnaNames = (ks: DnaKey[]) => ks.map((k) => DNA_META[k].label.toLowerCase()).join(' and ');
+  // a photograph from an image model: offered only where the server has one, its price said first
+  const [imageGen, setImageGen] = useState<{ enabled: boolean; why: string; price: number } | null>(null);
+  useEffect(() => {
+    if (!signedIn || project.mode !== 'create') return;
+    let live = true;
+    fetch('/api/ux-v0/assets')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => live && j && setImageGen({ enabled: !!j.enabled, why: String(j.why ?? ''), price: Number(j.prices?.wide ?? 0) }))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [signedIn, project.mode]);
+  const photograph = (sectionId: string, confirmed = false) => {
+    const p = current.current;
+    const s = currentSpec(p);
+    const sec = s?.sections.find((x) => x.id === sectionId);
+    if (!s || !sec || sec.locked || !imageGen?.enabled) return;
+    const what = (kindDef(sec.kind)?.label ?? 'part').toLowerCase();
+    const ratio = ratioFor(sec.kind, sec.variant);
+    if (!confirmed)
+      return say(`A photograph for the ${what} from an image model costs about US$${imageGen.price.toFixed(2)}, counted apart from text. Make it?`, 'info', {
+        acts: [
+          { label: 'Make it', run: () => void photograph(sectionId, true), strong: true },
+          { label: 'Not now', run: () => setNotice(null) },
+        ],
+      });
+    void (async () => {
+      setBusy('Making the photograph…');
+      const look = s.look ?? lookFromTokens(s.tokens);
+      const r = await runOp<{ image: { dataUrl: string; mime: string; prompt: string; model: string; cost: number }; usage: Usage }>('image', 'Making the photograph', '/api/ux-v0/assets', {
+        projectId: p.id,
+        brief: p.brief.doc,
+        purpose: `the ${what}`,
+        ratio,
+        treatment: `${s.tokens.imageTreatment} treatment, ${look.language} direction`,
+        colours: paletteOf(s.tokens, look.accent2),
+      });
+      setBusy(null);
+      if (!r) return;
+      if (!r.ok) return failed(r);
+      const { image } = r.data;
+      const blob = await (await fetch(image.dataUrl)).blob();
+      const up = await addUpload(new File([blob], `photograph.${image.mime.split('/')[1] ?? 'png'}`, { type: image.mime }));
+      if (!up.ok) return say(up.error, 'error');
+      const made = `Made with ${image.model} for this project`;
+      const ref = normalizeRef({ ...up.ref, title: `Photograph for the ${what}`, license: made, attribution: made, note: `Prompt: ${image.prompt}`.slice(0, 400), asContent: true, state: 'kept' }) ?? up.ref;
+      const now = current.current;
+      const cur = currentSpec(now);
+      const sec2 = cur?.sections.find((x) => x.id === sectionId);
+      if (!cur || !sec2) return;
+      const board = { ...now.moodboard, refs: [ref, ...now.moodboard.refs] };
+      const res = applyPatch(cur, { op: 'images', sectionId, images: sec2.images.length ? [ref.id, ...sec2.images.slice(1)] : [ref.id], summary: `A photograph for the ${what}` }, board);
+      update((p2) => {
+        const specs = res.ok ? [...p2.specs.slice(0, p2.specIndex + 1), { ...res.spec, version: cur.version + 1 }].slice(-30) : p2.specs;
+        return { ...p2, usage: addUsage(p2.usage, r.data.usage), moodboard: { ...p2.moodboard, refs: [ref, ...p2.moodboard.refs] }, specs, specIndex: specs.length - 1 };
+      });
+      if (res.ok) say(`The photograph is in place, and on the moodboard with its prompt and model (US$${image.cost.toFixed(2)}).`, 'info', { acts: [{ label: 'Undo', run: () => stepVersion(-1) }] });
+      else say(`The photograph is on the moodboard, but could not be placed: ${res.error}`, 'error');
+    })();
+  };
+  /** A picture SocriaUX makes for one part, in the design's own colours: on the moodboard with its reason, in place as one version. */
+  const makeArt = (sectionId: string, kind: ProcKind) => {
+    const p = current.current;
+    const s = currentSpec(p);
+    const sec = s?.sections.find((x) => x.id === sectionId);
+    if (!s || !sec || sec.locked) return;
+    const def = kindDef(sec.kind);
+    const seed = (Date.now() + sectionId.length * 7919) % 2147483647;
+    const proc: ProcSpec = { kind, seed, ratio: ratioFor(sec.kind, sec.variant), palette: paletteOf(s.tokens, (s.look ?? lookFromTokens(s.tokens)).accent2) };
+    const ref = normalizeRef(procRef(proc, `Art for the ${(def?.label ?? 'part').toLowerCase()}: ${PROC_SAYS[kind]}, in this design’s own colours`, PROC_LABEL[kind]));
+    if (!ref) return;
+    const board = { ...p.moodboard, refs: [ref, ...p.moodboard.refs.filter((r) => r.id !== ref.id)] };
+    const images = sec.images.length ? [ref.id, ...sec.images.slice(1)] : [ref.id];
+    const res = applyPatch(s, { op: 'images', sectionId, images, summary: `${PROC_LABEL[kind]} made for the ${(def?.label ?? 'part').toLowerCase()}` }, board);
+    if (!res.ok) return say(`That art could not be placed: ${res.error}`, 'error');
+    update((p2) => {
+      const specs = [...p2.specs.slice(0, p2.specIndex + 1), { ...res.spec, version: s.version + 1 }].slice(-30);
+      return { ...p2, moodboard: { ...p2.moodboard, refs: [ref, ...p2.moodboard.refs.filter((r) => r.id !== ref.id)] }, specs, specIndex: specs.length - 1 };
+    });
+    say(`Made: ${PROC_LABEL[kind].toLowerCase()} for the ${(def?.label ?? 'part').toLowerCase()}, in this design’s colours. It is on the moodboard with where it came from.`, 'info', {
+      acts: [
+        { label: 'Undo', run: () => stepVersion(-1) },
+        { label: 'Another', run: () => makeArt(sectionId, kind) },
+      ],
+    });
+    runChecks(res.spec);
+  };
+  /** A change of the design's motion: one version; a motion kept in the art direction or locked in the DNA is asked about first. */
+  const changeMotion = (next: Partial<Motion>, label: string) => {
+    const p = current.current;
+    const s = currentSpec(p);
+    if (!s) return;
+    const now = (s.look ?? lookFromTokens(s.tokens)).motion;
+    const patch: Patch = { op: 'look', look: { motion: { ...now, ...next } }, summary: `Motion: ${label}` };
+    const hit = lockedChanges(s, patch, p.direction.chosen?.locks ?? []);
+    const moved = dnaMovedBy(s, [patch]);
+    if (hit.length || moved.length)
+      return say(`${hit.length ? 'The motion is kept in the art direction.' : ''} ${moved.length ? `This moves the ${dnaNames(moved)} away from where you locked it in the Creative DNA.` : ''} Change it anyway?`.trim(), 'info', {
+        acts: [
+          { label: 'Change anyway', run: () => (applyLocal(patch, label), undefined), strong: true },
+          { label: 'Keep it as it is', run: () => setNotice(null) },
+        ],
+      });
+    applyLocal(patch, label);
+  };
 
   const sampleRef = async (ref: MoodboardRef) => {
     const sw = await sampleSwatches(ref.thumb || ref.url);
@@ -789,6 +901,24 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const editDirection = (id: string, next: ArtDirection, group: LockGroup) =>
     update((p) => ({ ...p, direction: { ...p.direction, options: p.direction.options.map((o) => (o.id === id ? { ...next, locks: [...new Set([...o.locks, group])], source: 'person' } : o)) } }));
 
+  /** One direction kept, whole groups taken from another: a direction of its own beside the others (one at a time). */
+  const combineDirection = (baseId: string, fromId: string, groups: LockGroup[]) => {
+    const p = current.current;
+    const base = p.direction.options.find((o) => o.id === baseId);
+    const from = p.direction.options.find((o) => o.id === fromId);
+    if (!base || !from) return;
+    const made = combineDirections(base, from, groups);
+    if (!made) return say('Choose two different directions, and at least one thing to take.', 'error');
+    update((p2) => {
+      // a new combination takes the place of an earlier one: the directions shown stay at most four
+      const rest = p2.direction.options.filter((o) => o.id !== made.id && !o.id.includes('_x_'));
+      const at = rest.findIndex((o) => o.id === baseId);
+      const options = [...rest.slice(0, at + 1), made, ...rest.slice(at + 1)].slice(0, 4);
+      return { ...p2, direction: { ...p2.direction, options } };
+    });
+    say(`${made.name} is beside the others: ${made.rationale[0]} Approve it to design with it.`, 'info');
+  };
+
   const lockDirection = (id: string, group: LockGroup, on: boolean) =>
     update((p) => ({ ...p, direction: { ...p.direction, options: p.direction.options.map((o) => (o.id === id ? { ...o, locks: on ? [...new Set([...o.locks, group])] : o.locks.filter((g) => g !== group) } : o)) } }));
 
@@ -801,7 +931,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   };
 
   // ── looking at what was drawn ───────────────────────────────────────
-  // Drawn offscreen at 1280 and 390 px, measured, read. With `autofix`, the fixes that need no
+  // Drawn offscreen at 1280, 834 and 390 px, measured, read. With `autofix`, the fixes that need no
   // words are applied — at most two rounds, never to what the designer locked or fixed — before
   // anyone sees the page. Otherwise the findings are only reported.
   const inspect = async (from: DesignSpec, autofix: boolean): Promise<{ spec: DesignSpec; fixed: string[]; ev: Evaluation; audit: PageAudit | null }> => {
@@ -809,10 +939,10 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     let audit: PageAudit | null = null;
     const measureAt = async (s: DesignSpec) => {
       const html = renderDesign(s, withUploads(current.current.moodboard.refs, true)).html;
-      const [desktop, phone] = await Promise.all([measurePage(html, 1280, 900, nonce), measurePage(html, 390, 844, nonce)]);
+      const [desktop, tablet, phone] = await Promise.all([measurePage(html, 1280, 900, nonce), measurePage(html, 834, 1112, nonce), measurePage(html, 390, 844, nonce)]);
       audit = desktop;
       // and whether it keeps what was decided: the approved direction, the brief's locked parts and rules, the pictures it may place
-      return evaluateDesign(s, { desktop, phone }, locks, { direction: current.current.direction.chosen, brief: current.current.brief.doc, board: current.current.moodboard });
+      return evaluateDesign(s, { desktop, tablet, phone }, locks, { direction: current.current.direction.chosen, brief: current.current.brief.doc, board: current.current.moodboard });
     };
     let spec = from;
     const fixed: string[] = [];
@@ -850,7 +980,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const label = approved ? `Designing in the “${approved.name}” direction` : 'Designing from the brief';
     setBusy(`${label}…`);
     const version = (p.specs[p.specs.length - 1]?.version ?? 0) + 1;
-    const r = await runOp<{ spec: DesignSpec; artDirection?: ArtDirection; placeholders: string[]; usage: Usage; notice?: string }>('generate', label, '/api/ux-v0/generate', { projectId: p.id, brief: p.brief.doc, moodboard: p.moodboard, direction: dir, artDirection: approved, version, dna: dnaUse ?? dnaOf(p) });
+    const r = await runOp<{ spec: DesignSpec; artDirection?: ArtDirection; placeholders: string[]; usage: Usage; notice?: string; complexity?: { level: 'low' | 'medium' | 'high'; why: string[]; tier: 'economy' | 'premium' } }>('generate', label, '/api/ux-v0/generate', { projectId: p.id, brief: p.brief.doc, moodboard: p.moodboard, direction: dir, artDirection: approved, version, dna: dnaUse ?? dnaOf(p) });
     setBusy(null);
     if (!r) return;
     // a failed or cancelled generation leaves the design on the canvas exactly as it was
@@ -859,13 +989,13 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     if (!drawn) return say('The design that came back did not hold together. Nothing changed; try again.', 'error');
     // what the designer locked comes through a new generation exactly as it was
     const fresh = holdLocked(drawn, currentSpec(current.current)).spec;
-    // before it is shown: drawn at desktop and phone widths, measured, and fixed where no words are needed
-    setBusy('Checking it at desktop and phone widths…');
+    // before it is shown: drawn at desktop, tablet and phone widths, measured, and fixed where no words are needed
+    setBusy('Checking it at desktop, tablet and phone widths…');
     setChecks({ running: true, ev: null, fixed: [], version: fresh.version });
     const checked = await inspect(fresh, true);
     setBusy(null);
     const kept: DesignSpec | null = checked.fixed.length
-      ? { ...checked.spec, version: fresh.version + 1, reason: `Checked at desktop and phone: ${checked.fixed.length} fix${checked.fixed.length === 1 ? '' : 'es'}`, createdAt: Date.now() }
+      ? { ...checked.spec, version: fresh.version + 1, reason: `Checked at desktop, tablet and phone: ${checked.fixed.length} fix${checked.fixed.length === 1 ? '' : 'es'}`, createdAt: Date.now() }
       : null;
     setChecks({ running: false, ev: checked.ev, fixed: checked.fixed, version: (kept ?? fresh).version, audit: checked.audit });
     update((p2) => {
@@ -891,8 +1021,11 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     setComposeMode('change');
     const ph = r.data.placeholders;
     const done = ph.length ? `Designed. ${ph.length} placeholder${ph.length === 1 ? '' : 's'} for facts only you have: ${ph.slice(0, 5).join(', ')}${ph.length > 5 ? '…' : ''}` : 'Designed from the brief. Select any part to question or change it.';
+    // how demanding the server read the page to be, and so which model made it: the cost explained
+    const cx = r.data.complexity;
+    const how = cx && cx.level !== 'medium' ? ` Read as ${cx.level === 'high' ? 'demanding' : 'simple'} (${cx.why.join(', ')}), so made on the ${cx.tier} model.` : '';
     // a fallback or a budget note is said with the result, never dropped by it
-    say(r.data.notice ? `${done} ${r.data.notice}` : done);
+    say(`${done}${how}${r.data.notice ? ` ${r.data.notice}` : ''}`);
   };
 
   const applyLocal = useCallback(
@@ -923,6 +1056,38 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     },
     [current, update, say] // eslint-disable-line react-hooks/exhaustive-deps
   );
+
+  /**
+   * A change made by hand (the type, a change asked for in words and read in code): applied at once as a version
+   * Undo takes back, or asked about first when it touches what the designer locked (in the art direction, the
+   * Creative DNA or a section), leaves their design system, or carries a concern of its own.
+   */
+  const applyChecked = (patches: Patch[], label: string, concern = '') => {
+    const p = current.current;
+    const s = currentSpec(p);
+    if (!s || !patches.length) return;
+    const locks = p.direction.chosen?.locks ?? [];
+    const hit = [...new Set(patches.flatMap((pt) => lockedChanges(s, pt, locks)))];
+    const sectionsHit = patches.flatMap((pt) => lockedTouched(s, pt));
+    const ds = p.brief.doc?.system;
+    const outside = ds ? [...new Set(patches.flatMap((pt) => offSystem(pt, ds)))] : [];
+    const moved = dnaMovedBy(s, patches);
+    const concerns = [
+      hit.length ? `This changes the ${hit.map((g) => LOCK_LABEL[g].toLowerCase()).join(' and ')}, which you locked in the art direction.` : '',
+      moved.length ? `This moves the ${dnaNames(moved)} away from where you locked it in the Creative DNA.` : '',
+      outside.length && ds ? `This uses ${outside.join(' and ')}, which ${outside.length > 1 ? 'are' : 'is'} not in your design system (${ds.name}).` : '',
+      sectionsHit.length ? 'This changes a section you locked.' : '',
+      concern,
+    ].filter(Boolean);
+    if (concerns.length)
+      return say(`${concerns.join(' ')} Make the change anyway?`, 'info', {
+        acts: [
+          { label: 'Apply anyway', run: () => (applyLocal(patches, label), undefined), strong: true },
+          { label: 'Keep it as it is', run: () => setNotice(null) },
+        ],
+      });
+    applyLocal(patches, label);
+  };
 
   /** One creative decision changed, everything else kept: in code, as a version Undo takes back. */
   const adjustDesign = (as: Adjust[]): boolean => {
@@ -958,27 +1123,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const qe = !imported ? readQuickEdit(comment, s, selection) : null;
     if (qe && !qe.patches.length) return say(`Nothing to change: ${qe.label}.`, 'info');
     if (qe) {
-      const locks = p.direction.chosen?.locks ?? [];
-      const hit = [...new Set(qe.patches.flatMap((pt) => lockedChanges(s, pt, locks)))];
-      const sectionsHit = qe.patches.flatMap((pt) => lockedTouched(s, pt));
-      const ds = p.brief.doc?.system;
-      const outside = ds ? [...new Set(qe.patches.flatMap((pt) => offSystem(pt, ds)))] : [];
-      const moved = dnaMovedBy(s, qe.patches);
-      const concerns = [
-        hit.length ? `This changes the ${hit.map((g) => LOCK_LABEL[g].toLowerCase()).join(' and ')}, which you locked in the art direction.` : '',
-        moved.length ? `This moves the ${dnaNames(moved)} away from where you locked it in the Creative DNA.` : '',
-        outside.length && ds ? `This uses ${outside.join(' and ')}, which ${outside.length > 1 ? 'are' : 'is'} not in your design system (${ds.name}).` : '',
-        sectionsHit.length ? 'This changes a section you locked.' : '',
-        qe.concern ? qe.concern.replace(/\s*Make the change anyway\?$/, '') : '',
-      ].filter(Boolean);
-      if (concerns.length)
-        return say(`${concerns.join(' ')} Make the change anyway?`, 'info', {
-          acts: [
-            { label: 'Apply anyway', run: () => (applyLocal(qe.patches, qe.label), undefined), strong: true },
-            { label: 'Keep it as it is', run: () => setNotice(null) },
-          ],
-        });
-      applyLocal(qe.patches, qe.label);
+      applyChecked(qe.patches, qe.label, qe.concern ? qe.concern.replace(/\s*Make the change anyway\?$/, '') : '');
       return;
     }
     // the everyday ways of asking for one change of the look are done at once, in code, keeping everything else
@@ -1395,6 +1540,22 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                 </span>
               )}
               {spec && !imported && (
+                <details className="v0-adjust v0-motion">
+                  <summary className="sb-link is-meta">Type</summary>
+                  <div className="v0-adjust-panel v0-motion-panel">
+                    <TypePanel tokens={spec.tokens} look={spec.look ?? lookFromTokens(spec.tokens)} onChange={(patches, label) => applyChecked(patches, label)} />
+                  </div>
+                </details>
+              )}
+              {spec && !imported && (
+                <details className="v0-adjust v0-motion">
+                  <summary className="sb-link is-meta">Motion</summary>
+                  <div className="v0-adjust-panel v0-motion-panel">
+                    <MotionPanel motion={(spec.look ?? lookFromTokens(spec.tokens)).motion} onChange={changeMotion} />
+                  </div>
+                </details>
+              )}
+              {spec && !imported && (
                 <details className="v0-adjust">
                   <summary className="sb-link is-meta">Adjust</summary>
                   <div className="v0-adjust-panel" role="group" aria-label="Change one decision, keep everything else">
@@ -1594,6 +1755,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                 onAuto={() => project.direction.options[0] && approveDirection(project.direction.options[0])}
                 onBack={() => setView('dna')}
                 onReplace={replaceDirection}
+                onCombine={combineDirection}
                 dna={dnaOf(project)}
                 onOpenDna={() => setView('dna')}
                 nonce={nonce}
@@ -1738,7 +1900,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
               />
             )}
             {rail === 'selection' && spec && !imported && editing && spec.sections.some((x) => x.id === editing.sectionId) && (
-              <SectionEditor spec={spec} sectionId={editing.sectionId} path={editing.path} onPatch={(pt, label) => applyLocal(pt, label)} onLock={lockSection} />
+              <SectionEditor spec={spec} sectionId={editing.sectionId} path={editing.path} onPatch={(pt, label) => applyLocal(pt, label)} onLock={lockSection} onMakeArt={makeArt} imageGen={imageGen} onPhotograph={(id) => photograph(id)} viewport={project.viewport} />
             )}
             {rail === 'selection' && (
               <Inspect
@@ -1871,9 +2033,9 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                   </section>
                 )}
                 <section className="v0-cellset">
-                  <span className="sb-label">Drawn at desktop and phone widths</span>
+                  <span className="sb-label">Drawn at desktop, tablet and phone widths</span>
                   {!checks || (checks.running && !checks.ev) ? (
-                    <p className="v0-quiet" role="status">{checks?.running ? 'Measuring the page at 1280 and 390 px…' : 'Not checked yet.'}</p>
+                    <p className="v0-quiet" role="status">{checks?.running ? 'Measuring the page at 1280, 834 and 390 px…' : 'Not checked yet.'}</p>
                   ) : (
                     <>
                       <div className="v0-scores">
@@ -2107,7 +2269,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   );
 }
 
-const STAGE_ORDER: readonly CallKind[] = ['discover', 'direction', 'brief', 'refine-brief', 'art-direction', 'generate', 'refine', 'critique'];
+const STAGE_ORDER: readonly CallKind[] = ['discover', 'direction', 'brief', 'refine-brief', 'art-direction', 'generate', 'refine', 'critique', 'image'];
 
 /** What the project has cost, by stage, as the provider reported it; and per accepted (downloaded) design. */
 function CostPanel({ usage, note, calls }: { usage: UsageTotals; note: string; calls: CallTiming[] }) {
@@ -2115,6 +2277,7 @@ function CostPanel({ usage, note, calls }: { usage: UsageTotals; note: string; c
   const staged = STAGE_ORDER.filter((k) => by[k]?.calls);
   const counted = staged.reduce((n, k) => n + (by[k]?.calls ?? 0), 0);
   const per = costPerAccepted(usage);
+  const econ = acceptedEconomics(usage);
   const accepted = usage.accepted?.length ?? 0;
   return (
     <details className="v0-cost">
@@ -2151,6 +2314,12 @@ function CostPanel({ usage, note, calls }: { usage: UsageTotals; note: string; c
           </p>
         )}
         <p className="v0-cost-l">{per != null ? `Per accepted design: US$${per.toFixed(4)} (${accepted} downloaded).` : 'Cost per accepted design appears once you download a design.'}</p>
+        {econ && (
+          <p className="v0-cost-l">
+            Of that, US${econ.text.toFixed(4)} for text and US${econ.images.toFixed(4)} for pictures; {econ.generations} generation{econ.generations === 1 ? '' : 's'} and {econ.refinements} model-worked change{econ.refinements === 1 ? '' : 's'} per accepted design
+            {econ.seconds != null ? `, ${econ.seconds} s of model time` : ''}.
+          </p>
+        )}
         {note && <p className="v0-cost-l is-note">{note}</p>}
         {(usage.reasoning || usage.cached) && (
           <p className="v0-cost-l">

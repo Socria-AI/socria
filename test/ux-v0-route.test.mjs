@@ -33,7 +33,7 @@ const swap = {
     b.onResolve({ filter: /^next\/(server|headers)$/ }, (a) => ({ path: `${a.path}.js`, external: true }));
   },
 };
-const ROUTES = ['critique', 'discover', 'brief', 'direct', 'generate', 'refine', 'images', 'projects', 'design-system'];
+const ROUTES = ['critique', 'discover', 'brief', 'direct', 'generate', 'refine', 'images', 'projects', 'design-system', 'assets'];
 await Promise.all(
   ROUTES.map((r) =>
     build({
@@ -736,6 +736,67 @@ console.log('\n=== the Creative DNA through the routes ===');
   const viaModel = await post('refine', { projectId: 'uxv0_dna', spec, brief, moodboard: { refs: [] }, comment: 'Make the whole page feel like a poster', dna: quiet }, DU, [{ understood: 'A poster', patch: { op: 'look', look: { grid: 'poster', rhythm: 'dramatic' }, summary: 'Poster grid' } }]);
   ok('…the same for a change the model wrote, checked in code after it answered; the model was told the DNA', viaModel.json.dnaMoved.includes('composition') && /Creative DNA/.test(viaModel.json.challenge) && J(viaModel.calls[0]).includes('CREATIVE DNA'), J(viaModel.json));
   ok('a DNA that does not hold together is ignored, never trusted', (await post('refine', { projectId: 'uxv0_dna', spec, moodboard: { refs: [] }, comment: 'Use Inter for the headlines', dna: { dims: { typography: { value: 'x', locked: true } } } }, DU, [])).json.challenge === '');
+}
+
+console.log('\n=== pictures from an image model: off unless configured, priced, capped, recorded apart ===');
+{
+  const IU = 'user_v0_img';
+  const brief = { objective: 'Show a ceramic studio’s new glazes and sell the first run of vessels.', audience: 'Collectors', personality: ['quiet', 'tactile'], visualDirection: 'Warm daylight', palette: [{ hex: '#f2ede4', role: 'background' }, { hex: '#1d1a16', role: 'text' }, { hex: '#7a3b22', role: 'accent' }], typography: { display: 'Fraunces', body: 'Inter' }, pageType: 'website' };
+  delete process.env.SOCRIAUX_IMAGE_GEN;
+  const g0 = await post('assets', null, IU, [], 'GET');
+  ok('off by default: the browser is told it is off, and why', g0.status === 200 && g0.json.enabled === false && /off on this server/.test(g0.json.why) && g0.json.prices.square > 0, J(g0.json));
+  globalThis.__imagesScript = [];
+  const p0 = await post('assets', { projectId: 'uxv0_img', brief, purpose: 'the opening', ratio: '16:9' }, IU, []);
+  ok('…and asking anyway is refused before any provider is called', p0.status === 403 && p0.json.off === true && p0.calls.length === 0, J(p0));
+  process.env.SOCRIAUX_IMAGE_GEN = 'on';
+  process.env.SOCRIAUX_IMAGE_DAILY_USD = '1';
+  const p1 = await post('assets', { projectId: 'uxv0_img', brief, purpose: 'the opening', subject: 'a celadon vessel on a plaster plinth', ratio: '16:9', treatment: 'natural light, documentary', colours: ['bone', 'iron red'], mood: ['quiet'] }, IU, []);
+  const call = p1.calls.find((c) => c.images);
+  ok('on: one picture from the image model, checked to be a real PNG, returned as a data address', p1.status === 200 && /^data:image\/png;base64,/.test(p1.json.image.dataUrl) && p1.json.image.mime === 'image/png' && p1.calls.length === 1 && call?.images.model === 'gpt-image-1' && call.images.size === '1536x1024' && call.images.n === 1, J({ status: p1.status, calls: p1.calls.length, size: call?.images?.size }));
+  ok('…its prompt written from the brief and the direction: the subject, the use, the treatment, the colours; never text or logos', /celadon vessel/.test(p1.json.image.prompt) && /the opening/.test(p1.json.image.prompt) && /natural light/.test(p1.json.image.prompt) && /iron red/.test(p1.json.image.prompt) && /No text, letters, numbers, logos/.test(p1.json.image.prompt) && p1.json.image.prompt === call.images.prompt);
+  ok('…priced, and the price recorded as the "image" stage, apart from text', p1.json.image.cost > 0 && p1.json.usage.stage === 'image' && p1.json.usage.cost === p1.json.image.cost && bumps.at(-1)?.p_cost === p1.json.image.cost, J({ usage: p1.json.usage, bump: bumps.at(-1) }));
+  process.env.SOCRIAUX_IMAGE_DAILY_USD = '0.01';
+  const p2 = await post('assets', { projectId: 'uxv0_img', brief, purpose: 'a project in the gallery', ratio: '1:1' }, IU, []);
+  ok('a picture that would pass the day’s budget for pictures is refused before the provider is asked', p2.status === 429 && /budget for pictures/.test(p2.json.error) && p2.calls.length === 0, J(p2));
+  process.env.SOCRIAUX_IMAGE_DAILY_USD = '1';
+  globalThis.__imagesScript = [Buffer.from('<html>not a picture</html>'.repeat(4)).toString('base64')];
+  const p3 = await post('assets', { projectId: 'uxv0_img', brief, purpose: 'the opening', ratio: '4:3' }, IU, []);
+  ok('an answer that is not a real picture is refused; nothing kept', p3.status === 502 && /not a picture/.test(p3.json.error), J(p3));
+  globalThis.__imagesScript = [Object.assign(new Error('rate limited'), { status: 429 })];
+  const p4 = await post('assets', { projectId: 'uxv0_img', brief, purpose: 'the opening', ratio: '4:3' }, IU, []);
+  ok('a busy provider is a calm 503', p4.status === 503 && /busy/.test(p4.json.error));
+  ok('no purpose, no picture', (await post('assets', { projectId: 'uxv0_img', brief, ratio: '4:3' }, IU, [])).status === 400);
+  ok('signed out: refused', (await post('assets', { purpose: 'x' }, null, [])).status === 401);
+  delete process.env.SOCRIAUX_IMAGE_GEN;
+  delete process.env.SOCRIAUX_IMAGE_DAILY_USD;
+  globalThis.__imagesScript = [];
+}
+
+console.log('\n=== how demanding a generation is: read in code, said, and the model chosen by it ===');
+{
+  // two people, so each stays within the day's generations (SOCRIAUX_DAILY_GENERATIONS=2 here)
+  const CU = 'user_v0_cx';
+  const CU2 = 'user_v0_cx2';
+  const page = { title: 'Page', pageType: 'website', sections: [{ id: 'hero', kind: 'hero', content: { title: 'Hello', primary: 'Go' } }, { id: 'f', kind: 'footer', content: { brand: 'B' } }] };
+  const formPage = { title: 'Contact', pageType: 'app-screen', sections: [{ id: 'c', kind: 'form', content: { title: 'Write to us', fields: [{ label: 'Name', type: 'text', required: true }, { label: 'Email', type: 'email', required: true }], submit: 'Send' } }] };
+  const form = { objective: 'A contact form for a small accounting practice', audience: 'Local businesses', personality: ['clear'], visualDirection: 'Plain and calm' };
+  const immersive = { objective: 'An immersive 3D product experience for a new speaker, with a configurator for its finish', audience: 'Audiophiles', personality: ['precise', 'bold'], visualDirection: 'Dark studio, rim light' };
+  const g1 = await post('generate', { projectId: 'uxv0_cx', brief: form, moodboard: {}, version: 1 }, CU, [formPage]);
+  ok('a simple page is read as simple, and still made on the premium model by default', g1.status === 200 && g1.json.complexity?.level === 'low' && g1.json.complexity.tier === 'premium' && g1.calls[0]?.model === 'gpt-6.1-sol', J({ status: g1.status, cx: g1.json?.complexity, model: g1.calls[0]?.model, err: g1.json?.error }));
+  ok('  its usage carries the time it took on the server', typeof g1.json.usage?.ms === 'number' && g1.json.usage.ms >= 0, J(g1.json.usage));
+  process.env.SOCRIAUX_SIMPLE_ECONOMY = 'on';
+  const g2 = await post('generate', { projectId: 'uxv0_cx', brief: form, moodboard: {}, version: 2 }, CU, [formPage]);
+  ok('where the deployment opted in, simple work goes to the economy model, and says so', g2.status === 200 && g2.json.complexity.tier === 'economy' && g2.calls[0]?.model === 'gpt-6-luna' && g2.json.usage.tier === 'economy', J({ status: g2.status, cx: g2.json?.complexity, model: g2.calls[0]?.model }));
+  const g3 = await post('generate', { projectId: 'uxv0_cx2', brief: immersive, moodboard: {}, version: 1 }, CU2, [page]);
+  ok('demanding work never does: a 3D object and a configurator stay on the premium model, with the reasons said', g3.status === 200 && g3.json.complexity.level === 'high' && g3.json.complexity.tier === 'premium' && g3.calls[0]?.model === 'gpt-6.1-sol' && g3.json.complexity.why.includes('a 3D object') && g3.json.complexity.why.includes('a configurator'), J({ status: g3.status, cx: g3.json?.complexity, model: g3.calls[0]?.model, err: g3.json?.error }));
+  ok('  and the page it makes has the 3D object and the configurator the brief needs', g3.status === 200 && ['scene', 'configurator'].every((k) => g3.json.spec.sections.some((x) => x.kind === k)), J(g3.json?.spec?.sections?.map((x) => x.kind)));
+  process.env.SOCRIAUX_TIER_GENERATE = 'premium';
+  const g4 = await post('generate', { projectId: 'uxv0_cx2', brief: form, moodboard: {}, version: 1 }, CU2, [formPage]);
+  ok('an operator’s tier set for the stage still holds over the reading', g4.status === 200 && g4.calls[0]?.model === 'gpt-6.1-sol', J({ status: g4.status, model: g4.calls[0]?.model }));
+  delete process.env.SOCRIAUX_TIER_GENERATE;
+  delete process.env.SOCRIAUX_SIMPLE_ECONOMY;
+  const logged = db.rows('ux_v0_calls').filter((r) => r.user_id === CU || r.user_id === CU2);
+  ok('each generation is in the call log with the tier it ran on', logged.length === 4 && J(logged.map((r) => r.tier)) === J(['premium', 'economy', 'premium', 'premium']), J(logged.map((r) => [r.tier, r.model])));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

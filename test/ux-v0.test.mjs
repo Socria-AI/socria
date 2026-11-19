@@ -1869,5 +1869,294 @@ console.log('\n=== layout pieces: a section composed from stacks, grids and prop
   ok('relevance: a page without what the work needs loses for it, and says so', noBooking.scores.relevance < 80 && noBooking.notes.relevance.some((x) => /booking/.test(x)), J(noBooking.notes.relevance));
 }
 
+// ── the production engine: pictures made in code, the image-model pathway, motion v2, interactions, 3D ──
+{
+  const pal = ['#f4efe6', '#1d1b18', '#b4532a', '#2f5d62', '#9a948a'];
+  const recipe = { kind: 'contour', seed: 42, ratio: '16:9', palette: pal };
+  const p = V.normalizeProc(recipe);
+  ok('a picture’s recipe is kept as given: kind, seed, ratio, palette', p && p.kind === 'contour' && p.seed === 42 && p.ratio === '16:9' && p.palette.length === 5, J(p));
+  ok('the same recipe draws the same picture; another seed, another picture', V.proceduralSvg(p) === V.proceduralSvg(V.normalizeProc({ ...recipe })) && V.proceduralSvg(p) !== V.proceduralSvg({ ...p, seed: 43 }));
+  ok('a recipe of an unknown kind, with one colour, or with things that are not colours, is refused', V.normalizeProc({ kind: 'blob', palette: pal }) === null && V.normalizeProc({ kind: 'field', palette: ['#000000'] }) === null && V.normalizeProc({ kind: 'field', palette: ['red', 'url(javascript:x)'] }) === null && V.normalizeProc('field') === null);
+  const bare = V.normalizeProc({ kind: 'grain', palette: ['#000000', '#ffffff'] });
+  ok('  without a ratio or a seed it is drawn at 4:3 from seed 1', bare.ratio === '4:3' && bare.seed === 1);
+  for (const k of V.PROC_KINDS) {
+    const svg = V.proceduralSvg(V.normalizeProc({ kind: k, seed: 7, ratio: '16:9', palette: pal }));
+    const foreign = [...new Set(svg.match(/#[0-9a-f]{6}\b/gi) ?? [])].filter((h) => !pal.includes(h.toLowerCase()));
+    ok(`"${k}" is a drawing at its ratio, in the design’s own colours, with nothing that runs or loads`, svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675"') && svg.length > 300 && !foreign.length && !/<script|foreignObject|\son[a-z]+=|href="http|<image/i.test(svg), J(foreign));
+  }
+  ok('square and upright ratios are drawn as such', /viewBox="0 0 1200 1200"/.test(V.proceduralSvg({ ...p, ratio: '1:1' })) && /viewBox="0 0 1200 1600"/.test(V.proceduralSvg({ ...p, ratio: '3:4' })));
+  const PFX = 'data:image/svg+xml;charset=utf-8,';
+  const uri = V.proceduralUri(p);
+  ok('as an address a page can show: a data: URI of that same drawing, escaped only where a URI must be', uri.startsWith(PFX) && decodeURIComponent(uri.slice(PFX.length)) === V.proceduralSvg(p).replace(/"/g, "'") && !/[<>#"]/.test(uri.slice(PFX.length)) && uri.length < encodeURIComponent(V.proceduralSvg(p)).length * 0.85, String(uri.length));
+  ok('one recipe, one stable id', V.procId(p) === V.procId({ ...p, palette: [...pal] }) && V.procId(p) !== V.procId({ ...p, seed: 43 }) && V.procId(p).startsWith('contour-'));
+  const made = V.normalizeRef(V.procRef(p, 'The opening has no photograph yet and asked for a picture'));
+  ok('a made picture is a kept moodboard reference, usable as content, with its provenance and its reason', made.provider === 'socriaux' && made.id === `socriaux:${V.procId(p)}` && made.creator === 'SocriaUX' && /no third-party rights/.test(made.license) && /opening/.test(made.reason) && made.state === 'kept' && made.asContent === true, J(made));
+  const claimed = V.normalizeRef({ ...V.procRef(p, 'x'), license: 'CC0', creator: 'Someone else' });
+  ok('  its credit says it was made here, and its licence and maker cannot be claimed otherwise', V.creditText(made) === '“Contour lines”, made by SocriaUX for this project' && /SocriaUX/.test(claimed.license) && claimed.creator === 'SocriaUX');
+  ok('  without a valid recipe it is refused, not stored', V.normalizeRef({ ...V.procRef(p, 'x'), proc: { kind: 'field', palette: [] } }) === null);
+  ok('each part’s picture is drawn at the ratio its layout shows', V.ratioFor('hero', 'full-bleed') === '16:9' && V.ratioFor('hero', 'split') === '4:3' && V.ratioFor('gallery', 'strip') === '3:4' && V.ratioFor('gallery', 'grid') === '1:1' && V.ratioFor('split', 'image-left') === '4:3');
+  ok('its colours come from the design’s tokens; a second ink that is not a colour is not used', J(V.paletteOf({ colors: { background: '#ffffff', text: '#111111', accent: '#aa3300', muted: '#999999' } }, 'nope')) === J(['#ffffff', '#111111', '#aa3300', '#aa3300', '#999999']));
+
+  // the image-model pathway: off unless the server turns it on, priced first, prompted from the brief, checked
+  ok('pictures from an image model are off by default, and say why', V.imageGenConfig({}).enabled === false && /off/.test(V.imageGenConfig({}).why));
+  ok('  turned on without a key they are still off, saying so; with no budget for pictures, off', V.imageGenConfig({ SOCRIAUX_IMAGE_GEN: 'on' }).enabled === false && /key/.test(V.imageGenConfig({ SOCRIAUX_IMAGE_GEN: 'on' }).why) && V.imageGenConfig({ SOCRIAUX_IMAGE_GEN: 'on', OPENAI_API_KEY: 'k', SOCRIAUX_IMAGE_DAILY_USD: '0' }).enabled === false);
+  const gen = V.imageGenConfig({ SOCRIAUX_IMAGE_GEN: 'on', OPENAI_API_KEY: 'k' });
+  ok('  on, with a key: one model, medium quality, US$1 a day unless the server says otherwise', gen.enabled && gen.model === 'gpt-image-1' && gen.quality === 'medium' && gen.dailyUsd === 1 && V.imageGenConfig({ SOCRIAUX_IMAGE_GEN: 'on', OPENAI_API_KEY: 'k', SOCRIAUX_IMAGE_QUALITY: 'HIGH' }).quality === 'high');
+  ok('the price is known before a picture is made: square and wide, from the list or the server’s own', V.imagePrice(gen, '1:1', {}) === 0.042 && V.imagePrice(gen, '16:9', {}) === 0.063 && V.imagePrice(gen, '1:1', { SOCRIAUX_IMAGE_PRICE_MEDIUM: '0.05' }) === 0.05 && V.imagePrice(gen, '16:9', { SOCRIAUX_IMAGE_PRICE_MEDIUM: '0.05' }) === 0.075);
+  ok('sizes follow the ratio', V.sizeFor('1:1') === '1024x1024' && V.sizeFor('3:4') === '1024x1536' && V.sizeFor('16:9') === '1536x1024' && V.sizeFor('4:3') === '1536x1024');
+  const imgBrief = V.normalizeBrief({ objective: 'A site for a glassblowing studio in Lisbon', audience: 'collectors', personality: ['quiet', 'precise'] });
+  const prompt = V.imagePrompt({ brief: imgBrief, purpose: 'the opening', ratio: '16:9', treatment: 'warm treatment', colours: ['#f4efe6', '#b4532a'] });
+  ok('the prompt is written from the brief and the direction: subject, use, audience, treatment, colours, mood, frame', /glassblowing/.test(prompt) && /the opening/.test(prompt) && /collectors/.test(prompt) && /warm treatment/.test(prompt) && /#b4532a/.test(prompt) && /quiet/.test(prompt) && /16:9 frame/.test(prompt), prompt);
+  ok('  it always asks for no text, logos or watermarks, and stays within a bound', /No text, letters, numbers, logos, signage or watermarks/.test(prompt) && V.imagePrompt({ brief: null, purpose: 'x'.repeat(5000), subject: 'y'.repeat(5000), ratio: '1:1' }).length <= 1800);
+  const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+  ok('what comes back is checked to be a picture: a PNG is kept', V.checkImage(PNG).ok === true && V.checkImage(PNG).mime === 'image/png');
+  const jpg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(80, 1)]).toString('base64');
+  const webp = Buffer.concat([Buffer.from('RIFF'), Buffer.from([1, 2, 3, 4]), Buffer.from('WEBPVP8 '), Buffer.alloc(80, 1)]).toString('base64');
+  ok('  a JPEG and a WebP are recognised', V.checkImage(jpg).mime === 'image/jpeg' && V.checkImage(webp).mime === 'image/webp');
+  ok('  nothing, markup, text that is not base64, or a picture too large is refused', !V.checkImage('').ok && !V.checkImage(Buffer.from('<svg onload=alert(1)>'.repeat(10)).toString('base64')).ok && !V.checkImage('not base64 at all <script>'.repeat(5)).ok && !V.checkImage(PNG, 10).ok);
+  const asked = [];
+  const fakeImages = { images: { generate: async (req, o) => (asked.push({ req, o }), { data: [{ b64_json: PNG }] }) } };
+  const got = await V.generateImage(fakeImages, gen, 'a prompt', '3:4');
+  ok('one picture is asked for, at the ratio’s size, in the configured quality and model', got.b64 === PNG && asked.length === 1 && asked[0].req.n === 1 && asked[0].req.size === '1024x1536' && asked[0].req.quality === 'medium' && asked[0].req.model === 'gpt-image-1', J(asked.map((a) => a.req)));
+
+  // a page that uses them: a made picture, a tagged gallery, a 3D object, a configurator
+  const prodBoard = V.normalizeMoodboard({ refs: [V.procRef(p, 'The opening asked for a picture'), ref('g1'), ref('g2'), ref('g3'), ref('g4')] });
+  const kin = V.motionFor('kinetic');
+  const prodInput = {
+    title: 'Atelier Noor', pageType: 'website', platform: 'web', tokens: SPEC.tokens,
+    sections: [
+      { id: 'hero', kind: 'hero', variant: 'split', content: { title: 'Light, held', subtitle: 'Glass made by hand.', primary: 'See the work' }, images: [made.id] },
+      { id: 'how', kind: 'features', variant: 'list', content: { title: 'How a piece is made', items: [{ title: 'Gather', text: 'Molten glass from the furnace.' }, { title: 'Blow', text: 'One breath at a time.' }, { title: 'Shape', text: 'Wood, water and paper.' }, { title: 'Anneal', text: 'A night to cool.' }] }, images: [] },
+      { id: 'gal', kind: 'gallery', variant: 'grid', content: { title: 'Work', tags: ['Vessels', 'Lamps', 'Vessels', 'Lamps'] }, images: ['openverse:g1', 'openverse:g2', 'openverse:g3', 'openverse:g4'] },
+      { id: 'obj', kind: 'scene', variant: 'object', content: { title: 'The Halo vessel', text: 'Turn it.', model: 'knot', material: 'gloss', color: '#2f5d62', caption: 'Drag to turn.' }, images: [] },
+      { id: 'cfg', kind: 'configurator', variant: 'panel', content: { title: 'Make it yours', groups: [{ name: 'Finish', options: [{ label: 'Smoke', price: '', swatch: '#5a5a5a' }, { label: 'Amber', price: '+£40', swatch: '#c98a2b' }] }, { name: 'Size', options: [{ label: 'Small', price: '' }, { label: 'Large', price: '+£120' }] }], base: '£280', action: 'Reserve it', note: 'Made to order.' }, images: [] },
+      { id: 'foot', kind: 'footer', variant: 'simple', content: { brand: 'Atelier Noor', columns: [] }, images: [] },
+    ],
+  };
+  const prod = V.normalizeSpec(prodInput, prodBoard);
+  const page = V.renderDesign(prod, prodBoard.refs).html;
+  ok('every new part survives the spec: the scene and the configurator are kept', J(prod.sections.map((x) => x.kind)) === J(['hero', 'features', 'gallery', 'scene', 'configurator', 'footer']), J(prod.sections.map((x) => x.kind)));
+  ok('a made picture is drawn in place from its recipe', page.includes(`src="${PFX}`));
+  const credits = (page.match(/<p class="credits">([^]*?)<\/p>/) ?? ['', ''])[1];
+  ok('  it needs no credit line; the found pictures keep theirs', /A\. Photographer/.test(credits) && !/SocriaUX/.test(credits), credits);
+  ok('a tagged gallery offers each kind as a filter, and each picture opens large', (page.match(/data-ux-filter="/g) ?? []).length === 3 && (page.match(/data-ux-open=""/g) ?? []).length === 4 && page.includes('data-tag="Lamps"'));
+  ok('the scene is a canvas with its drawn silhouette inside, named for a screen reader and reachable by keyboard', /data-ux-scene data-model="knot" data-material="gloss" data-color="#2f5d62" role="img" aria-label="The Halo vessel: a knot in gloss, shown in three dimensions\./.test(page) && /<canvas class="sc-canvas"><\/canvas><svg/.test(page) && /data-ux-scene[^>]*tabindex="0"/.test(page));
+  const odd = V.renderDesign(V.normalizeSpec({ ...prodInput, sections: [{ id: 'o', kind: 'scene', variant: 'object', content: { title: 'X', model: 'teapot', material: 'jelly', color: 'red;background:url(x)' } }] }, prodBoard), prodBoard.refs).html;
+  ok('  an unknown object or material falls back; a colour that is not a colour is dropped', /data-model="vessel" data-material="satin" role="img"/.test(odd) && !/url\(x\)/.test(odd));
+  ok('the 3D runtime is inlined in an export only where there is a scene', V.renderDesign(prod, prodBoard.refs, { runtime: true }).html.includes('__uxScene') && !page.includes('__uxScene') && !V.renderDesign(V.normalizeSpec({ ...prodInput, sections: prodInput.sections.filter((x) => x.kind !== 'scene') }, prodBoard), prodBoard.refs, { runtime: true }).html.includes('__uxScene'));
+  ok('the configurator is a real form: a radio group per choice, the first chosen, a total from the base and the prices', (page.match(/name="cfg-g0"/g) ?? []).length === 2 && (page.match(/name="cfg-g1"/g) ?? []).length === 2 && /data-ux-config-total data-base="280" data-cur="£">£280</.test(page) && /nothing was ordered/.test(page));
+
+  // run in a DOM: the self-test finds each part working; real clicks do what they say
+  const pdom = new JSDOM(page, { runScripts: 'outside-only', pretendToBeVisual: true });
+  const pw = pdom.window;
+  pw.eval(V.BEHAVIOR_SOURCE);
+  const counts = pw.__uxBehaviors;
+  ok('the behaviour runtime binds the gallery, its filter and the configurator', counts.galleries === 1 && counts.filters === 1 && counts.configurators === 1, J(counts));
+  const selfI = pw.__uxBehaviors.selfTestInteractive();
+  ok('  its self-test finds each one working, and leaves it as it was', selfI.length === 3 && selfI.every((x) => !x.problems.length) && pw.document.querySelectorAll('.g-item[hidden]').length === 0, J(selfI));
+  const pd = pw.document;
+  pd.querySelector('[data-ux-filter="Lamps"]').click();
+  const shownFigs = [...pd.querySelectorAll('.g-item')].filter((f) => !f.hidden);
+  ok('choosing "Lamps" shows only the lamps, and says which filter is on', shownFigs.length === 2 && shownFigs.every((f) => f.getAttribute('data-tag') === 'Lamps') && pd.querySelector('[data-ux-filter="Lamps"]').getAttribute('aria-pressed') === 'true' && pd.querySelector('[data-ux-filter=""]').getAttribute('aria-pressed') === 'false');
+  shownFigs[1].click();
+  const lbox = pd.querySelector('.ux-lb');
+  ok('  a picture opens large as a dialog, among the pictures shown', lbox && !lbox.hidden && lbox.getAttribute('role') === 'dialog' && /2 of 2/.test(lbox.textContent));
+  lbox.dispatchEvent(new pw.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  ok('  Escape closes it', lbox.hidden);
+  let recolour = '';
+  pd.addEventListener('ux-config', (e) => (recolour = e.detail.swatch));
+  const cfgRoot = pd.querySelector('[data-ux-config]');
+  for (const g of cfgRoot.querySelectorAll('fieldset')) {
+    const opts = g.querySelectorAll('input[type=radio]');
+    opts[opts.length - 1].checked = true;
+  }
+  cfgRoot.querySelector('form').dispatchEvent(new pw.Event('change', { bubbles: true }));
+  ok('choosing Amber and Large: the total and the choice follow, and the object on the page is told the colour', cfgRoot.querySelector('[data-ux-config-total]').textContent === '£440' && /Amber · Large/.test(cfgRoot.querySelector('[data-ux-config-choice]').textContent) && recolour === '#c98a2b', cfgRoot.querySelector('[data-ux-config-total]').textContent);
+  cfgRoot.querySelector('form').dispatchEvent(new pw.Event('submit', { bubbles: true, cancelable: true }));
+  ok('  the action confirms the choice and says nothing was ordered', !cfgRoot.querySelector('[data-ux-config-done]').hidden && /Amber · Large, £440/.test(cfgRoot.querySelector('[data-ux-config-said]').textContent));
+
+  // the 3D runtime without WebGL: the silhouette stays, and its self-test says so rather than claim a drawing
+  const sdom = new JSDOM(page, { runScripts: 'outside-only', pretendToBeVisual: true });
+  sdom.window.HTMLCanvasElement.prototype.getContext = () => null;
+  sdom.window.eval(V.SCENE_RUNTIME);
+  const sres = sdom.window.__uxScene.selfTest();
+  ok('without WebGL the scene keeps its drawn silhouette, and the self-test reports it, not a drawing', sdom.window.__uxScene.report.fallback === 1 && sres[0].webgl === false && /silhouette/.test(sres[0].problems[0]) && sdom.window.document.querySelector('[data-ux-scene] svg') !== null && !sdom.window.document.querySelector('[data-ux-scene]').classList.contains('sc-live'), J(sres));
+
+  // charts and tables on a screen: values said, series shown or hidden, rows filtered
+  const appSpec = V.normalizeSpec({ title: 'Lab', pageType: 'app-screen', platform: 'web', tokens: SPEC.tokens, sections: [
+    { id: 'ch', kind: 'chart', variant: 'line', content: { title: 'Readings', labels: ['Mon', 'Tue', 'Wed', 'Thu'], series: [{ name: 'Probe A', values: [3, 5, 4, 6] }, { name: 'Probe B', values: [2, 3, 3, 4] }] } },
+    { id: 'tb', kind: 'table', variant: 'default', content: { title: 'Samples', columns: ['Sample', 'Site'], rows: Array.from({ length: 7 }, (_, i) => ({ cells: [`S-${i + 1}`, i % 2 ? 'North' : 'South'] })) } },
+  ] }, board);
+  const appHtml = V.renderDesign(appSpec, board.refs).html;
+  ok('each reading on a chart says its value to a pointer and a screen reader', appHtml.includes('<title>Probe A, Tue: 5</title>'));
+  ok('  with two series the key shows or hides each; a long table can be filtered', (appHtml.match(/data-ux-series="/g) ?? []).length === 2 && appHtml.includes('data-ux-table-filter'));
+  const adom = new JSDOM(appHtml, { runScripts: 'outside-only', pretendToBeVisual: true });
+  adom.window.eval(V.BEHAVIOR_SOURCE);
+  const ast = adom.window.__uxBehaviors.selfTestInteractive();
+  ok('  their self-test finds both working', ast.length === 2 && ast.every((x) => !x.problems.length) && ast.map((x) => x.kind).sort().join() === 'chart,table', J(ast));
+  const ad = adom.window.document;
+  const lgB = ad.querySelector('[data-ux-series="1"]');
+  lgB.click();
+  ok('  hiding a series hides its line and points, and its button says so', lgB.getAttribute('aria-pressed') === 'false' && [...ad.querySelectorAll('svg.chart .s1')].length > 0 && [...ad.querySelectorAll('svg.chart .s1')].every((m) => m.classList.contains('is-off')));
+  ad.querySelector('[data-ux-series="0"]').click();
+  ok('  the last series shown cannot be hidden', ad.querySelector('[data-ux-series="0"]').getAttribute('aria-pressed') === 'true');
+  const findIn = ad.querySelector('[data-ux-table-filter]');
+  findIn.value = 'north';
+  findIn.dispatchEvent(new adom.window.Event('input', { bubbles: true }));
+  const rowsShown = [...ad.querySelectorAll('.table-card tbody tr')].filter((r) => !r.hidden);
+  ok('  typing in the filter keeps only the rows that say it', rowsShown.length === 3 && rowsShown.every((r) => /North/.test(r.textContent)), String(rowsShown.length));
+
+  // motion v2: the scripted layer, marked only where the page plays; nothing at all under reduced motion
+  ok('the kinetic preset scrubs, tells a story, scales pictures in, draws lines and answers the pointer', kin.scrub === 2 && kin.story && kin.media === 'scale' && kin.draw && kin.magnetic && kin.cursor === 'tilt');
+  ok('  calm does none of it; still marks nothing', !V.motionFor('calm').story && !V.motionFor('calm').magnetic && V.motionFor('calm').media === 'none' && V.scriptedMarks(V.motionFor('still')).body === '');
+  const mk = V.scriptedMarks(kin);
+  ok('its marks: the page says what plays; story, pictures, tilt and drawing are each switched on', /data-mo=""/.test(mk.body) && /data-mo-scrub="2"/.test(mk.body) && /data-mo-magnetic/.test(mk.body) && /data-mo-cursor="tilt"/.test(mk.body) && mk.story && mk.media && mk.tilt && mk.draw, J(mk));
+  const moving = V.normalizeSpec({ ...prodInput, look: { ...V.lookFromTokens(SPEC.tokens), motion: kin } }, prodBoard);
+  const played = V.renderDesign(moving, prodBoard.refs, { motion: 'play' }).html;
+  const resting = V.renderDesign(moving, prodBoard.refs).html;
+  ok('where the page plays, the sequence of points becomes the pinned story, one step per point', /<section class="mo-story /.test(played) && (played.match(/data-mo-step=""/g) ?? []).length === 4);
+  ok('  pictures arrive as they come into view, and tilt toward the pointer', /<figure data-mo-in="" data-mo-tilt="" class="g-item/.test(played));
+  ok('  each effect waits for the runtime (body.mo-ready), with a reduced-motion alternative', /\.mo-ready/.test(played) && /prefers-reduced-motion/.test(played));
+  ok('on the canvas (static) none of it is marked: the page is simply there', !/mo-story|data-mo-in|data-mo-step|data-mo=""/.test(resting));
+  const noScripts = played.replace(/<script>[^]*?<\/script>/g, '');
+  const media = (reduce) => (q) => ({ matches: reduce && /reduce/.test(q), media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} });
+  const mdom = new JSDOM(noScripts, { runScripts: 'outside-only', pretendToBeVisual: true });
+  mdom.window.matchMedia = media(false);
+  mdom.window.eval(V.MOTION_RUNTIME);
+  const mrep = mdom.window.__uxMotion.report;
+  ok('the motion runtime wires the story, the arrivals and the scrub, then marks the page ready', mdom.window.document.body.classList.contains('mo-ready') && mrep.stories === 1 && mrep.steps === 4 && mrep.reveal >= 4 && mrep.scrub === 2, J(mrep));
+  ok('  the first step takes the stage; without IntersectionObserver every arrival is simply shown', mdom.window.document.querySelector('[data-mo-step]').classList.contains('is-on') && mrep.revealed === mrep.reveal);
+  const rdom = new JSDOM(noScripts, { runScripts: 'outside-only', pretendToBeVisual: true });
+  rdom.window.matchMedia = media(true);
+  rdom.window.eval(V.MOTION_RUNTIME);
+  ok('under prefers-reduced-motion it does nothing: no ready mark, nothing wired', !rdom.window.document.body.classList.contains('mo-ready') && rdom.window.__uxMotion.report.reduced === true && rdom.window.__uxMotion.report.stories === 0);
+  const sdom2 = new JSDOM(resting, { runScripts: 'outside-only', pretendToBeVisual: true });
+  sdom2.window.matchMedia = media(false);
+  sdom2.window.eval(V.MOTION_RUNTIME);
+  ok('  nor on a page that does not play', !sdom2.window.document.body.classList.contains('mo-ready'));
+}
+
+// ── a part set apart at a width: what the designer changed for tablets or phones ──
+{
+  ok('width rules keep only what is a rule, at a width there is', J(V.normalizeResponsive({ mobile: { hide: true, align: 'justify', pad: 'xl', media: 'first', type: 's', junk: 1 }, desktop: { hide: true }, tablet: {} })) === J({ mobile: { hide: true, media: 'first', type: 's' } }));
+  ok('  nothing set is nothing kept', V.normalizeResponsive({}) === undefined && V.normalizeResponsive(null) === undefined && V.normalizeResponsive({ mobile: { hide: false } }) === undefined);
+  const base = V.normalizeSpec({ title: 'W', pageType: 'website', tokens: SPEC.tokens, sections: [
+    { id: 'hero', kind: 'hero', variant: 'split', content: { title: 'Light', subtitle: 'Held to it.', primary: 'Go' }, images: ['openverse:a1'] },
+    { id: 'how', kind: 'features', variant: 'list', content: { title: 'How', items: [{ title: 'A', text: 'a' }, { title: 'B', text: 'b' }, { title: 'C', text: 'c' }] }, images: [] },
+  ] }, board);
+  let r = V.applyPatch(base, { op: 'responsive', sectionId: 'how', breakpoint: 'mobile', rule: { hide: true }, summary: 'Hidden on phones' }, board);
+  ok('a "responsive" patch sets one part apart at one width: a new version, only that part touched', r.ok && r.spec.version === base.version + 1 && J(r.touched) === J(['how']) && r.spec.sections[1].responsive.mobile.hide === true && !r.spec.sections[0].responsive);
+  r = V.applyPatch(r.spec, { op: 'responsive', sectionId: 'how', breakpoint: 'mobile', rule: { align: 'center' }, summary: 'x' }, board);
+  ok('  another rule at that width joins it, the first kept', r.ok && J(r.spec.sections[1].responsive.mobile) === J({ hide: true, align: 'center' }));
+  r = V.applyPatch(r.spec, { op: 'responsive', sectionId: 'how', breakpoint: 'phone', rule: { hide: null }, summary: 'x' }, board);
+  ok('  null takes one back to the desktop’s ("phone" read as phones)', r.ok && J(r.spec.sections[1].responsive.mobile) === J({ align: 'center' }));
+  const cleared = V.applyPatch(r.spec, { op: 'responsive', sectionId: 'how', breakpoint: 'mobile', rule: { align: null }, summary: 'x' }, board);
+  ok('  with nothing left, the part has no width rules at all', cleared.ok && cleared.spec.sections[1].responsive === undefined);
+  ok('a width rule without a width, without a rule, or with no real rule is refused, saying why', !V.applyPatch(base, { op: 'responsive', sectionId: 'how', rule: { hide: true }, summary: 'x' }, board).ok && !V.applyPatch(base, { op: 'responsive', sectionId: 'how', breakpoint: 'mobile', summary: 'x' }, board).ok && /not something/.test(V.applyPatch(base, { op: 'responsive', sectionId: 'how', breakpoint: 'mobile', rule: { colour: 'red' }, summary: 'x' }, board).error));
+  ok('  on a locked part it is asked about first, like any change', V.lockedTouched(V.setLocked(base, 'how', true), { op: 'responsive', sectionId: 'how', breakpoint: 'mobile', rule: { hide: true }, summary: 'x' }).includes('how'));
+  ok('a part’s rules survive the spec being read again', J(V.normalizeSpec(JSON.parse(J(r.spec)), board).sections[1].responsive) === J({ mobile: { align: 'center' } }));
+  let wr = base;
+  for (const pt of [{ op: 'responsive', sectionId: 'hero', breakpoint: 'mobile', rule: { media: 'first', type: 's', align: 'center' } }, { op: 'responsive', sectionId: 'how', breakpoint: 'tablet', rule: { pad: 's' } }, { op: 'responsive', sectionId: 'how', breakpoint: 'mobile', rule: { hide: true } }]) wr = V.applyPatch(wr, { ...pt, summary: 'x' }, board).spec;
+  const wh = V.renderDesign(wr, board.refs).html;
+  ok('the renderer marks each part with its rules, by name', /class="sx sx-hero[^"]* rs-m-center rs-m-media-first rs-m-type-s"/.test(wh) && /class="sx sx-features[^"]* rs-t-pad-s rs-m-hide"/.test(wh), (wh.match(/class="sx sx-(hero|features)[^"]*"/g) ?? []).join(' | '));
+  const rcss = V.responsiveCss(wr.sections);
+  ok('  and writes each rule once, at its width, only for what the page uses', /@media \(max-width:759px\)\{\.sx\.rs-m-hide\{display:none!important\}/.test(rcss) && rcss.includes('@media (min-width:760px) and (max-width:1099px){.sx.rs-t-pad-s{padding-block:calc(var(--space) * .55)}}') && !/rs-t-hide|rs-m-start|type-l/.test(rcss) && wh.includes(rcss), rcss);
+  ok('  a page with no width rules carries none of it', V.responsiveCss(base.sections) === '' && !/rs-m-|rs-t-/.test(V.renderDesign(base, board.refs).html));
+  ok('what a part’s rules say, in words', J(V.describeResponsive(wr.sections[0].responsive)) === J(['On phones: centred, picture before the words, headings smaller']) && J(V.describeResponsive(wr.sections[1].responsive)) === J(['On tablets: tight spacing', 'On phones: hidden']));
+  const sel = (id) => ({ element: { ux: { section: id, path: 'title' } } });
+  const q = (t, id = 'hero') => V.readQuickEdit(t, base, sel(id));
+  ok('"hide this on phones" is done in code, for the part selected', J(q('hide this on phones', 'how')?.patches) === J([{ op: 'responsive', sectionId: 'how', breakpoint: 'mobile', rule: { hide: true }, summary: 'Hidden on phones' }]), J(q('hide this on phones', 'how')));
+  ok('  "centre it on mobile", "picture first on phones", "smaller headings on tablets", "more space on phones"', q('centre it on mobile')?.patches[0].rule.align === 'center' && q('put the picture first on phones')?.patches[0].rule.media === 'first' && q('smaller headings on tablets')?.patches[0].breakpoint === 'tablet' && q('smaller headings on tablets')?.patches[0].rule.type === 's' && q('more space on phones')?.patches[0].rule.pad === 'l');
+  ok('  a picture’s place is not set on a part with no picture; with nothing selected it is the model’s', q('picture first on phones', 'how') === null && V.readQuickEdit('hide the gallery on phones', base, null) === null);
+}
+
+// ── combining two directions: one kept, whole groups taken from the other ──
+{
+  const brief = V.normalizeBrief({ pageType: 'website', platform: 'web', objective: 'Sell hand-blown glass from a Lisbon studio', audience: 'Collectors and interior designers', personality: ['quiet', 'precise', 'warm'], visualDirection: 'Light through glass, raw plaster, thin type' }, new Set());
+  const [a, b] = V.proposeDirections({ brief });
+  const locked = { ...a, locks: ['palette', 'voice'] };
+  const c = V.combineDirections(locked, b, ['type', 'motion']);
+  ok('combined: the type and the motion are the other’s, everything else the base’s', c && J(c.tokens.fonts) === J(b.tokens.fonts) && c.look.ratio === b.look.ratio && c.look.weight === b.look.weight && J(c.look.motion) === J(b.look.motion) && J(c.tokens.colors) === J(a.tokens.colors) && c.look.grid === a.look.grid && c.voice === a.voice && c.language === a.language, J({ fonts: c?.tokens.fonts, from: b.tokens.fonts }));
+  ok('  what was taken is locked as the designer’s decision; the base’s own locks on what it kept stay', c && J([...c.locks].sort()) === J(['motion', 'palette', 'type', 'voice']) && c.source === 'person');
+  ok('  it is a direction of its own: its own id and name, its reason said, its DNA read again, no stale plan', c && c.id !== a.id && c.id !== b.id && c.name.includes(a.name) && c.name.includes(b.name) && /^Combined by hand: the type and motion of/.test(c.rationale[0]) && c.dnaLean === 'combined by hand' && /type and motion of/.test(c.dnaSaid[0]) && c.dna && !c.designPlan && V.normalizeDirection(c) !== null);
+  const lay = V.combineDirections(a, b, ['layout']);
+  ok('taking the layout takes the structure it gives the design, not only its grid', lay && lay.look.grid === b.look.grid && lay.plan === b.plan && J(lay.compose ?? null) === J(b.compose ?? null) && lay.composition === b.composition && J(lay.tokens.colors) === J(a.tokens.colors));
+  const pal = V.combineDirections(a, b, ['palette']);
+  ok('taking the palette brings the second accent with it', pal && J(pal.tokens.colors) === J(b.tokens.colors) && (pal.look.accent2 ?? '') === (b.look.accent2 ?? ''));
+  ok('nothing to take, one direction with itself, or groups that are not groups: no combination', V.combineDirections(a, b, []) === null && V.combineDirections(a, a, ['type']) === null && V.combineDirections(a, b, ['everything']) === null);
+  ok('the base and the other are left as they were', J(V.proposeDirections({ brief })[0].tokens) === J(a.tokens) && J(V.proposeDirections({ brief })[1].look) === J(b.look));
+  const spec = V.normalizeSpec({ title: 'Glass', pageType: 'website', tokens: c.tokens, look: c.look, sections: [{ id: 'hero', kind: 'hero', variant: 'editorial', content: { title: 'Glass' }, images: [] }] }, null);
+  ok('a design from the combination draws with its faces and motion', V.renderDesign(spec, []).html.includes(c.tokens.fonts.display.replace(/ /g, '+')) && spec.look.motion.feel === b.look.motion.feel);
+}
+
+// ── how demanding a generation is; what each accepted design took ──
+{
+  const C = (o, env = {}) => V.generationComplexity({ kind: 'site', required: [], words: '', motion: 'calm', references: 0, system: false, dna: null, ...o }, env);
+  ok('a form with one job and quiet motion is simple; a site of several parts is not; a coming-soon page is', C({ kind: 'form', required: ['form'] }).level === 'low' && C({}).level === 'medium' && C({ words: 'a coming soon page for a bakery' }).level === 'low');
+  ok('a 3D object, a configurator, kinetic motion, an expressive Creative DNA or such words: demanding, and it says why', C({ required: ['scene'] }).level === 'high' && C({ required: ['configurator'] }).why.includes('a configurator') && C({ motion: 'kinetic' }).level === 'high' && C({ dna: { composition: 82 } }).level === 'high' && C({ words: 'an immersive webgl product launch' }).why.includes('an immersive or 3D experience') && C({ words: 'a scroll-driven story of the harvest' }).why.includes('motion that tells the story'));
+  ok('a design system, references, lively motion or a richer kind of work make it medium', C({ system: true }).why.includes('a design system to keep to') && C({ references: 6 }).why[0] === '6 references to interpret' && C({ kind: 'dashboard' }).why.includes('a dashboard') && C({ kind: 'form', required: ['form'], motion: 'lively' }).level === 'medium');
+  const on = { SOCRIAUX_SIMPLE_ECONOMY: 'on' };
+  ok('advanced work never goes to the cheaper model; simple work does only where the deployment opted in', C({ required: ['scene'] }, on).tier === 'premium' && C({}, on).tier === 'premium' && C({ kind: 'form', required: ['form'] }, on).tier === 'economy' && C({ kind: 'form', required: ['form'] }).tier === 'premium');
+  let t = { calls: 0, input: 0, output: 0, cost: 0 };
+  t = V.addUsage(t, { model: 'gpt-6.1-sol', input: 1000, cached: 0, output: 2000, cost: 0.2, stage: 'generate', tier: 'premium', ms: 30000 });
+  t = V.addUsage(t, { model: 'gpt-6-luna', input: 500, cached: 0, output: 100, cost: 0.01, stage: 'refine', tier: 'economy', ms: 4000 });
+  t = V.addUsage(t, { model: 'gpt-image-1', input: 0, cached: 0, output: 0, cost: 0.063, stage: 'image', tier: 'economy', ms: 20000 });
+  t = V.addUsage(t, { model: 'gpt-6.1-sol', input: 1000, cached: 0, output: 2000, cost: 0.2, stage: 'generate', tier: 'premium', ms: 26000 });
+  ok('each call adds its time, by stage; pictures are their own stage', t.ms === 80000 && t.byStage.generate.ms === 56000 && t.byStage.image.ms === 20000 && t.byStage.image.cost === 0.063 && t.byStage.image.calls === 1, J(t));
+  ok('before a design is accepted there is nothing per design to say', V.acceptedEconomics(t) === null);
+  t = V.acceptDesign(V.acceptDesign(t, 3), 5);
+  const e = V.acceptedEconomics(t);
+  ok('per accepted design: the money with text and pictures apart, the attempts, the time', e.accepted === 2 && e.cost === 0.2365 && e.images === 0.0315 && e.text === 0.205 && e.generations === 1 && e.refinements === 0.5 && e.seconds === 40, J(e));
+  ok('a call’s time is kept as measured, and nonsense is not', V.normalizeUsage({ model: 'x', input: 1, cached: 0, output: 1, cost: 0.1, ms: 1234 }).ms === 1234 && V.normalizeUsage({ model: 'x', ms: -5 }).ms === undefined && V.normalizeUsage({ model: 'x', ms: 'soon' }).ms === undefined);
+  const proj = { ...V.makeProject('create', 'Economics'), usage: t };
+  const back = V.normalizeProject(JSON.parse(J(proj))).usage;
+  ok('…and the totals, their times and what was accepted survive a save', back.ms === 80000 && back.byStage.generate.ms === 56000 && J(back.accepted) === J([3, 5]) && J(V.acceptedEconomics(back)) === J(e));
+}
+
+// ── the drawn page, checked at three widths, its interactive parts tried, its scripts and weight looked at ──
+{
+  const qs = V.normalizeSpec({ title: 'QA', pageType: 'website', tokens: SPEC.tokens, sections: [
+    { id: 'hero', kind: 'hero', variant: 'editorial', content: { title: 'Glass, held', subtitle: 'Made by hand.', primary: 'See it' }, images: [] },
+    { id: 'gal', kind: 'gallery', variant: 'grid', content: { title: 'Work', tags: ['A', 'B', 'A'] }, images: ['openverse:a1', 'openverse:a2', 'openverse:a3'] },
+    { id: 'obj', kind: 'scene', variant: 'object', content: { title: 'The vessel', model: 'vessel', material: 'satin' }, images: [] },
+    { id: 'cfg', kind: 'configurator', variant: 'panel', content: { title: 'Make it yours', groups: [{ name: 'Finish', options: [{ label: 'Smoke', price: '' }, { label: 'Amber', price: '+£40' }] }], base: '£280', action: 'Reserve it' }, images: [] },
+  ] }, board);
+  const au = (o = {}) => V.normalizeAudit({ width: 1280, viewport: 900, height: 4000, overflowX: 0, bodySize: 17, sections: [], headings: [{ level: 1, size: 64, lines: 2, width: 900, section: 'hero', path: 'title', text: 'Glass, held' }], contrast: [], targets: [], images: [], overflow: [], measure: [], style: {}, behaviors: [], ...o });
+  const kept = au({ interactive: [{ kind: 'gallery', index: 0, items: 3, problems: ['a picture does not open large'] }], scenes: [{ index: 0, webgl: true, drawn: false, problems: ['nothing was drawn at the centre of the scene'] }], errors: ['TypeError: x is undefined'], weight: { html: 90000, images: 3, oversized: 2, inline: 0 } });
+  ok('the audit keeps what the interactive parts, the scenes, the scripts and the weight said, held to its shape', kept.interactive[0].problems[0] === 'a picture does not open large' && kept.scenes[0].webgl === true && kept.errors[0].startsWith('TypeError') && kept.weight.oversized === 2 && V.normalizeAudit({ width: 10, errors: Array(20).fill('e'.repeat(500)) }).errors.length === 5 && V.normalizeAudit({ width: 10, errors: ['e'.repeat(500)] }).errors[0].length === 120);
+  const ev = V.evaluateDesign(qs, { desktop: kept });
+  const fn = ev.findings.filter((f) => f.kind === 'function');
+  ok('a gallery that does not open is a must-fix on that gallery', fn.some((f) => f.section === 'gal' && /gallery does not work/.test(f.message) && f.severity === 'high'), J(fn.map((f) => f.message)));
+  ok('a scene that ran WebGL and drew nothing is a must-fix on that scene', fn.some((f) => f.section === 'obj' && /drew nothing/.test(f.message)));
+  ok('a script that failed is said, in the browser’s words', fn.some((f) => /A script failed on the page: TypeError/.test(f.message)));
+  ok('pictures far larger than shown are a performance note, not a must-fix', ev.findings.some((f) => f.kind === 'performance' && f.severity === 'low' && /2 pictures are more than three times larger/.test(f.message)));
+  const quiet = V.evaluateDesign(qs, { desktop: au({ scenes: [{ index: 0, webgl: false, drawn: false, problems: ['no WebGL here: the drawn silhouette stands in'] }], interactive: [{ kind: 'gallery', index: 0, items: 3, problems: [] }], errors: [], weight: { html: 90000, images: 3, oversized: 0, inline: 0 } }) });
+  ok('…but no WebGL is not a fault (the silhouette stands in, as made), and parts that work say nothing', !quiet.findings.some((f) => f.kind === 'function' || f.kind === 'performance'), J(quiet.findings.filter((f) => f.kind === 'function').map((f) => f.message)));
+  ok('markup that has grown heavy is said, with how much of it is pictures written into the page', V.evaluateDesign(qs, { desktop: au({ weight: { html: 900000, images: 9, oversized: 0, inline: 700000 } }) }).findings.some((f) => f.kind === 'performance' && /900 KB of markup, 700 KB of it pictures/.test(f.message)));
+  const both = { overflow: [{ section: 'hero', path: 'title', by: 30, tag: 'h1' }] };
+  const three = V.evaluateDesign(qs, { desktop: au(), tablet: au({ width: 834, ...both, overflow: [...both.overflow, { section: 'cfg', path: 'groups', by: 12, tag: 'div' }] }), phone: au({ width: 390, ...both }) });
+  const ov = three.findings.filter((f) => f.kind === 'overflow');
+  ok('at three widths: what the phone already found is not counted again for the tablet; what only the tablet shows is said for it', ov.length === 2 && ov.some((f) => f.viewport === 'phone' && f.section === 'hero') && ov.some((f) => f.viewport === 'tablet' && f.section === 'cfg' && /past the edge of the tablet/.test(f.message)), J(ov.map((f) => [f.viewport, f.section])));
+  const tgt = V.evaluateDesign(qs, { tablet: au({ width: 834, targets: [{ section: 'cfg', path: 'action', w: 30, h: 30, text: 'Go' }] }) });
+  ok('a tablet is touched, so its targets are checked too', tgt.findings.some((f) => f.kind === 'target' && f.viewport === 'tablet'));
+  // the audit's own source, in a DOM: it hears a script that fails, and tries the interactive parts
+  const page = V.renderDesign(qs, board.refs).html;
+  const qd = new JSDOM(page, { runScripts: 'outside-only', pretendToBeVisual: true });
+  qd.window.eval(V.INSPECTOR_SOURCE);
+  qd.window.eval(V.BEHAVIOR_SOURCE);
+  qd.window.dispatchEvent(new qd.window.ErrorEvent('error', { message: 'ReferenceError: boom is not defined' }));
+  const res = qd.window.__uxv0Audit();
+  ok('the in-page audit collects a failing script, and returns the interactive self-test and the page’s weight', res.errors.includes('ReferenceError: boom is not defined') && Array.isArray(res.interactive) && res.interactive.some((x) => x.kind === 'configurator' && !x.problems.length) && res.weight.html > 1000 && res.weight.images === 3, J({ errors: res.errors, interactive: res.interactive, weight: res.weight }));
+}
+
+// ── what the benchmark taught the intent reader ──
+{
+  const req = (t) => V.readIntent(t).requirements.map((r) => r.component);
+  const research = 'A research interface to explore glacier mass balance across field stations: compare glaciers over a decade and inspect each station’s readings.';
+  ok('a research interface that compares over time and inspects readings is a data interface, with its chart and its table', V.readIntent(research).kind === 'data' && req(research).includes('chart') && req(research).includes('table'), J(V.readIntent(research)));
+  ok('"reserve one" of a product to configure is not a booking of a time', !req('A product page where you configure the chair and reserve one').includes('booking') && !req('Pre-order the speaker: configure the finish, then the reservation').includes('booking'));
+  ok('…while a table, a night, a class or plain bookings still are', ['Make a reservation for a table at our restaurant', 'Hotel reservations for a night or two', 'Book a class at the studio', 'Bookings for the climbing gym'].every((t) => req(t).includes('booking')));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

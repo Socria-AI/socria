@@ -18,6 +18,7 @@ import { normalizeDesignSystem, type DesignSystem } from './design-system';
 import { EMPTY_DIRECTION, normalizeDirectionState, type DirectionState } from './direction';
 import { normalizeDNA, normalizeRefDna, type CreativeDNA, type RefDna } from './dna';
 import { signatureOf, type DesignSignature } from './signature';
+import { normalizeProc, procId, type ProcSpec } from './assets';
 import { GRIDS, normalizeMotion, normalizeSpec, type DesignSpec, type Motion } from './spec';
 import { bodyFont, displayFont } from './fonts';
 
@@ -211,6 +212,8 @@ export interface Usage {
   stage?: CallKind;
   tier?: 'economy' | 'premium';
   effort?: string;
+  /** the operation's time on the server, from its arrival to its answer (ms, measured) */
+  ms?: number;
 }
 
 export interface CardTurn {
@@ -254,8 +257,8 @@ export type RefAspect = (typeof REF_ASPECTS)[number];
 export interface MoodboardRef {
   /** provider:id (an upload: upload:<file id>) */
   id: string;
-  /** a licensed library, or the designer's own upload (kept in this browser's file store) */
-  provider: Provider | 'upload';
+  /** a licensed library, the designer's own upload (kept in this browser's file store), or a picture SocriaUX made for this project (lib/ux-v0/assets.ts) */
+  provider: Provider | 'upload' | 'socriaux';
   providerId: string;
   url: string;
   thumb: string;
@@ -299,6 +302,10 @@ export interface MoodboardRef {
   media?: 'image' | 'video';
   /** its design DNA, measured from its pixels (lib/ux-v0/ref-dna.ts) and kept so it is never measured again */
   dna?: RefDna;
+  /** a picture SocriaUX made: its recipe (drawn wherever it is shown, never stored as pixels) */
+  proc?: ProcSpec;
+  /** why a made picture exists: the part that asked for it */
+  reason?: string;
 }
 
 export interface Palette {
@@ -446,8 +453,8 @@ export interface DesignBrief {
 
 // ── usage ────────────────────────────────────────────────────────────
 
-export type CallKind = 'discover' | 'direction' | 'brief' | 'refine-brief' | 'art-direction' | 'generate' | 'refine' | 'critique';
-export const CALL_KINDS: readonly CallKind[] = ['discover', 'direction', 'brief', 'refine-brief', 'art-direction', 'generate', 'refine', 'critique'];
+export type CallKind = 'discover' | 'direction' | 'brief' | 'refine-brief' | 'art-direction' | 'generate' | 'refine' | 'critique' | 'image';
+export const CALL_KINDS: readonly CallKind[] = ['discover', 'direction', 'brief', 'refine-brief', 'art-direction', 'generate', 'refine', 'critique', 'image'];
 
 /** What each stage is, in words, for the cost panel, the settings and the report. */
 export const STAGE_LABEL: Record<CallKind, string> = {
@@ -459,6 +466,8 @@ export const STAGE_LABEL: Record<CallKind, string> = {
   generate: 'Generation',
   refine: 'Refinement',
   critique: 'Critique',
+  // a picture made by an image model (lib/ux-v0/image-gen-server.ts): priced and capped apart from the text stages
+  image: 'Images',
 };
 
 export interface StageSpend {
@@ -467,6 +476,8 @@ export interface StageSpend {
   cost: number;
   /** of those calls, how many ran on the premium model */
   premium: number;
+  /** the time they took on the server (ms, measured; from when it was recorded) */
+  ms?: number;
 }
 
 export interface UsageTotals {
@@ -481,6 +492,8 @@ export interface UsageTotals {
   byStage?: Partial<Record<CallKind, StageSpend>>;
   /** the design versions the designer accepted by downloading them: cost per accepted design is cost / accepted */
   accepted?: number[];
+  /** the time the calls took on the server (ms, measured; from when it was recorded) */
+  ms?: number;
 }
 
 // ── the project ──────────────────────────────────────────────────────
@@ -691,6 +704,7 @@ export function normalizeUsage(v: unknown): Usage | null {
     ...((CALL_KINDS as readonly string[]).includes(r.stage as string) ? { stage: r.stage as CallKind } : {}),
     ...(r.tier === 'economy' || r.tier === 'premium' ? { tier: r.tier } : {}),
     ...(typeof r.effort === 'string' && /^[a-z]{2,8}$/.test(r.effort) ? { effort: r.effort } : {}),
+    ...(typeof r.ms === 'number' && r.ms > 0 ? { ms: num(r.ms, 0, 6e5, 0) } : {}),
   };
 }
 
@@ -727,6 +741,39 @@ export function normalizeCard(v: unknown): ReasoningCard | null {
 
 export function normalizeRef(v: unknown): MoodboardRef | null {
   const r = obj(v);
+  // a picture SocriaUX made: its recipe is the picture; its id is the recipe's
+  if (r.provider === 'socriaux') {
+    const proc = normalizeProc(r.proc);
+    if (!proc) return null;
+    const providerId = procId(proc);
+    return {
+      id: `socriaux:${providerId}`,
+      provider: 'socriaux',
+      providerId,
+      proc,
+      url: '',
+      thumb: '',
+      width: num(r.width, 0, 100000, 0),
+      height: num(r.height, 0, 100000, 0),
+      color: hex(r.color),
+      title: clean(r.title, 200) || 'Made by SocriaUX',
+      creator: 'SocriaUX',
+      creatorUrl: '',
+      sourceUrl: '',
+      license: 'Made by SocriaUX for this project (no third-party rights)',
+      licenseUrl: '',
+      attribution: 'Made by SocriaUX for this project',
+      downloadPing: '',
+      category: oneOf(r.category, MOOD_CATEGORIES, 'imagery'),
+      query: '',
+      state: oneOf(r.state, ['proposed', 'kept', 'rejected'] as const, 'kept'),
+      addedAt: time(r.addedAt, Date.now()),
+      asContent: r.asContent !== false,
+      ...(clean(r.reason, 200) ? { reason: clean(r.reason, 200) } : {}),
+      ...(r.key === true ? { key: true } : {}),
+      ...((dna) => (dna ? { dna } : {}))(normalizeRefDna(r.dna)),
+    };
+  }
   const upload = r.provider === 'upload';
   const provider: MoodboardRef['provider'] = upload ? 'upload' : oneOf(r.provider, PROVIDERS, 'openverse');
   // an upload's picture lives in this browser's file store, found by its id; its address is made when it is shown
@@ -800,6 +847,7 @@ export function normalizeTypePair(v: unknown): TypePair | null {
  */
 export function creditText(r: Pick<MoodboardRef, 'provider' | 'title' | 'creator' | 'license'>): string {
   if (r.provider === 'upload') return `${r.title ? `“${r.title}”, ` : ''}your own reference`;
+  if (r.provider === 'socriaux') return `${r.title ? `“${r.title}”, ` : ''}made by SocriaUX for this project`;
   const by = r.creator ? ` by ${r.creator}` : '';
   if (r.provider === 'unsplash') return `Photo${by} on Unsplash`;
   if (r.provider === 'pexels') return `Photo${by} on Pexels`;
@@ -972,11 +1020,12 @@ const usageTotals = (v: unknown): UsageTotals => {
   const out: UsageTotals = { calls: num(r.calls, 0, 1e7, 0), input: num(r.input, 0, 1e12, 0), output: num(r.output, 0, 1e12, 0), cost: num(r.cost, 0, 1e7, 0) };
   if (num(r.cached, 0, 1e12, 0)) out.cached = num(r.cached, 0, 1e12, 0);
   if (num(r.reasoning, 0, 1e12, 0)) out.reasoning = num(r.reasoning, 0, 1e12, 0);
+  if (num(r.ms, 0, 1e12, 0)) out.ms = num(r.ms, 0, 1e12, 0);
   const by: Partial<Record<CallKind, StageSpend>> = {};
   for (const [k, x] of Object.entries(obj(r.byStage))) {
     if (!(CALL_KINDS as readonly string[]).includes(k)) continue;
     const o = obj(x);
-    by[k as CallKind] = { calls: num(o.calls, 0, 1e7, 0), cost: num(o.cost, 0, 1e7, 0), premium: num(o.premium, 0, 1e7, 0) };
+    by[k as CallKind] = { calls: num(o.calls, 0, 1e7, 0), cost: num(o.cost, 0, 1e7, 0), premium: num(o.premium, 0, 1e7, 0), ...(num(o.ms, 0, 1e12, 0) ? { ms: num(o.ms, 0, 1e12, 0) } : {}) };
   }
   if (Object.keys(by).length) out.byStage = by;
   const accepted = (Array.isArray(r.accepted) ? r.accepted : []).filter((x): x is number => Number.isInteger(x) && x > 0 && x < 1e6);
@@ -1105,9 +1154,11 @@ export function addUsage(t: UsageTotals, u: Usage | null): UsageTotals {
   const out: UsageTotals = { ...t, calls: t.calls + 1, input: t.input + u.input, output: t.output + u.output, cost: round(t.cost + (u.cost ?? 0)) };
   if (u.cached) out.cached = (t.cached ?? 0) + u.cached;
   if (u.reasoning) out.reasoning = (t.reasoning ?? 0) + u.reasoning;
+  if (u.ms) out.ms = (t.ms ?? 0) + u.ms;
   if (u.stage) {
     const was = t.byStage?.[u.stage] ?? { calls: 0, cost: 0, premium: 0 };
-    out.byStage = { ...(t.byStage ?? {}), [u.stage]: { calls: was.calls + 1, cost: round(was.cost + (u.cost ?? 0)), premium: was.premium + (u.tier === 'premium' ? 1 : 0) } };
+    const ms = (was.ms ?? 0) + (u.ms ?? 0);
+    out.byStage = { ...(t.byStage ?? {}), [u.stage]: { calls: was.calls + 1, cost: round(was.cost + (u.cost ?? 0)), premium: was.premium + (u.tier === 'premium' ? 1 : 0), ...(ms ? { ms } : {}) } };
   }
   return out;
 }
@@ -1121,4 +1172,35 @@ export function acceptDesign(t: UsageTotals, version: number): UsageTotals {
 export function costPerAccepted(t: UsageTotals): number | null {
   const n = t.accepted?.length ?? 0;
   return n ? Math.round((t.cost / n) * 1e6) / 1e6 : null;
+}
+
+/**
+ * What it took to reach each accepted design, on average, from what was measured: the money (text and pictures
+ * apart), the attempts (designs generated, changes worked out by a model), and the time the calls took. Null
+ * before a design is accepted. Pictures from an image model are their own line, never folded into text.
+ */
+export interface AcceptedEconomics {
+  accepted: number;
+  cost: number;
+  text: number;
+  images: number;
+  generations: number;
+  refinements: number;
+  /** seconds of server time per accepted design; null when no call recorded its time */
+  seconds: number | null;
+}
+export function acceptedEconomics(t: UsageTotals): AcceptedEconomics | null {
+  const n = t.accepted?.length ?? 0;
+  if (!n) return null;
+  const r6 = (x: number) => Math.round(x * 1e6) / 1e6;
+  const images = t.byStage?.image?.cost ?? 0;
+  return {
+    accepted: n,
+    cost: r6(t.cost / n),
+    text: r6(Math.max(0, t.cost - images) / n),
+    images: r6(images / n),
+    generations: Math.round(((t.byStage?.generate?.calls ?? 0) / n) * 10) / 10,
+    refinements: Math.round(((t.byStage?.refine?.calls ?? 0) / n) * 10) / 10,
+    seconds: t.ms ? Math.round(t.ms / n / 100) / 10 : null,
+  };
 }

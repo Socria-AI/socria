@@ -11,6 +11,7 @@
 // from this origin). Nothing leaves the browser: uploads are not sent to the
 // account or to any model.
 
+import { proceduralUri } from '@/lib/ux-v0/assets';
 import { useEffect, useMemo, useState } from 'react';
 import { getArtifact, putArtifact } from '@/lib/ux-v0/store';
 import { fileId, normalizeRef, type MoodboardRef } from '@/lib/ux-v0/types';
@@ -56,8 +57,13 @@ export async function preloadUploads(refs: readonly MoodboardRef[], forFrames = 
 
 /** The refs with their uploads' addresses filled in: object URLs for the workspace, data URLs for frames. */
 export function withUploads(refs: readonly MoodboardRef[], forFrames = false): MoodboardRef[] {
-  if (!refs.some((r) => r.provider === 'upload')) return refs as MoodboardRef[];
+  if (!refs.some((r) => r.provider === 'upload' || r.provider === 'socriaux')) return refs as MoodboardRef[];
   return refs.map((r) => {
+    // a picture SocriaUX made is drawn from its recipe (lib/ux-v0/assets.ts)
+    if (r.provider === 'socriaux' && r.proc) {
+      const url = proceduralUri(r.proc);
+      return { ...r, url, thumb: url };
+    }
     if (r.provider !== 'upload') return r;
     const url = (forFrames ? dataUrls.get(r.providerId) : objectUrls.get(r.providerId)) ?? '';
     return url ? { ...r, url, thumb: forFrames ? url : objectUrls.get(r.providerId) ?? url } : r;

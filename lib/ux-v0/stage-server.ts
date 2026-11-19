@@ -161,6 +161,7 @@ const STAGE_WORDS: Record<CallKind, string> = {
   generate: 'Designing',
   refine: 'Working out the change',
   critique: 'Reading the design',
+  image: 'Making the picture',
 };
 const secondsOf = (ms: number) => Math.max(1, Math.round(ms / 1000));
 
@@ -300,7 +301,9 @@ async function execute(req: NextRequest, ctx: StageContext, s: Stage, op: string
     const answer = await s.finish(asked);
     const ok = (answer.status ?? 200) < 300;
     const rec = record(ok ? (asked.fellBack ? 'fallback' : 'ok') : 'invalid', ok ? asked.fellBack : String(answer.body.error ?? '').slice(0, 120));
-    answer.body = { ...answer.body, usage: answer.body.usage ?? asked.usage, ...noticeOf(g, asked), ...(budget ? { budget } : {}) };
+    // the call's usage carries its time on the server, so a project can say what each accepted design took
+    const used = (answer.body.usage ?? asked.usage) as Record<string, unknown> | null | undefined;
+    answer.body = { ...answer.body, usage: used ? { ...used, ms: rec.totalMs } : used, ...noticeOf(g, asked), ...(budget ? { budget } : {}) };
     return { answer, record: rec };
   } catch (e) {
     const resting = sleepAnswer(e);

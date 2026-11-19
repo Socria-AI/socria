@@ -15,13 +15,13 @@ import { contrastRatio } from '../ux/audit';
 import { HEX6, mix } from './color';
 import { textPatch } from './edit';
 import { FONTS, knownFont } from './fonts';
-import { ensureContrast, PADS, type DesignSpec, type Patch, type Section } from './spec';
+import { ensureContrast, PADS, stacksPicture, type Breakpoint, type DesignSpec, type Patch, type Section } from './spec';
 
 export interface QuickEdit {
   patches: Patch[];
   /** what was done, in a few words, for the designer */
   label: string;
-  kind: 'colour' | 'type' | 'corners' | 'words' | 'size' | 'space' | 'remove';
+  kind: 'colour' | 'type' | 'corners' | 'words' | 'size' | 'space' | 'remove' | 'width';
   /** a reason to ask before applying it (text that would be hard to read), said as a question */
   concern?: string;
 }
@@ -151,6 +151,39 @@ export function readQuickEdit(comment: string, spec: DesignSpec | null | undefin
       if (p) return { patches: [p], label: `new words: “${quoted.slice(0, 60)}${quoted.length > 60 ? '…' : ''}”`, kind: 'words' };
     }
     return null;
+  }
+
+  // AT A WIDTH, for the selected part: "hide this on phones", "centre it on mobile", "picture first on phones",
+  // "smaller headings on tablets" (lib/ux-v0/spec.ts Responsive); without a selection it is the model's to place
+  const bp: Breakpoint | null = /\b(on|for|at) (phones?|mobiles?|small screens?)\b/.test(w) ? 'mobile' : /\b(on|for|at) (tablets?|ipads?)\b/.test(w) ? 'tablet' : null;
+  if (bp) {
+    if (!selected) return null;
+    const where = bp === 'mobile' ? 'on phones' : 'on tablets';
+    const picture = /\b(picture|image|photo|media|object)\b/.test(w);
+    const heads = /\b(headlines?|headings?|titles?|type)\b/.test(w);
+    const [rule, said]: [Record<string, unknown> | null, string] = /\b(hide|hidden|remove|drop|don't show|do not show)\b/.test(w)
+      ? [{ hide: true }, 'hidden']
+      : /\b(show|unhide|bring (it )?back)\b/.test(w)
+        ? [{ hide: null }, 'shown again']
+        : picture && stacksPicture(selected) && /\b(first|above|before|on top|at the top)\b/.test(w)
+          ? [{ media: 'first' }, 'picture before the words']
+          : picture && stacksPicture(selected) && /\b(last|below|after|under|underneath|at the bottom)\b/.test(w)
+            ? [{ media: 'last' }, 'picture after the words']
+            : /\b(cent(re|er)(d|ed)?)\b/.test(w)
+              ? [{ align: 'center' }, 'centred']
+              : /\b(left|left-aligned)\b/.test(w)
+                ? [{ align: 'start' }, 'set left']
+                : heads && /\b(smaller|less prominent)\b/.test(w)
+                  ? [{ type: 's' }, 'smaller headings']
+                  : heads && /\b(bigger|larger)\b/.test(w)
+                    ? [{ type: 'l' }, 'larger headings']
+                    : /\b(more (space|padding|room)|airier|roomier)\b/.test(w)
+                      ? [{ pad: 'l' }, 'generous spacing']
+                      : /\b(less (space|padding|room)|tighter|more compact)\b/.test(w)
+                        ? [{ pad: 's' }, 'tight spacing']
+                        : [null, ''];
+    if (!rule) return null;
+    return { patches: [{ op: 'responsive', sectionId: selected.id, breakpoint: bp, rule, summary: `${said.charAt(0).toUpperCase()}${said.slice(1)} ${where}` }], label: `${said} ${where}`, kind: 'width' };
   }
 
   // A COLOUR for a role: "the button colour to black", "a white background", "make it navy" (with a button selected)

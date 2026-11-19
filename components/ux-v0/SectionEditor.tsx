@@ -11,9 +11,10 @@
 // (lib/ux-v0/edit.ts), and a locked section is carried through a new
 // generation, asked about before a model changes it, and never auto-repaired.
 
+import { PROC_KINDS, PROC_LABEL, PROC_SAYS, type ProcKind } from '@/lib/ux-v0/assets';
 import { useEffect, useRef, useState } from 'react';
 import { fieldLabel, textAt, textPatch } from '@/lib/ux-v0/edit';
-import { PADS, SHAPE_EFFECTIVE, SHAPE_FIELDS, TONES, kindDef, shapeDefault, type DesignSpec, type Patch } from '@/lib/ux-v0/spec';
+import { BREAKPOINTS, BREAKPOINT_LABEL, PADS, SHAPE_EFFECTIVE, SHAPE_FIELDS, TONES, describeResponsive, kindDef, shapeDefault, stacksPicture, type Breakpoint, type BreakpointRule, type DesignSpec, type Patch, type Section } from '@/lib/ux-v0/spec';
 import type { Piece } from '@/lib/ux-v0/compose';
 
 const TONE_LABEL: Record<(typeof TONES)[number], string> = { base: 'Page', alt: 'Alternate', accent: 'Accent', accent2: 'Second accent', invert: 'Inverted' };
@@ -70,18 +71,86 @@ const groundColour = (spec: DesignSpec, t: (typeof TONES)[number]): string => {
   }
 };
 
+/** One choice among a few, as a row of buttons; the one shown is pressed. */
+function SegRow({ label, value, options, disabled, onPick }: { label: string; value: string; options: [string, string][]; disabled: boolean; onPick: (v: string, said: string) => void }) {
+  return (
+    <div className="v0-edit-row" role="group" aria-label={label}>
+      <span className="v0-edit-l">{label}</span>
+      <span className="sb-seg v0-edit-seg">
+        {options.map(([v, l]) => (
+          <button key={v || 'auto'} type="button" className={`sb-seg-item${value === v ? ' is-on' : ''}`} aria-pressed={value === v} disabled={disabled} onClick={() => value !== v && onPick(v, l)}>
+            {l}
+          </button>
+        ))}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * What changes at a narrower width: the designer's own decisions for tablets and phones (lib/ux-v0/spec.ts
+ * Responsive), each one a "responsive" patch, a version Undo takes back. "As designed" takes a rule away.
+ */
+function WidthRules({ sec, label, name, locked, viewport, onPatch }: { sec: Section; label: string; name: string; locked: boolean; viewport?: 'desktop' | 'tablet' | 'mobile'; onPatch: (patch: Patch, label: string) => void }) {
+  const [bp, setBp] = useState<Breakpoint>(viewport === 'tablet' ? 'tablet' : 'mobile');
+  useEffect(() => {
+    if (viewport === 'tablet' || viewport === 'mobile') setBp(viewport);
+  }, [viewport]);
+  const rule: BreakpointRule = sec.responsive?.[bp] ?? {};
+  const where = BREAKPOINT_LABEL[bp].toLowerCase();
+  const set = (k: keyof BreakpointRule, v: string | boolean, said: string) =>
+    onPatch({ op: 'responsive', sectionId: sec.id, breakpoint: bp, rule: { [k]: v === '' ? null : v }, summary: `${label} ${where}: ${said.toLowerCase()}` }, `the ${name} ${where}: ${said.toLowerCase()}`);
+  const hasPicture = stacksPicture(sec);
+  const said = describeResponsive(sec.responsive);
+  return (
+    <div className="v0-edit-bp" role="group" aria-label="At other widths">
+      <div className="v0-edit-row">
+        <span className="v0-edit-l">At other widths</span>
+        <span className="sb-seg v0-edit-seg" role="radiogroup" aria-label="Width">
+          {BREAKPOINTS.map((b) => (
+            <button key={b} type="button" role="radio" aria-checked={bp === b} className={`sb-seg-item${bp === b ? ' is-on' : ''}`} onClick={() => setBp(b)}>
+              {b === 'tablet' ? 'Tablet' : 'Phone'}
+            </button>
+          ))}
+        </span>
+      </div>
+      <SegRow label="Shown" value={rule.hide ? 'hide' : ''} options={[['', 'Shown'], ['hide', 'Hidden']]} disabled={locked} onPick={(v) => set('hide', v === 'hide', v === 'hide' ? 'hidden' : 'shown')} />
+      {!rule.hide && (
+        <>
+          <SegRow label="Words" value={rule.align ?? ''} options={[['', 'As designed'], ['start', 'Left'], ['center', 'Centred']]} disabled={locked} onPick={(v, l) => set('align', v, v ? `words ${l}` : 'words as designed')} />
+          <SegRow label="Spacing" value={rule.pad ?? ''} options={[['', 'As designed'], ['s', 'Tight'], ['m', 'Even'], ['l', 'Generous']]} disabled={locked} onPick={(v, l) => set('pad', v, v ? `${l} spacing` : 'spacing as designed')} />
+          <SegRow label="Headings" value={rule.type ?? ''} options={[['', 'As designed'], ['s', 'Smaller'], ['l', 'Larger']]} disabled={locked} onPick={(v, l) => set('type', v, v ? `headings ${l}` : 'headings as designed')} />
+          {hasPicture && <SegRow label="Picture" value={rule.media ?? ''} options={[['', 'As designed'], ['first', 'First'], ['last', 'Last']]} disabled={locked} onPick={(v, l) => set('media', v, v ? `picture ${l === 'First' ? 'before' : 'after'} the words` : 'picture as designed')} />}
+        </>
+      )}
+      {said.length > 0 && <p className="v0-quiet v0-edit-bp-said">{said.join(' · ')}</p>}
+    </div>
+  );
+}
+
 export function SectionEditor({
   spec,
   sectionId,
   path,
   onPatch,
   onLock,
+  onMakeArt,
+  imageGen,
+  onPhotograph,
+  viewport,
 }: {
   spec: DesignSpec;
   sectionId: string;
   path: string;
   onPatch: (patch: Patch, label: string) => void;
   onLock: (sectionId: string, locked: boolean) => void;
+  /** a picture made for this part by SocriaUX, in the design's colours (lib/ux-v0/assets.ts) */
+  onMakeArt?: (sectionId: string, kind: ProcKind) => void;
+  /** a photograph from an image model, when the server offers one (its price said first) */
+  imageGen?: { enabled: boolean; why: string; price: number } | null;
+  onPhotograph?: (sectionId: string) => void;
+  /** the width the canvas shows: the width the "At other widths" controls start at */
+  viewport?: 'desktop' | 'tablet' | 'mobile';
 }) {
   const idx = spec.sections.findIndex((s) => s.id === sectionId);
   const sec = idx >= 0 ? spec.sections[idx] : null;
@@ -113,6 +182,30 @@ export function SectionEditor({
           {locked ? 'Locked' : 'Lock it'}
         </button>
       </div>
+      {onMakeArt && def.images[1] > 0 && !locked && (
+        <div className="v0-edit-row">
+          <span className="v0-edit-l">Pictures · art made for it</span>
+          <span className="v0-edit-arts" role="group" aria-label="Make art for this part">
+            {PROC_KINDS.map((k) => (
+              <button key={k} type="button" className="sb-link is-meta" title={`${PROC_LABEL[k]}: ${PROC_SAYS[k]}`} onClick={() => onMakeArt(sec.id, k)}>
+                {PROC_LABEL[k]}
+              </button>
+            ))}
+          </span>
+          <span className="v0-quiet">Drawn by SocriaUX in this design’s own colours, in place of its first picture; kept on the moodboard with where it came from. Undo takes it back.</span>
+          {imageGen && (
+            <span className="v0-edit-foot">
+              {imageGen.enabled ? (
+                <button type="button" className="sb-link is-meta is-strong" onClick={() => onPhotograph?.(sec.id)}>
+                  A photograph from an image model (about US${imageGen.price.toFixed(2)})
+                </button>
+              ) : (
+                <span className="v0-quiet">Photographs from an image model: {imageGen.why.replace(/\.$/, '').toLowerCase()}.</span>
+              )}
+            </span>
+          )}
+        </div>
+      )}
       {locked && <p className="v0-quiet">Kept exactly as it is: a new generation carries it over, a change by SocriaUX is asked about first, and the automatic repairs leave it alone. Unlock it to change it.</p>}
 
       {text && (
@@ -231,6 +324,8 @@ export function SectionEditor({
           ))}
         </span>
       </div>
+
+      <WidthRules sec={sec} label={def.label} name={name} locked={locked} viewport={viewport} onPatch={onPatch} />
 
       <div className="v0-edit-row v0-edit-acts" role="group" aria-label="Its place">
         <button type="button" className="sb-link is-meta" disabled={locked || idx === 0} onClick={() => onPatch({ op: 'move', sectionId: sec.id, to: idx - 1, summary: `Moved the ${name} up` }, `the ${name} moved up`)}>

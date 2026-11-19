@@ -68,3 +68,10 @@ export * from '@/lib/ux-v0/ref-dna';
 export * from '@/lib/ux-v0/originality';
 // Explore Directions: how the directions differ, row by row, and the DNA each explores
 export * from '@/lib/ux-v0/explore';
+// the scripted layer of the motion: scrub, story, arrivals, magnetic, tilt, line drawing
+export { MOTION_RUNTIME } from '@/lib/ux-v0/motion-runtime';
+// the 3D scene runtime
+export { SCENE_RUNTIME } from '@/lib/ux-v0/scene-runtime';
+// pictures SocriaUX draws in code, and the separate image-model pathway (its prompt, price and checks)
+export * from '@/lib/ux-v0/assets';
+export { imageGenConfig, sizeFor, imagePrice, imagePrompt, checkImage, generateImage } from '@/lib/ux-v0/image-gen-server';

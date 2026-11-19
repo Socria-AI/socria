@@ -54,6 +54,11 @@ export function sampleFor(component: string, intent: DesignIntent, brief: Brief)
       return { title: '[Items]', columns: ['[Name]', '[Owner]', 'Status'], rows: [1, 2, 3, 4].map((i) => ({ cells: [`[Item ${i}]`, '[Owner]'], status: '[Status]' })) };
     case 'chart':
       return { title: '[What is measured]', labels: ['[1]', '[2]', '[3]', '[4]', '[5]'], series: [{ name: 'Sample', values: [3, 5, 4, 7, 6] }], note: 'Sample data.' };
+    case 'scene':
+      // the object is the designer's to name; the vessel is only a stand-in until it is
+      return { title: '[The object]', text: '', model: 'vessel', material: 'satin', caption: 'Drag it, or use the arrow keys, to turn it.' };
+    case 'configurator':
+      return { title: 'Make it yours', groups: [{ name: '[Finish]', options: [{ label: '[Finish 1]', price: '', swatch: '' }, { label: '[Finish 2]', price: '[+price]', swatch: '' }] }, { name: '[Size]', options: [{ label: '[Size 1]', price: '' }, { label: '[Size 2]', price: '[+price]' }] }], base: '[Price]', action: 'Reserve it', note: 'A prototype: nothing is ordered.' };
     default:
       return null;
   }

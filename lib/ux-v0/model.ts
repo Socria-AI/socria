@@ -107,6 +107,8 @@ export const STAGE_TIER: Record<CallKind, Tier> = {
   generate: 'premium',
   refine: 'economy',
   critique: 'premium',
+  // not a text stage: a picture from an image model, routed by lib/ux-v0/image-gen-server.ts
+  image: 'economy',
 };
 
 export interface Route {
@@ -168,8 +170,73 @@ export function economyRoute(stage: CallKind, env: Env = process.env): Route {
 }
 
 /** Every stage's route, for the evaluation and the logs. */
+/** The text model for each stage. Pictures from an image model are routed apart (lib/ux-v0/image-gen-server.ts). */
 export function routingTable(env: Env = process.env): Route[] {
-  return (Object.keys(STAGE_TIER) as CallKind[]).map((k) => routeFor(k, {}, env));
+  return (Object.keys(STAGE_TIER) as CallKind[]).filter((k) => k !== 'image').map((k) => routeFor(k, {}, env));
+}
+
+/**
+ * HOW DEMANDING A GENERATION IS, read in code before the model is asked: low (a simple page with one job: a
+ * contact form, a short notice), medium (a page of several parts, references to interpret, a design system to
+ * keep to), high (motion that tells a story, a 3D object, a configurator, data shown and explored, an experimental
+ * Creative DNA, words asking for an immersive or award-grade experience). Advanced work is never sent to the
+ * cheaper model: high and medium go to the premium tier. Simple work stays on the premium tier as well, unless the
+ * deployment opts in (SOCRIAUX_SIMPLE_ECONOMY=on); an operator's tier set for the stage (SOCRIAUX_TIER_GENERATE)
+ * is theirs and still holds. The reading and its reasons are said in the answer, so the cost is explained.
+ */
+export type Complexity = 'low' | 'medium' | 'high';
+export interface ComplexityInput {
+  /** the experience being made (lib/ux-v0/intent.ts) and the components it needs */
+  kind: string;
+  required: readonly string[];
+  /** the brief's own words: its objective, visual direction and requirements */
+  words: string;
+  /** the direction's motion feel and visual language */
+  motion: string;
+  /** references kept on the moodboard, and whether a design system is to be kept to */
+  references: number;
+  system: boolean;
+  /** the Creative DNA's values, when there is one */
+  dna?: Partial<Record<string, number>> | null;
+}
+export interface ComplexityRead {
+  level: Complexity;
+  why: string[];
+  tier: Tier;
+}
+
+const DEMANDING: [RegExp, string][] = [
+  [/\b(3d|three[- ]dimensional|webgl|immersive)\b/, 'an immersive or 3D experience'],
+  [/\b(scroll[- ]?(driven|story|telling|triggered)|scrollytelling|pinned|kinetic|motion[- ]rich|cinematic)\b/, 'motion that tells the story'],
+  [/\b(configurat\w+|customi[sz]\w+ (the|your) product|build your own)\b/, 'a configurator'],
+  [/\b(data vi[sz]\w*|visuali[sz]ation|interactive (chart|map|data))\b/, 'data shown and explored'],
+  [/\b(experimental|award[- ]?(winning|grade|level)|avant[- ]garde|unconventional)\b/, 'an experimental brief'],
+];
+/** a page with one job: a form, or a site the brief says is a single page, a notice or a sign-up */
+const ONE_JOB = /\b(one[- ]page|single[- ]page|landing page|coming soon|holding page|notice|contact (form|page)|sign[- ]?up|wait ?list|newsletter|rsvp)\b/;
+const RICH_KINDS: Record<string, string> = { editorial: 'an editorial page', portfolio: 'a portfolio', dashboard: 'a dashboard', checkout: 'a checkout', booking: 'a booking flow', flow: 'a flow of several steps', app: 'a screen of an app' };
+
+export function generationComplexity(x: ComplexityInput, env: Env = process.env): ComplexityRead {
+  const w = String(x.words ?? '').toLowerCase();
+  const high: string[] = [];
+  const medium: string[] = [];
+  if (x.required.includes('scene')) high.push('a 3D object');
+  if (x.required.includes('configurator')) high.push('a configurator');
+  for (const [re, said] of DEMANDING) if (re.test(w) && !high.includes(said)) high.push(said);
+  if (x.motion === 'kinetic') high.push('kinetic motion');
+  if (x.kind === 'interactive' || x.kind === 'data') high.push(x.kind === 'data' ? 'a data experience' : 'an interactive experience');
+  const d = x.dna ?? {};
+  if ((d.composition ?? 50) >= 75 || (d.motion ?? 50) >= 75 || (d.interaction ?? 50) >= 75) high.push('a Creative DNA set far toward the expressive');
+  if (x.system) medium.push('a design system to keep to');
+  if (x.references >= 4) medium.push(`${x.references} references to interpret`);
+  if (x.motion === 'lively') medium.push('lively motion');
+  if (RICH_KINDS[x.kind]) medium.push(RICH_KINDS[x.kind]);
+  if (w.length > 420) medium.push('a long brief');
+  const simple = (x.kind === 'form' || (x.kind === 'site' && ONE_JOB.test(w))) && x.required.length <= 1 && ['still', 'calm', 'measured', ''].includes(x.motion);
+  const level: Complexity = high.length ? 'high' : medium.length || !simple ? 'medium' : 'low';
+  const why = level === 'high' ? [...new Set(high)] : level === 'medium' ? (medium.length ? medium : ['a page of several parts']) : ['one job, few parts, quiet motion'];
+  const tier: Tier = level === 'low' && (env.SOCRIAUX_SIMPLE_ECONOMY ?? '').trim().toLowerCase() === 'on' ? 'economy' : 'premium';
+  return { level, why: why.slice(0, 4), tier };
 }
 
 /**
@@ -225,6 +292,7 @@ export const MAX_TOKENS: Record<CallKind, number> = {
   generate: 5200,
   refine: 2200,
   critique: 1400,
+  image: 0,
 };
 
 /**

@@ -803,7 +803,14 @@ export function shapeByDNA(d: { tokens: DesignTokens; look: Look; compose?: Reco
   if (doLook && s('interaction') > 0.3 && !locks.has('motion')) {
     const it = v('interaction');
     const hover: Motion['hover'] = it <= 25 ? 'underline' : it >= 72 ? (look.motion.hover === 'zoom' ? 'zoom' : 'lift') : look.motion.hover;
-    if (hover !== look.motion.hover && look.motion.feel !== 'still') (look.motion = { ...look.motion, hover }), tell('interaction', `${hover} on hover`);
+    const changes: string[] = [];
+    if (hover !== look.motion.hover && look.motion.feel !== 'still') (look.motion = { ...look.motion, hover }), changes.push(`${hover} on hover`);
+    // a tactile interface answers a fine pointer: buttons drawn toward it, and (most tactile) pictures tilting to it
+    const magnetic = look.motion.feel !== 'still' && it >= 70;
+    const cursor: Motion['cursor'] = look.motion.feel !== 'still' && it >= 84 ? 'tilt' : it <= 40 ? 'none' : look.motion.cursor ?? 'none';
+    if (magnetic !== !!look.motion.magnetic && (it >= 70 || it <= 40)) (look.motion = { ...look.motion, magnetic }), changes.push(magnetic ? 'buttons drawn to the pointer' : 'buttons that stay put');
+    if (cursor !== (look.motion.cursor ?? 'none')) (look.motion = { ...look.motion, cursor }), changes.push(cursor === 'tilt' ? 'pictures tilting to the pointer' : 'pictures that stay still under the pointer');
+    if (changes.length) tell('interaction', changes.join(', '));
   }
 
   // INFORMATION: what a dashboard leads with

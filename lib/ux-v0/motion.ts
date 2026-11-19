@@ -41,10 +41,10 @@ export const SECTION_LABEL: Record<Motion['sections'], string> = { none: 'None',
 /** Each feel as a whole: the timings and behaviours that belong together. */
 export const MOTION_PRESETS: Record<Motion['feel'], Motion> = {
   still: { ...STILL_MOTION },
-  calm: { feel: 'calm', duration: 900, stagger: 90, distance: 14, ease: 'gentle', entrance: 'fade', headline: 'fade', scroll: true, parallax: 1, hover: 'zoom', sections: 'none', nav: true },
-  measured: { feel: 'measured', duration: 620, stagger: 70, distance: 20, ease: 'out', entrance: 'rise', headline: 'mask', scroll: true, parallax: 0, hover: 'underline', sections: 'none', nav: true },
-  lively: { feel: 'lively', duration: 520, stagger: 55, distance: 30, ease: 'expo', entrance: 'slide', headline: 'words', scroll: true, parallax: 2, hover: 'lift', sections: 'wipe', nav: true },
-  kinetic: { feel: 'kinetic', duration: 760, stagger: 38, distance: 52, ease: 'expo', entrance: 'scale', headline: 'letters', scroll: true, parallax: 3, hover: 'invert', sections: 'expand', nav: true },
+  calm: { feel: 'calm', duration: 900, stagger: 90, distance: 14, ease: 'gentle', entrance: 'fade', headline: 'fade', scroll: true, parallax: 1, hover: 'zoom', sections: 'none', nav: true, scrub: 0, story: false, media: 'none', magnetic: false, cursor: 'none', draw: false },
+  measured: { feel: 'measured', duration: 620, stagger: 70, distance: 20, ease: 'out', entrance: 'rise', headline: 'mask', scroll: true, parallax: 0, hover: 'underline', sections: 'none', nav: true, scrub: 0, story: false, media: 'mask', magnetic: false, cursor: 'none', draw: true },
+  lively: { feel: 'lively', duration: 520, stagger: 55, distance: 30, ease: 'expo', entrance: 'slide', headline: 'words', scroll: true, parallax: 2, hover: 'lift', sections: 'wipe', nav: true, scrub: 1, story: false, media: 'mask', magnetic: true, cursor: 'none', draw: true },
+  kinetic: { feel: 'kinetic', duration: 760, stagger: 38, distance: 52, ease: 'expo', entrance: 'scale', headline: 'letters', scroll: true, parallax: 3, hover: 'invert', sections: 'expand', nav: true, scrub: 2, story: true, media: 'scale', magnetic: true, cursor: 'tilt', draw: true },
 };
 
 const ORDER: Motion['feel'][] = ['still', 'calm', 'measured', 'lively', 'kinetic'];
@@ -148,6 +148,39 @@ function arrivalFrames(m: Motion, name: string): string {
   }
 }
 
+/** The CSS of the scripted layer: the scrubbed opening, the pinned story, pictures arriving, tilt, line drawing. */
+function scriptedCss(m: Motion): string {
+  const out: string[] = [];
+  const R = '.mo-ready';
+  if (m.scrub) {
+    const lift = m.scrub >= 2 ? 150 : 64;
+    const zoom = m.scrub >= 2 ? 0.16 : 0.06;
+    // the opening's words lift away and fade as the page leaves it; its picture settles in scale (desktop only)
+    out.push(`@media (min-width:761px){${R} .sx-hero .hero-text,${R} .sx-hero .hs-words,${R} .sx-hero .h-poster{translate:0 calc(var(--hp,0) * -${lift}px);filter:opacity(calc(1 - var(--hp,0) * .85))}${R} .sx-hero figure img,${R} .sx-hero .bleed-img{scale:calc(1 + var(--hp,0) * ${zoom})}}`);
+  }
+  if (m.story) {
+    // one sequence pinned: the section holds the screen while its points take the stage one at a time
+    out.push(`@media (min-width:761px){${R} .mo-story{height:calc(var(--n,4) * 72vh + 28vh)}${R} .mo-story>.wrap{position:sticky;top:0;min-height:100vh;box-sizing:border-box;display:grid;align-content:center;padding-block:8vh}${R} .mo-story .features{position:relative;display:block;min-height:min(52vh,520px)}${R} .mo-story [data-mo-step]{position:absolute;inset:0 auto auto 0;width:min(62ch,100%);opacity:0;translate:0 -18px;transition:opacity calc(var(--mo-d) * .3) var(--mo-e),translate calc(var(--mo-d) * .3) var(--mo-e);animation:none!important}${R} .mo-story [data-mo-step].is-on{opacity:1;translate:none;transition-duration:var(--mo-d);transition-delay:calc(var(--mo-d) * .28)}${R} .mo-story [data-mo-step]:not(.is-on){pointer-events:none}${R} .mo-story [data-mo-step] .h-item{font-size:clamp(30px,4.2vw,64px);line-height:1.04}${R} .mo-story>.wrap::after{content:"";display:block;height:2px;margin-top:4vh;background:currentColor;opacity:.45;transform-origin:left center;transform:scaleX(var(--sp,0))}}`);
+  }
+  if (m.media === 'mask') out.push(`${R} [data-mo-in] img{clip-path:inset(0 0 100% 0);transition:clip-path calc(var(--mo-d) * 1.6) var(--mo-e)}${R} [data-mo-in].is-in img{clip-path:inset(0)}`);
+  if (m.media === 'scale') out.push(`${R} [data-mo-in]{overflow:hidden}${R} [data-mo-in] img{scale:1.18;transition:scale calc(var(--mo-d) * 2) var(--mo-e)}${R} [data-mo-in].is-in img{scale:1}`);
+  if (m.cursor === 'tilt') out.push(`@media (hover:hover) and (pointer:fine){${R} [data-mo-tilt]{transition:transform 260ms var(--mo-e)}}`);
+  if (m.magnetic) out.push(`@media (hover:hover) and (pointer:fine){${R} .btn{transition:translate 200ms var(--mo-e)}}`);
+  if (m.draw) out.push(`${R} .mo-draw{stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset calc(var(--mo-d) * 2.4) var(--mo-e)}${R} .is-in .mo-draw{stroke-dashoffset:0}`);
+  return out.join('');
+}
+
+/** What the scripted layer marks on the page, as body attributes and as markers in the rendered sections. */
+export function scriptedMarks(m: Motion | undefined): { body: string; story: boolean; media: boolean; tilt: boolean; draw: boolean } {
+  if (!m || m.feel === 'still') return { body: '', story: false, media: false, tilt: false, draw: false };
+  const attrs = [' data-mo=""'];
+  if (m.scrub) attrs.push(` data-mo-scrub="${m.scrub}"`);
+  if (m.magnetic) attrs.push(' data-mo-magnetic=""');
+  if (m.cursor && m.cursor !== 'none') attrs.push(` data-mo-cursor="${m.cursor}"`);
+  if (m.media && m.media !== 'none') attrs.push(` data-mo-media="${m.media}"`);
+  return { body: attrs.join(''), story: !!m.story, media: !!m.media && m.media !== 'none', tilt: m.cursor === 'tilt', draw: !!m.draw };
+}
+
 /**
  * The motion stylesheet for a look. `play` writes everything; `reduced` writes
  * the reduced-motion alternative unconditionally (for previewing it); `static`
@@ -229,6 +262,9 @@ export function motionCss(look: Look, mode: MotionMode, opts: { app?: boolean } 
     add(`.sx-nav{position:sticky;top:0;z-index:30;background:var(--bg)}`);
     add(`@supports (animation-timeline: scroll()){@keyframes mo-nav{to{box-shadow:0 1px 0 var(--line)}}@keyframes mo-brand{to{scale:.88}}.sx-nav{animation:mo-nav linear both;animation-timeline:scroll(root);animation-range:0 180px}.sx-nav .brand{transform-origin:left center;animation:mo-brand linear both;animation-timeline:scroll(root);animation-range:0 180px}}`);
   }
+  // ── the scripted layer (lib/ux-v0/motion-runtime.ts): applies only once the runtime has run (body.mo-ready),
+  // so a page without it is simply complete; under reduced motion the runtime never marks the page ready
+  add(scriptedCss(m));
   // phones: shorter travel, no parallax
   add(`@media (max-width:760px){:root{--mo-x:${Math.round(m.distance * 0.6)}px}${PICTURES.join(',')},.art>*{animation:none!important}}`);
   // reduced motion: nothing travels; the first screen fades in briefly
