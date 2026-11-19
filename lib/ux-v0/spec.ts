@@ -58,7 +58,7 @@ const WEB: readonly PageType[] = ['website'];
 const APP: readonly PageType[] = ['app-screen'];
 
 export const LIBRARY: readonly KindDef[] = [
-  { kind: 'nav', label: 'Navigation', pages: WEB, variants: ['inline', 'centered', 'minimal'], images: [0, 0], note: 'top bar: brand, up to 6 links, optional button',
+  { kind: 'nav', label: 'Navigation', pages: WEB, variants: ['inline', 'centered', 'minimal', 'menu'], images: [0, 0], note: 'top bar: brand, up to 6 links, optional button; menu keeps the bar to the brand and a Menu button that opens the links full-screen (on a phone every variant does)',
     fields: { brand: T(40, true), links: TS(24, 0, 6), cta: T(30) } },
   { kind: 'hero', label: 'Hero', pages: WEB, variants: ['split', 'centered', 'full-bleed', 'editorial', 'statement', 'poster'], images: [0, 1], note: 'the opening statement; full-bleed and split want an image; statement is type alone, very large; poster is huge type with an image set against it',
     fields: { eyebrow: T(48), title: T(120, true), subtitle: T(320), primary: T(30), secondary: T(30), note: T(140) } },
@@ -72,8 +72,8 @@ export const LIBRARY: readonly KindDef[] = [
     fields: { quote: T(420, true), author: T(60, true), role: T(90) } },
   { kind: 'stats', label: 'Figures', pages: WEB, variants: ['row', 'band', 'giant'], images: [0, 0], note: '2–6 figures; giant sets them as huge numerals; unknown figures are [bracketed placeholders]',
     fields: { title: T(110), items: { t: 'list', n: [2, 6], req: true, item: { value: T(18, true), label: T(70, true) } } } },
-  { kind: 'compose', label: 'Composed', pages: BOTH, variants: ['free'], images: [0, 6], note: 'a section built from layout pieces (stacks, grids in proportion, boxes, text, figures, pictures, buttons, lists, rules) when no other section draws the arrangement needed',
-    fields: { root: { t: 'tree', req: true } } },
+  { kind: 'compose', label: 'Composed', pages: BOTH, variants: ['free'], images: [0, 6], note: 'a section built from layout pieces (stacks, grids in proportion, boxes, text, figures, pictures, buttons, lists, rules; layers of one piece over another; a 12-column field where each piece is placed by hand and may overlap) when no other section draws the arrangement needed. span: wide or bleed runs it past the page’s column or edge to edge; tall: screen gives it a whole screen',
+    fields: { root: { t: 'tree', req: true }, span: { t: 'enum', values: ['wide', 'bleed'] }, tall: { t: 'enum', values: ['screen'] } } },
   { kind: 'logos', label: 'Names', pages: WEB, variants: ['row'], images: [0, 0], note: 'partner or press names, set as words',
     fields: { title: T(80), names: TS(32, 3, 8, true) } },
   { kind: 'pricing', label: 'Pricing', pages: WEB, variants: ['cards'], images: [0, 0], note: '1–4 plans',
@@ -259,6 +259,8 @@ export interface Section {
   shape?: SectionShape;
   /** what the designer set apart for tablets or phones: hidden there, aligned, spaced, its picture's place */
   responsive?: Responsive;
+  /** a sequence of points the designer chose to tell as the page's pinned story (one section at most) */
+  story?: true;
 }
 
 export interface DesignSpec {
@@ -378,6 +380,7 @@ export const BREAKPOINT_QUERY: Record<Breakpoint, string> = { tablet: '(min-widt
 export const BP_ALIGNS = ['start', 'center'] as const;
 export const BP_MEDIA = ['first', 'last'] as const;
 export const BP_TYPES = ['s', 'l'] as const;
+export const BP_CROPS = ['wide', 'square', 'tall'] as const;
 export interface BreakpointRule {
   /** not shown at this width */
   hide?: boolean;
@@ -389,6 +392,8 @@ export interface BreakpointRule {
   media?: (typeof BP_MEDIA)[number];
   /** its headings set smaller, or larger, here */
   type?: (typeof BP_TYPES)[number];
+  /** its pictures cropped for this width: wide, square or tall */
+  crop?: (typeof BP_CROPS)[number];
 }
 export type Responsive = Partial<Record<Breakpoint, BreakpointRule>>;
 
@@ -405,6 +410,7 @@ export function normalizeResponsive(v: unknown): Responsive | undefined {
     if ((PADS as readonly string[]).includes(x.pad as string)) rule.pad = x.pad as Pad;
     if ((BP_MEDIA as readonly string[]).includes(x.media as string)) rule.media = x.media as BreakpointRule['media'];
     if ((BP_TYPES as readonly string[]).includes(x.type as string)) rule.type = x.type as BreakpointRule['type'];
+    if ((BP_CROPS as readonly string[]).includes(x.crop as string)) rule.crop = x.crop as BreakpointRule['crop'];
     if (Object.keys(rule).length) out[bp] = rule;
   }
   return Object.keys(out).length ? out : undefined;
@@ -427,6 +433,7 @@ export function describeResponsive(r: Responsive | undefined): string[] {
       x.pad ? `${{ s: 'tight', m: 'even', l: 'generous' }[x.pad]} spacing` : '',
       x.media ? `picture ${x.media === 'first' ? 'before' : 'after'} the words` : '',
       x.type ? `headings ${x.type === 's' ? 'smaller' : 'larger'}` : '',
+      x.crop ? `pictures cropped ${x.crop}` : '',
     ].filter(Boolean);
     if (said.length) out.push(`${BREAKPOINT_LABEL[bp]}: ${said.join(', ')}`);
   }
@@ -701,6 +708,7 @@ export function normalizeSection(v: unknown, pageType: PageType, imageIds: Reado
   if (shape) sec.shape = shape;
   const responsive = normalizeResponsive(r.responsive);
   if (responsive) sec.responsive = responsive;
+  if (r.story === true && def.kind === 'features') sec.story = true;
   return sec;
 }
 
@@ -754,8 +762,8 @@ export function normalizeSpec(v: unknown, moodboard?: Moodboard | null): DesignS
 
 // ── patches: iteration that touches only what was asked ───────────────
 
-export type PatchOp = 'tokens' | 'look' | 'content' | 'variant' | 'tone' | 'shape' | 'responsive' | 'replace' | 'add' | 'remove' | 'move' | 'images' | 'none';
-export const PATCH_OPS: readonly PatchOp[] = ['tokens', 'look', 'content', 'variant', 'tone', 'shape', 'responsive', 'replace', 'add', 'remove', 'move', 'images', 'none'];
+export type PatchOp = 'tokens' | 'look' | 'content' | 'variant' | 'tone' | 'shape' | 'responsive' | 'story' | 'replace' | 'add' | 'remove' | 'move' | 'images' | 'none';
+export const PATCH_OPS: readonly PatchOp[] = ['tokens', 'look', 'content', 'variant', 'tone', 'shape', 'responsive', 'story', 'replace', 'add', 'remove', 'move', 'images', 'none'];
 
 export interface Patch {
   op: PatchOp;
@@ -775,6 +783,8 @@ export interface Patch {
   /** a "responsive" patch: the width it is for, and the rules to set there (null or false clears one) */
   breakpoint?: Breakpoint;
   rule?: Record<string, unknown>;
+  /** a "story" patch: this sequence is (true) or is no longer (false) the one told as the pinned story */
+  story?: boolean;
   /** one line: what the change is */
   summary: string;
 }
@@ -798,6 +808,7 @@ export function normalizePatch(v: unknown): Patch {
     images: Array.isArray(r.images) ? r.images.filter((x: unknown): x is string => typeof x === 'string').slice(0, 8) : undefined,
     breakpoint: (BREAKPOINTS as readonly string[]).includes(r.breakpoint) ? (r.breakpoint as Breakpoint) : r.breakpoint === 'phone' ? 'mobile' : undefined,
     rule: r.rule && typeof r.rule === 'object' && !Array.isArray(r.rule) ? o(r.rule) : undefined,
+    story: typeof r.story === 'boolean' ? r.story : undefined,
     summary: s(r.summary, 200),
   };
 }
@@ -881,6 +892,19 @@ export function applyPatch(spec: DesignSpec, patchIn: Patch, moodboard?: Moodboa
       // the settings asked for, the rest kept; what the designer set is theirs: the planner leaves it alone
       const sec: Section = { ...target!, shape: normalizeShape(target!.kind, { ...(target!.shape ?? {}), ...asked }), fixed: true };
       return next(spec.sections.map((x, i) => (i === idx ? sec : x)), undefined, undefined, [sec.id]);
+    }
+    case 'story': {
+      const miss = needTarget();
+      if (miss) return miss;
+      const n = Array.isArray(target!.content.items) ? (target!.content.items as unknown[]).length : 0;
+      if (target!.kind !== 'features' || n < 3 || n > 6) return { ok: false, error: 'A story is a sequence of three to six points.' };
+      if (typeof p.story !== 'boolean') return { ok: false, error: 'Tell it as the story, or not?' };
+      // one story to a page: choosing this sequence releases any other
+      const sections = spec.sections.map((x, i) => {
+        const { story: _was, ...rest } = x;
+        return i === idx && p.story ? ({ ...rest, story: true as const, fixed: true } as Section) : (rest as Section);
+      });
+      return next(sections, undefined, undefined, [target!.id]);
     }
     case 'responsive': {
       const miss = needTarget();
@@ -966,7 +990,7 @@ function describeField(f: Field): string {
         .map(([k, x]) => `${k}: ${describeField(x)}`)
         .join(', ')}}] ${f.n[0]}–${f.n[1]}${f.req ? '*' : ''}`;
     case 'tree':
-      return 'one piece* — {"t":"stack","dir":"row|col","gap":"s|m|l","align":"start|center|end|stretch","children":[pieces]} | {"t":"grid","cols":[2–4 whole numbers 1–12: the columns\' proportion, e.g. [5,7]],"gap","align","children":[pieces]} | {"t":"box","tone":"base|alt|accent|invert","pad":"s|m|l","children":[pieces]} | {"t":"text","role":"eyebrow|title|heading|lead|body|caption|quote","text"} | {"t":"figure","value","label"} | {"t":"image","at":its index in this section\'s images,"ratio":"1:1|4:3|3:2|16:9|3:4|2:3"} | {"t":"button","label","style":"primary|secondary|link"} | {"t":"list","items":[…],"marker":"none|number|rule"} | {"t":"rule"}; at most 4 levels deep and 48 pieces; one title';
+      return 'one piece* — {"t":"stack","dir":"row|col","gap":"s|m|l","align":"start|center|end|stretch","children":[pieces],"pin":true to hold a column in view while the one beside it scrolls} | {"t":"grid","cols":[2–4 whole numbers 1–12: the columns\' proportion, e.g. [5,7]],"gap","align","children":[pieces]} | {"t":"box","tone":"base|alt|accent|invert","pad":"s|m|l","children":[pieces]} | {"t":"layer","place":"top-start|top|top-end|start|center|end|bottom-start|bottom|bottom-end","inset":"s|m|l","children":[the ground first (a picture or a box), then what sits over it]} | {"t":"field","rows":"s|m|l" (row height),"children":[pieces, each with "cell":[first column 1–12, columns spanned, first row 1–8, rows spanned]]} — a field places pieces by hand on twelve columns: they may overlap, sit off-axis, leave columns empty; words that meet a picture are drawn above it on a plate | {"t":"text","role":"eyebrow|title|heading|lead|body|caption|quote","text","size":"l|xl|giant" (a title, heading or quote at display size),"align":"center|end","over":"lines" (a title that crosses a picture, set line by line on strips of the ground)} | {"t":"figure","value","label"} | {"t":"image","at":its index in this section\'s images,"ratio":"1:1|4:3|3:2|16:9|21:9|3:4|2:3","fill":true to fill its cell} | {"t":"button","label","style":"primary|secondary|link"} | {"t":"list","items":[…],"marker":"none|number|rule"} | {"t":"rule"}; at most 4 levels deep and 48 pieces; one title';
   }
 }
 

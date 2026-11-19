@@ -18,6 +18,7 @@
 import { fitToIntent } from './fit';
 import { EXPERIENCE_LABEL, intentOf, pageTypeFor, structureRule } from './intent';
 import { layoutBrief } from './layout';
+import { holdArrangement } from './arrange';
 import { tellsRule } from './tells';
 import { systemBrief } from './design-system';
 import { designFromDirection, directionBrief, LOCK_LABEL, planLayout, type ArtDirection, type LockGroup } from './direction';
@@ -255,7 +256,8 @@ export function parseGenerate(raw: unknown, brief: DesignBrief, moodboard: Moodb
   if (dir) {
     const { tokens, look } = designFromDirection(dir);
     const spec = normalizeSpec({ ...r, tokens, look, pageType, platform: brief.platform, version, reason, createdAt: Date.now() }, moodboard);
-    return fit(spec ? planLayout(spec) : null);
+    const fitted = fit(spec ? planLayout(spec) : null);
+    return fitted ? holdArrangement(fitted, dir, moodboard) : null;
   }
   const pal = Object.fromEntries(brief.palette.map((p) => [p.role, p.hex]));
   const t = obj(r.tokens);
@@ -301,6 +303,7 @@ Patch operations (the "op"):
 - "tone": set the ground one section sits on, or its spacing — {"sectionId", "tone": ${TONES.join('|')}, "pad": s|m|l}.
 - "shape": how one booking or hero is set, the rest of it kept — {"sectionId", "shape": {…}}. A booking: "side" start|end (where its summary card, day grid or panel sits), "times" tiles|rows|pills, "summary" card|inline|bar (a bar keeps the choice beside the confirm action), "ratio" 0.3–0.62 (the narrower column's share), "density" airy|even|dense, "align" left|center. A hero: "align" left|center, "side" start|end (where the words sit), "valign" top|middle|bottom (over a full picture), "measure" 0.45–1 (how wide the words run), "scale" 0.82–1.25 (the headline's size), "ratio" 0.36–0.64 (the words' share beside a picture).
 - "responsive": set one section apart at a narrower width, the desktop kept as it is — {"sectionId", "breakpoint": "tablet"|"mobile", "rule": {any of: "hide" true, "align" start|center, "pad" s|m|l, "media" first|last (where its picture sits once its parts stack), "type" s|l (its headings smaller or larger)}}; a rule set to null goes back to the desktop's. Use it when the comment names phones, mobile or tablets.
+- "story": tell one sequence of three to six points (a features section) as the page’s pinned story, or stop — {"sectionId", "story": true|false}.
 - "content": change fields of one section — {"sectionId", "content": {only the fields that change}}.
 - "variant": switch one section's variant — {"sectionId", "variant"}.
 - "images": change which moodboard images one section uses — {"sectionId", "images": [ids]}.

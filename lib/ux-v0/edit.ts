@@ -94,7 +94,7 @@ export function setLocked(spec: DesignSpec, sectionId: string, locked: boolean):
 
 /** The locked sections a patch would change: asked about before it is applied. */
 export function lockedTouched(spec: DesignSpec, patch: Patch): string[] {
-  if (!patch.sectionId || !['content', 'variant', 'tone', 'shape', 'responsive', 'images', 'replace', 'remove', 'move'].includes(patch.op)) return [];
+  if (!patch.sectionId || !['content', 'variant', 'tone', 'shape', 'responsive', 'story', 'images', 'replace', 'remove', 'move'].includes(patch.op)) return [];
   const sec = spec.sections.find((s) => s.id === patch.sectionId);
   return sec?.locked ? [sec.id] : [];
 }

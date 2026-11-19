@@ -713,3 +713,33 @@
   flex-basis: 100%;
   margin: 0;
 }
+
+/* where a picture's subject is: nine places */
+.v0-focal {
+  display: inline-grid;
+  grid-template-columns: repeat(3, 18px);
+  gap: 3px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--sb-well);
+}
+.v0-focal-dot {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: var(--sb-paper);
+  cursor: pointer;
+}
+.v0-focal-dot.is-on {
+  background: var(--sb-ink);
+}
+.v0-focal-dot:focus-visible {
+  outline: 2px solid var(--sb-moss);
+  outline-offset: 1px;
+}
+.v0-focal-dot:disabled {
+  cursor: default;
+  opacity: 0.5;
+}

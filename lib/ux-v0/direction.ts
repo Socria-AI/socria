@@ -52,6 +52,8 @@ import { paletteFromSwatches, type BoardReading } from './references';
 import { intentOf, requiredComponents } from './intent';
 import { askedTells, tellsOf, unaskedTells, type Tell } from './tells';
 import { normalizeDesignPlan, planBrief, plannedDirection, SIGNATURES, type DesignPlan, type PlanContext, type Signature } from './plan';
+import { applyReading, readCreative, readingIsEmpty, type CreativeReading, type OpeningArrange } from './interpret';
+import { MOTION_PRESETS } from './motion';
 
 // ── the visual languages ─────────────────────────────────────────────
 
@@ -409,7 +411,7 @@ export const LANGUAGES: readonly Language[] = [
     id: 'night',
     name: 'After dark',
     blurb: 'cinema and nightlife: a deep coloured ground (ink blue, oxblood, bottle green), light type with wide spacing, two inks drawn from the same night, duotone photographs',
-    keywords: ['dark', 'night', 'nightlife', 'evening', 'cinematic', 'cinema', 'film', 'moody', 'bar', 'cocktail', 'cocktails', 'club', 'jazz', 'theatre', 'theater', 'gaming', 'game', 'futuristic', 'dramatic', 'mysterious', 'sleek', 'premium', 'audio', 'headphones', 'car', 'cars', 'watch', 'whisky', 'whiskey', 'spirits', 'luxury', 'late'],
+    keywords: ['dark', 'night', 'nightlife', 'evening', 'moody', 'bar', 'cocktail', 'cocktails', 'club', 'jazz', 'theatre', 'theater', 'gaming', 'game', 'futuristic', 'dramatic', 'mysterious', 'sleek', 'premium', 'audio', 'headphones', 'car', 'cars', 'watch', 'whisky', 'whiskey', 'spirits', 'luxury', 'late'],
     traits: ['dark', 'sans', 'dramatic', 'loud'],
     display: ['Gloock', 'Bodoni Moda', 'Syne', 'Unbounded'],
     body: ['Manrope', 'Geist', 'Inter'],
@@ -463,6 +465,151 @@ export const LANGUAGES: readonly Language[] = [
     imagery: 'Photographs printed in duotone, framed with a hard offset shadow; stickers and stamps.',
     avoid: ['glossy gradients', 'thin light type', 'corporate blue', 'soft drop shadows'],
   },
+  {
+    id: 'brutal',
+    name: 'Raw structure',
+    blurb: 'brutalism for the web: the structure left showing, one heavy face at full weight, thick rules, square boxes, mono labels, nothing softened',
+    keywords: ['brutalist', 'brutalism', 'brutal', 'raw', 'concrete', 'stark', 'blunt', 'uncompromising', 'anti-design', 'underground', 'radical', 'manifesto', 'protest', 'activist', 'squat', 'experimental', 'archive', 'zine', 'collective', 'architecture', 'sculpture', 'noise', 'techno'],
+    traits: ['loud', 'heavy', 'stark', 'raw', 'mono'],
+    display: ['Archivo Black', 'Alfa Slab One', 'Chivo', 'Schibsted Grotesk', 'Epilogue'],
+    body: ['IBM Plex Sans', 'Chivo', 'Schibsted Grotesk', 'Work Sans'],
+    mono: ['Space Mono', 'Martian Mono', 'IBM Plex Mono'],
+    palette: 'white',
+    scale: ['compact', 'comfortable'],
+    radius: ['none'],
+    treatment: ['mono', 'contrast'],
+    style: 'bold',
+    look: {
+      ratio: [1.5, 1.618, 1.414], weight: [900, 800], case: ['upper', 'sentence'], tracking: ['tight'], emphasis: ['highlight', 'underline'], label: ['mono'],
+      grid: ['modular', 'asymmetric', 'swiss'], align: ['left'], width: ['wide'], rhythm: ['dramatic', 'even'], containers: ['ruled', 'framed'], rules: ['heavy'], buttons: ['block', 'outline'],
+      frame: ['plain'], motifs: [['numbering', 'big-numerals'], ['numbering']], shapes: [[]],
+    },
+    accent2: null,
+    motion: ['measured', 'still', 'lively'], moTweak: { entrance: 'none', headline: 'none', hover: 'invert', sections: 'none', ease: 'snap', parallax: 0 },
+    prefer: { hero: ['statement', 'poster', 'editorial'], features: ['index', 'numbered', 'columns'], quote: ['large', 'pull'], stats: ['giant', 'row'], cta: ['statement', 'band'], text: ['two-column', 'lead'], gallery: ['grid', 'mosaic'], split: ['image-left', 'image-right'], faq: ['two-column', 'accordion'], list: ['schedule', 'simple'] },
+    tones: { alternate: false, cta: 'invert', stats: 'invert' },
+    concept: (c) => `The structure left showing for ${c.audience}: one heavy face, thick rules and numbered parts, so ${c.what} is stated, not dressed.`,
+    voice: 'Blunt and exact: statements, not slogans; numbers and names where adjectives would go.',
+    composition: 'A visible grid of ruled cells, parts numbered, headlines at full weight hard against the left edge; nothing centred, nothing softened.',
+    imagery: 'Photographs in hard black and white, uncropped and unframed, captioned in mono.',
+    avoid: ['rounded corners', 'soft shadows', 'gradients', 'friendly illustration', 'a centred hero'],
+  },
+  {
+    id: 'cinema',
+    name: 'Widescreen',
+    blurb: 'a film in stills: pictures edge to edge, words laid over them like titles, a dark field between scenes, long slow movement',
+    keywords: ['cinematic', 'cinema', 'film', 'filmic', 'movie', 'director', 'documentary', 'screening', 'trailer', 'scene', 'scenes', 'storytelling', 'narrative', 'immersive', 'atmospheric', 'dramatic', 'epic', 'landscape', 'expedition', 'travel', 'automotive', 'launch', 'premiere', 'festival'],
+    traits: ['dark', 'dramatic', 'slow', 'pictures'],
+    display: ['Cinzel', 'Marcellus', 'Oswald', 'Cormorant Garamond', 'Red Hat Display'],
+    body: ['Inter', 'Figtree', 'Hanken Grotesk', 'Crimson Pro'],
+    mono: ['DM Mono'],
+    palette: 'dark',
+    scale: ['spacious'],
+    radius: ['none'],
+    treatment: ['contrast', 'muted'],
+    style: 'minimal',
+    look: {
+      ratio: [1.5, 1.414], weight: [400, 500], case: ['upper', 'sentence'], tracking: ['wide', 'normal'], emphasis: ['italic', 'none'], label: ['caps', 'quiet'],
+      grid: ['stack', 'asymmetric'], align: ['left', 'center'], width: ['wide'], rhythm: ['dramatic'], containers: ['open'], rules: ['none', 'hairline'], buttons: ['outline', 'underline'],
+      frame: ['plain'], motifs: [['captions'], []], shapes: [[]],
+    },
+    accent2: null,
+    motion: ['measured', 'lively', 'calm'], moTweak: { duration: 1100, ease: 'expo', entrance: 'fade', headline: 'mask', hover: 'zoom', sections: 'none', parallax: 2, scrub: 1, media: 'scale' },
+    prefer: { hero: ['full-bleed', 'statement', 'editorial'], features: ['list', 'index'], quote: ['large', 'pull'], stats: ['row'], cta: ['image', 'statement'], text: ['lead', 'narrow'], gallery: ['strip', 'mosaic'], split: ['image-right', 'image-left'], faq: ['accordion'], list: ['simple', 'schedule'] },
+    tones: { alternate: false, quote: 'invert' },
+    concept: (c) => `A film in stills for ${c.audience}: each picture given the whole screen and one line laid over it, so ${c.what} unfolds scene by scene.`,
+    voice: 'Like titles on a film: few words, present tense, one line to a scene.',
+    composition: 'Scenes, not sections: a picture edge to edge, words laid low over it, darkness between; each scene held before the next.',
+    imagery: 'Wide photographs with deep contrast and a single source of light; never a collage.',
+    avoid: ['card grids', 'icon rows', 'bright white panels', 'many small pictures', 'busy navigation'],
+  },
+  {
+    id: 'future',
+    name: 'Signal',
+    blurb: 'a near-future interface: a dark field, wide squared type, mono read-outs, hairlines and one luminous ink',
+    keywords: ['futuristic', 'futurism', 'future', 'sci-fi', 'scifi', 'cyber', 'space', 'aerospace', 'satellite', 'robotics', 'quantum', 'ai', 'machine', 'synthetic', 'speculative', 'lab', 'prototype', 'electric', 'ev', 'drone', 'hologram', 'digital art', 'generative', 'simulation'],
+    traits: ['dark', 'mono', 'cold', 'technical', 'wide'],
+    display: ['Michroma', 'Orbitron', 'Syncopate', 'Chakra Petch', 'Space Grotesk'],
+    body: ['Chakra Petch', 'Onest', 'Inter', 'IBM Plex Sans'],
+    mono: ['Martian Mono', 'JetBrains Mono', 'DM Mono'],
+    palette: 'deep',
+    scale: ['comfortable', 'compact'],
+    radius: ['none', 'soft'],
+    treatment: ['duotone', 'contrast'],
+    style: 'technical',
+    look: {
+      ratio: [1.414, 1.333], weight: [400, 500], case: ['upper', 'sentence'], tracking: ['wide'], emphasis: ['accent'], label: ['mono'],
+      grid: ['modular', 'asymmetric', 'swiss'], align: ['left'], width: ['wide'], rhythm: ['even', 'dramatic'], containers: ['ruled', 'open'], rules: ['hairline'], buttons: ['outline', 'block'],
+      frame: ['plain', 'inset'], motifs: [['numbering', 'big-numerals'], ['numbering']], shapes: [[]],
+    },
+    accent2: { turn: 160, s: 0.75, l: 0.58 },
+    motion: ['lively', 'kinetic', 'measured'], moTweak: { entrance: 'mask', headline: 'letters', hover: 'invert', sections: 'wipe', ease: 'expo', draw: true },
+    prefer: { hero: ['statement', 'split', 'poster'], features: ['index', 'numbered', 'grid'], quote: ['large'], stats: ['giant', 'row'], cta: ['statement', 'band'], text: ['lead', 'two-column'], gallery: ['grid', 'strip'], split: ['image-right', 'image-left'], faq: ['accordion'], list: ['schedule', 'simple'] },
+    tones: { alternate: false, stats: 'invert' },
+    concept: (c) => `A read-out from a little way ahead for ${c.audience}: wide squared type, mono figures and one luminous ink on a dark field, so ${c.what} reads as already working.`,
+    voice: 'Precise and unexcited: specifications before claims, units on every number.',
+    composition: 'A dark field ruled in hairlines; read-outs in mono at the edges; one wide headline and one lit figure to a screen.',
+    imagery: 'Renders and made drawings rather than photographs: orbits, lattices, contour fields in two inks.',
+    avoid: ['stock photography of people', 'rounded friendly cards', 'pastel colour', 'serif body text'],
+  },
+  {
+    id: 'industrial',
+    name: 'Workshop',
+    blurb: 'a parts catalogue: condensed signage type, numbered components, data plates, hairline tables, safety colour used once',
+    keywords: ['industrial', 'factory', 'workshop', 'manufacturing', 'machined', 'engineered', 'engineering', 'tooling', 'hardware', 'steel', 'aluminium', 'aluminum', 'foundry', 'fabrication', 'logistics', 'warehouse', 'equipment', 'utilitarian', 'workwear', 'furniture', 'bicycle', 'motor', 'audio', 'speaker', 'product'],
+    traits: ['mono', 'condensed', 'technical', 'plain'],
+    display: ['Barlow Condensed', 'Oswald', 'Big Shoulders Display', 'Bebas Neue', 'Chivo'],
+    body: ['IBM Plex Sans', 'Onest', 'Chivo', 'Public Sans'],
+    mono: ['IBM Plex Mono', 'DM Mono', 'Fragment Mono'],
+    palette: 'stone',
+    scale: ['compact', 'comfortable'],
+    radius: ['none'],
+    treatment: ['muted', 'mono'],
+    style: 'technical',
+    look: {
+      ratio: [1.414, 1.5], weight: [600, 700], case: ['upper', 'sentence'], tracking: ['normal', 'wide'], emphasis: ['accent', 'underline'], label: ['mono'],
+      grid: ['modular', 'swiss'], align: ['left'], width: ['wide', 'standard'], rhythm: ['even'], containers: ['ruled', 'open'], rules: ['hairline', 'heavy'], buttons: ['block', 'solid'],
+      frame: ['inset', 'plain'], motifs: [['numbering', 'captions'], ['numbering']], shapes: [[]],
+    },
+    accent2: null,
+    motion: ['measured', 'calm'], moTweak: { entrance: 'rise', headline: 'mask', hover: 'underline', sections: 'none', ease: 'out', parallax: 0, draw: true },
+    prefer: { hero: ['split', 'editorial', 'statement'], features: ['index', 'numbered', 'columns'], quote: ['pull'], stats: ['row', 'giant'], cta: ['band', 'statement'], text: ['two-column', 'narrow'], gallery: ['grid', 'mosaic'], split: ['image-left', 'image-right'], faq: ['two-column', 'accordion'], list: ['schedule', 'menu'] },
+    tones: { alternate: true, stats: 'alt' },
+    concept: (c) => `A parts catalogue for ${c.audience}: condensed signage type, every component numbered and specified, so ${c.what} is shown as made.`,
+    voice: 'A specification sheet with good manners: materials, dimensions, tolerances; no superlatives.',
+    composition: 'A modular grid of ruled cells like a drawing sheet: a title block, numbered parts, a table of facts beside each picture.',
+    imagery: 'The object on a plain ground, lit evenly, shown whole and then in detail; captions as data plates.',
+    avoid: ['lifestyle photography', 'script type', 'rounded corners', 'decorative gradients'],
+  },
+  {
+    id: 'maximal',
+    name: 'More is more',
+    blurb: 'maximalism with a plan: a heavy display face, two inks and a ground colour, pattern, running bands of text, pictures in number, one clear path through it all',
+    keywords: ['maximalist', 'maximalism', 'maximal', 'exuberant', 'abundant', 'ornate', 'lavish', 'eclectic', 'carnival', 'festival', 'celebration', 'party', 'fashion week', 'streetwear', 'pop', 'colourful', 'colorful', 'vibrant', 'energetic', 'collage', 'kitsch', 'camp', 'baroque', 'drag', 'market'],
+    traits: ['loud', 'colourful', 'busy', 'heavy', 'playful'],
+    display: ['Abril Fatface', 'Dela Gothic One', 'Bricolage Grotesque', 'Unbounded', 'Rubik Mono One'],
+    body: ['Rubik', 'Figtree', 'Work Sans', 'Karla'],
+    mono: ['Space Mono'],
+    palette: 'tinted',
+    scale: ['comfortable', 'compact'],
+    radius: ['round', 'none'],
+    treatment: ['duotone', 'contrast', 'warm'],
+    style: 'bold',
+    look: {
+      ratio: [1.618, 1.5], weight: [800, 900, 700], case: ['sentence', 'upper'], tracking: ['tight'], emphasis: ['highlight', 'accent'], label: ['caps', 'mono'],
+      grid: ['poster', 'asymmetric', 'modular'], align: ['left'], width: ['wide'], rhythm: ['dramatic'], containers: ['bands', 'framed'], rules: ['heavy'], buttons: ['offset', 'pill'],
+      frame: ['offset', 'arch', 'circle'], motifs: [['marquee', 'shapes', 'big-numerals'], ['marquee', 'shapes']], shapes: [['circle', 'diamond', 'blob', 'quarter'], ['square', 'circle', 'arch']],
+    },
+    accent2: { turn: 120, s: 0.8, l: 0.52 },
+    motion: ['kinetic', 'lively'], moTweak: { entrance: 'scale', headline: 'words', hover: 'lift', sections: 'expand', ease: 'snap' },
+    prefer: { hero: ['poster', 'split', 'full-bleed'], features: ['grid', 'numbered'], quote: ['large', 'pull'], stats: ['giant', 'band'], cta: ['band', 'image'], text: ['lead'], gallery: ['mosaic', 'grid'], split: ['image-left', 'image-right'], faq: ['accordion'], list: ['menu', 'schedule'] },
+    tones: { alternate: true, cta: 'accent', stats: 'accent2', quote: 'accent' },
+    concept: (c) => `Plenty, on purpose, for ${c.audience}: a heavy display face, two inks, pattern and running text, with one clear path so ${c.what} is a feast and not a mess.`,
+    voice: 'Generous and quick: lists, asides, exclamation by typography rather than punctuation.',
+    composition: 'Bands of colour stacked like posters on a wall: huge type crossing pictures, a ticker between parts, shapes where a corner would be empty.',
+    imagery: 'Many pictures, cut out, overlapped and overprinted in two inks; pattern as a picture of its own.',
+    avoid: ['empty white space', 'thin grey type', 'a single polite accent', 'everything aligned to one quiet column'],
+  },
 ];
 
 const LANG = new Map(LANGUAGES.map((l) => [l.id, l]));
@@ -482,25 +629,35 @@ const CLASHES: Record<string, readonly string[]> = {
   civic: ['nightlife', 'club', 'fashion', 'luxury', 'perfume', 'gallery', 'festival', 'gig', 'bar', 'cocktail', 'cocktails', 'jazz'],
   night: ['clinic', 'patients', 'children', 'kids', 'baby', 'school', 'pension', 'council', 'accessible', 'appointments', 'bakery', 'breakfast', 'morning', 'mornings', 'yoga', 'pregnancy'],
   'retro-print': ['luxury', 'clinic', 'patients', 'legal', 'bank', 'funeral', 'pension', 'hotel', 'spa', 'enterprise'],
+  brutal: ['luxury', 'spa', 'wellness', 'yoga', 'children', 'kids', 'baby', 'wedding', 'clinic', 'patients', 'pension', 'bank', 'funeral', 'bakery', 'florist', 'hotel', 'calm'],
+  cinema: ['clinic', 'patients', 'children', 'kids', 'council', 'pension', 'benefits', 'appointments', 'developer', 'api', 'bakery', 'accessible'],
+  future: ['bakery', 'cafe', 'café', 'coffee', 'wedding', 'spa', 'yoga', 'children', 'kids', 'heritage', 'handmade', 'funeral', 'florist', 'pension', 'council'],
+  industrial: ['spa', 'wellness', 'yoga', 'wedding', 'children', 'kids', 'baby', 'perfume', 'florist', 'cocktail', 'cocktails', 'funeral', 'therapy'],
+  maximal: ['luxury', 'calm', 'clinic', 'patients', 'therapy', 'legal', 'bank', 'funeral', 'pension', 'spa', 'meditation', 'council', 'developer', 'api', 'minimal'],
 };
 
 /** How well each language suits a working interface (an app screen), added to its fit when the designer's words do not name one. */
-const APP_FIT: Record<string, number> = { utility: 7, civic: 4, swiss: 3, geometric: 2, organic: 0, broadsheet: -1, craft: -3, gallery: -3, night: -2, 'quiet-luxury': -5, poster: -6, 'retro-print': -5 };
+const APP_FIT: Record<string, number> = { utility: 7, civic: 4, swiss: 3, geometric: 2, organic: 0, broadsheet: -1, craft: -3, gallery: -3, night: -2, 'quiet-luxury': -5, poster: -6, 'retro-print': -5, brutal: -4, cinema: -7, future: 1, industrial: 2, maximal: -7 };
 
 /** Words people use for a language, by its id. */
 const SYNONYMS: Record<string, readonly string[]> = {
   broadsheet: ['newspaper', 'broadsheet', 'editorial', 'magazine', 'literary', 'journal'],
   swiss: ['swiss', 'helvetica', 'international style', 'modernist', 'grid-based', 'bauhaus'],
   'quiet-luxury': ['luxury', 'luxe', 'high-end', 'upscale', 'hotel', 'quiet luxury', 'aesop'],
-  poster: ['poster', 'brutalist', 'loud', 'campaign', 'gig poster', 'maximal', 'maximalist'],
+  poster: ['poster', 'loud', 'campaign', 'gig poster'],
   craft: ['handmade', 'cosy', 'cozy', 'rustic', 'artisan', 'warm'],
   geometric: ['geometric', 'shapes', 'socria', 'paper and ink', 'bauhaus'],
   utility: ['technical', 'developer', 'terminal', 'mono', 'dashboard', 'engineering'],
   gallery: ['gallery', 'minimal', 'minimalist', 'white space', 'portfolio', 'museum'],
   organic: ['organic', 'soft', 'calming', 'natural', 'wellness'],
   civic: ['accessible', 'government', 'gov.uk', 'plain', 'public service'],
-  night: ['dark', 'dark mode', 'night', 'moody', 'cinematic', 'neon', 'black'],
+  night: ['dark', 'dark mode', 'night', 'moody', 'neon', 'black'],
   'retro-print': ['retro', 'vintage', 'risograph', 'riso', 'zine', 'seventies', '70s', 'print'],
+  brutal: ['brutalist', 'brutalism', 'brutal', 'raw', 'anti-design'],
+  cinema: ['cinematic', 'filmic', 'widescreen', 'film', 'like a film'],
+  future: ['futuristic', 'futurist', 'sci-fi', 'cyber', 'space-age'],
+  industrial: ['industrial', 'utilitarian', 'workshop', 'factory', 'catalogue of parts'],
+  maximal: ['maximalist', 'maximalism', 'more is more', 'exuberant', 'eclectic'],
 };
 
 // ── the direction ────────────────────────────────────────────────────
@@ -566,6 +723,57 @@ export interface ArtDirection {
    * its layout idea, its ONE signature move and one detail only its subject has, with what the critique changed.
    */
   designPlan?: DesignPlan;
+  /**
+   * The creative reading of the designer's own words, as this direction carries it (lib/ux-v0/interpret.ts): each
+   * decision said with the word it came from, and what it asks of the sections a generator chooses.
+   */
+  reading?: { said: string[]; sections: string[] };
+  /** the arrangement its opening takes when the reading asks for one: words layered over the picture, the title crossing it, or set off-axis */
+  arrange?: OpeningArrange;
+  /** parts given a whole screen, pictures run edge to edge, titles at display size */
+  frame?: { tall?: boolean; bleed?: boolean; display?: 'xl' | 'giant' };
+}
+
+/** The words of a brief that say what the work should feel like: its personality first, the most specific last. */
+export function creativeWords(brief: Pick<DesignBrief, 'personality' | 'objective' | 'visualDirection' | 'layoutDirection'>, notes = ''): string {
+  return [(brief.personality ?? []).join(', '), brief.objective, brief.visualDirection, brief.layoutDirection, notes].filter(Boolean).join('. ');
+}
+
+/** A direction with a creative reading written into it: the look in code, and what the opening and the frames take. */
+export function withReading(d: ArtDirection, reading: CreativeReading, opts: { keepColours?: boolean; keepType?: boolean; ownGrid?: boolean } = {}): ArtDirection {
+  if (readingIsEmpty(reading)) return d;
+  const read = applyReading(d, reading, { ...opts, presets: MOTION_PRESETS });
+  const applied = read.applied;
+  // a ground that changed temperature keeps every text colour as readable as it was (AAA stays AAA)
+  const was = d.tokens.colors;
+  const now = { ...read.direction.tokens.colors };
+  if (now.background !== was.background || now.muted !== was.muted) {
+    const keep = (fg: string, old: string) => ensureContrast(fg, now.background, Math.min(7, Math.floor(contrastRatio(old, was.background) * 100) / 100));
+    now.text = keep(now.text, was.text);
+    now.muted = keep(now.muted, was.muted);
+  }
+  let direction = { ...read.direction, tokens: normalizeTokens({ ...read.direction.tokens, colors: now }, []), look: normalizeLook(read.direction.look, read.direction.look) };
+  // a reading never produces one of the looks generated pages share (lib/ux-v0/tells.ts): where its tint, corners or
+  // surfaces would, that part is left as the direction had it
+  const count = (t: DesignTokens, l: Look) => tellsOf({ colors: t.colors, fonts: t.fonts, radius: t.radius, look: l }).length;
+  const before = count(d.tokens, d.look);
+  if (count(direction.tokens, direction.look) > before) {
+    const plainColours = { ...direction, tokens: { ...direction.tokens, colors: d.tokens.colors } };
+    const plainSurface = { ...plainColours, tokens: { ...plainColours.tokens, radius: d.tokens.radius }, look: { ...plainColours.look, containers: d.look.containers, align: d.look.align, grid: d.look.grid } };
+    direction = count(plainColours.tokens, plainColours.look) <= before ? plainColours : plainSurface;
+    const i = applied.indexOf('the ground warmed');
+    if (i >= 0) applied.splice(i, 1);
+    const j = applied.indexOf('the ground cooled');
+    if (j >= 0) applied.splice(j, 1);
+  }
+  const ex = reading.execution;
+  const frame = { ...(ex.tall ? { tall: true } : {}), ...(ex.bleed ? { bleed: true } : {}), ...(ex.display ? { display: ex.display } : {}) };
+  return {
+    ...direction,
+    reading: { said: applied.slice(0, 10), sections: reading.sections.slice(0, 6) },
+    ...(ex.arrange && !d.locks.includes('layout') ? { arrange: ex.arrange } : {}),
+    ...(Object.keys(frame).length && !d.locks.includes('layout') ? { frame } : {}),
+  };
 }
 
 /**
@@ -653,6 +861,11 @@ const PLAN_AFFINITY: Record<string, readonly string[]> = {
   civic: ['statement', 'index', 'one-column', 'composed', 'figures-first', 'long-read', 'work-index'],
   night: ['image-led', 'poster', 'composed', 'one-piece', 'trend-first', 'magazine', 'split'],
   'retro-print': ['poster', 'index', 'composed', 'magazine', 'detail-first', 'work-index', 'one-column'],
+  brutal: ['statement', 'index', 'composed', 'work-index', 'text-first', 'detail-first', 'one-column'],
+  cinema: ['image-led', 'one-piece', 'composed', 'long-read', 'trend-first', 'split', 'statement'],
+  future: ['statement', 'composed', 'index', 'work-first', 'trend-first', 'magazine', 'split'],
+  industrial: ['side-by-side', 'index', 'composed', 'work-index', 'detail-first', 'long-read', 'split'],
+  maximal: ['poster', 'work-first', 'composed', 'magazine', 'figures-first', 'image-led', 'split'],
 };
 
 /** How each language would compose a booking, in order of preference. */
@@ -669,6 +882,11 @@ const BOOKING_AFFINITY: Record<string, readonly string[]> = {
   civic: ['list', 'calendar', 'strip'],
   night: ['immersive', 'strip', 'split'],
   'retro-print': ['strip', 'calendar', 'list'],
+  brutal: ['list', 'calendar', 'strip'],
+  cinema: ['immersive', 'split', 'strip'],
+  future: ['strip', 'split', 'calendar'],
+  industrial: ['calendar', 'list', 'split'],
+  maximal: ['strip', 'immersive', 'calendar'],
 };
 const BOOKING_SAY: Record<string, string> = {
   strip: 'The booking as a strip: the days in one row, the times as a grid beneath.',
@@ -1455,23 +1673,11 @@ export function lockedChanges(spec: DesignSpec, patch: Patch, locks: readonly Lo
 export function combineDirections(base: ArtDirection, from: ArtDirection, groups: readonly LockGroup[]): ArtDirection | null {
   const take = new Set(groups.filter((g): g is LockGroup => (LOCK_GROUPS as readonly string[]).includes(g)));
   if (!take.size || base.id === from.id) return null;
-  const tokens: Record<string, unknown> = { ...base.tokens, colors: { ...base.tokens.colors }, fonts: { ...base.tokens.fonts } };
-  for (const [k, g] of Object.entries(TOKEN_GROUP)) if (take.has(g)) tokens[k] = JSON.parse(JSON.stringify((from.tokens as unknown as Record<string, unknown>)[k] ?? null)) ?? tokens[k];
-  const look: Record<string, unknown> = { ...base.look };
-  for (const [k, g] of Object.entries(LOOK_GROUP)) if (take.has(g) && (from.look as unknown as Record<string, unknown>)[k] !== undefined) look[k] = JSON.parse(JSON.stringify((from.look as unknown as Record<string, unknown>)[k]));
   const taken = LOCK_GROUPS.filter((g) => take.has(g));
-  const said = taken.map((g) => LOCK_LABEL[g].toLowerCase());
-  const list = said.length > 1 ? `${said.slice(0, -1).join(', ')} and ${said[said.length - 1]}` : said[0];
-  const { designPlan: _plan, ...rest } = base;
+  const list = listOf(taken.map((g) => LOCK_LABEL[g].toLowerCase()));
   const combined = normalizeDirection({
-    ...rest,
+    ...mergedGroups(base, from, take),
     id: `${base.id}_x_${from.id}`.replace(/[^a-z0-9_-]/gi, '').slice(0, 64),
-    name: `${base.name} × ${from.name}`,
-    tokens,
-    look,
-    ...(take.has('layout') ? { compose: from.compose, plan: from.plan, order: from.order, lead: from.lead, shapes: from.shapes, composition: from.composition } : {}),
-    ...(take.has('imagery') ? { imagery: from.imagery } : {}),
-    ...(take.has('voice') ? { voice: from.voice } : {}),
     rationale: [`Combined by hand: the ${list} of ${from.name}.`, ...base.rationale.slice(0, 3)],
     locks: [...new Set([...base.locks.filter((g) => !take.has(g)), ...taken])],
     source: 'person',
@@ -1479,6 +1685,52 @@ export function combineDirections(base: ArtDirection, from: ArtDirection, groups
   if (!combined) return null;
   // said on the board where a direction's lean is: combined by hand, and what was taken from which
   return { ...combined, dna: dnaOfDirection(combined), dnaLean: 'combined by hand', dnaSaid: [`the ${list} of ${from.name}, on ${base.name}`] };
+}
+
+const listOf = (said: string[]) => (said.length > 1 ? `${said.slice(0, -1).join(', ')} and ${said[said.length - 1]}` : said[0]);
+
+/** One direction with whole groups taken from another: the tokens, the look and what the layout, pictures and voice carry. */
+function mergedGroups(base: ArtDirection, from: ArtDirection, take: ReadonlySet<LockGroup>): Record<string, unknown> {
+  const tokens: Record<string, unknown> = { ...base.tokens, colors: { ...base.tokens.colors }, fonts: { ...base.tokens.fonts } };
+  for (const [k, g] of Object.entries(TOKEN_GROUP)) if (take.has(g)) tokens[k] = JSON.parse(JSON.stringify((from.tokens as unknown as Record<string, unknown>)[k] ?? null)) ?? tokens[k];
+  const look: Record<string, unknown> = { ...base.look };
+  for (const [k, g] of Object.entries(LOOK_GROUP)) if (take.has(g) && (from.look as unknown as Record<string, unknown>)[k] !== undefined) look[k] = JSON.parse(JSON.stringify((from.look as unknown as Record<string, unknown>)[k]));
+  const { designPlan: _plan, ...rest } = base;
+  return {
+    ...rest,
+    name: `${base.name} × ${from.name}`,
+    tokens,
+    look,
+    ...(take.has('layout') ? { compose: from.compose, plan: from.plan, order: from.order, lead: from.lead, shapes: from.shapes, composition: from.composition } : {}),
+    ...(take.has('imagery') ? { imagery: from.imagery } : {}),
+    ...(take.has('voice') ? { voice: from.voice } : {}),
+  };
+}
+
+/**
+ * A HYBRID the designer's words asked for ("architectural minimalism with experimental editorial typography"): one
+ * language as the base, the part another was named for taken from it. SocriaUX's own reading, not a decision of the
+ * designer's on the board: nothing is locked by it, and it says in its reasons which words it came from.
+ */
+export function hybridDirection(base: ArtDirection, from: ArtDirection, groups: readonly LockGroup[], words: string): ArtDirection | null {
+  const take = new Set(groups);
+  if (!take.size || base.language === from.language) return null;
+  const list = listOf(LOCK_GROUPS.filter((g) => take.has(g)).map((g) => LOCK_LABEL[g].toLowerCase()));
+  const h = normalizeDirection({ ...mergedGroups(base, from, take), concept: `${base.concept.replace(/\.$/, '')}, with the ${list} of ${from.name.toLowerCase()}.`.slice(0, 320), rationale: [`From your words (${words}): ${base.name}, with the ${list} of ${from.name}.`, ...base.rationale.slice(0, 3)], source: base.source });
+  return h;
+}
+
+/** The two languages a reading's influences name, which is the base, and what the other gives: or null. */
+export function hybridOf(reading: CreativeReading): { base: string; from: string; groups: LockGroup[]; words: string } | null {
+  const known = reading.influences.filter((x, i, xs) => !!languageOf(x.language) && xs.findIndex((y) => y.language === x.language) === i);
+  if (known.length < 2) return null;
+  const plain = known.filter((x) => !x.aspect);
+  const aimed = known.filter((x) => !!x.aspect);
+  const base = plain[0] ?? aimed.find((x) => x.aspect === 'layout') ?? known[0];
+  const from = aimed.find((x) => x !== base) ?? known.find((x) => x !== base)!;
+  const GROUP: Record<string, LockGroup> = { type: 'type', layout: 'layout', palette: 'palette', imagery: 'imagery', motion: 'motion', surface: 'surface' };
+  const groups: LockGroup[] = from.aspect ? [GROUP[from.aspect]] : ['type', 'motifs'];
+  return { base: base.language, from: from.language, groups, words: `${base.said} with ${from.said}` };
 }
 
 /** The tokens and look a design takes from its direction. */
@@ -1553,6 +1805,10 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
   // asking again: what was shown steps back, so new languages come forward
   const adjusted = fits.map((x) => ({ ...x, adj: x.score - (seen.has(x.id) ? top + 1 : 0) })).sort((a, b) => b.adj - a.adj);
   const maxAdj = Math.max(1, adjusted[0].adj);
+  // what the designer's own words ask for, as execution (lib/ux-v0/interpret.ts): every direction carries it,
+  // within what is locked; they differ in everything it leaves open
+  // (the brief first, then what was written on the references, then the notes for this direction: the last said wins)
+  const reading = readCreative(creativeWords(brief, [board?.words ?? '', (brief.rules ?? []).join('. '), ask.notes ?? ''].filter(Boolean).join('. ')), avoid);
   const chosen: ArtDirection[] = [];
   const usedFonts = new Set<string>();
   const usedIds = new Set<string>();
@@ -1574,8 +1830,17 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
   const firstId = adjusted[0].id;
   // for each lean, how well each language embodies it, 0 (least of all) to 1 (most)
   const leans = slots.map((sl) => relAffinity(fits.map((x) => x.id), sl));
-  chosen.push(make(firstId, round === 0 && !(ask.base && ask.base.locks.includes('palette'))));
-  usedIds.add(firstId);
+  // two languages the designer named together: the first direction is built from both (lib/ux-v0/interpret.ts)
+  const mix = round === 0 && !ask.base ? hybridOf(reading) : null;
+  const mixed = mix ? hybridDirection(buildDirection(languageOf(mix.base)!, brief, { seed, faithful: false, directives, usedFonts, notes }), buildDirection(languageOf(mix.from)!, brief, { seed: seed + 31, faithful: false, directives, usedFonts }), mix.groups, mix.words) : null;
+  if (mixed) {
+    chosen.push(mixed);
+    usedFonts.add(mixed.tokens.fonts.display);
+    usedIds.add(mix!.base);
+  } else {
+    chosen.push(make(firstId, round === 0 && !(ask.base && ask.base.locks.includes('palette'))));
+    usedIds.add(firstId);
+  }
   while (chosen.length < count) {
     let best: { id: string; v: number } | null = null;
     const wantFit = chosen.length === 1 ? 0.45 : 0.35;
@@ -1604,7 +1869,9 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
     const locked = applyLocks(applyBrief(d, brief, i === 0 && round === 0), ask.base);
     // its look drawn from its lean of the DNA: type, grid, rhythm, ornament, motion, spacing, colour, pictures
     // (where the DNA narrows the grids, each direction takes one the others have not)
-    const shaped = ask.dna ? withDNA(locked, brief, slots[Math.min(i, 3)], i === 0 && round === 0, 'look', i, grids) : locked;
+    const shaped0 = ask.dna ? withDNA(locked, brief, slots[Math.min(i, 3)], i === 0 && round === 0, 'look', i, grids) : locked;
+    const faithful = i === 0 && round === 0 && !mixed;
+    const shaped = withReading(shaped0, reading, { keepColours: !!brief.system || (faithful && brief.decisions?.colour !== 'delegated'), keepType: !!brief.system || (faithful && brief.decisions?.typography !== 'delegated'), ownGrid: i > 0 });
     grids.push(shaped.look.grid);
     return { ...shaped, id: `dir_${d.language}_${round}_${i}` };
   });
@@ -1615,7 +1882,19 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
   // …then its opening, proportions and what it leads with, from the same lean
   const laid = ask.dna ? composed.map((d, i) => withDNA(d, brief, slots[Math.min(i, 3)], i === 0 && round === 0, 'layout', i)) : composed;
   // each direction's plan, critiqued and revised before anyone sees it (lib/ux-v0/plan.ts)
-  return laid.map((d, i) => withPlan(d, brief, notes, i === 0 && round === 0 && !ask.base, seed + i * 104729));
+  return laid.map((d, i) => {
+    const planned = withPlan(d, brief, notes, i === 0 && round === 0 && !ask.base, seed + i * 104729);
+    // the plan's critique revises a direction; what the reading asked of the opening and the frames is carried through it
+    // …and the directions stay different in structure: the first, the faithful reading, takes the arrangement the
+    // words asked for; the others keep their own plan's opening (and still carry the reading in their look)
+    const arrange = !d.arrange || i === 0 ? d.arrange : undefined;
+    const { arrange: _own, ...rest0 } = planned;
+    // the plan's critique may quiet a direction, but not below what the designer's own words asked of the type
+    const wantRatio = reading.execution.look.ratio;
+    const typeFree = !planned.locks.includes('type') && !brief.system && !(i === 0 && round === 0 && !mixed && brief.decisions?.typography !== 'delegated');
+    const rest = wantRatio && typeFree && rest0.look.ratio < wantRatio ? { ...rest0, look: { ...rest0.look, ratio: wantRatio } } : rest0;
+    return { ...rest, ...(d.reading ? { reading: d.reading } : {}), ...(arrange ? { arrange } : {}), ...(d.frame ? { frame: d.frame } : {}) };
+  });
 }
 
 /**
@@ -1779,6 +2058,21 @@ export function normalizeDirection(v: unknown): ArtDirection | null {
     ...shapesOf(r.shapes),
     ...((plan) => (plan ? { designPlan: plan } : {}))(normalizeDesignPlan(r.designPlan)),
     ...dnaOfStored(r),
+    ...readingOfStored(r),
+  };
+}
+
+/** A stored direction's creative reading, its opening's arrangement and its frames: held to their shape. */
+function readingOfStored(r: Record<string, any>): Pick<ArtDirection, 'reading' | 'arrange' | 'frame'> {
+  const rd = r.reading && typeof r.reading === 'object' ? (r.reading as Record<string, unknown>) : {};
+  const said = strs(rd.said, 240, 10);
+  const sections = strs(rd.sections, 420, 6);
+  const fr = r.frame && typeof r.frame === 'object' ? (r.frame as Record<string, unknown>) : {};
+  const frame = { ...(fr.tall === true ? { tall: true } : {}), ...(fr.bleed === true ? { bleed: true } : {}), ...(fr.display === 'xl' || fr.display === 'giant' ? { display: fr.display as 'xl' | 'giant' } : {}) };
+  return {
+    ...(said.length || sections.length ? { reading: { said, sections } } : {}),
+    ...(r.arrange === 'layered' || r.arrange === 'overlap' || r.arrange === 'offset' ? { arrange: r.arrange as OpeningArrange } : {}),
+    ...(Object.keys(frame).length ? { frame } : {}),
   };
 }
 
@@ -1947,6 +2241,23 @@ export function directionBrief(dir: ArtDirection, pageType: 'website' | 'app-scr
     L.motifs.includes('icons') ? '' : 'Icons are not part of this language: leave feature icons out.',
     motionBrief(L.motion),
     planBrief(dir.designPlan),
+    readingLines(dir),
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** The creative reading the direction carries, for the generator: what it means for the sections it chooses. */
+function readingLines(dir: ArtDirection): string {
+  if (!dir.reading?.said.length && !dir.arrange && !dir.frame) return '';
+  const f = dir.frame ?? {};
+  return [
+    'THE CREATIVE READING — what the designer’s own words ask of the page (the look already carries it in code; the sections you choose must carry it too):',
+    ...(dir.reading?.said ?? []).map((x) => `- ${x}`),
+    ...(dir.reading?.sections ?? []).map((x) => `- ${x}`),
+    dir.arrange ? `- Open with a composed section, not a library hero: ${dir.arrange === 'layered' ? 'its words layered over its picture (a "layer" piece)' : dir.arrange === 'overlap' ? 'a "field" with the title at display size crossing the picture' : 'a "field" with the title off-axis and columns left empty on purpose'}.` : '',
+    f.tall || f.bleed ? `- Give the composed sections that carry a picture ${[f.tall ? 'a whole screen (tall "screen")' : '', f.bleed ? 'the full width (span "bleed")' : ''].filter(Boolean).join(' and ')}.` : '',
+    f.display ? `- Titles in composed sections at display size ("size": "${f.display}").` : '',
   ]
     .filter(Boolean)
     .join('\n');

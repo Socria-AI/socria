@@ -329,6 +329,41 @@ export const BEHAVIOR_SOURCE = String.raw`(function () {
     return { root: root, form: form, update: update, total: total, choice: choice, done: done };
   }
 
+
+  // ── a navigation's menu: the links full-screen, where the bar does not show them ──
+  function menu(btn) {
+    var panel = document.getElementById(btn.getAttribute('aria-controls'));
+    if (!panel) return null;
+    var close = $(panel, '[data-ux-menu-close]');
+    function focusable() { return $$(panel, 'a[href],button').filter(function (el) { return !el.hidden; }); }
+    function open() {
+      panel.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+      document.documentElement.style.overflow = 'hidden';
+      (close || panel).focus();
+    }
+    function shut(quiet) {
+      panel.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+      document.documentElement.style.overflow = '';
+      if (quiet !== true) btn.focus();
+    }
+    btn.hidden = false;
+    btn.addEventListener('click', function () { if (panel.hidden) open(); else shut(); });
+    if (close) close.addEventListener('click', function () { shut(); });
+    panel.addEventListener('click', function (ev) { if (ev.target.closest('a')) shut(true); });
+    panel.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape') { ev.preventDefault(); shut(); return; }
+      if (ev.key !== 'Tab') return;
+      var f = focusable();
+      if (!f.length) return;
+      var first = f[0], last = f[f.length - 1];
+      if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+      else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+    });
+    return { btn: btn, panel: panel, open: open, shut: shut, links: $$(panel, '.nav-over-links a').length };
+  }
+
   var bookings = $$(document, '[data-ux-booking]').filter(fresh).map(booking).filter(Boolean);
   $$(document, 'form[data-ux-form]').filter(fresh).forEach(formBehaviour);
   $$(document, '.table-card table').filter(fresh).forEach(tableBehaviour);
@@ -337,6 +372,8 @@ export const BEHAVIOR_SOURCE = String.raw`(function () {
   var legends = $$(document, '[data-ux-legend]').filter(fresh).map(legend).filter(Boolean);
   var tableFilters = $$(document, '[data-ux-table-filter]').filter(fresh).map(tableFilter).filter(Boolean);
   var configs = $$(document, '[data-ux-config]').filter(fresh).map(configurator).filter(Boolean);
+  var menus = $$(document, '[data-ux-menu]').filter(fresh).map(menu).filter(Boolean);
+  if (document.body) document.body.classList.add('ux-js');
 
   // the audit's look at whether each interactive part works, in place, and back as it was
   function selfTestInteractive() {
@@ -391,6 +428,16 @@ export const BEHAVIOR_SOURCE = String.raw`(function () {
       t.run();
       if (rows.some(function (r) { return r.hidden; })) p.push('clearing the filter does not show every row');
       out.push({ kind: 'table', index: i, items: rows.length, problems: p });
+    });
+    menus.forEach(function (m, i) {
+      var p = [];
+      m.open();
+      if (m.panel.hidden || m.btn.getAttribute('aria-expanded') !== 'true') p.push('the menu does not open');
+      else if (!m.panel.contains(document.activeElement)) p.push('opening the menu does not move focus into it');
+      if (!m.links) p.push('the menu has no links');
+      m.panel.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      if (!m.panel.hidden) { p.push('Escape does not close the menu'); m.shut(true); }
+      out.push({ kind: 'menu', index: i, items: m.links, problems: p });
     });
     configs.forEach(function (c, i) {
       var p = [];
@@ -487,5 +534,5 @@ export const BEHAVIOR_SOURCE = String.raw`(function () {
     $$(fm.root, '.field.is-invalid').forEach(function (n) { n.classList.remove('is-invalid'); });
     return { index: i, kind: 'form', slots: inputs.length, problems: problems };
   }
-  window.__uxBehaviors = { selfTest: selfTest, selfTestInteractive: selfTestInteractive, bookings: bookings.length, forms: forms.length, galleries: galleries.length, filters: filterSets.length, charts: legends.length, tables: tableFilters.length, configurators: configs.length };
+  window.__uxBehaviors = { selfTest: selfTest, selfTestInteractive: selfTestInteractive, bookings: bookings.length, forms: forms.length, galleries: galleries.length, filters: filterSets.length, charts: legends.length, tables: tableFilters.length, configurators: configs.length, menus: menus.length };
 })();`;

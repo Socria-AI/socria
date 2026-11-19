@@ -12,7 +12,7 @@
 
 import type { ArtDirection } from './direction';
 import { fitToIntent, sampleFor } from './fit';
-import { composedOpening } from './compose';
+import { arrangedOpening, composedOpening } from './compose';
 import { hashText, seeded } from './layout';
 import { intentOf, pageTypeFor, requiredComponents } from './intent';
 import { normalizeSpec, type DesignSpec } from './spec';
@@ -45,7 +45,7 @@ export function studySpec(d: ArtDirection, brief: DesignBrief, name: string, ref
   const intent = intentOf(brief);
   const pageType = pageTypeFor(intent, brief.pageType);
   // only a picture marked for the page appears in the page; references only inspire
-  const usable = refs.filter((r) => r.state !== 'rejected' && r.media !== 'video' && !r.avoid && r.asContent !== false && (r.provider !== 'upload' || r.asContent === true) && r.url);
+  const usable = refs.filter((r) => r.state !== 'rejected' && r.media !== 'video' && !r.avoid && r.asContent !== false && (r.provider !== 'upload' || r.asContent === true) && (r.url || r.provider === 'socriaux'));
   const imgs = usable.slice(0, 4).map((r) => r.id);
   const img = imgs.slice(0, 1);
   const board = { refs: [...refs], queries: [], palettes: [], type: [] } as any;
@@ -81,8 +81,24 @@ export function studySpec(d: ArtDirection, brief: DesignBrief, name: string, ref
             : null;
     // a composed opening (the 'composed' plan): built from pieces, its proportions and order drawn per project
     const detail = d.designPlan?.detail.terms.length ? d.designPlan.detail.text : '';
-    const opening =
-      d.plan === 'composed'
+    // the arrangement a creative reading asked of the opening (layered, overlapping, off-axis), with its frames
+    const arranged = d.arrange
+      ? {
+          id: 'opening',
+          kind: 'compose',
+          variant: 'free',
+          images: img,
+          tone: 'base',
+          content: {
+            root: arrangedOpening({ eyebrow: brief.personality.slice(0, 3).join(' · '), title: studyHeadline(brief.objective, name), lead: intent.task, action, ...(detail ? { detail: `[${detail.charAt(0).toUpperCase()}${detail.slice(1)}]` } : {}) }, img.length > 0, seeded(hashText(`${d.id}|${d.language}|arranged`)), d.arrange, d.frame?.display),
+            ...(d.arrange === 'layered' && img.length && d.frame?.bleed ? { span: 'bleed' } : d.arrange !== 'layered' ? { span: 'wide' } : {}),
+            ...(d.arrange === 'layered' && img.length && d.frame?.tall ? { tall: 'screen' } : {}),
+          },
+        }
+      : null;
+    const opening = arranged
+      ? arranged
+      : d.plan === 'composed'
         ? {
             id: 'opening',
             kind: 'compose',

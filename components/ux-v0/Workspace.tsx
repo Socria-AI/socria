@@ -1900,7 +1900,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
               />
             )}
             {rail === 'selection' && spec && !imported && editing && spec.sections.some((x) => x.id === editing.sectionId) && (
-              <SectionEditor spec={spec} sectionId={editing.sectionId} path={editing.path} onPatch={(pt, label) => applyLocal(pt, label)} onLock={lockSection} onMakeArt={makeArt} imageGen={imageGen} onPhotograph={(id) => photograph(id)} viewport={project.viewport} />
+              <SectionEditor spec={spec} sectionId={editing.sectionId} path={editing.path} onPatch={(pt, label) => applyLocal(pt, label)} onLock={lockSection} onMakeArt={makeArt} imageGen={imageGen} onPhotograph={(id) => photograph(id)} viewport={project.viewport} refs={project.moodboard.refs} onFocus={(id, x, y) => updateRef(id, { focus: { x, y } })} />
             )}
             {rail === 'selection' && (
               <Inspect

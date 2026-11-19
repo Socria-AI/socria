@@ -33,6 +33,9 @@ import { tellsOf, unaskedTells, type LookProfile, type Tell, type TellHit } from
 import { colourFieldFor, decidedMoves, loudMoves, oneMoment, quietRatio, showsDetail, SIGNATURE_LABEL, unevenRatio, type Signature } from './plan';
 import { conformance } from './design-system';
 import { knownFont } from './fonts';
+import { holdArrangement } from './arrange';
+import { creativeWords } from './direction';
+import { readCreative, readingBreaches, readingIsEmpty } from './interpret';
 import { whyFor } from './knowledge';
 import { stepMotion } from './motion';
 import { STILL_MOTION, ensureContrast, kindDef, lookFromTokens, normalizeTokens, usableImages, type DesignSpec, type Patch, type Section } from './spec';
@@ -60,6 +63,8 @@ export interface PageAudit {
   interactive?: { kind: string; index: number; items: number; problems: string[] }[];
   /** each 3D scene: drawn (its centre read back), or the drawn silhouette standing in where WebGL is not */
   scenes?: { index: number; webgl: boolean; drawn: boolean; problems: string[] }[];
+  /** on a composed field: words that run into other words where pieces were placed over one another */
+  collisions?: { section: string; path: string; text: string; with: string }[];
   /** scripts that failed on the page, in the browser's words */
   errors?: string[];
   /** what the page weighs: characters of markup, pictures, pictures far larger than shown, characters inlined */
@@ -98,6 +103,7 @@ export function normalizeAudit(v: unknown): PageAudit | null {
     behaviors: list(r.behaviors, 10, (x) => ({ index: n(x.index, 0, 100), kind: (x.kind === 'form' ? 'form' : 'booking') as 'booking' | 'form', slots: n(x.slots, 0, 1000), problems: (Array.isArray(x.problems) ? x.problems : []).map((p: unknown) => s(p, 120)).filter(Boolean).slice(0, 6) })),
     interactive: list(r.interactive, 20, (x) => ({ kind: s(x.kind, 16), index: n(x.index, 0, 100), items: n(x.items, 0, 10000), problems: (Array.isArray(x.problems) ? x.problems : []).map((p: unknown) => s(p, 120)).filter(Boolean).slice(0, 6) })),
     scenes: list(r.scenes, 6, (x) => ({ index: n(x.index, 0, 100), webgl: x.webgl === true, drawn: x.drawn === true, problems: (Array.isArray(x.problems) ? x.problems : []).map((p: unknown) => s(p, 120)).filter(Boolean).slice(0, 4) })),
+    collisions: list(r.collisions, 6, (x) => ({ section: s(x.section, 48), path: s(x.path, 60), text: s(x.text, 40), with: s(x.with, 40) })),
     errors: (Array.isArray(r.errors) ? r.errors : []).map((e: unknown) => s(e, 120)).filter(Boolean).slice(0, 5),
     weight: ((w) => ({ html: n(w.html, 0, 1e9), images: n(w.images, 0, 1e5), oversized: n(w.oversized, 0, 1e5), inline: n(w.inline, 0, 1e9) }))(o(r.weight)),
   };
@@ -282,7 +288,7 @@ export type Severity = 'high' | 'medium' | 'low';
 
 export interface Finding {
   id: string;
-  kind: 'overflow' | 'contrast' | 'target' | 'image' | 'hierarchy' | 'headline' | 'measure' | 'rhythm' | 'cliche' | 'length' | 'placeholder' | 'generic' | 'fidelity' | 'motion' | 'function' | 'performance';
+  kind: 'overflow' | 'contrast' | 'target' | 'image' | 'hierarchy' | 'headline' | 'measure' | 'rhythm' | 'cliche' | 'length' | 'placeholder' | 'generic' | 'fidelity' | 'motion' | 'function' | 'performance' | 'composition';
   severity: Severity;
   viewport: 'desktop' | 'tablet' | 'phone' | 'page';
   section: string;
@@ -577,7 +583,7 @@ function functionChecks(spec: DesignSpec, audits: { desktop?: PageAudit | null; 
   }
   // the interactive parts, tried in place: a gallery that does not open, a filter that shows nothing, a chart key
   // that hides nothing, a table filter that hides everything, a configurator whose total does not follow
-  const SAID: Record<string, [string, string]> = { gallery: ['gallery', 'gallery'], chart: ['chart', 'chart'], table: ['table', 'table'], configurator: ['configurator', 'configurator'], filter: ['filter', ''], page: ['page', ''] };
+  const SAID: Record<string, [string, string]> = { gallery: ['gallery', 'gallery'], chart: ['chart', 'chart'], table: ['table', 'table'], configurator: ['configurator', 'configurator'], filter: ['filter', ''], menu: ['navigation’s menu', 'nav'], page: ['page', ''] };
   for (const it of audits.desktop?.interactive ?? []) {
     if (!it.problems.length) continue;
     const [name, kind] = SAID[it.kind] ?? [it.kind, ''];
@@ -590,6 +596,14 @@ function functionChecks(spec: DesignSpec, audits: { desktop?: PageAudit | null; 
     const sec = spec.sections.filter((x) => x.kind === 'scene')[sc.index];
     add({ kind: 'function', severity: 'high', viewport: 'page', section: sec?.id ?? '', message: `The 3D scene ran but drew nothing${sc.problems.length ? `: ${sc.problems.join('; ')}` : ''}.`, manual: true });
   }
+  // a composed field whose words run into each other: an overlap that reads as an accident, not a decision
+  const hitSeen = new Set<string>();
+  for (const [vp, a] of [['desktop', audits.desktop], ['tablet', audits.tablet]] as const)
+    for (const c of a?.collisions ?? []) {
+      if (hitSeen.has(c.section)) continue;
+      hitSeen.add(c.section);
+      add({ kind: 'composition', severity: 'high', viewport: vp, section: c.section, message: `In ${label(spec, c.section)}, “${c.text}” runs into “${c.with}” where the pieces overlap.`, ask: `In the composed section, move “${c.text}” to rows or columns where it does not cross “${c.with}”, keeping the rest of the arrangement.`, manual: true });
+    }
   // a script that failed on the page, at any width, said once
   const errs = [...new Set([audits.desktop, audits.tablet, audits.phone].flatMap((a) => a?.errors ?? []))];
   if (errs.length) add({ kind: 'function', severity: 'high', viewport: 'page', section: '', message: `A script failed on the page: ${errs.slice(0, 2).join('; ')}.`, manual: true });
@@ -599,11 +613,33 @@ function functionChecks(spec: DesignSpec, audits: { desktop?: PageAudit | null; 
   if (wt && wt.html > 600_000) add({ kind: 'performance', severity: 'medium', viewport: 'page', section: '', message: `The page is ${Math.round(wt.html / 1000)} KB of markup${wt.inline > 200_000 ? `, ${Math.round(wt.inline / 1000)} KB of it pictures written into the page` : ''}: it will be slow to arrive.` });
 }
 
+const J0 = (v: unknown) => JSON.stringify(v);
+
 function fidelityChecks(spec: DesignSpec, ctx: FidelityContext, add: (f: Omit<Finding, 'id'>) => void): string[] {
   const kept: string[] = [];
   const look = spec.look ?? lookFromTokens(spec.tokens);
   const tk = spec.tokens;
   const dir = ctx.direction;
+  // what the designer's own words asked for (lib/ux-v0/interpret.ts): a restriction the page now breaks is put back
+  const reading = ctx.brief ? readCreative(creativeWords(ctx.brief), '') : null;
+  const breaches = readingBreaches(spec, reading);
+  for (const b of breaches)
+    add({
+      kind: 'fidelity', severity: 'medium', viewport: 'page', section: b.variant?.sectionId ?? '',
+      message: `The page has ${b.what}; your words said: ${b.said}.`,
+      fix: b.look ? { op: 'look', look: b.look, summary: `As you said: ${b.said}` } : b.tokens ? { op: 'tokens', tokens: b.tokens, summary: `As you said: ${b.said}` } : b.variant ? { op: 'variant', sectionId: b.variant.sectionId, variant: b.variant.to, summary: `As you said: ${b.said}` } : undefined,
+      restore: true,
+    });
+  if (reading && !readingIsEmpty(reading) && !breaches.length) kept.push('what your words asked for');
+  // the opening in the arrangement the direction carries: one a later change turned back into a library hero is recomposed
+  if (dir?.arrange) {
+    const held = holdArrangement(spec, dir, ctx.board ?? null);
+    const i = spec.sections.findIndex((x, j) => x.kind === 'hero' && J0(held.sections[j]) !== J0(x));
+    if (held !== spec && i >= 0) {
+      const sec = held.sections[i];
+      add({ kind: 'fidelity', severity: 'medium', viewport: 'page', section: sec.id, message: `The opening is a standard hero; the direction composes it ${dir.arrange === 'layered' ? 'with its words layered over its picture' : dir.arrange === 'overlap' ? 'with its title crossing its picture' : 'off-axis'}.`, fix: { op: 'replace', sectionId: sec.id, section: { kind: sec.kind, variant: sec.variant, content: sec.content, images: sec.images }, summary: 'The opening composed as the direction asks' }, restore: true });
+    } else kept.push('the opening’s arrangement');
+  }
   if (dir) {
     // the direction's colours as a page would normalise them, so contrast fixes are not mistaken for drift
     const dirColors = normalizeTokens(dir.tokens, []).colors;

@@ -162,6 +162,31 @@ export const AUDIT_SOURCE = String.raw`(function () {
     // …and each 3D scene: drawn (its centre pixel read back), or its drawn silhouette standing in
     try { out.scenes = window.__uxScene && window.__uxScene.selfTest ? window.__uxScene.selfTest() : []; } catch (e) { out.scenes = [{ index: 0, webgl: true, drawn: false, problems: ['the scene check failed: ' + String(e && e.message || e).slice(0, 80)] }]; }
     out.errors = errors.slice();
+    // where pieces were placed over one another (a composed field): words that run into other words. Each cell's
+    // lines of text as the browser set them, compared with every other cell's
+    out.collisions = [];
+    var fields = document.querySelectorAll('.cp-field');
+    for (var fi = 0; fi < fields.length && fi < 8; fi++) {
+      if (getComputedStyle(fields[fi]).display !== 'grid') continue;
+      var cells = [], kids = fields[fi].children;
+      for (var ci = 0; ci < kids.length && ci < 8; ci++) {
+        if (kids[ci].classList.contains('cp-media')) continue;
+        var rg = document.createRange();
+        rg.selectNodeContents(kids[ci]);
+        var lr = rg.getClientRects(), lines = [];
+        for (var li = 0; li < lr.length && lines.length < 40; li++) if (lr[li].width > 2 && lr[li].height > 6 && lr[li].height < 400) lines.push(lr[li]);
+        cells.push({ el: kids[ci], lines: lines });
+      }
+      for (var a1 = 0; a1 < cells.length; a1++) for (var b1 = a1 + 1; b1 < cells.length; b1++) {
+        var hit = false;
+        for (var x1 = 0; x1 < cells[a1].lines.length && !hit; x1++) for (var y1 = 0; y1 < cells[b1].lines.length && !hit; y1++) {
+          var A = cells[a1].lines[x1], B = cells[b1].lines[y1];
+          var w = Math.min(A.right, B.right) - Math.max(A.left, B.left), h = Math.min(A.bottom, B.bottom) - Math.max(A.top, B.top);
+          if (w > 4 && h > 4 && w * h > 0.12 * Math.min(A.width * A.height, B.width * B.height)) hit = true;
+        }
+        if (hit && out.collisions.length < 6) { var wc2 = where(cells[b1].el.querySelector('[data-ux-path]') || cells[b1].el); out.collisions.push({ section: wc2.section, path: wc2.path, text: txt(cells[b1].el.innerText || '', 40), with: txt(cells[a1].el.innerText || '', 40) }); }
+      }
+    }
     // what the page weighs: its markup, its pictures, and pictures far larger than they are shown (a vector
     // drawing has no size to waste, so it is not counted)
     var dpr = window.devicePixelRatio || 1, over = 0, inline = 0, imgs = [], all = document.images;

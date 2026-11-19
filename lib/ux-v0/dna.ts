@@ -469,6 +469,11 @@ export const LANGUAGE_DNA: Record<string, DnaVector> = {
   civic: { restraint: 25, composition: 10, typography: 20, motion: 10, density: 55, colour: 45, imagery: 15, interaction: 20, information: 60 },
   night: { restraint: 65, composition: 65, typography: 65, motion: 75, density: 30, colour: 50, imagery: 70, interaction: 60, information: 40 },
   'retro-print': { restraint: 85, composition: 60, typography: 62, motion: 80, density: 65, colour: 85, imagery: 85, interaction: 80, information: 45 },
+  brutal: { restraint: 55, composition: 70, typography: 80, motion: 25, density: 70, colour: 20, imagery: 35, interaction: 45, information: 60 },
+  cinema: { restraint: 30, composition: 55, typography: 55, motion: 70, density: 12, colour: 30, imagery: 75, interaction: 55, information: 20 },
+  future: { restraint: 50, composition: 60, typography: 45, motion: 75, density: 55, colour: 60, imagery: 80, interaction: 75, information: 65 },
+  industrial: { restraint: 30, composition: 25, typography: 40, motion: 30, density: 70, colour: 25, imagery: 25, interaction: 40, information: 75 },
+  maximal: { restraint: 96, composition: 82, typography: 78, motion: 85, density: 80, colour: 95, imagery: 90, interaction: 75, information: 50 },
 };
 
 /** Where each page plan (direction.ts SITE_PLANS…) sits. */

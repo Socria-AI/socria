@@ -87,7 +87,8 @@ const TREAT_FILTER: Record<string, string> = { natural: 'none', muted: 'saturate
 
 /** Which part leads the board: the language decides. */
 const ARRANGE: Record<string, 'type' | 'picture' | 'system'> = {
-  poster: 'type', swiss: 'type', 'retro-print': 'type', geometric: 'type',
+  poster: 'type', swiss: 'type', 'retro-print': 'type', geometric: 'type', brutal: 'type', maximal: 'type',
+  cinema: 'picture', future: 'system', industrial: 'system',
   'quiet-luxury': 'picture', night: 'picture', gallery: 'picture', craft: 'picture', organic: 'picture',
   utility: 'system', civic: 'system', broadsheet: 'system',
 };
@@ -463,6 +464,17 @@ function Spread({ d, n, total, p, onPreview }: { d: ArtDirection; n: number; tot
               {d.dnaSaid && d.dnaSaid.length > 0 && <span className="v0-quiet"> — {d.dnaSaid.slice(0, 3).map((x) => x.replace(/^[^:]*:\s*/, '')).join('; ')}</span>}
             </span>
           </div>
+        )}
+        {d.reading && d.reading.said.length > 0 && (
+          <details className="v0-dir-more ad-read">
+            <summary className="sb-link is-meta">Read from your words ({d.reading.said.length})</summary>
+            <ul className="v0-plain">
+              {d.reading.said.map((x, i) => (
+                <li key={i}>{x}</li>
+              ))}
+              {d.arrange && <li>The opening: {d.arrange === 'layered' ? 'its words layered over its picture' : d.arrange === 'overlap' ? 'its title crossing its picture' : 'its title set off-axis'}</li>}
+            </ul>
+          </details>
         )}
         {d.locks.length > 0 && <p className="v0-quiet v0-dir-locks">Kept: {d.locks.map((g) => LOCK_LABEL[g].toLowerCase()).join(', ')}</p>}
         <div className="ad-acts">

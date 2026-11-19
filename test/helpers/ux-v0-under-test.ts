@@ -75,3 +75,6 @@ export { SCENE_RUNTIME } from '@/lib/ux-v0/scene-runtime';
 // pictures SocriaUX draws in code, and the separate image-model pathway (its prompt, price and checks)
 export * from '@/lib/ux-v0/assets';
 export { imageGenConfig, sizeFor, imagePrice, imagePrompt, checkImage, generateImage } from '@/lib/ux-v0/image-gen-server';
+// the creative reading: qualities, refusals, tensions, influences and restrictions, as execution
+export * from '@/lib/ux-v0/interpret';
+export { holdArrangement } from '@/lib/ux-v0/arrange';

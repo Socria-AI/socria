@@ -27,7 +27,7 @@ import { contrastRatio } from '../ux/audit';
 import { isDark, mix, rgbOf } from './color';
 import { advanceEm, fontStack, fontStylesheet, hasItalic, knownFont, nearestWeight } from './fonts';
 import { BREAKPOINTS, BREAKPOINT_QUERY, NEEDS_IMAGE, SCENE_MATERIALS, SCENE_MODELS, SHAPE_EFFECTIVE, ensureContrast, kindDef, lookFromTokens, type DesignSpec, type DesignTokens, type Look, type Section, type Shape } from './spec';
-import type { Piece } from './compose';
+import { fieldLayers, type Piece } from './compose';
 
 /**
  * A section's shape, as the page draws it: each setting its variant uses becomes a class (sh-side-end,
@@ -256,7 +256,9 @@ class Images {
     if (!ref) return `<div class="${cls} img-missing" ${attr(section.id, `images.${i}`)} role="img" aria-label="Image to come"></div>`;
     this.used.set(ref.id, ref);
     const alt = ref.title && !/^(untitled|image|photo)$/i.test(ref.title) ? ref.title : '';
-    return `<img class="${cls}" src="${esc(ref.url)}" alt="${esc(alt)}" ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" referrerpolicy="no-referrer" ${attr(section.id, `images.${i}`)}>`;
+    // its subject stays in view however the layout crops it (whole percentages, checked where the picture is kept)
+    const focus = ref.focus ? ` style="object-position:${ref.focus.x}% ${ref.focus.y}%"` : '';
+    return `<img class="${cls}" src="${esc(ref.url)}" alt="${esc(alt)}"${focus} ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" referrerpolicy="no-referrer" ${attr(section.id, `images.${i}`)}>`;
   }
   /** a caption for a picture, when the look captions them: "Fig. 2 — Morning counter" */
   cap(section: Section, i: number): string {
@@ -365,7 +367,14 @@ const num = (i: number) => String(i + 1).padStart(2, '0');
 const SECTIONS: Record<string, R> = {
   nav: (s, c) => {
     const links = (c.links as string[]).map((l, i) => `<li><a href="#" ${attr(s.id, `links.${i}`)}>${t(l)}</a></li>`).join('');
-    return `<header class="wrap nav-in"><a class="brand" href="#" ${attr(s.id, 'brand')}>${t(c.brand)}</a>${links ? `<nav aria-label="Main"><ul class="nav-links">${links}</ul></nav>` : ''}${c.cta ? btn(s, 'cta', c.cta, 'primary') : ''}</header>`;
+    // where the links are not shown in the bar (on a phone; always, in the "menu" variant) a Menu button opens them
+    // full-screen. The button appears only once SocriaUX's behaviour runtime has bound it (lib/ux-v0/behaviors.ts), so a
+    // page without scripts never shows a control that does nothing
+    const big = (c.links as string[]).map((l) => `<li><a href="#">${t(l)}</a></li>`).join('');
+    const menu = links
+      ? `<button type="button" class="nav-menu" data-ux-menu aria-expanded="false" aria-controls="${esc(s.id)}-menu" hidden>Menu</button><div class="nav-over" id="${esc(s.id)}-menu" data-ux-menu-panel role="dialog" aria-modal="true" aria-label="Menu" hidden><button type="button" class="nav-close" data-ux-menu-close>Close</button><ul class="nav-over-links">${big}</ul>${c.cta ? `<a class="btn btn-primary" href="#">${t(c.cta)}</a>` : ''}</div>`
+      : '';
+    return `<header class="wrap nav-in"><a class="brand" href="#" ${attr(s.id, 'brand')}>${t(c.brand)}</a>${links ? `<nav aria-label="Main"><ul class="nav-links">${links}</ul></nav>` : ''}${c.cta ? btn(s, 'cta', c.cta, 'primary') : ''}${menu}</header>`;
   },
   hero: (s, c, x) => {
     const { im, look } = x;
@@ -431,7 +440,7 @@ const SECTIONS: Record<string, R> = {
     const piece = (p: Piece, path: string): string => {
       switch (p.t) {
         case 'stack':
-          return `<div class="cp-stack cp-${p.dir} cp-gap-${p.gap} cp-al-${p.align}">${p.children.map((ch, i) => piece(ch, `${path}.children.${i}`)).join('')}</div>`;
+          return `<div class="cp-stack cp-${p.dir} cp-gap-${p.gap} cp-al-${p.align}${p.pin ? ' cp-pin' : ''}">${p.children.map((ch, i) => piece(ch, `${path}.children.${i}`)).join('')}</div>`;
         case 'grid': {
           const cols = p.cols.map((n) => `minmax(0,${Math.max(1, Math.min(12, Math.round(n)))}fr)`).join(' ');
           return `<div class="cp-grid cp-gap-${p.gap} cp-al-${p.align}" style="--cp-cols:${cols}">${p.children.map((ch, i) => piece(ch, `${path}.children.${i}`)).join('')}</div>`;
@@ -442,19 +451,22 @@ const SECTIONS: Record<string, R> = {
           return `<div class="cp-box ${p.tone === 'base' ? 'cp-tone-base' : `tone-${p.tone}`} cp-pad-${p.pad}">${p.children.map((ch, i) => piece(ch, `${path}.children.${i}`)).join('')}</div>`;
         case 'text': {
           const a = attr(s.id, `${path}.text`);
+          const set = `${p.size ? ` cp-sz-${p.size}` : ''}${p.align ? ` cp-ta-${p.align}` : ''}`;
           // the page's opening (no hero before it): its title is the page's h1
-          if (p.role === 'title') return x.first || x.lead ? `<h1 class="h-hero cp-title" ${a}>${t(p.text)}</h1>` : `<h2 class="h-section cp-title" ${a}>${t(p.text)}</h2>`;
-          if (p.role === 'heading') return `<h3 class="h-item cp-heading" ${a}>${t(p.text)}</h3>`;
+          // set on strips of the ground: the words ride above every strip, so a strip never clips the line before it
+          const ink = p.over === 'lines' ? `<span class="cp-ink">${t(p.text)}</span>` : t(p.text);
+          if (p.role === 'title') return x.first || x.lead ? `<h1 class="h-hero cp-title${set}" ${a}>${ink}</h1>` : `<h2 class="h-section cp-title${set}" ${a}>${ink}</h2>`;
+          if (p.role === 'heading') return `<h3 class="h-item cp-heading${set}" ${a}>${t(p.text)}</h3>`;
           if (p.role === 'eyebrow') return `<p class="eyebrow" ${a}>${t(p.text)}</p>`;
-          if (p.role === 'lead') return `<p class="body-lg cp-lead" ${a}>${t(p.text)}</p>`;
+          if (p.role === 'lead') return `<p class="body-lg cp-lead${set}" ${a}>${t(p.text)}</p>`;
           if (p.role === 'caption') return `<p class="small cp-caption" ${a}>${t(p.text)}</p>`;
-          if (p.role === 'quote') return `<blockquote class="cp-quote" ${a}><p>${t(p.text)}</p></blockquote>`;
-          return `<p class="cp-body" ${a}>${t(p.text)}</p>`;
+          if (p.role === 'quote') return `<blockquote class="cp-quote${set}" ${a}><p>${t(p.text)}</p></blockquote>`;
+          return `<p class="cp-body${set}" ${a}>${t(p.text)}</p>`;
         }
         case 'figure':
           return `<div class="cp-figure"><span class="cp-fig-v" ${attr(s.id, `${path}.value`)}>${t(p.value)}</span>${p.label ? `<span class="cp-fig-l" ${attr(s.id, `${path}.label`)}>${t(p.label)}</span>` : ''}</div>`;
         case 'image':
-          return x.im.has(s, p.at) ? `<figure class="cp-img cp-r-${p.ratio.replace(':', 'x')}">${x.im.img(s, p.at, 'cp-im', !!(x.first || x.lead))}${x.im.cap(s, p.at)}</figure>` : '';
+          return x.im.has(s, p.at) ? `<figure class="cp-img cp-r-${p.ratio.replace(':', 'x')}${p.fill ? ' cp-fill' : ''}">${x.im.img(s, p.at, 'cp-im', !!(x.first || x.lead))}${x.im.cap(s, p.at)}</figure>` : '';
         case 'button':
           return p.style === 'link' ? `<a class="cp-link" href="#" ${attr(s.id, `${path}.label`)}>${t(p.label)}</a>` : btn(s, `${path}.label`, p.label, p.style);
         case 'list': {
@@ -463,9 +475,23 @@ const SECTIONS: Record<string, R> = {
         }
         case 'rule':
           return '<hr class="cp-rule">';
+        case 'layer': {
+          // the first piece is the ground; the rest sit over it, anchored. Over a picture the words are light on a
+          // shade (as an opening over a full picture is); over a box they wear the box's own ground
+          const ground = p.children[0];
+          const onImage = ground.t === 'image' && x.im.has(s, ground.at);
+          const g = piece(ground.t === 'image' ? { ...ground, fill: true } : ground, `${path}.children.0`);
+          if (!g) return p.children.slice(1).map((ch, i) => piece(ch, `${path}.children.${i + 1}`)).join('');
+          return `<div class="cp-layer cp-at-${p.place} cp-inset-${p.inset}${onImage ? ' cp-on-img' : ''}"><div class="cp-ground">${g}${onImage ? '<div class="cp-shade"></div>' : ''}</div>${p.children.slice(1).map((ch, i) => `<div class="cp-over${onImage ? ' scrim' : ''}">${piece(ch, `${path}.children.${i + 1}`)}</div>`).join('')}</div>`;
+        }
+        case 'field': {
+          const how = fieldLayers(p);
+          return `<div class="cp-field cp-rows-${p.rows}">${p.children.map((ch, i) => { const k = p.cells[i]; const h = how[i]; return `<div class="cp-cell${h.media ? ' cp-media' : ''}${h.over ? (h.lines ? ' cp-lines' : ' cp-plate') : ''}" style="--c:${k.col};--s:${k.span};--r:${k.row};--rs:${k.rows}">${piece(ch, `${path}.children.${i}`)}</div>`; }).join('')}</div>`;
+        }
       }
     };
-    return `<div class="wrap cp">${piece(c.root as Piece, 'root')}</div>`;
+    const span = c.span === 'wide' || c.span === 'bleed' ? ` cp-span-${c.span}` : '';
+    return `<div class="wrap cp${span}${c.tall === 'screen' ? ' cp-tall' : ''}">${piece(c.root as Piece, 'root')}</div>`;
   },
   logos: (s, c) =>
     `<div class="wrap logos">${c.title ? `<p class="eyebrow" ${attr(s.id, 'title')}>${t(c.title)}</p>` : ''}<ul class="names">${(c.names as string[]).map((n, i) => `<li ${attr(s.id, `names.${i}`)}>${t(n)}</li>`).join('')}</ul></div>`,
@@ -738,6 +764,7 @@ function responsiveClasses(s: Section): string {
     if (x.pad) out.push(`rs-${b}-pad-${x.pad}`);
     if (x.media) out.push(`rs-${b}-media-${x.media}`);
     if (x.type) out.push(`rs-${b}-type-${x.type}`);
+    if (x.crop) out.push(`rs-${b}-crop-${x.crop}`);
   }
   return out.length ? ` ${out.join(' ')}` : '';
 }
@@ -760,6 +787,8 @@ export function responsiveCss(sections: readonly Section[]): string {
     if (has('media-last')) rules.push(`.sx.rs-${b}-media-last :is(${RS_MEDIA}){order:9}`);
     if (has('type-s')) rules.push(`.sx.rs-${b}-type-s .h-hero{font-size:calc(min(var(--fs-hero),var(--fit-hero,999px)) * .82)}.sx.rs-${b}-type-s .h-section{font-size:calc(min(var(--fs-h2),var(--fit-h2,999px)) * .85)}`);
     if (has('type-l')) rules.push(`.sx.rs-${b}-type-l .h-hero{font-size:calc(min(var(--fs-hero),var(--fit-hero,999px)) * 1.12)}.sx.rs-${b}-type-l .h-section{font-size:calc(min(var(--fs-h2),var(--fit-h2,999px)) * 1.12)}`);
+    // its pictures cropped for this width (their focal point keeps the subject in view)
+    for (const [c, ratio] of [['wide', '16/9'], ['square', '1/1'], ['tall', '3/4']] as const) if (has(`crop-${c}`)) rules.push(`.sx.rs-${b}-crop-${c} figure img,.sx.rs-${b}-crop-${c} .bleed-img{aspect-ratio:${ratio};height:auto;min-height:0;object-fit:cover}`);
     if (rules.length) out.push(`@media ${BREAKPOINT_QUERY[bp]}{${rules.join('')}}`);
   }
   return out.join('\n');
@@ -948,7 +977,12 @@ p{max-width:68ch}
   // ── nav and footer
   add(`.nav-in{display:flex;align-items:center;gap:28px}.brand{margin:0;font-size:1.4rem;text-decoration:none;letter-spacing:-.01em;line-height:1.1}
 .nav-links{display:flex;gap:26px;list-style:none;margin:0 0 0 auto;padding:0}.nav-links a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;text-decoration:none;font-size:.95rem;color:var(--muted)}.nav-links a:hover{color:var(--text)}
-.v-centered .nav-in{justify-content:center;flex-wrap:wrap}.v-centered .nav-links{margin:0}.v-minimal .nav-links{display:none}
+.v-centered .nav-in{justify-content:center;flex-wrap:wrap}.v-centered .nav-links{margin:0}.v-minimal .nav-links{display:none}.v-menu .nav-links{display:none}
+.nav-menu{display:none;font:inherit;font-weight:600;min-height:44px;padding:0 14px;border:var(--rule-w,1px) solid currentColor;border-radius:var(--r-pill,999px);background:transparent;color:inherit;cursor:pointer;margin-left:auto}
+.ux-js .v-menu .nav-menu:not([hidden]){display:inline-flex;align-items:center}.v-menu .nav-in .btn{margin-left:0}
+.nav-over{position:fixed;inset:0;z-index:60;background:var(--bg);color:var(--text);display:grid;align-content:center;justify-items:start;gap:clamp(20px,4vh,40px);padding:clamp(24px,8vw,96px);overflow:auto}.nav-over[hidden]{display:none}
+.nav-over-links{list-style:none;margin:0;padding:0;display:grid;gap:clamp(6px,1.6vh,18px)}.nav-over-links a{font-family:var(--display);font-size:clamp(2rem,7vw,4.6rem);line-height:1.05;color:inherit;text-decoration:none;display:inline-flex;min-height:48px;align-items:center}.nav-over-links a:hover,.nav-over-links a:focus-visible{text-decoration:underline;text-underline-offset:.12em}
+.nav-close{position:absolute;top:clamp(16px,4vw,32px);right:clamp(16px,4vw,32px);font:inherit;font-weight:600;min-height:44px;padding:0 14px;border:var(--rule-w,1px) solid currentColor;border-radius:var(--r-pill,999px);background:transparent;color:inherit;cursor:pointer}
 .nav-in .btn{min-height:44px;padding:0 18px;font-size:.92rem}.nav-in .brand{display:inline-flex;align-items:center;min-height:44px;min-width:44px}.v-inline .nav-in .btn,.v-minimal .nav-in .btn{margin-left:auto}.v-inline .nav-links~.btn{margin-left:0}
 .foot{display:grid;gap:36px}.foot ul{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:4px}.foot a{display:inline-flex;align-items:center;min-height:44px;min-width:44px;text-decoration:none;color:var(--muted)}@media (min-width:760px){.foot a{min-height:32px}}.foot a:hover{color:var(--text)}
 .foot-cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}.foot-title{margin:0;font-weight:600;font-size:.9rem}.legal{margin:0}
@@ -1109,10 +1143,36 @@ th .th-sort{all:unset;cursor:pointer;display:inline-flex;gap:6px;align-items:cen
 .cp-quote{margin:0;font-family:var(--display);font-size:var(--fs-h3);line-height:1.3}.cp-quote p{margin:0}
 .cp-figure{display:grid;gap:6px}.cp-fig-v{font-family:var(--display);font-size:min(clamp(3rem,9vw,7rem),24cqi);line-height:.9;letter-spacing:-.02em;font-variant-numeric:tabular-nums}.cp-fig-l{color:var(--muted);font-size:.95rem}
 .cp-img{margin:0}.cp-img img{display:block;width:100%;height:auto;object-fit:cover;border-radius:var(--r)}
-.cp-r-1x1 img{aspect-ratio:1/1}.cp-r-4x3 img{aspect-ratio:4/3}.cp-r-3x2 img{aspect-ratio:3/2}.cp-r-16x9 img{aspect-ratio:16/9}.cp-r-3x4 img{aspect-ratio:3/4}.cp-r-2x3 img{aspect-ratio:2/3}
+.cp-r-1x1 img{aspect-ratio:1/1}.cp-r-4x3 img{aspect-ratio:4/3}.cp-r-3x2 img{aspect-ratio:3/2}.cp-r-16x9 img{aspect-ratio:16/9}.cp-r-3x4 img{aspect-ratio:3/4}.cp-r-2x3 img{aspect-ratio:2/3}.cp-r-21x9 img{aspect-ratio:21/9}
 .cp-link{color:inherit;text-decoration:underline;text-underline-offset:3px;min-height:44px;display:inline-flex;align-items:center}
 .cp-list{margin:0;padding-left:1.2em;display:grid;gap:8px}.cp-m-none{list-style:none;padding-left:0}.cp-m-rule{list-style:none;padding-left:0;gap:0}.cp-m-rule li{padding:10px 0;border-top:1px solid var(--line)}
-.cp-rule{width:100%;border:0;border-top:var(--rule-w,1px) solid var(--rule-c,var(--line));margin:0}`);
+.cp-rule{width:100%;border:0;border-top:var(--rule-w,1px) solid var(--rule-c,var(--line));margin:0}
+.wrap.cp-span-wide{width:min(1680px,100% - 40px)}.wrap.cp-span-bleed{width:100%}
+.sx-compose:has(>.cp-span-bleed>.cp-layer){padding-block:0}.cp-tall{min-height:min(100vh,1080px);display:grid;align-content:center}.cp-tall>.cp-layer{min-height:min(100vh,1080px)}
+.cp-sz-l.cp-title.h-hero,.cp .cp-sz-l.cp-title.h-hero{font-size:min(calc(var(--fs-hero) * 1.25),14cqi)}.cp .cp-sz-xl.cp-title{font-size:min(calc(var(--fs-hero) * 1.6),17cqi);line-height:.98}.cp .cp-sz-giant.cp-title{font-size:min(calc(var(--fs-hero) * 2.2),21cqi);line-height:.92;letter-spacing:-.03em}
+.cp .cp-sz-l.cp-heading,.cp .cp-sz-l.cp-quote{font-size:min(var(--fs-h2),9cqi);line-height:1.1}.cp .cp-sz-xl.cp-heading,.cp .cp-sz-xl.cp-quote{font-size:min(calc(var(--fs-h2) * 1.4),11cqi);line-height:1.05}.cp .cp-sz-giant.cp-heading,.cp .cp-sz-giant.cp-quote{font-size:min(var(--fs-hero),13cqi);line-height:1}
+.cp :is(.cp-sz-l,.cp-sz-xl,.cp-sz-giant){max-width:none}.cp :is(.cp-sz-xl,.cp-sz-giant){padding-bottom:.16em}
+.cp-ta-center{text-align:center;margin-inline:auto}.cp-ta-end{text-align:right;margin-left:auto}
+.cp-layer{display:grid;position:relative;isolation:isolate;container-type:inline-size}.cp-layer>*{grid-area:1/1;min-width:0}
+.cp-ground{position:relative;display:grid;min-height:0}.cp-ground>*{min-width:0}.cp-shade{position:absolute;inset:0;background:rgba(0,0,0,.36);border-radius:var(--r);pointer-events:none}
+.cp-over{z-index:1;display:grid;gap:12px;max-width:min(100%,64ch);height:max-content}
+.cp-inset-s>.cp-over{padding:14px}.cp-inset-m>.cp-over{padding:clamp(18px,3cqi,40px)}.cp-inset-l>.cp-over{padding:clamp(28px,6cqi,88px)}
+.cp-at-top-start>.cp-over{place-self:start start}.cp-at-top>.cp-over{place-self:start center;text-align:center}.cp-at-top-end>.cp-over{place-self:start end;text-align:right}
+.cp-at-start>.cp-over{place-self:center start}.cp-at-center>.cp-over{place-self:center;text-align:center}.cp-at-end>.cp-over{place-self:center end;text-align:right}
+.cp-at-bottom-start>.cp-over{place-self:end start}.cp-at-bottom>.cp-over{place-self:end center;text-align:center}.cp-at-bottom-end>.cp-over{place-self:end end;text-align:right}
+.cp-on-img>.cp-over{--text:#fff;--muted:#fff;--accent-ink:#fff;--line:rgba(255,255,255,.5);color:#fff}.cp-on-img>.cp-over .em{color:inherit}.cp-on-img>.cp-over .cp-caption,.cp-on-img>.cp-over .eyebrow{color:#fff}
+.cp-on-img>.cp-over .btn-secondary{color:#fff;border-color:rgba(255,255,255,.7)}
+.cp-fill{height:100%;display:grid}.cp-fill img{height:100%;min-height:clamp(280px,52vh,760px);aspect-ratio:auto}.cp-tall .cp-fill img{min-height:min(100vh,1080px)}.cp-span-bleed .cp-fill img,.cp-span-bleed>.cp-layer>.cp-ground .cp-shade{border-radius:0}
+.cp-pin{position:sticky;top:clamp(16px,6vh,72px);align-self:start}
+.cp-field{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));column-gap:clamp(12px,1.6vw,28px);row-gap:clamp(8px,1.2vw,20px);grid-auto-rows:minmax(var(--cp-row,72px),auto)}
+.cp-rows-s{--cp-row:clamp(28px,4vw,56px)}.cp-rows-m{--cp-row:clamp(44px,6.5vw,96px)}.cp-rows-l{--cp-row:clamp(64px,10vw,150px)}
+.cp-cell{grid-column:var(--c)/span var(--s);grid-row:var(--r)/span var(--rs);min-width:0;z-index:2;align-self:start;container-type:inline-size}.cp-cell.cp-media{z-index:1;align-self:stretch}
+.cp-cell.cp-media>.cp-img{height:100%}.cp-cell.cp-media>.cp-fill img{min-height:0}
+.cp-plate{background:var(--bg);color:var(--text);padding:clamp(12px,1.8vw,26px);align-self:end}
+.cp-lines{align-self:center}.cp .cp-lines>.cp-title{display:inline;background:var(--bg);color:var(--text);padding:.08em .14em;line-height:1.1;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+@media (max-width:899px){.cp-field{display:flex;flex-direction:column;gap:clamp(16px,4vw,28px)}.cp-field>.cp-cell{align-self:stretch}.cp-plate{padding:0;background:none}.cp-ink{position:relative}.cp .cp-lines>.cp-title{display:block;background:none;padding:0;line-height:1.02}.cp-pin{position:static}.cp-cell.cp-media>.cp-fill img{min-height:0;aspect-ratio:4/3}
+.cp-span-bleed>.cp-field>.cp-cell:not(.cp-media),.cp-span-bleed>.cp-grid>*:not(.cp-img),.cp-span-bleed>.cp-stack>*:not(.cp-img){padding-inline:20px}.cp-ta-end{text-align:left;margin-left:0}}
+@media (max-width:720px){.cp-layer .cp-over{max-width:100%}.cp-at-end>.cp-over,.cp-at-top-end>.cp-over,.cp-at-bottom-end>.cp-over{text-align:left;justify-self:start}}`);
   add(`.sh-align-center .bk-head{text-align:center;margin-inline:auto;max-width:760px}.sh-align-center .bk-head .lede{margin-inline:auto}
 .sh-density-airy .bk-panel,.sh-density-airy .bk-body{gap:clamp(28px,4vw,52px)}.sh-density-airy .bk-slot-grid{gap:12px}.sh-density-airy .bk-slot{min-height:68px;padding:14px 18px}.sh-density-airy .bk-day{min-height:72px;padding:12px 18px}
 .sh-density-dense .bk-panel,.sh-density-dense .bk-body{gap:clamp(14px,2vw,20px)}.sh-density-dense .bk-slot-grid{gap:6px}.sh-density-dense .bk-slot{min-height:48px;padding:8px 12px}.sh-density-dense .bk-day{min-height:52px;min-width:76px;padding:8px 12px}.sh-density-dense .bk-times-wrap{margin-top:12px}
@@ -1203,7 +1263,7 @@ th .th-sort{all:unset;cursor:pointer;display:inline-flex;gap:6px;align-items:cen
 .app main{grid-template-columns:repeat(12,minmax(0,1fr))}.app main>*{grid-column:1/-1}.app main>.sx-chart:has(+.sx-feed),.app main>.sx-feed+.sx-chart{grid-column:span 8}.app main>.sx-chart+.sx-feed,.app main>.sx-feed:has(+.sx-chart){grid-column:span 4}
 }
 @media (max-width:759px){
-.nav-links{display:none}.nav-in .btn{margin-left:auto}
+.nav-links{display:none}.nav-in .btn{margin-left:auto}.ux-js .nav-menu:not([hidden]){display:inline-flex;align-items:center;margin-left:8px}.ux-js .nav-in:has(.nav-menu:not([hidden]))>.btn{display:none}
 .app.nav-sidebar .appnav{flex-direction:row;align-items:center;border-right:0;border-bottom:1px solid var(--line);overflow-x:auto}.app.nav-sidebar .appnav ul{display:flex}.app.nav-sidebar .an-user{display:none}
 .art{width:clamp(96px,30vw,140px)}.hero-statement.has-art .art{order:-1}
 .st-giant{grid-template-columns:1fr}
@@ -1357,7 +1417,9 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], op
   // pinned as a story, pictures arriving as they come into view, pictures that tilt, a chart's line drawing itself
   const marks = play ? scriptedMarks(look.motion) : { body: '', story: false, media: false, tilt: false, draw: false };
   if (marks.story && !app) {
-    const story = spec.sections.find((x, i) => i > 0 && x.kind === 'features' && Array.isArray(x.content.items) && (x.content.items as unknown[]).length >= 3 && (x.content.items as unknown[]).length <= 6);
+    // the sequence the designer chose to tell as the story, else the first that can be one
+    const tellable = (x: Section, i: number) => i > 0 && x.kind === 'features' && Array.isArray(x.content.items) && (x.content.items as unknown[]).length >= 3 && (x.content.items as unknown[]).length <= 6;
+    const story = spec.sections.find((x, i) => x.story && tellable(x, i)) ?? spec.sections.find(tellable);
     if (story) {
       const at = `data-ux-section="${esc(story.id)}"`;
       const i0 = body.indexOf(at);

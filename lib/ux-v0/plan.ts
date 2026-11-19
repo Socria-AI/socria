@@ -52,6 +52,11 @@ const AFFINITY: Record<string, readonly Signature[]> = {
   civic: ['colour-field', 'oversized-figure', 'uneven-split'],
   night: ['full-bleed-picture', 'giant-type', 'one-motion'],
   'retro-print': ['giant-type', 'colour-field', 'oversized-figure'],
+  brutal: ['giant-type', 'oversized-figure', 'uneven-split'],
+  cinema: ['full-bleed-picture', 'one-motion', 'giant-type'],
+  future: ['oversized-figure', 'one-motion', 'giant-type'],
+  industrial: ['uneven-split', 'oversized-figure', 'framed-picture'],
+  maximal: ['colour-field', 'giant-type', 'oversized-figure'],
 };
 
 export interface PlanColour {

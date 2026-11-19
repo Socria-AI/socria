@@ -306,6 +306,8 @@ export interface MoodboardRef {
   proc?: ProcSpec;
   /** why a made picture exists: the part that asked for it */
   reason?: string;
+  /** where its subject is, as a share of its width and height (0–100): what stays in view however it is cropped */
+  focus?: { x: number; y: number };
 }
 
 export interface Palette {
@@ -739,6 +741,15 @@ export function normalizeCard(v: unknown): ReasoningCard | null {
   };
 }
 
+/** A focal point held to the picture: whole percentages; the centre is no focal point at all. */
+function focusOf(v: unknown): { focus?: { x: number; y: number } } {
+  const f = obj(v);
+  if (typeof f.x !== 'number' || typeof f.y !== 'number' || !Number.isFinite(f.x) || !Number.isFinite(f.y)) return {};
+  const x = Math.max(0, Math.min(100, Math.round(f.x)));
+  const y = Math.max(0, Math.min(100, Math.round(f.y)));
+  return x === 50 && y === 50 ? {} : { focus: { x, y } };
+}
+
 export function normalizeRef(v: unknown): MoodboardRef | null {
   const r = obj(v);
   // a picture SocriaUX made: its recipe is the picture; its id is the recipe's
@@ -770,6 +781,7 @@ export function normalizeRef(v: unknown): MoodboardRef | null {
       addedAt: time(r.addedAt, Date.now()),
       asContent: r.asContent !== false,
       ...(clean(r.reason, 200) ? { reason: clean(r.reason, 200) } : {}),
+      ...focusOf(r.focus),
       ...(r.key === true ? { key: true } : {}),
       ...((dna) => (dna ? { dna } : {}))(normalizeRefDna(r.dna)),
     };
@@ -794,6 +806,7 @@ export function normalizeRef(v: unknown): MoodboardRef | null {
     ...(swatches.length ? { swatches } : {}),
     ...(r.media === 'video' ? { media: 'video' as const } : {}),
     ...((dna) => (dna ? { dna } : {}))(normalizeRefDna(r.dna)),
+    ...focusOf(r.focus),
     id: `${provider}:${providerId}`,
     provider,
     providerId,

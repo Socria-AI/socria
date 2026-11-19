@@ -486,7 +486,7 @@ console.log('\n=== art direction ===');
   const clinic = mk({ objective: 'Let patients book appointments', audience: 'Patients of all ages', personality: ['clear', 'kind', 'trustworthy'], visualDirection: 'Accessible, plain, high contrast', palette: [{ hex: '#ffffff', role: 'background' }, { hex: '#0b0c0c', role: 'text' }, { hex: '#005eb8', role: 'accent' }, { hex: '#ffffff', role: 'accent-text' }], typography: { display: 'Public Sans', body: 'Public Sans' } });
   const bar = mk({ objective: 'Fill late sets at a jazz and cocktail bar', audience: 'Music lovers after dinner', personality: ['intimate', 'moody'], visualDirection: 'Low light, dark, brass', palette: [{ hex: '#12151c', role: 'background' }, { hex: '#f1ece2', role: 'text' }, { hex: '#e0a43c', role: 'accent' }, { hex: '#12151c', role: 'accent-text' }], typography: { display: 'Bodoni Moda', body: 'Inter' } });
 
-  ok('twelve visual languages, each a whole system', V.LANGUAGES.length === 12 && V.LANGUAGES.every((l) => l.display.every((f) => V.knownFont(f)) && l.body.every((f) => V.knownFont(f) && !V.knownFont(f).displayOnly)));
+  ok('seventeen visual languages, each a whole system', V.LANGUAGES.length === 17 && V.LANGUAGES.every((l) => l.display.every((f) => V.knownFont(f)) && l.body.every((f) => V.knownFont(f) && !V.knownFont(f).displayOnly)));
   const d = V.proposeDirections({ brief: cafe });
   ok('three directions, each a different language', d.length === 3 && new Set(d.map((x) => x.language)).size === 3, J(d.map((x) => x.language)));
   ok('the first is the faithful reading: the brief’s palette and type exactly as approved', d[0].tokens.colors.accent === '#6b3e1f' && d[0].tokens.colors.background === '#f6f1e9' && d[0].tokens.fonts.display === 'Fraunces' && d[0].language === 'craft', J(d[0].tokens));
@@ -523,7 +523,7 @@ console.log('\n=== art direction ===');
   ok('direction state is held to its shape', st.options.length === 1 && st.chosen.language === d[1].language && st.approved && st.notes.length === 1200 && J(st.seen) === J(['craft']));
   ok('the generator is told the direction, its variants, and what to refuse', (() => { const t = V.generateSystem(cafe, d[0]); return t.includes('THE APPROVED ART DIRECTION') && t.includes(d[0].concept) && t.includes('do not write "tokens"') && t.includes('stock phrases'); })());
   const gen = V.parseGenerate({ title: 'Halcyon', tokens: { colors: { accent: '#ff00ff' } }, sections: SPEC.sections }, cafe, board, 2, 'r', d[1]);
-  ok('a generated spec takes the direction’s tokens and look, whatever the model wrote', gen.tokens.colors.accent === d[1].tokens.colors.accent && gen.look.language === d[1].language && J(gen.look) === J(d[1].look), J(gen.tokens.colors));
+  ok('a generated spec takes the direction’s tokens and look, whatever the model wrote', gen.tokens.colors.accent === d[1].tokens.colors.accent && gen.look.language === d[1].language && J({ ...gen.look, frame: '' }) === J({ ...d[1].look, frame: '' }) /* (the plan's one-move rule may quiet a picture frame once there are pictures) */, J(gen.tokens.colors));
   ok('…and is planned: every content section on a ground, with its spacing', gen.sections.every((x) => x.tone && x.pad));
 }
 
@@ -1138,7 +1138,7 @@ console.log('\n=== composition: directions that differ in structure ===');
     const dirs = V.proposeDirections({ brief: b });
     const studies = dirs.map((d) => V.studySpec(d, b, 'Name', []));
     const dv = V.diversityOf(studies);
-    const flat = V.diversityOf(dirs.map((d) => V.studySpec({ ...d, compose: undefined, order: undefined, lead: undefined, plan: undefined, shapes: undefined }, b, 'Name', [])));
+    const flat = V.diversityOf(dirs.map((d) => V.studySpec({ ...d, compose: undefined, order: undefined, lead: undefined, plan: undefined, shapes: undefined, arrange: undefined }, b, 'Name', [])));
     ok(`${what}: three plans, three structures (closest pair ≥ 0.33 apart; 0 without plans)`, new Set(dirs.map((d) => d.plan)).size === 3 && dv.minStructure >= 0.33 && flat.minStructure === 0, J({ plans: dirs.map((d) => d.plan), dv: dv.minStructure, flat: flat.minStructure }));
   }
   const dash = cases['a scientific dashboard'];
@@ -2156,6 +2156,129 @@ console.log('\n=== layout pieces: a section composed from stacks, grids and prop
   ok('a research interface that compares over time and inspects readings is a data interface, with its chart and its table', V.readIntent(research).kind === 'data' && req(research).includes('chart') && req(research).includes('table'), J(V.readIntent(research)));
   ok('"reserve one" of a product to configure is not a booking of a time', !req('A product page where you configure the chair and reserve one').includes('booking') && !req('Pre-order the speaker: configure the finish, then the reservation').includes('booking'));
   ok('…while a table, a night, a class or plain bookings still are', ['Make a reservation for a table at our restaurant', 'Hotel reservations for a night or two', 'Book a class at the studio', 'Bookings for the climbing gym'].every((t) => req(t).includes('booking')));
+}
+
+// ── the creative ceiling: pieces placed by hand, the creative reading, hybrids, a wider range ──
+{
+  // composition: layers and a twelve-column field
+  const field = V.normalizeCompose({ t: 'field', rows: 'l', children: [
+    { t: 'text', role: 'title', text: 'Concrete, held', size: 'giant', over: 'lines', cell: [1, 9, 2, 2] },
+    { t: 'image', at: 0, ratio: '4:3', fill: true, cell: [6, 7, 1, 4] },
+    { t: 'text', role: 'caption', text: 'Bergen, 2024', cell: [9, 4, 4, 1] },
+    { t: 'text', role: 'lead', text: 'A studio for buildings that carry weight.', cell: [1, 4, 5, 1] },
+    { t: 'text', role: 'body', text: 'x', cell: [40, 99, -3, 100] },
+  ] });
+  ok('a field keeps each piece where it was placed, inside twelve columns and eight rows', field.t === 'field' && J(field.cells[0]) === J({ col: 1, span: 9, row: 2, rows: 2 }) && J(field.cells[1]) === J({ col: 6, span: 7, row: 1, rows: 4 }) && J(field.cells[4]) === J({ col: 12, span: 1, row: 1, rows: 8 }), J(field.cells));
+  const how = V.fieldLayers(field);
+  ok('words that share columns and rows with a picture are drawn above it, on a plate, or line by line on strips of the ground when a title asks', how[1].media && how[0].over && how[0].lines && how[2].over && !how[2].lines && !how[3].over && V.overlapsIn(field), J(how));
+  ok('display sizes are for titles, headings and quotes only; strips are for a title only', V.normalizeCompose({ t: 'text', role: 'body', text: 'x', size: 'giant', over: 'lines' }).size === undefined && V.normalizeCompose({ t: 'text', role: 'heading', text: 'x', size: 'xl', over: 'lines' }).size === 'xl' && V.normalizeCompose({ t: 'text', role: 'heading', text: 'x', over: 'lines' }).over === undefined && V.normalizeCompose({ t: 'text', role: 'title', text: 'x', over: 'blend' }).over === 'lines');
+  const layer = V.normalizeCompose({ t: 'layer', place: 'somewhere', inset: 'l', children: [{ t: 'image', at: 0, ratio: '21:9' }, { t: 'text', role: 'title', text: 'A hall' }] });
+  ok('a layer is a ground and what sits over it; an unknown place falls back; one piece alone is just that piece', layer.t === 'layer' && layer.place === 'bottom-start' && layer.children[0].ratio === '21:9' && V.normalizeCompose({ t: 'layer', children: [{ t: 'rule' }] }).t === 'rule');
+  ok('a stored field comes back the same (its cells kept beside its pieces)', J(V.normalizeCompose(JSON.parse(J(field)))) === J(field));
+  ok('a column can be pinned; a row cannot', V.normalizeCompose({ t: 'stack', dir: 'col', pin: true, children: [{ t: 'rule' }] }).pin === true && V.normalizeCompose({ t: 'stack', dir: 'row', pin: true, children: [{ t: 'rule' }] }).pin === undefined);
+  const cboard = V.normalizeMoodboard({ refs: [ref('a1'), ref('a2')] });
+  const cspec = V.normalizeSpec({ title: 'C', pageType: 'website', tokens: SPEC.tokens, sections: [
+    { id: 'open', kind: 'compose', content: { root: field, span: 'wide' }, images: ['openverse:a1'] },
+    { id: 'scene', kind: 'compose', content: { root: layer, span: 'bleed', tall: 'screen' }, images: ['openverse:a2'] },
+    { id: 'plain', kind: 'compose', content: { root: { t: 'stack', dir: 'col', children: [{ t: 'text', role: 'title', text: 'Plain' }] }, span: 'sideways', tall: 'forever' }, images: [] },
+  ] }, cboard);
+  const chtml = V.renderDesign(cspec, cboard.refs).html;
+  ok('the field is drawn from numbers the normaliser checked: each cell by its columns and rows, the picture beneath, the words above', /<div class="cp-field cp-rows-l">/.test(chtml) && chtml.includes('class="cp-cell cp-lines" style="--c:1;--s:9;--r:2;--rs:2"') && chtml.includes('class="cp-cell cp-media" style="--c:6;--s:7;--r:1;--rs:4"') && chtml.includes('class="cp-cell cp-plate" style="--c:9;--s:4;--r:4;--rs:1"'));
+  ok('the layer: its picture fills the ground under a shade, its words over it', /<div class="cp-layer cp-at-bottom-start cp-inset-l cp-on-img"><div class="cp-ground"><figure class="cp-img cp-r-21x9 cp-fill">/.test(chtml) && chtml.includes('<div class="cp-shade"></div>') && chtml.includes('<div class="cp-over scrim">'));
+  ok('a section’s frame: wide or edge to edge, a whole screen; anything else is no frame', chtml.includes('class="wrap cp cp-span-wide"') && chtml.includes('class="wrap cp cp-span-bleed cp-tall"') && chtml.includes('<div class="wrap cp"><div class="cp-stack') && cspec.sections[2].content.span === '' && cspec.sections[2].content.tall === '');
+  ok('a title at display size carries its size by name', chtml.includes('cp-title cp-sz-giant'));
+  ok('below 900 px a field reads as one column, in its written order', /@media \(max-width:899px\)\{\.cp-field\{display:flex;flex-direction:column/.test(chtml));
+  ok('words on a field never end up behind a picture, whatever order they were written in', (() => { const f = V.normalizeCompose({ t: 'field', children: [{ t: 'image', at: 0, cell: [1, 12, 1, 3] }, { t: 'text', role: 'body', text: 'After', cell: [2, 4, 2, 1] }] }); const g = V.normalizeCompose({ t: 'field', children: [{ t: 'text', role: 'body', text: 'Before', cell: [2, 4, 2, 1] }, { t: 'image', at: 0, cell: [1, 12, 1, 3] }] }); return V.fieldLayers(f)[1].over && V.fieldLayers(g)[0].over && V.fieldLayers(g)[1].media; })());
+  const evc = V.evaluateDesign(cspec, { desktop: V.normalizeAudit({ width: 1280, viewport: 900, height: 3000, collisions: [{ section: 'open', path: 'root.children.3.text', text: 'A studio for buildings', with: 'Concrete, held' }] }) });
+  ok('words that run into other words where pieces overlap are a must-fix on that section, with what to ask', evc.findings.some((f) => f.kind === 'composition' && f.severity === 'high' && f.section === 'open' && /runs into “Concrete, held”/.test(f.message) && /does not cross/.test(f.ask)), J(evc.findings.map((f) => f.kind)));
+  const rnd = () => 0.3;
+  const laid = V.arrangedOpening({ title: 'A hall', lead: 'Daylight, once.', action: 'Visit' }, true, rnd, 'layered', 'giant');
+  const crossed = V.arrangedOpening({ title: 'A hall', lead: 'Daylight, once.', action: 'Visit', detail: 'Bergen' }, true, rnd, 'overlap');
+  const off = V.arrangedOpening({ title: 'A hall', lead: 'Daylight, once.' }, false, rnd, 'overlap');
+  ok('the engine’s own arranged openings: words layered over the picture; the title crossing it; off-axis when there is no picture to cross', laid.t === 'layer' && laid.children[0].fill === true && laid.children[1].children.some((c) => c.size === 'giant') && crossed.t === 'field' && V.overlapsIn(crossed) && crossed.children.some((c) => c.over === 'lines') && off.t === 'field' && !off.children.some((c) => c.t === 'image') && off.cells[0].col >= 1, J([laid.t, crossed.t, off.t]));
+
+  // the creative reading
+  const r1 = V.readCreative('An architectural experience that feels monumental, restrained, cinematic, and museum-like.');
+  ok('"monumental, restrained, cinematic, museum-like" is read as decisions, not keywords: whole screens, giant titles, words over pictures, slow movement, nothing ornamental', J(r1.qualities.map((q) => q.id)) === J(['monumental', 'restrained', 'cinematic', 'museum', 'architectural']) && r1.execution.tall && r1.execution.bleed && r1.execution.display === 'giant' && r1.execution.arrange === 'layered' && r1.execution.motion.duration === 1100 && r1.execution.feel === 'calm' && r1.execution.motifs.drop.includes('icons') && !r1.execution.motifs.add.includes('shapes') && r1.execution.dna.restraint <= -30 && r1.execution.dna.density <= -30, J(r1.execution));
+  const r2 = V.readCreative('Combine architectural minimalism with experimental editorial typography, but avoid the coldness usually associated with minimalist websites.');
+  ok('"minimalism, but avoid the coldness": a tension, resolved by keeping the restraint and warming the ground', r2.refusals[0]?.id === 'cold' && r2.tensions[0]?.keep === 'minimal' && r2.tensions[0].without === 'cold' && r2.execution.warmth === 1 && r2.execution.tokens.imageTreatment === 'warm' && r2.qualities.some((q) => q.id === 'minimal') && (r2.execution.dna.restraint ?? 0) < 0, J(r2.tensions));
+  ok('  …the corners stay square beside "architectural" (warmth does not undo the structure), and minimalism is not refused by being named there', r2.execution.tokens.radius !== 'soft' && r2.qualities.some((q) => q.id === 'minimal'));
+  ok('  …and the two languages named together are read with what each is for', J(r2.influences.map((i) => [i.language, i.aspect])) === J([['swiss', null], ['broadsheet', 'type']]) && J(V.hybridOf(r2)) === J({ base: 'swiss', from: 'broadsheet', groups: ['type'], words: 'architectural minimalism with editorial' }), J(r2.influences));
+  const r3 = V.readCreative('A playful, maximalist shop. No cards, no rounded corners, nothing corporate.');
+  ok('restrictions are held over the qualities: playful asks for round corners, "no rounded corners" wins', r3.execution.forbid.containers.includes('cards') && r3.execution.forbid.radius.includes('round') && r3.execution.tokens.radius === 'none' && r3.restrictions.length === 2 && r3.refusals[0].id === 'corporate');
+  ok('a quality refused outright is not applied ("nothing cinematic")', !V.readCreative('Editorial and warm, nothing cinematic.').qualities.some((q) => q.id === 'cinematic') && V.readCreative('Editorial and warm, nothing cinematic.').qualities.some((q) => q.id === 'editorial'));
+  ok('a plain brief reads as nothing, and nothing is changed', V.readingIsEmpty(V.readCreative('A website for a dentist in Leeds.')) && V.readingIsEmpty(null));
+  ok('qualities named beside one another are not "influences" unless the words combine them', V.readCreative('Cinematic and museum-like.').influences.length === 0);
+  ok('the last thing said wins: a note for this direction over what the brief said', V.readCreative('calm. kinetic').execution.feel === 'kinetic' && V.readCreative('kinetic. calm').execution.feel === 'calm');
+  ok('a ground is warmed or cooled visibly, keeping how light it is; a colour of its own is only leaned', V.temper('#ffffff', 1) !== '#ffffff' && V.hslOf(V.temper('#ffffff', 1))[2] > 0.94 && V.hslOf(V.temper('#ffffff', -1))[0] > 180 && V.temper('#ffffff', 0) === '#ffffff' && Math.abs(V.hslOf(V.temper('#2255aa', 1))[2] - V.hslOf('#2255aa')[2]) < 0.02);
+  const mkb = (o) => V.normalizeBrief({ pageType: 'website', platform: 'web', audience: 'clients', personality: [], palette: [], typography: { display: '', body: '' }, ...o }, new Set());
+  const hb = mkb({ objective: 'A website for an architecture practice', visualDirection: 'Combine architectural minimalism with experimental editorial typography, but avoid the coldness usually associated with minimalist websites.' });
+  const hd = V.proposeDirections({ brief: hb, salt: 'p1' });
+  ok('the first direction is the hybrid the words asked for: one language, the type of another, said in its reasons, nothing locked by it', hd[0].language === 'swiss' && / × /.test(hd[0].name) && V.knownFont(hd[0].tokens.fonts.display).kind === 'serif' && /^From your words \(architectural minimalism with editorial\)/.test(hd[0].rationale[0]) && hd[0].locks.length === 0, J([hd[0].name, hd[0].tokens.fonts, hd[0].rationale[0]]));
+  ok('  every direction carries the reading in its look (a warmed ground, said); only the faithful one takes the arrangement, so they stay different in structure', hd.every((d) => d.reading?.said.some((x) => /without the coldness/.test(x)) && V.hslOf(d.tokens.colors.background)[1] > 0.08) && hd[0].arrange === 'overlap' && hd.slice(1).every((d) => !d.arrange) && new Set(hd.map((d) => d.plan)).size === 3 && new Set(hd.map((d) => d.language)).size === 3, J(hd.map((d) => [d.tokens.colors.background, d.arrange, d.plan])));
+  ok('  a warmed ground keeps every text colour as readable as it was', hd.every((d) => V.ensureContrast(d.tokens.colors.text, d.tokens.colors.background, 4.5) === d.tokens.colors.text && V.ensureContrast(d.tokens.colors.muted, d.tokens.colors.background, 4.5) === d.tokens.colors.muted));
+  ok('  the reading and the arrangement survive a save', (() => { const back = V.normalizeDirection(JSON.parse(J(hd[0]))); return back.arrange === 'overlap' && J(back.reading) === J(hd[0].reading) && J(back.frame) === J(hd[0].frame); })());
+  ok('the generator is told the reading: each decision, what it asks of the sections, and that the opening is composed', (() => { const t = V.generateSystem(hb, hd[0]); return t.includes('THE CREATIVE READING') && /without the coldness/.test(t) && /Open with a composed section, not a library hero/.test(t) && /"field"/.test(t); })());
+  const mon = mkb({ objective: 'A site for a concert hall by an architecture studio', visualDirection: 'An architectural experience that feels monumental, restrained, cinematic, and museum-like.' });
+  const md = V.proposeDirections({ brief: mon, salt: 'p2' });
+  ok('"monumental… cinematic" reaches the direction: spacious, a steep scale, slow calm movement, captions and no ornament, whole-screen frames', md.every((d) => d.tokens.scale === 'spacious' && d.look.ratio >= 1.5 && d.look.motion.feel === 'calm' && d.look.motion.duration === 1100 && !d.look.motifs.includes('icons') && !d.look.motifs.includes('shapes') && d.frame?.tall && d.frame.display === 'giant') && md[0].arrange === 'layered', J(md.map((d) => [d.tokens.scale, d.look.ratio, d.look.motion.feel, d.look.motifs, d.arrange])));
+  // …and it is held in code after generation, whatever the model wrote
+  const heroOnly = { title: 'Hall', sections: [{ id: 'nav', kind: 'nav', content: { brand: 'Hall', links: ['Programme', 'Visit'] } }, { id: 'hero', kind: 'hero', variant: 'centered', content: { eyebrow: 'Bergen', title: 'A hall cut from one pour', subtitle: 'Daylight enters once, from above.', primary: 'See the programme' }, images: ['openverse:a1'] }, { id: 'f', kind: 'footer', content: { brand: 'Hall' } }] };
+  const gen = V.parseGenerate(heroOnly, mon, cboard, 1, 'r', md[0]);
+  const op = gen.sections[1];
+  ok('a library hero the model wrote is recomposed as the direction asks, from the model’s own words and picture: words layered over it, edge to edge, a whole screen', op.kind === 'compose' && op.id === 'hero' && op.content.root.t === 'layer' && J(op.images) === J(['openverse:a1']) && J(op.content.root).includes('A hall cut from one pour') && J(op.content.root).includes('See the programme') && op.content.span === 'bleed' && op.content.tall === 'screen' && gen.notes.some((n) => /opening composed as the direction asks/.test(n)), J([op.kind, op.content.span, gen.notes]));
+  ok('  an opening the model composed itself is kept; a locked opening is never recomposed', (() => { const own = { ...heroOnly, sections: [heroOnly.sections[0], { id: 'open', kind: 'compose', content: { root: { t: 'field', children: [{ t: 'text', role: 'title', text: 'Mine', cell: [3, 8, 1, 2] }] } }, images: [] }] }; const kept = V.parseGenerate(own, mon, cboard, 1, 'r', md[0]); const lockedSpec = V.setLocked(V.normalizeSpec({ ...heroOnly, pageType: 'website', tokens: md[0].tokens, look: md[0].look }, cboard), 'hero', true); return J(kept.sections[1].content.root).includes('Mine') && kept.sections[1].content.root.cells[0].col === 3 && V.holdArrangement(lockedSpec, md[0], cboard) === lockedSpec; })());
+  const drift = V.evaluateDesign(V.normalizeSpec({ ...heroOnly, pageType: 'website', tokens: md[0].tokens, look: md[0].look }, cboard), {}, [], { direction: md[0], brief: mon, board: cboard });
+  ok('  a later change that turns the opening back into a standard hero is found, with the fix that recomposes it', drift.findings.some((f) => f.kind === 'fidelity' && /standard hero/.test(f.message) && f.fix?.op === 'replace' && f.fix.section.kind === 'compose' && f.restore));
+  const nocards = mkb({ objective: 'A shop for hand-thrown cups', visualDirection: 'Warm and plain. No cards, no rounded corners.' });
+  const cardy = V.normalizeSpec({ title: 'Cups', pageType: 'website', tokens: { ...SPEC.tokens, radius: 'round' }, look: { ...V.lookFromTokens(SPEC.tokens), containers: 'cards' }, sections: [{ id: 'hero', kind: 'hero', variant: 'editorial', content: { title: 'Cups' } }] }, null);
+  const br = V.evaluateDesign(cardy, {}, [], { brief: nocards });
+  ok('what the designer’s words refused is checked on the drawn design: cards and rounded corners are found, each with the fix that puts their words back', br.findings.filter((f) => f.kind === 'fidelity' && /your words said/.test(f.message)).length === 2 && br.findings.some((f) => f.fix?.look?.containers === 'open') && br.findings.some((f) => f.fix?.tokens?.radius === 'none'), J(br.findings.map((f) => f.message)));
+  ok('a reading never produces one of the looks generated pages share', (() => { const cream = mkb({ objective: 'A bakery', visualDirection: 'Warm, handmade', palette: [{ hex: '#ffffff', role: 'background' }, { hex: '#221c17', role: 'text' }, { hex: '#b4532a', role: 'accent' }], typography: { display: 'Fraunces', body: 'Inter' } }); return V.proposeDirections({ brief: cream }).every((d) => V.tellsOf({ colors: d.tokens.colors, fonts: d.tokens.fonts, radius: d.tokens.radius, look: d.look }).length === 0); })());
+
+  // a wider range: languages and faces
+  ok('five more languages (raw structure, widescreen, signal, workshop, more is more), each named by its own words', ['brutal', 'cinema', 'future', 'industrial', 'maximal'].every((id) => !!V.languageOf(id)) && [['A brutalist archive for a noise label', 'brutal'], ['A cinematic site for a documentary about the Arctic', 'cinema'], ['A futuristic site for a satellite maker', 'future'], ['An industrial catalogue of machined parts', 'industrial'], ['A maximalist shop for a streetwear label', 'maximal']].every(([t, id]) => V.proposeDirections({ brief: mkb({ objective: t, visualDirection: t }) })[0].language === id));
+  ok('  each has its place in every table the engine reads (DNA, plans, booking, layout, signature)', ['brutal', 'cinema', 'future', 'industrial', 'maximal'].every((id) => !!V.LANGUAGE_DNA[id] && V.proposeDirections({ brief: mkb({ objective: `A ${id} thing`, visualDirection: V.languageOf(id).keywords.slice(0, 3).join(', ') }) }).every((d) => !!d.designPlan && !!d.plan)));
+  ok('seventy-four faces now, every one a real family with its own weights; a display-only face is never body text', V.FONTS.length === 74 && new Set(V.FONTS.map((f) => f.name)).size === 74 && V.FONTS.every((f) => f.weights.length >= 1 && (f.variable ? f.weights.length === 2 && f.weights[0] < f.weights[1] : true)) && V.LANGUAGES.every((l) => l.display.every((f) => V.knownFont(f)) && l.body.every((f) => V.knownFont(f) && !V.knownFont(f).displayOnly) && l.mono.every((f) => V.knownFont(f)?.kind === 'mono')), String(V.FONTS.length));
+  ok('  a face with optical sizes asks for them', V.fontStylesheet(['Literata']).includes('family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900'));
+
+  // navigation: a menu that works where the bar does not show the links
+  const nspec = V.normalizeSpec({ title: 'N', pageType: 'website', tokens: SPEC.tokens, sections: [{ id: 'nav', kind: 'nav', variant: 'menu', content: { brand: 'Atelier', links: ['Work', 'Studio', 'Journal'], cta: 'Write' } }, { id: 'hero', kind: 'hero', variant: 'editorial', content: { title: 'x' } }] }, null);
+  const nhtml = V.renderDesign(nspec, []).html;
+  ok('the menu’s button is hidden until the runtime binds it: a page without scripts shows no control that does nothing', /<button type="button" class="nav-menu" data-ux-menu aria-expanded="false" aria-controls="nav-menu" hidden>Menu<\/button>/.test(nhtml) && /id="nav-menu" data-ux-menu-panel role="dialog" aria-modal="true" aria-label="Menu" hidden/.test(nhtml));
+  const nd = new JSDOM(nhtml, { runScripts: 'outside-only', pretendToBeVisual: true });
+  nd.window.eval(V.BEHAVIOR_SOURCE);
+  const nw = nd.window.document;
+  const mb = nw.querySelector('[data-ux-menu]');
+  const panel = nw.getElementById('nav-menu');
+  ok('bound: the button shows, the page says scripts are on', !mb.hidden && nw.body.classList.contains('ux-js') && nd.window.__uxBehaviors.menus === 1);
+  mb.click();
+  ok('opening it shows the links large, says it is open, and moves focus inside', !panel.hidden && mb.getAttribute('aria-expanded') === 'true' && panel.contains(nw.activeElement) && panel.querySelectorAll('.nav-over-links a').length === 3);
+  panel.dispatchEvent(new nd.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  ok('Escape closes it and gives focus back to the button', panel.hidden && mb.getAttribute('aria-expanded') === 'false' && nw.activeElement === mb);
+  ok('its self-test tries it and finds it working', nd.window.__uxBehaviors.selfTestInteractive().some((x) => x.kind === 'menu' && x.items === 3 && !x.problems.length));
+  ok('on a phone every navigation with links gets the menu (they were simply hidden before)', /@media \(max-width:759px\)\{\n\.nav-links\{display:none\}[^}]*\}\.ux-js \.nav-menu:not\(\[hidden\]\)\{display:inline-flex/.test(V.renderDesign(V.normalizeSpec({ ...nspec, sections: [{ ...nspec.sections[0], variant: 'inline' }, nspec.sections[1]] }, null), []).html));
+
+  // a picture's subject, crops for a width, the story the designer chose, the motion in words
+  const fref = V.normalizeRef({ ...ref('f1'), focus: { x: 82.4, y: 14 } });
+  ok('a picture keeps where its subject is, as whole percentages; the centre is no focal point', J(fref.focus) === J({ x: 82, y: 14 }) && V.normalizeRef({ ...ref('f2'), focus: { x: 50, y: 50 } }).focus === undefined && V.normalizeRef({ ...ref('f3'), focus: { x: 'left', y: 3 } }).focus === undefined && V.normalizeRef({ ...ref('f4'), focus: { x: 900, y: -5 } }).focus.x === 100);
+  const fb = V.normalizeMoodboard({ refs: [fref] });
+  const fs = V.normalizeSpec({ title: 'F', pageType: 'website', tokens: SPEC.tokens, sections: [{ id: 'hero', kind: 'hero', variant: 'split', content: { title: 'x' }, images: [fref.id] }, { id: 'how', kind: 'features', variant: 'list', content: { title: 'How', items: [{ title: 'A', text: 'a' }, { title: 'B', text: 'b' }, { title: 'C', text: 'c' }] } }, { id: 'then', kind: 'features', variant: 'numbered', content: { title: 'Then', items: [{ title: 'D', text: 'd' }, { title: 'E', text: 'e' }, { title: 'F', text: 'f' }] } }] }, fb);
+  ok('…and is drawn with it in view however the layout crops it', V.renderDesign(fs, fb.refs).html.includes('style="object-position:82% 14%"'));
+  const cropped = V.applyPatch(fs, { op: 'responsive', sectionId: 'hero', breakpoint: 'mobile', rule: { crop: 'tall' }, summary: 'x' }, fb);
+  ok('a picture cropped for phones: a rule of its own, written at that width only', cropped.ok && cropped.spec.sections[0].responsive.mobile.crop === 'tall' && /@media \(max-width:759px\)\{[^@]*\.sx\.rs-m-crop-tall figure img[^}]*aspect-ratio:3\/4/.test(V.renderDesign(cropped.spec, fb.refs).html) && V.describeResponsive(cropped.spec.sections[0].responsive)[0] === 'On phones: pictures cropped tall');
+  const kinSpec = { ...fs, look: { ...fs.look, motion: V.motionFor('kinetic') } };
+  const first = V.renderDesign(kinSpec, fb.refs, { motion: 'play' }).html;
+  const told = V.applyPatch(kinSpec, { op: 'story', sectionId: 'then', story: true, summary: 'x' }, fb);
+  const second = V.renderDesign(told.spec, fb.refs, { motion: 'play' }).html;
+  const storyOf = (h) => (h.match(/<section class="mo-story [^>]*data-ux-section="([^"]+)"/) ?? [])[1];
+  ok('the pinned story is the first sequence that can be one, until the designer chooses another', storyOf(first) === 'how' && told.ok && told.spec.sections[2].story === true && storyOf(second) === 'then');
+  const moved = V.applyPatch(told.spec, { op: 'story', sectionId: 'how', story: true, summary: 'x' }, fb);
+  ok('  one story to a page: choosing another releases the first; a section that cannot be one is refused', moved.ok && moved.spec.sections[1].story === true && moved.spec.sections[2].story === undefined && !V.applyPatch(fs, { op: 'story', sectionId: 'hero', story: true, summary: 'x' }, fb).ok);
+  const slow = V.readQuickEdit('slow down the transitions', kinSpec, null);
+  ok('"slow down the transitions" is done in code: the design’s own motion, longer, nothing else', slow?.kind === 'motion' && slow.patches[0].op === 'look' && slow.patches[0].look.motion.duration > kinSpec.look.motion.duration && slow.patches[0].look.motion.feel === 'kinetic' && V.readQuickEdit('make the animations faster', kinSpec, null).patches[0].look.motion.duration < kinSpec.look.motion.duration);
+  ok('  "remove the parallax" too; on a still design there is no motion to change, so it is the model’s to read', V.readQuickEdit('remove the parallax', kinSpec, null).patches[0].look.motion.parallax === 0 && V.readQuickEdit('slow down the transitions', fs, null) === null);
+  ok('  "crop the picture tall on phones" for the part selected', V.readQuickEdit('crop the picture tall on phones', fs, { element: { ux: { section: 'hero', path: 'title' } } })?.patches[0].rule.crop === 'tall');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

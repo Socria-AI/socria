@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from 'react';
 import { fieldLabel, textAt, textPatch } from '@/lib/ux-v0/edit';
 import { BREAKPOINTS, BREAKPOINT_LABEL, PADS, SHAPE_EFFECTIVE, SHAPE_FIELDS, TONES, describeResponsive, kindDef, shapeDefault, stacksPicture, type Breakpoint, type BreakpointRule, type DesignSpec, type Patch, type Section } from '@/lib/ux-v0/spec';
 import type { Piece } from '@/lib/ux-v0/compose';
+import type { MoodboardRef } from '@/lib/ux-v0/types';
 
 const TONE_LABEL: Record<(typeof TONES)[number], string> = { base: 'Page', alt: 'Alternate', accent: 'Accent', accent2: 'Second accent', invert: 'Inverted' };
 const PAD_LABEL: Record<(typeof PADS)[number], string> = { s: 'Tight', m: 'Even', l: 'Generous' };
@@ -120,10 +121,34 @@ function WidthRules({ sec, label, name, locked, viewport, onPatch }: { sec: Sect
           <SegRow label="Words" value={rule.align ?? ''} options={[['', 'As designed'], ['start', 'Left'], ['center', 'Centred']]} disabled={locked} onPick={(v, l) => set('align', v, v ? `words ${l}` : 'words as designed')} />
           <SegRow label="Spacing" value={rule.pad ?? ''} options={[['', 'As designed'], ['s', 'Tight'], ['m', 'Even'], ['l', 'Generous']]} disabled={locked} onPick={(v, l) => set('pad', v, v ? `${l} spacing` : 'spacing as designed')} />
           <SegRow label="Headings" value={rule.type ?? ''} options={[['', 'As designed'], ['s', 'Smaller'], ['l', 'Larger']]} disabled={locked} onPick={(v, l) => set('type', v, v ? `headings ${l}` : 'headings as designed')} />
+          {sec.images.length > 0 && <SegRow label="Crop" value={rule.crop ?? ''} options={[['', 'As designed'], ['wide', 'Wide'], ['square', 'Square'], ['tall', 'Tall']]} disabled={locked} onPick={(v, l) => set('crop', v, v ? `pictures cropped ${l}` : 'pictures as designed')} />}
           {hasPicture && <SegRow label="Picture" value={rule.media ?? ''} options={[['', 'As designed'], ['first', 'First'], ['last', 'Last']]} disabled={locked} onPick={(v, l) => set('media', v, v ? `picture ${l === 'First' ? 'before' : 'after'} the words` : 'picture as designed')} />}
         </>
       )}
       {said.length > 0 && <p className="v0-quiet v0-edit-bp-said">{said.join(' · ')}</p>}
+    </div>
+  );
+}
+
+/** Where the picture's subject is: nine places; what stays in view however a layout or a width crops it. */
+function FocalPoint({ refId, refs, locked, onFocus }: { refId: string; refs: readonly MoodboardRef[]; locked: boolean; onFocus: (refId: string, x: number, y: number) => void }) {
+  const ref = refs.find((r) => r.id === refId);
+  if (!ref) return null;
+  const at = ref.focus ?? { x: 50, y: 50 };
+  const STOPS = [15, 50, 85];
+  const NAME = ['top', 'middle', 'bottom'];
+  const SIDE = ['left', 'centre', 'right'];
+  return (
+    <div className="v0-edit-row" role="group" aria-label="The picture’s subject">
+      <span className="v0-edit-l">Subject at</span>
+      <span className="v0-focal" role="radiogroup" aria-label="Where the picture’s subject is">
+        {STOPS.map((y, yi) =>
+          STOPS.map((x, xi) => {
+            const on = Math.abs(at.x - x) < 18 && Math.abs(at.y - y) < 18;
+            return <button key={`${x}-${y}`} type="button" role="radio" aria-checked={on} aria-label={`${NAME[yi]} ${SIDE[xi]}`} title={`${NAME[yi]} ${SIDE[xi]}`} className={`v0-focal-dot${on ? ' is-on' : ''}`} disabled={locked} onClick={() => onFocus(refId, x, y)} />;
+          })
+        )}
+      </span>
     </div>
   );
 }
@@ -138,6 +163,8 @@ export function SectionEditor({
   imageGen,
   onPhotograph,
   viewport,
+  refs,
+  onFocus,
 }: {
   spec: DesignSpec;
   sectionId: string;
@@ -151,6 +178,9 @@ export function SectionEditor({
   onPhotograph?: (sectionId: string) => void;
   /** the width the canvas shows: the width the "At other widths" controls start at */
   viewport?: 'desktop' | 'tablet' | 'mobile';
+  /** the moodboard's pictures, and setting where a picture's subject is (kept with the picture) */
+  refs?: readonly MoodboardRef[];
+  onFocus?: (refId: string, x: number, y: number) => void;
 }) {
   const idx = spec.sections.findIndex((s) => s.id === sectionId);
   const sec = idx >= 0 ? spec.sections[idx] : null;
@@ -324,6 +354,17 @@ export function SectionEditor({
           ))}
         </span>
       </div>
+
+      {sec.kind === 'features' && Array.isArray(sec.content.items) && sec.content.items.length >= 3 && sec.content.items.length <= 6 && (
+        <SegRow
+          label="Told as"
+          value={sec.story ? 'story' : ''}
+          options={[['', 'A list'], ['story', 'The pinned story']]}
+          disabled={locked}
+          onPick={(v) => onPatch({ op: 'story', sectionId: sec.id, story: v === 'story', summary: v === 'story' ? `${def.label} told as the pinned story` : `${def.label} no longer the story` }, v === 'story' ? `the ${name} told as the pinned story (where the motion tells one)` : `the ${name} as a list`)}
+        />
+      )}
+      {onFocus && refs && sec.images.length > 0 && <FocalPoint refId={sec.images[0]} refs={refs} locked={locked} onFocus={onFocus} />}
 
       <WidthRules sec={sec} label={def.label} name={name} locked={locked} viewport={viewport} onPatch={onPatch} />
 

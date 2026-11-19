@@ -21,7 +21,7 @@ export interface QuickEdit {
   patches: Patch[];
   /** what was done, in a few words, for the designer */
   label: string;
-  kind: 'colour' | 'type' | 'corners' | 'words' | 'size' | 'space' | 'remove' | 'width';
+  kind: 'colour' | 'type' | 'corners' | 'words' | 'size' | 'space' | 'remove' | 'width' | 'motion';
   /** a reason to ask before applying it (text that would be hard to read), said as a question */
   concern?: string;
 }
@@ -181,9 +181,28 @@ export function readQuickEdit(comment: string, spec: DesignSpec | null | undefin
                       ? [{ pad: 'l' }, 'generous spacing']
                       : /\b(less (space|padding|room)|tighter|more compact)\b/.test(w)
                         ? [{ pad: 's' }, 'tight spacing']
-                        : [null, ''];
+                        : picture && /\b(crop(ped)?|cut)\b/.test(w) && /\b(tall|portrait|upright|square|wide|landscape)\b/.test(w)
+                          ? [{ crop: /\b(tall|portrait|upright)\b/.test(w) ? 'tall' : /\bsquare\b/.test(w) ? 'square' : 'wide' }, `pictures cropped ${/\b(tall|portrait|upright)\b/.test(w) ? 'tall' : /\bsquare\b/.test(w) ? 'square' : 'wide'}`]
+                          : [null, ''];
     if (!rule) return null;
     return { patches: [{ op: 'responsive', sectionId: selected.id, breakpoint: bp, rule, summary: `${said.charAt(0).toUpperCase()}${said.slice(1)} ${where}` }], label: `${said} ${where}`, kind: 'width' };
+  }
+
+  // THE MOTION, as it is said every day: "slow down the transition", "faster animations", "no parallax", "stop
+  // the animation" — one look patch to the design's own motion, nothing else touched (the Motion panel does the same)
+  if (/\b(transitions?|animations?|motion|movement|parallax|reveals?|arrivals?)\b/.test(w)) {
+    const m = (spec.look ?? null)?.motion;
+    if (m && m.feel !== 'still') {
+      const slower = /\b(slow(er|ly)?( down)?|more gentle|gentler|calmer|less (fast|abrupt|snappy))\b/.test(w);
+      const faster = /\b(fast(er)?|quick(er|en)?|speed (it |them )?up|snappier|less slow)\b/.test(w);
+      if (/\b(no|remove|without|stop|drop|kill|turn off)\b[^.]{0,20}\bparallax\b/.test(w)) return m.parallax ? { patches: [{ op: 'look', look: { motion: { ...m, parallax: 0, scrub: 0 } }, summary: 'No parallax' }], label: 'no parallax', kind: 'motion' } : { patches: [], label: 'there is no parallax', kind: 'motion' };
+      if (slower !== faster) {
+        const duration = Math.round(Math.max(200, Math.min(1600, m.duration * (slower ? 1.4 : 0.7))) / 10) * 10;
+        const stagger = Math.round(Math.max(0, Math.min(200, m.stagger * (slower ? 1.3 : 0.75))));
+        if (duration === m.duration) return { patches: [], label: `the motion is already as ${slower ? 'slow' : 'fast'} as it goes`, kind: 'motion' };
+        return { patches: [{ op: 'look', look: { motion: { ...m, duration, stagger } }, summary: slower ? 'Slower motion' : 'Faster motion' }], label: `${slower ? 'slower' : 'faster'} motion (${duration} ms)`, kind: 'motion' };
+      }
+    }
   }
 
   // A COLOUR for a role: "the button colour to black", "a white background", "make it navy" (with a button selected)
