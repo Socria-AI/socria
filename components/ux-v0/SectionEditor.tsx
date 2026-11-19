@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { fieldLabel, textAt, textPatch } from '@/lib/ux-v0/edit';
 import { PADS, SHAPE_EFFECTIVE, SHAPE_FIELDS, TONES, kindDef, shapeDefault, type DesignSpec, type Patch } from '@/lib/ux-v0/spec';
+import type { Piece } from '@/lib/ux-v0/compose';
 
 const TONE_LABEL: Record<(typeof TONES)[number], string> = { base: 'Page', alt: 'Alternate', accent: 'Accent', accent2: 'Second accent', invert: 'Inverted' };
 const PAD_LABEL: Record<(typeof PADS)[number], string> = { s: 'Tight', m: 'Even', l: 'Generous' };
@@ -178,6 +179,35 @@ export function SectionEditor({
           </div>
         );
       })}
+
+      {sec.kind === 'compose' && (sec.content.root as Piece | undefined)?.t === 'grid' && (sec.content.root as Extract<Piece, { t: 'grid' }>).children.length >= 2 && (() => {
+        // a composed section's own arrangement: the proportion of its first two columns, and which side is which
+        const root = sec.content.root as Extract<Piece, { t: 'grid' }>;
+        const [a, b = 1] = root.cols;
+        const share = a / (a + b);
+        const gcd = (x: number, y: number): number => (y ? gcd(y, x % y) : x);
+        const setShare = (v: number) => {
+          const left = Math.max(2, Math.min(10, Math.round(v * 12)));
+          const g = gcd(left, 12 - left);
+          const cols = [left / g, (12 - left) / g, ...root.cols.slice(2)];
+          onPatch({ op: 'content', sectionId: sec.id, content: { root: { ...root, cols } }, summary: `${def.label}: columns at ${cols[0]} : ${cols[1]}` }, `the ${name}’s columns at ${cols[0]} : ${cols[1]}`);
+        };
+        const swap = () => {
+          const children = [root.children[1], root.children[0], ...root.children.slice(2)];
+          const cols = [root.cols[1] ?? 1, root.cols[0], ...root.cols.slice(2)];
+          onPatch({ op: 'content', sectionId: sec.id, content: { root: { ...root, children, cols } }, summary: `${def.label}: sides swapped` }, `the ${name}’s sides swapped`);
+        };
+        return (
+          <>
+            <ShapeRange label="Columns" min={0.17} max={0.83} value={share} shown={(v) => `${Math.round(v * 12)} : ${12 - Math.round(v * 12)}`} disabled={locked} onCommit={setShare} />
+            <div className="v0-edit-row v0-edit-acts" role="group" aria-label="Its arrangement">
+              <button type="button" className="sb-link is-meta" disabled={locked} onClick={swap}>
+                Swap sides
+              </button>
+            </div>
+          </>
+        );
+      })()}
 
       <div className="v0-edit-row" role="group" aria-label="Ground">
         <span className="v0-edit-l">Ground</span>

@@ -54,7 +54,10 @@ await ctx.route('**/api/ux-v0/**', async (r) => {
     const intent = V.settleIntent(V.designerWords(body.intent, body.questions ?? []), { current: body.current?.intent ?? null });
     const qs = V.normalizeDiscovery({ questions: body.questions }).questions;
     const layout = V.settleLayout(V.designerWords(body.intent, qs, body.instruction ?? ''), qs, V.normalizeBrief(body.current)?.layout, intent, body.instruction ?? '');
-    briefSent = { ...parsed, intent, pageType: V.pageTypeFor(intent, parsed.pageType), ...(layout ? { layout } : {}) };
+    // as the route does: a design system the designer attached stays attached through a rewrite
+    const drafted = { ...parsed, intent, pageType: V.pageTypeFor(intent, parsed.pageType), ...(layout ? { layout } : {}) };
+    const system = V.normalizeBrief(body.current)?.system;
+    briefSent = system ? V.briefWithSystem(drafted, system) : drafted;
     return r.fulfill({ json: { usage: usage(body.action === 'refine' ? 'refine-brief' : 'brief', 'economy'), brief: briefSent, queries: [] } });
   }
   if (url.endsWith('/direct')) {
@@ -140,6 +143,16 @@ await lay.getByLabel('Alignment').selectOption('');
 await page.waitForTimeout(300);
 ok('"SocriaUX decides" leaves it open again', !/Alignment: centred/.test(await lay.locator('.st-layout-said').innerText()));
 await page.screenshot({ path: `${S}ui-2b-brief-layout-1440.png` });
+// the designer's own design system, from its files (read in the browser), built within from here on
+const sys = page.locator('#bp-system');
+await sys.scrollIntoViewIfNeeded();
+ok('the brief offers to build within the designer’s own design system (files, or a GitHub repository)', /Design system/.test(await sys.innerText()) && (await sys.locator('input[type="file"]').count()) === 1 && (await sys.getByRole('button', { name: 'Read from GitHub' }).count()) === 1);
+const TOKENS = ':root { --color-primary: #0f766e; --color-background: #f8fafc; --color-surface: #ffffff; --color-text: #0f172a; --color-muted: #475569; --color-border: #cbd5e1; --font-heading: "Söhne Breit", sans-serif; --font-body: Inter, sans-serif; --radius-md: 6px; }';
+await sys.locator('input[type="file"]').setInputFiles([{ name: 'tokens.css', mimeType: 'text/css', buffer: Buffer.from(TOKENS) }, { name: 'README.md', mimeType: 'text/markdown', buffer: Buffer.from('# Tidewater\n\n## Rules\n- Never use more than one accent per screen\n') }]);
+await page.waitForSelector('#bp-system.is-on', { timeout: 8000 });
+const sysText = await page.locator('#bp-system').innerText();
+ok('…attached: its name, its colours by role, its faces (one drawn with the closest SocriaUX can serve, and said), its rules', /Tidewater/.test(sysText) && /#0f766e/i.test(sysText) && /Söhne Breit/.test(sysText) && /1 rule/.test(sysText), sysText.slice(0, 400));
+await page.locator('#bp-system').screenshot({ path: `${S}ui-2c-design-system-1440.png` });
 await page.getByRole('button', { name: 'Approve and choose a direction' }).click();
 await page.waitForSelector('.v0-dir', { timeout: 15000 });
 await page.waitForTimeout(2500);
@@ -148,6 +161,12 @@ ok('three directions, each with its study', (await page.locator('.v0-dir').count
 const splits = [];
 for (let i = 0; i < 3; i++) splits.push(await page.frameLocator('.v0-dir iframe').nth(i).locator('.bk-split').count());
 ok('…all three keep what the designer decided: the class first (its card beside the times)', splits.every((n) => n === 1), JSON.stringify(splits));
+// each direction's plan, critiqued before it was shown
+const plans = await page.locator('.ad-plan').allInnerTexts();
+ok('each direction states its plan: one bold move, the detail only its subject has, its colours named', plans.length === 3 && plans.every((t) => /bold move/i.test(t) && /only this/i.test(t) && /colours/i.test(t)), JSON.stringify(plans.map((t) => t.slice(0, 200))));
+const chips = await page.locator('.ad-plan').evaluateAll((els) => els.map((el) => [...el.querySelectorAll('.ad-plan-chip')].map((c) => getComputedStyle(c).backgroundColor)));
+ok('…built within the design system: its accent and its ground among every direction’s named colours', chips.length === 3 && chips.every((xs) => xs.includes('rgb(15, 118, 110)') && xs.includes('rgb(248, 250, 252)')), JSON.stringify(chips));
+await page.locator('.ad-plan').first().screenshot({ path: `${S}ui-3b-plan-1440.png` });
 await shootAll('3-direction');
 await page.locator('.v0-dir').first().getByRole('button', { name: 'Use this direction' }).click();
 await page.waitForSelector('iframe.v0-frame', { timeout: 40000 });
@@ -155,6 +174,8 @@ await page.waitForTimeout(3500);
 const fr = () => page.frames().find((f) => f.url() === 'about:srcdoc' && f.parentFrame() === page.mainFrame());
 const frame = page.frameLocator('iframe.v0-frame');
 ok('the generated design is the booking itself: no "Begin", no "Read more"', (await frame.locator('[data-ux-booking]').count()) === 1 && !(await frame.locator('text=/^(Begin|Read more)$/').count()));
+const confirmColours = await frame.locator('[data-ux-confirm]').evaluate((e) => { const c = getComputedStyle(e); return `${c.backgroundColor} ${c.borderColor} ${c.color}`; });
+ok('…drawn in the design system’s own accent', /rgb\(15, 118, 110\)/.test(confirmColours), confirmColours);
 await shootAll('4-canvas');
 // the booking works on the canvas: choose a time, confirm
 await page.getByRole('radio', { name: 'None' }).click().catch(() => {});

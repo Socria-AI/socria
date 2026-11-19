@@ -21,6 +21,7 @@
 import { FONTS } from './fonts';
 import { EXPERIENCES } from './intent';
 import { LANGUAGES } from './direction';
+import { SIGNATURES } from './plan';
 import { MOOD_CATEGORIES, PALETTE_ROLES, VERDICTS, type CallKind } from './types';
 
 type Schema = Record<string, unknown>;
@@ -66,6 +67,9 @@ const artDirection = object({
       avoid: strs(5),
       // optional in the prompt: null keeps the candidate's own faces
       fonts: { anyOf: [object({ display: DISPLAY, body: BODY }), { type: 'null' }] },
+      // the plan (lib/ux-v0/plan.ts): its one bold move, and one detail only this subject has; null keeps the engine's
+      signature: { anyOf: [oneOf([...SIGNATURES]), { type: 'null' }] },
+      detail: strOrNull,
     }),
     3
   ),

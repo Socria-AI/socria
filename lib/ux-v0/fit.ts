@@ -12,9 +12,10 @@
 import type { ArtDirection } from './direction';
 import { intentOf, requiredComponents, sampleBooking, type DesignIntent } from './intent';
 import { avoidGeneric, honourLayout, leadKindFor, orderFor, type LayoutDecisions } from './layout';
+import { holdSignature } from './plan';
 import { kindDef, normalizeSection, normalizeShape, type DesignSpec, type Section } from './spec';
 
-type Brief = Parameters<typeof intentOf>[0] & { objective?: string; audience?: string; layout?: LayoutDecisions; spec?: { corners?: string; density?: string } };
+type Brief = Parameters<typeof intentOf>[0] & { objective?: string; audience?: string; layout?: LayoutDecisions; spec?: { corners?: string; density?: string; motion?: unknown } };
 
 /** Sample content for a component the design must have, labelled as such. */
 export function sampleFor(component: string, intent: DesignIntent, brief: Brief): Record<string, unknown> | null {
@@ -172,8 +173,12 @@ export function fitToIntent(spec: DesignSpec, intent: DesignIntent, opts: { brie
   const honoured = honourLayout(sections, dec, { pageType: spec.pageType, screen: intent.screen, needs: requiredComponents(intent), kind: intent.kind, language, compose });
   sections = honoured.sections;
   changes.push(...honoured.changes);
+  // the direction's ONE bold move, drawn; everything around it kept quiet (lib/ux-v0/plan.ts)
+  const held = holdSignature({ ...spec, sections }, opts.dir?.designPlan?.signature, { decisions: dec, motionDecided: !!opts.brief?.spec?.motion });
+  sections = held.spec.sections;
+  changes.push(...held.changes);
   // and the habits of generated pages, taken out where nobody chose them (lib/ux-v0/layout.ts avoidGeneric)
-  const plain = avoidGeneric({ ...spec, sections }, { decisions: dec, language, surfaceLocked: !!opts.dir?.locks?.includes('surface'), corners: opts.brief?.spec?.corners });
+  const plain = avoidGeneric({ ...spec, ...(held.spec.look ? { look: held.spec.look } : {}), sections }, { decisions: dec, language, surfaceLocked: !!opts.dir?.locks?.includes('surface'), corners: opts.brief?.spec?.corners });
   changes.push(...plain.changes);
   const out: DesignSpec = { ...plain.spec, notes: [...spec.notes, ...changes].slice(-8) };
   return { spec: out, changes };

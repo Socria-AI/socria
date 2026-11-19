@@ -49,11 +49,13 @@ import type { BriefPart, DesignBrief } from './types';
 import { motionFor, readMotionWords } from './motion';
 import { paletteFromSwatches, type BoardReading } from './references';
 import { intentOf, requiredComponents } from './intent';
+import { askedTells, tellsOf, unaskedTells, type Tell } from './tells';
+import { normalizeDesignPlan, planBrief, plannedDirection, SIGNATURES, type DesignPlan, type PlanContext, type Signature } from './plan';
 
 // ── the visual languages ─────────────────────────────────────────────
 
 type Alt<T> = readonly T[];
-type PaletteStrategy = 'paper' | 'white' | 'dark' | 'tinted' | 'ink';
+type PaletteStrategy = 'paper' | 'white' | 'dark' | 'tinted' | 'ink' | 'stone' | 'deep';
 
 interface Ctx {
   audience: string;
@@ -114,32 +116,32 @@ export interface Language {
 export const LANGUAGES: readonly Language[] = [
   {
     id: 'broadsheet',
-    name: 'Broadsheet',
-    blurb: 'a printed review: serif headlines with italic emphasis, heads in a side column, hairline rules, numbered sections, captioned photographs',
+    name: 'Journal',
+    blurb: 'a contemporary journal: big serif headlines over a quiet sans, heads in a side column, one heavy rule where each part begins, captioned photographs as plates',
     keywords: ['editorial', 'news', 'journal', 'magazine', 'story', 'stories', 'writing', 'writer', 'literary', 'publication', 'essay', 'research', 'report', 'thoughtful', 'considered', 'trusted', 'authority', 'intelligent', 'academic', 'book', 'reading', 'press', 'print', 'archive', 'history', 'heritage', 'serious', 'law', 'policy', 'knowledge', 'insight'],
     traits: ['serif', 'light', 'quiet', 'classic', 'traditional'],
-    display: ['Newsreader', 'Source Serif 4', 'Libre Baskerville', 'Playfair Display', 'EB Garamond', 'Spectral'],
-    body: ['Source Serif 4', 'Newsreader', 'Public Sans', 'IBM Plex Sans', 'Inter'],
+    display: ['Newsreader', 'Source Serif 4', 'Spectral', 'Libre Baskerville', 'EB Garamond'],
+    body: ['IBM Plex Sans', 'Public Sans', 'Instrument Sans', 'Source Serif 4'],
     mono: ['IBM Plex Mono'],
-    palette: 'paper',
+    palette: 'white',
     scale: ['comfortable'],
     radius: ['none'],
     treatment: ['mono', 'muted'],
     style: 'editorial',
     look: {
-      ratio: [1.333, 1.25, 1.414], weight: [500, 400, 600], case: ['sentence'], tracking: ['tight'], emphasis: ['italic'], label: ['rule', 'caps'],
-      grid: ['editorial'], align: ['left'], width: ['wide', 'standard'], rhythm: ['even'], containers: ['ruled'], rules: ['hairline', 'heavy'], buttons: ['underline', 'solid'],
-      frame: ['plain'], motifs: [['numbering', 'captions', 'pull-quote'], ['captions', 'pull-quote']], shapes: [[]],
+      ratio: [1.414, 1.5, 1.333], weight: [500, 400, 600], case: ['sentence'], tracking: ['tight'], emphasis: ['italic'], label: ['rule', 'sentence'],
+      grid: ['editorial'], align: ['left'], width: ['standard', 'wide'], rhythm: ['even'], containers: ['open'], rules: ['heavy', 'none'], buttons: ['underline', 'solid'],
+      frame: ['plain'], motifs: [['captions', 'pull-quote'], ['captions']], shapes: [[]],
     },
     accent2: null,
     motion: ['measured', 'calm'], moTweak: { hover: 'underline', parallax: 0, headline: 'mask', sections: 'none' },
     prefer: { hero: ['editorial', 'statement', 'split'], features: ['index', 'columns', 'numbered'], quote: ['pull', 'large'], stats: ['row'], cta: ['statement', 'band'], text: ['two-column', 'lead'], gallery: ['mosaic', 'grid'], split: ['image-left', 'image-right'], faq: ['two-column', 'accordion'], list: ['simple', 'schedule', 'menu'] },
     tones: { alternate: false },
-    concept: (c) => `A considered broadsheet for ${c.audience}: serif headlines, heads set in a side column and hairline rules, so ${c.what} reads like something written, not sold.`,
+    concept: (c) => `A contemporary journal for ${c.audience}: big serif headlines over a quiet sans, and one heavy rule where each part begins, so ${c.what} reads like something written, not sold.`,
     voice: 'Measured and exact, like a good editor: short declarative headlines, one idea per paragraph, italics for the word that matters.',
-    composition: 'Section heads sit in a narrow left column beside their text; rules divide the page into an index a reader can scan.',
+    composition: 'Section heads sit in a narrow left column beside their text; one heavy rule opens each part, and the type scale does the rest.',
     imagery: 'Documentary photographs, black and white or muted, captioned like plates.',
-    avoid: ['a centred hero over a gradient', 'icon cards in rows', 'pill buttons'],
+    avoid: ['hairline rules boxing every part', 'numbered sections that are not steps', 'a centred hero over a gradient', 'icon cards in rows', 'pill buttons'],
   },
   {
     id: 'swiss',
@@ -173,31 +175,31 @@ export const LANGUAGES: readonly Language[] = [
   {
     id: 'quiet-luxury',
     name: 'Quiet luxury',
-    blurb: 'a hotel or atelier: light high-contrast serif, centred and slow, wide margins, small spaced capitals, framed photographs, almost no colour',
+    blurb: 'a hotel or atelier: a cool stone ground, a light high-contrast serif over a precise sans, asymmetric and slow, wide margins, photographs framed with a margin, almost no colour',
     keywords: ['luxury', 'luxurious', 'elegant', 'elegance', 'refined', 'premium', 'exclusive', 'hotel', 'resort', 'spa', 'fashion', 'jewellery', 'jewelry', 'atelier', 'boutique', 'timeless', 'understated', 'sophisticated', 'bespoke', 'couture', 'wine', 'fine', 'calm', 'serene', 'private', 'villa', 'wedding', 'perfume', 'beauty'],
-    traits: ['serif', 'light', 'quiet', 'classic', 'minimal', 'centred'],
-    display: ['Cormorant Garamond', 'Bodoni Moda', 'Instrument Serif', 'Playfair Display'],
-    body: ['Instrument Sans', 'Hanken Grotesk', 'Work Sans', 'Karla', 'EB Garamond'],
+    traits: ['serif', 'light', 'quiet', 'classic', 'minimal'],
+    display: ['Cormorant Garamond', 'Bodoni Moda', 'Instrument Serif'],
+    body: ['Instrument Sans', 'Hanken Grotesk', 'Work Sans', 'Karla'],
     mono: ['IBM Plex Mono'],
-    palette: 'paper',
+    palette: 'stone',
     scale: ['spacious'],
     radius: ['none'],
     treatment: ['warm', 'muted'],
     style: 'minimal',
     look: {
       ratio: [1.25, 1.333], weight: [400, 300], case: ['sentence', 'upper'], tracking: ['normal', 'wide'], emphasis: ['italic'], label: ['caps'],
-      grid: ['centered'], align: ['center'], width: ['narrow', 'standard'], rhythm: ['even'], containers: ['open'], rules: ['hairline', 'none'], buttons: ['underline', 'outline'],
-      frame: ['inset', 'arch'], motifs: [['captions'], []], shapes: [[]],
+      grid: ['asymmetric', 'editorial'], align: ['left'], width: ['standard', 'narrow'], rhythm: ['even'], containers: ['open'], rules: ['none', 'hairline'], buttons: ['underline', 'outline'],
+      frame: ['inset', 'plain'], motifs: [['captions'], []], shapes: [[]],
     },
     accent2: null,
     motion: ['calm'], moTweak: { duration: 1150, ease: 'gentle', entrance: 'fade', headline: 'fade', parallax: 1, hover: 'zoom', distance: 10 },
-    prefer: { hero: ['full-bleed', 'centered', 'split'], features: ['columns', 'list'], quote: ['large'], stats: ['row'], cta: ['centered', 'statement'], text: ['narrow', 'lead'], gallery: ['strip', 'mosaic'], split: ['image-left', 'image-right'], faq: ['accordion'], list: ['menu', 'simple'] },
+    prefer: { hero: ['full-bleed', 'editorial', 'split'], features: ['columns', 'list'], quote: ['large'], stats: ['row'], cta: ['statement', 'band'], text: ['narrow', 'lead'], gallery: ['strip', 'mosaic'], split: ['image-left', 'image-right'], faq: ['accordion'], list: ['menu', 'simple'] },
     tones: { alternate: false, quote: 'alt', cta: 'alt' },
-    concept: (c) => `Quiet luxury for ${c.audience}: light serif type, wide margins and very little colour, so ${c.what} feels unhurried and certain of its worth.`,
+    concept: (c) => `Quiet luxury for ${c.audience}: a cool stone ground, light serif type set off-centre and very little colour, so ${c.what} feels unhurried and certain of its worth.`,
     voice: 'Few words, carefully chosen. Never a superlative, never urgency; describe the experience, not the offer.',
-    composition: 'Centred and slow: one idea per screen, generous space above and below, photographs framed with a margin.',
+    composition: 'Slow and off-centre: one idea per screen, set to one side of a wide margin, photographs framed with a margin.',
     imagery: 'Warm, natural-light photographs of rooms, materials and details, given room to breathe.',
-    avoid: ['bold sans headlines', 'bright colour', 'badges and counters', 'busy grids'],
+    avoid: ['everything centred', 'cream and gold', 'bold sans headlines', 'bright colour', 'badges and counters', 'busy grids'],
   },
   {
     id: 'poster',
@@ -230,32 +232,32 @@ export const LANGUAGES: readonly Language[] = [
   },
   {
     id: 'craft',
-    name: 'Hand and table',
-    blurb: 'a café, bakery or maker: warm soft serif, cream ground, arched photographs, pill buttons, menus set as ruled lists',
+    name: 'Market label',
+    blurb: 'a café, bakery or maker: a printed market label, with a bright ground, one strong local colour in bands, sturdy type set large, square-cut photographs and menus set as ruled lists',
     keywords: ['warm', 'handmade', 'artisan', 'artisanal', 'local', 'cosy', 'cozy', 'coffee', 'cafe', 'café', 'bakery', 'bread', 'food', 'restaurant', 'kitchen', 'community', 'honest', 'craft', 'crafted', 'maker', 'small', 'family', 'friendly', 'neighbourhood', 'neighborhood', 'welcoming', 'homely', 'farm', 'market', 'florist', 'ceramics', 'pottery', 'brewery', 'shop'],
-    traits: ['serif', 'light', 'rounded', 'warm', 'playful'],
-    display: ['Fraunces', 'Young Serif', 'DM Serif Display', 'Lora'],
-    body: ['Karla', 'DM Sans', 'Work Sans', 'Hanken Grotesk'],
+    traits: ['sans', 'bold', 'warm', 'playful'],
+    display: ['Bricolage Grotesque', 'Familjen Grotesk', 'Young Serif', 'Archivo'],
+    body: ['Karla', 'Work Sans', 'DM Sans', 'Hanken Grotesk'],
     mono: ['Space Mono'],
-    palette: 'tinted',
+    palette: 'white',
     scale: ['comfortable'],
-    radius: ['round'],
-    treatment: ['warm', 'natural'],
+    radius: ['soft', 'none'],
+    treatment: ['natural', 'warm'],
     style: 'warm',
     look: {
       ratio: [1.333, 1.414], weight: [600, 500], case: ['sentence'], tracking: ['normal', 'tight'], emphasis: ['italic'], label: ['sentence'],
-      grid: ['asymmetric'], align: ['left'], width: ['standard'], rhythm: ['even'], containers: ['framed', 'cards'], rules: ['hairline'], buttons: ['pill'],
-      frame: ['arch', 'circle'], motifs: [['shapes', 'captions'], ['shapes']], shapes: [['arch', 'circle'], ['circle', 'blob']],
+      grid: ['asymmetric'], align: ['left'], width: ['standard'], rhythm: ['even'], containers: ['bands', 'framed'], rules: ['heavy', 'hairline'], buttons: ['solid', 'underline'],
+      frame: ['plain', 'arch'], motifs: [['captions'], ['captions', 'big-numerals']], shapes: [[]],
     },
     accent2: { turn: 35, s: 0.5, l: 0.72 },
     motion: ['calm', 'measured'], moTweak: { hover: 'lift', entrance: 'rise', parallax: 1 },
     prefer: { hero: ['split', 'editorial', 'centered'], features: ['list', 'grid'], quote: ['with-portrait', 'large'], stats: ['row'], cta: ['image', 'band'], text: ['narrow', 'lead'], gallery: ['mosaic', 'grid'], list: ['menu', 'schedule'], split: ['image-left', 'image-right'], faq: ['accordion'] },
     tones: { alternate: true, cta: 'accent', quote: 'alt' },
-    concept: (c) => `A warm, hand-set page for ${c.audience}: a soft serif, a cream ground and photographs in arched frames, so ${c.what} feels like a place you already know.`,
+    concept: (c) => `A market label for ${c.audience}: a bright ground, one strong local colour in bands and sturdy type set large, so ${c.what} reads like the sign over the counter.`,
     voice: 'Warm and plain, like the person behind the counter: specific about what is made, how and when.',
-    composition: 'An asymmetric, relaxed layout; arches and circles echo the photographs; the menu or list set out like a printed card.',
-    imagery: 'Close, warm natural-light photographs of hands, materials and the place itself.',
-    avoid: ['cold blue tech colours', 'hard square boxes', 'stock smiling teams', 'all-caps shouting'],
+    composition: 'An asymmetric, relaxed layout; colour comes in bands, like a printed label; the menu or list set out like a card on the counter.',
+    imagery: 'Close natural-light photographs of hands, materials and the place itself, cut square.',
+    avoid: ['cream with a soft serif and terracotta', 'pill buttons everywhere', 'cold blue tech colours', 'stock smiling teams'],
   },
   {
     id: 'geometric',
@@ -347,29 +349,29 @@ export const LANGUAGES: readonly Language[] = [
   {
     id: 'organic',
     name: 'Soft ground',
-    blurb: 'wellness and care: a light humane serif, soft tinted grounds, round forms and circle-framed photographs, unhurried spacing',
+    blurb: 'wellness and care: a light humane serif, a soft tinted ground in a cool natural hue, circle-framed photographs, unhurried spacing set to one side',
     keywords: ['calm', 'natural', 'nature', 'wellness', 'wellbeing', 'health', 'organic', 'gentle', 'care', 'caring', 'sustainable', 'sustainability', 'therapy', 'therapist', 'yoga', 'mindful', 'mindfulness', 'soft', 'healing', 'meditation', 'skincare', 'plants', 'garden', 'eco', 'green', 'nurturing', 'kind', 'safe', 'family', 'children', 'baby', 'pregnancy', 'mental'],
     traits: ['serif', 'light', 'rounded', 'soft', 'quiet'],
-    display: ['Fraunces', 'Lora', 'Newsreader', 'Cormorant Garamond'],
+    display: ['Lora', 'Newsreader', 'Cormorant Garamond', 'Fraunces'],
     body: ['Manrope', 'DM Sans', 'Hanken Grotesk', 'Karla'],
     mono: ['IBM Plex Mono'],
     palette: 'tinted',
     scale: ['spacious'],
-    radius: ['round'],
+    radius: ['soft'],
     treatment: ['warm', 'natural'],
     style: 'warm',
     look: {
       ratio: [1.25, 1.333], weight: [400, 300], case: ['sentence'], tracking: ['normal'], emphasis: ['italic'], label: ['sentence'],
-      grid: ['centered', 'asymmetric'], align: ['center', 'left'], width: ['standard'], rhythm: ['even'], containers: ['cards'], rules: ['none'], buttons: ['pill'],
+      grid: ['asymmetric', 'editorial'], align: ['left'], width: ['standard'], rhythm: ['even'], containers: ['open', 'framed'], rules: ['none'], buttons: ['solid', 'outline'],
       frame: ['circle', 'arch'], motifs: [['shapes'], ['shapes', 'captions']], shapes: [['blob', 'circle'], ['circle', 'arch']],
     },
     accent2: { turn: 40, s: 0.35, l: 0.8 },
     motion: ['calm'], moTweak: { entrance: 'rise', hover: 'lift', parallax: 1, ease: 'gentle' },
-    prefer: { hero: ['split', 'centered'], features: ['grid', 'list'], quote: ['with-portrait', 'large'], stats: ['row'], cta: ['band', 'centered'], text: ['narrow'], faq: ['accordion'], list: ['simple', 'schedule'], gallery: ['grid'], split: ['image-left', 'image-right'] },
+    prefer: { hero: ['split', 'editorial'], features: ['list', 'columns'], quote: ['with-portrait', 'large'], stats: ['row'], cta: ['band', 'statement'], text: ['narrow'], faq: ['accordion'], list: ['simple', 'schedule'], gallery: ['grid'], split: ['image-left', 'image-right'] },
     tones: { alternate: true, cta: 'accent' },
-    concept: (c) => `Soft ground for ${c.audience}: a light humane serif, tinted grounds and round forms, so ${c.what} feels safe to take a first step on.`,
+    concept: (c) => `Soft ground for ${c.audience}: a light humane serif on a cool tinted ground, set to one side with room to breathe, so ${c.what} feels safe to take a first step on.`,
     voice: 'Gentle and reassuring without being vague: say what happens, who you will meet, what it costs.',
-    composition: 'Unhurried, with soft tinted bands and rounded cards; circles and organic shapes frame people and places.',
+    composition: 'Unhurried and off-centre, with soft tinted bands; circles frame people and places, and nothing else is boxed.',
     imagery: 'Natural light, real people and places, warm and unposed; framed in circles and arches.',
     avoid: ['clinical blue', 'hard black rules', 'aggressive urgency', 'tiny dense type'],
   },
@@ -405,31 +407,31 @@ export const LANGUAGES: readonly Language[] = [
   {
     id: 'night',
     name: 'After dark',
-    blurb: 'cinema and nightlife: a dark ground, light type with wide spacing, a single bright accent, high-contrast photographs, a slow marquee',
+    blurb: 'cinema and nightlife: a deep coloured ground (ink blue, oxblood, bottle green), light type with wide spacing, two inks drawn from the same night, duotone photographs',
     keywords: ['dark', 'night', 'nightlife', 'evening', 'cinematic', 'cinema', 'film', 'moody', 'bar', 'cocktail', 'cocktails', 'club', 'jazz', 'theatre', 'theater', 'gaming', 'game', 'futuristic', 'dramatic', 'mysterious', 'sleek', 'premium', 'audio', 'headphones', 'car', 'cars', 'watch', 'whisky', 'whiskey', 'spirits', 'luxury', 'late'],
     traits: ['dark', 'sans', 'dramatic', 'loud'],
-    display: ['Bodoni Moda', 'Syne', 'Space Grotesk', 'Unbounded', 'Gloock'],
-    body: ['Space Grotesk', 'Inter', 'Manrope', 'Geist'],
-    mono: ['Space Mono', 'Geist Mono'],
-    palette: 'dark',
+    display: ['Gloock', 'Bodoni Moda', 'Syne', 'Unbounded'],
+    body: ['Manrope', 'Geist', 'Inter'],
+    mono: ['Geist Mono', 'Space Mono'],
+    palette: 'deep',
     scale: ['spacious'],
     radius: ['none'],
-    treatment: ['contrast', 'duotone'],
+    treatment: ['duotone', 'contrast'],
     style: 'bold',
     look: {
       ratio: [1.414, 1.5], weight: [400, 700], case: ['upper', 'sentence'], tracking: ['wide', 'tight'], emphasis: ['accent', 'italic'], label: ['mono'],
       grid: ['asymmetric', 'poster'], align: ['left'], width: ['wide'], rhythm: ['dramatic'], containers: ['open'], rules: ['hairline'], buttons: ['outline', 'pill'],
-      frame: ['plain'], motifs: [['marquee', 'captions'], ['captions', 'numbering']], shapes: [[]],
+      frame: ['plain'], motifs: [['captions'], ['captions', 'marquee']], shapes: [[]],
     },
-    accent2: null,
+    accent2: { turn: -40, s: 0.5, l: 0.66 },
     motion: ['lively', 'calm'], moTweak: { headline: 'mask', parallax: 2, hover: 'zoom', sections: 'wipe' },
     prefer: { hero: ['full-bleed', 'poster', 'statement'], features: ['index', 'numbered'], quote: ['pull'], stats: ['giant'], cta: ['statement', 'image'], text: ['lead'], gallery: ['strip', 'mosaic'], list: ['menu', 'schedule'], faq: ['accordion'] },
     tones: { alternate: false, cta: 'accent' },
-    concept: (c) => `After dark for ${c.audience}: a black ground, light type and one bright accent, so ${c.what} feels like the lights going down.`,
+    concept: (c) => `After dark for ${c.audience}: a deep coloured ground, light type and two inks from the same night, so ${c.what} feels like the lights going down.`,
     voice: 'Low-voiced and confident: a few evocative words, then the facts — when, where, how to get in.',
-    composition: 'Wide asymmetric spaces on a dark ground; huge light headlines; images bleed to the edges.',
-    imagery: 'Low-light, high-contrast photographs with deep blacks; colour only from the light sources.',
-    avoid: ['white backgrounds', 'pastels', 'friendly rounded shapes', 'cluttered grids'],
+    composition: 'Wide asymmetric spaces on a deep coloured ground; huge light headlines; images bleed to the edges in two tones.',
+    imagery: 'Low-light photographs printed in the ground’s own two tones; colour only from the light sources.',
+    avoid: ['black with a single neon accent', 'white backgrounds', 'pastels', 'friendly rounded shapes', 'cluttered grids'],
   },
   {
     id: 'retro-print',
@@ -551,6 +553,11 @@ export interface ArtDirection {
    * drawn per project within the language (lib/ux-v0/layout.ts shapeFor).
    */
   shapes?: Record<string, SectionShape>;
+  /**
+   * The direction's plan, critiqued before it is shown (lib/ux-v0/plan.ts): its colours named, its type roles,
+   * its layout idea, its ONE signature move and one detail only its subject has, with what the critique changed.
+   */
+  designPlan?: DesignPlan;
 }
 
 /**
@@ -577,17 +584,20 @@ const SITE_PLANS: readonly Plan[] = [
   { id: 'poster', say: 'A poster: one huge headline, a giant figure, a statement to act on.', compose: { hero: 'poster', stats: 'giant', cta: 'statement', features: 'list', form: 'split' } },
   { id: 'side-by-side', say: 'Side by side: the opening split between words and a picture, the points in a grid.', compose: { hero: 'split', features: 'grid', gallery: 'grid', form: 'split' }, needsImage: true },
   { id: 'centred', say: 'Centred and unhurried: a centred opening, the points as a quiet list, generous space.', compose: { hero: 'centered', features: 'list', cta: 'centered', form: 'split' } },
+  { id: 'composed', say: 'Composed from pieces: an opening of its own proportions (a compose section, words and picture or a figure set unevenly), then the points as a ruled list.', compose: { features: 'list', form: 'split' }, lead: 'compose' },
 ];
 const PORTFOLIO_PLANS: readonly Plan[] = [
   { id: 'work-first', say: 'The work leads: a mosaic of pieces opens the page; the words come after.', compose: { gallery: 'mosaic', hero: 'statement', features: 'grid' }, lead: 'gallery' },
   { id: 'work-index', say: 'An index of work: an editorial opening, each project an entry in a typographic index.', compose: { hero: 'editorial', features: 'index', gallery: 'strip' } },
   { id: 'one-piece', say: 'One piece at a time: a full-bleed opening, then the work as a strip to move through.', compose: { hero: 'full-bleed', gallery: 'strip', features: 'list' }, needsImage: true },
   { id: 'poster', say: 'A poster: the name set huge, the work in a grid beneath.', compose: { hero: 'poster', gallery: 'grid', features: 'numbered' } },
+  { id: 'composed', say: 'Composed from pieces: an opening of its own proportions (a compose section, the work set against the words), then the rest of the work.', compose: { gallery: 'grid', features: 'list' }, lead: 'compose' },
 ];
 const EDITORIAL_PLANS: readonly Plan[] = [
   { id: 'long-read', say: 'A long read: an editorial opening, then the text in one narrow column.', compose: { hero: 'editorial', text: 'narrow', quote: 'pull' } },
   { id: 'magazine', say: 'A magazine spread: a poster headline, the text in two columns, a large pull quote.', compose: { hero: 'poster', text: 'two-column', quote: 'large' } },
   { id: 'text-first', say: 'The text leads: the first paragraph opens the page, set large; the rest follows.', compose: { text: 'lead', hero: 'statement', quote: 'pull' }, lead: 'text' },
+  { id: 'composed', say: 'Composed from pieces: an opening of its own proportions (a compose section, the headline set against a picture or a caption), then the text.', compose: { text: 'narrow', quote: 'pull' }, lead: 'compose' },
 ];
 const SCREEN_PLANS: readonly Plan[] = [
   { id: 'figures-first', say: 'Figures first: the key measures in a row, then the trend, then the detail.', compose: { chart: 'line', 'app-nav': 'sidebar' }, order: ['stat-cards', 'chart', 'table'] },
@@ -623,18 +633,18 @@ export function plansFor(kind: string): readonly Plan[] {
 
 /** Each language's plans, most fitting first. */
 const PLAN_AFFINITY: Record<string, readonly string[]> = {
-  broadsheet: ['index', 'long-read', 'work-index', 'detail-first', 'statement', 'one-column'],
-  swiss: ['index', 'figures-first', 'work-index', 'side-by-side', 'one-column', 'magazine'],
-  'quiet-luxury': ['centred', 'image-led', 'one-piece', 'long-read', 'split', 'trend-first'],
-  poster: ['poster', 'statement', 'magazine', 'trend-first', 'work-first', 'split'],
-  craft: ['side-by-side', 'image-led', 'work-first', 'text-first', 'split', 'figures-first'],
-  geometric: ['poster', 'side-by-side', 'work-first', 'figures-first', 'magazine', 'split'],
-  utility: ['index', 'figures-first', 'detail-first', 'one-column', 'statement', 'work-index'],
-  gallery: ['image-led', 'work-first', 'one-piece', 'long-read', 'centred', 'trend-first'],
-  organic: ['image-led', 'centred', 'one-piece', 'text-first', 'split', 'trend-first'],
-  civic: ['statement', 'index', 'one-column', 'figures-first', 'long-read', 'work-index'],
-  night: ['image-led', 'poster', 'one-piece', 'trend-first', 'magazine', 'split'],
-  'retro-print': ['poster', 'index', 'magazine', 'detail-first', 'work-index', 'one-column'],
+  broadsheet: ['index', 'long-read', 'composed', 'work-index', 'detail-first', 'statement', 'one-column'],
+  swiss: ['index', 'composed', 'figures-first', 'work-index', 'side-by-side', 'one-column', 'magazine'],
+  'quiet-luxury': ['image-led', 'one-piece', 'composed', 'long-read', 'split', 'trend-first', 'centred'],
+  poster: ['poster', 'statement', 'composed', 'magazine', 'trend-first', 'work-first', 'split'],
+  craft: ['side-by-side', 'composed', 'image-led', 'work-first', 'text-first', 'split', 'figures-first'],
+  geometric: ['poster', 'composed', 'side-by-side', 'work-first', 'figures-first', 'magazine', 'split'],
+  utility: ['index', 'figures-first', 'detail-first', 'one-column', 'composed', 'statement', 'work-index'],
+  gallery: ['image-led', 'work-first', 'composed', 'one-piece', 'long-read', 'trend-first', 'centred'],
+  organic: ['image-led', 'one-piece', 'text-first', 'composed', 'split', 'trend-first', 'centred'],
+  civic: ['statement', 'index', 'one-column', 'composed', 'figures-first', 'long-read', 'work-index'],
+  night: ['image-led', 'poster', 'composed', 'one-piece', 'trend-first', 'magazine', 'split'],
+  'retro-print': ['poster', 'index', 'composed', 'magazine', 'detail-first', 'work-index', 'one-column'],
 };
 
 /** How each language would compose a booking, in order of preference. */
@@ -999,24 +1009,46 @@ export function paletteFor(strategy: PaletteStrategy, base: DesignTokens['colors
       text = hslHex(bh, Math.min(0.2, bs), 0.94);
       accent = hslOf(base.accent)[2] < 0.55 ? hslHex(ah, Math.max(as, 0.65), 0.62) : base.accent;
       break;
-    case 'tinted':
-      bg = hslHex(hue, Math.min(0.42, Math.max(0.22, as * 0.5)), 0.93);
-      text = hslHex(hue, 0.32, 0.12);
+    case 'tinted': {
+      // tinted by the accent's hue, unless the accent is a warm orange or terracotta: a peach ground behind it is
+      // the generated look, so the tint turns to a cool natural hue across the wheel (a sage, a eucalyptus)
+      const th = as > 0.12 && ah >= 5 && ah <= 45 ? ah + 120 : hue;
+      bg = hslHex(th, Math.min(0.42, Math.max(0.22, as * 0.5)), 0.93);
+      text = hslHex(th, 0.32, 0.12);
       break;
+    }
     case 'ink':
       bg = hslHex(46, 0.38, 0.9);
       text = hslHex(hue, 0.4, 0.13);
       accent = as > 0.12 ? hslHex(ah, Math.max(as, 0.7), 0.47) : '#d2452d';
       break;
+    case 'stone': {
+      // a light grey with a slight bias: toward the accent when it is cool, toward a cool stone when it is warm
+      // (a warm bias behind a warm accent is cream again)
+      const sh = as > 0.12 && (ah < 5 || ah > 65) ? ah : 205;
+      bg = hslHex(sh, 0.09, 0.935);
+      text = hslHex(sh, 0.2, 0.11);
+      break;
+    }
+    case 'deep': {
+      // a deep coloured ground of the accent's own hue, and a lighter ink beside it on the wheel: never black with a pop
+      const gh = as > 0.12 ? ah : 222;
+      bg = hslHex(gh, 0.42, 0.14);
+      text = hslHex(gh, 0.22, 0.93);
+      accent = hslHex(gh + 28, 0.6, 0.7);
+      break;
+    }
   }
   // a button's label must read on the accent: the accent moves (keeping its hue) until it does
   const label = onAccent(accent);
   accent = ensureContrast(accent, label, 4.6);
   const dark = isDark(bg);
-  const surface = dark ? mix(bg, '#ffffff', 0.07) : mix(bg, '#ffffff', strategy === 'white' ? 0.0 : 0.55);
-  const muted = ensureContrast(mix(text, bg, 0.38), bg, 4.6);
+  const surface0 = dark ? mix(bg, '#ffffff', 0.07) : mix(bg, '#ffffff', strategy === 'white' ? 0.0 : 0.55);
+  const surface = surface0 === bg ? (dark ? mix(bg, '#ffffff', 0.07) : mix(bg, text, 0.035)) : surface0;
+  // secondary text reads on the page and on the panels set on it (a lighter surface on a dark or deep ground)
+  const muted = ensureContrast(ensureContrast(mix(text, bg, 0.38), bg, 4.6), surface, 4.6);
   const line = mix(bg, text, dark ? 0.2 : 0.16);
-  return { background: bg, surface: surface === bg ? (dark ? mix(bg, '#ffffff', 0.07) : mix(bg, text, 0.035)) : surface, text, muted, accent, accentText: label, line };
+  return { background: bg, surface, text, muted, accent, accentText: label, line };
 }
 
 /** A second ink in a set relation to the first: turned round the wheel, at the language's own strength. */
@@ -1125,7 +1157,7 @@ export function buildDirection(lang: Language, brief: DesignBrief, opt: BuildOpt
   // colour: the brief's own palette for the faithful reading; the language's way with those hues otherwise
   let strategy: PaletteStrategy = lang.palette;
   if (d.dark === true) strategy = 'dark';
-  if (d.dark === false && strategy === 'dark') strategy = 'paper';
+  if (d.dark === false && (strategy === 'dark' || strategy === 'deep')) strategy = 'paper';
   const base = { ...briefColors(brief), ...(opt.baseColors ?? {}) };
   if (d.accent) base.accent = d.accent;
   // the faithful reading keeps the brief's palette and type, unless the designer left them to SocriaUX
@@ -1211,13 +1243,20 @@ export function buildDirection(lang: Language, brief: DesignBrief, opt: BuildOpt
     },
     notes
   );
+  // THE LOOKS GENERATED PAGES SHARE (lib/ux-v0/tells.ts), kept out where nobody asked for them: the designer's own
+  // palette and type pair are theirs; anything else that shows one is moved off it, and it is said
+  // (colours sampled from the references the designer kept for their colour are the designer's too)
+  const own = (keepColours && keepType && d.dark === undefined && !d.accent) || !!opt.baseColors;
+  const asked = askedTells(`${briefText(brief)} ${opt.notes ?? ''}`, { align: brief.layout?.align, corners: brief.spec?.corners ?? d.corners, ownColours: own });
+  const off = offTells(lang, tokens, look, asked, { keepColours: (keepColours && d.dark === undefined) || !!opt.baseColors, keepType, base });
   const c = ctxOf(brief);
   const fit = fitScores(brief, opt.notes ?? '').find((x) => x.id === lang.id);
   const rationale = [
     fit && fit.matched.length ? `${opt.notes ? 'Your brief and notes speak' : 'The brief speaks'} of ${fit.matched.slice(0, 3).join(', ')}; ${lang.name.toLowerCase()} is a language built for that.` : `A deliberate contrast to the obvious reading of the brief: ${lang.blurb.split(':')[0]}.`,
-    f && d.dark === undefined && !d.accent ? 'Keeps the palette and type pair you approved in the brief exactly as they are.' : f ? `Keeps your brief’s type; its colours move ${d.dark ? 'onto a dark ground' : 'to the accent you named'}, as your notes ask.` : `Takes the brief’s accent into ${strategy === 'dark' ? 'a dark ground' : strategy === 'tinted' ? 'a tinted ground of its own hue' : strategy === 'ink' ? 'two inks on newsprint' : strategy === 'white' ? 'a white page with the colour turned up' : 'a paper ground with deep ink'}, set in ${display} and ${body}.`,
+    f && d.dark === undefined && !d.accent ? 'Keeps the palette and type pair you approved in the brief exactly as they are.' : f ? `Keeps your brief’s type; its colours move ${d.dark ? 'onto a dark ground' : 'to the accent you named'}, as your notes ask.` : `Takes the brief’s accent into ${strategy === 'dark' ? 'a dark ground' : strategy === 'deep' ? 'a deep ground of its own hue' : strategy === 'stone' ? 'a cool stone ground' : strategy === 'tinted' ? 'a tinted ground' : strategy === 'ink' ? 'two inks on newsprint' : strategy === 'white' ? 'a white page with the colour turned up' : 'a paper ground with deep ink'}, set in ${display} and ${body}.`,
     ...(d.said.length ? [`From your notes: ${d.said.join(', ')}.`] : []),
     ...(opt.colorNote ? [opt.colorNote] : []),
+    ...(off.moved.length ? [`Kept off ${off.moved.join(' and ')}: a look generated pages share.`] : []),
   ];
   return {
     id: `dir_${lang.id}_${(opt.seed >>> 0).toString(36)}`,
@@ -1229,11 +1268,46 @@ export function buildDirection(lang: Language, brief: DesignBrief, opt: BuildOpt
     composition: lang.composition,
     imagery: d.noImages ? 'Type does the work; photographs only where a real place or person must be shown.' : lang.imagery,
     avoid: [...lang.avoid],
-    tokens,
-    look,
+    tokens: off.tokens,
+    look: off.look,
     locks: [],
     source: 'engine',
   };
+}
+
+/**
+ * A direction moved off the looks generated pages share that nobody asked for: a cream ground under a serif and
+ * a terracotta accent goes to a cool stone (or, the colours being the designer's, the headline face to the
+ * language's sans); black with one neon pop goes to a deep ground of its own hue (or gets a second ink); hairline
+ * boxes and reflexive numbering go; everything centred goes to one side; round corners everywhere soften.
+ */
+function offTells(lang: Language, tokens: DesignTokens, look: Look, asked: Set<Tell>, o: { keepColours: boolean; keepType: boolean; base: DesignTokens['colors'] }): { tokens: DesignTokens; look: Look; moved: string[] } {
+  let t = tokens;
+  let l = look;
+  const moved: string[] = [];
+  for (let round = 0; round < 3; round++) {
+    const hits = tellsOf({ colors: t.colors, fonts: t.fonts, radius: t.radius, look: l }).filter((h) => !asked.has(h.tell));
+    if (!hits.length) break;
+    let changed = false;
+    for (const h of hits) {
+      const before = JSON.stringify([t, l]);
+      if (h.tell === 'cream-serif-terracotta') {
+        if (!o.keepColours) t = { ...t, colors: paletteFor('stone', o.base) };
+        else if (!o.keepType) {
+          const sans = [...lang.display, ...lang.body, 'Familjen Grotesk'].find((f) => knownFont(f)?.kind === 'sans' && f !== t.fonts.body);
+          if (sans) t = { ...t, fonts: { ...t.fonts, display: sans } };
+        }
+      } else if (h.tell === 'black-acid-pop') {
+        if (!o.keepColours) t = { ...t, colors: paletteFor('deep', o.base) };
+        else l = { ...l, accent2: secondInk(t.colors.accent, { turn: -40, s: 0.5, l: 0.66 }, t.colors.background) };
+      } else if (h.tell === 'hairline-columns') l = { ...l, containers: 'open', rules: 'heavy', motifs: l.motifs.filter((m) => m !== 'numbering') };
+      else if (h.tell === 'all-centred') l = { ...l, align: 'left', grid: 'asymmetric' };
+      else if (h.tell === 'rounded-everything') t = { ...t, radius: 'soft' };
+      if (JSON.stringify([t, l]) !== before) (changed = true), moved.push(h.label);
+    }
+    if (!changed) break;
+  }
+  return { tokens: moved.length ? normalizeTokens(t, []) : t, look: l, moved: [...new Set(moved)] };
 }
 
 // ── difference ───────────────────────────────────────────────────────
@@ -1257,6 +1331,7 @@ export function directionDistance(a: ArtDirection, b: ArtDirection): number {
     [3, ne(JSON.stringify(a.compose ?? {}), JSON.stringify(b.compose ?? {}))],
     [2, ne(JSON.stringify(a.order ?? []), JSON.stringify(b.order ?? [])) || ne(a.lead ?? '', b.lead ?? '')],
     [1, ne(JSON.stringify(a.shapes ?? {}), JSON.stringify(b.shapes ?? {}))],
+    [1, ne(a.designPlan?.signature ?? '', b.designPlan?.signature ?? '')],
     [1.5, ne(A.align, B.align)],
     [2, ne(A.containers, B.containers)],
     [1.5, ne(A.buttons, B.buttons)],
@@ -1434,8 +1509,11 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
   while (chosen.length < count) {
     let best: { id: string; v: number } | null = null;
     const wantFit = chosen.length === 1 ? 0.45 : 0.35;
+    // asking again means new languages: one already shown comes back only when no new one is left to offer
+    const freshLeft = adjusted.some((y) => !usedIds.has(y.id) && !seen.has(y.id) && y.adj >= -4);
     for (const x of adjusted) {
       if (usedIds.has(x.id)) continue;
+      if (freshLeft && seen.has(x.id)) continue;
       const fitN = Math.max(0, x.adj) / maxAdj;
       if (x.adj < -4) continue; // the designer asked to avoid it
       const trial = buildDirection(languageOf(x.id)!, brief, { seed: seed + chosen.length * 7919, faithful: false, directives, usedFonts });
@@ -1455,7 +1533,37 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
   });
   // the task's own components composed differently in each direction (a booking: calendar, list, split…)
   const intent = intentOf(brief);
-  return composeDirections(finished, requiredComponents(intent), (brief.references ?? []).length > 0, intent.kind, { decisions: brief.layout, seed, density: brief.spec?.density, vary: !!ask.salt });
+  const composed = composeDirections(finished, requiredComponents(intent), (brief.references ?? []).length > 0, intent.kind, { decisions: brief.layout, seed, density: brief.spec?.density, vary: !!ask.salt });
+  // each direction's plan, critiqued and revised before anyone sees it (lib/ux-v0/plan.ts)
+  return composed.map((d, i) => withPlan(d, brief, notes, i === 0 && round === 0 && !ask.base, seed + i * 104729));
+}
+
+/** What a direction's plan is judged against: the work, its subject, the designer's words and decisions. */
+export function planContext(brief: DesignBrief, notes = '', faithful = false): PlanContext {
+  const intent = intentOf(brief);
+  return {
+    kind: intent.kind,
+    screen: intent.screen,
+    hasImage: (brief.references ?? []).length > 0,
+    subject: intent.subject,
+    words: `${briefText(brief)} ${notes}`,
+    decisions: brief.layout,
+    // motion the designer set, or ruled out ("no animation"), is theirs
+    motionDecided: !!brief.spec?.motion || /\b(no|without|never)\s+(animation|animations|motion|movement)\b|\bstatic\b/i.test(`${(brief.rules ?? []).join(' ')} ${notes}`),
+    ownColours: (faithful && brief.decisions?.colour !== 'delegated') || brief.decisions?.colour === 'locked' || !!brief.system,
+    align: brief.layout?.align,
+    corners: brief.spec?.corners,
+  };
+}
+
+/** A direction with its plan: the signature chosen per project, the critique's revisions made. */
+export function withPlan(d: ArtDirection, brief: DesignBrief, notes: string, faithful: boolean, seed: number, given?: { detail?: string; signature?: Signature }): ArtDirection {
+  const lang = languageOf(d.language);
+  const body2 = lang?.body.find((f) => f !== d.tokens.fonts.body && f !== d.tokens.fonts.display);
+  const typeLocked = d.locks.includes('type') || (faithful && brief.decisions?.typography !== 'delegated');
+  const planned = plannedDirection(d, planContext(brief, notes, faithful), seeded(hashText(`${seed}|plan|${d.language}`)), typeLocked ? undefined : body2, given ?? (d.designPlan ? { detail: d.designPlan.detail.terms.length ? d.designPlan.detail.text : undefined, signature: d.designPlan.signature } : undefined));
+  // what the designer locked stays exactly as it was, whatever the critique would have changed
+  return d.locks.length ? { ...applyLocks(planned, d), designPlan: planned.designPlan } : planned;
 }
 
 /**
@@ -1505,6 +1613,7 @@ export function normalizeDirection(v: unknown): ArtDirection | null {
     source: r.source === 'model' || r.source === 'person' ? r.source : 'engine',
     ...composeOf(r.compose, r.plan, r.order, r.lead),
     ...shapesOf(r.shapes),
+    ...((plan) => (plan ? { designPlan: plan } : {}))(normalizeDesignPlan(r.designPlan)),
   };
 }
 
@@ -1565,9 +1674,11 @@ You are given three candidates the engine chose for fit and for difference. For 
 - imagery: one sentence — what pictures and how they are treated, or why there are none.
 - avoid: 2–4 specific things this direction refuses (generic AI-design habits included).
 - fonts: optionally {"display", "body"} from this list only, to serve the concept better; omit to keep the candidate's.
+- signature: its ONE bold move, the only loud thing on the page (everything else stays quiet), one of: ${SIGNATURES.join(', ')}; omit to keep the candidate's.
+- detail: one detail only this subject has, shown as content: its real units, conventions or terms of art (a yoga class's level and room temperature in °C; a bakery's oven times; a lab's °C, % RH and hPa), in under 20 words. Never a generic claim.
 
 Rules: honour the designer's own notes and what they want to avoid above everything else. Keep the three directions clearly different from one another. You may change a candidate's "language" to another catalogue id only when the designer's notes ask for it, and the three must stay different languages. Do not touch groups the designer locked. No hype words, no emoji.
-Respond with ONE JSON object: {"directions": [{"candidate": 1, "language": "...", "name": "...", "concept": "...", "rationale": ["..."], "voice": "...", "composition": "...", "imagery": "...", "avoid": ["..."], "fonts": {"display": "...", "body": "..."}}, ...]}`;
+Respond with ONE JSON object: {"directions": [{"candidate": 1, "language": "...", "name": "...", "concept": "...", "rationale": ["..."], "voice": "...", "composition": "...", "imagery": "...", "avoid": ["..."], "fonts": {"display": "...", "body": "..."}, "signature": "...", "detail": "..."}, ...]}`;
 }
 
 export function directUser(ask: DirectionAsk, options: readonly ArtDirection[]): string {
@@ -1578,7 +1689,7 @@ export function directUser(ask: DirectionAsk, options: readonly ArtDirection[]):
     ask.avoid ? `THEY DO NOT WANT: “${ask.avoid}”` : '',
     ask.base?.locks.length ? `LOCKED BY THE DESIGNER (keep as they are): ${ask.base.locks.map((g) => LOCK_LABEL[g]).join(', ')}.` : '',
     `FONTS YOU MAY NAME: ${FONTS.map((f) => f.name).join(', ')}.`,
-    `THE CANDIDATES:\n${options.map((d, i) => `${i + 1}. ${d.language} — ${languageOf(d.language)?.blurb}; fonts ${d.tokens.fonts.display} / ${d.tokens.fonts.body}; ground ${d.tokens.colors.background}, accent ${d.tokens.colors.accent}.`).join('\n')}`,
+    `THE CANDIDATES:\n${options.map((d, i) => `${i + 1}. ${d.language} — ${languageOf(d.language)?.blurb}; fonts ${d.tokens.fonts.display} / ${d.tokens.fonts.body}; ground ${d.tokens.colors.background}, accent ${d.tokens.colors.accent}${d.designPlan ? `; its one bold move: ${d.designPlan.signatureSays}; its subject detail so far: ${d.designPlan.detail.terms.length ? d.designPlan.detail.text : 'none yet (write one)'}` : ''}.`).join('\n')}`,
   ]
     .filter(Boolean)
     .join('\n\n');
@@ -1607,10 +1718,15 @@ export function parseDirections(raw: unknown, ask: DirectionAsk, options: readon
     const fonts = o(m.fonts);
     const display = knownFont(fonts.display);
     const body = knownFont(fonts.body);
-    const tokens = typeLocked
+    let tokens = typeLocked
       ? d.tokens
       : { ...d.tokens, fonts: { display: display ? display.name : d.tokens.fonts.display, body: body && !body.displayOnly ? body.name : d.tokens.fonts.body } };
-    const look = typeLocked ? d.look : { ...d.look, weight: nearestWeight(tokens.fonts.display, d.look.weight) };
+    let look = typeLocked ? d.look : { ...d.look, weight: nearestWeight(tokens.fonts.display, d.look.weight) };
+    // a face the model chose that brings back a look generated pages share (a serif on cream with terracotta) is not
+    // taken: the engine's pair stays
+    const words = `${briefText(ask.brief)} ${ask.notes ?? ''}`;
+    const tellCount = (t: DesignTokens, l: Look) => unaskedTells({ colors: t.colors, fonts: t.fonts, radius: t.radius, look: l }, words, { align: ask.brief.layout?.align, corners: ask.brief.spec?.corners }).length;
+    if (!typeLocked && tellCount(tokens, look) > tellCount(d.tokens, d.look)) (tokens = d.tokens), (look = d.look);
     out[i] = {
       ...d,
       tokens,
@@ -1624,6 +1740,11 @@ export function parseDirections(raw: unknown, ask: DirectionAsk, options: readon
       avoid: strs(m.avoid, 120, 4).length ? strs(m.avoid, 120, 4) : d.avoid,
       source: 'model',
     };
+    // the model knows this subject: its detail (units, conventions, terms) and its choice of signature, when it is
+    // one the design can draw, go into the plan, which is critiqued again
+    const detail = str(m.detail, 160);
+    const signature = (SIGNATURES as readonly string[]).includes(m.signature) ? (m.signature as Signature) : undefined;
+    if (detail || signature) out[i] = withPlan(out[i], ask.brief, ask.notes ?? '', i === 0 && (ask.round ?? 0) === 0 && !ask.base, hash(`${out[i].id}|${detail}`), { ...(detail ? { detail } : out[i].designPlan?.detail.terms.length ? { detail: out[i].designPlan!.detail.text } : {}), ...(signature ? { signature } : {}) });
   });
   return out;
 }
@@ -1650,6 +1771,7 @@ export function directionBrief(dir: ArtDirection, pageType: 'website' | 'app-scr
     prefer ? `Variants that speak this language (best first): ${prefer}.` : '',
     L.motifs.includes('icons') ? '' : 'Icons are not part of this language: leave feature icons out.',
     motionBrief(L.motion),
+    planBrief(dir.designPlan),
   ]
     .filter(Boolean)
     .join('\n');

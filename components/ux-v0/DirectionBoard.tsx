@@ -27,6 +27,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { contrastRatio } from '@/lib/ux/audit';
 import { LOCK_LABEL, languageOf, type ArtDirection, type DirectionState, type LockGroup } from '@/lib/ux-v0/direction';
+import type { DesignPlan } from '@/lib/ux-v0/plan';
 import { FONTS, fontStack, fontStylesheet, nearestWeight } from '@/lib/ux-v0/fonts';
 import { EASE_CURVE, HEADLINE_LABEL, MOTION_LABEL, describeMotion, motionFor, stepMotion } from '@/lib/ux-v0/motion';
 import { takenFrom } from '@/lib/ux-v0/references';
@@ -101,6 +102,58 @@ function Study({ html, width, label, ratio }: { html: string; width: number; lab
     <div className="ad-study" ref={box} style={{ aspectRatio: String(ratio) }}>
       <iframe title={label} sandbox="" srcDoc={html} tabIndex={-1} aria-hidden="true" loading="lazy" style={{ width, height: Math.ceil(width / ratio), transform: `scale(${scale})` }} />
     </div>
+  );
+}
+
+/**
+ * THE PLAN, as a studio states it before drawing (lib/ux-v0/plan.ts): its one bold move, the detail only this
+ * subject has, its colours named and its type, and what the critique changed before the designer saw it (or
+ * could not settle, said plainly).
+ */
+function PlanBand({ plan, n }: { plan: DesignPlan; n: number }) {
+  return (
+    <section className="ad-plan" aria-label={`The plan of direction ${n}`}>
+      <div className="ad-plan-cell">
+        <span className="ad-l">One bold move</span>
+        <p className="ad-plan-big">{plan.signatureSays.charAt(0).toUpperCase() + plan.signatureSays.slice(1)}</p>
+        <p className="ad-plan-note">Everything around it stays quiet.</p>
+      </div>
+      <div className="ad-plan-cell">
+        <span className="ad-l">Only this subject</span>
+        {plan.detail.terms.length ? <p className="ad-plan-big">{plan.detail.text.charAt(0).toUpperCase() + plan.detail.text.slice(1)}</p> : <p className="ad-plan-big is-open">Still to find</p>}
+        <p className="ad-plan-note">Shown as content, in its own terms.</p>
+      </div>
+      <div className="ad-plan-cell">
+        <span className="ad-l">Colours, named</span>
+        <ul className="ad-plan-colours">
+          {plan.colours.map((c) => (
+            <li key={`${c.role}-${c.hex}`}>
+              <span className="ad-plan-chip" style={{ background: c.hex }} aria-hidden="true" />
+              <span>{c.name}</span>
+              <span className="ad-plan-role">{c.role === 'ground' ? 'ground' : c.role === 'ink' ? 'text' : c.role === 'muted' ? 'quiet text' : c.role === 'second' ? 'second ink' : c.role}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="ad-plan-note">{plan.type.note}</p>
+      </div>
+      <div className="ad-plan-cell">
+        <span className="ad-l">Checked before you saw it</span>
+        {plan.revised.length || plan.open.length ? (
+          <ul className="ad-plan-checks">
+            {plan.revised.map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+            {plan.open.map((r) => (
+              <li key={r} className="is-open">
+                {r}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="ad-plan-note">Nothing generic found: one bold move, a detail of its own, no look generated pages share.</p>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -419,6 +472,8 @@ function Spread({ d, n, total, p, onPreview }: { d: ArtDirection; n: number; tot
           <b>Fig. {n}.1</b> Drawn by SocriaUX’s renderer from this direction, at 1280 and 390 px.
         </p>
       </section>
+
+      {d.designPlan && <PlanBand plan={d.designPlan} n={n} />}
 
       <section className="ad-type" aria-label="Typography">
         <div className="ad-block-head">

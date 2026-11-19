@@ -25,6 +25,7 @@ import { LOCK_GROUPS, LOCK_LABEL, lockedChanges, type LockGroup } from '@/lib/ux
 import { MAX_TOKENS, economyRoute, refineTier } from '@/lib/ux-v0/model';
 import { bad, failed, noModel, projectIdOf, readBody, signInFirst } from '@/lib/ux-v0/route-kit';
 import { lockedTouched } from '@/lib/ux-v0/edit';
+import { offSystem } from '@/lib/ux-v0/design-system';
 import { applyPatch, kindDef, normalizeSpec } from '@/lib/ux-v0/spec';
 import { normalizeBrief, normalizeMoodboard, normalizeSelection } from '@/lib/ux-v0/types';
 import { gate, noticeOf, recordUsage } from '@/lib/ux-v0/usage-server';
@@ -73,6 +74,10 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       r.challenge = `This changes the ${what}, which you locked in the art direction. ${r.challenge ? `${r.challenge} ` : ''}Make the change anyway?`.trim();
     }
     // …and neither is a section the designer locked on the canvas
+    // a change that takes the design outside the designer's design system is asked about first, like a lock
+    const ds = normalizeBrief(body.brief)?.system;
+    const outside = ds ? offSystem(r.patch, ds) : [];
+    if (outside.length && !force) r.challenge = `This uses ${outside.join(' and ')}, which ${outside.length > 1 ? 'are' : 'is'} not in your design system (${ds!.name}). ${r.challenge ? `${r.challenge} ` : ''}Make the change anyway?`.trim();
     const lockedSections = lockedTouched(spec, r.patch);
     if (lockedSections.length && !force) {
       const sec = spec.sections.find((s) => s.id === lockedSections[0]);

@@ -47,3 +47,12 @@ export * from '@/lib/ux-v0/structure';
 // the layout: what the designer decided (lead, arrangement, alignment, pictures), the one layout question, and
 // the settings each direction varies within
 export * from '@/lib/ux-v0/layout';
+// the looks generated pages share, detected and kept out unless asked for
+export * from '@/lib/ux-v0/tells';
+// each direction's plan: named colours, type, layout, one signature move, one subject detail; critiqued
+export * from '@/lib/ux-v0/plan';
+// the designer's design system: read from their files or GitHub, built within, checked against
+export * from '@/lib/ux-v0/design-system';
+export { repoTarget, pickFiles, fetchSystemFiles } from '@/lib/ux-v0/design-system-server';
+// layout pieces: a section composed from stacks, grids in proportion, boxes, text, figures, pictures
+export * from '@/lib/ux-v0/compose';

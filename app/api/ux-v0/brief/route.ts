@@ -22,6 +22,8 @@ import { formatFor } from '@/lib/ux-v0/schemas';
 import { designerWords, pageTypeFor, settleIntent } from '@/lib/ux-v0/intent';
 import { briefSystem, briefUser, parseBrief, type BriefInput, briefQueries } from '@/lib/ux-v0/design';
 import { readLayout, settleLayout } from '@/lib/ux-v0/layout';
+import { briefTells, tellQuestion } from '@/lib/ux-v0/tells';
+import { briefWithSystem } from '@/lib/ux-v0/design-system';
 import { MAX_TOKENS, economyRoute } from '@/lib/ux-v0/model';
 import { bad, failed, noModel, projectIdOf, readBody, signInFirst } from '@/lib/ux-v0/route-kit';
 import { normalizeBrief, normalizeDiscovery, normalizeMoodboard } from '@/lib/ux-v0/types';
@@ -77,8 +79,14 @@ export const POST = withMeter(async function POST(req: NextRequest) {
     const layout = settleLayout(words, discovery.questions, prior, intentNow, instruction);
     const density = readLayout(words).density;
     const spec = !parsed.spec?.density && density ? { ...(parsed.spec ?? {}), density } : parsed.spec;
-    const { layout: _fromModel, ...prose } = parsed; // never the model's to decide
-    const brief = { ...prose, intent: intentNow, pageType: pageTypeFor(intentNow, parsed.pageType), ...(layout ? { layout } : {}), ...(spec ? { spec } : {}) };
+    const { layout: _fromModel, system: _alsoNot, ...prose } = parsed; // never the model's to decide
+    // a proposed palette that falls into a look generated pages share, which the designer's words did not ask for, is
+    // said as a question still open (lib/ux-v0/tells.ts): the brief is theirs to approve, so it is not changed behind them
+    const flagged = (current ?? normalizeBrief(body.current))?.system ? [] : briefTells(prose, words).map(tellQuestion).filter((q) => !prose.openQuestions.includes(q));
+    const drafted = { ...prose, openQuestions: [...prose.openQuestions, ...flagged].slice(-6), intent: intentNow, pageType: pageTypeFor(intentNow, parsed.pageType), ...(layout ? { layout } : {}), ...(spec ? { spec } : {}) };
+    // the designer's design system, when one is attached, stays attached and the brief stays built within it
+    const ds = (current ?? normalizeBrief(body.current))?.system;
+    const brief = ds ? briefWithSystem(drafted, ds) : drafted;
     // a refinement that moved the visual direction brings new searches for the board
     return NextResponse.json({ brief, queries: refining ? briefQueries(asked.json, moodboard) : [], usage: asked.usage, ...noticeOf(g, asked) });
   } catch (e) {

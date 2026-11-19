@@ -50,6 +50,8 @@ import {
   type PictureRole,
 } from '@/lib/ux-v0/layout';
 import { LayoutSketch, sketchWords } from './LayoutSketch';
+import { post } from './api';
+import { DS_ROLES, briefWithSystem, briefWithoutSystem, normalizeDesignSystem, parseDesignSystem, systemCorners, systemRatio, type DSRole, type DesignSystem } from '@/lib/ux-v0/design-system';
 
 interface Props {
   brief: DesignBrief;
@@ -233,6 +235,163 @@ function LayoutDecide({ brief, onChange }: { brief: DesignBrief; onChange: (b: D
       </div>
       <p className="st-why-note st-layout-said">{layoutSaid(d, intent)}</p>
     </div>
+  );
+}
+
+/**
+ * THE DESIGNER'S DESIGN SYSTEM (lib/ux-v0/design-system.ts): their own colours, type, spacing and corners, from
+ * the files they already have (read here, in the browser) or a public GitHub repository (read by the server).
+ * Attached, it decides the brief's colours, type and layout as rules, so every direction keeps it, and every
+ * design is checked against it. How it was mapped is said: a face drawn with another, a role derived.
+ */
+function SystemBlock({ brief, onChange }: { brief: DesignBrief; onChange: (b: DesignBrief) => void }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [url, setUrl] = useState('');
+  const ds = brief.system;
+  const attach = (system: DesignSystem) => {
+    setError('');
+    onChange(briefWithSystem(brief, system));
+  };
+  const fromFiles = async (list: FileList | null) => {
+    const files = [...(list ?? [])].slice(0, 12);
+    if (!files.length) return;
+    setBusy('Reading your files…');
+    const read = await Promise.all(files.map(async (f) => ({ path: f.name, text: f.size > 400_000 ? '' : await f.text().catch(() => '') })));
+    setBusy(null);
+    const r = parseDesignSystem(read, { kind: 'file', ref: files.map((f) => f.name).join(', ').slice(0, 160), files: [] });
+    if (r.system) attach(r.system);
+    else setError(r.error ?? 'Nothing in those files could be read as a design system.');
+  };
+  const fromGitHub = async () => {
+    if (!url.trim()) return;
+    setBusy('Reading the repository…');
+    const r = await post<{ system: DesignSystem }>('/api/ux-v0/design-system', { url: url.trim() });
+    setBusy(null);
+    const system = r.ok ? normalizeDesignSystem(r.data.system) : undefined;
+    if (system) attach(system);
+    else setError(r.ok ? 'That repository’s design system could not be read.' : r.error);
+  };
+  const roleLabel: Record<DSRole, string> = { background: 'Background', surface: 'Surface', text: 'Text', muted: 'Quiet text', accent: 'Accent', accentText: 'On accent', line: 'Lines' };
+  if (!ds)
+    return (
+      <section className="st-block c-12 st-system" id="bp-system" aria-label="Design system">
+        <span className="st-block-label">
+          <span className="sb-label">Design system</span>
+          <span className="st-block-note">optional</span>
+        </span>
+        <p className="st-why-note">Build within your own: its colours, type, spacing and corners are kept in every direction, and every design is checked against them before you see it.</p>
+        <div className="st-system-acts">
+          <label className="sb-btn is-sm st-system-file">
+            Add its files
+            <input type="file" multiple accept=".json,.css,.scss,.md,.mdx,.txt" onChange={(e) => (fromFiles(e.target.files), (e.target.value = ''))} disabled={!!busy} />
+          </label>
+          <span className="st-system-or">or</span>
+          <form
+            className="st-system-gh"
+            onSubmit={(e) => {
+              e.preventDefault();
+              fromGitHub();
+            }}
+          >
+            <label className="v0-sr" htmlFor="st-system-url">
+              A public GitHub repository
+            </label>
+            <input id="st-system-url" className="v0-field" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="github.com/owner/design-system" disabled={!!busy} />
+            <button type="submit" className="sb-link is-meta is-strong" disabled={!!busy || !url.trim()}>
+              Read from GitHub
+            </button>
+          </form>
+        </div>
+        <p className="st-system-hint">Design tokens as JSON (W3C, Style Dictionary or Tokens Studio), CSS custom properties, and your guidelines in Markdown. Nothing in them is run.</p>
+        {busy && (
+          <p className="st-system-busy" role="status">
+            {busy}
+          </p>
+        )}
+        {error && (
+          <p className="st-system-error" role="alert">
+            {error}
+          </p>
+        )}
+      </section>
+    );
+  const sizes = ds.sizes.filter((x) => x >= 12).slice(0, 8);
+  return (
+    <section className="st-block c-12 st-system is-on" id="bp-system" aria-label="Design system">
+      <span className="st-block-label">
+        <span className="sb-label">Design system</span>
+        <span className="st-block-note">{ds.source.kind === 'github' ? `from github.com/${ds.source.ref}` : `from ${ds.source.ref}`}</span>
+        <button type="button" className="sb-link is-meta st-system-detach" onClick={() => onChange(briefWithoutSystem(brief))}>
+          Detach
+        </button>
+      </span>
+      <div className="st-system-body">
+        <div className="st-system-name">
+          <p className="st-system-title">{ds.name}</p>
+          <p className="st-why-note">Kept in every direction as a rule. Every design is checked against it, and a change that leaves it is asked about first.</p>
+        </div>
+        <ul className="st-system-roles" aria-label="Its colours, by role">
+          {DS_ROLES.filter((k) => ds.roles[k]).map((k) => (
+            <li key={k}>
+              <span className="st-system-chip" style={{ background: ds.roles[k] }} aria-hidden="true" />
+              <span>{roleLabel[k]}</span>
+              <code>{ds.roles[k]}</code>
+            </li>
+          ))}
+        </ul>
+        <div className="st-system-type">
+          {ds.fonts.map((f) => (
+            <p key={f.role}>
+              <span className="st-system-k">{f.role === 'display' ? 'Headlines' : f.role === 'body' ? 'Text' : 'Figures'}</span> {f.family}
+              {f.standIn !== f.family && <span className="st-system-standin"> · drawn with {f.standIn}</span>}
+            </p>
+          ))}
+          {sizes.length > 0 && (
+            <p>
+              <span className="st-system-k">Sizes</span> {sizes.join(' · ')} px{systemRatio(ds) ? ` (a ${systemRatio(ds)} scale)` : ''}
+            </p>
+          )}
+          {systemCorners(ds) && (
+            <p>
+              <span className="st-system-k">Corners</span> {systemCorners(ds) === 'none' ? 'square' : systemCorners(ds)}
+            </p>
+          )}
+        </div>
+        {(ds.rules.length > 0 || ds.components.length > 0 || ds.notes.length > 0) && (
+          <div className="st-system-more">
+            {ds.rules.length > 0 && (
+              <details>
+                <summary className="sb-link is-meta">{ds.rules.length === 1 ? '1 rule' : `${ds.rules.length} rules`}</summary>
+                <ul className="v0-plain">
+                  {ds.rules.map((r) => (
+                    <li key={r}>{r}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            {ds.components.length > 0 && (
+              <details>
+                <summary className="sb-link is-meta">{ds.components.length === 1 ? '1 component' : `${ds.components.length} components`}</summary>
+                <ul className="v0-plain">
+                  {ds.components.map((c) => (
+                    <li key={c.name}>
+                      <b>{c.name}</b>
+                      {c.notes ? `: ${c.notes}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            {ds.notes.map((n) => (
+              <p key={n} className="st-system-note">
+                {n}
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -465,6 +624,7 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
 
         <div className="st-board">
           <IntentBlock brief={brief} onChange={onChange} />
+          <SystemBlock brief={brief} onChange={onChange} />
           <section className="st-block c-5" id="bp-audience" aria-label="Audience">
             {head('Audience', 'audience', 'idea')}
             <label className="v0-brief-field">

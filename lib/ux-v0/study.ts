@@ -12,6 +12,8 @@
 
 import type { ArtDirection } from './direction';
 import { fitToIntent, sampleFor } from './fit';
+import { composedOpening } from './compose';
+import { hashText, seeded } from './layout';
 import { intentOf, pageTypeFor, requiredComponents } from './intent';
 import { normalizeSpec, type DesignSpec } from './spec';
 import type { DesignBrief, MoodboardRef } from './types';
@@ -55,7 +57,10 @@ export function studySpec(d: ArtDirection, brief: DesignBrief, name: string, ref
     // a trend the direction leads with is drawn, so its hierarchy shows
     if ((intent.kind === 'dashboard' || intent.kind === 'data') && d.order?.includes('chart') && !kinds.includes('chart')) kinds.push('chart');
     const rank = (k: string) => (d.order?.includes(k) ? d.order.indexOf(k) : 50);
-    const parts = [...kinds].sort((a, b) => rank(a) - rank(b)).map((c) => ({ id: c, kind: c, variant: d.compose?.[c] || undefined, images: c === 'booking' && d.compose?.booking === 'immersive' ? img : [], content: sampleFor(c, intent, brief) }));
+    // the detail only this subject has (the direction's plan), shown where it belongs, bracketed until it is real
+    const detail = d.designPlan?.detail.terms.length ? d.designPlan.detail.text : '';
+    const own = (c: string, content: Record<string, unknown> | null) => (c === 'booking' && content && detail && !content.intro ? { ...content, intro: `[${detail.charAt(0).toUpperCase()}${detail.slice(1)}]` } : content);
+    const parts = [...kinds].sort((a, b) => rank(a) - rank(b)).map((c) => ({ id: c, kind: c, variant: d.compose?.[c] || undefined, images: c === 'booking' && d.compose?.booking === 'immersive' ? img : [], content: own(c, sampleFor(c, intent, brief)) }));
     sections = [...head, ...parts];
     if (!sections.length) sections = [{ id: 'head', kind: 'app-header', content: { title: name, subtitle: intent.task, actions: [] } }];
   } else {
@@ -74,7 +79,20 @@ export function studySpec(d: ArtDirection, brief: DesignBrief, name: string, ref
           : goals.length >= 2
             ? { id: 'goals', kind: 'features', variant: d.compose?.features ?? 'columns', tone: d.look.containers === 'bands' ? 'alt' : 'base', content: { title: 'What people come to do', items: goals.map((g) => ({ title: g, text: '' })) } }
             : null;
-    const body = second && d.lead === second.kind ? [second, hero] : [hero, second];
+    // a composed opening (the 'composed' plan): built from pieces, its proportions and order drawn per project
+    const detail = d.designPlan?.detail.terms.length ? d.designPlan.detail.text : '';
+    const opening =
+      d.plan === 'composed'
+        ? {
+            id: 'opening',
+            kind: 'compose',
+            variant: 'free',
+            images: img,
+            tone: 'base',
+            content: { root: composedOpening({ title: studyHeadline(brief.objective, name), lead: intent.task, action, ...(detail ? { detail: `[${detail.charAt(0).toUpperCase()}${detail.slice(1)}]` } : {}) }, img.length > 0, seeded(hashText(`${d.id}|${d.language}|opening`)), d.designPlan?.signature) },
+          }
+        : hero;
+    const body = second && d.lead === second.kind ? [second, opening] : [opening, second];
     sections = [{ id: 'nav', kind: 'nav', variant: 'minimal', content: { brand: name, links: [], cta: action } }, ...body].filter(Boolean);
   }
   const spec = normalizeSpec({ title: name, pageType, platform: brief.platform, tokens: d.tokens, look: d.look, sections }, board);

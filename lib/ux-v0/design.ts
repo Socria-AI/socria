@@ -18,6 +18,8 @@
 import { fitToIntent } from './fit';
 import { EXPERIENCE_LABEL, intentOf, pageTypeFor, structureRule } from './intent';
 import { layoutBrief } from './layout';
+import { tellsRule } from './tells';
+import { systemBrief } from './design-system';
 import { designFromDirection, directionBrief, LOCK_LABEL, planLayout, type ArtDirection, type LockGroup } from './direction';
 import { normQ, readQueries } from './discovery';
 import { fontMenu } from './fonts';
@@ -111,6 +113,7 @@ The brief:
 - visualDirection: the look and feel, concretely (light, density, imagery, texture, contrast).
 - palette: 5–7 colours as hex, each with a distinct role from: background, surface, text, muted, accent, accent-text, line. Text must read on background (aim for 7:1), muted text 4.5:1, accent-text on accent 4.5:1. Draw on kept palettes when there are any.
 - typography: display and body, chosen ONLY from: ${fontMenu()}. Say why in "rationale".
+- Choose colours and type from this subject's own world, not from what generated pages share. ${tellsRule()} A palette and type the designer described are theirs: follow them exactly.
 - layoutDirection: structure and rhythm.
 - functionalRequirements: what it must do (sections, forms, flows).
 - references: ids of the pictures marked for the page that the design should show (only ids listed under PICTURES MARKED FOR THE PAGE; an empty list when none are). Inspiring references shape the other fields: say in visualDirection and layoutDirection what is taken from them.
@@ -173,7 +176,10 @@ const NOT_GENERIC = `Avoid the generic generated page:
 - Headlines say something only this brand could say: a particular, a number, a place, a promise. Short. One may emphasise a single word by wrapping it in *asterisks*.
 - Do not open every section with an eyebrow label; use one only where it adds information (a date, a place, a category), at most on half the sections.
 - Not a three-icon card grid by default: use features only for genuinely parallel points, and the variant the direction prefers.
-- Vary the structure: no two neighbouring sections of the same kind; not the stock order hero → features → pricing → questions → call to action unless this brief needs exactly that.`;
+- Vary the structure: no two neighbouring sections of the same kind; not the stock order hero → features → pricing → questions → call to action unless this brief needs exactly that.
+- ${tellsRule()}
+- Structure is information: numbering, eyebrows and dividers only where they say something true (number steps only when the order matters).
+- When no section in the library draws the arrangement the design needs (an opening at an uneven proportion, a figure set against the words, three unequal columns), compose it from pieces: a "compose" section. Keep it simple: two or three levels, words that say something, one title. When the direction's composition says it is composed from pieces, open with a compose section.`;
 
 export function generateSystem(brief: DesignBrief, dir: ArtDirection | null = null): string {
   // WHAT IS BEING MADE decides the structure, not a page type: a booking screen is the booking itself
@@ -208,8 +214,9 @@ Respond with ONE JSON object: {"title": "...", "pageType": "${pageType}", "platf
 
 export function generateUser(input: GenerateInput): string {
   return [
-    `THE APPROVED BRIEF:\n${JSON.stringify(input.brief)}`,
+    `THE APPROVED BRIEF:\n${JSON.stringify({ ...input.brief, system: undefined })}`,
     briefDecisions(input.brief),
+    systemBrief(input.brief.system),
     `PICTURES YOU MAY PLACE (id, category, subject, orientation):\n${keptRefs(input.moodboard)}`,
     inspiration(input.moodboard),
     input.direction ? `A NEW DIRECTION THE DESIGNER ASKED FOR: “${input.direction}”` : '',
@@ -298,6 +305,7 @@ export function refineUser(input: RefineInput): string {
     : 'THE SELECTION: none — the comment is about the whole design.';
   return [
     input.brief ? `THE BRIEF: objective — ${input.brief.objective}; audience — ${input.brief.audience}; personality — ${input.brief.personality.join(', ')}.` : '',
+    systemBrief(input.brief?.system),
     `THE DESIGN NOW:\n${specDigest(input.spec)}`,
     `PICTURES THAT MAY BE PLACED:\n${keptRefs(input.moodboard)}`,
     where,

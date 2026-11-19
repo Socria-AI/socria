@@ -321,8 +321,12 @@ export function bookingVariantsFor(d: LayoutDecisions | undefined, hasImage: boo
   return v;
 }
 
-/** Languages that use a habit of generated pages on purpose: theirs, not a default. */
-export const ON_PURPOSE: Record<string, readonly string[]> = { 'quiet-luxury': ['centred'], organic: ['rounded', 'centred'], craft: ['rounded'] };
+/**
+ * Languages that use a habit of generated pages on purpose: theirs, not a default. None does now: the styles
+ * that leaned on one (a centred, cream quiet luxury; round soft grounds and market stalls) were reworked off it
+ * (lib/ux-v0/tells.ts). A designer who asks for one gets it.
+ */
+export const ON_PURPOSE: Record<string, readonly string[]> = {};
 
 const HERO_FOR: Record<'lead' | 'arrangement' | 'pictures' | 'align', Record<string, readonly string[]>> = {
   lead: { words: ['statement', 'poster', 'editorial', 'centered'], picture: ['full-bleed', 'split'], work: ['statement', 'editorial', 'poster'], task: ['editorial', 'statement'], text: ['editorial', 'statement'] },

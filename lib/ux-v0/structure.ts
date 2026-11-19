@@ -14,17 +14,22 @@
 //   tokenDistance       0 … 1: palette roles that differ, and the type pairing
 
 import { shapeSignature, type DesignSpec, type Section } from './spec';
+import { composeSignature, type Piece } from './compose';
 
 /** The parts that frame a page rather than say anything: left out of the comparison. */
 const FRAME = new Set(['nav', 'app-nav', 'footer', 'app-header']);
 
-type Part = Pick<Section, 'kind' | 'variant'> & Partial<Pick<Section, 'shape'>>;
+type Part = Pick<Section, 'kind' | 'variant'> & Partial<Pick<Section, 'shape' | 'content'>>;
 
-/** A design's structure: its parts in order, each as kind/variant, with the shape it draws in brackets. */
+/**
+ * A design's structure: its parts in order, each as kind/variant, with the shape it draws in brackets; a
+ * composed section by the arrangement of its pieces (lib/ux-v0/compose.ts), proportions included.
+ */
 export function structureOf(spec: { sections: readonly Part[] }): string[] {
   return spec.sections
     .filter((s) => !FRAME.has(s.kind))
     .map((s) => {
+      if (s.kind === 'compose' && s.content?.root) return `compose/${composeSignature(s.content.root as Piece)}`;
       const sig = shapeSignature(s.kind, s.variant, s.shape);
       return `${s.kind}/${s.variant}${sig ? `[${sig}]` : ''}`;
     });

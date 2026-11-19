@@ -28,7 +28,10 @@ import { primaryAction } from './study';
 import { intentOf, requiredComponents } from './intent';
 import { contrastRatio } from '../ux/audit';
 import { isDark } from './color';
-import { LOCK_LABEL, briefColors, lockedChanges, type ArtDirection, type LockGroup } from './direction';
+import { LOCK_LABEL, briefColors, lockedChanges, paletteFor, type ArtDirection, type LockGroup } from './direction';
+import { tellsOf, unaskedTells, type LookProfile, type Tell, type TellHit } from './tells';
+import { colourFieldFor, decidedMoves, loudMoves, oneMoment, quietRatio, showsDetail, SIGNATURE_LABEL, unevenRatio, type Signature } from './plan';
+import { conformance } from './design-system';
 import { knownFont } from './fonts';
 import { whyFor } from './knowledge';
 import { stepMotion } from './motion';
@@ -50,7 +53,7 @@ export interface PageAudit {
   images: { section: string; path: string; ok: boolean; w: number; h: number }[];
   overflow: { section: string; path: string; by: number; tag: string }[];
   measure: { section: string; path: string; cpl: number }[];
-  style: { gradients: number; shadows: number; roundedBoxes: number; trackedCaps: number; centred: number; blocks: number; emoji: number; icons: number; families: Record<string, number> };
+  style: { gradients: number; shadows: number; roundedBoxes: number; trackedCaps: number; centred: number; blocks: number; emoji: number; icons: number; rails: number; families: Record<string, number> };
   /** each booking and form, tried in place by the behaviour runtime: what did not work */
   behaviors: { index: number; kind: 'booking' | 'form'; slots: number; problems: string[] }[];
 }
@@ -82,7 +85,7 @@ export function normalizeAudit(v: unknown): PageAudit | null {
     measure: list(r.measure, 20, (x) => ({ section: s(x.section, 48), path: s(x.path, 60), cpl: n(x.cpl, 0, 1000) })),
     style: {
       gradients: n(st.gradients, 0, 1e5), shadows: n(st.shadows, 0, 1e5), roundedBoxes: n(st.roundedBoxes, 0, 1e5), trackedCaps: n(st.trackedCaps, 0, 1e5),
-      centred: n(st.centred, 0, 1e5), blocks: n(st.blocks, 0, 1e5), emoji: n(st.emoji, 0, 1e5), icons: n(st.icons, 0, 1e5), families: fam,
+      centred: n(st.centred, 0, 1e5), blocks: n(st.blocks, 0, 1e5), emoji: n(st.emoji, 0, 1e5), icons: n(st.icons, 0, 1e5), rails: n(st.rails, 0, 1e5), families: fam,
     },
     behaviors: list(r.behaviors, 10, (x) => ({ index: n(x.index, 0, 100), kind: (x.kind === 'form' ? 'form' : 'booking') as 'booking' | 'form', slots: n(x.slots, 0, 1000), problems: (Array.isArray(x.problems) ? x.problems : []).map((p: unknown) => s(p, 120)).filter(Boolean).slice(0, 6) })),
   };
@@ -179,6 +182,8 @@ export function genericSignals(spec: DesignSpec, audit?: PageAudit | null): Sign
   if (at >= 4) add(8, 'The stock order: hero, features, pricing, questions, call to action.');
   const cl = clichesIn(spec);
   if (cl.length) add(Math.min(16, cl.length * 4), `Stock phrases: ${[...new Set(cl.map((c) => `“${c.phrase}”`))].slice(0, 4).join(', ')}.`);
+  // the looks generated pages share (lib/ux-v0/tells.ts), as they are, asked for or not: this measures the page
+  for (const h of tellsOf(lookProfileOf(spec, audit))) add(10, `${h.label.charAt(0).toUpperCase()}${h.label.slice(1)}.`);
   if (audit) {
     if (audit.style.gradients > 0) add(Math.min(12, 6 + audit.style.gradients * 2), `${audit.style.gradients} decorative gradient${audit.style.gradients > 1 ? 's' : ''}.`);
     if (audit.style.shadows > 3) add(5, 'Soft drop shadows on many boxes.');
@@ -187,6 +192,76 @@ export function genericSignals(spec: DesignSpec, audit?: PageAudit | null): Sign
     if (audit.style.trackedCaps > 6 && look.language !== 'quiet-luxury') add(4, `${audit.style.trackedCaps} runs of letter-spaced capitals.`);
   }
   return out.sort((a, b) => b.weight - a.weight);
+}
+
+// ── the looks generated pages share, in a design ──────────────────────
+
+/** A design's look, as the tells read it: its tokens, its look, its sections and (when measured) its page. */
+export function lookProfileOf(spec: DesignSpec, audit?: PageAudit | null): LookProfile {
+  const look = spec.look ?? lookFromTokens(spec.tokens);
+  return { colors: spec.tokens.colors, fonts: spec.tokens.fonts, radius: spec.tokens.radius, look, sections: spec.sections, style: audit ? audit.style : null };
+}
+
+/** The tells a design shows that nobody asked for: in the brief's words, its decisions, or a palette that is the brief's own. */
+export function designTells(spec: DesignSpec, audit: PageAudit | null, ctx: FidelityContext = {}): TellHit[] {
+  const b = ctx.brief ?? null;
+  const same = (a?: string, c?: string) => !!a && !!c && a.toLowerCase() === c.toLowerCase();
+  const role = (r: string) => b?.palette.find((p) => p.role === r)?.hex;
+  const own = (!!b && same(spec.tokens.colors.background, role('background')) && same(spec.tokens.colors.accent, role('accent'))) || !!ctx.direction?.locks.includes('palette') || !!b?.system;
+  const words = b ? [b.objective, b.audience, b.personality.join(' '), b.visualDirection, b.layoutDirection, (b.rules ?? []).join(' ')].join(' ') : '';
+  return unaskedTells(lookProfileOf(spec, audit), words, { align: b?.layout?.align, corners: b?.spec?.corners, ownColours: own });
+}
+
+/** The patch that draws a bold move (on) or quiets it (off), where code can make it. */
+export function moveFix(m: Signature, spec: DesignSpec, on: boolean): Patch | null {
+  const look = spec.look ?? lookFromTokens(spec.tokens);
+  const free = (x: Section) => !x.fixed && !x.locked;
+  const hero = spec.sections.find((x) => x.kind === 'hero' && free(x));
+  const say = (what: string) => `${on ? 'The plan’s bold move' : 'One loud move, not two'}: ${what}`;
+  switch (m) {
+    case 'giant-type':
+      if (!hero) return null;
+      return { op: 'shape', sectionId: hero.id, shape: { scale: on ? 1.22 : 1.05 }, summary: say(on ? 'the headline set huge' : 'the headline brought back to size') } as Patch;
+    case 'colour-field': {
+      const x = on ? colourFieldFor(spec.sections) : spec.sections.find((y) => free(y) && (y.tone === 'accent' || y.tone === 'accent2'));
+      return x ? ({ op: 'tone', sectionId: x.id, tone: on ? 'accent' : 'alt', summary: say(on ? 'one part on a field of the accent' : 'the field of colour back to the page’s ground') } as Patch) : null;
+    }
+    case 'oversized-figure': {
+      const x = spec.sections.find((y) => y.kind === 'stats' && free(y));
+      return x ? ({ op: 'variant', sectionId: x.id, variant: on ? 'giant' : 'row', summary: say(on ? 'the figures set very large' : 'the figures in a row') } as Patch) : null;
+    }
+    case 'uneven-split': {
+      const x = spec.sections.find((y) => free(y) && ((y.kind === 'hero' && y.variant === 'split') || (y.kind === 'booking' && (y.variant === 'split' || y.variant === 'calendar'))));
+      return x ? ({ op: 'shape', sectionId: x.id, shape: { ratio: on ? unevenRatio(x.shape?.ratio) : quietRatio(Number(x.shape?.ratio ?? 0.45)) }, summary: say(on ? 'a sharply uneven split' : 'the split less extreme, its larger side kept') } as Patch) : null;
+    }
+    case 'framed-picture':
+      return { op: 'look', look: { frame: on ? 'inset' : 'plain' }, summary: say(on ? 'the pictures framed' : 'the pictures unframed') } as Patch;
+    case 'one-motion':
+      if (!on && look.motion.feel === 'still') return null;
+      return { op: 'look', look: { motion: on ? oneMoment(look.motion) : { ...look.motion, headline: 'fade' } }, summary: say(on ? 'the headline arriving' : 'the headline arriving quietly') } as Patch;
+    case 'full-bleed-picture':
+      return hero && hero.images.length ? ({ op: 'variant', sectionId: hero.id, variant: on ? 'full-bleed' : 'split', summary: say(on ? 'one picture edge to edge' : 'the picture beside the words') } as Patch) : null;
+  }
+}
+
+/** The change that takes a tell out, when code can make it: a ground, a look, the corners. A palette change is offered, not made. */
+export function tellFix(tell: Tell, spec: DesignSpec): { patch: Patch; manual: boolean } | null {
+  const look = spec.look ?? lookFromTokens(spec.tokens);
+  const c = spec.tokens.colors;
+  switch (tell) {
+    case 'cream-serif-terracotta':
+      return { patch: { op: 'tokens', tokens: { colors: paletteFor('stone', c) }, summary: 'A cool stone ground instead of cream, off a look generated pages share' } as Patch, manual: true };
+    case 'black-acid-pop':
+      return { patch: { op: 'tokens', tokens: { colors: paletteFor('deep', c) }, summary: 'A deep ground of its own hue instead of black with one neon accent' } as Patch, manual: true };
+    case 'hairline-columns':
+      return { patch: { op: 'look', look: { containers: 'open', rules: 'heavy', motifs: look.motifs.filter((m) => m !== 'numbering') }, summary: 'One heavy rule where each part begins, instead of hairline boxes and numbering' } as Patch, manual: false };
+    case 'all-centred':
+      return { patch: { op: 'look', look: { align: 'left', grid: 'asymmetric' }, summary: 'Set to one side instead of everything centred' } as Patch, manual: false };
+    case 'rounded-everything':
+      return { patch: { op: 'tokens', tokens: { radius: 'soft' }, summary: 'Softer corners instead of round corners on every box' } as Patch, manual: false };
+    default:
+      return null;
+  }
 }
 
 // ── findings ─────────────────────────────────────────────────────────
@@ -344,6 +419,43 @@ export function evaluateDesign(spec: DesignSpec, audits: { desktop?: PageAudit |
   const ph = new Set<string>();
   JSON.stringify(spec.sections.map((x) => x.content)).replace(/\[[^\]\n]{2,40}\]/g, (m) => (ph.add(m), m));
   if (ph.size >= 6) add({ kind: 'placeholder', severity: 'low', viewport: 'page', section: '', message: `${ph.size} facts are still placeholders (${[...ph].slice(0, 3).join(', ')}…).` });
+
+  // 10b · the looks generated pages share (lib/ux-v0/tells.ts), where nobody asked for them. A palette that is the
+  // brief's own is the designer's (the brief said so when it was proposed); the rest is fixed in code where it can be
+  for (const h of designTells(spec, audits.desktop ?? audits.phone ?? null, ctx)) {
+    const fix = tellFix(h.tell, spec);
+    add({
+      kind: 'generic',
+      severity: 'medium',
+      viewport: 'page',
+      section: h.tell === 'emoji-markers' ? (spec.sections.find((x) => /^\s*[\u2600-\u27BF\uD83C-\uDBFF]/.test(String(x.content?.title ?? '')))?.id ?? '') : '',
+      message: `Reads as a generated page: ${h.label} (${h.evidence}).`,
+      ...(fix ? { fix: fix.patch, manual: fix.manual } : { ask: h.tell === 'emoji-markers' ? 'Replace the emoji markers with words or numbers that say something about each part.' : `Take out ${h.label}.` }),
+    });
+  }
+
+  // 10b2 · the designer's design system (lib/ux-v0/design-system.ts): where the design leaves it, the change that
+  // puts it back (a fix that restores the system is not held back by locks: the system is the designer's)
+  if (ctx.brief?.system) for (const c of conformance(spec, ctx.brief.system)) add({ kind: 'fidelity', severity: 'medium', viewport: 'page', section: '', message: c.message, fix: c.fix, restore: true });
+
+  // 10c · the direction's plan, kept (lib/ux-v0/plan.ts): its one bold move drawn, no second loud move, and the
+  // detail only its subject has shown as content
+  const plan = ctx.direction?.designPlan;
+  if (plan) {
+    const moves = loudMoves(spec);
+    // a move the designer's own decisions make (an uneven arrangement) is theirs, never a second one to quiet
+    const decided = decidedMoves(ctx.brief?.layout);
+    const extra = moves.filter((m) => m !== plan.signature && !decided.includes(m));
+    if (extra.length) {
+      const fix = moveFix(extra[0], spec, false);
+      add({ kind: 'generic', severity: 'medium', viewport: 'page', section: fix && 'sectionId' in fix ? String((fix as any).sectionId) : '', message: `More than one loud move: ${extra.map((m) => SIGNATURE_LABEL[m]).join('; ')}, besides the plan’s one (${plan.signatureSays}).`, ...(fix ? { fix } : {}) });
+    }
+    if (!moves.includes(plan.signature)) {
+      const fix = moveFix(plan.signature, spec, true);
+      if (fix) add({ kind: 'fidelity', severity: 'low', viewport: 'page', section: 'sectionId' in fix ? String((fix as any).sectionId) : '', message: `The plan’s one bold move is missing: ${plan.signatureSays}.`, fix });
+    }
+    if (!showsDetail(spec, plan)) add({ kind: 'fidelity', severity: 'low', viewport: 'page', section: '', message: `Nothing shows ${plan.detail.text}: the detail only this subject has.`, ask: `Show ${plan.detail.text}, where it belongs, in this subject's own terms.` });
+  }
 
   // 11b · an action that names nothing ("Begin", "Read more"): the brief's own action instead, or none
   const action = ctx.brief ? primaryAction(ctx.brief) : '';

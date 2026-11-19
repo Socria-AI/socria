@@ -91,7 +91,7 @@ export const AUDIT_SOURCE = String.raw`(function () {
     }
     var all = body ? body.getElementsByTagName('*') : [];
     var n = Math.min(all.length, 5000);
-    var st = { gradients: 0, shadows: 0, roundedBoxes: 0, trackedCaps: 0, centred: 0, blocks: 0, emoji: 0, icons: 0, families: {} };
+    var st = { gradients: 0, shadows: 0, roundedBoxes: 0, trackedCaps: 0, centred: 0, blocks: 0, emoji: 0, icons: 0, rails: 0, families: {} };
     var emojiRe = /[☀-➿]|\uD83C[\uDF00-\uDFFF]|\uD83D[\uDC00-\uDE4F\uDE80-\uDEFF]|\uD83E[\uDD00-\uDDFF]/;
     for (var k = 0; k < n; k++) {
       var el = all[k];
@@ -105,6 +105,14 @@ export const AUDIT_SOURCE = String.raw`(function () {
       var rad = parseFloat(cs.borderTopLeftRadius) || 0;
       var boxed = (rgba(cs.backgroundColor) || [0, 0, 0, 0])[3] > 0.05 || parseFloat(cs.borderTopWidth) > 0;
       if (rad >= 12 && boxed && rect.width > 120 && rect.height > 80 && el.tagName !== 'IMG') st.roundedBoxes++;
+      // an accent bar down one side of a rounded box: a thick coloured left edge the other edges do not share
+      if (rad >= 6 && rect.width > 120 && rect.height > 60) {
+        var blw = parseFloat(cs.borderLeftWidth) || 0;
+        var lc = rgba(cs.borderLeftColor);
+        var tc = rgba(cs.borderTopColor);
+        var inset = /inset\s+([3-9]|1[0-9])px\s+0(px)?\s+0(px)?/.test(cs.boxShadow || '');
+        if ((blw >= 3 && lc && lc[3] > 0.5 && (!tc || parseFloat(cs.borderTopWidth) < 1 || Math.abs(lc[0] - tc[0]) + Math.abs(lc[1] - tc[1]) + Math.abs(lc[2] - tc[2]) > 60)) || inset) st.rails++;
+      }
       var own = ownText(el);
       if (own.length > 1) {
         var size = parseFloat(cs.fontSize);

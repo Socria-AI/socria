@@ -23,6 +23,19 @@ const contentFor = (def) => {
   const c = Object.fromEntries(Object.entries(def.fields).map(([k, f]) => [k, sample(f, k, k.length)]));
   if (def.kind === 'chart') { c.labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']; c.series = [{ name: 'Visits', values: [3, 5, 4, 7, 6] }]; }
   if (def.kind === 'table') { c.columns = ['Name', 'Time', 'Seats']; c.rows = [{ cells: ['Ada', '8:00', '4'], status: 'Booked' }, { cells: ['Ben', '9:30', '2'], status: 'Waiting' }]; }
+  // a composed section: every piece, boxes on each ground (so their words are measured on them too)
+  if (def.kind === 'compose')
+    c.root = { t: 'stack', dir: 'col', gap: 'l', children: [
+      { t: 'grid', cols: [5, 7], gap: 'l', align: 'end', children: [
+        { t: 'stack', dir: 'col', gap: 'm', children: [{ t: 'text', role: 'eyebrow', text: 'Since 1998' }, { t: 'text', role: 'title', text: 'Rooms for *thinking*, built slowly' }, { t: 'text', role: 'lead', text: 'An architecture studio for houses, schools and small public buildings.' }, { t: 'stack', dir: 'row', gap: 's', children: [{ t: 'button', label: 'See the work', style: 'primary' }, { t: 'button', label: 'Write to us', style: 'link' }] }] },
+        { t: 'stack', dir: 'col', gap: 's', children: [{ t: 'image', at: 0, ratio: '4:3' }, { t: 'text', role: 'caption', text: 'The library at Kew, 2019, 1,240 m²' }] },
+      ] },
+      { t: 'grid', cols: [1, 1, 1], gap: 'm', children: [
+        { t: 'box', tone: 'accent', pad: 'm', children: [{ t: 'figure', value: '42', label: 'projects built' }, { t: 'button', label: 'See them', style: 'primary' }] },
+        { t: 'box', tone: 'invert', pad: 'm', children: [{ t: 'text', role: 'heading', text: 'Schools' }, { t: 'text', role: 'body', text: 'Twelve, all still in use.' }, { t: 'button', label: 'Read about them', style: 'secondary' }] },
+        { t: 'box', tone: 'alt', pad: 'm', children: [{ t: 'list', items: ['Houses', 'Schools', 'Libraries'], marker: 'rule' }, { t: 'rule' }, { t: 'text', role: 'quote', text: 'They listened before they drew.' }] },
+      ] },
+    ] };
   if (def.kind === 'form') c.fields = [{ label: 'Your name', type: 'text', required: true }, { label: 'Email', type: 'email', required: true }, { label: 'How many?', type: 'select', options: ['2', '4', '6'] }, { label: 'Notes', type: 'textarea' }, { label: 'Keep me posted', type: 'checkbox' }];
   return c;
 };
@@ -76,7 +89,23 @@ for (const def of V.LIBRARY) {
       await page.setContent(doc, { waitUntil: 'networkidle' });
       const r = await page.evaluate((mobile) => {
         const lum = (c) => { const m = c.match(/[\d.]+/g); if (!m) return null; const [r, g, b, a = 1] = m.map(Number); if (a < 0.99) return null; const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
-        const bgOf = (el) => { for (let n = el; n; n = n.parentElement) { const cs = getComputedStyle(n); if (cs.backgroundImage !== 'none' || n.tagName === 'IMG') return 'image'; const c = cs.backgroundColor; const m = c.match(/[\d.]+/g); if (m && (m[3] === undefined || Number(m[3]) > 0.99)) return c; } return 'rgb(255,255,255)'; };
+        const bgOf = (el) => {
+          for (let n = el; n; n = n.parentElement) {
+            const cs = getComputedStyle(n);
+            if (cs.backgroundImage !== 'none' || n.tagName === 'IMG') return 'image';
+            const c = cs.backgroundColor;
+            const m = c.match(/[\d.]+/g);
+            if (m && (m[3] === undefined || Number(m[3]) > 0.99)) return c;
+            // a translucent dark backing over a picture (a caption on a photograph): its worst case, over pure white
+            const fig = n.closest('figure');
+            if (m && Number(m[3]) >= 0.3 && fig && fig.querySelector('img')) {
+              const a = Number(m[3]);
+              const mixc = (v) => Math.round(Number(v) * a + 255 * (1 - a));
+              return `rgb(${mixc(m[0])}, ${mixc(m[1])}, ${mixc(m[2])})`;
+            }
+          }
+          return 'rgb(255,255,255)';
+        };
         const bad = [];
         const seen = new Set();
         for (const el of document.querySelectorAll('body *')) {

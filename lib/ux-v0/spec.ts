@@ -15,6 +15,7 @@
 // the page.
 
 import { contrastRatio } from '../ux/audit';
+import { normalizeCompose } from './compose';
 import { bodyFont, displayFont, knownFont } from './fonts';
 import type { Moodboard, PageType, Platform } from './types';
 
@@ -26,7 +27,9 @@ type Field =
   | { t: 'nums'; n: [number, number]; req?: boolean }
   | { t: 'enum'; values: readonly string[]; req?: boolean }
   | { t: 'bool' }
-  | { t: 'list'; n: [number, number]; item: Record<string, Field>; req?: boolean };
+  | { t: 'list'; n: [number, number]; item: Record<string, Field>; req?: boolean }
+  /** a tree of layout pieces (lib/ux-v0/compose.ts), held to its shape there */
+  | { t: 'tree'; req?: boolean };
 
 export const ICONS = [
   'spark', 'leaf', 'cup', 'clock', 'map', 'shield', 'heart', 'users', 'chart', 'book', 'calendar', 'star',
@@ -66,6 +69,8 @@ export const LIBRARY: readonly KindDef[] = [
     fields: { quote: T(420, true), author: T(60, true), role: T(90) } },
   { kind: 'stats', label: 'Figures', pages: WEB, variants: ['row', 'band', 'giant'], images: [0, 0], note: '2–6 figures; giant sets them as huge numerals; unknown figures are [bracketed placeholders]',
     fields: { title: T(110), items: { t: 'list', n: [2, 6], req: true, item: { value: T(18, true), label: T(70, true) } } } },
+  { kind: 'compose', label: 'Composed', pages: BOTH, variants: ['free'], images: [0, 6], note: 'a section built from layout pieces (stacks, grids in proportion, boxes, text, figures, pictures, buttons, lists, rules) when no other section draws the arrangement needed',
+    fields: { root: { t: 'tree', req: true } } },
   { kind: 'logos', label: 'Names', pages: WEB, variants: ['row'], images: [0, 0], note: 'partner or press names, set as words',
     fields: { title: T(80), names: TS(32, 3, 8, true) } },
   { kind: 'pricing', label: 'Pricing', pages: WEB, variants: ['cards'], images: [0, 0], note: '1–4 plans',
@@ -531,12 +536,15 @@ function readField(f: Field, v: unknown): unknown {
         .map((item) => readFields(f.item, item))
         .filter((x): x is Record<string, unknown> => !!x)
         .slice(0, f.n[1]);
+    case 'tree':
+      return normalizeCompose(v);
   }
 }
 
 function ok(f: Field, v: unknown): boolean {
   switch (f.t) {
     case 'text':
+    case 'tree':
       return !f.req || !!v;
     case 'texts':
     case 'nums':
@@ -829,6 +837,8 @@ function describeField(f: Field): string {
       return `[{${Object.entries(f.item)
         .map(([k, x]) => `${k}: ${describeField(x)}`)
         .join(', ')}}] ${f.n[0]}–${f.n[1]}${f.req ? '*' : ''}`;
+    case 'tree':
+      return 'one piece* — {"t":"stack","dir":"row|col","gap":"s|m|l","align":"start|center|end|stretch","children":[pieces]} | {"t":"grid","cols":[2–4 whole numbers 1–12: the columns\' proportion, e.g. [5,7]],"gap","align","children":[pieces]} | {"t":"box","tone":"base|alt|accent|invert","pad":"s|m|l","children":[pieces]} | {"t":"text","role":"eyebrow|title|heading|lead|body|caption|quote","text"} | {"t":"figure","value","label"} | {"t":"image","at":its index in this section\'s images,"ratio":"1:1|4:3|3:2|16:9|3:4|2:3"} | {"t":"button","label","style":"primary|secondary|link"} | {"t":"list","items":[…],"marker":"none|number|rule"} | {"t":"rule"}; at most 4 levels deep and 48 pieces; one title';
   }
 }
 

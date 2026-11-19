@@ -17,6 +17,7 @@
 // model can write, so no answer from a model can unlock anything.
 
 import { kindDef, type DesignSpec, type Patch, type Section } from './spec';
+import { treeTextAt } from './compose';
 
 const isIndex = (x: string) => /^\d{1,3}$/.test(x);
 
@@ -44,6 +45,8 @@ export function textAt(sec: Section, path: string): { value: string; max: number
       i++;
       continue;
     }
+    // a composed section's words, wherever they sit in its tree of pieces (lib/ux-v0/compose.ts)
+    if (f.t === 'tree') return treeTextAt(value, parts.slice(i + 1));
     return null;
   }
   return null;

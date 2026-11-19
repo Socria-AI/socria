@@ -27,6 +27,7 @@ import { contrastRatio } from '../ux/audit';
 import { isDark, mix, rgbOf } from './color';
 import { advanceEm, fontStack, fontStylesheet, hasItalic, knownFont, nearestWeight } from './fonts';
 import { NEEDS_IMAGE, SHAPE_EFFECTIVE, ensureContrast, kindDef, lookFromTokens, type DesignSpec, type DesignTokens, type Look, type Section, type Shape } from './spec';
+import type { Piece } from './compose';
 
 /**
  * A section's shape, as the page draws it: each setting its variant uses becomes a class (sh-side-end,
@@ -393,6 +394,48 @@ const SECTIONS: Record<string, R> = {
       .map((it, i) => `<div class="stat"><dt ${attr(s.id, `items.${i}.label`)}>${t(it.label)}</dt><dd ${attr(s.id, `items.${i}.value`)}>${t(it.value)}</dd></div>`)
       .join('')}</dl></div>`;
   },
+  // a section composed from layout pieces (lib/ux-v0/compose.ts): every class from this renderer's own set,
+  // every proportion a whole number the normaliser checked, every word escaped
+  compose: (s, c, x) => {
+    const piece = (p: Piece, path: string): string => {
+      switch (p.t) {
+        case 'stack':
+          return `<div class="cp-stack cp-${p.dir} cp-gap-${p.gap} cp-al-${p.align}">${p.children.map((ch, i) => piece(ch, `${path}.children.${i}`)).join('')}</div>`;
+        case 'grid': {
+          const cols = p.cols.map((n) => `minmax(0,${Math.max(1, Math.min(12, Math.round(n)))}fr)`).join(' ');
+          return `<div class="cp-grid cp-gap-${p.gap} cp-al-${p.align}" style="--cp-cols:${cols}">${p.children.map((ch, i) => piece(ch, `${path}.children.${i}`)).join('')}</div>`;
+        }
+        case 'box':
+          // a box wears the page's own grounds (tone-alt, tone-accent, tone-invert): their words, lines and buttons
+          // already read on them
+          return `<div class="cp-box ${p.tone === 'base' ? 'cp-tone-base' : `tone-${p.tone}`} cp-pad-${p.pad}">${p.children.map((ch, i) => piece(ch, `${path}.children.${i}`)).join('')}</div>`;
+        case 'text': {
+          const a = attr(s.id, `${path}.text`);
+          // the page's opening (no hero before it): its title is the page's h1
+          if (p.role === 'title') return x.first || x.lead ? `<h1 class="h-hero cp-title" ${a}>${t(p.text)}</h1>` : `<h2 class="h-section cp-title" ${a}>${t(p.text)}</h2>`;
+          if (p.role === 'heading') return `<h3 class="h-item cp-heading" ${a}>${t(p.text)}</h3>`;
+          if (p.role === 'eyebrow') return `<p class="eyebrow" ${a}>${t(p.text)}</p>`;
+          if (p.role === 'lead') return `<p class="body-lg cp-lead" ${a}>${t(p.text)}</p>`;
+          if (p.role === 'caption') return `<p class="small cp-caption" ${a}>${t(p.text)}</p>`;
+          if (p.role === 'quote') return `<blockquote class="cp-quote" ${a}><p>${t(p.text)}</p></blockquote>`;
+          return `<p class="cp-body" ${a}>${t(p.text)}</p>`;
+        }
+        case 'figure':
+          return `<div class="cp-figure"><span class="cp-fig-v" ${attr(s.id, `${path}.value`)}>${t(p.value)}</span>${p.label ? `<span class="cp-fig-l" ${attr(s.id, `${path}.label`)}>${t(p.label)}</span>` : ''}</div>`;
+        case 'image':
+          return x.im.has(s, p.at) ? `<figure class="cp-img cp-r-${p.ratio.replace(':', 'x')}">${x.im.img(s, p.at, 'cp-im', !!(x.first || x.lead))}${x.im.cap(s, p.at)}</figure>` : '';
+        case 'button':
+          return p.style === 'link' ? `<a class="cp-link" href="#" ${attr(s.id, `${path}.label`)}>${t(p.label)}</a>` : btn(s, `${path}.label`, p.label, p.style);
+        case 'list': {
+          const tag = p.marker === 'number' ? 'ol' : 'ul';
+          return `<${tag} class="cp-list cp-m-${p.marker}">${p.items.map((it, i) => `<li ${attr(s.id, `${path}.items.${i}`)}>${t(it)}</li>`).join('')}</${tag}>`;
+        }
+        case 'rule':
+          return '<hr class="cp-rule">';
+      }
+    };
+    return `<div class="wrap cp">${piece(c.root as Piece, 'root')}</div>`;
+  },
   logos: (s, c) =>
     `<div class="wrap logos">${c.title ? `<p class="eyebrow" ${attr(s.id, 'title')}>${t(c.title)}</p>` : ''}<ul class="names">${(c.names as string[]).map((n, i) => `<li ${attr(s.id, `names.${i}`)}>${t(n)}</li>`).join('')}</ul></div>`,
   pricing: (s, c, x) => {
@@ -704,6 +747,8 @@ function css(tk: DesignTokens, look: Look, heads: Headlines = NO_HEADLINES): str
 --fs:${classic ? 17 : base}px;--fs-lede:${classic ? '1.15rem' : px(lede)};--fs-h3:${classic ? '1.25rem' : px(h3)};--fs-h2:${h2Size};--fs-hero:${heroSize};--fs-giant:${fluid(clampN(giantMax * 0.4, 40, 56), giantMax)};${fitVars}
 --hw:${weight};--iw:${classic ? weight : itemWeight};--track:${classic ? -0.025 : track}em;--track-h2:${classic ? -0.018 : trackH2}em;--lh-hero:${classic ? 1.02 : lhHero};--img:${filter};color-scheme:${dark ? 'dark' : 'light'}}`);
   for (const [name, gr] of Object.entries(g)) if (name !== 'base') add(`.tone-${name}{${groundVars(gr)};background:var(--bg);color:var(--text)}`);
+  // a composed box on the page's own ground, wherever it sits
+  add(`.cp-tone-base{${groundVars(g.base)};background:var(--bg);color:var(--text)}`);
 
   // ── base
   add(`*,*::before,*::after{box-sizing:border-box}
@@ -924,6 +969,25 @@ th .th-sort{all:unset;cursor:pointer;display:inline-flex;gap:6px;align-items:cen
 
   // ── shapes: each booking and opening as its own settings set it (spec.ts SHAPE_FIELDS). A class only when the
   // setting is there, so a design without one draws exactly as before; every value keeps 44 px targets.
+  // composed sections: stacks, grids in proportion, boxes on a ground, figures, pictures; one column on a phone
+  add(`.cp{display:block;container-type:inline-size}.cp-grid>*{container-type:inline-size}
+.cp .cp-title.h-hero{font-size:min(var(--fs-hero),11cqi);overflow-wrap:break-word}.cp .cp-title.h-section{font-size:min(var(--fs-h2,2.4rem),8cqi)}.cp :is(.cp-title,.cp-heading,.cp-lead,.cp-body,.cp-caption,.cp-quote,.cp-fig-v){overflow-wrap:break-word}
+.cp-stack{display:flex;flex-direction:column;min-width:0}.cp-stack.cp-row{flex-direction:row;flex-wrap:wrap}.cp-stack>*,.cp-grid>*{min-width:0}
+.cp-gap-s{gap:12px}.cp-gap-m{gap:clamp(16px,2.2vw,28px)}.cp-gap-l{gap:clamp(24px,4.4vw,64px)}
+.cp-stack.cp-col.cp-al-start{align-items:flex-start}.cp-stack.cp-col.cp-al-center{align-items:center;text-align:center}.cp-stack.cp-col.cp-al-end{align-items:flex-end;text-align:right}.cp-stack.cp-col.cp-al-stretch{align-items:stretch}
+.cp-stack.cp-row.cp-al-start{align-items:flex-start}.cp-stack.cp-row.cp-al-center{align-items:center}.cp-stack.cp-row.cp-al-end{align-items:flex-end}.cp-stack.cp-row.cp-al-stretch{align-items:stretch}
+.cp-grid{display:grid;grid-template-columns:var(--cp-cols,minmax(0,1fr) minmax(0,1fr))}.cp-grid.cp-al-start{align-items:start}.cp-grid.cp-al-center{align-items:center}.cp-grid.cp-al-end{align-items:end}.cp-grid.cp-al-stretch{align-items:stretch}
+@media (max-width:720px){.cp-grid{grid-template-columns:minmax(0,1fr)}.cp-stack.cp-col.cp-al-end{align-items:flex-start;text-align:left}}
+.cp-box{border-radius:var(--r)}.cp-pad-s{padding:16px}.cp-pad-m{padding:clamp(20px,3vw,32px)}.cp-pad-l{padding:clamp(28px,5vw,56px)}
+.cp-box{background:var(--bg);color:var(--text)}
+.cp-title,.cp-heading,.cp-lead,.cp-body,.cp-caption{margin:0;max-width:62ch}.cp-caption{color:var(--muted)}
+.cp-quote{margin:0;font-family:var(--display);font-size:var(--fs-h3);line-height:1.3}.cp-quote p{margin:0}
+.cp-figure{display:grid;gap:6px}.cp-fig-v{font-family:var(--display);font-size:min(clamp(3rem,9vw,7rem),24cqi);line-height:.9;letter-spacing:-.02em;font-variant-numeric:tabular-nums}.cp-fig-l{color:var(--muted);font-size:.95rem}
+.cp-img{margin:0}.cp-img img{display:block;width:100%;height:auto;object-fit:cover;border-radius:var(--r)}
+.cp-r-1x1 img{aspect-ratio:1/1}.cp-r-4x3 img{aspect-ratio:4/3}.cp-r-3x2 img{aspect-ratio:3/2}.cp-r-16x9 img{aspect-ratio:16/9}.cp-r-3x4 img{aspect-ratio:3/4}.cp-r-2x3 img{aspect-ratio:2/3}
+.cp-link{color:inherit;text-decoration:underline;text-underline-offset:3px;min-height:44px;display:inline-flex;align-items:center}
+.cp-list{margin:0;padding-left:1.2em;display:grid;gap:8px}.cp-m-none{list-style:none;padding-left:0}.cp-m-rule{list-style:none;padding-left:0;gap:0}.cp-m-rule li{padding:10px 0;border-top:1px solid var(--line)}
+.cp-rule{width:100%;border:0;border-top:var(--rule-w,1px) solid var(--rule-c,var(--line));margin:0}`);
   add(`.sh-align-center .bk-head{text-align:center;margin-inline:auto;max-width:760px}.sh-align-center .bk-head .lede{margin-inline:auto}
 .sh-density-airy .bk-panel,.sh-density-airy .bk-body{gap:clamp(28px,4vw,52px)}.sh-density-airy .bk-slot-grid{gap:12px}.sh-density-airy .bk-slot{min-height:68px;padding:14px 18px}.sh-density-airy .bk-day{min-height:72px;padding:12px 18px}
 .sh-density-dense .bk-panel,.sh-density-dense .bk-body{gap:clamp(14px,2vw,20px)}.sh-density-dense .bk-slot-grid{gap:6px}.sh-density-dense .bk-slot{min-height:48px;padding:8px 12px}.sh-density-dense .bk-day{min-height:52px;min-width:76px;padding:8px 12px}.sh-density-dense .bk-times-wrap{margin-top:12px}

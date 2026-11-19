@@ -568,8 +568,13 @@ console.log('\n=== looking at the drawn page ===');
   const spec = V.planLayout(V.normalizeSpec({ ...SPEC, look: V.proposeDirections({ brief: V.normalizeBrief({ pageType: 'website', objective: 'x', personality: ['warm'], visualDirection: 'handmade cafe', palette: [], typography: { display: 'Fraunces', body: 'Inter' } }, new Set()) })[0].look }, board));
   const audit = (o = {}) => V.normalizeAudit({ width: 390, viewport: 844, height: 6000, overflowX: 0, bodySize: 17, sections: [], headings: [{ level: 1, size: 48, lines: 3, width: 350, section: spec.sections[1].id, path: 'title', text: 'Hi' }], contrast: [], targets: [], images: [], overflow: [], measure: [], style: { gradients: 0, shadows: 0, roundedBoxes: 0, trackedCaps: 0, centred: 0, blocks: 20, emoji: 0, icons: 0, families: {} }, ...o });
   ok('an audit from the frame is held to its shape', V.normalizeAudit({ width: 'x' }) === null && audit({ contrast: Array(99).fill({ ratio: 2 }) }).contrast.length === 40);
-  const clean = V.evaluateDesign(spec, { desktop: audit({ width: 1280 }), phone: audit() });
+  // (the page's cream, Fraunces and tan palette is the brief's own: the designer's, so not a generated look to fix)
+  const ownBrief = V.normalizeBrief({ pageType: 'website', objective: 'x', personality: ['warm'], visualDirection: 'handmade cafe', palette: [{ hex: spec.tokens.colors.background, role: 'background' }, { hex: spec.tokens.colors.accent, role: 'accent' }, { hex: spec.tokens.colors.text, role: 'text' }], typography: { display: 'Fraunces', body: 'Inter' } }, new Set());
+  const clean = V.evaluateDesign(spec, { desktop: audit({ width: 1280 }), phone: audit() }, [], { brief: ownBrief });
   ok('a page that works has nothing to fix', clean.quality === 100 && !clean.findings.some((f) => f.severity !== 'low'), J(clean.findings));
+  const unasked = V.evaluateDesign(spec, { desktop: audit({ width: 1280 }), phone: audit() });
+  const tellF = unasked.findings.find((f) => f.kind === 'generic' && /cream with a serif headline/.test(f.message));
+  ok('…the same palette nobody asked for reads as a generated look: said, with a fix offered (not made)', !!tellF && tellF.manual === true && tellF.fix?.op === 'tokens', J(unasked.findings.map((f) => f.message)));
   const hero = spec.sections.find((x) => x.kind === 'hero');
   const over = V.evaluateDesign(spec, { phone: audit({ overflow: [{ section: hero.id, path: 'title', by: 40, tag: 'h1' }] }) });
   ok('a headline wider than the phone is serious, and fixed by stepping the type scale down', over.findings[0].severity === 'high' && over.findings[0].fix?.op === 'look' && over.findings[0].fix.look.ratio < spec.look.ratio);
@@ -718,7 +723,8 @@ console.log('\n=== knowledge, fidelity and precise refinement ===');
   const brief0 = V.normalizeBrief({ pageType: 'website', objective: 'Sell festival tickets', personality: ['bold'], visualDirection: 'poster', palette: [{ hex: '#ffffff', role: 'background' }, { hex: '#111111', role: 'text' }, { hex: '#ff4b1f', role: 'accent' }], typography: { display: 'Archivo', body: 'Inter' } }, new Set());
   const dir = { ...V.proposeDirections({ brief: brief0 })[0], locks: ['palette', 'motion'] };
   const d = V.designFromDirection(dir);
-  const good = V.normalizeSpec({ ...SPEC, tokens: d.tokens, look: d.look }, board);
+  // (a page keeps its direction when it keeps its plan too: its one bold move, held as generation holds it)
+  const good = V.holdSignature(V.normalizeSpec({ ...SPEC, tokens: d.tokens, look: d.look }, board), dir.designPlan?.signature).spec;
   const ev0 = V.evaluateDesign(good, {}, dir.locks, { direction: dir });
   ok('a page that keeps its direction is fully faithful, and says so', ev0.fidelity === 100 && ev0.kept.some((k) => k.includes(dir.name)));
   const drifted = { ...good, tokens: { ...good.tokens, colors: { ...good.tokens.colors, accent: '#00ff00' } }, look: { ...good.look, motion: V.STILL_MOTION } };
@@ -1015,7 +1021,9 @@ console.log('\n=== what is being made: intent, the booking, the behaviour runtim
   ok('each study is the booking in its direction\'s composition', studies.every((st, i) => st.sections.some((x) => x.kind === 'booking' && x.variant === (comps[i] === 'immersive' && !board.refs.length ? 'split' : comps[i]))), J(studies.map((st) => st.sections.map((x) => `${x.kind}/${x.variant}`))));
   const siteBrief = V.normalizeBrief({ pageType: 'website', platform: 'web', objective: 'A website for a ceramics studio', userGoals: ['See the pieces', 'Visit the studio'], personality: ['calm'], visualDirection: 'quiet', palette: [], typography: { display: 'Fraunces', body: 'Inter' } }, new Set());
   const siteStudy = V.studySpec(V.proposeDirections({ brief: siteBrief })[0], siteBrief, 'Kiln', board.refs);
-  ok('a site\'s study uses the brief\'s own words and actions, never "Begin"', !J(siteStudy).includes('"Begin"') && !J(siteStudy).includes('Read more') && siteStudy.sections.find((x) => x.kind === 'hero')?.content.title.includes('ceramics'));
+  // (its opening is a hero, or a section composed from pieces: the headline is the brief's own words either way)
+  const opening = siteStudy.sections.find((x) => x.kind === 'hero' || x.kind === 'compose');
+  ok('a site\'s study uses the brief\'s own words and actions, never "Begin"', !J(siteStudy).includes('"Begin"') && !J(siteStudy).includes('Read more') && /ceramics/.test(opening?.kind === 'hero' ? opening.content.title : J(opening?.content.root)), J(opening));
 
   // the function checks: a design missing what it must do is a finding with a fix
   const bare = V.normalizeSpec({ title: 'Lotus', pageType: 'app-screen', sections: [{ id: 'h', kind: 'app-header', content: { title: 'Lotus', subtitle: '', actions: [] } }] }, board);
@@ -1212,7 +1220,7 @@ console.log('\n=== layout: what the designer decides, the one question, the sett
   ok('the brief says where each decision came from, and what is left open', /Arrangement: uneven, from your words/.test(V.layoutSaid(s1, intentB)) && /Alignment, pictures: left open/.test(V.layoutSaid(s1, intentB)), V.layoutSaid(s1, intentB));
 
   // ── what the decisions allow
-  ok('nothing decided: no centred opening (unless the language centres on purpose)', !V.heroVariantsFor(undefined, true, 'swiss').includes('centered') && V.heroVariantsFor(undefined, true, 'quiet-luxury').includes('centered'));
+  ok('nothing decided: no centred opening, in any language (quiet luxury included, now that it was reworked off it)', V.LANGUAGES.every((l) => !V.heroVariantsFor(undefined, true, l.id).includes('centered')));
   ok('centred decided: the centred opening is allowed', V.heroVariantsFor({ align: 'center' }, true, 'swiss').includes('centered'));
   ok('no pictures: no opening built around one', V.heroVariantsFor({ pictures: 'none' }, true).every((v) => v !== 'split' && v !== 'full-bleed'));
   ok('a booking led by what is booked keeps it first (a split with its card)', J(V.bookingVariantsFor({ lead: 'subject' }, true)) === J(['split']));
@@ -1279,7 +1287,7 @@ console.log('\n=== layout: what the designer decides, the one question, the sett
   const g1 = V.avoidGeneric(genSpec, { language: 'swiss' });
   ok('a centred opening nobody chose is set to one side, and it is said', g1.spec.sections[0].variant === 'editorial' && g1.changes.some((c) => /one side/.test(c)));
   ok('…kept when the designer decided it', V.avoidGeneric(genSpec, { language: 'swiss', decisions: { align: 'center' } }).spec.sections[0].variant === 'centered');
-  ok('…kept when the language centres on purpose', V.avoidGeneric(genSpec, { language: 'quiet-luxury' }).spec.sections[0].variant === 'centered');
+  ok('…and quiet luxury, which used to centre by default, no longer keeps it unasked', V.avoidGeneric(genSpec, { language: 'quiet-luxury' }).spec.sections[0].variant === 'editorial');
   ok('a fixed section is never touched', V.avoidGeneric({ ...genSpec, sections: [{ ...genSpec.sections[0], fixed: true }] }, { language: 'swiss' }).spec.sections[0].variant === 'centered');
 
   // ── the settings as a patch, and as the page draws them
@@ -1327,6 +1335,266 @@ console.log('\n=== layout: what the designer decides, the one question, the sett
   // ── structure measures the settings too
   ok('the same layout set differently is a different structure, by how much differs', (() => { const x = V.structuralDistance({ sections: [{ kind: 'booking', variant: 'split', shape: { side: 'start', times: 'tiles' } }] }, { sections: [{ kind: 'booking', variant: 'split', shape: { side: 'end', times: 'tiles' } }] }); return x > 0 && x < 0.5; })());
   ok('…and a proportion only a hair different is the same', V.structuralDistance({ sections: [{ kind: 'booking', variant: 'split', shape: { ratio: 0.31 } }] }, { sections: [{ kind: 'booking', variant: 'split', shape: { ratio: 0.33 } }] }) === 0);
+}
+
+
+console.log('\n=== the looks generated pages share: detected, kept out unless asked for ===');
+{
+  const prof = (o = {}) => ({ colors: { background: '#ffffff', accent: '#1f4ea3' }, fonts: { display: 'Inter' }, radius: 'soft', look: { align: 'left', grid: 'stack', containers: 'open', rules: 'none', motifs: [], accent2: '' }, ...o });
+  const tells = (p) => V.tellsOf(p).map((h) => h.tell);
+  ok('cream, a serif headline and terracotta together are the look; any one alone is not', J(tells(prof({ colors: { background: '#f4ede4', accent: '#b4552d' }, fonts: { display: 'Fraunces' } }))) === J(['cream-serif-terracotta']) && !tells(prof({ colors: { background: '#f4ede4', accent: '#b4552d' }, fonts: { display: 'Inter' } })).length && !tells(prof({ colors: { background: '#ffffff', accent: '#b4552d' }, fonts: { display: 'Fraunces' } })).length);
+  ok('near-black with one acid green is the look; a second ink beside it is not', tells(prof({ colors: { background: '#0b0b0b', accent: '#a6ff00' } })).includes('black-acid-pop') && !tells(prof({ colors: { background: '#0b0b0b', accent: '#a6ff00' }, look: { ...prof().look, accent2: '#ff7ab6' } })).includes('black-acid-pop'));
+  ok('hairline boxes with numbered sections, everything centred, round cards everywhere: each detected', J(tells(prof({ look: { align: 'center', grid: 'centered', containers: 'ruled', rules: 'hairline', motifs: ['numbering'] } })).sort()) === J(['all-centred', 'hairline-columns']) && tells(prof({ radius: 'round', look: { ...prof().look, containers: 'cards' } })).includes('rounded-everything'));
+  ok('emoji as markers, from the words; accent rails and a purple gradient, from the rendered page', tells(prof({ sections: [{ kind: 'features', content: { items: [{ title: '🚀 Fast' }] } }] })).includes('emoji-markers') && tells(prof({ style: { gradients: 0, roundedBoxes: 0, centred: 0, blocks: 0, emoji: 0, rails: 3 } })).includes('accent-rail-cards') && tells(prof({ colors: { background: '#ffffff', accent: '#6d3df5' }, style: { gradients: 2, roundedBoxes: 0, centred: 0, blocks: 0, emoji: 0, rails: 0 } })).includes('purple-blue-gradient'));
+  // what the designer asked for stays theirs
+  const asked = (w, c) => [...V.askedTells(w, c)].sort();
+  ok('asked for in words: cream and terracotta; centred; a gradient', asked('a cream and terracotta palette').includes('cream-serif-terracotta') && asked('a centred layout').includes('all-centred') && asked('a soft gradient').includes('purple-blue-gradient'));
+  ok('…not when the words say to avoid it ("not centred", "no gradients")', !asked('not centred, please').includes('all-centred') && !asked('no gradients at all').includes('purple-blue-gradient'));
+  ok('asked for in decisions: centred in the brief, round corners set, a palette that is the designer\'s own', asked('', { align: 'center' }).includes('all-centred') && asked('', { corners: 'round' }).includes('rounded-everything') && asked('', { ownColours: true }).includes('cream-serif-terracotta'));
+  // the four styles that sat on those looks, reworked
+  const L = Object.fromEntries(V.LANGUAGES.map((l) => [l.id, l]));
+  ok('the styles reworked off the looks: Journal (no hairline boxes, no reflexive numbering), Market label (no cream, no soft serif first, no pills), After dark (a deep coloured ground, two inks), Quiet luxury (a cool stone ground, never centred)', L.broadsheet.name === 'Journal' && !L.broadsheet.look.containers.includes('ruled') && L.broadsheet.look.motifs.every((m) => !m.includes('numbering')) && L.craft.name === 'Market label' && L.craft.palette !== 'tinted' && L.craft.display[0] !== 'Fraunces' && !L.craft.look.buttons.includes('pill') && L.night.palette === 'deep' && L.night.accent2 && L['quiet-luxury'].palette === 'stone' && !L['quiet-luxury'].look.align.includes('center'));
+  ok('…and no language uses one of them on purpose any more', J(V.ON_PURPOSE) === '{}');
+  // the engine: across every language and the palettes that invite each look, nothing nobody asked for
+  const PALS = { terracotta: ['#f4ede4', '#2b211b', '#b4552d'], acid: ['#0b0b0b', '#f2f2f2', '#a6ff00'], vermilion: ['#111111', '#f5f5f5', '#ff4a1c'], navy: ['#f7f7f5', '#14213d', '#1f4ea3'] };
+  const SUBJ = ['A website for a neighbourhood bakery', 'A website for a jazz bar', 'A website for a small hotel', 'A literary magazine story', 'A website for a skincare brand', 'A website for a yoga studio'];
+  let n = 0;
+  const bad = [];
+  const seenLangs = new Set();
+  for (const [pn, [bg, tx, ac]] of Object.entries(PALS)) for (const disp of ['Fraunces', 'Space Grotesk']) for (const w of SUBJ) {
+    const b = V.normalizeBrief({ pageType: 'website', platform: 'web', objective: w, audience: 'people', personality: ['warm'], visualDirection: 'considered', palette: [{ hex: bg, role: 'background' }, { hex: tx, role: 'text' }, { hex: ac, role: 'accent' }], typography: { display: disp, body: 'Inter' }, userGoals: ['See it'] }, new Set());
+    b.intent = V.settleIntent(V.briefWords(b), {});
+    for (const d of [...V.proposeDirections({ brief: b, salt: 'p_t1' }), ...V.proposeDirections({ brief: b, salt: 'p_t2', round: 1 })]) {
+      n++;
+      seenLangs.add(d.language);
+      const own = d.rationale.some((r) => /Keeps the palette and type pair you approved/.test(r));
+      const hits = V.unaskedTells({ colors: d.tokens.colors, fonts: d.tokens.fonts, radius: d.tokens.radius, look: d.look }, w, { ownColours: own });
+      if (hits.length) bad.push(`${pn}/${disp}/${d.language}: ${hits.map((h) => h.tell)}`);
+    }
+  }
+  ok(`${n} directions across ${seenLangs.size} languages: none shows a generated look nobody asked for`, !bad.length && seenLangs.size >= 9, bad.slice(0, 4).join(' | '));
+  const tc = V.normalizeBrief({ pageType: 'website', platform: 'web', objective: 'A website for a bakery', audience: 'people', personality: ['warm'], visualDirection: 'considered', palette: [{ hex: '#f4ede4', role: 'background' }, { hex: '#2b211b', role: 'text' }, { hex: '#b4552d', role: 'accent' }], typography: { display: 'Fraunces', body: 'Inter' }, userGoals: ['See it'] }, new Set());
+  const ds = V.proposeDirections({ brief: tc });
+  ok('the designer\'s own cream, serif and terracotta stay in the faithful direction; another that would have fallen into it is moved, and says so', V.tellsOf({ colors: ds[0].tokens.colors, fonts: ds[0].tokens.fonts, radius: ds[0].tokens.radius, look: ds[0].look }).some((h) => h.tell === 'cream-serif-terracotta') && V.LANGUAGES.some((l) => V.buildDirection(l, tc, { seed: 7, faithful: false }).rationale.some((r) => /Kept off .* a look generated pages share/.test(r))));
+  const askedFor = { ...tc, visualDirection: 'cream and terracotta, a soft serif, like a country kitchen' };
+  ok('asked for in the brief\'s words, the look is the designer\'s: no direction is moved off it', V.LANGUAGES.every((l) => !V.buildDirection(l, askedFor, { seed: 7, faithful: false }).rationale.some((r) => /cream with a serif headline/.test(r))));
+  // (a direction on cream with terracotta whose headline face is a sans: the model then picks a serif)
+  const modelSerif = V.parseDirections({ directions: [{ candidate: 2, fonts: { display: 'Fraunces', body: 'Inter' } }] }, { brief: tc, notes: '' }, ds.map((d) => (d === ds[1] ? { ...d, tokens: { ...d.tokens, fonts: { display: 'Archivo', body: 'Inter' }, colors: { ...d.tokens.colors, background: '#f4ede4', accent: '#b4552d' } } } : d)));
+  ok('a face the art-direction model chose that brings the look back is not taken', modelSerif[1].tokens.fonts.display !== 'Fraunces', modelSerif[1].tokens.fonts.display);
+  // the brief says it, rather than changing a palette the designer has not approved yet
+  const q = V.briefTells(tc, 'A website for a bakery');
+  ok('a proposed brief palette that falls into a look is said, as a question still open', q.length === 1 && /a look many generated pages share/.test(V.tellQuestion(q[0])) && V.briefTells(tc, 'cream and terracotta please').length === 0);
+  ok('the brief writer and the generator are told the looks to avoid', /generated pages share/.test(V.briefSystem(false)) && /generated pages share/.test(V.generateSystem(tc, null)));
+  // a design: the fix that takes a look out is a real patch
+  const hairSpec = V.normalizeSpec({ ...SPEC, look: { ...(V.normalizeSpec(SPEC, board).look), containers: 'ruled', rules: 'hairline', motifs: ['numbering'], grid: 'editorial' } }, board);
+  const fx = V.tellFix('hairline-columns', hairSpec);
+  const fixed = V.applyPatch(hairSpec, fx.patch, board);
+  ok('hairline boxes and numbering come out as a look patch, applied by code', fx && !fx.manual && fixed.ok && fixed.spec.look.containers === 'open' && !fixed.spec.look.motifs.includes('numbering') && !V.tellsOf(V.lookProfileOf(fixed.spec)).some((h) => h.tell === 'hairline-columns'));
+  ok('the generic score counts each look a page shows', V.genericSignals(hairSpec).some((g) => /hairline rules/.test(g.reason)));
+}
+
+
+console.log('\n=== each direction’s plan, critiqued before anyone sees it ===');
+{
+  const mkP = (objective, extra = {}) => {
+    const b = V.normalizeBrief({ pageType: 'website', platform: 'web', objective, audience: 'people', personality: ['warm', 'clear'], visualDirection: 'considered', palette: [], typography: { display: 'Archivo', body: 'Inter' }, userGoals: ['See it', 'Get in touch'], ...extra }, new Set(['openverse:a1']));
+    b.intent = V.settleIntent(V.briefWords(b), {});
+    return b;
+  };
+  ok('colours are named plainly', V.colourName('#0b0b0b') === 'near-black' && V.colourName('#1f4ea3') === 'blue' && /stone|paper/.test(V.colourName('#ecedee')));
+  ok('the detail only a subject has: a yoga class’s level and °C; a bakery’s oven times; a lab’s units', V.subjectDetail('Booking screen for a yoga class').terms.includes('°C') && /oven/.test(V.subjectDetail('A website for a neighbourhood bakery').text) && V.subjectDetail('A dashboard for lab sensor readings').terms.includes('hPa'));
+  ok('…the designer’s own line with a number in it comes first, and nothing is made up for an unknown subject', /40 minutes/.test(V.subjectDetail('Sessions last 40 minutes. A website for a studio').text) && V.subjectDetail('A website for a xylograph collective') === null);
+  // every direction states a whole plan
+  const briefs = ['A website for a neighbourhood bakery', 'Booking screen for a yoga class', 'A website for an architecture studio', 'A dashboard for lab sensor readings', 'A literary magazine story', 'A motion design portfolio'].map((w, i) => mkP(w, i % 2 ? { references: ['openverse:a1'] } : {}));
+  const all = briefs.flatMap((b) => V.proposeDirections({ brief: b, salt: 'p_plan' }).map((d) => [b, d]));
+  const whole = all.every(([b, d]) => {
+    const p = d.designPlan;
+    if (!p) return false;
+    const can = V.drawableSignatures(d, V.planContext(b));
+    return p.colours.length >= 4 && p.colours.length <= 6 && p.colours.every((c) => c.name && /^#[0-9a-f]{6}$/.test(c.hex)) && p.type.display && p.type.body && p.layout && can.includes(p.signature) && (p.detail.terms.length > 0 || p.open.some((o) => /only this/.test(o)));
+  });
+  ok(`every direction (${all.length}) states its plan: 4–6 named colours, its type, its layout, one move it can draw, and its subject detail (or says it still needs one)`, whole, J(all.map(([, d]) => [d.language, d.designPlan?.signature, d.designPlan?.detail.terms])));
+  ok('…and every one passes its own critique, but for what only the designer or the model can supply', all.every(([b, d]) => V.critiquePlan(d.designPlan, d, V.planContext(b)).every((i) => i.id === 'no-detail' || i.id === 'tell')), J(all.map(([b, d]) => V.critiquePlan(d.designPlan, d, V.planContext(b)).map((i) => i.id))));
+  ok('…its one bold move is the only loud one in its own composition', all.every(([, d]) => !(d.compose?.stats === 'giant' && d.designPlan.signature !== 'oversized-figure') && !(['poster', 'statement'].includes(d.compose?.hero) && d.designPlan.signature !== 'giant-type')));
+  // (a site with pictures: a type-only one is led by its headline whatever the project, which is its move)
+  const pictured = mkP('A website for an architecture studio', { references: ['openverse:a1'] });
+  const sigs = new Set(Array.from({ length: 12 }, (_, i) => V.proposeDirections({ brief: pictured, salt: `p_sig_${i}` }).map((d) => d.designPlan.signature).join('|')));
+  ok('the same brief in twelve projects does not always make the same moves', sigs.size >= 3, [...sigs]);
+  // the critique, on plans that are generic on purpose
+  const site = mkP('A website for an architecture studio', { references: ['openverse:a1'] });
+  const base = V.proposeDirections({ brief: site })[1];
+  const ctx = V.planContext(site);
+  const issues = (d, plan) => V.critiquePlan({ ...d.designPlan, ...plan }, d, ctx).map((i) => i.id).sort();
+  ok('the critique catches a move the design cannot draw, the default type pair, numbering on what is not a sequence, no subject detail, and two loud moves', (() => {
+    const bad = { ...base, tokens: { ...base.tokens, fonts: { display: 'Inter', body: 'Inter' } }, look: { ...base.look, motifs: ['numbering'] }, compose: { ...base.compose, hero: 'poster', stats: 'giant' } };
+    const got = issues(bad, { signature: 'oversized-figure', detail: { text: '', terms: [] } });
+    return ['default-type', 'no-detail', 'numbering', 'too-loud'].every((x) => got.includes(x)) && issues({ ...base, compose: {} }, { signature: 'oversized-figure' }).includes('no-signature');
+  })());
+  const revised = V.plannedDirection({ ...base, tokens: { ...base.tokens, fonts: { display: 'Fraunces', body: 'Inter' } }, look: { ...base.look, motifs: ['numbering', 'captions'] }, compose: { ...base.compose, hero: 'poster', stats: 'giant' } }, ctx, V.seeded(1), 'Public Sans');
+  ok('…and revises what it can before anyone sees it, saying what it changed', revised.tokens.fonts.body === 'Public Sans' && !revised.look.motifs.includes('numbering') && revised.compose.stats === 'row' && revised.designPlan.signature === 'giant-type' && revised.designPlan.revised.length >= 3, J(revised.designPlan.revised));
+  const lockedType = V.withPlan({ ...base, tokens: { ...base.tokens, fonts: { display: 'Fraunces', body: 'Inter' } }, look: { ...base.look, motifs: ['numbering'] }, locks: ['type', 'motifs'] }, site, '', false, 7);
+  ok('…never against the designer’s locks (their type and motifs stay)', lockedType.tokens.fonts.body === 'Inter' && lockedType.look.motifs.includes('numbering'));
+  // the model knows the subject: its detail and its move are taken when they hold up
+  const written = V.parseDirections({ directions: [{ candidate: 1, detail: 'Each project with its site area in m² and the year it opened', signature: 'giant-type' }, { candidate: 2, signature: 'oversized-figure' }] }, { brief: site, notes: '' }, V.proposeDirections({ brief: site }));
+  ok('the art-direction model’s subject detail and move go into the plan; a move the design cannot draw is not taken', /m²/.test(written[0].designPlan.detail.text) && written[0].designPlan.signature === 'giant-type' && written[1].designPlan.signature !== 'oversized-figure');
+  ok('the strict schema asks the model for both', J(V.formatFor('art-direction')).includes('"signature"') && J(V.formatFor('art-direction')).includes('"detail"'));
+  // the plan in the design
+  const dir = { ...base, designPlan: { ...base.designPlan, signature: 'giant-type' } };
+  ok('the generator is told the plan: its one move, quiet elsewhere, and the subject detail as content', (() => { const t = V.generateSystem(site, dir); return t.includes("THE DIRECTION'S PLAN") && t.includes('The ONE bold move') && t.includes('Show this as content'); })());
+  const page = V.normalizeSpec({ title: 'Studio', pageType: 'website', look: dir.look, tokens: dir.tokens, sections: [{ id: 'hero', kind: 'hero', variant: 'editorial', content: { title: 'Rooms for thinking' } }, { id: 'n', kind: 'stats', variant: 'giant', content: { items: [{ value: '12', label: 'Projects' }, { value: '4', label: 'Cities' }] } }, { id: 'c', kind: 'cta', variant: 'band', tone: 'accent', content: { title: 'Talk to us', primary: 'Write to the studio' } }, { id: 'f', kind: 'footer', content: { brand: 'Studio' } }] }, board);
+  const held = V.holdSignature(page, 'giant-type');
+  ok('a design makes the plan’s one move (the headline set huge) and quiets the others (giant figures, a field of colour)', J(V.loudMoves(held.spec)) === J(['giant-type']) && held.spec.sections.find((x) => x.id === 'n').variant === 'row' && held.spec.sections.find((x) => x.id === 'c').tone === 'alt', J(V.loudMoves(held.spec)));
+  ok('…leaving a section the designer fixed exactly as it is', V.holdSignature({ ...page, sections: page.sections.map((x) => (x.id === 'c' ? { ...x, fixed: true } : x)) }, 'giant-type').spec.sections.find((x) => x.id === 'c').tone === 'accent');
+  const ev = V.evaluateDesign(page, {}, [], { direction: dir, brief: site });
+  const loudF = ev.findings.find((f) => /More than one loud move/.test(f.message));
+  const missingF = ev.findings.find((f) => /one bold move is missing/.test(f.message));
+  ok('the evaluation finds a second loud move and a missing signature, each with a fix that applies', !!loudF?.fix && !!missingF?.fix && V.applyPatch(page, loudF.fix, board).ok && V.applyPatch(page, missingF.fix, board).ok, J(ev.findings.map((f) => f.message)));
+  const noDetail = ev.findings.find((f) => /the detail only this subject has/.test(f.message));
+  ok('…and a design that does not show the subject’s detail is told what to add', !!noDetail && /m²|year/.test(noDetail.ask ?? ''), J(noDetail));
+  const gen = V.parseGenerate({ title: 'Studio', sections: page.sections }, site, board, 1, 'r', dir);
+  ok('a generated design holds its direction’s one move, and nothing else is loud', V.loudMoves(gen).every((m) => m === 'giant-type') && V.loudMoves(gen).includes('giant-type'), J(V.loudMoves(gen)));
+  ok('a stored plan comes back whole; a made-up move does not', V.normalizeDirection(JSON.parse(J(base))).designPlan?.signature === base.designPlan.signature && V.normalizeDesignPlan({ ...base.designPlan, signature: 'sparkles' }) === undefined);
+  // what the designer decided is a move already made: never quieted for another, never undone
+  const splitOf = (d) => d.shapes?.booking?.ratio;
+  const askedUneven = mkP('Booking screen for a pilates session', { layout: { arrangement: 'asymmetric' } });
+  const unevenDirs = Array.from({ length: 8 }, (_, i) => V.proposeDirections({ brief: askedUneven, salt: `p_uneven_${i}` })).flat();
+  ok(`asked for uneven: in every direction (${unevenDirs.length}) the split is sharply uneven, and it is the plan’s one bold move`, unevenDirs.every((d) => V.sharplyUneven(splitOf(d)) && d.designPlan.signature === 'uneven-split'), J(unevenDirs.map((d) => [d.language, d.compose?.booking, splitOf(d), d.designPlan.signature])));
+  const unevenStudies = unevenDirs.map((d) => V.studySpec(d, askedUneven, 'Pilates', []));
+  ok('…and every study drawn from them keeps it', unevenStudies.every((st) => st && V.loudMoves(st).includes('uneven-split')), J(unevenStudies.map((st) => st?.sections.find((x) => x.kind === 'booking')?.shape)));
+  const askedEven = mkP('Booking screen for a pilates session', { layout: { arrangement: 'split' } });
+  const evenDirs = Array.from({ length: 8 }, (_, i) => V.proposeDirections({ brief: askedEven, salt: `p_even_${i}` })).flat();
+  ok(`asked for side by side: no direction (${evenDirs.length}) makes the split uneven as its move`, evenDirs.every((d) => d.designPlan.signature !== 'uneven-split' && !V.sharplyUneven(splitOf(d))), J(evenDirs.map((d) => [d.language, splitOf(d), d.designPlan.signature])));
+  const bookingSpec = (ratio) => V.normalizeSpec({ title: 'Book', pageType: 'website', tokens: base.tokens, look: base.look, sections: [{ id: 'b', kind: 'booking', variant: 'split', shape: { ratio }, content: V.sampleFor('booking', askedUneven.intent, askedUneven) }, { id: 'n', kind: 'stats', variant: 'giant', content: { items: [{ value: '45', label: 'min' }, { value: '8', label: 'places' }] } }] }, board);
+  ok('at generation: an uneven split the designer asked for stays, whatever the move', V.holdSignature(bookingSpec(0.32), 'oversized-figure', { decisions: { arrangement: 'asymmetric' } }).spec.sections[0].shape.ratio === 0.32);
+  ok('…an even one they asked for is not made uneven by the move', !V.sharplyUneven(V.holdSignature(bookingSpec(0.5), 'uneven-split', { decisions: { arrangement: 'split' } }).spec.sections[0].shape.ratio));
+  ok('…and a split quieted for another move keeps its larger side (not flattened to the middle)', V.quietRatio(0.32) === 0.38 && V.quietRatio(0.61) === 0.58 && V.holdSignature(bookingSpec(0.31), 'oversized-figure').spec.sections[0].shape.ratio === 0.38);
+  const evenDir = { ...base, designPlan: { ...base.designPlan, signature: 'oversized-figure' } };
+  const loudOnes = (b) => V.evaluateDesign(bookingSpec(0.32), {}, [], { direction: evenDir, brief: b }).findings.filter((f) => /More than one loud move/.test(f.message));
+  ok('the evaluation never calls the designer’s own uneven split a second loud move; nobody’s, it does', loudOnes({ ...askedUneven }).length === 0 && loudOnes(mkP('Booking screen for a pilates session')).length === 1);
+  // a move the plan names is one the direction as composed draws
+  const drawnOk = all.filter(([b, d]) => !V.planContext(b).screen).every(([b, d]) => {
+    const composed = d.plan === 'composed';
+    const hero = composed ? 'compose' : d.compose?.hero ?? (V.planContext(b).hasImage ? 'split' : 'statement');
+    return (d.designPlan.signature !== 'uneven-split' || hero === 'split' || composed || ['split', 'calendar'].includes(d.compose?.booking)) && (d.designPlan.signature !== 'full-bleed-picture' || hero === 'full-bleed' || d.compose?.booking === 'immersive') && (d.designPlan.signature !== 'giant-type' || !composed);
+  });
+  ok('a page’s move is one its own opening draws: an uneven split over a split or a composed opening, one picture edge to edge only over a full-bleed, a huge headline only where there is a headline to set', drawnOk, J(all.map(([, d]) => [d.plan, d.compose?.hero, d.designPlan.signature])));
+  const studiesOf = all.filter(([b]) => !V.planContext(b).screen).map(([b, d]) => [d, V.studySpec(d, b, 'Name', V.planContext(b).hasImage ? board.refs : [])]);
+  const drawnIn = studiesOf.filter(([d, st]) => st && V.loudMoves(st).includes(d.designPlan.signature));
+  ok(`every page study draws its own move, where you can see it (${drawnIn.length}/${studiesOf.length})`, drawnIn.length === studiesOf.length, J(studiesOf.filter(([d, st]) => !(st && V.loudMoves(st).includes(d.designPlan.signature))).map(([d, st]) => [d.plan, d.compose?.hero, d.designPlan.signature, st && V.loudMoves(st)])));
+}
+
+
+console.log('\n=== the designer’s design system: read, built within, checked against ===');
+{
+  ok('colours as token files write them', V.colourHex('#1F4EA3') === '#1f4ea3' && V.colourHex('#abc') === '#aabbcc' && V.colourHex('rgb(31, 78, 163)') === '#1f4ea3' && V.colourHex('hsl(0, 0%, 100%)') === '#ffffff' && V.colourHex('rgba(0,0,0,0.1)') === null && V.colourHex('banana') === null);
+  ok('lengths in px, rem and em', V.lengthPx('16px') === 16 && V.lengthPx('1.5rem') === 24 && V.lengthPx('auto') === null);
+  // the W3C format: groups with $type, $value, aliases, a composite typography token
+  const dtcg = J({
+    color: { $type: 'color', brand: { blue: { $value: '#1f4ea3' } }, neutral: { 0: { $value: '#ffffff' }, 900: { $value: '#14161a' } }, background: { $value: '{color.neutral.0}' }, text: { $value: '{color.neutral.900}' }, primary: { $value: '{color.brand.blue}' }, border: { $value: '#d4d8de' } },
+    font: { heading: { $type: 'fontFamily', $value: ['Helvetica Neue', 'Arial', 'sans-serif'] }, body: { $type: 'fontFamily', $value: 'Source Serif 4, Georgia, serif' } },
+    size: { $type: 'dimension', 'font-size-sm': { $value: '14px' }, 'font-size-md': { $value: '16px' }, 'font-size-lg': { $value: '20px' }, 'font-size-xl': { $value: '25px' }, 'font-size-2xl': { $value: '31px' } },
+    radius: { md: { $type: 'dimension', $value: '6px' } },
+    type: { display: { $type: 'typography', $value: { fontFamily: 'Playfair Display', fontSize: '48px' } } },
+  });
+  const a = V.parseDesignSystem([{ path: 'tokens.json', text: dtcg }], { kind: 'file', ref: 'tokens.json', files: [] }).system;
+  ok('W3C design tokens: groups, aliases resolved, roles by name', a && a.roles.background === '#ffffff' && a.roles.text === '#14161a' && a.roles.accent === '#1f4ea3' && a.roles.line === '#d4d8de', J(a?.roles));
+  ok('…faces mapped to ones SocriaUX can serve, the stand-in said; its own face kept when it can be served', a.fonts.find((f) => f.role === 'body').standIn === 'Source Serif 4' && a.fonts.some((f) => f.family === 'Helvetica Neue' && f.standIn === 'Inter') && a.notes.some((n) => /Helvetica Neue.*drawn with Inter/.test(n)), J(a.fonts));
+  ok('…its type scale, corners and spacing read', V.systemRatio(a) === 1.25 && V.systemCorners(a) === 'soft', J({ r: V.systemRatio(a), c: V.systemCorners(a), s: a.sizes }));
+  // Style Dictionary and Tokens Studio: value, type
+  const sd = V.parseDesignSystem([{ path: 'style-dictionary.json', text: J({ color: { bg: { value: '#0f1115' }, fg: { value: '#f4f4f2' }, 'on-primary': { value: '#0f1115' }, primary: { value: '#ffcc33' } }, font: { family: { base: { value: 'Inter' } } } }) }], { kind: 'file', ref: 'x', files: [] }).system;
+  ok('Style Dictionary values; a dark system read as one (its ground the background, its light ink the text)', sd && sd.roles.background === '#0f1115' && sd.roles.text === '#f4f4f2' && sd.roles.accent === '#ffcc33' && sd.roles.accentText === '#0f1115', J(sd?.roles));
+  // CSS custom properties, with a dark block and var() references
+  const css = `:root { --brand-500: #c2410c; --color-primary: var(--brand-500); --color-background: #fafaf9; --color-text: #1c1917; --font-heading: "Instrument Serif", serif; --font-body: Inter, sans-serif; --radius-lg: 16px; --space-2: 8px; --space-4: 16px; --space-6: 24px; }
+  [data-theme="dark"] { --color-background: #0c0a09; --color-text: #fafaf9; }`;
+  const c = V.parseDesignSystem([{ path: 'tokens.css', text: css }], { kind: 'file', ref: 'tokens.css', files: [] }).system;
+  ok('CSS custom properties: var() resolved, the light block for the roles, dark mode kept apart, round corners read', c && c.roles.accent === '#c2410c' && c.roles.background === '#fafaf9' && c.colours.some((x) => x.mode === 'dark' && x.hex === '#0c0a09') && V.systemCorners(c) === 'round' && c.fonts.find((f) => f.role === 'display').standIn === 'Instrument Serif', J(c?.roles));
+  // guidelines in Markdown
+  const md = `# Acme Design System\n\n## Do's and don'ts\n- Use the primary colour for one action per screen\n- Never set body text below 16px\n\n## Button\nPrimary buttons are solid, 44px tall, with sentence-case labels.\n\n## Card\nCards are used only for selectable items.`;
+  const m = V.parseDesignSystem([{ path: 'tokens.css', text: css }, { path: 'README.md', text: md }], { kind: 'github', ref: 'acme/ds', files: [] }).system;
+  ok('guidelines: their rules and their components, and the system’s name', m.name === 'Acme Design System' && m.rules.length === 2 && /Never set body text below 16px/.test(m.rules.join()) && m.components.map((x) => x.name).join() === 'Button,Card' && /44px/.test(m.components[0].notes), J({ n: m.name, r: m.rules, c: m.components }));
+  ok('files with no tokens are refused, saying why', V.parseDesignSystem([{ path: 'notes.md', text: '# Hello' }], { kind: 'file', ref: 'x', files: [] }).system === null && /No design tokens/.test(V.parseDesignSystem([{ path: 'a.json', text: '{}' }], { kind: 'file', ref: 'x', files: [] }).error));
+  ok('a stored system comes back whole; garbage does not', J(V.normalizeDesignSystem(JSON.parse(J(m)))) === J(m) && V.normalizeDesignSystem({ name: 'x' }) === undefined && V.normalizeDesignSystem({ roles: { background: 'red' } }) === undefined);
+  // built within: the brief, then every direction
+  const b0 = V.normalizeBrief({ pageType: 'website', platform: 'web', objective: 'A website for an architecture studio', audience: 'clients', personality: ['precise'], visualDirection: 'calm', palette: [{ hex: '#ffffff', role: 'background' }, { hex: '#111111', role: 'text' }, { hex: '#e11d48', role: 'accent' }], typography: { display: 'Syne', body: 'Inter' }, userGoals: ['See the work', 'Get in touch'], rules: ['No stock photos'] }, new Set(['openverse:a1']));
+  b0.intent = V.settleIntent(V.briefWords(b0), {});
+  const bs = V.briefWithSystem(b0, m);
+  ok('attached, the brief takes its colours, type and layout from the system, each locked as a rule; its rules join the brief’s', bs.palette.find((x) => x.role === 'accent').hex === '#c2410c' && bs.typography.display === 'Instrument Serif' && bs.decisions.colour === 'locked' && bs.decisions.typography === 'locked' && bs.spec.corners === 'round' && bs.rules.includes('No stock photos') && bs.rules.some((r) => /16px/.test(r)) && bs.system === m);
+  ok('…it survives the brief being stored', V.normalizeBrief(JSON.parse(J(bs)), new Set()).system?.name === 'Acme Design System');
+  const dirs = V.proposeDirections({ brief: bs, salt: 'p_ds' });
+  ok('every direction keeps the system’s colours, faces and corners, and they still differ in composition', dirs.every((d) => d.tokens.colors.accent === '#c2410c' && d.tokens.colors.background === '#fafaf9' && d.tokens.fonts.display === 'Instrument Serif' && d.tokens.radius === 'round') && new Set(dirs.map((d) => d.plan)).size === 3, J(dirs.map((d) => [d.tokens.colors.accent, d.tokens.fonts.display, d.tokens.radius, d.plan])));
+  ok('…and no plan calls the system’s own palette a generated look', dirs.every((d) => !d.designPlan.open.some((o) => /falls into/.test(o))));
+  const back = V.briefWithoutSystem(bs);
+  ok('detached: the colours and type stay as they were, now the designer’s to change; its rules go', !back.system && back.decisions.colour === 'approved' && back.palette.find((x) => x.role === 'accent').hex === '#c2410c' && !back.rules.some((r) => /16px/.test(r)) && back.rules.includes('No stock photos'));
+  ok('the generator and the refiner are told the system, its components and its rules; the brief JSON does not repeat it', (() => { const u = V.generateUser({ brief: bs, moodboard: board, direction: '' }); return u.includes("THE DESIGNER'S DESIGN SYSTEM — Acme Design System") && u.includes('Button (Primary buttons are solid') && !u.includes('"importedAt"'); })() && V.refineUser({ brief: bs, spec: V.normalizeSpec(SPEC, board), moodboard: board, selection: null, comment: 'x', force: false, locks: [] }).includes('Acme Design System'));
+  // checked against it
+  const off = V.normalizeSpec({ ...SPEC, tokens: { ...SPEC.tokens, colors: { ...SPEC.tokens.colors, background: '#fafaf9', text: '#1c1917', accent: '#7c3aed' }, fonts: { display: 'Syne', body: 'Inter' }, radius: 'none' } }, board);
+  const conf = V.conformance(off, m);
+  ok('a design that leaves the system is found out: an accent not in it, faces not its own, square corners', J(conf.map((x) => x.what).sort()) === J(['colour', 'corners', 'type']), J(conf));
+  const fixed = conf.reduce((sp, x) => V.applyPatch(sp, x.fix, board).spec, off);
+  ok('…each with the change that puts it back', V.conformance(fixed, m).filter((x) => x.what !== 'scale').length === 0, J(V.conformance(fixed, m)));
+  const evc = V.evaluateDesign(off, {}, ['palette'], { brief: bs });
+  ok('the evaluation reports it before the design is shown, its fixes not held back by locks (the system is the designer’s)', evc.findings.filter((f) => f.kind === 'fidelity' && /Acme/.test(f.message) && f.fix && !f.blocked).length >= 3, J(evc.findings.map((f) => [f.message, !!f.fix, f.blocked])));
+  ok('a change that leaves the system is named, so it can be asked about first', J(V.offSystem({ op: 'tokens', tokens: { colors: { accent: '#7c3aed' }, fonts: { display: 'Anton' } } }, m)) === J(['the accent colour #7c3aed', 'the face Anton']) && V.offSystem({ op: 'tokens', tokens: { colors: { accent: '#c2410c' } } }, m).length === 0);
+  // GitHub: only two hosts, checked names, capped files, no redirects
+  ok('a repository is named safely: owner/repo, a github.com URL with a branch and folder; nothing else', J(V.repoTarget('github.com/acme/design-system/tree/main/tokens')) === J({ owner: 'acme', repo: 'design-system', ref: 'main', dir: 'tokens' }) && V.repoTarget('acme/ds').ref === 'HEAD' && V.repoTarget('https://gitlab.com/a/b') === null && V.repoTarget('acme/../etc') === null && V.repoTarget('github.com/acme/ds/tree/main/../../x') === null && V.repoTarget('-bad/x') === null);
+  const picked = V.pickFiles([{ path: 'README.md', size: 900 }, { path: 'node_modules/x/tokens.json', size: 10 }, { path: 'src/tokens/colors.json', size: 4000 }, { path: 'styles/variables.css', size: 2000 }, { path: 'big/tokens.json', size: 9e6 }, { path: 'src/index.ts', size: 10 }], '');
+  ok('…its files picked: tokens, then CSS variables, then guidelines; never vendored, huge or unrelated files', J(picked) === J(['src/tokens/colors.json', 'styles/variables.css', 'README.md']), J(picked));
+  const asked = [];
+  const fake = async (url, init) => {
+    asked.push([url, init.redirect]);
+    if (url.startsWith('https://api.github.com/')) return new Response(J({ tree: [{ path: 'tokens.css', type: 'blob', size: 500 }, { path: 'README.md', type: 'blob', size: 300 }] }), { status: 200 });
+    if (url.endsWith('/tokens.css')) return new Response(css, { status: 200 });
+    if (url.endsWith('/README.md')) return new Response(md, { status: 200 });
+    return new Response('', { status: 404 });
+  };
+  const got = await V.fetchSystemFiles(V.repoTarget('acme/ds'), fake);
+  ok('…read with two hosts only, redirects refused, and parsed into the same system', got.files?.length === 2 && asked.every(([u, r]) => /^https:\/\/(api\.github\.com|raw\.githubusercontent\.com)\//.test(u) && r === 'error') && V.parseDesignSystem(got.files, { kind: 'github', ref: 'acme/ds', files: [] }).system.roles.accent === '#c2410c', J(asked));
+  const missing = await V.fetchSystemFiles(V.repoTarget('acme/nope'), async () => new Response('', { status: 404 }));
+  const limited = await V.fetchSystemFiles(V.repoTarget('acme/busy'), async () => new Response('', { status: 403 }));
+  ok('…a missing or private repository, and GitHub’s rate limit, each said plainly', /not found, or it is private/.test(missing.error) && limited.status === 429 && /limiting/.test(limited.error));
+}
+
+
+console.log('\n=== layout pieces: a section composed from stacks, grids and proportions ===');
+{
+  const tree = { t: 'grid', cols: [5, 7], gap: 'l', align: 'end', children: [
+    { t: 'stack', dir: 'col', gap: 'm', align: 'start', children: [{ t: 'text', role: 'eyebrow', text: 'Since 1998' }, { t: 'text', role: 'title', text: 'Rooms for *thinking* <script>alert(1)</script>' }, { t: 'text', role: 'title', text: 'A second title' }, { t: 'button', label: 'See the work', style: 'primary' }] },
+    { t: 'box', tone: 'alt', pad: 'l', children: [{ t: 'figure', value: '42', label: 'projects built' }, { t: 'image', at: 0, ratio: '4:3' }] },
+  ] };
+  const n = V.normalizeCompose(tree);
+  ok('a tree of pieces is held to its shape: grid, stack, box, text, figure, image, button', n && n.t === 'grid' && J(n.cols) === '[5,7]' && n.children[1].children[0].t === 'figure');
+  ok('…one title per section: a second becomes a heading', n.children[0].children[2].role === 'heading');
+  const junk = V.normalizeCompose({ t: 'grid', cols: [0, 3.6, 99, 'x', 2, 4, 5], style: 'color:red', href: 'javascript:alert(1)', children: [{ t: 'iframe', src: 'x' }, { t: 'text', role: 'h1', text: 'x'.repeat(2000), onclick: 'x' }, { t: 'image', at: 99 }, { t: 'html', html: '<b>' }] });
+  ok('…unknown pieces and keys dropped, proportions whole and bounded, words capped, pictures only by a valid index', junk && J(junk.cols) === '[4,2,4,5]' && junk.children.length === 1 && junk.children[0].role === 'body' && junk.children[0].text.length === 700 && !('style' in junk) && !('href' in junk), J(junk));
+  const deep = (d) => (d === 0 ? { t: 'text', role: 'body', text: 'deep' } : { t: 'stack', dir: 'col', children: [deep(d - 1)] });
+  ok('…at most four levels deep', V.normalizeCompose(deep(3)) !== null && V.normalizeCompose(deep(6)) === null);
+  const many = V.normalizeCompose({ t: 'stack', dir: 'col', children: Array.from({ length: 8 }, () => ({ t: 'stack', dir: 'row', children: Array.from({ length: 8 }, () => ({ t: 'text', role: 'body', text: 'x' })) })) });
+  const count = (p) => 1 + ('children' in p ? p.children.reduce((a, c) => a + count(c), 0) : 0);
+  ok('…at most 48 pieces', count(many) <= 48, count(many));
+  // as a section, drawn
+  const spec = V.normalizeSpec({ title: 'Studio', pageType: 'website', tokens: SPEC.tokens, sections: [{ id: 'opening', kind: 'compose', content: { root: tree }, images: ['openverse:a1'] }, { id: 'f', kind: 'footer', content: { brand: 'Studio' } }] }, board);
+  ok('a compose section is a section like any other; one with nothing drawable is dropped', spec.sections[0].kind === 'compose' && V.normalizeSpec({ title: 'x', pageType: 'website', sections: [{ kind: 'compose', content: { root: { t: 'grid', children: [] } } }] }) === null);
+  const html = V.renderDesign(spec, board.refs).html;
+  const doc = parse(html);
+  ok('drawn from the renderer’s own classes, the proportion from whole numbers, the opening title an h1', !!doc.querySelector('.cp-grid') && /--cp-cols:minmax\(0,5fr\) minmax\(0,7fr\)/.test(html) && doc.querySelector('h1.cp-title') !== null && doc.querySelectorAll('.cp-title').length === 1);
+  ok('…every word escaped (the script is text), emphasis kept', !/<script>alert/.test(html) && /&lt;script&gt;/.test(html) && doc.querySelector('.cp-title em.em')?.textContent === 'thinking');
+  ok('…each word editable where it sits; the picture drawn by index', doc.querySelector('[data-ux-path="root.children.0.children.1.text"]') !== null && doc.querySelector('.cp-img img') !== null && /@media \(max-width:720px\)\{\.cp-grid\{grid-template-columns:minmax\(0,1fr\)\}/.test(html));
+  const sec = spec.sections[0];
+  const at = V.textAt(sec, 'root.children.0.children.3.label');
+  const p1 = V.textPatch(sec, 'root.children.1.children.0.value', '43');
+  ok('its words are changed in place, by path, through a patch that is checked like any other', at?.value === 'See the work' && at.max === 40 && p1 && V.applyPatch(spec, p1, board).spec.sections[0].content.root.children[1].children[0].value === '43');
+  const swapped = V.applyPatch(spec, { op: 'content', sectionId: 'opening', content: { root: { ...sec.content.root, cols: [7, 5], children: [sec.content.root.children[1], sec.content.root.children[0]] } } }, board);
+  ok('…and its arrangement (columns swapped, 7 : 5)', swapped.ok && J(swapped.spec.sections[0].content.root.cols) === '[7,5]' && swapped.spec.sections[0].content.root.children[0].t === 'box');
+  ok('its structure is its arrangement, proportions included', V.structureOf(spec)[0] === 'compose/grid(5:7)[col[eyebrow,title,heading,button],box-alt[figure,img4x3]]', V.structureOf(spec)[0]);
+  ok('a figure and a box on the accent are loud moves like any other', J(V.loudMoves({ sections: [{ ...sec, content: { root: { t: 'box', tone: 'accent', pad: 'm', children: [{ t: 'figure', value: '1', label: 'x' }] } } }] }).sort()) === J(['colour-field', 'oversized-figure']));
+  // the engine composes openings no fixed layout draws, differently per project
+  const opens = new Set(Array.from({ length: 30 }, (_, i) => V.composeSignature(V.composedOpening({ title: 'Rooms for thinking', lead: 'An architecture studio', action: 'See the work', detail: 'Each project with its area in m²' }, i % 2 === 0, V.seeded(i * 7 + 1)))));
+  ok('the engine composes openings of its own, many arrangements (≥ 12 in 30 projects)', opens.size >= 12, opens.size);
+  const site = V.normalizeBrief({ pageType: 'website', platform: 'web', objective: 'A website for a ceramics studio', audience: 'collectors', personality: ['calm'], visualDirection: 'quiet', palette: [], typography: { display: 'Archivo', body: 'Inter' }, userGoals: ['See the pieces', 'Visit the studio'] }, new Set());
+  site.intent = V.settleIntent(V.briefWords(site), {});
+  const composedDirs = Array.from({ length: 10 }, (_, i) => V.proposeDirections({ brief: site, salt: `p_cp_${i}` })).flat().filter((d) => d.plan === 'composed');
+  ok('directions take the composed plan, and its study opens with a section composed from pieces', composedDirs.length > 0 && composedDirs.every((d) => { const st = V.studySpec(d, site, 'Kiln', []); const first = st.sections.find((x) => x.kind !== 'nav'); return first.kind === 'compose' && V.normalizeCompose(first.content.root) !== null; }), composedDirs.length);
+  ok('the generator is told when and how to compose (the pieces, their limits)', /compose it from pieces/.test(V.generateSystem(site, composedDirs[0] ?? null)) && /compose \(/.test(V.libraryMenu('website')) && /at most 4 levels deep and 48 pieces/.test(V.libraryMenu('website')));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

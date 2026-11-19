@@ -33,7 +33,7 @@ const swap = {
     b.onResolve({ filter: /^next\/(server|headers)$/ }, (a) => ({ path: `${a.path}.js`, external: true }));
   },
 };
-const ROUTES = ['critique', 'discover', 'brief', 'direct', 'generate', 'refine', 'images', 'projects'];
+const ROUTES = ['critique', 'discover', 'brief', 'direct', 'generate', 'refine', 'images', 'projects', 'design-system'];
 await Promise.all(
   ROUTES.map((r) =>
     build({
@@ -473,6 +473,39 @@ console.log('\n=== the layout: one question, the decisions in the brief, a salt 
   const bk = g.json?.spec?.sections.find((x) => x.kind === 'booking');
   ok('left to SocriaUX, a generation is composed for this project, and the decisions hold whatever the model drew', g.status === 200 && g.json.artDirection.language === auto.language && bk.variant === 'split' && bk.shape?.summary === 'card', J({ lang: [g.json?.artDirection?.language, auto.language], bk }));
   ok('…the generator was told the decisions', J(g.calls[0].messages).includes("THE DESIGNER'S LAYOUT DECISIONS"));
+}
+
+
+console.log('\n=== the designer’s design system, from GitHub, kept through a rewrite ===');
+{
+  const V = await import(pathToFileURL(join(here, '.tmp', 'ux-v0-under-test.mjs')).href);
+  const U = 'user_v0_ds';
+  ok('signed out: refused before GitHub is asked', (await post('design-system', { url: 'acme/ds' }, null, [])).status === 401);
+  ok('not a GitHub repository: refused, saying what to give', (await post('design-system', { url: 'https://example.com/tokens.json' }, U, [])).status === 400);
+  const css = ':root { --color-primary: #c2410c; --color-background: #fafaf9; --color-text: #1c1917; --font-heading: "Instrument Serif"; --font-body: Inter; --radius-lg: 16px; }';
+  const realFetch = globalThis.fetch;
+  const asked = [];
+  globalThis.fetch = async (url, init) => {
+    asked.push(String(url));
+    if (String(url).startsWith('https://api.github.com/repos/acme/ds/')) return new Response(J({ tree: [{ path: 'tokens.css', type: 'blob', size: css.length }, { path: 'README.md', type: 'blob', size: 40 }] }), { status: 200 });
+    if (String(url).endsWith('/tokens.css')) return new Response(css, { status: 200 });
+    if (String(url).endsWith('/README.md')) return new Response('# Acme\n\n## Rules\n- Never use more than one accent', { status: 200 });
+    return new Response('', { status: 404 });
+  };
+  const got = await post('design-system', { url: 'github.com/acme/ds' }, U, []);
+  ok('a public repository is read into a system: its roles, faces and rules; only GitHub asked; no model', got.status === 200 && got.json.system.roles.accent === '#c2410c' && got.json.system.fonts[0].standIn === 'Instrument Serif' && got.json.system.rules.length === 1 && asked.every((u) => /^https:\/\/(api\.github\.com|raw\.githubusercontent\.com)\//.test(u)) && got.calls.length === 0, J({ s: got.status, j: got.json }).slice(0, 300));
+  const none = await post('design-system', { url: 'acme/missing' }, U, []);
+  ok('a missing or private repository is said plainly', none.status === 404 && /not found, or it is private/.test(none.json.error));
+  globalThis.fetch = realFetch;
+  // a brief built within it, rewritten: the system stays attached and the brief stays within it
+  const b0 = V.normalizeBrief({ pageType: 'website', platform: 'web', objective: 'A website for an architecture studio', audience: 'clients', personality: ['precise'], visualDirection: 'calm', palette: [{ hex: '#ffffff', role: 'background' }, { hex: '#111111', role: 'text' }, { hex: '#e11d48', role: 'accent' }], typography: { display: 'Syne', body: 'Inter' } }, new Set());
+  const within = V.briefWithSystem(b0, V.normalizeDesignSystem(got.json.system));
+  const rb = await post('brief', { projectId: 'uxv0_ds', action: 'refine', intent: 'A website for an architecture studio', questions: [], current: within, instruction: 'Make it warmer', moodboard: {} }, U, [{ ...within, palette: [{ hex: '#fff7ed', role: 'background' }, { hex: '#1c1917', role: 'text' }, { hex: '#ea580c', role: 'accent' }], typography: { display: 'Fraunces', body: 'Inter' }, system: null }]);
+  ok('a rewrite keeps the system, and the brief stays within it whatever the model wrote', rb.status === 200 && rb.json.brief.system?.name === 'Acme' && rb.json.brief.palette.find((x) => x.role === 'accent').hex === '#c2410c' && rb.json.brief.typography.display === 'Instrument Serif' && rb.json.brief.decisions.colour === 'locked', J(rb.json?.brief?.palette));
+  // a change that leaves the system is asked about first
+  const spec = V.normalizeSpec({ title: 'Studio', pageType: 'website', tokens: { colors: { background: '#fafaf9', surface: '#ffffff', text: '#1c1917', muted: '#57534e', accent: '#c2410c', accentText: '#ffffff', line: '#e7e5e4' }, fonts: { display: 'Instrument Serif', body: 'Inter' }, scale: 'comfortable', radius: 'round', style: 'editorial', imageTreatment: 'natural' }, sections: [{ id: 'hero', kind: 'hero', variant: 'editorial', content: { title: 'Rooms for thinking' } }] }, { refs: [] });
+  const ch = await post('refine', { projectId: 'uxv0_ds', spec, brief: within, moodboard: {}, comment: 'Make the accent purple' }, U, [{ understood: 'Purple accent', patch: { op: 'tokens', tokens: { colors: { accent: '#7c3aed' } }, summary: 'Purple' } }]);
+  ok('a change that leaves the design system is asked about first, with the patch', ch.status === 200 && /not in your design system \(Acme\)/.test(ch.json.challenge) && ch.json.applies === true, J(ch.json?.challenge));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
