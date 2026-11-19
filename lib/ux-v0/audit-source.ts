@@ -91,7 +91,7 @@ export const AUDIT_SOURCE = String.raw`(function () {
     }
     var all = body ? body.getElementsByTagName('*') : [];
     var n = Math.min(all.length, 5000);
-    var st = { gradients: 0, shadows: 0, roundedBoxes: 0, trackedCaps: 0, centred: 0, blocks: 0, emoji: 0, icons: 0, rails: 0, families: {} };
+    var st = { gradients: 0, shadows: 0, roundedBoxes: 0, trackedCaps: 0, centred: 0, blocks: 0, emoji: 0, icons: 0, rails: 0, blurs: 0, families: {} };
     var emojiRe = /[☀-➿]|\uD83C[\uDF00-\uDFFF]|\uD83D[\uDC00-\uDE4F\uDE80-\uDEFF]|\uD83E[\uDD00-\uDDFF]/;
     for (var k = 0; k < n; k++) {
       var el = all[k];
@@ -101,6 +101,8 @@ export const AUDIT_SOURCE = String.raw`(function () {
       var rect = el.getBoundingClientRect();
       var decorative = el.closest('.scrim,.bleed-shade,.img-missing,.hero-bleed .wrap');
       if (!decorative && /gradient/.test(cs.backgroundImage)) st.gradients++;
+      var bf = cs.backdropFilter || cs.webkitBackdropFilter || '';
+      if (bf && bf !== 'none' && /blur/.test(bf)) st.blurs++;
       if (cs.boxShadow && cs.boxShadow !== 'none' && !/^(rgba?\([^)]*\) )?\d+px \d+px 0px/.test(cs.boxShadow)) st.shadows++;
       var rad = parseFloat(cs.borderTopLeftRadius) || 0;
       var boxed = (rgba(cs.backgroundColor) || [0, 0, 0, 0])[3] > 0.05 || parseFloat(cs.borderTopWidth) > 0;

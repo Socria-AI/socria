@@ -1,5 +1,5 @@
 // app/api/ux-v0/direct/route.ts
-// POST { brief, notes?, avoid?, base?, round?, seen? } → { options, usage }
+// POST { brief, notes?, avoid?, base?, round?, seen?, dna? } → { options, usage }
 //
 // Art direction, before anything is drawn (lib/ux-v0/direction.ts). The engine
 // chooses three visual languages for fit and for difference — deterministic
@@ -19,6 +19,7 @@ import { MAX_TOKENS } from '@/lib/ux-v0/model';
 import { bad, projectIdOf, readBodyPrinted } from '@/lib/ux-v0/route-kit';
 import { normalizeBrief } from '@/lib/ux-v0/types';
 import { normalizeReading } from '@/lib/ux-v0/references';
+import { normalizeDNA } from '@/lib/ux-v0/dna';
 import { admit, refuse, runStage } from '@/lib/ux-v0/stage-server';
 
 export const runtime = 'nodejs';
@@ -44,6 +45,8 @@ export const POST = withMeter(async function POST(req: NextRequest) {
     board: normalizeReading(body.board),
     // the project's own salt, as the browser drew them: the same directions on both sides
     salt: saltOf(body.projectId),
+    // the project's Creative DNA, as the browser holds it: the same leans, the same locks
+    dna: normalizeDNA(body.dna) ?? null,
   };
   const options = proposeDirections(ask);
 

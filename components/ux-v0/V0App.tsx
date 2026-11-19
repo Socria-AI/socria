@@ -20,6 +20,7 @@ import '@/components/brand/socria-brand.css';
 import './ux-v0.css';
 import './home.css';
 import './studio.css';
+import './dna.css';
 
 const idFromUrl = () => {
   if (typeof window === 'undefined') return null;

@@ -1655,5 +1655,219 @@ console.log('\n=== layout pieces: a section composed from stacks, grids and prop
   ok('the generator is told when and how to compose (the pieces, their limits)', /compose it from pieces/.test(V.generateSystem(site, composedDirs[0] ?? null)) && /compose \(/.test(V.libraryMenu('website')) && /at most 4 levels deep and 48 pieces/.test(V.libraryMenu('website')));
 }
 
+// ── the Creative DNA (lib/ux-v0/dna.ts) ──────────────────────────────
+{
+  const mkB = (objective, extra = {}) => {
+    const b = V.normalizeBrief({ pageType: 'website', platform: 'web', objective, audience: 'people', personality: ['clear'], visualDirection: '', palette: [{ hex: '#f7f5f0', role: 'background' }, { hex: '#1d1c19', role: 'text' }, { hex: '#7a2e1d', role: 'accent' }], typography: { display: 'Archivo', body: 'Inter' }, userGoals: ['See it', 'Get in touch'], ...extra }, new Set());
+    b.intent = V.settleIntent(V.briefWords(b), {});
+    return b;
+  };
+  const inputOf = (b, board = null) => ({ brief: b, board, kind: V.intentOf(b).kind });
+  // stored state is held to its shape
+  ok('a stored DNA is held to its shape: values clamped, unknown dimensions and sources dropped', (() => {
+    const d = V.normalizeDNA({ dims: { restraint: { value: 140, locked: true, source: 'designer', because: ['x'] }, nonsense: { value: 3 }, motion: { value: 'x' }, density: { value: 30, source: 'hacker' } }, basis: 'b' });
+    return d.dims.restraint.value === 100 && d.dims.restraint.locked && !d.dims.nonsense && !d.dims.motion && d.dims.density.source === 'kind';
+  })());
+  ok('…and nothing comes of something that is not one', V.normalizeDNA('x') === undefined && V.normalizeDNA(null) === undefined);
+  // derived from the brief's words, negation read
+  const quietB = mkB('A website for a gallery of contemporary ceramics', { visualDirection: 'minimal, restrained, airy, with generous white space; editorial serif typography; calm and static', personality: ['quiet', 'precise'] });
+  const loudB = mkB('A website for a late-night music festival', { visualDirection: 'bold, loud, experimental, collage, dense with colour, kinetic and immersive', personality: ['wild', 'energetic'] });
+  const q = V.dnaValues(V.deriveDNA(inputOf(quietB)));
+  const l = V.dnaValues(V.deriveDNA(inputOf(loudB)));
+  ok('derived from the brief: a quiet gallery sits minimal, airy, still; a loud festival expressive, dense, immersive', q.restraint < 30 && q.density < 35 && q.motion < 30 && l.restraint > 65 && l.composition > 60 && l.motion > 65 && l.density > 55, J({ q, l }));
+  const notBusy = V.dnaValues(V.deriveDNA(inputOf(mkB('A website for a bookshop', { visualDirection: 'not busy, not cluttered' }))));
+  ok('…reading negation (“not busy” is airy, not dense)', notBusy.density < 45, notBusy.density);
+  const qd = V.deriveDNA(inputOf(quietB));
+  ok('each dimension says where it came from and why', qd.dims.restraint.source === 'brief' && qd.dims.restraint.because.some((x) => /minimal|restrained|quiet/.test(x)) && Object.values(qd.dims).every((d) => d.because.length > 0), J(qd.dims.restraint));
+  ok('the dimensions follow the kind of work: a dashboard gets information, a booking interaction', 'information' in V.deriveDNA(inputOf(mkB('A dashboard for lab sensor readings'))).dims && 'interaction' in V.deriveDNA(inputOf(mkB('Booking screen for a yoga class'))).dims);
+  // set, locked, released, delegated, added
+  let dna = V.setDim(qd, 'composition', 85);
+  dna = V.lockDim(dna, 'motion', true);
+  ok('set by the designer: theirs, at full strength; a lock is kept', dna.dims.composition.source === 'designer' && V.strengthOf(dna.dims.composition) === 1 && dna.dims.motion.locked && V.strengthOf(dna.dims.motion) === 1);
+  const again = V.deriveDNA(inputOf(mkB('A website for a gallery of contemporary ceramics', { visualDirection: 'bold and colourful now' })), dna);
+  ok('derived again from a changed brief: what the designer set or locked stays exactly as it was', again.dims.composition.value === 85 && again.dims.composition.source === 'designer' && again.dims.motion.locked && again.dims.motion.value === dna.dims.motion.value && again.dims.restraint.value !== dna.dims.restraint.value, J({ c: again.dims.composition, r: [again.dims.restraint.value, dna.dims.restraint.value] }));
+  ok('…and read again only when what it reads changed (the basis)', V.dnaBasis(inputOf(quietB)) === V.dnaBasis(inputOf(mkB('A website for a gallery of contemporary ceramics', { visualDirection: 'minimal, restrained, airy, with generous white space; editorial serif typography; calm and static', personality: ['quiet', 'precise'] }))) && V.dnaBasis(inputOf(quietB)) !== V.dnaBasis(inputOf(loudB)));
+  const released = V.releaseDim(dna, 'composition', inputOf(quietB));
+  ok('given back to SocriaUX: read again from the brief, no longer the designer’s', released.dims.composition.source !== 'designer' && released.dims.composition.value === qd.dims.composition.value);
+  const delegated = V.delegateAll(dna, inputOf(quietB));
+  ok('everything delegated: the lock is kept, the rest read again', delegated.dims.motion.locked && delegated.dims.composition.source !== 'designer');
+  const added = V.addDim(qd, 'interaction', inputOf(quietB));
+  ok('extendable: a dimension the kind does not have can be added (derived), kept through derivation, and removed', added.dims.interaction && 'interaction' in V.deriveDNA(inputOf(quietB), added).dims && !V.removeDim(added, 'interaction').dims.interaction);
+  ok('the DNA’s key changes with a value or a lock, not otherwise', V.dnaKeyOf(dna) !== V.dnaKeyOf(qd) && V.dnaKeyOf(V.lockDim(qd, 'density', true)) !== V.dnaKeyOf(qd) && V.dnaKeyOf(qd) === V.dnaKeyOf(V.normalizeDNA(JSON.parse(J(qd)))));
+  ok('the DNA told to a model is one compact line, with what is locked', V.dnaBrief(dna).length < 700 && /Locked by the designer: motion/.test(V.dnaBrief(dna)) && V.dnaBrief(null) === '');
+
+  // it materially changes the directions
+  const fashion = mkB('A luxury fashion house: a new collection of tailored coats, with appointments in the Paris atelier', { visualDirection: 'quiet, assured, exacting', personality: ['refined'] });
+  const lockAll = (base, vals) => Object.entries(vals).reduce((d, [k, v]) => V.lockDim(V.setDim(d, k, v), k, true), base);
+  const base = V.deriveDNA(inputOf(fashion));
+  const quietDirs = V.proposeDirections({ brief: fashion, dna: lockAll(base, { restraint: 8, composition: 15, typography: 85, motion: 10, density: 12 }), salt: 'p_dna' });
+  const loudDirs = V.proposeDirections({ brief: fashion, dna: lockAll(base, { restraint: 92, composition: 90, typography: 80, motion: 90, density: 60 }), salt: 'p_dna' });
+  const plain = V.proposeDirections({ brief: fashion, salt: 'p_dna' });
+  ok('a locked expressive DNA chooses other languages than a locked restrained one', quietDirs.map((d) => d.language).join() !== loudDirs.map((d) => d.language).join() && loudDirs.some((d) => ['poster', 'retro-print', 'night'].includes(d.language)), J([quietDirs.map((d) => d.language), loudDirs.map((d) => d.language)]));
+  const readOf = (ds) => ds.map((d) => V.dnaOfDesign(V.studySpec(d, fashion, 'Maison', [])));
+  const qr = readOf(quietDirs);
+  const lr = readOf(loudDirs);
+  ok('…and the studies drawn from them read that way: every expressive one more composed-off-grid, louder, more moving', qr.every((x, i) => lr[i].composition > x.composition && lr[i].restraint > x.restraint && lr[i].motion > x.motion), J({ qr: qr.map((x) => [x.composition, x.restraint, x.motion]), lr: lr.map((x) => [x.composition, x.restraint, x.motion]) }));
+  ok('locks survive divergence: with composition locked strict, all three use strict grids — three different ones', quietDirs.every((d) => ['swiss', 'modular', 'stack'].includes(d.look.grid)) && new Set(quietDirs.map((d) => d.look.grid)).size === 3, J(quietDirs.map((d) => d.look.grid)));
+  ok('…and every direction carries the DNA it embodies and says what it changed', quietDirs.every((d) => d.dna && d.dna.composition === 15 && d.dnaLean && Array.isArray(d.dnaSaid)) && !plain.some((d) => d.dna));
+  // controlled divergence
+  const slots = [0, 1, 2].map((i) => V.divergentDNA(base, i));
+  ok('controlled divergence: the first lean is the DNA itself, the second bolder, the third quieter, along what SocriaUX placed', slots[0].vector.restraint === base.dims.restraint.value && slots[1].vector.restraint > slots[0].vector.restraint && slots[2].vector.restraint < slots[0].vector.restraint, J(slots.map((s) => s.vector.restraint)));
+  const ownComp = V.setDim(base, 'composition', 40);
+  ok('…never along what the designer set or locked', [0, 1, 2].every((i) => V.divergentDNA(ownComp, i).vector.composition === 40));
+  // plans and booking compositions ranked by the direction's DNA
+  const site = mkB('A website for an architecture studio');
+  const [d0] = V.proposeDirections({ brief: site, count: 1, salt: 'p_plan' });
+  const planFor = (vec) => V.composeDirections([{ ...d0, plan: undefined, dna: vec, dnaWeight: 1 }], [], true, 'site', {})[0].plan;
+  const pLoud = planFor({ restraint: 90, composition: 92, typography: 85, motion: 85, density: 50 });
+  const pQuiet = planFor({ restraint: 10, composition: 10, typography: 40, motion: 10, density: 20 });
+  ok('a direction’s plan follows its DNA: an expressive one and a structured one take different plans', pLoud !== pQuiet && V.affinity(V.PLAN_DNA[pLoud], { composition: 92, restraint: 90 }) > V.affinity(V.PLAN_DNA[pQuiet], { composition: 92, restraint: 90 }), J([pLoud, pQuiet]));
+  // shaping never moves what was locked
+  const d = quietDirs[0];
+  const held = V.shapeByDNA({ tokens: d.tokens, look: d.look }, { restraint: 95, composition: 95, typography: 5, motion: 95, density: 95, colour: 95 }, { restraint: 1, composition: 1, typography: 1, motion: 1, density: 1, colour: 1 }, { locks: ['type', 'layout', 'motion', 'palette', 'motifs'], keepColours: true, keepType: true });
+  ok('shaping by the DNA never moves a locked group (type, layout, motion, palette, ornament)', held.look.grid === d.look.grid && held.look.ratio === d.look.ratio && held.tokens.fonts.display === d.tokens.fonts.display && J(held.look.motion) === J(d.look.motion) && held.tokens.colors.accent === d.tokens.colors.accent && J(held.look.motifs) === J(d.look.motifs) && held.tokens.scale === d.tokens.scale, J(held.said));
+  // the design held to its locked DNA
+  const lockedQuiet = lockAll(base, { restraint: 8, composition: 15, typography: 85, motion: 10, density: 12 });
+  const study = V.studySpec(quietDirs[0], fashion, 'Maison', []);
+  const drifted = V.applyPatch(study, { op: 'look', look: { grid: 'poster', rhythm: 'dramatic', motion: V.motionFor('kinetic') }, summary: 'drift' }, null).spec;
+  ok('a change that moves a locked dimension away is caught, read from the page before and after', J(V.lockedDnaMoves(study, drifted, lockedQuiet).sort()) === J(['composition', 'motion']), J(V.lockedDnaMoves(study, drifted, lockedQuiet)));
+  const fitted = V.fitDNA(drifted, lockedQuiet, (s, p) => { const r = V.applyPatch(s, p, null); return r.ok ? r.spec : null; }, { lang: V.languageOf(drifted.look.language) });
+  ok('…and a generated page that drifted from it is moved back in code (fitDNA), saying which', fitted.held.includes('composition') && fitted.held.includes('motion') && ['swiss', 'modular', 'stack'].includes(fitted.spec.look.grid) && V.dnaConsistency(fitted.spec, lockedQuiet).score > V.dnaConsistency(drifted, lockedQuiet).score, J({ held: fitted.held, grid: fitted.spec.look.grid }));
+  ok('the patches toward the DNA touch only the look and tokens, each saying so', V.dnaPatches(drifted, lockedQuiet).every((p) => ['look', 'tokens', 'shape'].includes(p.op) && /^Creative DNA:/.test(p.summary)));
+  // the direction chosen is adopted
+  const adopted = V.adoptLean(base, loudDirs[1].dna, loudDirs[1].name);
+  const lockedBase = V.lockDim(base, 'motion', true);
+  ok('the chosen direction’s lean becomes the designer’s; what was locked is untouched', Object.keys(adopted.dims).some((k) => adopted.dims[k].source === 'designer' && /direction you chose/.test(adopted.dims[k].because[0])) && V.adoptLean(lockedBase, { motion: 99 }, 'x').dims.motion.value === lockedBase.dims.motion.value);
+  ok('a project keeps its DNA through a save; one with none has none', V.normalizeProject({ ...V.makeProject('create', 'A'), dna }).dna.dims.composition.value === 85 && !('dna' in V.normalizeProject(V.makeProject('create', 'B'))));
+}
+
+// ── a reference's DNA, measured from its pixels (lib/ux-v0/ref-dna.ts) ──
+{
+  const W = 96, H = 64;
+  const img = (f) => { const d = new Uint8ClampedArray(W * H * 4); for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const [r, g, b] = f(x, y); const i = (y * W + x) * 4; d[i] = r; d[i + 1] = g; d[i + 2] = b; d[i + 3] = 255; } return { width: W, height: H, data: d }; };
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const blank = img((x, y) => (Math.abs(x - 48) < 5 && Math.abs(y - 32) < 5 ? [30, 30, 30] : [245, 244, 240]));
+  const corner = img((x, y) => (x > 78 && x < 88 && y > 48 && y < 58 ? [30, 30, 30] : [245, 244, 240]));
+  const noise = img(() => [rnd() * 255, rnd() * 255, rnd() * 255]);
+  const grid = img((x, y) => (x % 16 < 10 && y % 16 < 10 ? [40, 40, 40] : [235, 235, 235]));
+  const stripes = img((x, y) => (Math.floor((x + y) / 6) % 2 ? [230, 40, 60] : [20, 30, 140]));
+  const [vb, vc, vn, vg, vs] = [blank, corner, noise, grid, stripes].map((p) => V.refDnaOf(p, 'test').votes);
+  ok('measured: an empty frame is airy and minimal; a colourful, detailed one dense, expressive and vivid', vb.density < 15 && vb.restraint < 20 && vn.density > 85 && vn.restraint > 70 && vn.colour > 85, J({ vb, vn }));
+  ok('…weight off-centre and diagonals read as experimental; a centred mark and a regular grid as structured', vc.composition > vb.composition + 30 && vs.composition > 55 && vg.composition < 15 && vb.composition < 15, J([vb.composition, vc.composition, vs.composition, vg.composition]));
+  ok('…the regular repeat of a grid is found, and said', V.measurePixels(grid).regularity > 0.5 && V.refDnaOf(grid, 't').said.some((x) => /regular rhythm/.test(x)) && V.measurePixels(noise).regularity < 0.3);
+  ok('…pixels say nothing about type or interaction, and no vote is cast for them', !('typography' in vn) && !('interaction' in vn) && !('motion' in vn));
+  const moved = img((x, y) => (Math.abs(x - 20) < 6 ? [250, 250, 250] : [10, 10, 10]));
+  const still = V.refDnaOf([blank, blank], 'clip');
+  const moving = V.refDnaOf([blank, moved], 'clip');
+  ok('a moving reference: frames that change read as movement, frames that do not as still; both say they were read from frames', moving.votes.motion > still.votes.motion + 30 && moving.via.includes('motion') && still.votes.motion < 25, J([still.votes.motion, moving.votes.motion]));
+  ok('a stored measurement is held to its shape; one that does not hold together is dropped', V.normalizeRefDna({ votes: { density: 300, typography: 'x' }, said: ['a'], via: ['pixels', 'guess'], of: 'u' }).votes.density === 100 && !('typography' in V.normalizeRefDna({ votes: { density: 3, typography: 'x' }, via: ['pixels'], of: 'u' }).votes) && V.normalizeRefDna({ votes: { density: 3 }, via: ['guess'], of: 'u' }) === undefined && V.normalizeRefDna({ votes: {}, via: ['pixels'], of: 'u' }) === undefined);
+  ok('a reference keeps its measurement through a save (never measured twice)', V.normalizeRef({ ...ref('m1'), dna: V.refDnaOf(blank, 'https://images.example.org/m1-t.jpg') }).dna.of === 'https://images.example.org/m1-t.jpg');
+  ok('what is kept is only where it sits and why — numbers and phrases, no positions, no layout', (() => { const r = V.refDnaOf(corner, 'x'); return J(Object.keys(r).sort()) === J(['of', 'said', 'via', 'votes']) && Object.values(r.votes).every((v) => typeof v === 'number') && r.said.every((s) => typeof s === 'string' && s.length < 100); })());
+  // the references move the DNA: what is taken counts more; what is left behind counts the other way
+  const b = V.normalizeBrief({ pageType: 'website', platform: 'web', objective: 'A website for a photographer', audience: 'clients', personality: ['clear'], visualDirection: '', palette: [], typography: { display: 'Archivo', body: 'Inter' }, userGoals: ['See work'] }, new Set());
+  b.intent = V.settleIntent(V.briefWords(b), {});
+  const airy = V.refDnaOf(blank, 'a');
+  const dense = V.refDnaOf(noise, 'n');
+  const boardOf = (refs) => V.normalizeMoodboard({ refs });
+  const derive = (refs) => V.dnaValues(V.deriveDNA({ brief: b, board: boardOf(refs), kind: 'site' }));
+  const none = derive([]);
+  const withAiry = derive([ref('ra', { dna: airy })]);
+  const withDense = derive([ref('rn', { dna: dense })]);
+  ok('kept references move the DNA: an airy, minimal one toward airy and minimal; a dense, vivid one the other way', withAiry.density < none.density && withAiry.restraint < none.restraint && withDense.density > none.density && withDense.colour > none.colour, J({ none, withAiry, withDense }));
+  const liked = derive([ref('rn', { dna: dense, take: ['composition'] })]);
+  const left = derive([ref('rn', { dna: dense, leave: ['composition'] })]);
+  ok('…what the designer takes from one counts more; what they leave behind counts the other way', liked.density > withDense.density - 1 && left.density < none.density, J({ withDense: withDense.density, liked: liked.density, left: left.density, none: none.density }));
+  const steer = derive([ref('rn', { dna: dense, avoid: true, state: 'kept' })]);
+  ok('…and one to steer away from pushes away from it', steer.density < none.density, J({ steer: steer.density, none: none.density }));
+  ok('a DNA from references says so', V.deriveDNA({ brief: b, board: boardOf([ref('ra', { dna: airy, key: true }), ref('rb', { dna: airy })]), kind: 'site' }).dims.density.source === 'references');
+}
+
+// ── Explore Directions: genuinely different directions (lib/ux-v0/explore.ts) ──
+{
+  const mkB = (objective, extra = {}) => {
+    const b = V.normalizeBrief({ pageType: 'website', platform: 'web', objective, audience: 'people', personality: ['clear'], visualDirection: '', palette: [{ hex: '#f7f5f0', role: 'background' }, { hex: '#1d1c19', role: 'text' }, { hex: '#7a2e1d', role: 'accent' }], typography: { display: 'Archivo', body: 'Inter' }, userGoals: ['See it'], ...extra }, new Set());
+    b.intent = V.settleIntent(V.briefWords(b), {});
+    return b;
+  };
+  const briefs = ['A luxury fashion house with appointments in its Paris atelier', 'A dashboard for lab sensor readings across three cleanrooms', 'A website for an architecture studio', 'An experimental portfolio for a motion designer', 'A booking app for a climbing gym'];
+  let near = 0;
+  let minRows = 6;
+  for (const w of briefs)
+    for (const salt of ['p_x1', 'p_x2']) {
+      const b = mkB(w);
+      const c = V.compareDirections(V.proposeDirections({ brief: b, salt, dna: V.deriveDNA({ brief: b, board: null, kind: V.intentOf(b).kind }) }));
+      near += c.nearIdentical.length;
+      minRows = Math.min(minRows, c.distinctRows);
+    }
+  ok('across five kinds of work, no two directions are one design in different colours', near === 0, near);
+  ok('…each set differs in at least three of the six things a studio compares', minRows >= 3, minRows);
+  // a set the designer has constrained almost entirely: what they share is said to be the designer's doing
+  {
+    const b = mkB('Booking screen for a yoga class');
+    const base0 = V.deriveDNA({ brief: b, board: null, kind: V.intentOf(b).kind });
+    const tight = V.lockDim(V.setDim(V.lockDim(V.setDim(base0, 'composition', 100), 'composition', true), 'motion', 20), 'motion', true);
+    const ds = V.proposeDirections({ brief: b, salt: 'p_tight', dna: tight }).map((d) => ({ ...d, locks: ['palette', 'type', 'surface'] }));
+    const c = V.compareDirections(ds);
+    const why = V.sharedBecause(c, { locks: ['palette', 'type', 'surface'], dna: tight, system: true, decided: { lead: 'task' } });
+    ok('what the directions share because the designer decided it is said, row by row (composition locked, a design system)', c.rows.filter((r) => !r.distinct).every((r) => r.row === 'motion' ? /motion you locked/.test(why.motion ?? '') : true) && (!why.typography || /design system/.test(why.typography)) && (!why.layout || /composition you locked/.test(why.layout)), J({ why, rows: c.rows.map((r) => [r.row, r.distinct]) }));
+    ok('…and a row nobody decided gets no reason (it is SocriaUX’s to vary)', Object.keys(V.sharedBecause(V.compareDirections([ds[0], { ...ds[0], id: 'x' }]), { locks: [], dna: null, system: false })).length === 0);
+    const near = V.compareDirections([ds[0], { ...ds[0], id: 'twin', look: { ...ds[0].look, motion: { ...ds[0].look.motion, headline: ds[0].look.motion.headline === 'mask' ? 'fade' : 'mask' } } }]);
+    ok('two directions that differ in one aspect only are flagged as nearly one design', near.nearIdentical.length === 1, J(near.pairs));
+  }
+  ok('a direction’s lean is said against the project’s DNA, the largest move first', (() => { const x = V.dnaDelta({ restraint: 80, composition: 52 }, { restraint: 40, composition: 50 }); return x.length === 1 && x[0].key === 'restraint' && /\+40/.test(x[0].says); })());
+}
+
+// ── the Originality Audit (lib/ux-v0/originality.ts) ──────────────────
+{
+  const mkB = (objective, extra = {}) => {
+    const b = V.normalizeBrief({ pageType: 'website', platform: 'web', objective, audience: 'people', personality: ['clear'], visualDirection: '', palette: [], typography: { display: '', body: '' }, userGoals: ['See it'], ...extra }, new Set());
+    b.intent = V.settleIntent(V.briefWords(b), {});
+    return b;
+  };
+  const generic = V.normalizeSpec({
+    pageType: 'website', platform: 'web', version: 1,
+    tokens: { colors: { background: '#ffffff', surface: '#f6f5ff', text: '#111111', muted: '#555555', accent: '#6d3df5', accentText: '#ffffff', line: '#e5e5e5' }, fonts: { display: 'Inter', body: 'Inter' }, radius: 'round', scale: 'comfortable', style: 'minimal', imageTreatment: 'natural' },
+    look: { language: 'classic', ratio: 1.25, weight: 600, case: 'sentence', tracking: 'tight', emphasis: 'accent', label: 'caps', mono: 'IBM Plex Mono', grid: 'centered', align: 'center', width: 'standard', rhythm: 'even', containers: 'cards', rules: 'none', buttons: 'pill', frame: 'plain', motifs: ['icons', 'shapes'], shapes: ['blob'], accent2: '', motion: V.motionFor('calm') },
+    sections: [
+      { id: 'nav', kind: 'nav', variant: 'inline', content: { brand: 'Acme', links: ['Features', 'Pricing', 'About', 'Contact'], cta: 'Get started' } },
+      { id: 'hero', kind: 'hero', variant: 'centered', content: { title: 'Pots for slow mornings', subtitle: 'Thrown by hand.', primary: 'Shop the bowls' } },
+      { id: 'logos', kind: 'logos', variant: 'row', content: { title: 'As seen in', names: ['A', 'B', 'C', 'D'] } },
+      { id: 'features', kind: 'features', variant: 'grid', content: { title: 'Why our studio', items: [1, 2, 3, 4, 5, 6].map((i) => ({ title: `Point ${i}`, text: 'A sentence.' })) } },
+      { id: 'quote', kind: 'quote', variant: 'large', content: { quote: 'The best bowl I own.', author: 'A collector' } },
+      { id: 'pricing', kind: 'pricing', variant: 'cards', content: { title: 'Workshops', plans: [{ name: 'Taster', price: '£40', features: ['a'] }, { name: 'Course', price: '£220', features: ['b'] }] } },
+      { id: 'cta', kind: 'cta', variant: 'centered', content: { title: 'Visit the studio', primary: 'Plan a visit' } },
+      { id: 'footer', kind: 'footer', variant: 'simple', content: { brand: 'Acme', legal: '©' } },
+    ],
+  }, null);
+  const ceramics = mkB('A website for a ceramics studio selling hand-thrown bowls');
+  const o = V.auditOriginality({ spec: generic, brief: ceramics });
+  const flagged = o.findings.filter((f) => !f.justified).map((f) => f.pattern).sort();
+  ok('a generic page is read for what generated pages do by habit', J(flagged) === J(['centred-hero', 'decoration', 'generic-type', 'purple-gradient', 'recycled-nav', 'rounded-cards', 'saas-template']), J(flagged));
+  ok('…each with a targeted change, and four scores within 0–100', o.findings.every((f) => f.fix?.length) && Object.values(o.scores).every((x) => x >= 0 && x <= 100) && o.scores.distinctiveness < 50);
+  let fixed = generic;
+  for (const p of V.originalityFixes(o)) { const r = V.applyPatch(fixed, p, null); if (r.ok) fixed = r.spec; }
+  const o2 = V.auditOriginality({ spec: fixed, brief: ceramics });
+  ok('one pass of its fixes leaves nothing unjustified, and the page keeps its sections and words', o2.findings.filter((f) => !f.justified).length === 0 && o2.scores.distinctiveness > o.scores.distinctiveness && fixed.sections.length === generic.sections.length && fixed.sections.find((s) => s.kind === 'hero').content.title === 'Pots for slow mornings', J(o2.findings.map((f) => f.pattern)));
+  const nav = fixed.sections.find((s) => s.kind === 'nav').content.links;
+  ok('…the navigation now names this page’s own parts', nav.length >= 2 && !nav.some((l) => /^(features|pricing|about|contact)$/i.test(l)) && nav.includes('Why our studio'), J(nav));
+  const saas = V.auditOriginality({ spec: generic, brief: mkB('A SaaS platform for project management teams, with subscription pricing'), words: 'rounded, friendly, purple' });
+  const ok2 = Object.fromEntries(saas.findings.map((f) => [f.pattern, f.justified]));
+  ok('the same patterns are allowed when the brief or the designer’s words justify them, and the reason is said', ok2['saas-template'] && ok2['rounded-cards'] && ok2['purple-gradient'] && ok2['recycled-nav'] && !ok2['centred-hero'] && saas.findings.filter((f) => f.justified).every((f) => f.because), J(ok2));
+  const centredDecided = V.auditOriginality({ spec: generic, brief: mkB('A website for a ceramics studio', { layout: { align: 'center' } }) });
+  ok('…a centred layout the designer decided is theirs', centredDecided.findings.find((f) => f.pattern === 'centred-hero')?.justified === true);
+  const locked = V.auditOriginality({ spec: generic, brief: ceramics, locks: ['layout', 'surface', 'palette', 'type', 'motifs', 'voice'] });
+  ok('a fix never touches what the designer locked', V.originalityFixes(locked).length === 0, J(V.originalityFixes(locked).map((p) => p.summary)));
+  const earlier = V.signatureOf(generic, 'p_old', 'Last spring’s studio');
+  const rep = V.auditOriginality({ spec: generic, brief: ceramics, past: [earlier, { ...earlier, project: 'p_other', language: 'poster', grid: 'poster', hero: 'poster', display: 'Anton', hue: 10, kinds: ['hero', 'gallery'] }] });
+  ok('a design that repeats an earlier one in this browser is said, naming it', rep.findings.some((f) => f.pattern === 'repetition' && /Last spring/.test(f.detail)) && rep.repeats[0].project === 'p_old' && rep.repeats[0].similarity > 0.9);
+  const dash = V.auditOriginality({ spec: { ...generic, look: { ...generic.look, ratio: 1.2 } }, brief: mkB('A dashboard for lab sensor readings'), dna: V.setDim(V.deriveDNA({ brief: mkB('A dashboard for lab sensor readings'), board: null, kind: 'dashboard' }), 'typography', 15) });
+  ok('…and functional type on a working interface, as its DNA says, is allowed', dash.findings.find((f) => f.pattern === 'generic-type')?.justified === true);
+  ok('the rendered page counts too: frosted panels on an imported page are found', V.auditOriginality({ spec: fixed, brief: ceramics, audit: { ...V.normalizeAudit({ width: 1280, style: { blurs: 3 } }) } }).findings.some((f) => f.pattern === 'glass') && V.normalizeAudit({ width: 1280, style: { blurs: 2 } }).style.blurs === 2);
+  const intentB = mkB('Booking screen for a yoga class');
+  const noBooking = V.auditOriginality({ spec: generic, brief: intentB });
+  ok('relevance: a page without what the work needs loses for it, and says so', noBooking.scores.relevance < 80 && noBooking.notes.relevance.some((x) => /booking/.test(x)), J(noBooking.notes.relevance));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

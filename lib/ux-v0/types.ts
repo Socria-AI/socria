@@ -16,6 +16,8 @@ import { normalizeIntent, type DesignIntent } from './intent';
 import { normalizeLayout, type LayoutDecisions } from './layout';
 import { normalizeDesignSystem, type DesignSystem } from './design-system';
 import { EMPTY_DIRECTION, normalizeDirectionState, type DirectionState } from './direction';
+import { normalizeDNA, normalizeRefDna, type CreativeDNA, type RefDna } from './dna';
+import { signatureOf, type DesignSignature } from './signature';
 import { GRIDS, normalizeMotion, normalizeSpec, type DesignSpec, type Motion } from './spec';
 import { bodyFont, displayFont } from './fonts';
 
@@ -295,6 +297,8 @@ export interface MoodboardRef {
   swatches?: string[];
   /** an upload can be a picture or a moving reference (a clip or an animated GIF) */
   media?: 'image' | 'video';
+  /** its design DNA, measured from its pixels (lib/ux-v0/ref-dna.ts) and kept so it is never measured again */
+  dna?: RefDna;
 }
 
 export interface Palette {
@@ -492,6 +496,8 @@ export interface DesignProject {
   brief: { doc: DesignBrief | null; approved: boolean; version: number };
   /** the art direction: proposed options, the designer's notes and locks, and the one approved (lib/ux-v0/direction.ts) */
   direction: DirectionState;
+  /** the Creative DNA (lib/ux-v0/dna.ts): derived from the brief and references, set and locked by the designer */
+  dna?: CreativeDNA;
   /** generated designs: every version, newest last; specIndex is the one shown */
   specs: DesignSpec[];
   specIndex: number;
@@ -521,6 +527,8 @@ export interface ProjectSummary {
   pageType: PageType | null;
   /** an imported file's kind */
   medium: ArtifactKind | null;
+  /** its design's signature, so a new design can be checked against it (lib/ux-v0/signature.ts) */
+  signature?: DesignSignature;
   /** the art direction the design follows */
   direction: string;
   /** up to three kept moodboard thumbnails: the studies behind a work in progress */
@@ -738,6 +746,7 @@ export function normalizeRef(v: unknown): MoodboardRef | null {
     ...(typeof r.asContent === 'boolean' ? { asContent: r.asContent } : {}),
     ...(swatches.length ? { swatches } : {}),
     ...(r.media === 'video' ? { media: 'video' as const } : {}),
+    ...((dna) => (dna ? { dna } : {}))(normalizeRefDna(r.dna)),
     id: `${provider}:${providerId}`,
     provider,
     providerId,
@@ -1015,6 +1024,7 @@ export function normalizeProject(v: unknown, opts: { forSync?: boolean } = {}): 
     moodboard,
     brief: { doc: normalizeBrief(b.doc, kept.size ? kept : undefined), approved: b.approved === true, version: num(b.version, 0, 1e4, 0) },
     direction: normalizeDirectionState(r.direction),
+    ...((dna) => (dna && Object.keys(dna.dims).length ? { dna } : {}))(normalizeDNA(r.dna)),
     specs,
     specIndex: specs.length ? num(r.specIndex, 0, specs.length - 1, specs.length - 1) : -1,
     artifact: normalizeArtifact(r.artifact),
@@ -1075,6 +1085,7 @@ export function summarize(p: DesignProject): ProjectSummary {
     pageType: p.brief.doc?.pageType ?? currentSpec(p)?.pageType ?? null,
     medium: imported ? imported.kind : null,
     direction: p.direction.chosen?.name ?? '',
+    ...((spec) => (spec && !imported ? { signature: signatureOf(spec, p.id, p.name) } : {}))(currentSpec(p)),
     studies: p.moodboard.refs
       .filter((r) => r.state === 'kept' && r.thumb)
       .slice(0, 3)

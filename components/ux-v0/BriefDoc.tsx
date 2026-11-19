@@ -577,7 +577,7 @@ export function BriefDoc({ brief, version, approved, refs, busy, hasDesign, onCh
                 Approve and let SocriaUX choose
               </button>
               <button type="button" className="sb-btn is-primary" onClick={onApprove} disabled={!!busy}>
-                {busy ? busy : 'Approve and choose a direction'}
+                {busy ? busy : 'Approve and set the Creative DNA'}
               </button>
             </>
           )}

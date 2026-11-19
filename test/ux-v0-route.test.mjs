@@ -703,5 +703,40 @@ console.log('\n=== one operation, on a deadline, streamed, cancellable, recorded
   ok('quick edit: the button colour to black, its words kept readable on it, at once', btn.json.deterministic === true && btn.json.patch.tokens.colors.accent === '#000000' && btn.json.patch.tokens.colors.accentText === '#ffffff' && btn.json.challenge === '' && btn.calls.length === 0, J(btn.json));
 }
 
+console.log('\n=== the Creative DNA through the routes ===');
+{
+  const V = await import(pathToFileURL(join(here, '.tmp', 'ux-v0-under-test.mjs')).href);
+  const DU = 'user_v0_dna';
+  const brief = { objective: 'A luxury fashion house: a new collection of tailored coats.', audience: 'Clients of the house', personality: ['quiet', 'exacting'], visualDirection: 'Quiet, assured', palette: [{ hex: '#f4f1ea', role: 'background' }, { hex: '#1b1a17', role: 'text' }, { hex: '#5a2a1c', role: 'accent' }, { hex: '#ffffff', role: 'accent-text' }], typography: { display: 'Fraunces', body: 'Inter' }, pageType: 'website' };
+  const nb = V.normalizeBrief(brief);
+  const base = V.deriveDNA({ brief: nb, board: null, kind: V.intentOf(nb).kind });
+  const lockAll = (d, vals) => Object.entries(vals).reduce((x, [k, v]) => V.lockDim(V.setDim(x, k, v), k, true), d);
+  const quiet = lockAll(base, { composition: 12, motion: 8, typography: 85 });
+  // the server draws the same directions from the same DNA as the browser
+  const d = await post('direct', { projectId: 'uxv0_dna', brief, dna: quiet }, DU, [{ directions: [{ candidate: 1, name: 'One' }, { candidate: 2, name: 'Two' }, { candidate: 3, name: 'Three' }] }]);
+  const local = V.proposeDirections({ brief: nb, dna: V.normalizeDNA(quiet), salt: V.saltOf('uxv0_dna') });
+  ok('direct: the three are drawn from the DNA the browser sent — the same languages it drew, each carrying its lean', d.status === 200 && J(d.json.options.map((o) => o.language)) === J(local.map((o) => o.language)) && d.json.options.every((o) => o.dna && o.dna.composition === 12 && typeof o.dnaLean === 'string'), J(d.json.options?.map((o) => [o.language, o.dna?.composition])));
+  ok('…and the locks hold in all three: strict grids, still motion', d.json.options.every((o) => ['swiss', 'modular', 'stack'].includes(o.look.grid) && ['still', 'calm'].includes(o.look.motion.feel)), J(d.json.options.map((o) => [o.look.grid, o.look.motion.feel])));
+  // a generated page held to its locked DNA, whatever the approved direction or the model did
+  const wild = { ...d.json.options[0], look: { ...d.json.options[0].look, grid: 'poster', rhythm: 'dramatic', motion: V.motionFor('kinetic') } };
+  const sections = [{ id: 'nav', kind: 'nav', content: { brand: 'Maison', links: ['Collection'] } }, { id: 'hero', kind: 'hero', variant: 'editorial', content: { title: 'Coats, cut slowly', primary: 'Book a fitting' } }, { id: 'f', kind: 'footer', content: { brand: 'Maison' } }];
+  const g = await post('generate', { projectId: 'uxv0_dna', brief, moodboard: { refs: [] }, version: 1, artDirection: wild, dna: quiet }, DU, [{ title: 'Maison', sections }]);
+  ok('generate: a page that drifted from a locked dimension is moved back in code, and the answer says which', g.status === 200 && g.json.dnaHeld.includes('composition') && g.json.dnaHeld.includes('motion') && ['swiss', 'modular', 'stack'].includes(g.json.spec.look.grid) && g.json.spec.look.motion.feel !== 'kinetic', J({ held: g.json.dnaHeld, grid: g.json.spec.look.grid, feel: g.json.spec.look.motion?.feel }));
+  ok('…the generator was told the DNA in one line, with what is locked', J(g.calls[0]).includes('CREATIVE DNA') && J(g.calls[0]).includes('Locked by the designer'));
+  const g0 = await post('generate', { projectId: 'uxv0_dna2', brief, moodboard: { refs: [] }, version: 1, artDirection: wild }, 'user_v0_dna2', [{ title: 'Maison', sections }]);
+  ok('…and without a DNA, nothing is held and nothing told', g0.status === 200 && J(g0.json.dnaHeld) === '[]' && !J(g0.calls[0]).includes('CREATIVE DNA'), J(g0.json.dnaHeld));
+  // a change that moves a locked dimension is asked about first — even one made in code
+  const spec = g.json.spec;
+  const sans = await post('refine', { projectId: 'uxv0_dna', spec, brief, moodboard: { refs: [] }, comment: 'Use Inter for the headlines', dna: quiet }, DU, []);
+  ok('refine: a quick edit that moves the typography away from where it was locked is asked about, the patch ready, no model asked', sans.status === 200 && sans.json.deterministic === true && sans.json.dnaMoved.includes('typography') && /Creative DNA/.test(sans.json.challenge) && sans.json.applies === true && sans.calls.length === 0, J(sans.json));
+  const forced = await post('refine', { projectId: 'uxv0_dna', spec, brief, moodboard: { refs: [] }, comment: 'Use Inter for the headlines', dna: quiet, force: true }, DU, []);
+  ok('…and once the designer says so, it is made', forced.json.challenge === '' && forced.json.applies === true);
+  const free = await post('refine', { projectId: 'uxv0_dna', spec, brief, moodboard: { refs: [] }, comment: 'Use Inter for the headlines', dna: base }, DU, []);
+  ok('…nothing is asked when that dimension is not locked', free.json.challenge === '' && J(free.json.dnaMoved) === '[]', J(free.json));
+  const viaModel = await post('refine', { projectId: 'uxv0_dna', spec, brief, moodboard: { refs: [] }, comment: 'Make the whole page feel like a poster', dna: quiet }, DU, [{ understood: 'A poster', patch: { op: 'look', look: { grid: 'poster', rhythm: 'dramatic' }, summary: 'Poster grid' } }]);
+  ok('…the same for a change the model wrote, checked in code after it answered; the model was told the DNA', viaModel.json.dnaMoved.includes('composition') && /Creative DNA/.test(viaModel.json.challenge) && J(viaModel.calls[0]).includes('CREATIVE DNA'), J(viaModel.json));
+  ok('a DNA that does not hold together is ignored, never trusted', (await post('refine', { projectId: 'uxv0_dna', spec, moodboard: { refs: [] }, comment: 'Use Inter for the headlines', dna: { dims: { typography: { value: 'x', locked: true } } } }, DU, [])).json.challenge === '');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

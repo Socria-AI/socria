@@ -119,7 +119,11 @@ out('brief asked with kept refs: ' + calls.brief[0].moodboard.refs.filter((x) =>
 await page.waitForTimeout(600);
 await page.screenshot({ path: S + 'v0-12-brief.png' });
 // art direction: three directions, drawn as specimens; one taken, one part of it changed (and so kept)
-await page.getByRole('button', { name: 'Approve and choose a direction' }).click();
+await page.getByRole('button', { name: 'Approve and set the Creative DNA' }).click();
+// the Creative DNA step (optional): SocriaUX's reading, one click on to the directions
+await page.waitForSelector('.dna-studio', { timeout: 10000 });
+out('creative DNA: ' + (await page.locator('.dna-summary-words').innerText()));
+await page.getByRole('button', { name: 'Explore directions' }).click();
 await page.waitForSelector('.v0-dir', { timeout: 10000 });
 await page.waitForTimeout(1500);
 const dirs = await page.$$eval('.v0-dir', (els) => els.map((e) => [e.querySelector('.v0-dir-text > .sb-label')?.textContent, e.querySelector('.v0-cell-title')?.textContent]));

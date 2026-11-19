@@ -78,10 +78,18 @@ import { LAYOUT_QUESTION_ID } from '@/lib/ux-v0/layout';
 import { designerWords } from '@/lib/ux-v0/intent';
 import { elementSelection } from '@/lib/ux-v0/selection';
 import { Moodboard } from './Moodboard';
+import { DnaStudio, type Measuring } from './DnaStudio';
+import { DnaGlyph, dnaWords } from './DnaParts';
+import { measureReference } from './ref-dna-loader';
+import { addDim, adoptLean, delegateAll, deriveDNA, dnaBasis, dnaConsistency, dnaKeyOf, dnaKeysFor, dnaOfDesign, dnaPatches, dnaValues, lockDim, lockedDnaMoves, releaseDim, removeDim, setDim, DNA_META, type CreativeDNA, type DnaInput, type DnaKey } from '@/lib/ux-v0/dna';
+import { auditOriginality, originalityFixes, PATTERN_LABEL, type DesignSignature, type Originality } from '@/lib/ux-v0/originality';
+import { intentOf } from '@/lib/ux-v0/intent';
+import { listProjects } from '@/lib/ux-v0/store';
+import type { PageAudit } from '@/lib/ux-v0/evaluate';
 import { Stage, type SelectMode, type StageHandle } from './Stage';
 import { SAVE_WORDS, useV0Project } from './useV0Project';
 
-type View = 'intent' | 'import' | 'discovery' | 'brief' | 'direction' | 'design';
+type View = 'intent' | 'import' | 'discovery' | 'brief' | 'dna' | 'direction' | 'design';
 
 /** A model operation in progress, as the working strip shows it: only what the server has said happened. */
 interface Work {
@@ -156,6 +164,22 @@ interface Checks {
   fixed: string[];
   /** the version it was about */
   version: number;
+  /** the page as measured at desktop width: what the originality audit reads of the rendered page */
+  audit?: PageAudit | null;
+}
+
+/** What the Creative DNA is read from: the brief, the moodboard, the kind of work, the designer's first words. */
+function dnaInputOf(p: DesignProject): DnaInput {
+  const brief = p.brief.doc;
+  return { brief, board: p.moodboard, kind: brief ? intentOf(brief).kind : 'site', words: p.intent };
+}
+
+/** The project's Creative DNA: read again when what it is read from changed; what the designer set or locked stays theirs. */
+function dnaOf(p: DesignProject): CreativeDNA | null {
+  if (!p.brief.doc && !p.moodboard.refs.some((r) => r.state === 'kept')) return p.dna ?? null;
+  const input = dnaInputOf(p);
+  if (p.dna && p.dna.basis === dnaBasis(input)) return p.dna;
+  return deriveDNA(input, p.dna ?? null);
 }
 
 interface Notice {
@@ -217,6 +241,37 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const [zoom, setZoom] = useState(1);
   const [checks, setChecks] = useState<Checks | null>(null);
   const [dirNote, setDirNote] = useState('');
+  // the Creative DNA's references, each measured once in this browser (lib/ux-v0/ref-dna.ts): what is being measured, what could not be
+  const [measuring, setMeasuring] = useState<Measuring>({});
+  const measuringNow = useRef(new Set<string>());
+  // earlier designs in this browser, for the originality audit's check for repetition
+  const [past, setPast] = useState<DesignSignature[]>([]);
+  useEffect(() => {
+    let live = true;
+    listProjects()
+      .then((all) => live && setPast(all.filter((x) => x.id !== initial.id && x.signature).map((x) => ({ ...x.signature!, project: x.id, name: x.name }))))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [initial.id]);
+  // the Originality Audit of the design on the canvas: one pass of arithmetic, no model (lib/ux-v0/originality.ts)
+  const originality = useMemo<Originality | null>(
+    () =>
+      spec && project.mode === 'create' && !imported
+        ? auditOriginality({
+            spec,
+            brief: project.brief.doc,
+            dna: project.dna ?? null,
+            audit: checks && checks.version === spec.version ? checks.audit ?? null : null,
+            words: [project.direction.notes, project.intent].filter(Boolean).join('. '),
+            past,
+            locks: project.direction.chosen?.locks ?? [],
+            project: project.id,
+          })
+        : null,
+    [spec, project.mode, imported, project.brief.doc, project.dna, checks, project.direction.notes, project.intent, past, project.direction.chosen, project.id]
+  );
   // the design in a real viewport, its motion playing
   const [previewing, setPreviewing] = useState(false);
   // visual parts of the brief changed since the design was drawn: what "Apply to the design" would carry over
@@ -480,6 +535,63 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     if (added.length) update((p) => ({ ...p, moodboard: { ...p.moodboard, refs: [...added, ...p.moodboard.refs] } }));
     if (errors.length) setImgError(errors.length > 1 ? `${errors[0]} (and ${errors.length - 1} more)` : errors[0]);
   };
+  // ── the Creative DNA ────────────────────────────────────────────────
+  // What it is read from changes (the brief, the references, what is taken or left from each): it is read again,
+  // in code, at once; what the designer set or locked stays theirs. Nothing here asks a model.
+  useEffect(() => {
+    const p = current.current;
+    const next = dnaOf(p);
+    if (next && next !== p.dna) update((p2) => ({ ...p2, dna: dnaOf(p2) ?? next }), false);
+  }, [project.brief.doc, project.moodboard, project.intent]); // eslint-disable-line react-hooks/exhaustive-deps
+  const changeDna = (f: (d: CreativeDNA, input: DnaInput) => CreativeDNA) =>
+    update((p) => {
+      const input = dnaInputOf(p);
+      return { ...p, dna: f(dnaOf(p) ?? deriveDNA(input, null), input) };
+    });
+  /** A kept reference's pixels, measured once in this browser and kept on it (a failure is said, not guessed around). */
+  const measureRef = async (r: MoodboardRef) => {
+    const ui = uiRefs.find((x) => x.id === r.id) ?? r;
+    const src = ui.thumb || ui.url;
+    const of = r.provider === 'upload' ? r.id : r.thumb || r.url;
+    if (!src || measuringNow.current.has(r.id)) return;
+    measuringNow.current.add(r.id);
+    setMeasuring((m) => ({ ...m, [r.id]: { state: 'measuring' } }));
+    const got = await measureReference(src, r.media, of);
+    measuringNow.current.delete(r.id);
+    if (got.ok) {
+      updateRef(r.id, { dna: got.dna });
+      setMeasuring(({ [r.id]: _done, ...rest }) => rest);
+    } else setMeasuring((m) => ({ ...m, [r.id]: { state: 'failed', reason: got.reason } }));
+  };
+  // each kept reference (and each one to steer away from) measured once, again only when its picture changed
+  useEffect(() => {
+    if (project.mode !== 'create') return;
+    const todo = project.moodboard.refs.filter((r) => (r.state === 'kept' || r.avoid) && !measuring[r.id] && r.dna?.of !== (r.provider === 'upload' ? r.id : r.thumb || r.url));
+    if (!todo.length) return;
+    let stop = false;
+    (async () => {
+      for (const r of todo.slice(0, 8)) {
+        if (stop) break;
+        await measureRef(r);
+      }
+    })();
+    return () => {
+      stop = true;
+    };
+  }, [project.moodboard.refs, uiRefs]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** The DNA dimensions the designer locked that these changes would move the design away from. */
+  const dnaMovedBy = (s: DesignSpec, patches: Patch[]): DnaKey[] => {
+    const dna = dnaOf(current.current);
+    if (!dna || !Object.values(dna.dims).some((d) => d?.locked)) return [];
+    let t = s;
+    for (const pt of patches) {
+      const r = applyPatch(t, pt, current.current.moodboard);
+      if (r.ok) t = r.spec;
+    }
+    return lockedDnaMoves(s, t, dna);
+  };
+  const dnaNames = (ks: DnaKey[]) => ks.map((k) => DNA_META[k].label.toLowerCase()).join(' and ');
+
   const sampleRef = async (ref: MoodboardRef) => {
     const sw = await sampleSwatches(ref.thumb || ref.url);
     if (sw.length) updateRef(ref.id, { swatches: sw });
@@ -610,8 +722,8 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const base = st.options.find((o) => o.locks.length) ?? (st.chosen && st.chosen.locks.length ? st.chosen : null);
     const round = again ? st.round + 1 : st.round;
     const seen = again ? [...new Set([...st.seen, ...st.options.map((o) => o.language)])] : st.seen;
-    // the project's own salt: this brief in another project is composed differently
-    return { brief: p.brief.doc!, notes: st.notes, avoid: st.avoid, base, round, seen, board: readBoard(p.moodboard), salt: saltOf(p.id) };
+    // the project's own salt: this brief in another project is composed differently; its Creative DNA steers all three
+    return { brief: p.brief.doc!, notes: st.notes, avoid: st.avoid, base, round, seen, board: readBoard(p.moodboard), salt: saltOf(p.id), dna: dnaOf(p) };
   };
 
   const proposeDirectionsFor = async (again: boolean) => {
@@ -619,7 +731,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     if (!p.brief.doc) return;
     const ask = directionAsk(p, again);
     const options = proposeDirections(ask);
-    update((p2) => ({ ...p2, direction: { ...p2.direction, options, round: ask.round, seen: [...new Set([...ask.seen, ...options.map((o) => o.language)])].slice(-24), forBrief: briefKey(p.brief.doc!) } }));
+    update((p2) => ({ ...p2, direction: { ...p2.direction, options, round: ask.round, seen: [...new Set([...ask.seen, ...options.map((o) => o.language)])].slice(-24), forBrief: briefKey(p.brief.doc!), forDna: dnaKeyOf(ask.dna) } }));
     setDirNote('Writing each direction for this brand…');
     const r = await runOp<{ options: ArtDirection[]; usage: Usage }>('direct', 'Writing each direction for this brand', '/api/ux-v0/direct', { projectId: p.id, ...ask, base: ask.base }, true);
     if (!r) return;
@@ -664,8 +776,14 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     if (!p.brief.doc) return;
     update((p2) => ({ ...p2, brief: { ...p2.brief, approved: true } }));
     setView('direction');
-    // none yet, or made for a brief that has since changed
-    if (!p.direction.options.length || p.direction.forBrief !== briefKey(p.brief.doc)) proposeDirectionsFor(false);
+    // none yet, or made for a brief or a Creative DNA that has since changed
+    if (!p.direction.options.length || p.direction.forBrief !== briefKey(p.brief.doc) || (p.direction.forDna ?? '') !== dnaKeyOf(dnaOf(p))) proposeDirectionsFor(false);
+  };
+  /** The brief approved: on to the Creative DNA (optional: Explore directions is one click on). */
+  const openDna = () => {
+    if (!current.current.brief.doc) return;
+    update((p2) => ({ ...p2, brief: { ...p2.brief, approved: true }, dna: dnaOf(p2) ?? undefined }));
+    setView('dna');
   };
 
   const editDirection = (id: string, next: ArtDirection, group: LockGroup) =>
@@ -675,19 +793,24 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     update((p) => ({ ...p, direction: { ...p.direction, options: p.direction.options.map((o) => (o.id === id ? { ...o, locks: on ? [...new Set([...o.locks, group])] : o.locks.filter((g) => g !== group) } : o)) } }));
 
   const approveDirection = (d: ArtDirection) => {
-    update((p) => ({ ...p, direction: { ...p.direction, chosen: d, approved: true } }));
-    generate('', d);
+    // where the chosen direction leaned away from the DNA, the DNA follows it: chosen, so the designer's
+    const was = dnaOf(current.current);
+    const dna = was ? adoptLean(was, d.dna, d.name) : null;
+    update((p) => ({ ...p, ...(dna ? { dna } : {}), direction: { ...p.direction, chosen: d, approved: true } }));
+    generate('', d, false, dna);
   };
 
   // ── looking at what was drawn ───────────────────────────────────────
   // Drawn offscreen at 1280 and 390 px, measured, read. With `autofix`, the fixes that need no
   // words are applied — at most two rounds, never to what the designer locked or fixed — before
   // anyone sees the page. Otherwise the findings are only reported.
-  const inspect = async (from: DesignSpec, autofix: boolean): Promise<{ spec: DesignSpec; fixed: string[]; ev: Evaluation }> => {
+  const inspect = async (from: DesignSpec, autofix: boolean): Promise<{ spec: DesignSpec; fixed: string[]; ev: Evaluation; audit: PageAudit | null }> => {
     const locks = current.current.direction.chosen?.locks ?? [];
+    let audit: PageAudit | null = null;
     const measureAt = async (s: DesignSpec) => {
       const html = renderDesign(s, withUploads(current.current.moodboard.refs, true)).html;
       const [desktop, phone] = await Promise.all([measurePage(html, 1280, 900, nonce), measurePage(html, 390, 844, nonce)]);
+      audit = desktop;
       // and whether it keeps what was decided: the approved direction, the brief's locked parts and rules, the pictures it may place
       return evaluateDesign(s, { desktop, phone }, locks, { direction: current.current.direction.chosen, brief: current.current.brief.doc, board: current.current.moodboard });
     };
@@ -703,31 +826,31 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       }
       ev = await measureAt(spec);
     }
-    return { spec, fixed, ev };
+    return { spec, fixed, ev, audit };
   };
 
   /** Check the design as it stands, and say what was found (nothing is changed). */
   const runChecks = async (from: DesignSpec) => {
     setChecks((c) => ({ running: true, ev: c?.ev ?? null, fixed: [], version: from.version }));
     const r = await inspect(from, false);
-    setChecks({ running: false, ev: r.ev, fixed: [], version: from.version });
+    setChecks({ running: false, ev: r.ev, fixed: [], version: from.version, audit: r.audit });
   };
 
   // ── generating and changing the design ──────────────────────────────
-  const generate = async (dir = '', art: ArtDirection | null = null, confirmed = false): Promise<void> => {
+  const generate = async (dir = '', art: ArtDirection | null = null, confirmed = false, dnaUse: CreativeDNA | null = null): Promise<void> => {
     const p = current.current;
     if (!p.brief.doc) return;
     const approved = art ?? (p.direction.approved ? p.direction.chosen : null);
     // before a premium step that a budget might not hold: the measured cost, the limit, what is left — the designer decides
     const warn = !confirmed ? warnBefore('generate', budgetSeen.current) : null;
     if (warn) {
-      say(`${warn} Design it anyway?`, 'info', { acts: [{ label: 'Design it', run: () => void generate(dir, art, true), strong: true }, { label: 'Not now', run: () => setNotice(null) }] });
+      say(`${warn} Design it anyway?`, 'info', { acts: [{ label: 'Design it', run: () => void generate(dir, art, true, dnaUse), strong: true }, { label: 'Not now', run: () => setNotice(null) }] });
       return;
     }
     const label = approved ? `Designing in the “${approved.name}” direction` : 'Designing from the brief';
     setBusy(`${label}…`);
     const version = (p.specs[p.specs.length - 1]?.version ?? 0) + 1;
-    const r = await runOp<{ spec: DesignSpec; artDirection?: ArtDirection; placeholders: string[]; usage: Usage; notice?: string }>('generate', label, '/api/ux-v0/generate', { projectId: p.id, brief: p.brief.doc, moodboard: p.moodboard, direction: dir, artDirection: approved, version });
+    const r = await runOp<{ spec: DesignSpec; artDirection?: ArtDirection; placeholders: string[]; usage: Usage; notice?: string }>('generate', label, '/api/ux-v0/generate', { projectId: p.id, brief: p.brief.doc, moodboard: p.moodboard, direction: dir, artDirection: approved, version, dna: dnaUse ?? dnaOf(p) });
     setBusy(null);
     if (!r) return;
     // a failed or cancelled generation leaves the design on the canvas exactly as it was
@@ -744,7 +867,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const kept: DesignSpec | null = checked.fixed.length
       ? { ...checked.spec, version: fresh.version + 1, reason: `Checked at desktop and phone: ${checked.fixed.length} fix${checked.fixed.length === 1 ? '' : 'es'}`, createdAt: Date.now() }
       : null;
-    setChecks({ running: false, ev: checked.ev, fixed: checked.fixed, version: (kept ?? fresh).version });
+    setChecks({ running: false, ev: checked.ev, fixed: checked.fixed, version: (kept ?? fresh).version, audit: checked.audit });
     update((p2) => {
       const specs = [...p2.specs, fresh, ...(kept ? [kept] : [])].slice(-30);
       const used = r.data.artDirection ?? null;
@@ -813,11 +936,13 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       const r = adjust(s, a);
       if (!r) continue;
       const hit = [...new Set(r.patches.flatMap((pt) => lockedChanges(s, pt, locks)))];
+      const moved = dnaMovedBy(s, r.patches);
       if (hit.length) refused.push(`${ADJUST_LABEL[a].toLowerCase()} would change ${hit.map((g) => LOCK_LABEL[g].toLowerCase()).join(' and ')}, which you locked`);
+      else if (moved.length) refused.push(`${ADJUST_LABEL[a].toLowerCase()} would move the ${dnaNames(moved)} away from where you locked it in the Creative DNA`);
       else done.push(r);
     }
     if (done.length) applyLocal(done.flatMap((d) => d.patches), done.map((d) => d.label).join('; '));
-    if (refused.length) say(`${done.length ? 'Done, except: ' : 'Nothing changed: '}${refused.join('; ')}. Unlock it in the direction to change it.`, 'info');
+    if (refused.length) say(`${done.length ? 'Done, except: ' : 'Nothing changed: '}${refused.join('; ')}. Unlock it to change it.`, 'info');
     else if (!done.length) say('Nothing to change: the design is already there.', 'info');
     return true;
   };
@@ -838,8 +963,10 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       const sectionsHit = qe.patches.flatMap((pt) => lockedTouched(s, pt));
       const ds = p.brief.doc?.system;
       const outside = ds ? [...new Set(qe.patches.flatMap((pt) => offSystem(pt, ds)))] : [];
+      const moved = dnaMovedBy(s, qe.patches);
       const concerns = [
         hit.length ? `This changes the ${hit.map((g) => LOCK_LABEL[g].toLowerCase()).join(' and ')}, which you locked in the art direction.` : '',
+        moved.length ? `This moves the ${dnaNames(moved)} away from where you locked it in the Creative DNA.` : '',
         outside.length && ds ? `This uses ${outside.join(' and ')}, which ${outside.length > 1 ? 'are' : 'is'} not in your design system (${ds.name}).` : '',
         sectionsHit.length ? 'This changes a section you locked.' : '',
         qe.concern ? qe.concern.replace(/\s*Make the change anyway\?$/, '') : '',
@@ -870,6 +997,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       comment,
       force: false,
       locks: p.direction.chosen?.locks ?? [],
+      dna: dnaOf(p),
     });
     setBusy(null);
     if (!r) return;
@@ -1150,6 +1278,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       ? [
           { id: 'discovery', label: 'Discovery', ok: !!project.intent },
           { id: 'brief', label: 'Brief', ok: !!project.brief.doc },
+          { id: 'dna', label: 'DNA', ok: !!project.brief.doc },
           { id: 'direction', label: 'Direction', ok: !!project.brief.doc && (project.brief.approved || project.direction.options.length > 0) },
           { id: 'design', label: 'Design', ok: !!spec },
         ]
@@ -1411,12 +1540,41 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                 }}
                 edited={spec ? briefEdits : []}
                 onApplyToDesign={applyBriefToDesign}
-                onApprove={openDirection}
+                onApprove={openDna}
                 onSkip={() => {
                   update((p) => ({ ...p, brief: { ...p.brief, approved: true } }));
                   generate();
                 }}
                 onBack={() => setView('discovery')}
+              />
+            )}
+
+            {view === 'dna' && project.brief.doc && (
+              <DnaStudio
+                dna={dnaOf(project) ?? deriveDNA(dnaInputOf(project), null)}
+                kind={intentOf(project.brief.doc).kind}
+                hasImages={(project.brief.doc.references ?? []).length > 0 || project.moodboard.refs.some((r) => r.state === 'kept' && r.asContent)}
+                brief={project.brief.doc}
+                name={project.name}
+                salt={saltOf(project.id)}
+                refs={uiRefs}
+                frameRefs={frameRefs}
+                measuring={measuring}
+                nonce={nonce}
+                busy={busy}
+                onSet={(k, v) => changeDna((d) => setDim(d, k, v))}
+                onLock={(k, on) => changeDna((d) => lockDim(d, k, on))}
+                onRelease={(k) => changeDna((d, input) => releaseDim(d, k, input))}
+                onDelegateAll={() => changeDna((d, input) => delegateAll(d, input))}
+                onAdd={(k) => changeDna((d, input) => addDim(d, k, input))}
+                onRemove={(k) => changeDna((d) => removeDim(d, k))}
+                onAspects={(id, take, leave) => updateRef(id, { take, leave })}
+                onMeasure={(r) => {
+                  setMeasuring(({ [r.id]: _was, ...rest }) => rest);
+                  void measureRef(r);
+                }}
+                onExplore={openDirection}
+                onBack={() => setView('brief')}
               />
             )}
 
@@ -1434,8 +1592,10 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                 onLock={lockDirection}
                 onApprove={approveDirection}
                 onAuto={() => project.direction.options[0] && approveDirection(project.direction.options[0])}
-                onBack={() => setView('brief')}
+                onBack={() => setView('dna')}
                 onReplace={replaceDirection}
+                dna={dnaOf(project)}
+                onOpenDna={() => setView('dna')}
                 nonce={nonce}
               />
             )}
@@ -1616,6 +1776,98 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                     <button type="button" className="sb-link is-meta is-strong" onClick={() => setView('direction')}>
                       Choose a different direction
                     </button>
+                  </section>
+                )}
+                {project.dna && (
+                  <section className="v0-cellset dna-canvas">
+                    <span className="sb-label">Creative DNA</span>
+                    {(() => {
+                      const dna = project.dna!;
+                      const own = dnaOfDesign(spec);
+                      const c = dnaConsistency(spec, dna);
+                      const drift = c.gaps.filter((g) => Math.abs(g.delta) > 15 && (dna.dims[g.key]?.locked || dna.dims[g.key]?.source === 'designer')).map((g) => g.key);
+                      const brief = project.brief.doc;
+                      const patches = drift.length
+                        ? dnaPatches(spec, dna, drift, {
+                            lang: languageOf(spec.look.language) ?? null,
+                            kind: brief ? intentOf(brief).kind : 'site',
+                            hasImages: spec.sections.some((x) => x.images.length > 0),
+                            keepColours: !!brief?.system || brief?.decisions?.colour === 'locked' || (project.direction.chosen?.locks ?? []).includes('palette'),
+                            keepType: !!brief?.system || brief?.decisions?.typography === 'locked' || (project.direction.chosen?.locks ?? []).includes('type'),
+                            locks: project.direction.chosen?.locks ?? [],
+                          })
+                        : [];
+                      return (
+                        <>
+                          <DnaGlyph dna={own} against={dnaValues(dna)} keys={dnaKeysFor(brief ? intentOf(brief).kind : 'site', false).filter((k) => dna.dims[k])} label="This design's DNA (filled), against yours (hollow)" />
+                          <p className="v0-quiet">
+                            This design reads <b>{dnaWords(own)}</b>. It keeps your DNA at <b>{c.score}</b> of 100.
+                            {drift.length ? ` The ${drift.map((k) => DNA_META[k].label.toLowerCase()).join(' and ')} drifted from where you set it.` : ''}
+                          </p>
+                          <span className="v0-finding-acts">
+                            {patches.length > 0 && (
+                              <button type="button" className="sb-link is-meta is-strong" onClick={() => applyLocal(patches, `brought back to the Creative DNA (${drift.map((k) => DNA_META[k].label.toLowerCase()).join(', ')})`)}>
+                                Bring it back to the DNA
+                              </button>
+                            )}
+                            <button type="button" className="sb-link is-meta" onClick={() => setView('dna')}>
+                              Shape the DNA
+                            </button>
+                          </span>
+                        </>
+                      );
+                    })()}
+                  </section>
+                )}
+                {originality && (
+                  <section className="v0-cellset orig" aria-label="Originality">
+                    <span className="sb-label">Originality</span>
+                    <div className="orig-scores">
+                      {(
+                        [
+                          ['distinctiveness', 'Its own'],
+                          ['composition', 'Composed'],
+                          ['relevance', 'Does its job'],
+                          ['dna', 'Keeps its DNA'],
+                        ] as const
+                      ).map(([k, label]) => (
+                        <span key={k} className="orig-score" title={originality.notes[k].join('; ') || 'Nothing lost'}>
+                          <b>{originality.scores[k]}</b>
+                          <span className="orig-score-l">{label}</span>
+                          <span className="orig-bar" aria-hidden="true">
+                            <i style={{ width: `${originality.scores[k]}%` }} />
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                    {originality.findings.length === 0 ? (
+                      <p className="v0-quiet">None of the patterns generated pages fall into{past.length ? ', and nothing repeated from your earlier designs' : ''}.</p>
+                    ) : (
+                      <ul className="orig-list">
+                        {originality.findings.map((f) => (
+                          <li key={f.pattern} className={f.justified ? 'is-allowed' : 'is-open'}>
+                            <span className="orig-k">{f.justified ? 'Allowed' : 'Generic'} · {PATTERN_LABEL[f.pattern]}</span>
+                            <span className="v0-body">{f.detail}</span>
+                            {f.justified && f.because && <span className="v0-quiet">Because {f.because}.</span>}
+                            {!f.justified && f.fix && f.fix.length > 0 && (
+                              <span className="v0-finding-acts">
+                                <button type="button" className="sb-link is-meta is-strong" onClick={() => applyLocal(f.fix!, f.fixLabel ?? f.label)}>
+                                  {f.fixLabel ?? 'Fix it'}
+                                </button>
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {originality.findings.filter((f) => !f.justified && f.fix?.length).length > 1 && (
+                      <button type="button" className="sb-btn is-sm" onClick={() => applyLocal(originalityFixes(originality), 'what nothing justified, made its own')}>
+                        Fix what nothing justifies
+                      </button>
+                    )}
+                    <p className="v0-quiet orig-foot">
+                      Read in code from the design{checks?.audit && checks.version === spec.version ? ' and its rendered page' : ''}, against your brief, words and DNA — no model asked. Each fix is one version Undo takes back.
+                    </p>
                   </section>
                 )}
                 <section className="v0-cellset">

@@ -60,3 +60,11 @@ export * from '@/lib/ux-v0/compose';
 export * from '@/lib/ux-v0/quick-edit';
 export * from '@/lib/ux-v0/telemetry';
 export * from '@/lib/ux-v0/estimates';
+// the Creative DNA: dimensions, derivation, locks, divergence, shaping a design, reading one back
+export * from '@/lib/ux-v0/dna';
+// a reference's design DNA, measured from its pixels
+export * from '@/lib/ux-v0/ref-dna';
+// the originality audit: generic patterns, their justification, targeted fixes, four scores
+export * from '@/lib/ux-v0/originality';
+// Explore Directions: how the directions differ, row by row, and the DNA each explores
+export * from '@/lib/ux-v0/explore';

@@ -1,5 +1,5 @@
 // app/api/ux-v0/refine/route.ts
-// POST { spec, brief, moodboard, selection?, comment, force, locks? } → { patch, applies, understood, challenge, question, regenerate, locked }
+// POST { spec, brief, moodboard, selection?, comment, force, locks?, dna? } → { patch, applies, understood, challenge, question, regenerate, locked, dnaMoved }
 //
 // A comment on part of a generated design becomes ONE typed patch
 // (lib/ux-v0/design.ts, spec.ts). The patch is checked here against the spec
@@ -8,7 +8,10 @@
 // the change, it says so and the designer decides — the patch travels with
 // the concern, so "apply anyway" needs no second call. A change to something
 // the designer locked in the art direction is always such a concern: it is
-// checked here in code (lockedChanges), not left to the model to notice.
+// checked here in code (lockedChanges), not left to the model to notice. So is a
+// change that moves the page away from a dimension the designer locked in the
+// Creative DNA (lib/ux-v0/dna.ts lockedDnaMoves): read from the page before and
+// after, in code.
 //
 // The everyday small changes (a colour, a typeface, the corners, new words for
 // a field, the headline's size) are read in code first (lib/ux-v0/quick-edit.ts)
@@ -25,6 +28,7 @@ import { bad, projectIdOf, readBodyPrinted } from '@/lib/ux-v0/route-kit';
 import { lockedTouched } from '@/lib/ux-v0/edit';
 import { offSystem } from '@/lib/ux-v0/design-system';
 import { readQuickEdit } from '@/lib/ux-v0/quick-edit';
+import { DNA_META, lockedDnaMoves, normalizeDNA, type CreativeDNA } from '@/lib/ux-v0/dna';
 import { applyPatch, kindDef, normalizeSpec, type DesignSpec, type Patch } from '@/lib/ux-v0/spec';
 import { admit, refuse, respondOnce, runStage } from '@/lib/ux-v0/stage-server';
 import { normalizeBrief, normalizeMoodboard, normalizeSelection, type DesignBrief, type Moodboard } from '@/lib/ux-v0/types';
@@ -33,10 +37,17 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-/** A patch's concerns before it is applied: what the designer locked, their design system, a locked section. */
-function concerns(spec: DesignSpec, patch: Patch, locks: LockGroup[], brief: DesignBrief | null, force: boolean, challenge: string) {
+/** A patch's concerns before it is applied: what the designer locked, their Creative DNA, their design system, a locked section. */
+function concerns(spec: DesignSpec, patch: Patch, locks: LockGroup[], brief: DesignBrief | null, force: boolean, challenge: string, moodboard: Moodboard, dna: CreativeDNA | null) {
   const locked = lockedChanges(spec, patch, locks);
   let said = challenge;
+  // a change that moves the page away from a dimension locked in the Creative DNA is asked about first
+  const trial = dna && patch.op !== 'none' ? applyPatch(spec, patch, moodboard) : null;
+  const dnaMoved = trial?.ok ? lockedDnaMoves(spec, trial.spec, dna) : [];
+  if (dnaMoved.length && !force) {
+    const what = dnaMoved.map((k) => DNA_META[k].label.toLowerCase()).join(' and ');
+    said = `This moves the ${what} away from where you locked it in the Creative DNA. ${said ? `${said} ` : ''}Make the change anyway?`.trim();
+  }
   if (locked.length && !force) {
     const what = locked.map((g) => LOCK_LABEL[g].toLowerCase()).join(' and ');
     said = `This changes the ${what}, which you locked in the art direction. ${said ? `${said} ` : ''}Make the change anyway?`.trim();
@@ -52,7 +63,7 @@ function concerns(spec: DesignSpec, patch: Patch, locks: LockGroup[], brief: Des
     const what = (sec && kindDef(sec.kind)?.label.toLowerCase()) || 'section';
     said = `This changes the ${what}, which you locked. ${said && !locked.length ? `${said} ` : ''}Make the change anyway?`.trim();
   }
-  return { locked, lockedSections, challenge: said };
+  return { locked, lockedSections, dnaMoved, challenge: said };
 }
 
 function trialOf(spec: DesignSpec, patch: Patch, moodboard: Moodboard) {
@@ -73,6 +84,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
   const force = body.force === true;
   const locks: LockGroup[] = Array.isArray(body.locks) ? [...new Set(body.locks.filter((x: unknown): x is LockGroup => typeof x === 'string' && (LOCK_GROUPS as readonly string[]).includes(x)))] : [];
   const brief = normalizeBrief(body.brief);
+  const dna = normalizeDNA(body.dna) ?? null;
   const stream = /application\/x-ndjson/.test(req.headers.get('accept') ?? '');
 
   // the everyday small changes: read in code, answered at once — no model, no charge, nothing regenerated
@@ -85,9 +97,9 @@ export const POST = withMeter(async function POST(req: NextRequest) {
   }
   if (quick && quick.patches.length === 1) {
     const patch = quick.patches[0];
-    const c = concerns(spec, patch, locks, brief, force, force ? '' : quick.concern ?? '');
+    const c = concerns(spec, patch, locks, brief, force, force ? '' : quick.concern ?? '', moodboard, dna);
     const t = trialOf(spec, patch, moodboard);
-    const out = { understood: quick.label.charAt(0).toUpperCase() + quick.label.slice(1), challenge: c.challenge, question: '', regenerate: '', patch, locked: c.locked, lockedSections: c.lockedSections, applies: t.applies, error: t.error, usage: null, complexity: { tier: null, why: 'done in code: a small change SocriaUX reads exactly' }, deterministic: true };
+    const out = { understood: quick.label.charAt(0).toUpperCase() + quick.label.slice(1), challenge: c.challenge, question: '', regenerate: '', patch, locked: c.locked, lockedSections: c.lockedSections, dnaMoved: c.dnaMoved, applies: t.applies, error: t.error, usage: null, complexity: { tier: null, why: 'done in code: a small change SocriaUX reads exactly' }, deterministic: true };
     return stream ? respondOnce(true, { status: 200, body: out }) : NextResponse.json(out);
   }
 
@@ -97,13 +109,13 @@ export const POST = withMeter(async function POST(req: NextRequest) {
     stage: 'refine',
     operation: 'patch',
     label: 'ux-v0/refine',
-    prompt: { system: refineSystem(), user: refineUser({ brief, spec, moodboard, selection, comment, force, locks }), maxTokens: MAX_TOKENS.refine, temperature: 0.4, tier: complexity.tier },
+    prompt: { system: refineSystem(), user: refineUser({ brief, spec, moodboard, selection, comment, force, locks, dna }), maxTokens: MAX_TOKENS.refine, temperature: 0.4, tier: complexity.tier },
     finish: (asked) => {
       const r = parseRefine(asked.json, force);
       // a locked decision, the design system, a locked section: never changed silently — the designer is asked first
-      const c = concerns(spec, r.patch, locks, brief, force, r.challenge);
+      const c = concerns(spec, r.patch, locks, brief, force, r.challenge, moodboard, dna);
       const t = trialOf(spec, r.patch, moodboard);
-      return { body: { understood: r.understood, challenge: c.challenge, question: r.question, regenerate: r.regenerate, patch: r.patch, locked: c.locked, lockedSections: c.lockedSections, applies: t.applies, error: t.error, complexity: { tier: asked.tier ?? complexity.tier, why: complexity.why } } };
+      return { body: { understood: r.understood, challenge: c.challenge, question: r.question, regenerate: r.regenerate, patch: r.patch, locked: c.locked, lockedSections: c.lockedSections, dnaMoved: c.dnaMoved, applies: t.applies, error: t.error, complexity: { tier: asked.tier ?? complexity.tier, why: complexity.why } } };
     },
   });
 });

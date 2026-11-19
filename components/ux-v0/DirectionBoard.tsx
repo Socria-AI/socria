@@ -36,7 +36,10 @@ import { buildSandboxDoc } from '@/lib/ux-v0/sandbox';
 import { studySpec } from '@/lib/ux-v0/study';
 import { BUTTONS, CONTAINERS, FRAMES, GRIDS, MOTIFS, MOTION_FEELS, STILL_MOTION, TREATMENTS, normalizeSpec, type DesignSpec, type Look, type Motion } from '@/lib/ux-v0/spec';
 import type { DesignBrief, MoodboardRef } from '@/lib/ux-v0/types';
+import { dnaValues, type CreativeDNA } from '@/lib/ux-v0/dna';
+import { compareDirections, sharedBecause } from '@/lib/ux-v0/explore';
 import { Preview } from './Preview';
+import { DnaGlyph, dnaWords } from './DnaParts';
 
 interface Props {
   state: DirectionState;
@@ -56,6 +59,9 @@ interface Props {
   onBack: () => void;
   /** swap one direction for another the engine has not shown, keeping the other two */
   onReplace: (id: string) => void;
+  /** the project's Creative DNA, which each direction leans from */
+  dna?: CreativeDNA | null;
+  onOpenDna?: () => void;
 }
 
 const GRID_LABEL: Record<string, string> = { stack: 'Stacked', editorial: 'Editorial side column', swiss: 'Strict columns', centered: 'Centred', asymmetric: 'Asymmetric', poster: 'Poster', modular: 'Modular cells' };
@@ -447,6 +453,15 @@ function Spread({ d, n, total, p, onPreview }: { d: ArtDirection; n: number; tot
           {d.name}
         </h3>
         <p className="ad-thesis">{d.concept}</p>
+        {d.dna && (
+          <div className="ad-dna">
+            <DnaGlyph dna={d.dna} against={p.dna ? dnaValues(p.dna) : undefined} label={`Direction ${n}'s Creative DNA, against yours`} />
+            <span className="ad-dna-text">
+              <b>{d.dnaLean ? d.dnaLean.charAt(0).toUpperCase() + d.dnaLean.slice(1) : 'Your Creative DNA'}</b>
+              {d.dnaSaid && d.dnaSaid.length > 0 && <span className="v0-quiet"> — {d.dnaSaid.slice(0, 3).map((x) => x.replace(/^[^:]*:\s*/, '')).join('; ')}</span>}
+            </span>
+          </div>
+        )}
         {d.locks.length > 0 && <p className="v0-quiet v0-dir-locks">Kept: {d.locks.map((g) => LOCK_LABEL[g].toLowerCase()).join(', ')}</p>}
         <div className="ad-acts">
           <button type="button" className={`sb-btn${n === 1 ? ' is-primary' : ''}`} onClick={() => p.onApprove(d)} disabled={!!p.busy}>
@@ -663,6 +678,62 @@ function Spread({ d, n, total, p, onPreview }: { d: ArtDirection; n: number; tot
   );
 }
 
+/** The directions side by side, row by row: where each made its own choice, and where they agree. */
+function Compare({ options, brief, dna }: { options: ArtDirection[]; brief: DesignBrief; dna?: CreativeDNA | null }) {
+  const c = useMemo(() => compareDirections(options), [options]);
+  const because = useMemo(() => sharedBecause(c, { locks: [...new Set(options.flatMap((d) => d.locks))], dna, system: !!brief.system, decided: brief.layout ?? null }), [c, options, dna, brief]);
+  const explained = c.rows.filter((r) => !r.distinct && because[r.row]).length;
+  const shared = c.rows.filter((r) => !r.distinct).length;
+  return (
+    <details className="ad-compare">
+      <summary>
+        <span className="sb-label">How they differ</span>
+        <span className="v0-quiet">
+          {c.distinctRows} of {c.rows.length} differ in every direction
+          {c.nearIdentical.length ? ` · ${c.nearIdentical.length === 1 ? 'two are' : 'some are'} nearly the same design` : ''}
+          {shared && explained === shared ? ' · what they share, you decided' : explained ? ` · ${explained} shared because you decided ${explained === 1 ? 'it' : 'them'}` : ''}
+        </span>
+      </summary>
+      {c.nearIdentical.length > 0 && (
+        <p className="v0-quiet ad-compare-note">
+          {explained === shared && shared
+            ? 'They share what you decided, so little is left for them to differ in. Unlock a group or give a dimension back to SocriaUX to see them differ more — or ask for three others.'
+            : 'Two of them are close. Ask for three others, or swap one with “Not this one”.'}
+        </p>
+      )}
+      <div className="ad-compare-scroll">
+        <table className="ad-compare-t">
+          <thead>
+            <tr>
+              <th scope="col">
+                <span className="v0-sr">Aspect</span>
+              </th>
+              {options.map((d, i) => (
+                <th key={d.id} scope="col">
+                  {String(i + 1).padStart(2, '0')} · {d.name}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {c.rows.map((r) => (
+              <tr key={r.row} className={r.distinct ? 'is-distinct' : ''}>
+                <th scope="row">
+                  {r.label}
+                  <span className="ad-compare-mark">{r.distinct ? 'each its own' : because[r.row] ? `shared: ${because[r.row]}` : 'shared'}</span>
+                </th>
+                {r.cells.map((cell, i) => (
+                  <td key={i}>{cell.says}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  );
+}
+
 export function DirectionBoard(p: Props) {
   const { state } = p;
   const [preview, setPreview] = useState<{ spec: DesignSpec; title: string } | null>(null);
@@ -697,6 +768,22 @@ export function DirectionBoard(p: Props) {
         </div>
       </div>
 
+      {p.dna && (
+        <p className="ad-dna-strip">
+          <span className="sb-label">Drawn from your Creative DNA</span>
+          <DnaGlyph dna={dnaValues(p.dna)} label="Your Creative DNA" />
+          <span className="ad-dna-strip-words">{dnaWords(dnaValues(p.dna))}</span>
+          <span className="v0-quiet">The first keeps it as it is; the others lean along what SocriaUX placed — never what you set or locked.</span>
+          {p.onOpenDna && (
+            <button type="button" className="sb-link is-meta is-strong" onClick={p.onOpenDna}>
+              Shape the DNA
+            </button>
+          )}
+        </p>
+      )}
+
+      {state.options.length > 1 && <Compare options={state.options} brief={p.brief} dna={p.dna} />}
+
       {state.options.length > 1 && (
         <nav className="ad-index" aria-label="The directions">
           {state.options.map((d, i) => (
@@ -727,7 +814,7 @@ export function DirectionBoard(p: Props) {
           {p.busy ?? 'Let SocriaUX choose'}
         </button>
         <button type="button" className="sb-link" onClick={p.onBack}>
-          Back to the brief
+          {p.onOpenDna ? 'Back to the Creative DNA' : 'Back to the brief'}
         </button>
         <span className="v0-quiet">SocriaUX’s choice is the first: the most faithful reading of your brief, with its palette and type as you approved them.</span>
       </footer>

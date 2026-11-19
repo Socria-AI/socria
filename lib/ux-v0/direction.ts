@@ -46,6 +46,7 @@ import {
 import { normalizeShape, SHAPE_FIELDS, type SectionShape } from './spec';
 import { bookingVariantsFor, hashText, heroVariantsFor, orderFor, seeded, shapeFor, type LayoutDecisions } from './layout';
 import type { BriefPart, DesignBrief } from './types';
+import { BOOKING_DNA, DNA_KEYS, DNA_META, LANGUAGE_DNA, PLAN_DNA, affinity, dnaDirectives, dnaSay, divergentDNA, holdToDNA, shapeByDNA, type CreativeDNA, type DnaKey, type DnaVector } from './dna';
 import { motionFor, readMotionWords } from './motion';
 import { paletteFromSwatches, type BoardReading } from './references';
 import { intentOf, requiredComponents } from './intent';
@@ -530,6 +531,13 @@ export interface ArtDirection {
   look: Look;
   /** groups the designer decided: kept through asking again, regenerating and refining */
   locks: LockGroup[];
+  /** the Creative DNA this direction embodies (lib/ux-v0/dna.ts): the designer's, or the lean it explores */
+  dna?: DnaVector;
+  /** how much the DNA steered it (0–1), for its plan and layouts */
+  dnaWeight?: number;
+  /** what the DNA changed in it, said plainly, and the lean it explores */
+  dnaSaid?: string[];
+  dnaLean?: string;
   /** who wrote it last */
   source: 'engine' | 'model' | 'person';
   /**
@@ -707,7 +715,9 @@ export function composeDirections(dirs: ArtDirection[], components: readonly (st
       // a plan the designer already has (a direction kept, its composition locked) stays its own
       const own = d.plan ? plans.find((p) => p.id === d.plan) : null;
       const prefs = PLAN_AFFINITY[d.language] ?? [];
-      const rank = (p: Plan) => (fits(p) ? 0 : 1000) + (prefs.includes(p.id) ? prefs.indexOf(p.id) : 100 + plans.indexOf(p));
+      // a plan closer to the direction's Creative DNA comes forward, as far as the DNA steers it
+      const dnaPull = (p: Plan) => (d.dna && d.dnaWeight ? -4 * d.dnaWeight * affinity(PLAN_DNA[p.id], d.dna) : 0);
+      const rank = (p: Plan) => (fits(p) ? 0 : 1000) + (prefs.includes(p.id) ? prefs.indexOf(p.id) : 100 + plans.indexOf(p)) + dnaPull(p);
       const ranked = [...plans].sort((a, b) => rank(a) - rank(b)).filter((p) => !used.has(p.id));
       const pick = own ?? choose(ranked.filter((p) => rank(p) < 1000).slice(0, 2)) ?? ranked[0] ?? plans[0];
       used.add(pick.id);
@@ -729,7 +739,9 @@ export function composeDirections(dirs: ArtDirection[], components: readonly (st
     const allowed = bookingVariantsFor(dec, hasImage);
     const used = new Set<string>();
     out = out.map((d) => {
-      const prefs = (BOOKING_AFFINITY[d.language] ?? ['strip', 'calendar', 'list', 'split']).filter((v) => allowed.includes(v));
+      const base = (BOOKING_AFFINITY[d.language] ?? ['strip', 'calendar', 'list', 'split']).filter((v) => allowed.includes(v));
+      // the booking's composition closer to the direction's Creative DNA comes forward
+      const prefs = d.dna && (d.dnaWeight ?? 0) > 0.2 ? [...base].sort((a, b) => base.indexOf(a) - 3 * (d.dnaWeight ?? 0) * affinity(BOOKING_DNA[a], d.dna!) - (base.indexOf(b) - 3 * (d.dnaWeight ?? 0) * affinity(BOOKING_DNA[b], d.dna!))) : base;
       const pick = choose(prefs.filter((v) => !used.has(v)).slice(0, 2)) ?? allowed.find((v) => !used.has(v)) ?? prefs[0] ?? allowed[0];
       used.add(pick);
       return { ...d, plan: d.plan && plans.length ? d.plan : `booking-${pick}`, compose: { ...(d.compose ?? {}), booking: pick }, composition: `${BOOKING_SAY[pick]} ${d.composition}`.slice(0, 280) };
@@ -790,6 +802,8 @@ export interface DirectionState {
   seen: string[];
   /** the brief the options were made for (briefKey): a changed brief brings new ones */
   forBrief: string;
+  /** the Creative DNA they were drawn from (dnaKeyOf): a changed DNA brings new ones */
+  forDna?: string;
 }
 
 export const EMPTY_DIRECTION: DirectionState = { options: [], chosen: null, approved: false, notes: '', avoid: '', round: 0, seen: [], forBrief: '' };
@@ -1451,6 +1465,8 @@ export interface DirectionAsk {
   board?: BoardReading;
   /** the project, so the same brief in two projects is drawn two ways; open decisions vary with it */
   salt?: string;
+  /** the project's Creative DNA (lib/ux-v0/dna.ts): it chooses the languages, shapes each direction, and holds what is locked */
+  dna?: CreativeDNA | null;
 }
 
 /**
@@ -1471,6 +1487,18 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
   // the project's own salt: the same brief in another project gets other directions (none, for older callers)
   const seed = hash(`${briefText(brief)}|${notes}|${avoid}|${round}${ask.salt ? `|${ask.salt}` : ''}`);
   const directives = readDirectives(notes, avoid);
+  // THE CREATIVE DNA (lib/ux-v0/dna.ts): three leans of it (the designer's own, bolder, quieter — along what SocriaUX
+  // placed; what the designer set or locked is the same in all three), each steering its direction
+  const slots = [0, 1, 2, 3].map((i) => divergentDNA(ask.dna, i));
+  const say = dnaSay(ask.dna);
+  // what the DNA asks for plainly, where the designer's words did not already say
+  const fromDna = dnaDirectives(slots[0].vector, slots[0].strength);
+  if (fromDna.density && !directives.density) directives.density = fromDna.density;
+  if (fromDna.motion && !directives.motion) directives.motion = fromDna.motion;
+  if (fromDna.minimal && directives.minimal === undefined && !directives.loud) directives.minimal = true;
+  if (fromDna.loud && directives.loud === undefined && !directives.minimal) directives.loud = true;
+  if (fromDna.colourful && directives.colourful === undefined) directives.colourful = true;
+  if (fromDna.serif !== undefined && directives.serif === undefined) directives.serif = fromDna.serif;
   if (board) {
     // what the references show, where the words did not already say
     if (board.serif !== undefined && directives.serif === undefined) directives.serif = board.serif;
@@ -1480,7 +1508,10 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
     if (board.density) (directives.density = board.density), directives.said.push(board.density === 'airy' ? 'generous space, from your references' : 'a denser page, from your references');
   }
   const fromRefs = board?.colours.length ? paletteFromSwatches(board.colours) : null;
-  const fits = fitScores(brief, notes, avoid);
+  const fits0 = fitScores(brief, notes, avoid);
+  // a language closer to the DNA comes forward, as far as the designer set the DNA (dnaSay); one the designer asked
+  // to avoid stays out whatever the DNA says
+  const fits = say > 0.01 ? dnaFits(fits0, fitScores(brief, notes, ''), slots[0], say) : fits0;
   const top = Math.max(1, fits[0].score);
   // asking again: what was shown steps back, so new languages come forward
   const adjusted = fits.map((x) => ({ ...x, adj: x.score - (seen.has(x.id) ? top + 1 : 0) })).sort((a, b) => b.adj - a.adj);
@@ -1504,6 +1535,8 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
   };
   // the faithful reading first (only on the first round: asking again means "show me others")
   const firstId = adjusted[0].id;
+  // for each lean, how well each language embodies it, 0 (least of all) to 1 (most)
+  const leans = slots.map((sl) => relAffinity(fits.map((x) => x.id), sl));
   chosen.push(make(firstId, round === 0 && !(ask.base && ask.base.locks.includes('palette'))));
   usedIds.add(firstId);
   while (chosen.length < count) {
@@ -1520,22 +1553,116 @@ export function proposeDirections(ask: DirectionAsk): ArtDirection[] {
       const dist = Math.min(...chosen.map((c) => directionDistance(c, trial)));
       // for a project, a small nudge of its own: of two alternatives nearly as good, projects do not all get the same
       const nudge = ask.salt ? (seeded(hashText(`${seed}|${x.id}|${chosen.length}`))() - 0.5) * 0.12 : 0;
-      const v = wantFit * fitN + (1 - wantFit) * dist + nudge;
+      // the lean this slot explores pulls the language that embodies it forward
+      const lean = ask.dna ? Math.max(say, 0.15) * 0.5 * (leans[Math.min(chosen.length, 3)].get(x.id) ?? 0) : 0;
+      const v = wantFit * fitN + (1 - wantFit) * dist + nudge + lean;
       if (!best || v > best.v) best = { id: x.id, v };
     }
     if (!best) break;
     usedIds.add(best.id);
     chosen.push(make(best.id, false));
   }
+  const grids: string[] = [];
   const finished = chosen.map((d, i) => {
     const locked = applyLocks(applyBrief(d, brief, i === 0 && round === 0), ask.base);
-    return { ...locked, id: `dir_${d.language}_${round}_${i}` };
+    // its look drawn from its lean of the DNA: type, grid, rhythm, ornament, motion, spacing, colour, pictures
+    // (where the DNA narrows the grids, each direction takes one the others have not)
+    const shaped = ask.dna ? withDNA(locked, brief, slots[Math.min(i, 3)], i === 0 && round === 0, 'look', i, grids) : locked;
+    grids.push(shaped.look.grid);
+    return { ...shaped, id: `dir_${d.language}_${round}_${i}` };
   });
-  // the task's own components composed differently in each direction (a booking: calendar, list, split…)
+  // the task's own components composed differently in each direction (a booking: calendar, list, split…), the
+  // plans closest to each direction's DNA first
   const intent = intentOf(brief);
   const composed = composeDirections(finished, requiredComponents(intent), (brief.references ?? []).length > 0, intent.kind, { decisions: brief.layout, seed, density: brief.spec?.density, vary: !!ask.salt });
+  // …then its opening, proportions and what it leads with, from the same lean
+  const laid = ask.dna ? composed.map((d, i) => withDNA(d, brief, slots[Math.min(i, 3)], i === 0 && round === 0, 'layout', i)) : composed;
   // each direction's plan, critiqued and revised before anyone sees it (lib/ux-v0/plan.ts)
-  return composed.map((d, i) => withPlan(d, brief, notes, i === 0 && round === 0 && !ask.base, seed + i * 104729));
+  return laid.map((d, i) => withPlan(d, brief, notes, i === 0 && round === 0 && !ask.base, seed + i * 104729));
+}
+
+/**
+ * A direction drawn from a DNA lean (lib/ux-v0/dna.ts shapeByDNA): its type, grid, rhythm, opening, ornament, motion,
+ * spacing and treatment of pictures, within its language and never against what the designer decided (their palette
+ * and type in the faithful reading, a design system, the groups they locked).
+ */
+export function withDNA(d: ArtDirection, brief: DesignBrief, lean: { vector: DnaVector; strength: Partial<Record<DnaKey, number>>; said: string }, faithful: boolean, phase: 'look' | 'layout' | 'all' = 'all', slot = 0, taken: readonly string[] = []): ArtDirection {
+  const lang = languageOf(d.language);
+  const intent = intentOf(brief);
+  const keepColours = (faithful && brief.decisions?.colour !== 'delegated') || brief.decisions?.colour === 'locked' || !!brief.system || d.locks.includes('palette');
+  const keepType = (faithful && brief.decisions?.typography !== 'delegated') || brief.decisions?.typography === 'locked' || !!brief.system || d.locks.includes('type');
+  const out = shapeByDNA({ tokens: d.tokens, look: d.look, compose: d.compose, shapes: d.shapes as Record<string, Record<string, unknown>> | undefined, order: d.order }, lean.vector, lean.strength, {
+    lang: lang ?? null,
+    keepColours,
+    keepType,
+    kind: intent.kind,
+    hasImages: (brief.references ?? []).length > 0,
+    locks: d.locks,
+    phase,
+    seed: slot,
+    taken: d.locks.includes('layout') ? [] : taken,
+  });
+  const info = DNA_KEYS.reduce((s, k) => s + (lean.strength[k] ?? 0), 0) / DNA_KEYS.length;
+  // what the designer set or locked holds: once the plan has set the opening, the direction is read and moved back
+  // toward any such dimension it sits too far from (never a group locked in the art direction)
+  let held: { moved: DnaKey[]; off: DnaKey[] } = { moved: [], off: [] };
+  if (phase !== 'look') {
+    const targets: DnaVector = {};
+    for (const k of DNA_KEYS) if ((lean.strength[k] ?? 0) >= 0.99 && typeof lean.vector[k] === 'number') targets[k] = lean.vector[k];
+    if (Object.keys(targets).length) {
+      const h = holdToDNA({ ...d, tokens: out.tokens, look: out.look, compose: out.compose ?? d.compose, shapes: (out.shapes ?? d.shapes) as Record<string, Record<string, unknown>> | undefined, order: out.order ?? d.order }, targets, { locks: d.locks, lang: lang ?? null, screen: !!intent.screen });
+      out.tokens = h.d.tokens;
+      out.look = h.d.look;
+      if (h.d.compose) out.compose = h.d.compose;
+      held = h;
+    }
+  }
+  // what it changed, one line per dimension (the layout phase adds to what the look phase said)
+  const said = [...(phase === 'layout' ? d.dnaSaid ?? [] : [])];
+  for (const k of held.moved) if (!out.said.some((x) => x.startsWith(DNA_META[k].label))) out.said.push(`${DNA_META[k].label} ${lean.vector[k]}: held where you set it`);
+  for (const line of out.said) {
+    const head = line.slice(0, line.indexOf(':'));
+    const at = said.findIndex((x) => x.startsWith(`${head}:`));
+    if (at >= 0) said[at] = `${said[at]}, ${line.slice(line.indexOf(':') + 1).trim()}`;
+    else said.push(line);
+  }
+  return {
+    ...d,
+    tokens: out.tokens,
+    look: out.look,
+    ...(out.compose ? { compose: out.compose } : {}),
+    ...(out.shapes ? { shapes: out.shapes as ArtDirection['shapes'] } : {}),
+    ...(out.order ? { order: out.order } : {}),
+    dna: { ...lean.vector },
+    dnaWeight: Math.round(info * 100) / 100,
+    dnaSaid: said.slice(0, 8),
+    dnaLean: lean.said,
+  };
+}
+
+/**
+ * The fit of each language, with the DNA's say blended in: (1 − say) of how the brief reads it, say of how well its
+ * own DNA matches, on the brief's own scale. A language the designer asked to avoid keeps its score: out, whatever
+ * the DNA says.
+ */
+function dnaFits(fits: Fit[], free: Fit[], lean: { vector: DnaVector; strength: Partial<Record<DnaKey, number>> }, say: number): Fit[] {
+  const unavoided = new Map(free.map((x) => [x.id, x.score]));
+  const avoided = new Set(fits.filter((x) => x.score - (unavoided.get(x.id) ?? x.score) <= -4).map((x) => x.id));
+  const open = fits.filter((x) => !avoided.has(x.id));
+  if (open.length < 2) return fits;
+  const lo = Math.min(...open.map((x) => x.score));
+  const spread = Math.max(1, Math.max(...open.map((x) => x.score)) - lo);
+  const rel = relAffinity(open.map((x) => x.id), lean);
+  const blended = open.map((x) => ({ ...x, score: Math.round((lo + spread * ((1 - say) * ((x.score - lo) / spread) + say * (rel.get(x.id) ?? 0))) * 100) / 100 }));
+  return [...blended, ...fits.filter((x) => avoided.has(x.id))].sort((a, b) => b.score - a.score);
+}
+
+/** How well each language's own DNA matches a lean, relative to the others: 0 the least, 1 the most. */
+function relAffinity(ids: string[], lean: { vector: DnaVector; strength: Partial<Record<DnaKey, number>> }): Map<string, number> {
+  const raw = ids.map((id) => [id, affinity(LANGUAGE_DNA[id], lean.vector, lean.strength)] as const);
+  const lo = Math.min(...raw.map((x) => x[1]));
+  const hi = Math.max(...raw.map((x) => x[1]));
+  return new Map(raw.map(([id, a]) => [id, hi - lo < 0.02 ? 0.5 : (a - lo) / (hi - lo)]));
 }
 
 /** What a direction's plan is judged against: the work, its subject, the designer's words and decisions. */
@@ -1573,13 +1700,13 @@ export function withPlan(d: ArtDirection, brief: DesignBrief, notes: string, fai
 export const saltOf = (id: unknown): string => (typeof id === 'string' && /^[A-Za-z0-9_-]{1,96}$/.test(id) ? id : '');
 
 /** SocriaUX's own choice, when the designer leaves it: the faithful reading. */
-export function autoDirection(brief: DesignBrief, notes = '', avoid = '', salt = ''): ArtDirection {
-  return proposeDirections({ brief, notes, avoid, count: 1, ...(salt ? { salt } : {}) })[0];
+export function autoDirection(brief: DesignBrief, notes = '', avoid = '', salt = '', dna: CreativeDNA | null = null): ArtDirection {
+  return proposeDirections({ brief, notes, avoid, count: 1, ...(salt ? { salt } : {}), ...(dna ? { dna } : {}) })[0];
 }
 
 /** A direction revised in words ("darker, more like a bar"), keeping what is locked. */
-export function reviseDirection(base: ArtDirection, brief: DesignBrief, words: string, avoid = '', salt = ''): ArtDirection {
-  const options = proposeDirections({ brief, notes: words, avoid, base, count: 3, ...(salt ? { salt } : {}) });
+export function reviseDirection(base: ArtDirection, brief: DesignBrief, words: string, avoid = '', salt = '', dna: CreativeDNA | null = null): ArtDirection {
+  const options = proposeDirections({ brief, notes: words, avoid, base, count: 3, ...(salt ? { salt } : {}), ...(dna ? { dna } : {}) });
   // the language the words point at, or the one closest to where the designer already was
   const fits = fitScores(brief, words, avoid);
   const wanted = options.find((o) => o.language === fits[0].id) ?? options[0];
@@ -1614,7 +1741,17 @@ export function normalizeDirection(v: unknown): ArtDirection | null {
     ...composeOf(r.compose, r.plan, r.order, r.lead),
     ...shapesOf(r.shapes),
     ...((plan) => (plan ? { designPlan: plan } : {}))(normalizeDesignPlan(r.designPlan)),
+    ...dnaOfStored(r),
   };
+}
+
+function dnaOfStored(r: Record<string, any>): Pick<ArtDirection, 'dna' | 'dnaWeight' | 'dnaSaid' | 'dnaLean'> {
+  const dna: DnaVector = {};
+  const src = r.dna && typeof r.dna === 'object' ? (r.dna as Record<string, unknown>) : {};
+  for (const k of DNA_KEYS) if (typeof src[k] === 'number' && Number.isFinite(src[k])) dna[k] = Math.max(0, Math.min(100, Math.round(src[k] as number)));
+  if (!Object.keys(dna).length) return {};
+  const said = (Array.isArray(r.dnaSaid) ? r.dnaSaid : []).filter((x: unknown) => typeof x === 'string').map((x: string) => x.slice(0, 200)).slice(0, 6);
+  return { dna, ...(typeof r.dnaWeight === 'number' ? { dnaWeight: Math.max(0, Math.min(1, r.dnaWeight)) } : {}), ...(said.length ? { dnaSaid: said } : {}), ...(typeof r.dnaLean === 'string' ? { dnaLean: r.dnaLean.slice(0, 200) } : {}) };
 }
 
 function shapesOf(v: unknown): { shapes?: Record<string, SectionShape> } {
@@ -1653,6 +1790,7 @@ export function normalizeDirectionState(v: unknown): DirectionState {
     round: Math.max(0, Math.min(99, Math.round(Number(r.round) || 0))),
     seen: strs(r.seen, 40, 24).filter((x) => LANG.has(x)),
     forBrief: str(r.forBrief, 16),
+    ...(str(r.forDna, 16) ? { forDna: str(r.forDna, 16) } : {}),
   };
 }
 

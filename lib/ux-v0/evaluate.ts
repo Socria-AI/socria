@@ -53,7 +53,7 @@ export interface PageAudit {
   images: { section: string; path: string; ok: boolean; w: number; h: number }[];
   overflow: { section: string; path: string; by: number; tag: string }[];
   measure: { section: string; path: string; cpl: number }[];
-  style: { gradients: number; shadows: number; roundedBoxes: number; trackedCaps: number; centred: number; blocks: number; emoji: number; icons: number; rails: number; families: Record<string, number> };
+  style: { gradients: number; shadows: number; roundedBoxes: number; trackedCaps: number; centred: number; blocks: number; emoji: number; icons: number; rails: number; families: Record<string, number>; /** frosted, backdrop-blurred panels (imported designs; the renderer never draws them) */ blurs?: number };
   /** each booking and form, tried in place by the behaviour runtime: what did not work */
   behaviors: { index: number; kind: 'booking' | 'form'; slots: number; problems: string[] }[];
 }
@@ -85,7 +85,7 @@ export function normalizeAudit(v: unknown): PageAudit | null {
     measure: list(r.measure, 20, (x) => ({ section: s(x.section, 48), path: s(x.path, 60), cpl: n(x.cpl, 0, 1000) })),
     style: {
       gradients: n(st.gradients, 0, 1e5), shadows: n(st.shadows, 0, 1e5), roundedBoxes: n(st.roundedBoxes, 0, 1e5), trackedCaps: n(st.trackedCaps, 0, 1e5),
-      centred: n(st.centred, 0, 1e5), blocks: n(st.blocks, 0, 1e5), emoji: n(st.emoji, 0, 1e5), icons: n(st.icons, 0, 1e5), rails: n(st.rails, 0, 1e5), families: fam,
+      centred: n(st.centred, 0, 1e5), blocks: n(st.blocks, 0, 1e5), emoji: n(st.emoji, 0, 1e5), icons: n(st.icons, 0, 1e5), rails: n(st.rails, 0, 1e5), blurs: n(st.blurs, 0, 1e5), families: fam,
     },
     behaviors: list(r.behaviors, 10, (x) => ({ index: n(x.index, 0, 100), kind: (x.kind === 'form' ? 'form' : 'booking') as 'booking' | 'form', slots: n(x.slots, 0, 1000), problems: (Array.isArray(x.problems) ? x.problems : []).map((p: unknown) => s(p, 120)).filter(Boolean).slice(0, 6) })),
   };

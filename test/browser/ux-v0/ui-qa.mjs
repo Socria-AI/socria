@@ -166,9 +166,38 @@ await page.waitForSelector('#bp-system.is-on', { timeout: 8000 });
 const sysText = await page.locator('#bp-system').innerText();
 ok('…attached: its name, its colours by role, its faces (one drawn with the closest SocriaUX can serve, and said), its rules', /Tidewater/.test(sysText) && /#0f766e/i.test(sysText) && /Söhne Breit/.test(sysText) && /1 rule/.test(sysText), sysText.slice(0, 400));
 await page.locator('#bp-system').screenshot({ path: `${S}ui-2c-design-system-1440.png` });
-await page.getByRole('button', { name: 'Approve and choose a direction' }).click();
+await page.getByRole('button', { name: 'Approve and set the Creative DNA' }).click();
+// THE CREATIVE DNA: SocriaUX's reading of the brief, each dimension in a word with where it came from, a lock each,
+// a study drawn from it; set one, lock another; then on to the directions (one click for whoever delegates)
+await page.waitForSelector('.dna-studio', { timeout: 15000 });
+await page.waitForTimeout(1800);
+const dnaDims = await page.locator('.dna-dim').count();
+ok('the Creative DNA step: every dimension in a word, with where it came from and a lock of its own', dnaDims >= 6 && (await page.locator('.dna-lock').count()) === dnaDims && (await page.locator('.dna-src').count()) === dnaDims && (await page.locator('.dna-dim-word').allInnerTexts()).every((t) => t.trim().length > 2), dnaDims);
+ok('…a study drawn from it by the renderer the design will use', (await page.locator('.dna-specimen iframe').count()) === 1 && ((await page.locator('.dna-specimen iframe').getAttribute('srcdoc')) ?? '').length > 2000);
+await shootAll('2d-dna');
+const compDim = page.locator('.dna-dim', { has: page.locator('label', { hasText: /^Composition$/ }) });
+const compWordBefore = await compDim.locator('.dna-dim-word').innerText();
+const studyBefore = (await page.locator('.dna-specimen iframe').getAttribute('srcdoc')) ?? '';
+await compDim.locator('input[type="range"]').focus();
+await page.keyboard.press('End');
+await page.waitForTimeout(900);
+ok('a dimension set by keyboard: its word changes and it is said to be the designer’s', (await compDim.locator('.dna-dim-word').innerText()) !== compWordBefore && /Set by you/.test(await compDim.locator('.dna-src').innerText()), await compDim.innerText());
+ok('…and the study redraws from it', ((await page.locator('.dna-specimen iframe').getAttribute('srcdoc')) ?? '') !== studyBefore);
+const motionDim = page.locator('.dna-dim', { has: page.locator('label', { hasText: /^Motion$/ }) });
+await motionDim.locator('.dna-lock').click();
+await page.waitForTimeout(300);
+ok('a lock: pressed, and said', (await motionDim.locator('.dna-lock').getAttribute('aria-pressed')) === 'true' && /1 locked/.test(await page.locator('.dna-summary').innerText()));
+await page.screenshot({ path: `${S}ui-2e-dna-set-1440.png` });
+await page.getByRole('button', { name: 'Explore directions' }).click();
 await page.waitForSelector('.v0-dir', { timeout: 15000 });
 await page.waitForTimeout(2500);
+ok('the directions say the DNA they are drawn from, and what each explores', (await page.locator('.ad-dna-strip').count()) === 1 && (await page.locator('.ad-dna').count()) === 3 && /your Creative DNA as it is/i.test(await page.locator('.ad-dna').first().innerText()));
+await page.locator('.ad-compare > summary').click();
+await page.waitForTimeout(300);
+const cmpRows = await page.locator('.ad-compare-t tbody tr').count();
+ok('…and how they differ, side by side: six aspects, each said for each direction', cmpRows === 6 && (await page.locator('.ad-compare-t tbody tr').first().locator('td').count()) === 3, cmpRows);
+await page.locator('.ad-compare').screenshot({ path: `${S}ui-3a-compare-1440.png` });
+await page.locator('.ad-compare > summary').click();
 const studies = page.frameLocator('.v0-dir iframe');
 ok('three directions, each with its study', (await page.locator('.v0-dir').count()) === 3);
 const splits = [];
@@ -195,6 +224,14 @@ ok('the generated design is the booking itself: no "Begin", no "Read more"', (aw
 const confirmColours = await frame.locator('[data-ux-confirm]').evaluate((e) => { const c = getComputedStyle(e); return `${c.backgroundColor} ${c.borderColor} ${c.color}`; });
 ok('…drawn in the design system’s own accent', /rgb\(15, 118, 110\)/.test(confirmColours), confirmColours);
 await shootAll('4-canvas');
+// the canvas's Checks: the design's own DNA against the project's, and the Originality Audit (no model asked)
+await page.getByRole('tab', { name: /^Checks/ }).click();
+await page.waitForSelector('.orig', { timeout: 8000 }).catch(() => {});
+await page.waitForTimeout(600);
+const origText = (await page.locator('.orig').count()) ? await page.locator('.orig').innerText() : '';
+ok('Checks shows the Originality Audit: four scores, what was found (or that nothing generic was), read in code', (await page.locator('.orig-score').count()) === 4 && /Its own/.test(origText) && /no model asked/.test(origText), origText.slice(0, 300));
+ok('…and the design’s Creative DNA against the project’s, with how faithfully it keeps it', (await page.locator('.dna-canvas .dna-glyph').count()) === 1 && /keeps your DNA at \d+ of 100/.test(await page.locator('.dna-canvas').innerText()));
+await page.locator('.v0-rail').screenshot({ path: `${S}ui-4b-checks-1440.png` }).catch(() => {});
 // the booking works on the canvas: choose a time, confirm
 await page.getByRole('radio', { name: 'None' }).click().catch(() => {});
 await frame.locator('.bk-times:not([hidden]) .bk-slot:not(.is-full)').first().click().catch(() => {});

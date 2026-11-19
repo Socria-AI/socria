@@ -21,6 +21,7 @@ import { layoutBrief } from './layout';
 import { tellsRule } from './tells';
 import { systemBrief } from './design-system';
 import { designFromDirection, directionBrief, LOCK_LABEL, planLayout, type ArtDirection, type LockGroup } from './direction';
+import { dnaBrief, type CreativeDNA } from './dna';
 import { normQ, readQueries } from './discovery';
 import { fontMenu } from './fonts';
 import { knowledgeBrief } from './knowledge';
@@ -168,6 +169,8 @@ export interface GenerateInput {
   moodboard: Moodboard;
   /** a new direction asked for in words, when regenerating */
   direction: string;
+  /** the project's Creative DNA (lib/ux-v0/dna.ts): what it asks of the sections and the copy */
+  dna?: CreativeDNA | null;
 }
 
 /** What generated pages do by habit, and this one must not do unless the direction asks for it. */
@@ -232,6 +235,7 @@ export function generateUser(input: GenerateInput): string {
     `PICTURES YOU MAY PLACE (id, category, subject, orientation):\n${keptRefs(input.moodboard)}`,
     inspiration(input.moodboard),
     input.direction ? `A NEW DIRECTION THE DESIGNER ASKED FOR: “${input.direction}”` : '',
+    dnaBrief(input.dna),
   ]
     .filter(Boolean)
     .join('\n\n');
@@ -284,6 +288,8 @@ export interface RefineInput {
   force: boolean;
   /** what the designer locked in the art direction */
   locks?: readonly LockGroup[];
+  /** the project's Creative DNA: what it says, and what is locked in it */
+  dna?: CreativeDNA | null;
 }
 
 export function refineSystem(): string {
@@ -322,6 +328,7 @@ export function refineUser(input: RefineInput): string {
     `PICTURES THAT MAY BE PLACED:\n${keptRefs(input.moodboard)}`,
     where,
     input.locks?.length ? `LOCKED IN THE ART DIRECTION (the designer decided these): ${input.locks.map((g) => LOCK_LABEL[g]).join(', ')}. If the comment asks to change one, make the patch but say in "challenge" that it changes a locked decision.` : '',
+    dnaBrief(input.dna),
     `THE COMMENT: “${input.comment}”`,
     `force: ${input.force}`,
   ]
