@@ -16,11 +16,14 @@ import { makeProject, normalizeProject, type DesignProject, type ProjectSummary 
 import { checkFile } from './files';
 import { Home, type RemoteWork } from './Home';
 import { Workspace } from './Workspace';
+import { GraphicsWorkspace } from './graphics/GraphicsWorkspace';
+import { emptyGraphicState } from '@/lib/ux-v0/graphics/state';
 import '@/components/brand/socria-brand.css';
 import './ux-v0.css';
 import './home.css';
 import './studio.css';
 import './dna.css';
+import './graphics/graphics.css';
 
 const idFromUrl = () => {
   if (typeof window === 'undefined') return null;
@@ -117,18 +120,44 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
     window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(p.id)}`);
   };
 
+  /** A graphics project (lib/ux-v0/graphics): begun from the words typed on the home, if any. */
+  const startGraphic = async (intent: string) => {
+    setError('');
+    const p: DesignProject = { ...makeProject('create', 'Untitled graphic'), medium: 'graphic', graphic: emptyGraphicState(), intent: intent.slice(0, 600) };
+    await putProject(p);
+    passage(() => setOpen({ p, intent }));
+    window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(p.id)}`);
+  };
+
   const remove = async (s: ProjectSummary) => {
     const p = await getProject(s.id);
     const artifactId = p?.artifact?.type === 'imported' ? p.artifact.id : undefined;
     await deleteProject(s.id, artifactId);
-    // the designer's own references go with the project
-    await deleteArtifacts(p?.moodboard.refs.filter((r) => r.provider === 'upload').map((r) => r.providerId) ?? []);
+    // the designer's own references go with the project, and a graphic's own pictures
+    const gfx = p?.graphic ? [...(p.graphic.assets ?? []), ...(p.graphic.doc?.assets ?? []), ...p.graphic.versions.flatMap((v) => v.doc.assets)].map((a) => a.src).filter((src) => src.startsWith('upload:')).map((src) => src.slice('upload:'.length)) : [];
+    await deleteArtifacts([...new Set([...(p?.moodboard.refs.filter((r) => r.provider === 'upload').map((r) => r.providerId) ?? []), ...gfx])]);
     if (signedIn) {
       await fetch(`/api/ux-v0/projects?id=${encodeURIComponent(s.id)}`, { method: 'DELETE' }).catch(() => undefined);
       if (artifactId && p?.artifact?.type === 'imported' && p.artifact.kept === 'account') await fetch(`/api/files/original/${artifactId}`, { method: 'DELETE' }).catch(() => undefined);
     }
     refresh();
   };
+
+  if (open && open.p.medium === 'graphic') {
+    return (
+      <GraphicsWorkspace
+        key={open.p.id}
+        initial={open.p}
+        signedIn={signedIn}
+        startIntent={open.intent}
+        onExit={() => {
+          passage(() => setOpen(null));
+          refresh();
+          window.history.pushState(null, '', '/ux-v0');
+        }}
+      />
+    );
+  }
 
   if (open) {
     return (
@@ -160,6 +189,7 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
       nonce={nonce}
       onCreate={(intent) => start('create', { intent })}
       onCritique={(file) => start('critique', { file })}
+      onGraphic={(intent) => startGraphic(intent)}
       onOpen={(id) => openById(id)}
       onDelete={remove}
     />

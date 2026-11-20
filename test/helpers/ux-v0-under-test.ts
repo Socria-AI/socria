@@ -93,3 +93,12 @@ export { tightenField, withoutPiece } from '@/lib/ux-v0/compose';
 export { AREAS, AREA_LABEL, readScope, changesBetween, inScope, confine, describeBack } from '@/lib/ux-v0/scope';
 export { readTargeted, reshape } from '@/lib/ux-v0/targeted';
 export { capVersions, describeChanges, restoredVersion, MAX_VERSIONS } from '@/lib/ux-v0/history';
+// graphics 1.0: the document, its formats, text layout, the SVG renderer, composition
+export * as gfxDoc from '@/lib/ux-v0/graphics/doc';
+export * as gfxFormats from '@/lib/ux-v0/graphics/formats';
+export * as gfxText from '@/lib/ux-v0/graphics/text';
+export * as gfxRender from '@/lib/ux-v0/graphics/render';
+export * as gfxCompose from '@/lib/ux-v0/graphics/compose';
+export * as gfxCheck from '@/lib/ux-v0/graphics/check';
+export * as gfxEdit from '@/lib/ux-v0/graphics/edit';
+export * as gfxExport from '@/lib/ux-v0/graphics/export';

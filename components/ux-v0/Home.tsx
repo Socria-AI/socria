@@ -16,6 +16,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { renderDesign } from '@/lib/ux-v0/render';
+import { renderArtboard } from '@/lib/ux-v0/graphics/render';
+import { fontStylesheet } from '@/lib/ux-v0/fonts';
 import { buildSandboxDoc } from '@/lib/ux-v0/sandbox';
 import { getArtifact, getProject } from '@/lib/ux-v0/store';
 import { currentSpec, type ProjectSummary } from '@/lib/ux-v0/types';
@@ -36,6 +38,8 @@ interface Props {
   nonce: string;
   onCreate: (intent: string) => void;
   onCritique: (file: File) => void;
+  /** begin a graphic (a poster, a post, a cover…): lib/ux-v0/graphics */
+  onGraphic: (intent: string) => void;
   onOpen: (id: string) => void;
   onDelete: (s: ProjectSummary) => void;
 }
@@ -60,7 +64,26 @@ const num = (n: number) => `No. ${String(n).padStart(3, '0')}`;
 
 const MEDIUM: Record<string, string> = { html: 'an HTML page', png: 'a PNG image', jpg: 'a JPG image', svg: 'an SVG drawing' };
 
+const GRAPHIC_KIND: Record<string, string> = {
+  poster: 'Poster',
+  social: 'Social post',
+  carousel: 'Carousel',
+  ad: 'Advertisement',
+  banner: 'Banner',
+  magazine: 'Magazine cover',
+  book: 'Book cover',
+  album: 'Album cover',
+  card: 'Business card',
+  label: 'Label',
+  infographic: 'Infographic',
+  identity: 'Identity board',
+  announcement: 'Announcement',
+  presentation: 'Slide',
+  campaign: 'Campaign',
+};
+
 function kindLine(s: ProjectSummary): string {
+  if (s.graphic) return `${GRAPHIC_KIND[s.graphic] ?? 'Graphic'}${s.direction ? ` · ${s.direction}` : ''}`;
   if (s.mode === 'critique') return s.medium ? `Critique of ${MEDIUM[s.medium]}` : 'Critique';
   const page = s.pageType === 'app-screen' ? 'App screen' : s.pageType === 'website' ? 'Website' : 'Design';
   return s.direction ? `${page} · ${s.direction}` : page;
@@ -102,7 +125,7 @@ const keep = (key: string, v: string) => {
 
 // ── the plate: what a work looks like, drawn small ────────────────────
 
-type Shown = { kind: 'page'; html: string } | { kind: 'image'; url: string } | null;
+type Shown = { kind: 'page'; html: string } | { kind: 'image'; url: string } | { kind: 'svg'; svg: string } | null;
 
 /**
  * A work's plate. A generated design is drawn by the renderer at 1280 px and
@@ -137,10 +160,36 @@ function Plate({ s, ratio, nonce }: { s: ProjectSummary; ratio: number; nonce: s
   useEffect(() => {
     if (!near || (s.stage !== 'design' && s.stage !== 'imported')) return;
     let url = '';
+    const urls: string[] = [];
     let live = true;
     (async () => {
       const p = await getProject(s.id);
       if (!p || !live) return;
+      // a graphic: its first artboard, drawn by the same renderer as its editor and its exports
+      const gdoc = p.medium === 'graphic' ? p.graphic?.doc : null;
+      if (gdoc) {
+        const map = new Map<string, string>();
+        for (const a of gdoc.assets) {
+          if (!a.src.startsWith('upload:')) continue;
+          const rec = await getArtifact(a.src.slice('upload:'.length));
+          if (rec) {
+            const u = URL.createObjectURL(rec.data);
+            urls.push(u);
+            map.set(a.id, u);
+          }
+        }
+        if (!live) return;
+        const faces = fontStylesheet([gdoc.tokens.fonts.display, gdoc.tokens.fonts.body]);
+        if (faces && !document.querySelector(`link[data-mu-faces="${faces.length}-${gdoc.tokens.fonts.display}-${gdoc.tokens.fonts.body}"]`)) {
+          const l = document.createElement('link');
+          l.rel = 'stylesheet';
+          l.href = faces;
+          l.dataset.muFaces = `${faces.length}-${gdoc.tokens.fonts.display}-${gdoc.tokens.fonts.body}`;
+          document.head.appendChild(l);
+        }
+        const svg = renderArtboard(gdoc, gdoc.artboards[0], { href: (id, src) => map.get(id) ?? (src.startsWith('upload:') ? '' : src), idPrefix: `pl-${s.id}-` }).replace(/^<svg([^>]*?) width="[^"]+" height="[^"]+"/, '<svg$1 width="100%" height="100%"');
+        return setShown({ kind: 'svg', svg });
+      }
       // the same sealed document the workspace frames: no scripts, the nonce policy
       const seal = (html: string) => buildSandboxDoc(html, { parse: (h) => new DOMParser().parseFromString(h, 'text/html'), runScripts: false, nonce, inspector: '' }).doc;
       const spec = currentSpec(p);
@@ -164,6 +213,7 @@ function Plate({ s, ratio, nonce }: { s: ProjectSummary; ratio: number; nonce: s
     return () => {
       live = false;
       if (url) URL.revokeObjectURL(url);
+      urls.forEach((u) => URL.revokeObjectURL(u));
     };
   }, [near, s.id, s.stage, s.updatedAt, nonce]);
 
@@ -175,6 +225,7 @@ function Plate({ s, ratio, nonce }: { s: ProjectSummary; ratio: number; nonce: s
         <iframe className="mu-plate-frame" title="" sandbox="" srcDoc={shown.html} tabIndex={-1} style={{ width: 1280, height: Math.ceil(size.h / scale), transform: `scale(${scale})` }} />
       )}
       {shown?.kind === 'image' && <img className="mu-plate-img" src={shown.url} alt="" />}
+      {shown?.kind === 'svg' && <div className="mu-plate-svg" dangerouslySetInnerHTML={{ __html: shown.svg }} />}
       {!shown && s.studies.length > 0 && (
         <span className={`mu-studies n-${s.studies.length}`}>
           {s.studies.map((u) => (
@@ -405,6 +456,16 @@ export function Home(p: Props) {
             <p className="mu-door-b">HTML, PNG, JPG or SVG. Choose one or drop it here, then select any part and reason it through.</p>
             <button type="button" className="sb-link is-go" onClick={() => fileInput.current?.click()}>
               Choose a file <span className="sb-ar">→</span>
+            </button>
+          </section>
+          <section className="mu-door is-graphic" aria-labelledby="mu-gfx-t">
+            <p className="mu-door-k">Or, a graphic</p>
+            <h2 className="mu-door-t" id="mu-gfx-t">
+              Posters, posts, covers, cards, labels and charts.
+            </h2>
+            <p className="mu-door-b">Your words exactly, composed in three directions, then changed by hand or in words. PNG, JPEG, SVG and PDF.</p>
+            <button type="button" className="sb-link is-go" onClick={() => p.onGraphic(intent.trim())}>
+              Make a graphic <span className="sb-ar">→</span>
             </button>
           </section>
           {p.error && (

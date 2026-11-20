@@ -365,9 +365,25 @@
   align-self: center;
   white-space: nowrap;
 }
+.mu-door.is-graphic {
+  grid-row: 5;
+  margin-top: 0;
+  border-top: 0;
+}
+.mu-plate-svg {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.mu-plate-svg > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 .mu-error {
   grid-column: 5 / span 8;
-  grid-row: 5;
+  grid-row: 6;
   margin: 16px 0 0;
 }
 

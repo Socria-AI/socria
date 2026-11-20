@@ -287,6 +287,52 @@ console.log('\n=== projects: private, normalised, newest wins ===');
   ok('the owner can', !db.rows('ux_v0_projects').some((r) => r.id === 'uxv0_sync1'));
 }
 
+console.log('\n=== graphics projects: kept whole, held to their shape, private ===');
+{
+  const doc = {
+    schema: 1,
+    id: 'gd1',
+    name: 'Poster',
+    tokens: { colors: { background: '#ffffff', surface: '#ffffff', text: '#111111', muted: '#555555', accent: '#c2410c', accentText: '#ffffff', line: '#dddddd' }, fonts: { display: 'Fraunces', body: 'Inter' } },
+    artboards: [
+      {
+        id: 'ab1',
+        name: 'A4',
+        width: 595.28,
+        height: 841.89,
+        unit: 'pt',
+        dpi: 300,
+        background: '#ffffff',
+        bleed: 8.5,
+        safe: 34,
+        children: [
+          { id: 't1', type: 'text', role: 'headline', text: 'Letters in Motion', x: 34, y: 100, w: 500, h: 200, size: 72, font: 'Fraunces', weight: 700, color: '#111111', rotation: 0, opacity: 1 },
+          { id: 'i1', type: 'image', role: 'image', asset: 'up1', x: 0, y: 400, w: 595, h: 300, fit: 'cover', rotation: 0, opacity: 1 },
+          { id: 'i2', type: 'image', asset: 'evil', x: 0, y: 0, w: 10, h: 10, fit: 'cover', rotation: 0, opacity: 1 },
+        ],
+      },
+    ],
+    assets: [
+      { id: 'up1', kind: 'image', src: 'upload:file_abc', width: 1200, height: 800, name: 'Room', source: 'upload' },
+      { id: 'evil', kind: 'image', src: 'javascript:alert(1)', width: 1, height: 1, name: 'x', source: 'upload' },
+    ],
+    revision: 3,
+    updatedAt: 2000,
+  };
+  const g = { v: 1, id: 'uxv0_gfx1', name: 'Letters in Motion', mode: 'create', medium: 'graphic', updatedAt: 2000, createdAt: 1900, cards: [], graphic: { brief: { purpose: 'A poster', kind: 'poster', formats: ['a4'], content: { headline: 'Letters in Motion' }, mood: [], images: [] }, options: [], direction: null, doc, versions: [{ doc, label: 'Composed', at: 2000 }] } };
+  const put = await post('projects', { project: g }, A, [], 'PUT');
+  const row = db.rows('ux_v0_projects').find((r) => r.id === 'uxv0_gfx1');
+  ok('a graphics project syncs for its owner, as a graphic', put.status === 200 && row?.user_id === A && row.doc.medium === 'graphic', J(put));
+  ok('…its document whole: the words exactly, its upload kept by reference (the file itself stays in the browser)', row?.doc.graphic.doc.artboards[0].children.some((n) => n.text === 'Letters in Motion') && row.doc.graphic.doc.assets.some((a) => a.src === 'upload:file_abc') && row.doc.graphic.versions.length === 1);
+  ok('…held to its shape on the way in: a script address is no picture, and the object that used it goes', !row?.doc.graphic.doc.assets.some((a) => a.id === 'evil') && !row.doc.graphic.doc.artboards[0].children.some((n) => n.id === 'i2'));
+  const read = await post('projects', null, A, [], 'GET', '?id=uxv0_gfx1');
+  ok('the owner reads it back as a graphic', read.status === 200 && read.json.project.medium === 'graphic' && read.json.project.graphic.doc.artboards[0].children[0].text === 'Letters in Motion');
+  ok('nobody else reads it or lists it', (await post('projects', null, B, [], 'GET', '?id=uxv0_gfx1')).status === 404 && !(await post('projects', null, B, [], 'GET')).json.projects.some((x) => x.id === 'uxv0_gfx1'));
+  await post('projects', null, B, [], 'DELETE', '?id=uxv0_gfx1');
+  ok('…or deletes it', db.rows('ux_v0_projects').some((r) => r.id === 'uxv0_gfx1'));
+  ok('signed out: nothing', (await post('projects', null, null, [], 'GET', '?id=uxv0_gfx1')).status === 401 && (await post('projects', { project: g }, null, [], 'PUT')).status === 401);
+}
+
 console.log('\n=== GPT-6.1 Sol through every route (the Responses API) ===');
 {
   const C = 'user_v0_sol';
