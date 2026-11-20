@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getArtifact } from '@/lib/ux-v0/store';
-import { fontStylesheet } from '@/lib/ux-v0/fonts';
+import { graphicFontStylesheet } from '@/lib/ux-v0/fonts';
 import { walk, type Asset, type GraphicDoc } from '@/lib/ux-v0/graphics/doc';
 import type { GraphicDirection } from '@/lib/ux-v0/graphics/compose';
 import { canvasMeasure } from '@/lib/ux-v0/graphics/raster';
@@ -41,7 +41,7 @@ export const directionFaces = (d: GraphicDirection): Face[] => [
 /** Loads the faces (a Google Fonts stylesheet, then each face at its weight); true when something new arrived. */
 export async function loadFaces(faces: readonly Face[]): Promise<boolean> {
   if (typeof document === 'undefined' || !faces.length) return false;
-  const url = fontStylesheet(faces.map((f) => f.face));
+  const url = graphicFontStylesheet(faces.map((f) => f.face));
   if (url && !injected.has(url)) {
     injected.add(url);
     const link = document.createElement('link');

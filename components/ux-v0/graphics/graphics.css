@@ -740,6 +740,16 @@
   gap: 3px;
   min-width: 0;
 }
+/* A select sizes itself to its longest option; held to its column, so a long preset name never pushes past the
+   inspector's edge. */
+.gx-sel-field {
+  grid-template-columns: minmax(0, 1fr);
+}
+.gx-sel-field > select {
+  min-width: 0;
+  width: 100%;
+  text-overflow: ellipsis;
+}
 .gx-num {
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas: 'l l' 'i s';
@@ -1043,4 +1053,309 @@
   .gx * {
     transition: none !important;
   }
+}
+
+/* ── the expanded vocabulary: library, parameters, paint, effects, type, node editing ── */
+.gx-search {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--sb-rule-2);
+  border-radius: 4px;
+  background: var(--sb-paper);
+  color: var(--sb-ink);
+  font: inherit;
+  margin-bottom: 8px;
+}
+.gx-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.gx-cats button {
+  padding: 3px 8px;
+  border: 1px solid var(--sb-rule-2);
+  border-radius: 999px;
+  background: var(--sb-paper);
+  color: var(--sb-ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.gx-cats button.is-on {
+  background: var(--sb-ink);
+  color: var(--sb-paper);
+  border-color: var(--sb-ink);
+}
+.gx-lib {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.gx-lib button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 4px;
+  border: 1px solid var(--sb-rule-2);
+  border-radius: 4px;
+  background: var(--sb-paper);
+  color: var(--sb-ink);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.2;
+  cursor: pointer;
+  min-width: 0;
+}
+.gx-lib button span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gx-lib button:hover,
+.gx-lib button:focus-visible {
+  border-color: var(--sb-ink);
+}
+.gx-custom {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+.gx-custom > button {
+  padding: 6px 9px;
+  border: 1px solid var(--sb-rule-2);
+  border-radius: 4px;
+  background: var(--sb-paper);
+  color: var(--sb-ink);
+  font: inherit;
+  cursor: pointer;
+}
+.gx-ceiling {
+  margin-top: 8px;
+}
+.gx-more {
+  border-top: 1px solid var(--sb-rule-2);
+  padding: 8px 0 4px;
+}
+.gx-more > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.gx-params {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0;
+}
+.gx-param {
+  display: grid;
+  grid-template-columns: minmax(70px, 38%) 1fr 40px;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.gx-param span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gx-param input[type='range'] {
+  width: 100%;
+  min-width: 0;
+}
+.gx-param output {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.gx-paint {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+}
+.gx-swatches,
+.gx-harmony {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.gx-harmony span {
+  min-width: 96px;
+  font-size: 12px;
+}
+.gx-swatches button,
+.gx-harmony button {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--sb-rule-2);
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0;
+}
+.gx-stops {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.gx-stops li {
+  display: grid;
+  grid-template-columns: 32px 1fr 24px;
+  gap: 6px;
+  align-items: center;
+}
+.gx-mesh {
+  display: grid;
+  gap: 4px;
+}
+.gx-mesh.is-2 {
+  grid-template-columns: repeat(2, 40px);
+}
+.gx-mesh.is-3 {
+  grid-template-columns: repeat(3, 40px);
+}
+.gx-fx-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.gx-fx-list li {
+  border: 1px solid var(--sb-rule-2);
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+.gx-fx-list li.is-off {
+  opacity: 0.6;
+}
+.gx-fx-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.gx-fx-acts {
+  display: flex;
+  gap: 2px;
+}
+.gx-fx-body {
+  margin-top: 6px;
+  display: grid;
+  gap: 4px;
+}
+.gx-stroke {
+  border-bottom: 1px dashed var(--sb-rule-2);
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+}
+.gx-features {
+  border: 0;
+  padding: 0;
+  margin: 6px 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 8px;
+  font-size: 12px;
+}
+.gx-features legend {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.gx-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.gx-chips button {
+  padding: 2px 7px;
+  border: 1px solid var(--sb-rule-2);
+  border-radius: 999px;
+  background: var(--sb-paper);
+  color: var(--sb-ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.gx-chips button.is-on {
+  background: var(--sb-ink);
+  color: var(--sb-paper);
+}
+.gx-colour-inline input {
+  width: 30px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--sb-rule-2);
+  border-radius: 4px;
+}
+.gx-inks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 6px 0;
+}
+.gx-ink {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.gx-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: end;
+  margin-top: 6px;
+}
+.gx-nodes {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+}
+.gx-nodes-path {
+  fill: none;
+  stroke: #2f80ed;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  pointer-events: stroke;
+}
+.gx-nodes-path:hover {
+  stroke-width: 3;
+}
+.gx-nodes-arm {
+  stroke: #2f80ed;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.gx-nodes-anchor,
+.gx-nodes-handle {
+  fill: #ffffff;
+  stroke: #2f80ed;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  pointer-events: all;
+  cursor: move;
+}
+.gx-nodes-anchor.is-picked {
+  fill: #2f80ed;
+}
+.gx-nodes-handle {
+  fill: #2f80ed;
+}
+.gx-pathtag {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--sb-paper);
+  border: 1px solid var(--sb-rule-2);
+  font-size: 12px;
+  max-width: min(560px, calc(100% - 24px));
+  z-index: 3;
 }

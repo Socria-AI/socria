@@ -11,6 +11,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { applyOps, boxOnBoard, isLocked, walk, type Artboard, type GraphicDoc, type Located, type Op } from '@/lib/ux-v0/graphics/doc';
 import { renderArtboard } from '@/lib/ux-v0/graphics/render';
+import { insertNode, moveNodePart, pathD, removeNode, setSmooth, type BezierPath } from '@/lib/ux-v0/graphics/geometry';
+import { apply, IDENTITY, invert, mul, nodeMatrix, transformPath, type Mat } from '@/lib/ux-v0/graphics/vectorops';
 import type { Measure } from '@/lib/ux-v0/graphics/text';
 
 type Drag =
@@ -40,6 +42,8 @@ export function GraphicCanvas({
   guides = true,
   grid = false,
   rulers = true,
+  pathEdit = null,
+  onPathEdit,
 }: {
   doc: GraphicDoc;
   boardId: string;
@@ -57,6 +61,9 @@ export function GraphicCanvas({
   grid?: boolean;
   /** rulers along the top and the left, in the artboard's own unit */
   rulers?: boolean;
+  /** the path whose nodes are being edited (a Bézier shape), and how to leave that mode */
+  pathEdit?: string | null;
+  onPathEdit?: (id: string | null) => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(0.5);
@@ -66,6 +73,10 @@ export function GraphicCanvas({
   const [snaps, setSnaps] = useState<{ x: number[]; y: number[] }>({ x: [], y: [] });
   const [space, setSpace] = useState(false);
   const raf = useRef(0);
+  // node editing: the node dragged, the node picked (for Delete), and the path as it is being dragged
+  const [nodeDrag, setNodeDrag] = useState<{ s: number; i: number; part: 'anchor' | 'in' | 'out' } | null>(null);
+  const [picked, setPicked] = useState<{ s: number; i: number } | null>(null);
+  const [bezLive, setBezLive] = useState<BezierPath | null>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const board = doc.artboards.find((b) => b.id === boardId) ?? doc.artboards[0];
   useEffect(() => {
@@ -114,6 +125,10 @@ export function GraphicCanvas({
 
   // the document as drawn now: with the drag in progress applied (a preview, not a change)
   const shown = useMemo(() => {
+    if (bezLive && pathEdit) {
+      const r = applyOps(doc, [{ op: 'update', id: pathEdit, set: { bez: bezLive } }]);
+      return r.ok ? r.doc : doc;
+    }
     if (!drag || !delta) return doc;
     let ops: Op[] = [];
     if (drag.kind === 'move') ops = drag.ids.map((id) => ({ op: 'move', id, dx: delta.dx, dy: delta.dy }) as Op);
@@ -121,7 +136,7 @@ export function GraphicCanvas({
     else if (drag.kind === 'rotate' && delta.rotation !== undefined) ops = [{ op: 'update', id: drag.id, set: { rotation: delta.rotation } }];
     const r = ops.length ? applyOps(doc, ops) : null;
     return r && r.ok ? r.doc : doc;
-  }, [doc, drag, delta]);
+  }, [doc, drag, delta, bezLive, pathEdit]);
   const shownBoard = shown.artboards.find((b) => b.id === board.id) ?? board;
   const svg = useMemo(() => renderArtboard(shown, shownBoard, { guides, hit: true, measure, href, idPrefix: `cv-${shownBoard.id}-` }).replace(/^<svg([^>]*?) width="[^"]+" height="[^"]+"/, '<svg$1 width="100%" height="100%"'), [shown, shownBoard, measure, href, guides]);
   // the rulers' step: a round number of units at least 56 px apart at this zoom
@@ -133,6 +148,27 @@ export function GraphicCanvas({
   };
   const located = useMemo(() => walk(shownBoard), [shownBoard]);
   const sel = located.filter((l) => selection.includes(l.node.id));
+  // the path being edited: its 0–100 box mapped onto the artboard (its groups, its own transform, its size)
+  const editing = pathEdit ? located.find((l) => l.node.id === pathEdit && l.node.type === 'shape' && l.node.shape === 'bezier' && !isLocked(l)) ?? null : null;
+  const pathM: Mat | null = editing ? mul(editing.parents.reduce((m, g) => mul(m, nodeMatrix(g)), IDENTITY as Mat), mul(nodeMatrix(editing.node), [editing.node.w / 100, 0, 0, editing.node.h / 100, 0, 0])) : null;
+  const editBez = editing && editing.node.type === 'shape' ? editing.node.bez ?? null : null;
+  const commitBez = (bez: BezierPath, label: string) => editing && onCommit([{ op: 'update', id: editing.node.id, set: { bez } }], label);
+  useEffect(() => {
+    if (!pathEdit) return;
+    const key = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement)?.closest('input,textarea,select,[contenteditable]')) return;
+      if (e.key === 'Escape') (onPathEdit?.(null), setPicked(null));
+      if ((e.key === 'Delete' || e.key === 'Backspace') && picked && editBez) {
+        e.preventDefault();
+        e.stopPropagation();
+        const sub = editBez.subpaths[picked.s];
+        if (sub && sub.nodes.length > 2) commitBez({ subpaths: editBez.subpaths.map((x, j) => (j === picked.s ? removeNode(x, picked.i) : x)) }, 'node removed');
+        setPicked(null);
+      }
+    };
+    window.addEventListener('keydown', key, true);
+    return () => window.removeEventListener('keydown', key, true);
+  }); // eslint-disable-line react-hooks/exhaustive-deps
 
   // keyboard: space to pan
   useEffect(() => {
@@ -165,6 +201,23 @@ export function GraphicCanvas({
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
+    const nodeAttr = (e.target as Element).getAttribute?.('data-gfx-node');
+    if (nodeAttr && editing && editBez) {
+      const [s0, i0, part] = nodeAttr.split(':');
+      const at = { s: Number(s0), i: Number(i0) };
+      if (e.altKey && part === 'anchor') {
+        const nd = editBez.subpaths[at.s]?.nodes[at.i];
+        if (nd) commitBez({ subpaths: editBez.subpaths.map((x, j) => (j === at.s ? setSmooth(x, at.i, !nd.smooth) : x)) }, nd.smooth ? 'corner node' : 'smooth node');
+        return;
+      }
+      setPicked(at);
+      setNodeDrag({ ...at, part: part as 'anchor' | 'in' | 'out' });
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      return;
+    }
+    // the edited path's own outline: a press there (the first half of a double-click that adds a node) keeps the
+    // selection and the node editing as they are
+    if (editing && (e.target as Element).closest?.('.gx-nodes')) return;
     if (e.button === 1 || space) {
       setDrag({ kind: 'pan', x0: e.clientX, y0: e.clientY, px: pan.x, py: pan.y });
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -223,6 +276,14 @@ export function GraphicCanvas({
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
+    if (nodeDrag && editBez && pathM) {
+      const p = toBoard(e.clientX, e.clientY);
+      const [lx, ly] = apply(invert(pathM), p.x, p.y);
+      const base = bezLive ?? editBez;
+      const sub = base.subpaths[nodeDrag.s];
+      if (sub) setBezLive({ subpaths: base.subpaths.map((x, j) => (j === nodeDrag.s ? moveNodePart(x, nodeDrag.i, nodeDrag.part, Math.round(lx * 100) / 100, Math.round(ly * 100) / 100) : x)) });
+      return;
+    }
     if (!drag) return;
     const { clientX, clientY, shiftKey, altKey } = e;
     cancelAnimationFrame(raf.current);
@@ -272,6 +333,13 @@ export function GraphicCanvas({
   };
 
   const onPointerUp = () => {
+    if (nodeDrag) {
+      const b = bezLive;
+      setNodeDrag(null);
+      setBezLive(null);
+      if (b) commitBez(b, nodeDrag.part === 'anchor' ? 'node moved' : 'handle moved');
+      return;
+    }
     cancelAnimationFrame(raf.current);
     const d = drag;
     const dl = delta;
@@ -314,10 +382,36 @@ export function GraphicCanvas({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
       onDoubleClick={(e) => {
+        if (editing && editBez && pathM && (e.target as Element).getAttribute?.('data-gfx-seg') !== null && (e.target as Element).getAttribute?.('data-gfx-seg') !== undefined && (e.target as Element).hasAttribute?.('data-gfx-seg')) {
+          // a node added where the segment nearest the pointer passes
+          const p = toBoard(e.clientX, e.clientY);
+          const [lx, ly] = apply(invert(pathM), p.x, p.y);
+          let best = { s: -1, k: 0, t: 0.5, d: Infinity };
+          editBez.subpaths.forEach((sp, s) => {
+            const count = sp.closed ? sp.nodes.length : sp.nodes.length - 1;
+            for (let k = 0; k < count; k++) {
+              const a = sp.nodes[k];
+              const b = sp.nodes[(k + 1) % sp.nodes.length];
+              const p1 = a.out ?? [a.x, a.y];
+              const p2 = b.in ?? [b.x, b.y];
+              for (let i = 1; i < 20; i++) {
+                const t = i / 20;
+                const u = 1 - t;
+                const x = u * u * u * a.x + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * b.x;
+                const y = u * u * u * a.y + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * b.y;
+                const d = Math.hypot(x - lx, y - ly);
+                if (d < best.d) best = { s, k, t, d };
+              }
+            }
+          });
+          if (best.s >= 0) commitBez({ subpaths: editBez.subpaths.map((x, j) => (j === best.s ? insertNode(x, best.k, best.t) : x)) }, 'node added');
+          return;
+        }
         const l = hit(e.target, true);
         if (!l) return;
         onSelect([l.node.id]);
         if (l.node.type === 'text') onEditText?.(l.node.id);
+        if (l.node.type === 'shape' && l.node.shape === 'bezier' && !isLocked(l)) onPathEdit?.(l.node.id);
       }}
       role="application"
       aria-label={`Artboard “${board.name}”, ${Math.round(board.width)} × ${Math.round(board.height)} ${board.unit}. Click to select, drag to move.`}
@@ -337,6 +431,29 @@ export function GraphicCanvas({
             {isLocked(l) && <span className="gx-lockmark">Locked</span>}
           </div>
         ))}
+        {editing && editBez && pathM && (
+          <svg className="gx-nodes" style={{ left: pan.x, top: pan.y, width: board.width * zoom, height: board.height * zoom }} viewBox={`0 0 ${board.width} ${board.height}`} aria-label="Path nodes: drag to move, Alt-click to make smooth or a corner, double-click the path to add, Delete to remove, Escape to finish">
+            <path d={pathD(transformPath(bezLive ?? editBez, pathM))} className="gx-nodes-path" data-gfx-seg="" />
+            {(bezLive ?? editBez).subpaths.map((sp, s) =>
+              sp.nodes.map((nd, i) => {
+                const [ax, ay] = apply(pathM, nd.x, nd.y);
+                const r = 5 / zoom;
+                const hs = [nd.in ? (['in', apply(pathM, nd.in[0], nd.in[1])] as const) : null, nd.out ? (['out', apply(pathM, nd.out[0], nd.out[1])] as const) : null].filter(Boolean) as (readonly ['in' | 'out', [number, number]])[];
+                return (
+                  <g key={`${s}:${i}`}>
+                    {hs.map(([part, [hx, hy]]) => (
+                      <g key={part}>
+                        <line x1={ax} y1={ay} x2={hx} y2={hy} className="gx-nodes-arm" />
+                        <circle cx={hx} cy={hy} r={r * 0.8} className="gx-nodes-handle" data-gfx-node={`${s}:${i}:${part}`} />
+                      </g>
+                    ))}
+                    <rect x={ax - r} y={ay - r} width={r * 2} height={r * 2} className={`gx-nodes-anchor${nd.smooth ? ' is-smooth' : ''}${picked && picked.s === s && picked.i === i ? ' is-picked' : ''}`} data-gfx-node={`${s}:${i}:anchor`} rx={nd.smooth ? r : 0} />
+                  </g>
+                );
+              }),
+            )}
+          </svg>
+        )}
         {snaps.x.map((x) => (
           <span key={`gx${x}`} className="gx-guide gx-guide-v" style={{ left: pan.x + x * zoom, top: pan.y, height: board.height * zoom }} />
         ))}

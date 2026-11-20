@@ -12,6 +12,7 @@
 
 import { proposeDirections, type ArtDirection } from '../direction';
 import { accentFor } from '../graphics/compose';
+import { vocabularyFor } from '../graphics/vocabulary';
 import { normalizeBrief, type DesignProject } from '../types';
 import type { Measure } from '../graphics/text';
 import type { Asset } from '../graphics/doc';
@@ -57,7 +58,10 @@ export function startBoard(brief: BoardBrief, sys: MasterDesignSystem, opts: { r
     x += s.w + 72;
     return node;
   });
-  const b: BoardState = { ...emptyBoard(), request: opts.request ?? brief.purpose, brief, system: sys, options: [], materials, nodes: [...nodes, { id: boardId('bn'), type: 'system', x: x + 200, y: 300, w: 960, h: 640 }], assets: opts.assets ?? [] };
+  // one vocabulary for the whole board, read from its brief (kept when the system already has one)
+  const vocabulary = sys.vocabulary ?? vocabularyFor({ words: brief.purpose, mood: brief.mood, language: sys.direction.language, intensity: sys.composition.intensity, hasImage: (opts.assets ?? []).length > 0, seed: sys.id });
+  const system = vocabulary.strength >= 1 ? { ...sys, vocabulary } : sys;
+  const b: BoardState = { ...emptyBoard(), request: opts.request ?? brief.purpose, brief, system, options: [], materials, nodes: [...nodes, { id: boardId('bn'), type: 'system', x: x + 200, y: 300, w: 960, h: 640 }], assets: opts.assets ?? [] };
   return applyAll(b, arrange(b, 'editorial'));
 }
 

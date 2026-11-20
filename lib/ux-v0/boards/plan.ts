@@ -275,8 +275,11 @@ export function composeMaterial(m: GraphicMaterial, sys: MasterDesignSystem, ctx
   const assets = (ctx.assets ?? []).filter((a) => m.brief.images.includes(a.id));
   const brief: GraphicBrief = { ...m.brief, images: m.brief.images.filter((id) => assets.some((a) => a.id === id)) };
   const f = formatOf(brief.formats[0]);
-  const natural = f ? planFor(brief, directionOfSystem(sys), f) : null;
-  const over = natural ? overrideFor(m, ctx.sibling ?? 0, sys, natural, ctx.turn ?? Math.max(0, ctx.sibling ?? 0)) : undefined;
+  // the board's one vocabulary: every material speaks it, each in its own composition
+  const shared = sys.vocabulary ? { vocabulary: sys.vocabulary } : {};
+  const natural = f ? planFor(brief, directionOfSystem(sys), f, { over: shared }) : null;
+  const turned = natural ? overrideFor(m, ctx.sibling ?? 0, sys, natural, ctx.turn ?? Math.max(0, ctx.sibling ?? 0)) : undefined;
+  const over = turned || sys.vocabulary ? { ...(turned ?? {}), ...shared } : undefined;
   const made = composeGraphic(brief, directionOfSystem(sys), { measure: ctx.measure, seed: (ctx.seed ?? 7) + m.variant * 13 + (ctx.sibling ?? 0) * 5, assets: [...assets], name: m.name, over });
   const refined = refineDoc(made.doc, ctx.measure);
   const plan = made.plans[0];

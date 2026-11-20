@@ -4,15 +4,27 @@
 // inspector: every routine change by hand, exactly, without asking a model.
 
 import { useEffect, useRef, useState } from 'react';
-import { FONTS } from '@/lib/ux-v0/fonts';
+import { GRAPHIC_FONTS, graphicFont } from '@/lib/ux-v0/fonts';
 import { FORMATS, formatOf, sizeLabel } from '@/lib/ux-v0/graphics/formats';
-import { isLocked, newId, walk, type Artboard, type GraphicDoc, type Located, type Node, type Op, type Paint, type TextNode } from '@/lib/ux-v0/graphics/doc';
+import { isLocked, newId, walk, type Artboard, type GraphicDoc, type Located, type Node, type Op, type TextNode } from '@/lib/ux-v0/graphics/doc';
 import type { GFinding } from '@/lib/ux-v0/graphics/check';
 import { figureFor, type FormSystem } from '@/lib/ux-v0/form';
 import { weightsFor } from '../TypePanel';
+import { PRIMITIVE_BY_KIND } from '@/lib/ux-v0/graphics/geometry';
+import { PATTERN_BY_KIND } from '@/lib/ux-v0/graphics/patterns';
 
 const r1 = (v: number) => Math.round(v * 10) / 10;
-const kindLabel = (n: Node) => (n.type === 'text' ? 'Text' : n.type === 'image' ? 'Picture' : n.type === 'group' ? 'Group' : n.type === 'chart' ? 'Chart' : n.shape === 'recipe' ? 'Shape' : n.shape.charAt(0).toUpperCase() + n.shape.slice(1));
+const kindLabel = (n: Node): string => {
+  if (n.type === 'text') return 'Text';
+  if (n.type === 'image') return 'Picture';
+  if (n.type === 'group') return n.boolean ? ({ union: 'Union', subtract: 'Subtraction', intersect: 'Intersection', exclude: 'Exclusion' } as const)[n.boolean] : n.mask ? 'Mask group' : 'Group';
+  if (n.type === 'chart') return 'Chart';
+  if (n.type === 'pattern') return PATTERN_BY_KIND.get(n.gen)?.label ?? 'Pattern';
+  if (n.shape === 'prim') return (n.prim && PRIMITIVE_BY_KIND.get(n.prim.kind)?.label) || 'Shape';
+  if (n.shape === 'bezier') return 'Path';
+  if (n.shape === 'recipe') return 'Shape';
+  return n.shape.charAt(0).toUpperCase() + n.shape.slice(1);
+};
 export const nodeLabel = (n: Node) => n.name ?? (n.type === 'text' ? n.text.split('\n')[0].slice(0, 28) : kindLabel(n));
 
 /** A number field committed on Enter or when left: one operation, one history step. */
@@ -339,29 +351,10 @@ export function Inspector({
           <Num label="Opacity" value={Math.round(n.opacity * 100)} min={0} max={100} onCommit={(v) => set({ opacity: v / 100 }, 'opacity')} suffix="%" />
         </div>
         {n.type === 'text' && <TextFields n={n} set={set} textRef={textRef} />}
-        {n.type === 'shape' && (
+        {n.type === 'shape' && (n.shape === 'rect' || n.shape === 'polygon' || n.shape === 'star') && (
           <div className="gx-grid2">
-            {n.fill !== null && typeof n.fill === 'string' && <Colour label="Fill" value={n.fill} onCommit={(v) => set({ fill: v }, 'fill colour')} />}
-            {n.fill !== null && typeof n.fill === 'object' && <GradientFields fill={n.fill} onCommit={(f) => set({ fill: f }, 'gradient')} />}
-            {n.shape !== 'line' && (
-              <label className="gx-check">
-                <input type="checkbox" checked={n.fill !== null && typeof n.fill === 'object'} onChange={(e) => set({ fill: e.target.checked ? { type: 'linear', angle: 90, stops: [{ at: 0, color: typeof n.fill === 'string' ? n.fill : doc.tokens.colors.accent }, { at: 1, color: doc.tokens.colors.text }] } : typeof n.fill === 'object' && n.fill ? n.fill.stops[0].color : doc.tokens.colors.accent }, e.target.checked ? 'gradient fill' : 'solid fill')} /> Gradient
-              </label>
-            )}
-            <Colour label="Stroke" value={n.stroke?.color ?? '#111111'} onCommit={(v) => set({ stroke: { ...(n.stroke ?? { width: 1 }), color: v } }, 'stroke colour')} />
-            <Num label="Stroke" value={n.stroke?.width ?? 0} min={0} max={200} step={0.5} onCommit={(v) => set({ stroke: v > 0 ? { ...(n.stroke ?? { color: '#111111' }), width: v } : null }, 'stroke width')} suffix={board.unit} />
             {n.shape === 'rect' && <Num label="Radius" value={n.radius ?? 0} min={0} onCommit={(v) => set({ radius: v }, 'corner radius')} />}
             {(n.shape === 'polygon' || n.shape === 'star') && <Num label={n.shape === 'star' ? 'Points' : 'Sides'} value={n.sides ?? 5} min={3} max={24} onCommit={(v) => set({ sides: Math.round(v) }, 'sides')} />}
-            {n.stroke && (
-              <label className="gx-sel-field">
-                <span>Joins</span>
-                <select className="v0-select" value={n.stroke.join ?? 'miter'} onChange={(e) => set({ stroke: { ...n.stroke!, join: e.target.value } }, 'line joins')}>
-                  <option value="miter">Mitre</option>
-                  <option value="round">Round</option>
-                  <option value="bevel">Bevel</option>
-                </select>
-              </label>
-            )}
           </div>
         )}
         {n.type === 'image' && (
@@ -414,7 +407,7 @@ export function Inspector({
 function TextFields({ n, set, textRef }: { n: TextNode; set: (s: Record<string, unknown>, label: string) => void; textRef: React.RefObject<HTMLTextAreaElement> }) {
   const [words, setWords] = useState(n.text);
   useEffect(() => setWords(n.text), [n.text, n.id]);
-  const fam = FONTS.find((f) => f.name === n.font);
+  const fam = graphicFont(n.font);
   return (
     <div className="gx-textfields">
       <label className="gx-text">
@@ -425,7 +418,7 @@ function TextFields({ n, set, textRef }: { n: TextNode; set: (s: Record<string, 
         <span>Face</span>
         <select className="v0-select" value={n.font} onChange={(e) => set({ font: e.target.value }, `set in ${e.target.value}`)}>
           {!fam && <option value={n.font}>{n.font} (not on the list)</option>}
-          {FONTS.map((f) => (
+          {GRAPHIC_FONTS.map((f) => (
             <option key={f.name} value={f.name}>
               {f.name}
             </option>
@@ -467,17 +460,6 @@ function TextFields({ n, set, textRef }: { n: TextNode; set: (s: Record<string, 
         <Colour label="Colour" value={n.color} onCommit={(v) => set({ color: v }, 'text colour')} />
         <Num label="Outline" value={n.stroke?.width ?? 0} min={0} max={40} step={0.5} onCommit={(v) => set({ stroke: v > 0 ? { color: n.stroke?.color ?? n.color, width: v } : null }, 'outline')} />
       </div>
-    </div>
-  );
-}
-
-function GradientFields({ fill, onCommit }: { fill: Exclude<Paint, string>; onCommit: (f: Paint) => void }) {
-  return (
-    <div className="gx-gradient">
-      {fill.stops.map((s, i) => (
-        <Colour key={i} label={i === 0 ? 'From' : 'To'} value={s.color} onCommit={(v) => onCommit({ ...fill, stops: fill.stops.map((x, j) => (j === i ? { ...x, color: v } : x)) })} />
-      ))}
-      <Num label="Angle" value={fill.angle} min={-360} max={360} onCommit={(v) => onCommit({ ...fill, angle: v })} suffix="°" />
     </div>
   );
 }

@@ -7,7 +7,7 @@
 // fetched (offline, a picture whose server refuses) is said in the result: a fallback face stood in, a picture was
 // left out. Nothing here leaves the browser except those fetches.
 
-import { fontStylesheet } from '../fonts';
+import { graphicFontStylesheet } from '../fonts';
 import type { Artboard, GraphicDoc } from './doc';
 import { facesOf, pageSize, pdfFromPages, type PdfPage } from './export';
 import { exportPixels } from './formats';
@@ -28,7 +28,7 @@ async function toDataUrl(blob: Blob): Promise<string> {
 
 /** @font-face rules for the faces, with the font files inside; and whether every face could be fetched. */
 export async function embeddedFonts(faces: readonly string[]): Promise<{ css: string; ok: boolean }> {
-  const url = fontStylesheet(faces);
+  const url = graphicFontStylesheet(faces);
   if (!url) return { css: '', ok: true };
   if (fontCache.has(url)) return { css: fontCache.get(url)!, ok: true };
   try {

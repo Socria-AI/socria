@@ -9,6 +9,7 @@
 // be reset to the system on request. Nothing is regenerated for a token change; the changed materials are checked
 // and repaired within bounds (a wider face may need a smaller headline), never recomposed.
 
+import { normalizeVocabulary, type VisualVocabulary } from '../graphics/vocabulary';
 import { contrastRatio } from '../../ux/audit';
 import { describeForm, normalizeForm, type FormSystem } from '../form';
 import { knownFont, nearestWeight } from '../fonts';
@@ -62,6 +63,9 @@ export interface MasterDesignSystem {
   source?: { projectId: string; name: string };
   /** the full website direction it came from: a website concept is generated in it, with the system's tokens */
   art?: ArtDirection;
+  /** the visual vocabulary every material shares (graphics/vocabulary.ts): the same shapes, pattern, treatments and
+   * effects, each material executing them in its own composition */
+  vocabulary?: VisualVocabulary;
 }
 
 /** Which tokens a material's properties are bound to: by node id and property, and by artboard for the ground. */
@@ -192,6 +196,7 @@ export function normalizeSystem(v: unknown): MasterDesignSystem | null {
     ...(str(r.accentWhy, 200) ? { accentWhy: str(r.accentWhy, 200) } : {}),
     ...(r.source && typeof o(r.source).projectId === 'string' && /^[A-Za-z0-9_-]{1,96}$/.test(o(r.source).projectId) ? { source: { projectId: o(r.source).projectId, name: str(o(r.source).name, 100) } } : {}),
     ...(art ? { art } : {}),
+    ...((voc) => (voc ? { vocabulary: voc } : {}))(r.vocabulary ? normalizeVocabulary(r.vocabulary) : null),
   };
   return sys;
 }

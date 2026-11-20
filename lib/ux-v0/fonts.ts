@@ -113,6 +113,43 @@ export const FONTS: readonly FontEntry[] = [
 
 const BY_NAME = new Map(FONTS.map((f) => [f.name.toLowerCase(), f]));
 
+/**
+ * Faces only SocriaUX Graphics offers, for the axes its type controls set: width, slant, optical size, casualness and
+ * monospacing. They are kept out of FONTS on purpose. A website chooses, loads and measures its faces from that list
+ * (the model's menu and schemas, design-system imports, the type panel, headline fitting by measured advances), and
+ * none of that changes because Graphics has more faces. Their advances are not measured: text set in them is sized
+ * from the generic widths.
+ */
+export const GRAPHIC_ONLY_FONTS: readonly FontEntry[] = [
+  { name: 'Anybody', kind: 'sans', axes: 'ital,wdth,wght@0,50..150,100..900;1,50..150,100..900', note: 'a variable grotesk that stretches from compressed to extended: experimental type', ...V(100, 900), italic: true },
+  { name: 'Roboto Flex', kind: 'sans', axes: 'opsz,slnt,wdth,wght@8..144,-10..0,25..151,100..1000', note: 'a parametric grotesk with width, slant and optical-size axes', ...V(100, 900) },
+  { name: 'Recursive', kind: 'sans', axes: 'slnt,wght,CASL,CRSV,MONO@-15..0,300..1000,0..1,0..1,0..1', note: 'a variable face that moves from sans to mono and from linear to casual', ...V(300, 900) },
+];
+
+/** Families a graphic loads with more axes than a website does, so its text can set them. A website's Fraunces is
+ * loaded exactly as before (optical sizing would change how its pages draw). */
+const GRAPHIC_AXES: Readonly<Record<string, string>> = {
+  Fraunces: 'ital,opsz,wght,SOFT,WONK@0,9..144,300..900,0..100,0..1;1,9..144,300..900,0..100,0..1',
+};
+
+/** Every face Graphics offers: the website faces (with the axes a graphic loads), then the Graphics-only ones. */
+export const GRAPHIC_FONTS: readonly FontEntry[] = [
+  ...FONTS.map((f) => (GRAPHIC_AXES[f.name] ? { ...f, axes: GRAPHIC_AXES[f.name] } : f)),
+  ...GRAPHIC_ONLY_FONTS,
+];
+
+const GRAPHIC_BY_NAME = new Map(GRAPHIC_FONTS.map((f) => [f.name.toLowerCase(), f]));
+
+/** A face Graphics offers, as its list spells it, or null. */
+export function graphicFont(name: unknown): FontEntry | null {
+  if (typeof name !== 'string') return null;
+  return GRAPHIC_BY_NAME.get(name.trim().toLowerCase()) ?? null;
+}
+
+/** For the drawing helpers below: a website face as the website list has it, else a Graphics-only face. A name on the
+ * website list always resolves exactly as it did before Graphics had faces of its own. */
+const anyFace = (name: string): FontEntry | null => knownFont(name) ?? graphicFont(name);
+
 export const DEFAULT_DISPLAY = 'Fraunces';
 export const DEFAULT_BODY = 'Inter';
 
@@ -135,7 +172,7 @@ export function bodyFont(name: unknown): string {
 
 /** The weight a family can really draw nearest to the one asked. */
 export function nearestWeight(name: string, want: number): number {
-  const f = knownFont(name);
+  const f = anyFace(name);
   if (!f) return Math.max(100, Math.min(900, Math.round(want / 100) * 100));
   if (f.variable) return Math.max(f.weights[0], Math.min(f.weights[1], Math.round(want / 50) * 50));
   return [...f.weights].sort((a, b) => Math.abs(a - want) - Math.abs(b - want))[0];
@@ -229,22 +266,47 @@ const ADVANCE: Record<string, readonly [up400: number, lo400: number, up800: num
 
 /** The average advance of one character of this face at this weight, in ems (capitals or lower case). */
 export function advanceEm(name: string, weight: number, upper: boolean): number {
-  const f = knownFont(name);
+  const f = anyFace(name);
   const a = f ? ADVANCE[f.name] : undefined;
   if (!a) return f?.kind === 'mono' ? 0.6 : upper ? 0.72 : 0.56;
   const t = Math.max(0, Math.min(1, (weight - 400) / 400));
   return upper ? a[0] + (a[2] - a[0]) * t : a[1] + (a[3] - a[1]) * t;
 }
 
-/** Whether the family has a true italic loaded. */
-export function hasItalic(name: string): boolean {
-  return !!knownFont(name)?.italic;
+/** The variable axes a graphic loads a family with (italic and the weight range aside), each with its range: what a
+ * text's own axes may set. A static family has none. */
+export function fontAxes(name: string): Record<string, [number, number]> {
+  const f = graphicFont(name);
+  if (!f || !f.axes.includes('@')) return {};
+  const [tagsPart, valuesPart] = f.axes.split('@');
+  const first = valuesPart.split(';')[0].split(',');
+  const out: Record<string, [number, number]> = {};
+  tagsPart.split(',').forEach((t, i) => {
+    if (t === 'ital' || t === 'wght') return;
+    const m = (first[i] ?? '').match(/^(-?\d+(?:\.\d+)?)\.\.(-?\d+(?:\.\d+)?)$/);
+    if (m) out[t] = [Number(m[1]), Number(m[2])];
+  });
+  return out;
 }
 
-/** The stylesheet URL that loads these families, or null when there are none. */
+/** Whether the family has a true italic loaded. */
+export function hasItalic(name: string): boolean {
+  return !!anyFace(name)?.italic;
+}
+
+/** The stylesheet URL that loads these families for a website, or null when there are none. */
 export function fontStylesheet(names: readonly string[]): string | null {
+  return stylesheetOf(names, knownFont);
+}
+
+/** The stylesheet URL that loads these families for a graphic (its own faces and axes too), or null. */
+export function graphicFontStylesheet(names: readonly string[]): string | null {
+  return stylesheetOf(names, graphicFont);
+}
+
+function stylesheetOf(names: readonly string[], look: (n: string) => FontEntry | null): string | null {
   const families = [...new Set(names)]
-    .map((n) => knownFont(n))
+    .map((n) => look(n))
     .filter((f): f is FontEntry => !!f)
     .map((f) => `family=${encodeURIComponent(f.name).replace(/%20/g, '+')}${f.axes ? `:${f.axes}` : ''}`);
   if (!families.length) return null;
@@ -253,7 +315,7 @@ export function fontStylesheet(names: readonly string[]): string | null {
 
 /** The CSS font-family value for a face, with a fallback of its kind. */
 export function fontStack(name: string): string {
-  const f = knownFont(name);
+  const f = anyFace(name);
   const fallback = f?.kind === 'serif' ? 'Georgia, "Times New Roman", serif' : f?.kind === 'mono' ? 'ui-monospace, Menlo, monospace' : 'system-ui, -apple-system, "Segoe UI", sans-serif';
   return `"${f?.name ?? name}", ${fallback}`;
 }

@@ -13,7 +13,9 @@
 import { contrastRatio } from '../../ux/audit';
 import { ensureContrast } from '../spec';
 import { applyOps, boxOnBoard, isLocked, walk, type Artboard, type GraphicDoc, type Located, type Op, type TextNode } from './doc';
-import { approxMeasure, fitSize, layoutText, type Measure } from './text';
+import { approxMeasure, fitSize, fitToPath, layoutText, shownText, textPathLength, type Measure } from './text';
+import { colorAt, mixColor } from './paint';
+import type { Paint } from './doc';
 
 export type GKind = 'overflow' | 'broken-word' | 'safe' | 'contrast' | 'tiny' | 'missing' | 'placeholder' | 'outside' | 'empty' | 'collision';
 
@@ -51,10 +53,20 @@ function beneath(board: Artboard, before: Located, px: number, py: number): { co
     if (n.type === 'shape') {
       if (n.fill === null || n.shape === 'line') continue;
       if (typeof n.fill === 'string') return { color: n.fill.slice(0, 7) };
-      return { color: n.fill.stops[Math.floor(n.fill.stops.length / 2)].color.slice(0, 7) };
+      return { color: middleOf(n.fill) };
     }
   }
   return { color: (board.background ?? '#ffffff').slice(0, 7) };
+}
+
+/** The colour a gradient shows at its middle (a mesh's centre): what words over it are read against. */
+function middleOf(g: Exclude<Paint, string>): string {
+  if (g.type === 'mesh') {
+    const m = g.mesh ?? [];
+    if (m.length === 9) return m[4].slice(0, 7);
+    return m.length ? m.reduce((acc, c, i) => (i ? mixColor(acc, c, 1 / (i + 1)) : c)).slice(0, 7) : '#ffffff';
+  }
+  return g.stops.length ? colorAt(g.stops, 0.5).slice(0, 7) : '#ffffff';
 }
 
 const WORDS_ROLES = new Set(['headline', 'subhead', 'body', 'cta', 'meta', 'logo', 'label', 'caption']);
@@ -98,7 +110,15 @@ export function checkDoc(doc: GraphicDoc, measure: Measure = approxMeasure): GFi
       if (n.type !== 'text') continue;
       const t = n as TextNode;
       const L = layoutText(t, measure);
-      if (L.overflow || L.brokenWord) {
+      // words along a path: one line, read against the path's own length (their box does not apply)
+      if (t.path) {
+        const words = shownText(t).replace(/\s+/g, ' ');
+        const width = measure(words, t.font, t.weight, t.size, !!t.italic) + (t.tracking / 1000) * t.size * words.length;
+        if (width > textPathLength(t) * 1.02) {
+          const size = fitToPath(t, measure, minSize(board));
+          add({ kind: 'overflow', severity: 'high', artboard: board.id, node: n.id, message: `The words of “${name}” are longer than the path they are set along.`, ...(locked ? { blocked: true } : { fix: [{ op: 'update', id: n.id, set: { size } }] }) });
+        }
+      } else if (L.overflow || L.brokenWord) {
         const size = fitSize(t, measure, minSize(board));
         const fits = size >= minSize(board) && !layoutText({ ...t, size }, measure).overflow && !layoutText({ ...t, size }, measure).brokenWord;
         add({
@@ -142,8 +162,8 @@ export function checkDoc(doc: GraphicDoc, measure: Measure = approxMeasure): GFi
         // words straight on a photograph: said, for the designer (no colour is right everywhere on a picture)
         if (!t.stroke) add({ kind: 'contrast', severity: 'low', artboard: board.id, node: n.id, message: `“${name}” sits straight on a picture: check that it reads everywhere, or give it a ground.` });
       }
-      if (colours.length) {
-        const own = t.color.slice(0, 7);
+      if (colours.length && !(t.fill === null && !t.stroke)) {
+        const own = t.fill === null && t.stroke ? t.stroke.color.slice(0, 7) : t.fill && typeof t.fill === 'object' ? middleOf(t.fill) : t.color.slice(0, 7);
         const ratio = Math.min(...colours.map((c) => contrastRatio(own, c)));
         if (ratio < need) {
           const best = inkOnAll(own, colours, need, [doc.tokens.colors.text, doc.tokens.colors.background, doc.tokens.colors.accentText]);
@@ -161,7 +181,7 @@ export function checkDoc(doc: GraphicDoc, measure: Measure = approxMeasure): GFi
     }
     // words on words: two texts whose set lines cross (turned and vertical texts are composed on purpose and left out)
     const inks = visible
-      .filter((l) => l.node.type === 'text' && !l.node.rotation && !(l.node as TextNode).vertical)
+      .filter((l) => l.node.type === 'text' && !l.node.rotation && !(l.node as TextNode).vertical && !(l.node as TextNode).path)
       .map((l) => ({ l, a: inkArea(l.node as TextNode, boxOnBoard(l), layoutText(l.node as TextNode, measure)) }));
     for (let i = 0; i < inks.length; i++)
       for (let j = i + 1; j < inks.length; j++) {

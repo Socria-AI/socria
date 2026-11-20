@@ -10,7 +10,7 @@
 // The PDF writer has no dependency: a PDF of image pages is a few dozen lines of the format. The pictures it is
 // given (JPEG) come from the browser (lib/ux-v0/graphics/raster.ts) or, in tests, from anywhere.
 
-import { fontStylesheet } from '../fonts';
+import { graphicFontStylesheet } from '../fonts';
 import { normalizeDoc, walk, type Artboard, type GraphicDoc, type Repair } from './doc';
 import { pdfPoints } from './formats';
 import { renderArtboard, type RenderOptions } from './render';
@@ -20,13 +20,18 @@ export const NATIVE_FORMAT = 'socriaux.graphic/1';
 /** The faces a document uses, by name. */
 export function facesOf(doc: GraphicDoc): string[] {
   const s = new Set<string>([doc.tokens.fonts.display, doc.tokens.fonts.body]);
-  for (const b of doc.artboards) for (const l of walk(b)) if (l.node.type === 'text' || l.node.type === 'chart') s.add(l.node.font);
+  for (const b of doc.artboards)
+    for (const l of walk(b)) {
+      if (l.node.type === 'text' || l.node.type === 'chart') s.add(l.node.font);
+      if (l.node.type === 'text') for (const r of l.node.runs ?? []) if (r.font) s.add(r.font);
+      if (l.node.type === 'pattern' && l.node.gen === 'technical') s.add('IBM Plex Mono');
+    }
   return [...s];
 }
 
 /** An artboard as an SVG file (see the head of this file). */
 export function svgFile(doc: GraphicDoc, board: Artboard, opts: Omit<RenderOptions, 'guides'> & { linkFonts?: boolean } = {}): string {
-  const url = opts.linkFonts === false ? null : fontStylesheet(facesOf(doc));
+  const url = opts.linkFonts === false ? null : graphicFontStylesheet(facesOf(doc));
   const fontCss = opts.fontCss ?? (url ? `@import url('${url}');` : undefined);
   return `<?xml version="1.0" encoding="UTF-8"?>\n${renderArtboard(doc, board, { ...opts, fontCss, guides: false })}\n`;
 }

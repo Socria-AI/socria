@@ -12,9 +12,10 @@
 import { contrastRatio } from '../../ux/audit';
 import { FONTS, knownFont, nearestWeight } from '../fonts';
 import { COLOUR_WORDS, SPREAD, type GraphicKind } from '../graphics/compose';
-import { otherPairing } from '../graphics/edit';
+import { otherPairing, readGraphicEdit } from '../graphics/edit';
+import { applyOps as applyGfx } from '../graphics/doc';
 import { arrange, presentSize } from './layout';
-import { bounds, nodeOfMaterial, type Arrangement, type BoardOp, type BoardState, type Material } from './model';
+import { bounds, nodeOfMaterial, type Arrangement, type BoardOp, type BoardState, type GraphicMaterial, type Material } from './model';
 import { changedTokens, rulesOf, type MasterDesignSystem, type TokenKey } from './system';
 
 export type BoardAction =
@@ -114,6 +115,38 @@ export function readBoardEdit(words0: string, b: BoardState, ctx: { selection: r
   if (/\b(hide|remove|turn off)\b.*\b(notes|annotations)\b/.test(words)) return { label: 'annotations hidden', scope: 'board', ops: [{ op: 'annotations', visible: false }] };
   if (/\b(show|turn on)\b.*\b(notes|annotations)\b/.test(words)) return { label: 'annotations shown', scope: 'board', ops: [{ op: 'annotations', visible: true }] };
   if (/\b(annotat\w*|explain\w*|notes?)\b/.test(words) && /\b(add|write|explain|annotate|regenerate|update|refresh|again)\b/.test(words)) return { label: 'the notes written again from the board’s facts', scope: 'board', action: { kind: 'annotate' } };
+
+  // one change to the graphics' vocabulary on several materials at once ("add a grain texture to every material", "use
+  // a subtle halftone treatment on the pictures across the board"): the same edit read on each material's own document
+  // and applied there, nothing regenerated; a locked material is left as it is
+  const across = /\b(across the board|every (material|graphic|poster|design)s?|all (the )?(materials|graphics|posters|designs)|everywhere|on each( one)?)\b/;
+  if (across.test(words) || (ctx.selection.length > 1 && /\b(these|them|selected)\b/.test(words))) {
+    const t = pointAt(words, b, ctx.selection);
+    const inner = words.replace(/\b(to|on|in|for)?\s*(across the board|every (material|graphic|poster|design)s?|all (the )?(materials|graphics|posters|designs)|everywhere|each( one)?)\b/g, ' ').replace(/\s+/g, ' ').trim();
+    const lockedIds = new Set(b.nodes.filter((nd) => nd.type === 'material' && nd.locked).map((nd) => (nd as { material: string }).material));
+    const graphics = (t.list.length ? t.list : b.materials).filter((m): m is GraphicMaterial => m.type === 'graphic' && !!m.doc && !lockedIds.has(m.id));
+    const ops: BoardOp[] = [];
+    const done: string[] = [];
+    let label = '';
+    for (const m of graphics) {
+      let doc = m.doc!;
+      let changed = false;
+      for (const ab of m.doc!.artboards) {
+        const e = readGraphicEdit(inner, doc, { artboard: ab.id, selection: [] });
+        if (!e || (!e.ops.length && !e.next)) continue;
+        const r = e.next ? { ok: true as const, doc: e.next } : applyGfx(doc, e.ops);
+        if (!r.ok) continue;
+        doc = r.doc;
+        changed = true;
+        label = label || e.label;
+      }
+      if (changed) {
+        ops.push({ op: 'material-update', id: m.id, set: { doc } });
+        done.push(m.name);
+      }
+    }
+    if (ops.length) return { label: `${label} — on ${done.length} material${done.length > 1 ? 's' : ''} (${done.join(', ')}), each in its own design; nothing regenerated`, scope: 'materials', ops };
+  }
 
   // the website follows the system: "apply the same typography system to the website mockup"
   if (/\b(website|site)\b/.test(words) && /\b(apply|use|carry|bring|sync|match)\b/.test(words) && /\b(typograph\w*|fonts?|faces?|type|colou?rs?|palette|system|identity)\b/.test(words)) {

@@ -11,13 +11,14 @@
 // return null: nothing is guessed.
 
 import { contrastRatio } from '../../ux/audit';
-import { FONTS, knownFont } from '../fonts';
+import { FONTS, graphicFont } from '../fonts';
 import { ensureContrast } from '../spec';
 import { reshape } from '../targeted';
 import { applyOps, boxOnBoard, isLocked, walk, type Artboard, type GraphicDoc, type Located, type Node, type Op, type Role, type TextNode } from './doc';
 import { adaptBoard, type GraphicDirection } from './compose';
 import { formatFromWords } from './formats';
 import { approxMeasure, fitSize, type Measure } from './text';
+import { guarded, guardsOf, readVocabEdit } from './vocabedit';
 
 export interface GraphicEdit {
   ops: Op[];
@@ -105,7 +106,7 @@ function groundOf(board: Artboard, l: Located): string {
 
 /** Another pairing of faces, distinct from the current one: a serif display for a sans one and the reverse. */
 export function otherPairing(display: string, body: string): { display: string; body: string } {
-  const cur = knownFont(display);
+  const cur = graphicFont(display);
   const serif = cur?.kind === 'serif';
   const displays = FONTS.filter((f) => f.name !== display && (serif ? f.kind === 'sans' : f.kind === 'serif'));
   const bodies = FONTS.filter((f) => f.name !== body && !f.displayOnly && (serif ? f.kind === 'serif' : f.kind === 'sans'));
@@ -165,6 +166,36 @@ export function readGraphicEdit(words0: string, doc: GraphicDoc, ctx: EditContex
     const withFaces = applyOps(dupe.doc, faceOps);
     if (!withFaces.ok) return null;
     return { ops: [], next: withFaces.doc, label: `a second version in ${pair.display} and ${pair.body} (the original kept)`, scope: 'artboard' };
+  }
+
+  // the expanded vocabulary (vocabedit.ts): motifs replaced, effects, text on paths, patterns, drama, fewer ornaments,
+  // each guarded by what the words say to keep ("keep the typography unchanged", "using the same colours")
+  {
+    const guards = guardsOf(words);
+    const sentences = words.split(/(?<=[.!?;])\s+|\n+/).map((x) => x.trim()).filter(Boolean);
+    const actions = sentences.filter((x) => !/^(keep|leave|preserve)\b/.test(x) || /\b(make|add|create|replace|use|generate|turn)\b/.test(x));
+    const ops: Op[] = [];
+    const labels: string[] = [];
+    let question: string | undefined;
+    let scope: GraphicEdit['scope'] = 'artboard';
+    let current = doc;
+    for (const sentence of actions.length ? actions : [words]) {
+      const v = readVocabEdit(sentence, current, current.artboards.find((b) => b.id === board.id) ?? board, ctx.selection, measure);
+      if (!v) continue;
+      if (v.question && !v.ops.length) {
+        question = v.question;
+        continue;
+      }
+      const g = guarded(current, v.ops, guards);
+      const tried = applyOps(current, g.ops);
+      if (!tried.ok) return finish({ ops: g.ops, label: v.label, scope: v.scope });
+      current = tried.doc;
+      ops.push(...g.ops);
+      labels.push(g.held.length ? `${v.label}; ${g.held.join(' and ')} kept as asked` : v.label);
+      scope = v.scope;
+    }
+    if (ops.length) return finish({ ops, label: labels.join('; '), scope: labels.length > 1 ? 'artboard' : scope, ...(question ? { question } : {}) });
+    if (question) return { ops: [], label: 'that change', scope, question };
   }
 
   // bigger / smaller

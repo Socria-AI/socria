@@ -21,9 +21,10 @@ import { MAX_GRAPHIC_VERSIONS, type GraphicVersion } from '@/lib/ux-v0/graphics/
 import type { Measure } from '@/lib/ux-v0/graphics/text';
 import { GraphicCanvas, type CanvasHandle } from './GraphicCanvas';
 import { AddPanel, ArtboardsPanel, Inspector, LayersPanel, nodeLabel } from './GraphicPanels';
+import { CeilingInspector, ShapeLibrary } from './CeilingPanels';
 import { download, slug } from './faces';
 
-type Tab = 'layers' | 'boards' | 'add' | 'pictures' | 'brand' | 'versions';
+type Tab = 'layers' | 'boards' | 'add' | 'shapes' | 'pictures' | 'brand' | 'versions';
 export type EditorNote = { tone: 'ok' | 'warn' | 'ask'; text: string } | null;
 export type ChangeMeta = { label: string; version?: boolean; kind: 'edit' | 'undo' | 'redo' };
 
@@ -88,6 +89,7 @@ export function GraphicEditor(props: GraphicEditorProps) {
   const [boardId, setBoardId] = useState(given.artboards[0]?.id ?? '');
   const [selection, setSelection] = useState<string[]>([]);
   const [tab, setTab] = useState<Tab>('layers');
+  const [pathEdit, setPathEdit] = useState<string | null>(null);
   const [aids, setAids] = useState({ guides: true, grid: false, rulers: true });
   const [askWords, setAskWords] = useState('');
   const [pending, setPending] = useState<{ edit: GraphicEdit; doc: GraphicDoc; base: GraphicDoc } | null>(null);
@@ -363,6 +365,7 @@ export function GraphicEditor(props: GraphicEditorProps) {
     ['layers', 'Layers'],
     ['boards', 'Artboards'],
     ['add', 'Add'],
+    ['shapes', 'Shapes'],
     ['pictures', 'Pictures'],
     ['brand', 'Brand'],
     ...(props.versions ? ([['versions', 'Versions']] as [Tab, string][]) : []),
@@ -382,6 +385,7 @@ export function GraphicEditor(props: GraphicEditorProps) {
           {tab === 'layers' && <LayersPanel board={board} selection={selection} onSelect={setSelection} onOps={onOps} />}
           {tab === 'boards' && <ArtboardsPanel doc={doc} boardId={board.id} onPick={(id) => (setBoardId(id), setSelection([]))} onOps={onOps} onAdapt={adapt} />}
           {tab === 'add' && <AddPanel board={board} form={props.direction?.form ?? null} doc={doc} onOps={onOps} onUpload={addPicture} />}
+          {tab === 'shapes' && <ShapeLibrary board={board} doc={doc} onOps={onOps} onNote={(text) => setNote({ tone: 'warn', text })} />}
           {tab === 'pictures' && (
             <section className="gx-panel" aria-label="Pictures">
               <p className="gx-panel-h">Pictures in this design</p>
@@ -602,7 +606,15 @@ export function GraphicEditor(props: GraphicEditorProps) {
           </p>
         )}
         <div className={`gx-stage${live ? ' is-preview' : ''}`}>
-          <GraphicCanvas doc={doc} boardId={board.id} selection={selection} measure={measure} href={href} onSelect={setSelection} onCommit={onOps} onEditText={() => window.setTimeout(() => textRef.current?.focus(), 30)} zoomRef={zoomRef} guides={aids.guides} grid={aids.grid} rulers={aids.rulers} />
+          <GraphicCanvas doc={doc} boardId={board.id} selection={selection} measure={measure} href={href} onSelect={(ids) => (setSelection(ids), pathEdit && !ids.includes(pathEdit) && setPathEdit(null))} onCommit={onOps} onEditText={() => window.setTimeout(() => textRef.current?.focus(), 30)} zoomRef={zoomRef} guides={aids.guides} grid={aids.grid} rulers={aids.rulers} pathEdit={pathEdit} onPathEdit={setPathEdit} />
+          {pathEdit && (
+            <p className="gx-pathtag" role="status">
+              Editing nodes: drag a node or a handle; Alt-click a node for smooth or corner; double-click the path to add a node; Delete removes one.{' '}
+              <button type="button" className="sb-btn is-sm" onClick={() => setPathEdit(null)}>
+                Done
+              </button>
+            </p>
+          )}
           {live && <span className="gx-preview-tag">Preview</span>}
         </div>
         <div className="gx-askbar">
@@ -651,6 +663,7 @@ export function GraphicEditor(props: GraphicEditorProps) {
 
       <aside className="gx-right" aria-label="Properties">
         <Inspector doc={doc} board={board} selected={selected} findings={findings} onOps={onOps} onFix={(f) => f.fix && onOps(f.fix, `fixed: ${f.message}`)} onFixAll={fixAll} textRef={textRef} />
+        <CeilingInspector doc={doc} board={board} selected={selected} onOps={onOps} measure={measure} onPathEdit={(id) => (id && setSelection([id]), setPathEdit(id))} />
         {props.kindLabel && (
           <p className="v0-quiet gx-kindline">
             {props.kindLabel} · {doc.artboards.length} artboard{doc.artboards.length === 1 ? '' : 's'}
