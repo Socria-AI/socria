@@ -2608,5 +2608,22 @@ console.log('\n=== visual originality: shapes constructed, systems derived, comp
   ok('thirty versions kept, and the ones the designer kept whatever their age', capped.length === 30 && capped.some((s) => s.version === 3) && capped.some((s) => s.version === 7) && capped[capped.length - 1].version === 40);
 }
 
+// ── website mastery: tabs, before and after, a horizontal rail ──
+{
+  const ixSpec = V.normalizeSpec({ title: 'Atelier', pageType: 'website', tokens: SPEC.tokens, sections: [
+    { id: 'nav', kind: 'nav', variant: 'inline', content: { brand: 'Atelier', links: ['Services'] } },
+    { id: 'tb', kind: 'tabs', variant: 'top', content: { title: 'Services', items: [{ label: 'Restoration', text: 'Old frames brought back.' }, { label: 'Gilding', text: 'Gold leaf on gesso.' }] } },
+    { id: 'cp', kind: 'compare', variant: 'slider', content: { title: 'Before and after', caption: 'An 1890s frame.' }, images: [board.refs[0].id, board.refs[1].id] },
+    { id: 'one', kind: 'compare', variant: 'slider', content: { title: 'Only one' }, images: [board.refs[0].id] },
+    { id: 'rl', kind: 'features', variant: 'rail', content: { title: 'Process', items: [{ title: 'One', text: 'a' }, { title: 'Two', text: 'b' }, { title: 'Three', text: 'c' }] } },
+  ] }, board);
+  ok('tabs and a before-and-after are kinds of their own; a comparison with one picture is not drawn as one', ixSpec.sections.some((s) => s.kind === 'tabs') && ixSpec.sections.filter((s) => s.kind === 'compare').length === 1 && V.kindDef('features').variants.includes('rail'));
+  const ix = V.renderDesign(ixSpec, board.refs).html;
+  ok('tabs: a tab list (hidden until the runtime binds it), each tab controlling its panel, every panel readable without scripts', /role="tablist"[^>]*hidden/.test(ix) && /<button type="button" role="tab" class="tb-tab" id="tb-tab-0" aria-controls="tb-panel-0" aria-selected="true"/.test(ix) && (ix.match(/role="tabpanel"/g) ?? []).length === 2 && !/role="tabpanel"[^>]*hidden/.test(ix));
+  ok('before and after: both pictures, the slider a labelled range input that appears only when it works', (ix.match(/class="cmpr-img/g) ?? []).length === 2 && /<label class="cmpr-ctl" hidden><span class="small">Before · After<\/span><input class="cmpr-range" type="range"[^>]*aria-label="How much of the before picture shows"/.test(ix) && /data-ux-compare/.test(ix));
+  ok('the rail: a named region the keyboard can scroll', /<div class="f-rail-wrap" role="region" tabindex="0" aria-label="Process, scrolls sideways">/.test(ix));
+  ok('the runtime knows them: tabs by keyboard, the slider by pointer and keys, each tried by the audit', /function tabsBehaviour/.test(V.BEHAVIOR_SOURCE) && /function compareBehaviour/.test(V.BEHAVIOR_SOURCE) && /kind: 'tabs'/.test(V.BEHAVIOR_SOURCE) && /kind: 'compare'/.test(V.BEHAVIOR_SOURCE));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

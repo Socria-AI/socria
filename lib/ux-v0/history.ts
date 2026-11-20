@@ -7,7 +7,7 @@
 // version can be opened, compared and exported on its own, which a chain of differences cannot.
 
 import { AREA_LABEL, changesBetween, type Change } from './scope';
-import type { DesignSpec } from './spec';
+import { kindDef, type DesignSpec } from './spec';
 
 export const MAX_VERSIONS = 30;
 
@@ -29,7 +29,7 @@ export function describeChanges(from: DesignSpec, to: DesignSpec): string[] {
     const s = id ? to.sections.find((x) => x.id === id) ?? from.sections.find((x) => x.id === id) : null;
     if (!s) return '';
     const title = typeof s.content.title === 'string' ? (s.content.title as string).replace(/\*/g, '').slice(0, 32) : '';
-    return title ? `“${title}”` : `the ${s.kind}`;
+    return title ? `“${title}”` : `the ${(kindDef(s.kind)?.label ?? s.kind).toLowerCase()}`;
   };
   const out: string[] = [];
   const seen = new Set<string>();

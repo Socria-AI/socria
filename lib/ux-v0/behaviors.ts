@@ -21,6 +21,10 @@
 //   gallery   each picture opens large: previous, next, Escape and the arrow keys, focus returned on close.
 //   filters   a gallery's kinds of picture, a menu's groups: one at a time, or all.
 //   chart     each series can be shown or hidden (one always stays); each reading says its value.
+//   tabs      the panels become tabs: one shown at a time, the arrow keys, Home and End move between tabs (the
+//             focus moves with them), each tab says it is selected; without the runtime every panel shows.
+//   compare   two pictures, one over the other, cut at a slider: dragged on the picture or moved by the range
+//             input (keyboard, screen reader), the cut said as a percentage.
 //   configurator  options chosen in place: the total and the choice said as they change, a finish's
 //             colour shown (and sent to a 3D scene on the page); the action says plainly that it is a
 //             prototype and nothing was ordered.
@@ -373,7 +377,73 @@ export const BEHAVIOR_SOURCE = String.raw`(function () {
     return { btn: btn, panel: panel, open: open, shut: shut, links: $$(panel, '.nav-over-links a').length };
   }
 
+  // ── tabs ──
+  function tabsBehaviour(root) {
+    var list = $(root, '[role=tablist]');
+    var tabs = list ? $$(list, '[role=tab]') : [];
+    var panels = tabs.map(function (t) { return document.getElementById(t.getAttribute('aria-controls')); });
+    if (tabs.length < 2 || panels.some(function (x) { return !x; })) return null;
+    function select(i, focus) {
+      tabs.forEach(function (t, j) {
+        var on = j === i;
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+        t.tabIndex = on ? 0 : -1;
+        panels[j].hidden = !on;
+      });
+      if (focus) tabs[i].focus();
+    }
+    tabs.forEach(function (t, i) {
+      t.addEventListener('click', function () { select(i, false); });
+      t.addEventListener('keydown', function (e) {
+        var k = e.key, n = tabs.length, to = -1;
+        if (k === 'ArrowRight' || k === 'ArrowDown') to = (i + 1) % n;
+        else if (k === 'ArrowLeft' || k === 'ArrowUp') to = (i - 1 + n) % n;
+        else if (k === 'Home') to = 0;
+        else if (k === 'End') to = n - 1;
+        if (to < 0) return;
+        e.preventDefault();
+        select(to, true);
+      });
+    });
+    list.hidden = false;
+    root.classList.add('is-bound');
+    select(0, false);
+    return { root: root, tabs: tabs, panels: panels, select: select, at: function () { return tabs.findIndex(function (t) { return t.getAttribute('aria-selected') === 'true'; }); } };
+  }
+
+  // ── before and after ──
+  function compareBehaviour(root) {
+    var frame = $(root, '.cmpr-frame');
+    var stage = $(root, '.cmpr-stage') || frame;
+    var range = $(root, '.cmpr-range');
+    var ctl = $(root, '.cmpr-ctl');
+    if (!frame || !range || !ctl || $$(frame, 'img').length < 2) return null;
+    function set(v) {
+      v = Math.max(0, Math.min(100, Math.round(v)));
+      frame.style.setProperty('--cmp', v + '%');
+      range.value = String(v);
+      range.setAttribute('aria-valuetext', v + '% ' + (range.getAttribute('aria-label') || '').replace(/^How much of the /, '').replace(/ picture shows$/, '') + ' showing');
+      return v;
+    }
+    range.addEventListener('input', function () { set(Number(range.value)); });
+    var dragging = false;
+    function at(e) { var r = stage.getBoundingClientRect(); return ((e.clientX - r.left) / Math.max(1, r.width)) * 100; }
+    // a picture dragged would start the browser's own drag of the image (and cancel the pointer): not here
+    stage.addEventListener('dragstart', function (e) { e.preventDefault(); });
+    stage.querySelectorAll('img').forEach(function (im) { im.setAttribute('draggable', 'false'); });
+    stage.addEventListener('pointerdown', function (e) { dragging = true; try { stage.setPointerCapture(e.pointerId); } catch (x) {} set(at(e)); e.preventDefault(); });
+    stage.addEventListener('pointermove', function (e) { if (dragging) set(at(e)); });
+    stage.addEventListener('pointerup', function () { dragging = false; });
+    stage.addEventListener('pointercancel', function () { dragging = false; });
+    ctl.hidden = false;
+    root.classList.add('is-bound');
+    set(50);
+    return { root: root, set: set, range: range, frame: frame };
+  }
+
   var bookings = $$(document, '[data-ux-booking]').filter(fresh).map(booking).filter(Boolean);
+  var tabSets = $$(document, '[data-ux-tabs]').filter(fresh).map(tabsBehaviour).filter(Boolean);
+  var compares = $$(document, '[data-ux-compare]').filter(fresh).map(compareBehaviour).filter(Boolean);
   $$(document, 'form[data-ux-form]').filter(fresh).forEach(formBehaviour);
   $$(document, '.table-card table').filter(fresh).forEach(tableBehaviour);
   var filterSets = $$(document, '[data-ux-filters]').filter(fresh).map(filters).filter(Boolean);
@@ -447,6 +517,27 @@ export const BEHAVIOR_SOURCE = String.raw`(function () {
       m.panel.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       if (!m.panel.hidden) { p.push('Escape does not close the menu'); m.shut(true); }
       out.push({ kind: 'menu', index: i, items: m.links, problems: p });
+    });
+    tabSets.forEach(function (t, i) {
+      var p = [];
+      t.tabs[1].click();
+      if (t.at() !== 1 || t.panels[1].hidden || !t.panels[0].hidden) p.push('choosing a tab does not show its panel');
+      t.tabs[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      if (t.at() !== (2 % t.tabs.length)) p.push('the arrow keys do not move between tabs');
+      t.tabs[t.at()].dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+      if (t.at() !== 0) p.push('Home does not go to the first tab');
+      if (t.panels.filter(function (x) { return !x.hidden; }).length !== 1) p.push('more than one panel shows');
+      t.select(0, false);
+      out.push({ kind: 'tabs', index: i, items: t.tabs.length, problems: p });
+    });
+    compares.forEach(function (c, i) {
+      var p = [];
+      c.range.value = '20';
+      c.range.dispatchEvent(new Event('input', { bubbles: true }));
+      if (c.frame.style.getPropertyValue('--cmp').trim() !== '20%') p.push('the slider does not move the cut');
+      if (!/20%/.test(c.range.getAttribute('aria-valuetext') || '')) p.push('the cut is not said');
+      c.set(50);
+      out.push({ kind: 'compare', index: i, items: 2, problems: p });
     });
     configs.forEach(function (c, i) {
       var p = [];
@@ -543,5 +634,5 @@ export const BEHAVIOR_SOURCE = String.raw`(function () {
     $$(fm.root, '.field.is-invalid').forEach(function (n) { n.classList.remove('is-invalid'); });
     return { index: i, kind: 'form', slots: inputs.length, problems: problems };
   }
-  window.__uxBehaviors = { selfTest: selfTest, selfTestInteractive: selfTestInteractive, bookings: bookings.length, forms: forms.length, galleries: galleries.length, filters: filterSets.length, charts: legends.length, tables: tableFilters.length, configurators: configs.length, menus: menus.length };
+  window.__uxBehaviors = { tabs: tabSets.length, compares: compares.length, selfTest: selfTest, selfTestInteractive: selfTestInteractive, bookings: bookings.length, forms: forms.length, galleries: galleries.length, filters: filterSets.length, charts: legends.length, tables: tableFilters.length, configurators: configs.length, menus: menus.length };
 })();`;

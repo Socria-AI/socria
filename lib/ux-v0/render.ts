@@ -495,7 +495,10 @@ const SECTIONS: Record<string, R> = {
       .join('');
     const tag = s.variant === 'index' || s.variant === 'numbered' ? 'ol' : 'ul';
     const h = head(s, c, x);
-    return `<div class="wrap${h ? ' has-head' : ''}">${h}<${tag} class="features f-${s.variant} n-${Math.min(4, (c.items as any[]).length)}">${items}</${tag}></div>`;
+    const list = `<${tag} class="features f-${s.variant} n-${Math.min(4, (c.items as any[]).length)}">${items}</${tag}>`;
+    // a rail: the sequence scrolled sideways, a region the keyboard can scroll (arrow keys once it has focus)
+    if (s.variant === 'rail') return `<div class="wrap${h ? ' has-head' : ''}">${h}<div class="f-rail-wrap" role="region" tabindex="0" aria-label="${plain(c.title || 'The sequence')}, scrolls sideways">${list}</div></div>`;
+    return `<div class="wrap${h ? ' has-head' : ''}">${h}${list}</div>`;
   },
   split: (s, c, x) => {
     const { im } = x;
@@ -653,6 +656,29 @@ const SECTIONS: Record<string, R> = {
     return `<div class="wrap faq fq-${s.variant}${h ? ' has-head' : ''}">${h}<div class="faq-items">${(c.items as any[])
       .map((it, i) => `<details class="qa"${i === 0 ? ' open' : ''}><summary ${attr(s.id, `items.${i}.q`)}>${t(it.q)}</summary><p ${attr(s.id, `items.${i}.a`)}>${t(it.a)}</p></details>`)
       .join('')}</div></div>`;
+  },
+  tabs: (s, c, x) => {
+    // the panels stand one after another, each with its own heading, until SocriaUX's runtime binds them as tabs
+    // (the tab list appears and one panel shows at a time): a page without scripts still reads every panel
+    const h = head(s, c, x);
+    const items = c.items as any[];
+    const tabs = items.map((it, i) => `<button type="button" role="tab" class="tb-tab" id="${esc(s.id)}-tab-${i}" aria-controls="${esc(s.id)}-panel-${i}" aria-selected="${i === 0}"${i ? ' tabindex="-1"' : ''} ${attr(s.id, `items.${i}.label`)}>${t(it.label)}</button>`).join('');
+    const panels = items
+      .map((it, i) => `<div class="tb-panel" role="tabpanel" id="${esc(s.id)}-panel-${i}" aria-labelledby="${esc(s.id)}-tab-${i}" tabindex="0"><h3 class="h-item tb-panel-h">${t(it.title || it.label)}</h3><p ${attr(s.id, `items.${i}.text`)}>${t(it.text)}</p></div>`)
+      .join('');
+    return `<div class="wrap tb tb-${s.variant}${h ? ' has-head' : ''}" data-ux-tabs>${h}<div class="tb-body"><div class="tb-list" role="tablist" aria-label="${plain(c.title || 'Panels')}" hidden>${tabs}</div><div class="tb-panels">${panels}</div></div></div>`;
+  },
+  compare: (s, c, x) => {
+    // two pictures of one subject: the after drawn whole, the before over it cut at the slider (a range input, so
+    // the keyboard and a screen reader can move it); without scripts, or in the side variant, side by side
+    const { im } = x;
+    const h = head(s, c, x);
+    const before = String(c.before || 'Before');
+    const after = String(c.after || 'After');
+    const a = im.img(s, 0, 'cmpr-img');
+    const b = im.img(s, 1, 'cmpr-img');
+    const slider = s.variant === 'slider';
+    return `<div class="wrap cmpr cmpr-${s.variant}${h ? ' has-head' : ''}"${slider ? ' data-ux-compare' : ''}>${h}<figure class="cmpr-frame" style="--cmp:50%"><div class="cmpr-stage"><div class="cmpr-after">${b}<span class="cmpr-l cmpr-l-after" ${attr(s.id, 'after')}>${t(after)}</span></div><div class="cmpr-before">${a}<span class="cmpr-l cmpr-l-before" ${attr(s.id, 'before')}>${t(before)}</span></div>${slider ? '<span class="cmpr-handle" aria-hidden="true"></span>' : ''}</div>${c.caption ? `<figcaption class="small muted" ${attr(s.id, 'caption')}>${t(c.caption)}</figcaption>` : ''}</figure>${slider ? `<label class="cmpr-ctl" hidden><span class="small">${t(before)} · ${t(after)}</span><input class="cmpr-range" type="range" min="0" max="100" value="50" aria-label="${plain(`How much of the ${before.toLowerCase()} picture shows`)}"></label>` : ''}</div>`;
   },
   cta: (s, c, x) => {
     const { im, look } = x;
@@ -1191,6 +1217,14 @@ p{max-width:68ch}
 .li-main{display:flex;flex-direction:column}.li-name{font-weight:600}.li-price{font-variant-numeric:tabular-nums;font-weight:600}.li-text{grid-column:1/-1;margin:2px 0 0;font-size:.95rem}
 .l-menu .li-main{flex-direction:row;align-items:baseline;gap:10px}.l-schedule .li-meta{order:-1;font-variant-numeric:tabular-nums}
 .faq-items{border-top:var(--rule-w) solid var(--rule-c)}.qa{border-bottom:1px solid var(--line);padding:6px 0}
+.tb-list{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--line);margin-bottom:clamp(20px,3vw,32px);scrollbar-width:thin}.tb-tab{flex:0 0 auto;min-height:44px;padding:10px 16px;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;color:var(--muted);font:600 .98rem/1.2 var(--body);cursor:pointer}.tb-tab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent-ink)}.tb-tab:hover{color:var(--text)}
+.tb-panels{display:grid;gap:clamp(20px,3vw,32px)}.tb-panel{max-width:68ch}.tb-panel p{margin:10px 0 0;color:var(--muted)}.tb.is-bound .tb-panel-h{margin-top:0}.tb:not(.is-bound) .tb-panel{padding-top:clamp(12px,2vw,20px);border-top:1px solid var(--line)}
+.cmpr-frame{position:relative;margin:0;display:grid;gap:12px}.cmpr-stage{position:relative;display:grid;gap:12px}.cmpr-frame .cmpr-img{display:block;width:100%;aspect-ratio:3/2;object-fit:cover;border-radius:var(--r)}.cmpr-after,.cmpr-before{position:relative}.cmpr-l{position:absolute;top:12px;padding:4px 10px;border-radius:999px;background:rgba(0,0,0,.62);color:#fff;font:600 .8rem/1.4 var(--body)}.cmpr-l-before{left:12px}.cmpr-l-after{right:12px}
+.cmpr-side .cmpr-stage,.cmpr:not(.is-bound) .cmpr-stage{grid-template-columns:repeat(2,minmax(0,1fr))}.cmpr-side .cmpr-before,.cmpr:not(.is-bound) .cmpr-before{order:-1}.cmpr-side .cmpr-l-after,.cmpr:not(.is-bound) .cmpr-l-after{right:auto;left:12px}.cmpr-frame figcaption{grid-column:1/-1}
+.cmpr.is-bound .cmpr-stage{display:block}.cmpr.is-bound .cmpr-before{position:absolute;inset:0;clip-path:inset(0 calc(100% - var(--cmp)) 0 0)}.cmpr.is-bound .cmpr-before .cmpr-img{height:100%}.cmpr-handle{display:none}.cmpr.is-bound .cmpr-handle{display:block;position:absolute;top:0;bottom:0;left:var(--cmp);width:2px;margin-left:-1px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.35);pointer-events:none}.cmpr.is-bound .cmpr-stage{touch-action:pan-y;cursor:ew-resize;user-select:none;-webkit-user-select:none}.cmpr.is-bound .cmpr-img{-webkit-user-drag:none}.cmpr.is-bound .cmpr-frame figcaption{margin-top:10px}
+.cmpr-ctl{display:grid;gap:4px;margin-top:12px}.cmpr-range{width:100%;min-height:44px;accent-color:var(--accent-ink);cursor:pointer}
+.f-rail-wrap{overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;padding-bottom:12px;scrollbar-width:thin}.f-rail-wrap:focus-visible{outline:2px solid var(--accent-ink);outline-offset:4px}.features.f-rail{display:grid!important;grid-auto-flow:column;grid-template-columns:none!important;grid-auto-columns:minmax(260px,31%);gap:clamp(16px,2vw,28px)}.f-rail .feature{scroll-snap-align:start}
+@media (max-width:899px){.features.f-rail{grid-auto-columns:82%}.cmpr-side .cmpr-stage,.cmpr:not(.is-bound) .cmpr-stage{grid-template-columns:1fr}}
 .qa summary{cursor:pointer;font-weight:600;font-size:1.08rem;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:48px}.qa summary::after{content:"+";color:var(--muted);font-size:1.3em;line-height:1}.qa[open] summary::after{content:"−"}.qa summary::-webkit-details-marker{display:none}.qa p{margin:4px 0 14px;color:var(--muted);max-width:70ch}
 .cta-box{padding:clamp(36px,6vw,80px);border-radius:var(--r);text-align:center}.cta-box .actions{justify-content:center}.cta-box .body-lg{margin-inline:auto}
 .c-band{${groundVars(g.accent)};background:var(--bg);color:var(--text)}.c-band .body-lg{color:var(--muted)}
@@ -1396,6 +1430,7 @@ svg.cp-shape.cp-t-line{clip-path:none;color:var(--text);overflow:visible;backgro
 .plans.n-2{grid-template-columns:repeat(2,minmax(0,1fr))}.plans.n-3,.plans.n-4{grid-template-columns:repeat(2,minmax(0,1fr))}
 .foot{grid-template-columns:1.2fr 2fr}.foot-cols{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}.legal,.credits{grid-column:1/-1}
 .fq-two-column .faq-items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:48px}
+.tb-side.is-bound .tb-body{display:grid;grid-template-columns:minmax(180px,3fr) minmax(0,9fr);gap:clamp(24px,4vw,56px);align-items:start}.tb-side .tb-list{flex-direction:column;border-bottom:0;border-left:1px solid var(--line)}.tb-side .tb-tab{text-align:left;border-bottom:0;border-left:2px solid transparent;margin:0 0 0 -1px}.tb-side .tb-tab[aria-selected="true"]{border-left-color:var(--accent-ink)}
 .hs-foot{grid-template-columns:minmax(0,7fr) minmax(0,5fr);align-items:start}
 .hp-row{grid-template-columns:minmax(0,5fr) minmax(0,7fr)}.hp-row:not(.has-media){grid-template-columns:1fr auto}
 .hero-statement.has-art .hs-top{grid-template-columns:minmax(0,1fr) auto;align-items:end}

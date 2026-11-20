@@ -11,7 +11,7 @@
 // It reads only what it is sure of. Words it does not recognise widen nothing and narrow nothing.
 
 import { composeSignature, type Piece } from './compose';
-import type { DesignSpec, Section } from './spec';
+import { kindDef, type DesignSpec, type Section } from './spec';
 
 export const AREAS = ['words', 'type', 'colour', 'layout', 'space', 'shape', 'images', 'motion', 'responsive', 'structure', 'site'] as const;
 export type Area = (typeof AREAS)[number];
@@ -300,7 +300,7 @@ export function describeBack(back: readonly Change[], spec: DesignSpec): string 
   const parts: string[] = [];
   for (const c of back) {
     const s = c.section ? spec.sections.find((x) => x.id === c.section) : null;
-    const where = s ? ` in ${typeof s.content.title === 'string' && s.content.title ? `“${(s.content.title as string).replace(/\*/g, '').slice(0, 30)}”` : `the ${s.kind}`}` : c.section ? '' : ' across the page';
+    const where = s ? ` in ${typeof s.content.title === 'string' && s.content.title ? `“${(s.content.title as string).replace(/\*/g, '').slice(0, 30)}”` : `the ${(kindDef(s.kind)?.label ?? s.kind).toLowerCase()}`}` : c.section ? '' : ' across the page';
     const k = `${c.area}${where}`;
     if (seen.has(k)) continue;
     seen.add(k);

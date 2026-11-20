@@ -74,7 +74,7 @@ for (const def of V.LIBRARY) {
   for (const variant of def.variants) {
     const tone = look ? V.TONES[vi++ % V.TONES.length] : undefined;
     const app = !def.pages.includes('website');
-    const wantImgs = def.kind === 'gallery' ? 4 : def.images[1] > 0 ? 1 : 0;
+    const wantImgs = def.kind === 'gallery' ? 4 : Math.max(def.images[0], def.images[1] > 0 ? 1 : 0);
     const sec = { id: 's', kind: def.kind, variant, content: contentFor(def), images: refs.slice(0, wantImgs).map((r) => r.id), tone };
     const raw = { title: 'Check', pageType: app ? 'app-screen' : 'website', platform: 'web', tokens, look, sections: app && def.kind !== 'app-nav' ? [{ id: 'nav', kind: 'app-nav', variant: 'topbar', content: { brand: 'Studio', items: ['Today', 'Classes', 'Profile'] }, images: [] }, sec] : [sec] };
     const spec = V.normalizeSpec(raw, { refs, seen: refs.map((r) => r.id), queries: [], palettes: [], type: [] });
