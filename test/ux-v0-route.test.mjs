@@ -333,6 +333,35 @@ console.log('\n=== graphics projects: kept whole, held to their shape, private =
   ok('signed out: nothing', (await post('projects', null, null, [], 'GET', '?id=uxv0_gfx1')).status === 401 && (await post('projects', { project: g }, null, [], 'PUT')).status === 401);
 }
 
+console.log('\n=== boards: kept whole, held to their shape, private ===');
+{
+  const V = await import(pathToFileURL(join(here, '.tmp', 'ux-v0-under-test.mjs')).href);
+  const brief = V.boardPlan.readBoardRequest('A campaign for “Harbour Week”: two posters and an Instagram post');
+  const sys = V.boardPipeline.proposeSystems(brief, 'route-test')[0];
+  let board = V.boardPipeline.startBoard(brief, sys);
+  await V.boardPipeline.generate(board, {}, (op) => {
+    const r = V.boardModel.applyBoardOp(board, op);
+    if (r.ok) board = r.board;
+  });
+  const hostile = {
+    ...board,
+    nodes: [...board.nodes, { id: 'bn_x', type: 'note', text: '<script>alert(1)</script>', generated: false, x: 0, y: 0, w: 300, h: 90 }, { id: 'bn_y', type: 'material', material: 'm_none', x: 0, y: 0, w: 10, h: 10 }],
+    materials: [...board.materials, { id: 'm_w', type: 'website', name: 'Site', purpose: '', projectId: '../etc/passwd', view: 'desktop', created: false, status: 'ready', revision: 0 }],
+  };
+  const p = { v: 1, id: 'uxv0_board1', name: 'Harbour Week', mode: 'create', medium: 'board', intent: 'A campaign', updatedAt: 3000, createdAt: 2900, cards: [], board: hostile };
+  const put = await post('projects', { project: p }, A, [], 'PUT');
+  const row = db.rows('ux_v0_projects').find((r) => r.id === 'uxv0_board1');
+  ok('a board syncs for its owner, as a board: its system and every material whole', put.status === 200 && row?.user_id === A && row.doc.medium === 'board' && row.doc.board.system?.tokens.fonts.display === sys.tokens.fonts.display && row.doc.board.materials.filter((m) => m.type === 'graphic').every((m) => m.doc?.artboards?.length === 1), J(put));
+  ok('…held to its shape on the way in: a node pointing at nothing goes, a path is no project id', !row?.doc.board.nodes.some((n) => n.id === 'bn_y') && !row.doc.board.materials.some((m) => m.type === 'website' && String(m.projectId).includes('/')));
+  ok('…markup in a note is kept as words, never as markup to run', row?.doc.board.nodes.find((n) => n.id === 'bn_x')?.text === '<script>alert(1)</script>');
+  const read = await post('projects', null, A, [], 'GET', '?id=uxv0_board1');
+  ok('the owner reads it back as a board', read.status === 200 && read.json.project.medium === 'board' && read.json.project.board.materials.length === row.doc.board.materials.length);
+  ok('nobody else reads it or lists it', (await post('projects', null, B, [], 'GET', '?id=uxv0_board1')).status === 404 && !(await post('projects', null, B, [], 'GET')).json.projects.some((x) => x.id === 'uxv0_board1'));
+  await post('projects', null, B, [], 'DELETE', '?id=uxv0_board1');
+  ok('…or deletes it', db.rows('ux_v0_projects').some((r) => r.id === 'uxv0_board1'));
+  ok('signed out: nothing', (await post('projects', null, null, [], 'GET', '?id=uxv0_board1')).status === 401 && (await post('projects', { project: p }, null, [], 'PUT')).status === 401);
+}
+
 console.log('\n=== GPT-6.1 Sol through every route (the Responses API) ===');
 {
   const C = 'user_v0_sol';

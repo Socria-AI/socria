@@ -775,11 +775,12 @@ console.log('\n=== found by dogfooding: notes, fit, app screens, charts ===');
   const posterTokens = { ...V.DEFAULT_TOKENS, fonts: { display: 'Unbounded', body: 'Inter' } };
   const long = V.normalizeSpec({ ...SPEC, tokens: posterTokens, look: posterLook, sections: [{ id: 'h', kind: 'hero', variant: 'poster', content: { title: 'Drawings that *move*.', subtitle: 'x', primary: 'Go' } }] }, board);
   const lhtml = V.renderDesign(long, board.refs).html;
-  const fit = lhtml.match(/--fit-hero:calc\(\(100vw - 40px\) \/ ([\d.]+)\)/);
+  const fit = lhtml.match(/--fit-hero:calc\(min\(var\(--wrap\), 100vw - 40px\) \/ ([\d.]+)\)/);
   ok('a poster headline gets a size cap from its longest word ("Drawings", 8 letters of wide capitals)', !!fit && Number(fit[1]) > 8 * 0.85 && /font-size:min\(var\(--fs-hero\),var\(--fit-hero,999px\)\)/.test(lhtml), fit?.[0]);
   const short = V.normalizeSpec({ ...SPEC, tokens: posterTokens, look: posterLook, sections: [{ id: 'h', kind: 'hero', variant: 'poster', content: { title: 'Go on, try it.', subtitle: 'x', primary: 'Go' } }] }, board);
-  const sfit = Number(V.renderDesign(short, board.refs).html.match(/--fit-hero:calc\(\(100vw - 40px\) \/ ([\d.]+)\)/)?.[1]);
+  const sfit = Number(V.renderDesign(short, board.refs).html.match(/--fit-hero:calc\(min\(var\(--wrap\), 100vw - 40px\) \/ ([\d.]+)\)/)?.[1]);
   ok('a headline of short words is allowed larger than one with a long word', sfit > 0 && sfit < Number(fit?.[1]));
+  ok('the longest word is fitted to the room its headline really has: the page measure, the hero text’s column, a measure, the column beside a statement’s art, a split’s half', /--hero-ems:[\d.]+;/.test(lhtml) && lhtml.includes('.hero-text{--fit-hero:calc(min(820px, var(--wrap), 100vw - 40px) / var(--hero-ems))}') && lhtml.includes('.hero-statement.has-art{--fit-hero:calc((min(var(--wrap), 100vw - 40px) - clamp(120px, 22vw, 300px) - 28px) / var(--hero-ems))}') && lhtml.includes('.sh-measure .hero-statement{--fit-hero:') && lhtml.includes('.hero-split .hero-text{--fit-hero:'));
   // the kinetic headline marks where a highlighted word starts, so its highlight arrives with it
   ok('a highlighted word in a kinetic headline knows its first letter', /<em class="em" style="--hl-i:8">/.test(V.kineticHeadline('Drawings <em class="em">move</em>.', 'letters')));
   const hlCss = V.motionCss({ ...posterLook, emphasis: 'highlight', motion: V.MOTION_PRESETS.kinetic }, 'play');

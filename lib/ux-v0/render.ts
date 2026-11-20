@@ -1049,7 +1049,9 @@ function css(tk: DesignTokens, look: Look, heads: Headlines = NO_HEADLINES): str
   const fitH2 = wordEms(heads.section, trackH2);
   const fitGiant = wordEms(heads.giant, track);
   const fitVars = [
-    fitHero ? `--fit-hero:calc((100vw - 40px) / ${fitHero.toFixed(2)})` : '',
+    // the room is the page's measure (a headline lives in a .wrap), never more than the viewport; each hero
+    // layout narrows it further where its headline has less (below)
+    fitHero ? `--hero-ems:${fitHero.toFixed(2)};--fit-hero:calc(min(var(--wrap), 100vw - 40px) / ${fitHero.toFixed(2)})` : '',
     fitH2 ? `--fit-h2:calc((100vw - 40px) / ${fitH2.toFixed(2)});--fit-h2-col:calc((min(var(--wrap), 100vw - 40px) - clamp(32px, 5vw, 88px)) / 3 / ${fitH2.toFixed(2)})` : '',
     fitGiant ? `--fit-giant:calc((100vw - 40px) / ${fitGiant.toFixed(2)})` : '',
   ].filter(Boolean).map((v) => `${v};`).join('');
@@ -1089,7 +1091,17 @@ a{color:inherit}
 .h-hero,.h-section,.h-giant,.stat dd,.price,blockquote{font-weight:var(--hw)}
 .h-item,.h-card,.h-app,.brand{font-weight:var(--iw)}
 .h-hero{margin:0;font-size:min(var(--fs-hero),var(--fit-hero,999px));line-height:var(--lh-hero);letter-spacing:var(--track);text-wrap:balance;overflow-wrap:break-word;hyphens:manual}
-.h-section{margin:0 0 16px;font-size:min(var(--fs-h2),var(--fit-h2,999px));line-height:1.08;letter-spacing:var(--track-h2);text-wrap:balance;overflow-wrap:break-word}
+${
+  fitHero
+    ? // the headline's longest word fitted to the column it really has, so it never breaks in the middle: the hero
+      // text's 820px, a measure set on the hero, the column beside a statement's art on wider screens, a split's half
+      `.hero-text{--fit-hero:calc(min(820px, var(--wrap), 100vw - 40px) / var(--hero-ems))}
+.sh-measure .hero-text{--fit-hero:calc(min(820px, min(var(--wrap), 100vw - 40px) * var(--sh-measure)) / var(--hero-ems))}
+.sh-measure .hero-statement{--fit-hero:calc(min(var(--wrap), 100vw - 40px) * var(--sh-measure) / var(--hero-ems))}
+@media (min-width:760px){.hero-statement.has-art{--fit-hero:calc((min(var(--wrap), 100vw - 40px) - clamp(120px, 22vw, 300px) - 28px) / var(--hero-ems))}.sh-measure .hero-statement.has-art{--fit-hero:calc((min(var(--wrap), 100vw - 40px) - clamp(120px, 22vw, 300px) - 28px) * var(--sh-measure) / var(--hero-ems))}.hero-split .hero-text{--fit-hero:calc((min(var(--wrap), 100vw - 40px) - clamp(28px, 5vw, 72px)) * .47 / var(--hero-ems))}}
+`
+    : ''
+}.h-section{margin:0 0 16px;font-size:min(var(--fs-h2),var(--fit-h2,999px));line-height:1.08;letter-spacing:var(--track-h2);text-wrap:balance;overflow-wrap:break-word}
 .h-giant{margin:0;font-size:min(var(--fs-giant),var(--fit-giant,999px));line-height:${upper ? 0.95 : 1.02};letter-spacing:var(--track);text-wrap:balance;overflow-wrap:break-word}
 .h-item{margin:0 0 8px;font-size:var(--fs-h3);line-height:1.22;letter-spacing:${upper ? '0.01em' : '-0.005em'}}
 .lede,.body-lg,.hero-sub{font-size:var(--fs-lede);line-height:1.55;color:var(--muted);max-width:60ch}

@@ -17,6 +17,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { renderDesign } from '@/lib/ux-v0/render';
 import { renderArtboard } from '@/lib/ux-v0/graphics/render';
+import { boardOverviewSvg, websiteSchematicSvg } from '@/lib/ux-v0/boards/export';
+import { mockupSvg } from '@/lib/ux-v0/boards/mockup';
 import { fontStylesheet } from '@/lib/ux-v0/fonts';
 import { buildSandboxDoc } from '@/lib/ux-v0/sandbox';
 import { getArtifact, getProject } from '@/lib/ux-v0/store';
@@ -40,6 +42,8 @@ interface Props {
   onCritique: (file: File) => void;
   /** begin a graphic (a poster, a post, a cover…): lib/ux-v0/graphics */
   onGraphic: (intent: string) => void;
+  /** begin a board: many materials in one design system (lib/ux-v0/boards) */
+  onBoard: (intent: string) => void;
   onOpen: (id: string) => void;
   onDelete: (s: ProjectSummary) => void;
 }
@@ -83,6 +87,7 @@ const GRAPHIC_KIND: Record<string, string> = {
 };
 
 function kindLine(s: ProjectSummary): string {
+  if (s.board !== undefined) return `Board · ${s.board} material${s.board === 1 ? '' : 's'}${s.direction ? ` · ${s.direction}` : ''}`;
   if (s.graphic) return `${GRAPHIC_KIND[s.graphic] ?? 'Graphic'}${s.direction ? ` · ${s.direction}` : ''}`;
   if (s.mode === 'critique') return s.medium ? `Critique of ${MEDIUM[s.medium]}` : 'Critique';
   const page = s.pageType === 'app-screen' ? 'App screen' : s.pageType === 'website' ? 'Website' : 'Design';
@@ -165,6 +170,36 @@ function Plate({ s, ratio, nonce }: { s: ProjectSummary; ratio: number; nonce: s
     (async () => {
       const p = await getProject(s.id);
       if (!p || !live) return;
+      // a board: its overview without the notes, drawn by the same renderer as its export (websites as schematics)
+      const bd = p.medium === 'board' ? p.board : null;
+      if (bd && bd.system) {
+        const sys = bd.system;
+        const faces = fontStylesheet([sys.tokens.fonts.display, sys.tokens.fonts.body, 'Inter']);
+        if (faces && !document.querySelector(`link[data-mu-faces="b-${sys.tokens.fonts.display}-${sys.tokens.fonts.body}"]`)) {
+          const l = document.createElement('link');
+          l.rel = 'stylesheet';
+          l.href = faces;
+          l.dataset.muFaces = `b-${sys.tokens.fonts.display}-${sys.tokens.fonts.body}`;
+          document.head.appendChild(l);
+        }
+        const blank = (_id: string, src: string) => (src.startsWith('upload:') ? '' : src);
+        const ov = boardOverviewSvg(bd, {
+          annotations: false,
+          refHref: () => '',
+          materialSvg: (m, prefix) => {
+            if (m.type === 'graphic' && m.doc) return { svg: renderArtboard(m.doc, m.doc.artboards[0], { href: blank, idPrefix: `pl-${s.id}-${prefix}` }), w: m.doc.artboards[0].width, h: m.doc.artboards[0].height };
+            if (m.type === 'mockup') {
+              const src = bd.materials.find((x) => x.id === m.source?.material);
+              const a = src?.type === 'graphic' ? src.doc?.artboards[0] : null;
+              return mockupSvg(m.template, src?.type === 'graphic' && src.doc && a ? { svg: renderArtboard(src.doc, a, { href: blank, idPrefix: `pl-${s.id}-${prefix}s` }), w: a.width, h: a.height, ground: a.background ?? undefined } : null, sys, `pl-${s.id}-${prefix}`);
+            }
+            if (m.type === 'website') return { svg: websiteSchematicSvg(null, 1280, 820, false), w: 1280, h: 820 };
+            return null;
+          },
+        });
+        if (!live) return;
+        return setShown({ kind: 'svg', svg: ov.svg.replace(/^<svg([^>]*?) width="[^"]+" height="[^"]+"/, '<svg$1 width="100%" height="100%"') });
+      }
       // a graphic: its first artboard, drawn by the same renderer as its editor and its exports
       const gdoc = p.medium === 'graphic' ? p.graphic?.doc : null;
       if (gdoc) {
@@ -466,6 +501,16 @@ export function Home(p: Props) {
             <p className="mu-door-b">Your words exactly, composed in three directions, then changed by hand or in words. PNG, JPEG, SVG and PDF.</p>
             <button type="button" className="sb-link is-go" onClick={() => p.onGraphic(intent.trim())}>
               Make a graphic <span className="sb-ar">→</span>
+            </button>
+          </section>
+          <section className="mu-door is-graphic is-board" aria-labelledby="mu-board-t">
+            <p className="mu-door-k">Or, a board</p>
+            <h2 className="mu-door-t" id="mu-board-t">
+              A whole campaign in one design system.
+            </h2>
+            <p className="mu-door-b">Posters, posts, a website and mockups on one canvas, each its own composition in one shared system, annotated with why. Change the system once; every material follows.</p>
+            <button type="button" className="sb-link is-go" onClick={() => p.onBoard(intent.trim())}>
+              Make a board <span className="sb-ar">→</span>
             </button>
           </section>
           {p.error && (

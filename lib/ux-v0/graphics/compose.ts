@@ -144,7 +144,7 @@ export function readGraphicBrief(words: string, extra: Partial<GraphicBrief> = {
     .replace(/\s+/g, ' ')
     .trim();
   const headline = extra.content?.headline ?? q[0] ?? (subject ? subject.charAt(0).toUpperCase() + subject.slice(1, 60) : '[Headline]');
-  const dates = words.match(/\b\d{1,2}(?:[–-]\d{1,2})?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(?:\s+\d{4})?\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:[–-]\d{1,2})?(?:,?\s+\d{4})?\b/gi) ?? [];
+  const dates = (words.match(/\b\d{1,2}(?:[–-]\d{1,2})?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(?:\s+\d{4})?\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:[–-]\d{1,2})?(?:,?\s+\d{4})?\b|\b(?:every|each)\s+(?:mon|tues|wednes|thurs|fri|satur|sun)day(?:\s+in\s+(?:jan|feb|march|april|may|june|july|aug|sept?|oct|nov|dec)[a-z]*)?\b/gi) ?? []).map((d) => d.charAt(0).toUpperCase() + d.slice(1));
   const mood = [...new Set((words.match(/\b(minimal|minimalist|restrained|quiet|luxurious|luxury|bold|loud|experimental|playful|editorial|brutalist|technical|scientific|organic|warm|cinematic|futuristic|retro|corporate|elegant|geometric|maximalist|swiss|calm|raw|daring|premium|friendly|serious)\b/gi) ?? []).map((m) => m.toLowerCase()))];
   return {
     purpose: words.trim().slice(0, 600),
@@ -163,7 +163,7 @@ export function readGraphicBrief(words: string, extra: Partial<GraphicBrief> = {
 
 // ── the accent a graphic's directions start from ──
 
-const COLOUR_WORDS: readonly [RegExp, string, string][] = [
+export const COLOUR_WORDS: readonly [RegExp, string, string][] = [
   [/\b(red|crimson|scarlet)\b/, '#c8102e', 'red'],
   [/\b(vermilion|orange|tangerine)\b/, '#e4572e', 'orange'],
   [/\b(coral|salmon|peach)\b/, '#ef6f57', 'coral'],
@@ -195,7 +195,7 @@ const MOOD_HUES: readonly [RegExp, string[], string][] = [
   [/\b(restaurant|food|menu|kitchen|coffee|bakery|wine)\b/, ['#b5472c', '#6b4226', '#7a1f2b'], 'appetite'],
   [/\b(music|album|band|record|night)\b/, ['#4b2bd6', '#d6336c', '#0e7c86'], 'night'],
 ];
-const SPREAD = ['#d9472b', '#2a4fd6', '#c8901a', '#6b2d5c', '#1c7c74', '#1d1d1b', '#ef6f57', '#2f5d3a', '#3a2fd6', '#7a1f2b', '#e0a516', '#3d4a5c'];
+export const SPREAD = ['#d9472b', '#2a4fd6', '#c8901a', '#6b2d5c', '#1c7c74', '#1d1d1b', '#ef6f57', '#2f5d3a', '#3a2fd6', '#7a1f2b', '#e0a516', '#3d4a5c'];
 const hashOf = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 2166136261);
 
 /** The accent a graphic's directions start from, and why: a colour the brief names; else one its mood and subject
@@ -245,7 +245,19 @@ export function graphicDirectionOf(d: {
 // ── the plan ──
 
 /** The composition decided before anything is placed (see the head of this file). */
-export function planFor(brief: GraphicBrief, dir: GraphicDirection, f: Format, opts: { slide?: number } = {}): Plan {
+/**
+ * A composition asked for from outside the planner: a Board's coordinated materials share one system and differ in
+ * composition, so a second poster may ask for another archetype or another use of the palette. Only what fits is
+ * taken: a picture-led archetype needs a picture, and kinds whose composition the kind decides keep it.
+ */
+export interface PlanOverride {
+  archetype?: Archetype;
+  colour?: Plan['colour'];
+}
+const FREE_ARCHETYPES: readonly Archetype[] = ['type-poster', 'image-full', 'image-split', 'minimal', 'swiss', 'statement'];
+const FREE_KINDS: readonly GraphicKind[] = ['poster', 'social', 'ad', 'announcement', 'presentation', 'campaign'];
+
+export function planFor(brief: GraphicBrief, dir: GraphicDirection, f: Format, opts: { slide?: number; over?: PlanOverride } = {}): Plan {
   const said: string[] = [];
   const hasImage = brief.images.length > 0;
   // the brief's own mood outranks the direction's default volume: an experimental brief in a quiet language is not quiet
@@ -318,19 +330,41 @@ export function planFor(brief: GraphicBrief, dir: GraphicDirection, f: Format, o
     }
   }
   // restraint keeps one quiet mark (minimal is never empty); the rest follow the brief's volume
+  // a composition asked for by a Board (another archetype for a second poster): taken where it fits this kind and brief
+  const want = opts.over?.archetype;
+  if (want && want !== archetype && FREE_ARCHETYPES.includes(want) && FREE_KINDS.includes(brief.kind) && f.width / f.height <= 2.2 && (!want.startsWith('image') || hasImage)) {
+    archetype = want;
+    said.push(
+      want === 'image-full'
+        ? 'Composed to differ from its siblings: the picture fills the frame, the words on a ground of their own.'
+        : want === 'image-split'
+          ? 'Composed to differ from its siblings: the picture and the words share the frame.'
+          : want === 'minimal'
+            ? 'Composed to differ from its siblings: restraint, one quiet mark, wide margins.'
+            : want === 'swiss'
+              ? 'Composed to differ from its siblings: a visible grid, flush-left type, one block of colour.'
+              : want === 'type-poster'
+                ? 'Composed to differ from its siblings: the headline as the image, across the full width.'
+                : 'Composed to differ from its siblings: a statement, the headline large and one supporting line.',
+    );
+  }
   const shapes: Plan['shapes'] = archetype === 'minimal' ? 'motif' : !dir.form || restrained ? (archetype === 'label' ? 'frame' : archetype === 'album' || archetype === 'identity' ? 'mass' : 'none') : archetype === 'album' || archetype === 'book' ? 'mass' : loud ? 'mass' : 'motif';
   if (dir.form && shapes !== 'none') said.push(`Shapes from the direction’s own system (${dir.form.curvature >= 55 ? 'curved' : dir.form.orthogonal >= 60 ? 'right-angled' : 'angular'}), never decoration for its own sake.`);
   // the colour of the ground: a dark language keeps its dark ground; brutal turns to ink; a loud language (or a loud
   // brief in a language that allows it) gives the frame to its accent; the quiet and gridded languages keep their own
   const fieldOk = !['image-full', 'infographic', 'process', 'minimal', 'swiss', 'card', 'label'].includes(archetype);
-  const colour: Plan['colour'] = DARK_LANGS.includes(dir.language)
+  let colour: Plan['colour'] = DARK_LANGS.includes(dir.language)
     ? 'ground'
     : dir.language === 'brutal'
       ? 'inverse'
       : fieldOk && (LOUD_LANGS.includes(dir.language) || (loud && !QUIET_LANGS.includes(dir.language) && !GRID_LANGS.includes(dir.language)))
         ? 'accent-field'
         : 'ground';
-  if (colour === 'accent-field') said.push('The frame is the direction’s accent: a loud language, given the whole ground.');
+  // another use of the same palette, asked for by a Board (never a field behind a photograph, a chart or a diagram)
+  if (opts.over?.colour && opts.over.colour !== colour && !['image-full', 'infographic', 'process'].includes(archetype)) {
+    colour = opts.over.colour;
+    said.push(colour === 'accent-field' ? 'The same palette used differently: the accent takes the whole ground here.' : colour === 'inverse' ? 'The same palette used differently: ink for the ground, the paper for the type.' : 'The same palette used differently: the campaign’s own ground, the accent kept for one element.');
+  } else if (colour === 'accent-field') said.push('The frame is the direction’s accent: a loud language, given the whole ground.');
   else if (colour === 'inverse') said.push('Ink for the ground and the paper for the type: the direction is raw, in two colours.');
   const focal: Plan['focal'] = archetype === 'infographic' ? 'data' : archetype === 'album' ? 'shape' : hasImage && archetype.startsWith('image') ? 'image' : 'type';
   void opts;
@@ -338,10 +372,10 @@ export function planFor(brief: GraphicBrief, dir: GraphicDirection, f: Format, o
 }
 
 /** The visual languages of the direction engine (lib/ux-v0/direction.ts LANGUAGES), by how they compose a graphic. */
-const QUIET_LANGS = ['gallery', 'quiet-luxury'];
-const GRID_LANGS = ['swiss', 'utility', 'civic', 'industrial'];
-const LOUD_LANGS = ['poster', 'retro-print', 'maximal', 'brutal'];
-const DARK_LANGS = ['night', 'cinema', 'future'];
+export const QUIET_LANGS = ['gallery', 'quiet-luxury'];
+export const GRID_LANGS = ['swiss', 'utility', 'civic', 'industrial'];
+export const LOUD_LANGS = ['poster', 'retro-print', 'maximal', 'brutal'];
+export const DARK_LANGS = ['night', 'cinema', 'future'];
 
 // ── the layout ──
 
@@ -766,8 +800,8 @@ const LAYOUTS: Record<Archetype, Layout> = {
 };
 
 /** The artboard for one format (one slide of a carousel), composed (see the head of this file). */
-function composeBoard(brief: GraphicBrief, dir: GraphicDirection, f: Format, measure: Measure, seed: number, slide?: { index: number; total: number; point?: string }): { board: Artboard; plan: Plan } {
-  const plan0 = planFor(brief, dir, f);
+function composeBoard(brief: GraphicBrief, dir: GraphicDirection, f: Format, measure: Measure, seed: number, slide?: { index: number; total: number; point?: string }, over?: PlanOverride): { board: Artboard; plan: Plan } {
+  const plan0 = planFor(brief, dir, f, { over });
   const plan = slide && slide.index > 0 ? { ...plan0, archetype: 'statement' as Archetype, shapes: 'motif' as const } : plan0;
   const x = contextFor(brief, dir, f, plan, measure, seed + (slide?.index ?? 0));
   let children: Node[];
@@ -894,7 +928,7 @@ export interface Composed {
 }
 
 /** A graphic composed from a brief and a direction (see the head of this file). */
-export function composeGraphic(brief: GraphicBrief, dir: GraphicDirection, opts: { measure?: Measure; seed?: number; assets?: GraphicDoc['assets']; name?: string } = {}): Composed {
+export function composeGraphic(brief: GraphicBrief, dir: GraphicDirection, opts: { measure?: Measure; seed?: number; assets?: GraphicDoc['assets']; name?: string; over?: PlanOverride } = {}): Composed {
   const measure = opts.measure ?? approxMeasure;
   const seed = opts.seed ?? 7;
   const plans: Plan[] = [];
@@ -914,14 +948,14 @@ export function composeGraphic(brief: GraphicBrief, dir: GraphicDirection, opts:
       plans.push(r.plan);
     }
   } else if (brief.kind === 'card') {
-    const front = composeBoard(brief, dir, fmts[0], measure, seed);
+    const front = composeBoard(brief, dir, fmts[0], measure, seed, undefined, opts.over);
     boards.push({ ...front.board, name: 'Front' });
     plans.push(front.plan);
     const x = contextFor(brief, dir, fmts[0], { ...front.plan, colour: 'accent-field' }, measure, seed);
     boards.push({ ...front.board, id: newId('ab'), name: 'Back', background: x.ground, children: [text(x, 'logo', brief.content.brand || '[Brand]', { x: x.m, y: x.H * 0.32, w: x.W - x.m * 2, h: x.H * 0.36 }, { align: 'center', valign: 'middle', size: undefined, weight: 700, case: 'none' }), ...(fig(x, 'edge') ? [shape(x, 'motif', fig(x, 'edge')!, { x: 0, y: x.H * 0.8, w: x.W, h: x.H * 0.2 }, x.accent)] : [])] });
   } else
     for (const f of fmts) {
-      const r = composeBoard(brief, dir, f, measure, seed);
+      const r = composeBoard(brief, dir, f, measure, seed, undefined, opts.over);
       boards.push(r.board);
       plans.push(r.plan);
     }

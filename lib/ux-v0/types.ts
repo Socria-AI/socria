@@ -22,6 +22,7 @@ import { normalizeProc, procId, type ProcSpec } from './assets';
 import { GRIDS, normalizeMotion, normalizeSpec, type DesignSpec, type Motion } from './spec';
 import { bodyFont, displayFont } from './fonts';
 import { normalizeGraphicState, type GraphicState } from './graphics/state';
+import { normalizeBoard, type BoardState } from './boards/model';
 
 // ── small helpers ────────────────────────────────────────────────────
 
@@ -523,10 +524,13 @@ export interface DesignProject {
   edits?: { edits: number; confined: number };
   /** versions the designer chose to keep: never let go when older versions are (lib/ux-v0/history.ts) */
   keptVersions?: number[];
-  /** what is being made: a website (the default) or a graphic (lib/ux-v0/graphics) */
-  medium?: 'website' | 'graphic';
+  /** what is being made: a website (the default), a graphic (lib/ux-v0/graphics), or a board of many materials in one
+   * design system (lib/ux-v0/boards) */
+  medium?: 'website' | 'graphic' | 'board';
   /** a graphic's brief, directions, document and versions (lib/ux-v0/graphics/state.ts) */
   graphic?: GraphicState;
+  /** a board: its request, its Master Design System, its materials, what is on its canvas (lib/ux-v0/boards/model.ts) */
+  board?: BoardState;
   artifact: Artifact | null;
   cards: ReasoningCard[];
   usage: UsageTotals;
@@ -541,6 +545,8 @@ export interface ProjectSummary {
   mode: ProjectMode;
   /** a graphic, not a website: what kind of graphic (poster, carousel, cover, …) */
   graphic?: string;
+  /** a board, not a website: how many materials it holds */
+  board?: number;
   intent: string;
   updatedAt: number;
   cards: number;
@@ -1113,8 +1119,9 @@ export function normalizeProject(v: unknown, opts: { forSync?: boolean } = {}): 
         .filter((x): x is number => typeof x === 'number' && Number.isInteger(x) && x > 0 && specs.some((sp) => sp.version === x))
         .slice(0, 30),
     ),
-    ...(r.medium === 'graphic' ? { medium: 'graphic' as const } : {}),
+    ...(r.medium === 'graphic' ? { medium: 'graphic' as const } : r.medium === 'board' ? { medium: 'board' as const } : {}),
     ...((g) => (g && r.medium === 'graphic' ? { graphic: g } : {}))(normalizeGraphicState(r.graphic)),
+    ...((bd) => (bd ? { board: bd } : {}))(r.medium === 'board' ? normalizeBoard(r.board) : null),
     artifact: normalizeArtifact(r.artifact),
     cards,
     usage: usageTotals(r.usage),
@@ -1149,7 +1156,16 @@ export function makeProject(mode: ProjectMode, name: string, now = Date.now()): 
 export function summarize(p: DesignProject): ProjectSummary {
   const imported = p.artifact?.type === 'imported' ? p.artifact : null;
   const g = p.medium === 'graphic' ? p.graphic : undefined;
-  const stage: ProjectSummary['stage'] = g
+  const bd = p.medium === 'board' ? p.board : undefined;
+  const stage: ProjectSummary['stage'] = bd
+    ? bd.materials.some((m) => m.status === 'ready')
+      ? 'design'
+      : bd.system
+        ? 'direction'
+        : bd.brief
+          ? 'brief'
+          : 'begun'
+    : g
     ? g.doc
       ? 'design'
       : g.options.length
@@ -1173,16 +1189,17 @@ export function summarize(p: DesignProject): ProjectSummary {
     name: p.name,
     mode: p.mode,
     ...(p.medium === 'graphic' ? { graphic: g?.brief?.kind ?? 'graphic' } : {}),
+    ...(bd ? { board: bd.materials.length } : {}),
     intent: p.intent.slice(0, 160),
     updatedAt: p.updatedAt,
     cards: p.cards.length,
     hasDesign: !!p.artifact || p.specs.length > 0,
     createdAt: p.createdAt,
     stage,
-    versions: g ? g.versions.length : p.specs.length,
+    versions: bd ? bd.versions.length : g ? g.versions.length : p.specs.length,
     pageType: p.brief.doc?.pageType ?? currentSpec(p)?.pageType ?? null,
     medium: imported ? imported.kind : null,
-    direction: g ? g.direction?.name ?? '' : p.direction.chosen?.name ?? '',
+    direction: bd ? bd.system?.direction.name ?? '' : g ? g.direction?.name ?? '' : p.direction.chosen?.name ?? '',
     ...((spec) => (spec && !imported ? { signature: signatureOf(spec, p.id, p.name) } : {}))(currentSpec(p)),
     studies: p.moodboard.refs
       .filter((r) => r.state === 'kept' && r.thumb)

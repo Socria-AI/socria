@@ -17,13 +17,16 @@ import { checkFile } from './files';
 import { Home, type RemoteWork } from './Home';
 import { Workspace } from './Workspace';
 import { GraphicsWorkspace } from './graphics/GraphicsWorkspace';
+import { BoardWorkspace } from './boards/BoardWorkspace';
 import { emptyGraphicState } from '@/lib/ux-v0/graphics/state';
+import { emptyBoard } from '@/lib/ux-v0/boards/model';
 import '@/components/brand/socria-brand.css';
 import './ux-v0.css';
 import './home.css';
 import './studio.css';
 import './dna.css';
 import './graphics/graphics.css';
+import './boards/boards.css';
 
 const idFromUrl = () => {
   if (typeof window === 'undefined') return null;
@@ -129,12 +132,26 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
     window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(p.id)}`);
   };
 
+  /** A board (lib/ux-v0/boards): many materials in one design system, begun from the words typed on the home. */
+  const startBoard = async (intent: string) => {
+    setError('');
+    const p: DesignProject = { ...makeProject('create', 'Untitled board'), medium: 'board', board: emptyBoard(), intent: intent.slice(0, 600) };
+    await putProject(p);
+    passage(() => setOpen({ p, intent }));
+    window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(p.id)}`);
+  };
+
   const remove = async (s: ProjectSummary) => {
     const p = await getProject(s.id);
     const artifactId = p?.artifact?.type === 'imported' ? p.artifact.id : undefined;
     await deleteProject(s.id, artifactId);
     // the designer's own references go with the project, and a graphic's own pictures
     const gfx = p?.graphic ? [...(p.graphic.assets ?? []), ...(p.graphic.doc?.assets ?? []), ...p.graphic.versions.flatMap((v) => v.doc.assets)].map((a) => a.src).filter((src) => src.startsWith('upload:')).map((src) => src.slice('upload:'.length)) : [];
+    // a board's own pictures (its references, its materials', its versions'); its website stays, a project of its own
+    if (p?.board) {
+      const states = [p.board, ...p.board.versions.map((v) => v.state)];
+      gfx.push(...states.flatMap((st) => [...st.assets, ...st.materials.flatMap((m) => (m.type === 'graphic' && m.doc ? m.doc.assets : []))]).map((a) => a.src).filter((src) => src.startsWith('upload:')).map((src) => src.slice('upload:'.length)));
+    }
     await deleteArtifacts([...new Set([...(p?.moodboard.refs.filter((r) => r.provider === 'upload').map((r) => r.providerId) ?? []), ...gfx])]);
     if (signedIn) {
       await fetch(`/api/ux-v0/projects?id=${encodeURIComponent(s.id)}`, { method: 'DELETE' }).catch(() => undefined);
@@ -142,6 +159,23 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
     }
     refresh();
   };
+
+  if (open && open.p.medium === 'board') {
+    return (
+      <BoardWorkspace
+        key={open.p.id}
+        initial={open.p}
+        signedIn={signedIn}
+        startIntent={open.intent}
+        onOpenProject={(id) => openById(id)}
+        onExit={() => {
+          passage(() => setOpen(null));
+          refresh();
+          window.history.pushState(null, '', '/ux-v0');
+        }}
+      />
+    );
+  }
 
   if (open && open.p.medium === 'graphic') {
     return (
@@ -190,6 +224,7 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
       onCreate={(intent) => start('create', { intent })}
       onCritique={(file) => start('critique', { file })}
       onGraphic={(intent) => startGraphic(intent)}
+      onBoard={(intent) => startBoard(intent)}
       onOpen={(id) => openById(id)}
       onDelete={remove}
     />

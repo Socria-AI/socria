@@ -289,5 +289,12 @@ const dirFor = (purpose, mood, salt, i = 0) => {
   ok('with no shapes to turn, a pattern is offered with a question (previewed, never forced), clear of the words', offer && /no shapes/.test(offer.question ?? '') && offer.ops.length === 6 && applied.ok && K.checkDoc(applied.doc).filter((f) => f.kind === 'contrast' && f.severity === 'high').length === 0, J(offer?.question));
 }
 
+{
+  const one = D.normalizeDoc({ artboards: [{ id: 'b', width: 1080, height: 1080, children: [{ id: 'h', type: 'text', role: 'headline', text: 'Plain', x: 64, y: 64, w: 900, h: 200, size: 120, font: 'Inter' }] }] });
+  const e = E.readGraphicEdit('#ff00aa', one, { artboard: 'b', selection: ['h'] });
+  ok('a colour alone, with something selected, colours it (as the ask bar’s example offers)', e && e.ops.length === 1 && e.ops[0].set.color === '#ff00aa', J(e));
+  ok('…and with nothing selected it is not guessed at', E.readGraphicEdit('#ff00aa', one, { artboard: 'b', selection: [] }) === null);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

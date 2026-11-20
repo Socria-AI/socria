@@ -6,110 +6,36 @@
 // the directions are SocriaUX's own art-direction engine (lib/ux-v0/direction.ts) given to graphics
 // (graphicDirectionOf), or an approved website's direction, so a brand carries across media; the composition is
 // planned and placed in code (compose.ts), checked and repaired at most twice (check.ts); a change asked in words is
-// read into validated operations (edit.ts) and shown as a preview before it is applied. Every change, by hand or in
-// words, is one transactional operation: it is refused whole when it would break a lock or the document (the last
-// valid design is never lost), and the history takes it back. The project is saved like a website (useV0Project).
+// read into validated operations (edit.ts) and shown as a preview before it is applied. The editor itself
+// (GraphicEditor.tsx) is shared with the graphic materials of a board. The project is saved like a website
+// (useV0Project).
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SAVE_WORDS, useV0Project } from '../useV0Project';
 import { addUpload } from '../uploads';
-import { getArtifact, getProject, listProjects } from '@/lib/ux-v0/store';
+import { getProject, listProjects } from '@/lib/ux-v0/store';
 import { normalizeBrief, type DesignProject } from '@/lib/ux-v0/types';
 import { proposeDirections } from '@/lib/ux-v0/direction';
-import { fontStylesheet } from '@/lib/ux-v0/fonts';
-import { applyOps, locate, newId, walk, type Asset, type GraphicDoc, type Located, type Node, type Op } from '@/lib/ux-v0/graphics/doc';
-import { formatOf, sizeLabel } from '@/lib/ux-v0/graphics/formats';
-import { accentFor, adaptBoard, composeGraphic, graphicDirectionOf, type GraphicBrief, type GraphicDirection } from '@/lib/ux-v0/graphics/compose';
-import { checkDoc, refineDoc } from '@/lib/ux-v0/graphics/check';
-import { readGraphicEdit, type GraphicEdit } from '@/lib/ux-v0/graphics/edit';
-import { nativeFile, openNativeFile, svgFile } from '@/lib/ux-v0/graphics/export';
-import { canvasMeasure, embeddedAssets, exportBoardImage, exportPdf } from '@/lib/ux-v0/graphics/raster';
+import { newId, type Asset, type GraphicDoc } from '@/lib/ux-v0/graphics/doc';
+import { accentFor, composeGraphic, graphicDirectionOf, type GraphicBrief, type GraphicDirection } from '@/lib/ux-v0/graphics/compose';
+import { refineDoc } from '@/lib/ux-v0/graphics/check';
+import { canvasMeasure } from '@/lib/ux-v0/graphics/raster';
 import { emptyGraphicState, MAX_GRAPHIC_VERSIONS, type GraphicState, type GraphicVersion } from '@/lib/ux-v0/graphics/state';
-import { GraphicCanvas, type CanvasHandle } from './GraphicCanvas';
-import { AddPanel, ArtboardsPanel, Inspector, LayersPanel, nodeLabel } from './GraphicPanels';
+import { GraphicEditor, type EditorNote } from './GraphicEditor';
+import { directionFaces, facesUsed, loadFaces, useAssetUrls, useFaceMeasure } from './faces';
 import { BriefStage, DirectionsStage, briefOf, fieldsOf, KIND_LABEL, type BriefFields, type WebsiteSource } from './GraphicBrief';
 
 type View = 'brief' | 'directions' | 'edit';
-type Tab = 'layers' | 'boards' | 'add' | 'pictures' | 'brand' | 'versions';
-type Note = { tone: 'ok' | 'warn' | 'ask'; text: string } | null;
-type Face = { face: string; weight: number; italic: boolean };
-
-// ── fonts: the faces a design uses, loaded into the page before text is measured ──
-
-const injected = new Set<string>();
-const loadedFaces = new Set<string>();
-const faceKey = (f: Face) => `${f.face}|${f.weight}|${f.italic ? 1 : 0}`;
-
-function facesUsed(doc: GraphicDoc): Face[] {
-  const out = new Map<string, Face>();
-  for (const b of doc.artboards)
-    for (const l of walk(b)) {
-      const n = l.node;
-      if (n.type === 'text') out.set(faceKey({ face: n.font, weight: n.weight, italic: !!n.italic }), { face: n.font, weight: n.weight, italic: !!n.italic });
-      if (n.type === 'chart') for (const w of [400, 600]) out.set(faceKey({ face: n.font, weight: w, italic: false }), { face: n.font, weight: w, italic: false });
-    }
-  return [...out.values()];
-}
-
-const directionFaces = (d: GraphicDirection): Face[] => [
-  { face: d.tokens.fonts.display, weight: d.look.weight, italic: false },
-  { face: d.tokens.fonts.display, weight: 400, italic: false },
-  { face: d.tokens.fonts.body, weight: 400, italic: false },
-  { face: d.tokens.fonts.body, weight: 600, italic: false },
-];
-
-/** Loads the faces (a Google Fonts stylesheet, then each face at its weight); true when something new arrived. */
-async function loadFaces(faces: readonly Face[]): Promise<boolean> {
-  if (typeof document === 'undefined' || !faces.length) return false;
-  const url = fontStylesheet(faces.map((f) => f.face));
-  if (url && !injected.has(url)) {
-    injected.add(url);
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = url;
-    link.dataset.gxFonts = '1';
-    document.head.appendChild(link);
-    await new Promise<void>((res) => {
-      link.onload = () => res();
-      link.onerror = () => res();
-      window.setTimeout(res, 4000);
-    });
-  }
-  const wanted = faces.filter((f) => !loadedFaces.has(faceKey(f)));
-  if (!wanted.length) return false;
-  await Promise.race([
-    Promise.all(wanted.map((f) => document.fonts.load(`${f.italic ? 'italic ' : ''}${f.weight} 40px "${f.face}"`).then(() => loadedFaces.add(faceKey(f)), () => undefined))),
-    new Promise((res) => window.setTimeout(res, 3500)),
-  ]);
-  return true;
-}
+type Note = EditorNote;
 
 const seedOf = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % 9973;
-const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'graphic';
 const pushVersion = (list: GraphicVersion[], doc: GraphicDoc, label: string): GraphicVersion[] => [...list, { doc, label: label.slice(0, 160), at: Date.now() }].slice(-MAX_GRAPHIC_VERSIONS);
 const DEFAULT_NAMES = new Set(['Untitled design', 'Untitled graphic', '']);
-
-function download(blob: Blob, name: string) {
-  const u = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = u;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  window.setTimeout(() => URL.revokeObjectURL(u), 5000);
-}
-
-/** A direction for a document that has none (one opened from a file): its own tokens, a measured restraint. */
-function directionOfDoc(doc: GraphicDoc): GraphicDirection {
-  return { name: doc.direction?.name || 'This design', language: doc.direction?.language || 'editorial', tokens: doc.tokens, look: { case: 'sentence', tracking: 'normal', weight: 600 }, form: null, intensity: 40 };
-}
 
 export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent }: { initial: DesignProject; signedIn: boolean; onExit: () => void; startIntent?: string }) {
   const { project, update, save, current } = useV0Project(initial, signedIn);
   const g: GraphicState = project.graphic ?? emptyGraphicState();
   const setG = useCallback((fn: (x: GraphicState) => GraphicState) => update((p) => ({ ...p, graphic: fn(p.graphic ?? emptyGraphicState()) })), [update]);
-  const docNow = () => current.current.graphic?.doc ?? null;
 
   const [view, setView] = useState<View>(g.doc ? 'edit' : g.options.length ? 'directions' : 'brief');
   const [fields, setFields] = useState<BriefFields>(() => fieldsOf(g.brief, g.brief ? '' : startIntent ?? project.intent ?? ''));
@@ -122,80 +48,17 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent }: { 
   const [websites, setWebsites] = useState<WebsiteSource[]>([]);
   const [planNotes, setPlanNotes] = useState<string[]>([]);
 
-  // the editor
-  const [boardId, setBoardId] = useState(g.doc?.artboards[0]?.id ?? '');
-  const [selection, setSelection] = useState<string[]>([]);
-  const [tab, setTab] = useState<Tab>('layers');
-  const [aids, setAids] = useState({ guides: true, grid: false, rulers: true });
-  const [askWords, setAskWords] = useState('');
-  const [pending, setPending] = useState<{ edit: GraphicEdit; doc: GraphicDoc } | null>(null);
-  const past = useRef<{ doc: GraphicDoc; label: string }[]>([]);
-  const future = useRef<{ doc: GraphicDoc; label: string }[]>([]);
-  const [, setTick] = useState(0);
-  const clipboard = useRef<Node[]>([]);
-  const zoomRef = useRef<CanvasHandle | null>(null);
-  const textRef = useRef<HTMLTextAreaElement>(null);
-  const openInput = useRef<HTMLInputElement>(null);
-
-  // ── fonts and measuring ──
-  const [fontTick, setFontTick] = useState(0);
-  const measure = useMemo(() => canvasMeasure(), [fontTick]); // eslint-disable-line react-hooks/exhaustive-deps
-  const docFaces = useMemo(() => (g.doc ? facesUsed(g.doc).map(faceKey).sort().join(';') : ''), [g.doc]);
-  const optionFaces = useMemo(() => g.options.flatMap(directionFaces).map(faceKey).sort().join(';'), [g.options]);
-  useEffect(() => {
-    const keys = [docFaces, optionFaces].filter(Boolean).join(';');
-    if (!keys) return;
-    let live = true;
-    const faces = [...new Set(keys.split(';'))].map((k) => {
-      const [face, weight, italic] = k.split('|');
-      return { face, weight: Number(weight), italic: italic === '1' };
-    });
-    loadFaces(faces).then((changed) => live && changed && setFontTick((t) => t + 1));
-    return () => {
-      live = false;
-    };
-  }, [docFaces, optionFaces]);
+  // ── fonts and measuring: the faces of the design and of the directions on offer ──
+  const faces = useMemo(() => [...(g.doc ? facesUsed(g.doc) : []), ...g.options.flatMap(directionFaces)], [g.doc, g.options]);
+  const { measure, refresh: refreshMeasure } = useFaceMeasure(faces);
 
   // ── pictures kept in this browser, shown by object address ──
-  const [urls, setUrls] = useState<Record<string, string>>({});
-  // uploads this browser does not have (a project synced from another device): said, never drawn as a blank
-  const [missingUploads, setMissingUploads] = useState<string[]>([]);
-  const urlsRef = useRef(urls);
-  urlsRef.current = urls;
   const allAssets = useMemo(() => {
     const m = new Map<string, Asset>();
     for (const a of [...(g.assets ?? []), ...(g.doc?.assets ?? [])]) m.set(a.id, a);
     return [...m.values()];
   }, [g.assets, g.doc]);
-  const uploadKey = allAssets
-    .map((a) => a.src)
-    .filter((s) => s.startsWith('upload:'))
-    .sort()
-    .join(',');
-  useEffect(() => {
-    const srcs = [...new Set(uploadKey.split(',').filter((s) => s && !urlsRef.current[s]))];
-    if (!srcs.length) return;
-    let live = true;
-    (async () => {
-      const add: Record<string, string> = {};
-      const gone: string[] = [];
-      for (const s of srcs) {
-        const rec = await getArtifact(s.slice('upload:'.length));
-        if (rec) add[s] = URL.createObjectURL(rec.data);
-        else gone.push(s);
-      }
-      if (live) {
-        setUrls((u) => ({ ...u, ...add }));
-        if (gone.length) setMissingUploads((m) => [...new Set([...m, ...gone])]);
-      } else Object.values(add).forEach((u) => URL.revokeObjectURL(u));
-    })();
-    return () => {
-      live = false;
-    };
-  }, [uploadKey]);
-  useEffect(() => () => Object.values(urlsRef.current).forEach((u) => URL.revokeObjectURL(u)), []);
-  const href = useCallback((_id: string, src: string) => (src.startsWith('upload:') ? urls[src] ?? '' : src), [urls]);
-  const resolve = useCallback(async (src: string) => (src.startsWith('upload:') ? (await getArtifact(src.slice('upload:'.length)))?.data ?? null : null), []);
+  const { href, resolve, missing: missingUploads } = useAssetUrls(allAssets);
 
   // ── the websites whose direction a graphic may take ──
   useEffect(() => {
@@ -269,11 +132,6 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent }: { 
     const refined = refineDoc(doc, m);
     const ms = Math.round(performance.now() - t0);
     setG((x) => ({ ...x, brief, direction: dir, doc: refined.doc, versions: pushVersion(x.versions, refined.doc, `Composed in “${dir.name}”`) }));
-    past.current = [];
-    future.current = [];
-    setPending(null);
-    setBoardId(refined.doc.artboards[0].id);
-    setSelection([]);
     setPlanNotes([...new Set([...plans.flatMap((p) => p.said), ...(g.source ? [] : [`Colour: ${accentFor(brief, project.id).why}.`])])].slice(0, 9));
     const remaining = refined.remaining.filter((f) => f.severity !== 'low').length;
     setNote({
@@ -287,7 +145,7 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent }: { 
         .filter(Boolean)
         .join(' '),
     });
-    if (changed) setFontTick((t) => t + 1);
+    if (changed) refreshMeasure();
     setBusy('');
     setView('edit');
   };
@@ -314,273 +172,14 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent }: { 
     setG((x) => ({ ...x, options: siteDir && x.source ? [siteDir, ...options] : options }));
   };
 
-  // ── the editor's changes ──
-  const doc = pending?.doc ?? g.doc;
-  const board = doc ? doc.artboards.find((b) => b.id === boardId) ?? doc.artboards[0] : null;
-
-  useEffect(() => {
-    if (!g.doc) return;
-    if (!g.doc.artboards.some((b) => b.id === boardId)) setBoardId(g.doc.artboards[0].id);
-    setSelection((s) => {
-      const kept = s.filter((id) => !!locate(g.doc!, id));
-      return kept.length === s.length ? s : kept;
-    });
-  }, [g.doc, boardId]);
-
-  /** A new document as the current one: one step of the history (and a version, for a change asked in words). */
-  const commitDoc = (next: GraphicDoc, label: string, opts: { version?: boolean } = {}) => {
-    const cur = docNow();
-    if (!cur) return;
-    past.current.push({ doc: cur, label });
-    if (past.current.length > 100) past.current.shift();
-    future.current = [];
-    setG((x) => ({ ...x, doc: next, ...(opts.version ? { versions: pushVersion(x.versions, next, label) } : {}) }));
-    // a new artboard (added, duplicated, adapted) is the one shown
-    const fresh = next.artboards.find((b) => !cur.artboards.some((c) => c.id === b.id));
-    if (fresh) setBoardId(fresh.id);
-    setTick((t) => t + 1);
-  };
-
-  const onOps = (ops: Op[], label: string) => {
-    const cur = docNow();
-    if (!cur || !ops.length) return;
-    if (pending) setPending(null);
-    const r = applyOps(cur, ops);
-    if (!r.ok) {
-      setNote({ tone: 'warn', text: `Nothing changed: ${r.error}${r.locked?.length ? ' Unlock it first (Layers), or change something else.' : ''}` });
-      return;
-    }
-    commitDoc(r.doc, label);
-    // what was just made (added, pasted, duplicated, grouped) is what is selected next
-    if (ops.every((o) => ['add', 'asset', 'duplicate', 'group'].includes(o.op))) {
-      const made = r.touched.filter((id) => !!locate(r.doc, id));
-      if (made.length) setSelection(made);
-    }
-    setNote(r.notes.length ? { tone: 'warn', text: r.notes.join(' ') } : null);
-  };
-
-  const undo = () => {
-    const p = past.current.pop();
-    const cur = docNow();
-    if (!p || !cur) return;
-    future.current.push({ doc: cur, label: p.label });
-    setPending(null);
-    setG((x) => ({ ...x, doc: p.doc }));
-    setNote({ tone: 'ok', text: `Undone: ${p.label}.` });
-    setTick((t) => t + 1);
-  };
-  const redo = () => {
-    const f = future.current.pop();
-    const cur = docNow();
-    if (!f || !cur) return;
-    past.current.push({ doc: cur, label: f.label });
-    setPending(null);
-    setG((x) => ({ ...x, doc: f.doc }));
-    setNote({ tone: 'ok', text: `Redone: ${f.label}.` });
-    setTick((t) => t + 1);
-  };
-
-  // ── a change asked in words: read into operations, previewed, then applied or discarded ──
-  const ask = () => {
-    const words = askWords.trim();
-    const cur = docNow();
-    if (!words || !cur || !board) return;
-    const e = readGraphicEdit(words, cur, { artboard: board.id, selection, dir: g.direction ?? directionOfDoc(cur), measure });
-    if (!e) {
-      setNote({ tone: 'ask', text: 'SocriaUX could not read that as a change it can make without a model. Try “make the headline bigger”, “increase the contrast”, “move the logo beneath the title”, “use more editorial typography”, “adapt it to a story”, or select an object and change it in the panel on the right.' });
-      return;
-    }
-    if (e.question && !e.ops.length && !e.next) {
-      setNote({ tone: 'ask', text: e.question });
-      return;
-    }
-    let next: GraphicDoc | null = e.next ?? null;
-    if (!next) {
-      const r = applyOps(cur, e.ops);
-      if (!r.ok) {
-        setNote({ tone: 'warn', text: `Nothing changed: ${r.error}` });
-        return;
-      }
-      next = r.doc;
-    }
-    setPending({ edit: e, doc: next });
-    if (e.next) {
-      const fresh = next.artboards.find((b) => !cur.artboards.some((c) => c.id === b.id));
-      if (fresh) setBoardId(fresh.id);
-    }
-    setNote(e.question ? { tone: 'ask', text: e.question } : null);
-  };
-  const applyPending = () => {
-    if (!pending) return;
-    const p = pending;
-    setPending(null);
-    commitDoc(p.doc, p.edit.label, { version: true });
-    setNote({ tone: 'ok', text: `Applied: ${p.edit.label}. Undo takes it back.` });
-    setAskWords('');
-  };
-  const discardPending = () => {
-    const cur = docNow();
-    setPending(null);
-    if (cur && !cur.artboards.some((b) => b.id === boardId)) setBoardId(cur.artboards[0].id);
-    setNote({ tone: 'ok', text: 'Discarded: the design is as it was.' });
-  };
-
-  const adapt = (formatId: string) => {
-    const cur = docNow();
-    if (!cur || !board) return;
-    const f = formatOf(formatId);
-    const nb = adaptBoard(cur, board.id, formatId, g.direction ?? directionOfDoc(cur), { measure, kind: g.brief?.kind });
-    if (!nb || !f) return setNote({ tone: 'warn', text: 'This artboard has no headline to carry over, so it cannot be adapted.' });
-    onOps([{ op: 'artboard-add', artboard: nb, after: board.id }], `adapted to ${f.label}`);
-  };
-
-  const addPicture = async (f: File) => {
-    const cur = docNow();
-    if (!cur || !board) return;
-    const asset = await uploadPicture(f);
-    if (!asset) return;
-    const k = Math.min((board.width * 0.6) / asset.width, (board.height * 0.6) / asset.height);
-    const w = asset.width * k;
-    const h = asset.height * k;
-    const id = newId('n');
-    onOps(
-      [
-        { op: 'asset', asset },
-        { op: 'add', artboard: board.id, node: { id, type: 'image', role: 'image', asset: asset.id, fit: 'cover', x: (board.width - w) / 2, y: (board.height - h) / 2, w, h, rotation: 0, opacity: 1 } },
-      ],
-      'picture added',
-    );
-    setSelection([id]);
-  };
-
-  const fixAll = () => {
-    const cur = docNow();
-    if (!cur) return;
-    const r = refineDoc(cur, measure);
-    if (r.doc === cur || !r.fixed.length) return setNote({ tone: 'warn', text: 'Nothing could be fixed without taking something away. What is left is yours to decide.' });
-    commitDoc(r.doc, 'checks fixed');
-    setNote({ tone: 'ok', text: `Fixed: ${r.fixed.map((f) => f.replace(/\.$/, '')).join('; ')}.` });
-  };
-
-  // ── export ──
-  const exportAs = async (kind: 'png' | 'png2' | 'png-clear' | 'jpeg' | 'svg' | 'pdf' | 'pdf-bleed' | 'zip' | 'native') => {
-    const cur = docNow();
-    if (!cur || !board) return;
-    const base = slug(current.current.name || cur.name);
-    setBusy('Exporting…');
-    try {
-      if (kind === 'native') {
-        download(new Blob([nativeFile({ ...cur, name: current.current.name || cur.name })], { type: 'application/json' }), `${base}.socriaux.json`);
-        setNote({ tone: 'ok', text: 'The design file is downloaded: open it here again with “Open a design file”. Pictures from this browser go in it only by reference.' });
-      } else if (kind === 'svg') {
-        const assets = await embeddedAssets(cur, resolve);
-        const text = svgFile(cur, board, { measure, href: (id, src) => assets.map.get(id) ?? src, linkFonts: true });
-        download(new Blob([text], { type: 'image/svg+xml' }), `${base}-${slug(board.name)}.svg`);
-        setNote({ tone: assets.missing.length ? 'warn' : 'ok', text: `SVG downloaded: text kept as text, its faces linked from Google Fonts.${assets.missing.length ? ` Left out (could not be read): ${assets.missing.join(', ')}.` : ''}` });
-      } else if (kind === 'pdf' || kind === 'pdf-bleed') {
-        const r = await exportPdf(cur, cur.artboards, { bleed: kind === 'pdf-bleed', measure, resolve });
-        download(r.blob, `${base}.pdf`);
-        setNote({ tone: r.fontsSubstituted || r.missing.length ? 'warn' : 'ok', text: `PDF downloaded: ${cur.artboards.length} page${cur.artboards.length === 1 ? '' : 's'} at their exact sizes${kind === 'pdf-bleed' ? ', with bleed and trim boxes' : ''}. Each page is a high-resolution RGB picture: the text is not selectable, and it is not a CMYK print file.${r.fontsSubstituted ? ' A fallback face stood in for a typeface that could not be fetched.' : ''}${r.missing.length ? ` Left out: ${r.missing.join(', ')}.` : ''}` });
-      } else if (kind === 'zip') {
-        const JSZip = (await import('jszip')).default;
-        const zip = new JSZip();
-        let subs = false;
-        for (const b of cur.artboards) {
-          const r = await exportBoardImage(cur, b, { type: 'image/png', measure, resolve });
-          subs ||= r.fontsSubstituted;
-          zip.file(`${slug(b.name)}-${r.w}x${r.h}.png`, r.blob);
-        }
-        download(await zip.generateAsync({ type: 'blob' }), `${base}-artboards.zip`);
-        setNote({ tone: subs ? 'warn' : 'ok', text: `${cur.artboards.length} artboards downloaded as PNG files in one .zip.${subs ? ' A fallback face stood in for a typeface that could not be fetched.' : ''}` });
-      } else {
-        const type = kind === 'jpeg' ? 'image/jpeg' : 'image/png';
-        const r = await exportBoardImage(cur, board, { type, scale: kind === 'png2' ? 2 : 1, transparent: kind === 'png-clear', measure, resolve });
-        download(r.blob, `${base}-${slug(board.name)}${kind === 'png2' ? '@2x' : ''}.${kind === 'jpeg' ? 'jpg' : 'png'}`);
-        setNote({
-          tone: r.fontsSubstituted || r.missing.length ? 'warn' : 'ok',
-          text: `${kind === 'jpeg' ? 'JPEG' : 'PNG'} downloaded: ${r.w} × ${r.h} px${board.unit === 'pt' ? ` (${board.dpi} dpi)` : ''}${kind === 'png-clear' ? ', with a transparent ground' : ''}.${r.fontsSubstituted ? ' A fallback face stood in for a typeface that could not be fetched.' : ''}${r.missing.length ? ` Left out: ${r.missing.join(', ')}.` : ''}`,
-        });
-      }
-    } catch (e) {
-      setNote({ tone: 'warn', text: `The export did not finish: ${(e as Error).message || 'the browser refused it'}. The design is unchanged.` });
-    } finally {
-      setBusy('');
-    }
-  };
-
-  const openFile = async (f: File) => {
-    if (f.size > 30_000_000) return setNote({ tone: 'warn', text: 'That file is larger than 30 MB: not a SocriaUX design file.' });
-    const r = openNativeFile(await f.text());
-    if (!r) return setNote({ tone: 'warn', text: `“${f.name}” is not a SocriaUX graphic, or it is damaged. Nothing was changed.` });
-    if (docNow()) commitDoc(r.doc, `opened ${f.name}`, { version: true });
-    else setG((x) => ({ ...x, doc: r.doc, versions: pushVersion(x.versions, r.doc, `opened ${f.name}`) }));
-    setBoardId(r.doc.artboards[0].id);
-    setSelection([]);
-    setView('edit');
-    setNote({ tone: r.notes.length ? 'warn' : 'ok', text: `Opened “${f.name}”.${r.notes.length ? ` ${r.notes.slice(0, 3).join(' ')}` : ''}` });
-  };
-
-  // ── keyboard ──
-  const keys = useRef<(e: KeyboardEvent) => void>(() => undefined);
-  keys.current = (e: KeyboardEvent) => {
-    if (view !== 'edit' || !doc || !board) return;
-    const t = e.target as HTMLElement | null;
-    if (t?.closest('input,textarea,select,[contenteditable]')) return;
-    const mod = e.metaKey || e.ctrlKey;
-    const k = e.key.toLowerCase();
-    if (mod && k === 'z') return e.preventDefault(), e.shiftKey ? redo() : undo();
-    if (mod && k === 'y') return e.preventDefault(), redo();
-    if (mod && k === '0') return e.preventDefault(), zoomRef.current?.fit();
-    if (mod && (k === '=' || k === '+')) return e.preventDefault(), zoomRef.current?.zoomBy(1.2);
-    if (mod && k === '-') return e.preventDefault(), zoomRef.current?.zoomBy(1 / 1.2);
-    if (mod && k === 'a') return e.preventDefault(), setSelection(board.children.filter((n) => !n.hidden).map((n) => n.id));
-    if (e.key === 'Escape') return pending ? discardPending() : setSelection([]);
-    if (mod && k === 'v' && clipboard.current.length) {
-      e.preventDefault();
-      return onOps(clipboard.current.map((n) => ({ op: 'add', artboard: board.id, node: { ...JSON.parse(JSON.stringify(n)), x: n.x + 24, y: n.y + 24, locked: undefined } }) as Op), 'pasted');
-    }
-    if (!selection.length) return;
-    const sel = selection.map((id) => locate(doc, id)).filter((l): l is Located => !!l);
-    const ids = sel.map((l) => l.node.id);
-    if (e.key === 'Delete' || e.key === 'Backspace') return e.preventDefault(), onOps(ids.map((id) => ({ op: 'remove', id }) as Op), ids.length > 1 ? `${ids.length} objects deleted` : 'deleted');
-    if (e.key.startsWith('Arrow')) {
-      e.preventDefault();
-      const step = e.shiftKey ? 10 : 1;
-      const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
-      const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
-      return onOps(ids.map((id) => ({ op: 'move', id, dx, dy }) as Op), 'nudged');
-    }
-    if (mod && k === 'd') return e.preventDefault(), onOps(ids.map((id) => ({ op: 'duplicate', id }) as Op), 'duplicated');
-    if (mod && k === 'g') {
-      e.preventDefault();
-      if (e.shiftKey) return onOps(sel.filter((l) => l.node.type === 'group').map((l) => ({ op: 'ungroup', id: l.node.id }) as Op), 'ungrouped');
-      if (ids.length > 1) return onOps([{ op: 'group', ids }], 'grouped');
-      return;
-    }
-    if (mod && k === 'c') {
-      clipboard.current = sel.map((l) => JSON.parse(JSON.stringify(l.node)) as Node);
-      return setNote({ tone: 'ok', text: `Copied ${ids.length > 1 ? `${ids.length} objects` : nodeLabel(sel[0].node)}: paste with ⌘V / Ctrl+V.` });
-    }
-    if (e.key === ']' || e.key === '[') {
-      const l = sel[0];
-      return onOps([{ op: 'reorder', id: l.node.id, to: l.index + (e.key === ']' ? 1 : -1) }], e.key === ']' ? 'brought forward' : 'sent backward');
-    }
-  };
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => keys.current(e);
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, []);
-
-  const selected = useMemo(() => (doc ? selection.map((id) => locate(doc, id)).filter((l): l is Located => !!l) : []), [doc, selection]);
-  const findings = useMemo(() => (g.doc && board ? checkDoc(g.doc, measure).filter((f) => f.artboard === board.id) : []), [g.doc, measure, board]);
+  /** A document from the editor: the current one, and a version when it says so. */
+  const onEditorChange = (next: GraphicDoc, meta: { label: string; version?: boolean }) => setG((x) => ({ ...x, doc: next, ...(meta.version ? { versions: pushVersion(x.versions, next, meta.label) } : {}) }));
 
   const steps: { id: View; label: string; ok: boolean }[] = [
     { id: 'brief', label: 'Brief', ok: true },
     { id: 'directions', label: 'Directions', ok: !!g.brief && g.options.length > 0 },
     { id: 'edit', label: 'Design', ok: !!g.doc },
   ];
-  const printBleed = !!doc?.artboards.some((b) => b.unit === 'pt' && b.bleed > 0);
 
   return (
     <div className="v0 sb gx">
@@ -649,297 +248,27 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent }: { 
         <DirectionsStage brief={g.brief} options={g.options} assets={g.assets ?? []} measure={measure} href={href} source={g.source ?? null} onChoose={(d) => void composeIn(d, g.brief!)} onMore={moreDirections} onBack={() => setView('brief')} />
       )}
 
-      {view === 'edit' && doc && board && (
-        <div className="gx-ws">
-          <aside className="gx-left" aria-label="Layers, artboards and adding">
-            <nav className="gx-tabs" role="tablist" aria-label="Panels">
-              {(
-                [
-                  ['layers', 'Layers'],
-                  ['boards', 'Artboards'],
-                  ['add', 'Add'],
-                  ['pictures', 'Pictures'],
-                  ['brand', 'Brand'],
-                  ['versions', 'Versions'],
-                ] as [Tab, string][]
-              ).map(([id, label]) => (
-                <button key={id} type="button" role="tab" aria-selected={tab === id} className={`gx-tab${tab === id ? ' is-on' : ''}`} onClick={() => setTab(id)}>
-                  {label}
-                </button>
-              ))}
-            </nav>
-            <div className="gx-left-body" role="tabpanel">
-              {tab === 'layers' && <LayersPanel board={board} selection={selection} onSelect={setSelection} onOps={onOps} />}
-              {tab === 'boards' && <ArtboardsPanel doc={doc} boardId={board.id} onPick={(id) => (setBoardId(id), setSelection([]))} onOps={onOps} onAdapt={adapt} />}
-              {tab === 'add' && <AddPanel board={board} form={g.direction?.form ?? null} doc={doc} onOps={onOps} onUpload={addPicture} />}
-              {tab === 'pictures' && (
-                <section className="gx-panel" aria-label="Pictures">
-                  <p className="gx-panel-h">Pictures in this design</p>
-                  {!doc.assets.length && <p className="v0-quiet">None yet. Add one from “Add”, or below.</p>}
-                  <ul className="gx-pic-list is-small">
-                    {doc.assets.map((a) => {
-                      const sel = selected[0]?.node.type === 'image' ? selected[0] : null;
-                      return (
-                        <li key={a.id}>
-                          <img src={href(a.id, a.src)} alt={a.name} />
-                          <span>
-                            {a.name}
-                            <em className="v0-quiet">{missingUploads.includes(a.src) ? 'Not in this browser: it was added on another device. Add it again here.' : a.credit ?? a.source}</em>
-                          </span>
-                          {sel ? (
-                            <button type="button" className="sb-link is-meta" onClick={() => onOps([{ op: 'update', id: sel.node.id, set: { asset: a.id } }], 'picture replaced')}>
-                              Use in the selected picture
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              className="sb-link is-meta"
-                              onClick={() => {
-                                const k = Math.min((board.width * 0.6) / a.width, (board.height * 0.6) / a.height);
-                                const id = newId('n');
-                                onOps([{ op: 'add', artboard: board.id, node: { id, type: 'image', role: 'image', asset: a.id, fit: 'cover', x: (board.width - a.width * k) / 2, y: (board.height - a.height * k) / 2, w: a.width * k, h: a.height * k, rotation: 0, opacity: 1 } }], 'picture placed');
-                                setSelection([id]);
-                              }}
-                            >
-                              Place on the artboard
-                            </button>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  <label className="sb-btn is-sm gx-file">
-                    Add a picture
-                    <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => (e.target.files?.[0] && void addPicture(e.target.files[0]), (e.target.value = ''))} />
-                  </label>
-                </section>
-              )}
-              {tab === 'brand' && (
-                <section className="gx-panel" aria-label="Brand">
-                  <p className="gx-panel-h">{g.direction?.name ?? doc.direction?.name ?? 'This design'}</p>
-                  {g.source && <p className="v0-quiet">The direction of the website “{g.source.name}”.</p>}
-                  <p className="gx-panel-sub">Colours {selected.length ? '(click one to apply it to the selection)' : '(click one to make it the ground)'}</p>
-                  <div className="gx-palette">
-                    {Object.entries(doc.tokens.colors).map(([k, v]) => (
-                      <button
-                        key={k}
-                        type="button"
-                        className="gx-swatch"
-                        style={{ background: v }}
-                        title={`${k} ${v}`}
-                        aria-label={`${k} ${v}`}
-                        onClick={() => {
-                          if (!selected.length) return onOps([{ op: 'artboard-update', id: board.id, set: { background: v } }], `ground in ${k}`);
-                          onOps(selected.map((l) => ({ op: 'update', id: l.node.id, set: l.node.type === 'text' || l.node.type === 'chart' ? { color: v } : l.node.type === 'shape' && l.node.shape === 'line' ? { stroke: { ...(l.node.stroke ?? { width: 2 }), color: v } } : { fill: v } }) as Op), `${k} applied`);
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <p className="gx-panel-sub">Typefaces</p>
-                  <p>
-                    {doc.tokens.fonts.display} <span className="v0-quiet">display</span> · {doc.tokens.fonts.body} <span className="v0-quiet">text</span>
-                  </p>
-                  <p className="gx-panel-sub">Held for the whole design</p>
-                  <label className="gx-check">
-                    <input type="checkbox" checked={!!doc.locks?.colors} onChange={(e) => onOps([{ op: 'locks', colors: e.target.checked }], e.target.checked ? 'colours locked' : 'colours unlocked')} /> Lock the colours
-                  </label>
-                  <label className="gx-check">
-                    <input type="checkbox" checked={!!doc.locks?.fonts} onChange={(e) => onOps([{ op: 'locks', fonts: e.target.checked }], e.target.checked ? 'typefaces locked' : 'typefaces unlocked')} /> Lock the typefaces
-                  </label>
-                  <p className="v0-quiet">A change by hand or in words that would alter something locked is refused and said, never applied in part.</p>
-                  {planNotes.length > 0 && (
-                    <details className="gx-why" open>
-                      <summary>Why it is composed this way</summary>
-                      <ul>
-                        {planNotes.map((s) => (
-                          <li key={s}>{s}</li>
-                        ))}
-                      </ul>
-                    </details>
-                  )}
-                </section>
-              )}
-              {tab === 'versions' && (
-                <section className="gx-panel" aria-label="Versions">
-                  <p className="gx-panel-h">Versions</p>
-                  <button type="button" className="sb-btn is-sm" onClick={() => g.doc && setG((x) => ({ ...x, versions: pushVersion(x.versions, g.doc!, 'Kept by hand') }))}>
-                    Keep this as a version
-                  </button>
-                  <ol className="gx-versions" reversed>
-                    {g.versions
-                      .map((v, i) => ({ v, i }))
-                      .reverse()
-                      .map(({ v, i }) => (
-                        <li key={`${v.at}-${i}`}>
-                          <span>
-                            <b>{v.label}</b>
-                            <em className="v0-quiet">
-                              {new Date(v.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · {v.doc.artboards.length} artboard{v.doc.artboards.length === 1 ? '' : 's'}
-                            </em>
-                          </span>
-                          <button type="button" className="sb-link is-meta" onClick={() => (commitDoc(v.doc, `restored “${v.label}”`), setNote({ tone: 'ok', text: `Restored “${v.label}”. Undo goes back.` }))}>
-                            Restore
-                          </button>
-                        </li>
-                      ))}
-                  </ol>
-                  <p className="v0-quiet">The last {MAX_GRAPHIC_VERSIONS} are kept with the project. Every change since opening can also be undone (⌘Z / Ctrl+Z).</p>
-                </section>
-              )}
-            </div>
-          </aside>
-
-          <main className="gx-center">
-            <div className="v0-toolbar gx-toolbar" role="toolbar" aria-label="Canvas">
-              <span className="v0-zoom">
-                <button type="button" className="sb-link is-meta" onClick={undo} disabled={!past.current.length} title="Undo (⌘Z)">
-                  Undo
-                </button>
-                <button type="button" className="sb-link is-meta" onClick={redo} disabled={!future.current.length} title="Redo (⇧⌘Z)">
-                  Redo
-                </button>
-              </span>
-              <span className="v0-zoom">
-                <button type="button" className="sb-link is-meta" onClick={() => zoomRef.current?.zoomBy(1 / 1.2)} aria-label="Zoom out">
-                  −
-                </button>
-                <button type="button" className="sb-link is-meta" onClick={() => zoomRef.current?.fit()} title="Fit (⌘0)">
-                  Fit
-                </button>
-                <button type="button" className="sb-link is-meta" onClick={() => zoomRef.current?.zoomBy(1.2)} aria-label="Zoom in">
-                  +
-                </button>
-              </span>
-              <span className="sb-seg is-tight" role="group" aria-label="Canvas aids">
-                {(
-                  [
-                    ['guides', 'Guides'],
-                    ['grid', 'Grid'],
-                    ['rulers', 'Rulers'],
-                  ] as const
-                ).map(([k, label]) => (
-                  <button key={k} type="button" className={`sb-seg-item${aids[k] ? ' is-on' : ''}`} aria-pressed={aids[k]} onClick={() => setAids((a) => ({ ...a, [k]: !a[k] }))}>
-                    {label}
-                  </button>
-                ))}
-              </span>
-              <label className="gx-boardpick">
-                <span className="v0-sr">Artboard</span>
-                <select className="v0-select" value={board.id} onChange={(e) => (setBoardId(e.target.value), setSelection([]))}>
-                  {doc.artboards.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name} · {sizeLabel(b)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <details className="gx-export">
-                <summary className="sb-btn is-sm is-primary">Export</summary>
-                <div className="gx-export-menu" role="menu">
-                  <p className="gx-panel-sub">This artboard</p>
-                  <button type="button" role="menuitem" onClick={() => exportAs('png')}>
-                    PNG{board.unit === 'pt' ? ` at ${board.dpi} dpi` : ''}
-                  </button>
-                  {board.unit === 'px' && (
-                    <button type="button" role="menuitem" onClick={() => exportAs('png2')}>
-                      PNG at 2×
-                    </button>
-                  )}
-                  <button type="button" role="menuitem" onClick={() => exportAs('png-clear')}>
-                    PNG, transparent ground
-                  </button>
-                  <button type="button" role="menuitem" onClick={() => exportAs('jpeg')}>
-                    JPEG
-                  </button>
-                  <button type="button" role="menuitem" onClick={() => exportAs('svg')}>
-                    SVG (text kept as text)
-                  </button>
-                  <p className="gx-panel-sub">All {doc.artboards.length} artboards</p>
-                  <button type="button" role="menuitem" onClick={() => exportAs('pdf')}>
-                    PDF
-                  </button>
-                  {printBleed && (
-                    <button type="button" role="menuitem" onClick={() => exportAs('pdf-bleed')}>
-                      PDF with bleed
-                    </button>
-                  )}
-                  <button type="button" role="menuitem" onClick={() => exportAs('zip')}>
-                    PNG files (.zip)
-                  </button>
-                  <p className="gx-panel-sub">The design</p>
-                  <button type="button" role="menuitem" onClick={() => exportAs('native')}>
-                    Save the design file
-                  </button>
-                  <button type="button" role="menuitem" onClick={() => openInput.current?.click()}>
-                    Open a design file…
-                  </button>
-                  <p className="v0-quiet gx-export-note">PDF pages are high-resolution RGB pictures at the exact page size: not selectable text, not CMYK.</p>
-                </div>
-              </details>
-              <input ref={openInput} type="file" accept=".json,application/json" hidden onChange={(e) => (e.target.files?.[0] && void openFile(e.target.files[0]), (e.target.value = ''))} />
-            </div>
-            {missingUploads.some((m) => doc.assets.some((a) => a.src === m)) && (
-              <p className="gx-missing" role="status">
-                {missingUploads.filter((m) => doc.assets.some((a) => a.src === m)).length} picture(s) of this design are not in this browser (they were added on another device): they are left blank, and named in Pictures.
-              </p>
-            )}
-            <div className={`gx-stage${pending ? ' is-preview' : ''}`}>
-              <GraphicCanvas doc={doc} boardId={board.id} selection={selection} measure={measure} href={href} onSelect={setSelection} onCommit={onOps} onEditText={() => window.setTimeout(() => textRef.current?.focus(), 30)} zoomRef={zoomRef} guides={aids.guides} grid={aids.grid} rulers={aids.rulers} />
-              {pending && <span className="gx-preview-tag">Preview</span>}
-            </div>
-            <div className="gx-askbar">
-              {pending ? (
-                <div className="gx-pending" role="status">
-                  <span>
-                    <b>Preview:</b> {pending.edit.label} <span className="v0-quiet">({pending.edit.scope === 'selection' ? 'the selection' : pending.edit.scope === 'object' ? 'one object' : pending.edit.scope === 'artboard' ? 'this artboard' : 'the whole design'})</span>
-                  </span>
-                  <button type="button" className="sb-btn is-sm is-primary" onClick={applyPending}>
-                    Apply
-                  </button>
-                  <button type="button" className="sb-btn is-sm" onClick={discardPending}>
-                    Discard
-                  </button>
-                </div>
-              ) : (
-                <form
-                  className="gx-ask"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    ask();
-                  }}
-                >
-                  <label htmlFor="gx-ask-in" className="v0-sr">
-                    Ask for a change
-                  </label>
-                  <input
-                    id="gx-ask-in"
-                    value={askWords}
-                    onChange={(e) => setAskWords(e.target.value)}
-                    placeholder={selection.length ? `Change ${selection.length > 1 ? 'the selection' : nodeLabel(selected[0]?.node ?? doc.artboards[0].children[0])}: “make it bigger”, “move it beneath the title”, “#c2410c”…` : 'Ask for a change: “make the headline bigger”, “increase the contrast”, “adapt it to a story”…'}
-                    autoComplete="off"
-                  />
-                  <button type="submit" className="sb-btn is-sm is-primary" disabled={!askWords.trim()}>
-                    Preview
-                  </button>
-                </form>
-              )}
-              {note && (
-                <p className={`gx-note is-${note.tone}`} role={note.tone === 'warn' ? 'alert' : 'status'}>
-                  {note.text}
-                </p>
-              )}
-            </div>
-          </main>
-
-          <aside className="gx-right" aria-label="Properties">
-            <Inspector doc={doc} board={board} selected={selected} findings={findings} onOps={onOps} onFix={(f) => f.fix && onOps(f.fix, `fixed: ${f.message}`)} onFixAll={fixAll} textRef={textRef} />
-            {g.brief && (
-              <p className="v0-quiet gx-kindline">
-                {KIND_LABEL[g.brief.kind]} · {doc.artboards.length} artboard{doc.artboards.length === 1 ? '' : 's'}
-              </p>
-            )}
-          </aside>
-        </div>
+      {view === 'edit' && g.doc && (
+        <GraphicEditor
+          doc={g.doc}
+          onChange={onEditorChange}
+          name={project.name}
+          direction={g.direction ?? null}
+          kind={g.brief?.kind}
+          kindLabel={g.brief ? KIND_LABEL[g.brief.kind] : undefined}
+          measure={measure}
+          href={href}
+          resolve={resolve}
+          missingUploads={missingUploads}
+          upload={uploadPicture}
+          note={note}
+          onNote={setNote}
+          versions={g.versions}
+          onKeepVersion={(d) => setG((x) => ({ ...x, versions: pushVersion(x.versions, d, 'Kept by hand') }))}
+          planNotes={planNotes}
+          brand={{ title: g.direction?.name ?? g.doc.direction?.name ?? 'This design', note: g.source ? <p className="v0-quiet">The direction of the website “{g.source.name}”.</p> : undefined }}
+          allowOpen
+        />
       )}
     </div>
   );

@@ -306,9 +306,10 @@ export function readGraphicEdit(words0: string, doc: GraphicDoc, ctx: EditContex
     return finish({ ops, label: 'the layout made more experimental (the headline turned, the shapes crossing it, the column broken); the words untouched', scope: 'artboard' });
   }
 
-  // a colour for the selection or a named object: "make the headline #b4532a" / "… red"
+  // a colour for the selection or a named object: "make the headline #b4532a" / "… red"; a colour alone, with
+  // something selected, is that colour for it (as the ask bar's own example offers)
   const hex = words.match(/#[0-9a-f]{6}\b/);
-  if (hex && /\b(colou?r|make|set|turn)\b/.test(words)) {
+  if (hex && (/\b(colou?r|make|set|turn)\b/.test(words) || (words.trim() === hex[0] && ctx.selection.length > 0))) {
     if (doc.locks?.colors) return { ops: [], label: 'a colour', scope: 'object', question: 'The colours are locked for this design. Unlock them to change a colour.' };
     const t = targets(doc, board, words, ctx.selection);
     if (!t.list.length) return null;

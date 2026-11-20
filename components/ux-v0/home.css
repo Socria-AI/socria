@@ -370,6 +370,9 @@
   margin-top: 0;
   border-top: 0;
 }
+.mu-door.is-board {
+  grid-row: 6;
+}
 .mu-plate-svg {
   position: absolute;
   inset: 0;
@@ -383,7 +386,7 @@
 }
 .mu-error {
   grid-column: 5 / span 8;
-  grid-row: 6;
+  grid-row: 7;
   margin: 16px 0 0;
 }
 
