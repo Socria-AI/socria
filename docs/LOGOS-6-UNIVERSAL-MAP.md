@@ -144,6 +144,23 @@ The scale says *what* belongs on the map; the zoom says *how* it is drawn. The t
 - **"Start something new"** fades out before it is too small to read.
 - **Core chats** are filled lightly when zoomed out, where an open ring would be lost.
 - **Light and dark themes** are both styled, and on a phone the search takes a full row under the scales.
+- **The conversations blink.** The forty most recently active conversations on the map glint now and then, each at
+  its own pace, so they never blink together (`blinkers` in `lib/logos5/universe.ts`; each glint is a layer of its
+  own while it runs, so the number is capped):
+  - a session's disc brightens and a ring of its colour opens a little way out from it;
+  - a quick question's dot fills with light and its ring opens further.
+
+  The newer a conversation, the more often it glints (`blinkOf` in `lib/logos5/universe.ts`): every 2.6s for one
+  touched today, down to every 6.2s for one two months old or more. Each has a phase of its own, worked out from its
+  id, so a conversation always blinks the same way.
+  - What a search finds blinks faster (every 1.8s).
+  - What a search leaves out, what is leaving the map and what is being moved do not blink.
+  - While something is gone to (from search, Recent or Back), only it blinks, and its ring opens out three times.
+  - In Celestial the glints are gold, and the stars keep twinkling after the map has come in. Before, the twinkle
+    stopped once the map settled, and it now dims further (to 25%).
+  - The glints stand down while the camera moves (pan, zoom, pinch, keys or a glide) and come back when it rests.
+    The map is marked `data-moving` once when a move starts and cleared once it ends, never on every frame.
+  - The glint uses opacity and transform only, and nothing moves under reduced motion.
 
 ## Performance
 

@@ -11,3 +11,4 @@ export { latestOf } from '@/lib/session-rail';
 export { readNavSide, NAV_SIDES } from '@/components/logos5/nav-side';
 export { sanitizeVisNote, visNoteLine } from '@/lib/visual/context';
 export { readVisualAsk } from '@/lib/visual/intent';
+export { menuPlace } from '@/components/logos5/NavMover';

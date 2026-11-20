@@ -187,6 +187,9 @@ So a re-read of the conversation can add, refine or re-word, but it never delete
 - In the Everything view, the views form a rail on the **left**.
 - **Move the views** (the ⇄ control) puts them on the left, along the top, or on the right.
 - The choice is remembered (`socria.nav.side`) and shared by every open view.
+- **The control stays in sight.** Along the top it is pinned to the end of the row, which scrolls sideways when it holds more than fits. In a rail it is pinned to the rail's foot.
+- **Its choices float over the page** (`NavMover.tsx`, `menuPlace`). They sit under the button, or over it when the window has no room below, on the button's side of the window and always inside it. They are drawn into the app's root, so no row, rail or bar can clip them. (The row along the top used to clip them, so the menu could not be seen when the views were on top.)
+- The keys reach the choices: the current one takes the focus, Escape gives the focus back to the button, and tabbing away closes them.
 
 **The page header.** In a page view, the same choice moves the switch within the header:
 - left: just after the conversation's name;

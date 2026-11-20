@@ -18,7 +18,7 @@
 //     it is exact.
 
 import { build } from 'esbuild';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -115,6 +115,16 @@ console.log('\n=== near and far, keys, search ===');
 {
   ok('far off a name; nearer its kind; up close where it stands', H.detailAt(0.4) === 'far' && H.detailAt(0.8) === 'mid' && H.detailAt(1.4) === 'near');
   ok('fresh today, faded by two months', H.freshness(NOW, NOW) === 1 && H.freshness(NOW - 30 * DAY, NOW) === 0.5 && H.freshness(NOW - 90 * DAY, NOW) === 0);
+  {
+    const today = H.blinkOf('a', NOW, NOW), month = H.blinkOf('a', NOW - 30 * DAY, NOW), old = H.blinkOf('a', NOW - 90 * DAY, NOW);
+    ok('a conversation blinks the more often the newer it is: every 2.6s today, 4.4s a month back, 6.2s from two months', today.every === 2.6 && month.every === 4.4 && old.every === 6.2, J([today, month, old]));
+    const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+    const delays = ids.map((id) => H.blinkOf(id, NOW, NOW).delay);
+    const many = Array.from({ length: 90 }, (_, i) => ({ id: `t${String(i).padStart(2, '0')}`, at: NOW - i * 3600_000 }));
+    const blink = H.blinkers(many);
+    ok('the forty most recently active blink (each is a layer of its own while it does), newest first, ties by id', H.BLINK_MAX === 40 && blink.size === 40 && blink.has('t00') && blink.has('t39') && !blink.has('t40') && J([...H.blinkers([{ id: 'b', at: 5 }, { id: 'a', at: 5 }, { id: 'c', at: 1 }], 2)]) === J(['a', 'b']) && H.blinkers([], 40).size === 0);
+    ok('…each at a phase of its own (never all together), already part-way through its beat, the same every time', new Set(delays).size >= 7 && delays.every((d) => d <= 0 && d > -2.6) && J(H.blinkOf('a', NOW, NOW)) === J(today), J(delays));
+  }
   const at = (id, x, y) => ({ id, x, y, w: 100, h: 60 });
   const grid = [at('a', 0, 0), at('b', 200, 0), at('c', 400, 10), at('d', 0, 200), at('e', 210, 190)];
   ok('arrows go to the nearest conversation that way, straight ahead before the side', H.nearestWay('right', grid[0], grid) === 'b' && H.nearestWay('down', grid[0], grid) === 'd' && H.nearestWay('right', grid[1], grid) === 'c' && H.nearestWay('left', grid[0], grid) === null && H.nearestWay('down', grid[1], grid) === 'e');
@@ -206,6 +216,22 @@ console.log('\n=== this browser’s copy ===');
   ok('a damaged copy reads as a new arrangement', J(H.readHome(S)) === J(H.emptyArrangement()));
   const broken = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('full'); } };
   ok('a store that refuses does not break anything', J(H.readHome(broken)) === J(H.emptyArrangement()) && (H.writeHome(broken, a), true) && J(H.readHome(null)) === J(H.emptyArrangement()));
+}
+
+console.log('\n=== the conversations blink ===');
+{
+  const uni = readFileSync(join(root, 'components/logos5/universe.css'), 'utf8');
+  const bub = readFileSync(join(root, 'components/logos5/UniverseBubbles.tsx'), 'utf8');
+  ok('the ones that blink are marked, on the discs and the dots', /const blinky = useMemo\(\(\) => blinkers\(tiles\), \[tiles\]\);/.test(bub) && (bub.match(/blinky\.has\([dh]\.id\) \? 'can-blink' : ''/g) ?? []).length === 2);
+  ok('each conversation — a session\'s disc and a quick question\'s dot — carries its own beat and phase, from blinkOf', /const bk = blinkOf\(d\.id, tile\.at, now\);/.test(bub) && /const bk = blinkOf\(h\.id, tile\.at, now\);/.test(bub) && (bub.match(/'--bk': `\$\{bk\.every\}s`, '--bd': `\$\{bk\.delay\}s`/g) ?? []).length === 2);
+  ok('…a session glints at its own size: its disc brightens, its ring opens a little way (1.3)', /\.logos-root \.l5 :is\(\.l5b-hub\.can-blink, \.l5b-hub\.is-found\) \.l5b-disc::before \{\s*animation: l5b-blink-disc var\(--bk, 4\.4s\)/.test(uni) && /@keyframes l5b-blink-disc \{[\s\S]*?transform: scale\(1\.3\);/.test(uni));
+  ok('every conversation glints on a layer of its own — so the settled map, which stops the arrivals, keeps it — only when motion is welcome', /@media \(prefers-reduced-motion: no-preference\) \{\s*\.logos-root \.l5 :is\(\.l5b-dot\.can-blink, \.l5b-dot\.is-found\) \.l5b-pip::before \{\s*animation: l5b-blink var\(--bk, 4\.4s\) cubic-bezier\(0\.2, 0\.7, 0\.3, 1\) var\(--bd, 0s\) infinite;/.test(uni) && !/\.l5b\.is-settled[^{]*\.l5b-pip::before/.test(uni));
+  const kf = uni.match(/@keyframes l5b-blink \{([\s\S]*?)\n\}/)?.[1] ?? '';
+  ok('…a flash and a ring that opens out, with opacity and transform alone (the compositor\'s)', /opacity: 1;/.test(kf) && /transform: scale\(2\.35\);/.test(kf) && !/box-shadow|width|height|filter/.test(kf));
+  ok('…quicker for what a search finds; none for what it leaves out, what is leaving or moving; only what is gone to while it is', /:is\(\.l5b-dot\.is-found \.l5b-pip, \.l5b-hub\.is-found \.l5b-disc\)::before \{\s*animation-duration: 1\.8s;/.test(uni) && /:is\(\.l5b-dot:is\(\.is-dim, \.is-leaving, \.is-lifted\) \.l5b-pip, \.l5b-hub:is\(\.is-dim, \.is-leaving, \.is-lifted\) \.l5b-disc\)::before,\s*\.logos-root \.l5 \.l5b\.has-spot :is\(\.l5b-dot:not\(\.is-spot\) \.l5b-pip, \.l5b-hub:not\(\.is-spot\) \.l5b-disc\)::before \{\s*animation: none;/.test(uni));
+  ok('Celestial: the stars keep twinkling once the map has come in, on their own beats, and deeper', /html\[data-theme="night"\] \.logos-root \.l5 \.l5b\.is-settled \.l5b-dot\.can-blink \.l5b-pip \{\s*animation: cel-twinkle-pip var\(--bk, 4\.4s\) ease-in-out var\(--bd, 0s\) infinite;/.test(uni) && /@keyframes cel-twinkle-pip \{[\s\S]*?opacity: 0\.25;/.test(uni));
+  ok('the blinks stand down while the camera moves and come back as it rests — set once at the start of a move, never per frame', /if \(b && !b\.hasAttribute\('data-moving'\)\) b\.setAttribute\('data-moving', ''\);/.test(bub) && /box\.current\?\.removeAttribute\('data-moving'\);/.test(bub) && /\.l5b\[data-moving\] :is\(\.l5b-pip, \.l5b-disc\)::before \{\s*animation: none;/.test(uni) && /\.l5b\.is-settled\[data-moving\] \.l5b-dot\.can-blink \.l5b-pip \{\s*animation-play-state: paused;/.test(uni));
+  ok('what a search, Recent or Back went to: its ring opens out three times', /animation: l5b-spot 1\.4s cubic-bezier\(0\.2, 0\.8, 0\.2, 1\) 0\.65s 3 both;/.test(uni));
 }
 
 console.log(`\nlogos5-home: ${pass} passed, ${fail} failed`);

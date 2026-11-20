@@ -2846,18 +2846,14 @@ html[data-theme="night"] .logos-root .l5 .l5b-card-s em {
   html[data-theme="night"] .logos-root .l5 .l5b-halo {
     animation: cel-corona 5.2s ease-in-out infinite;
   }
-  /* the quick questions twinkle, never together */
+  /* the conversations twinkle, never together: each on its own beat, the newer ones quicker (--bk and --bd, from
+     lib/logos5/universe.ts blinkOf), deep enough to see — and on after the map has come in: the twinkle is not an
+     arrival, so the settled map (which stops the arrivals) keeps it */
   html[data-theme="night"] .logos-root .l5 .l5b-pip {
-    animation: l5b-settle 0.5s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)) var(--d, 0ms) both, cel-twinkle-pip 4.4s ease-in-out calc(var(--d, 0ms) + 700ms) infinite;
+    animation: l5b-settle 0.5s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)) var(--d, 0ms) both, cel-twinkle-pip var(--bk, 4.4s) ease-in-out var(--bd, 0s) infinite;
   }
-  html[data-theme="night"] .logos-root .l5 .l5b-dot:nth-child(3n) .l5b-pip {
-    animation-duration: 0.5s, 5.8s;
-  }
-  html[data-theme="night"] .logos-root .l5 .l5b-dot:nth-child(4n + 1) .l5b-pip {
-    animation-duration: 0.5s, 3.3s;
-  }
-  html[data-theme="night"] .logos-root .l5 .l5b-dot:nth-child(5n + 2) .l5b-pip {
-    animation-duration: 0.5s, 7.1s;
+  html[data-theme="night"] .logos-root .l5 .l5b.is-settled .l5b-dot.can-blink .l5b-pip {
+    animation: cel-twinkle-pip var(--bk, 4.4s) ease-in-out var(--bd, 0s) infinite;
   }
 }
 @keyframes cel-orbit {
@@ -2900,7 +2896,7 @@ html[data-theme="night"] .logos-root .l5 .l5b-card-s em {
     opacity: 1;
   }
   50% {
-    opacity: 0.45;
+    opacity: 0.25;
   }
 }
 
@@ -3554,7 +3550,7 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
   color: var(--lg-ink);
 }
 
-/* GONE TO: what a search, Recent or Back went to — a ring that opens out once from it, and it stays marked a moment */
+/* GONE TO: what a search, Recent or Back went to — a ring that opens out from it three times, and it stays marked a moment */
 .logos-root .l5 .l5b-hub.is-spot .l5b-disc,
 .logos-root .l5 .l5b-dot.is-spot .l5b-pip {
   box-shadow: 0 0 0 3px var(--lg-paper), 0 0 0 5.5px color-mix(in srgb, var(--c) 85%, var(--lg-ink)), 0 18px 34px -16px color-mix(in srgb, var(--c) 80%, #000);
@@ -3567,7 +3563,7 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
   border-radius: 50%;
   border: 2px solid color-mix(in srgb, var(--c) 70%, var(--lg-ink));
   pointer-events: none;
-  animation: l5b-spot 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) 0.65s both;
+  animation: l5b-spot 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) 0.65s 3 both;
 }
 @keyframes l5b-spot {
   from {
@@ -3577,6 +3573,97 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
   to {
     opacity: 0;
     transform: scale(1.9);
+  }
+}
+/* THE CONVERSATIONS BLINK (Logos 6): every conversation on the map glints now and then — its dot fills with light and
+   a ring of its own colour opens out from it — the newer ones more often (lib/logos5/universe.ts blinkOf: --bk, from
+   every 2.6s for today's to every 6.2s for two months back; --bd, a phase of its own), so they never blink together.
+   The forty most recently active blink (.can-blink, lib/logos5/universe.ts blinkers), and whatever a search finds.
+   A session's disc does the same at its own size: it brightens, and its ring opens a little way out (1.3, not the
+   quick question's 2.35). It is drawn on a layer of its own (::before), not the arrival, so the settled map keeps it.
+   What a search finds blinks quicker; what it leaves out, what is leaving and what is being moved do not blink; while
+   something is gone to, only that one does. Opacity and transform only, for the compositor; none under reduced motion. */
+.logos-root .l5 .l5b-dot .l5b-pip::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--c) 82%, var(--lg-ink));
+  background: radial-gradient(circle, color-mix(in srgb, var(--c) 55%, transparent) 0 42%, transparent 72%);
+  opacity: 0;
+  pointer-events: none;
+}
+html[data-theme="night"] .logos-root .l5 .l5b-dot .l5b-pip::before {
+  border-color: rgba(240, 216, 158, 0.9);
+  background: radial-gradient(circle, rgba(255, 244, 214, 0.8) 0 34%, rgba(240, 216, 158, 0.3) 52%, transparent 72%);
+  box-shadow: 0 0 16px 2px rgba(240, 216, 158, 0.45);
+}
+.logos-root .l5 .l5b-disc::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--c) 82%, var(--lg-ink));
+  background: radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.08) 55%, transparent 72%);
+  opacity: 0;
+  pointer-events: none;
+}
+html[data-theme="night"] .logos-root .l5 .l5b-disc::before {
+  border-color: rgba(240, 216, 158, 0.85);
+  background: radial-gradient(circle at 50% 42%, rgba(255, 244, 214, 0.45), rgba(240, 216, 158, 0.12) 55%, transparent 72%);
+  box-shadow: 0 0 22px 4px rgba(240, 216, 158, 0.35);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .logos-root .l5 :is(.l5b-dot.can-blink, .l5b-dot.is-found) .l5b-pip::before {
+    animation: l5b-blink var(--bk, 4.4s) cubic-bezier(0.2, 0.7, 0.3, 1) var(--bd, 0s) infinite;
+  }
+  .logos-root .l5 :is(.l5b-hub.can-blink, .l5b-hub.is-found) .l5b-disc::before {
+    animation: l5b-blink-disc var(--bk, 4.4s) cubic-bezier(0.2, 0.7, 0.3, 1) var(--bd, 0s) infinite;
+  }
+  .logos-root .l5 :is(.l5b-dot.is-found .l5b-pip, .l5b-hub.is-found .l5b-disc)::before {
+    animation-duration: 1.8s;
+  }
+  .logos-root .l5 :is(.l5b-dot:is(.is-dim, .is-leaving, .is-lifted) .l5b-pip, .l5b-hub:is(.is-dim, .is-leaving, .is-lifted) .l5b-disc)::before,
+  .logos-root .l5 .l5b.has-spot :is(.l5b-dot:not(.is-spot) .l5b-pip, .l5b-hub:not(.is-spot) .l5b-disc)::before {
+    animation: none;
+  }
+}
+/* …and while the camera moves they stand down: a pan or a zoom across hundreds of glints, each a layer of its own, took
+   three times as long a frame (scripts/verify-map.mjs --perf, 400 conversations); they come back as it comes to rest */
+.logos-root .l5 .l5b[data-moving] :is(.l5b-pip, .l5b-disc)::before {
+  animation: none;
+}
+html[data-theme="night"] .logos-root .l5 .l5b.is-settled[data-moving] .l5b-dot.can-blink .l5b-pip {
+  animation-play-state: paused;
+}
+@keyframes l5b-blink-disc {
+  0% {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  8% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  40%,
+  100% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+}
+@keyframes l5b-blink {
+  0% {
+    opacity: 0;
+    transform: scale(0.75);
+  }
+  7% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  36%,
+  100% {
+    opacity: 0;
+    transform: scale(2.35);
   }
 }
 /* the rest stand back while something is gone to */

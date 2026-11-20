@@ -380,14 +380,21 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 .logos-root .ls-kinds:is(.is-side-left, .is-side-right) .ls-page { white-space: normal; }
 .logos-root .ls.has-nav-left .ls-chat { left: calc(50% + 98px); width: min(760px, calc(100% - 196px - 48px)); }
 .logos-root .ls.has-nav-right .ls-chat { left: calc(50% - 98px); width: min(760px, calc(100% - 196px - 48px)); }
+/* MOVE THE VIEWS (NavMover.tsx). The button stays in sight: along the top it holds the end of the row (the row scrolls
+   sideways when it has more than fits, and the button used to scroll away with it), in a rail it holds the rail's
+   foot. Its choices float over the page at a place worked out from the button, so no row, rail or bar can clip them
+   (the row along the top did: the menu hung below it and was cut off). Not scoped to the app's root, so the choices
+   look the same wherever they are drawn; .lg-tokens on them gives them the colours. */
 .logos-root .ls-navmove { position: relative; align-self: center; }
+.logos-root .ls-kinds.is-side-top .ls-navmove { position: sticky; right: 0; z-index: 2; display: flex; align-items: center; align-self: stretch; padding-left: 14px; background-color: var(--c-paper); box-shadow: 40px 0 0 var(--c-paper); }
+.logos-root .ls-kinds.is-side-top .ls-navmove::before { content: ''; position: absolute; top: 0; bottom: 0; right: 100%; width: 28px; background: linear-gradient(to right, transparent, var(--c-paper)); pointer-events: none; }
+.logos-root .ls-kinds:is(.is-side-left, .is-side-right) .ls-navmove { position: sticky; bottom: 0; z-index: 2; background-color: var(--c-paper); }
 .logos-root .ls-navmove-b { font-size: 12.5px; color: var(--c-ink-60); white-space: nowrap; }
-.logos-root .ls-navmove-menu { position: absolute; z-index: 20; display: flex; gap: 4px; padding: 6px; border: 1px solid var(--c-rule); border-radius: 10px; background: var(--c-paper); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); }
-.logos-root .ls-kinds.is-side-top .ls-navmove-menu { top: 100%; right: 0; margin-top: 4px; }
-.logos-root .ls-kinds:is(.is-side-left, .is-side-right) .ls-navmove-menu { bottom: 100%; left: 0; margin-bottom: 4px; }
-.logos-root .ls-navmove-menu button { padding: 5px 10px; border: 1px solid transparent; border-radius: 6px; background: none; font: inherit; font-size: 12.5px; color: var(--c-ink); cursor: pointer; }
-.logos-root .ls-navmove-menu button[aria-pressed='true'] { border-color: var(--c-moss); background: rgba(var(--c-moss-rgb, 53, 70, 32), 0.08); }
-.logos-root .ls-navmove-menu button:focus-visible, .logos-root .ls-navmove-b:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+.ls-navmove-menu.is-floating { position: fixed; z-index: 1000; display: flex; gap: 4px; margin: 0; padding: 6px; border: 1px solid var(--c-rule); border-radius: 10px; background: var(--c-paper); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16); }
+.ls-navmove-menu.is-floating button { padding: 5px 10px; border: 1px solid transparent; border-radius: 6px; background: none; font: inherit; font-size: 12.5px; color: var(--c-ink); cursor: pointer; }
+.ls-navmove-menu.is-floating button:hover { background: rgba(var(--c-moss-rgb, 53, 70, 32), 0.06); }
+.ls-navmove-menu.is-floating button[aria-pressed='true'] { border-color: var(--c-moss); background: rgba(var(--c-moss-rgb, 53, 70, 32), 0.08); }
+.ls-navmove-menu.is-floating button:focus-visible, .logos-root .ls-navmove-b:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
 
 /* ── THE MIND MAP, in place (Logos 6): the same cards, in Ideas, Logic or Structure ── */
 .logos-root .ls.has-mind .ls-canvas, .logos-root .ls.has-mind .ls-feed { display: none; }

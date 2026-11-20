@@ -37,7 +37,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { cameraTransform, fitCamera, isDrag, keepInView, readWheel, toWorld, KEY_PAN, type Camera } from '@/lib/canvas';
 import { aggregated, camBetween, circleIn, lodFor, namesFromFar, revealOrder, tagsAt, viewCovers, viewOf, withinBudget, BUDGET, PER_FRAME, type Lod, type View } from '@/lib/logos5/mapLod';
 import type { Scale } from '@/lib/logos5/scales';
-import { boxAround, freshness, nearestWay, noteBox, type Box, type Match, type SharedIdea, type Tile } from '@/lib/logos5/universe';
+import { blinkers, blinkOf, boxAround, freshness, nearestWay, noteBox, type Box, type Match, type SharedIdea, type Tile } from '@/lib/logos5/universe';
 import { bubbleLayout, bubblePlaces, foldedBox, type BubbleCluster, type BubbleLink } from '@/lib/logos5/bubbles';
 import { mapProvenance, type MapMemory } from '@/lib/logos5/memoryAtlas';
 import { PROJECT_COLOR_KEYS, type Homes } from '@/lib/logos5/spatial';
@@ -293,9 +293,14 @@ export function BubbleMap({
       const { w, h } = sizeRef.current;
       const needs = lodFor(c.k, v.lod) !== v.lod || !v.cull || !viewCovers(v.cull, c, w, h) || Math.abs(Math.log(c.k / (v.cam.k || 1))) > 0.35;
       if (needs && !commitRaf.current) commitRaf.current = requestAnimationFrame(commit);
+      // the conversations' blinks stand down while the camera moves and come back as it rests (universe.css): set once
+      // as a move begins and cleared once it ends, never per frame — an attribute React does not manage
+      const b = box.current;
+      if (b && !b.hasAttribute('data-moving')) b.setAttribute('data-moving', '');
       if (idle.current) clearTimeout(idle.current);
       idle.current = setTimeout(() => {
         if (!commitRaf.current) commitRaf.current = requestAnimationFrame(commit);
+        box.current?.removeAttribute('data-moving');
       }, 160);
     },
     [applyCam, commit]
@@ -826,6 +831,8 @@ export function BubbleMap({
     return { x1: a.x + ((b.x - a.x) / d) * a.r, y1: a.y + ((b.y - a.y) / d) * a.r, x2: b.x - ((b.x - a.x) / d) * b.r, y2: b.y - ((b.y - a.y) / d) * b.r };
   };
   const dimmed = (id: string) => !!matchOf && !matchOf(id);
+  /** the conversations that blink: the most recently active (lib/logos5/universe.ts blinkers) */
+  const blinky = useMemo(() => blinkers(tiles), [tiles]);
   const lineLit = (ids: readonly string[]) => (litSet ? (ids.every((i) => litSet.has(i)) ? ' is-lit' : ' is-quiet') : '');
   /** a conversation's colour: its subject's, or its kind's, or how recent it is — as the person chose */
   const colorOf = (t: Tile, g: string): string => {
@@ -1157,6 +1164,8 @@ export function BubbleMap({
           if (!tile) return null;
           const s = shiftOf(h.id);
           const m = matchOf ? matchOf(h.id) : null;
+          // its blink, as a quick question's (universe.css, THE CONVERSATIONS BLINK)
+          const bk = blinkOf(h.id, tile.at, now);
           return (
             <div
               key={h.id}
@@ -1165,6 +1174,7 @@ export function BubbleMap({
                 h.shade ? 'is-shade' : '',
                 h.halo ? 'has-halo' : '',
                 h.focus ? 'is-focus' : '',
+                blinky.has(h.id) ? 'can-blink' : '',
                 sel.has(h.id) ? 'is-sel' : '',
                 h.id === activeId ? 'is-here' : '',
                 matchOf && !m ? 'is-dim' : '',
@@ -1182,7 +1192,7 @@ export function BubbleMap({
                 height: 2 * h.r,
                 transform: s.x || s.y ? `translate(${s.x}px, ${s.y}px)` : undefined,
                 // --fn and --rn unitless: the words fade in by their size on screen (font × zoom), never forced bigger than the disc
-                ...css({ '--c': colorOf(tile, h.g), '--r': `${h.r}px`, '--rn': h.r, '--f': `${h.font}px`, '--fn': h.font, '--lines': h.lines, '--d': `${hubArrives(h.id)}ms` }),
+                ...css({ '--c': colorOf(tile, h.g), '--r': `${h.r}px`, '--rn': h.r, '--f': `${h.font}px`, '--fn': h.font, '--lines': h.lines, '--d': `${hubArrives(h.id)}ms`, '--bk': `${bk.every}s`, '--bd': `${bk.delay}s` }),
               }}
               data-node={h.id}
               role="button"
@@ -1234,12 +1244,15 @@ export function BubbleMap({
           if (!tile) return null;
           const s = shiftOf(d.id);
           const m = matchOf ? matchOf(d.id) : null;
+          // its blink: how often (the newer, the more often) and its own phase (universe.css, THE CONVERSATIONS BLINK)
+          const bk = blinkOf(d.id, tile.at, now);
           return (
             <div
               key={d.id}
               className={[
                 'l5b-dot' + motion(d.id),
                 tile.kind === 'core' ? 'is-chat' : '',
+                blinky.has(d.id) ? 'can-blink' : '',
                 d.named ? 'is-named' : '',
                 `side-${d.side}`,
                 sel.has(d.id) ? 'is-sel' : '',
@@ -1251,7 +1264,7 @@ export function BubbleMap({
               ]
                 .filter(Boolean)
                 .join(' ')}
-              style={{ left: d.x + s.x, top: d.y + s.y, ...css({ '--c': colorOf(tile, d.g), '--r': `${d.r}px`, '--d': `${Math.min(ARRIVE_MAX, (d.hub ? hubArrives(d.hub) : ARRIVE.hub) + ARRIVE.dot + k * ARRIVE.dotStep)}ms` }) }}
+              style={{ left: d.x + s.x, top: d.y + s.y, ...css({ '--c': colorOf(tile, d.g), '--r': `${d.r}px`, '--d': `${Math.min(ARRIVE_MAX, (d.hub ? hubArrives(d.hub) : ARRIVE.hub) + ARRIVE.dot + k * ARRIVE.dotStep)}ms`, '--bk': `${bk.every}s`, '--bd': `${bk.delay}s` }) }}
               data-node={d.id}
               role="button"
               tabIndex={matchOf && !m ? -1 : 0}
