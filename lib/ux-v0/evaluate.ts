@@ -37,6 +37,7 @@ import { holdArrangement, holdStrategy } from './arrange';
 import { creativeWords } from './direction';
 import { readCreative, readingBreaches, readingIsEmpty } from './interpret';
 import { whyFor } from './knowledge';
+import { tightenField, withoutPiece, type Piece } from './compose';
 import { stepMotion } from './motion';
 import { STILL_MOTION, ensureContrast, kindDef, lookFromTokens, normalizeTokens, usableImages, type DesignSpec, type Patch, type Section } from './spec';
 import type { DesignBrief, Moodboard } from './types';
@@ -69,6 +70,21 @@ export interface PageAudit {
   errors?: string[];
   /** what the page weighs: characters of markup, pictures, pictures far larger than shown, characters inlined */
   weight?: { html: number; images: number; oversized: number; inline: number };
+  /** accessibility the browser can tell, and links that go nowhere yet or to a part that is not there */
+  a11y?: {
+    noAlt: { section: string; path: string }[];
+    noName: { section: string; path: string }[];
+    noLabel: { section: string; path: string }[];
+    skips: { section: string; path: string; from: number; to: number; text: string }[];
+    h1: number;
+    main: boolean;
+    lang: string;
+    unlinked: { section: string; path: string; text: string }[];
+    broken: { section: string; path: string; text: string; href: string }[];
+  };
+  /** parts with a wide band where nothing is (px), and shape planes touching no words and no picture */
+  voids?: { section: string; gap: number; at: number; height: number }[];
+  lone?: { section: string; path: string; share: number }[];
 }
 
 const o = (v: unknown): Record<string, any> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, any>) : {});
@@ -106,6 +122,26 @@ export function normalizeAudit(v: unknown): PageAudit | null {
     collisions: list(r.collisions, 6, (x) => ({ section: s(x.section, 48), path: s(x.path, 60), text: s(x.text, 40), with: s(x.with, 40) })),
     errors: (Array.isArray(r.errors) ? r.errors : []).map((e: unknown) => s(e, 120)).filter(Boolean).slice(0, 5),
     weight: ((w) => ({ html: n(w.html, 0, 1e9), images: n(w.images, 0, 1e5), oversized: n(w.oversized, 0, 1e5), inline: n(w.inline, 0, 1e9) }))(o(r.weight)),
+    ...(r.a11y && typeof r.a11y === 'object'
+      ? {
+          a11y: ((a) => {
+            const at = (x: Record<string, any>) => ({ section: s(x.section, 48), path: s(x.path, 80) });
+            return {
+              noAlt: list(a.noAlt, 8, at),
+              noName: list(a.noName, 8, at),
+              noLabel: list(a.noLabel, 8, at),
+              skips: list(a.skips, 6, (x) => ({ ...at(x), from: n(x.from, 1, 6), to: n(x.to, 1, 6), text: s(x.text, 60) })),
+              h1: n(a.h1, 0, 50),
+              main: a.main === true,
+              lang: s(a.lang, 20),
+              unlinked: list(a.unlinked, 12, (x) => ({ ...at(x), text: s(x.text, 40) })),
+              broken: list(a.broken, 8, (x) => ({ ...at(x), text: s(x.text, 40), href: s(x.href, 80) })),
+            };
+          })(o(r.a11y)),
+        }
+      : {}),
+    ...(Array.isArray(r.voids) ? { voids: list(r.voids, 12, (x) => ({ section: s(x.section, 48), gap: n(x.gap, 0, 1e5), at: n(x.at, 0, 1e6), height: n(x.height, 0, 1e6) })) } : {}),
+    ...(Array.isArray(r.lone) ? { lone: list(r.lone, 6, (x) => ({ section: s(x.section, 48), path: s(x.path, 80), share: n(x.share, 0, 100) })) } : {}),
   };
 }
 
@@ -288,7 +324,7 @@ export type Severity = 'high' | 'medium' | 'low';
 
 export interface Finding {
   id: string;
-  kind: 'overflow' | 'contrast' | 'target' | 'image' | 'hierarchy' | 'headline' | 'measure' | 'rhythm' | 'cliche' | 'length' | 'placeholder' | 'generic' | 'fidelity' | 'motion' | 'function' | 'performance' | 'composition';
+  kind: 'overflow' | 'contrast' | 'target' | 'image' | 'hierarchy' | 'headline' | 'measure' | 'rhythm' | 'cliche' | 'length' | 'placeholder' | 'generic' | 'fidelity' | 'motion' | 'function' | 'performance' | 'composition' | 'access' | 'link';
   severity: Severity;
   viewport: 'desktop' | 'tablet' | 'phone' | 'page';
   section: string;
@@ -508,6 +544,7 @@ export function evaluateDesign(spec: DesignSpec, audits: { desktop?: PageAudit |
 
   // 12 · fidelity: the approved direction, the brief's decisions and rules, the pictures it may place; and its motion
   functionChecks(spec, audits, ctx, add);
+  siteChecks(spec, audits, add);
   const held = fidelityChecks(spec, ctx, add);
 
   const signals = genericSignals(spec, audits.desktop ?? audits.phone ?? null);
@@ -611,6 +648,57 @@ function functionChecks(spec: DesignSpec, audits: { desktop?: PageAudit | null; 
   const wt = audits.desktop?.weight;
   if (wt && wt.oversized > 0) add({ kind: 'performance', severity: 'low', viewport: 'desktop', section: '', message: `${wt.oversized} picture${wt.oversized === 1 ? ' is' : 's are'} more than three times larger than ${wt.oversized === 1 ? 'it is' : 'they are'} shown: the page loads more than it uses.` });
   if (wt && wt.html > 600_000) add({ kind: 'performance', severity: 'medium', viewport: 'page', section: '', message: `The page is ${Math.round(wt.html / 1000)} KB of markup${wt.inline > 200_000 ? `, ${Math.round(wt.inline / 1000)} KB of it pictures written into the page` : ''}: it will be slow to arrive.` });
+}
+
+/**
+ * What a published website needs that a picture of one does not: every picture, control and field named, headings
+ * in order, one page title, a main landmark; every link going somewhere (a link to a part not on the page is a
+ * failure; one that goes nowhere yet is the designer's to set, and said as such); and the two compositional slips
+ * the eye catches first, a band where nothing is and a shape plane standing alone (judgements, not failures).
+ */
+function siteChecks(spec: DesignSpec, audits: { desktop?: PageAudit | null; tablet?: PageAudit | null; phone?: PageAudit | null }, add: (f: Omit<Finding, 'id'>) => void): void {
+  const a = audits.desktop?.a11y;
+  const website = spec.pageType === 'website';
+  if (a) {
+    for (const x of a.noAlt.slice(0, 3)) add({ kind: 'access', severity: 'high', viewport: 'page', section: x.section, message: `A picture in ${label(spec, x.section)} has no text alternative.`, manual: true });
+    for (const x of a.noName.slice(0, 3)) add({ kind: 'access', severity: 'high', viewport: 'page', section: x.section, message: `A control in ${label(spec, x.section)} has no name a screen reader can say.`, manual: true });
+    for (const x of a.noLabel.slice(0, 3)) add({ kind: 'access', severity: 'high', viewport: 'page', section: x.section, message: `A field in ${label(spec, x.section)} has no label.`, manual: true });
+    for (const x of a.skips.slice(0, 2)) add({ kind: 'access', severity: 'low', viewport: 'page', section: x.section, message: `The headings jump from level ${x.from} to ${x.to} at “${x.text}”: an outline read aloud skips a step.`, manual: true });
+    if (website && a.h1 !== 1) add({ kind: 'access', severity: 'medium', viewport: 'page', section: '', message: a.h1 ? `The page has ${a.h1} page titles (h1); it should have one.` : 'The page has no page title (h1).', manual: true });
+    if (website && !a.main) add({ kind: 'access', severity: 'low', viewport: 'page', section: '', message: 'The page has no main landmark: assistive technology cannot jump to its content.', manual: true });
+    for (const x of a.broken.slice(0, 4)) add({ kind: 'link', severity: 'high', viewport: 'page', section: x.section, message: `“${x.text}” goes to ${x.href}, which is not on the page.`, manual: true });
+    for (const x of a.unlinked.slice(0, 6)) add({ kind: 'link', severity: 'medium', viewport: 'page', section: x.section, message: `“${x.text}” goes nowhere yet.`, ask: 'Give it a destination in Publish: a part of the page, an address, an email or a phone number.', manual: true });
+  }
+  // a band where nothing is: in a composed field its empty rows are closed (the arrangement kept); elsewhere said
+  const seenVoid = new Set<string>();
+  for (const [vp, au] of [['desktop', audits.desktop], ['tablet', audits.tablet]] as const)
+    for (const v of au?.voids ?? []) {
+      if (seenVoid.has(v.section)) continue;
+      seenVoid.add(v.section);
+      const sec = spec.sections.find((x) => x.id === v.section);
+      const tight = sec?.kind === 'compose' && sec.content.root ? tightenField(sec.content.root as Piece) : null;
+      add({
+        kind: 'composition',
+        severity: 'medium',
+        viewport: vp,
+        section: v.section,
+        message: `${label(spec, v.section)} leaves a ${v.gap}px band with nothing in it: it reads as missing content, not as space.`,
+        ...(tight ? { fix: { op: 'content', sectionId: v.section, content: { ...sec!.content, root: tight }, summary: `Closed the empty band in ${label(spec, v.section)}` } as Patch } : { ask: `Tighten ${label(spec, v.section)}: close the empty band.` }),
+      });
+    }
+  // a plane touching nothing: offered to take away (never taken away without the designer: it is the direction's)
+  for (const l of (audits.desktop?.lone ?? []).slice(0, 3)) {
+    const sec = spec.sections.find((x) => x.id === l.section);
+    const cut = sec?.kind === 'compose' && sec.content.root && l.path.startsWith('root.') ? withoutPiece(sec.content.root as Piece, l.path) : null;
+    add({
+      kind: 'composition',
+      severity: 'low',
+      viewport: 'desktop',
+      section: l.section,
+      message: `A shape in ${label(spec, l.section)} (${l.share}% of it) touches no words and no picture: alone, it reads as a placeholder.`,
+      ...(cut ? { fix: { op: 'content', sectionId: l.section, content: { ...sec!.content, root: cut }, summary: `Took away the lone shape in ${label(spec, l.section)}` } as Patch, manual: true } : { manual: true }),
+    });
+  }
 }
 
 const J0 = (v: unknown) => JSON.stringify(v);

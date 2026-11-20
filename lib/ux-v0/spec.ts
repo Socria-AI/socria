@@ -285,6 +285,58 @@ export interface DesignSpec {
   /** what produced this version */
   reason: string;
   createdAt: number;
+  /** the site around the design: set by the designer, never by the model (see SiteSettings) */
+  site?: SiteSettings;
+}
+
+/**
+ * The site around a design: what search results and link previews read, where its forms send, where its buttons
+ * go. Every value is the designer's: SocriaUX never invents an address, a form service or a description of the
+ * business. Unset, the page's own words stand in where they can (lib/ux-v0/render.ts head) and the rest is said
+ * plainly as not set up (lib/ux-v0/links.ts, the checks, the export's README).
+ */
+export interface SiteSettings {
+  /** one or two sentences for search results and link previews */
+  description?: string;
+  /** the address the site will live at (https): canonical links, link previews, the sitemap */
+  url?: string;
+  /** where the forms send their answers: an https form endpoint, or a mailto: address */
+  formAction?: string;
+  /** the language of the page's words (BCP 47: "en", "fr-CA") */
+  lang?: string;
+  /** destinations the designer set for buttons and links, by "sectionId:path" (lib/ux-v0/links.ts) */
+  links?: Record<string, string>;
+}
+
+/** A destination a link may have: a part of the page, the top, an https address, an email or a phone number. */
+export function safeHref(v: unknown): string {
+  if (typeof v !== 'string') return '';
+  const h = v.trim();
+  if (/^#(top|s-[\w-]{1,60})$/.test(h)) return h;
+  if (/^https:\/\/[a-z0-9.-]+\.[a-z]{2,}(?::\d{2,5})?(?:[/?#][^\s"'<>`]*)?$/i.test(h) && h.length <= 500) return h;
+  if (/^mailto:[^\s"'<>@?]{1,64}@[a-z0-9.-]+\.[a-z]{2,}$/i.test(h) && h.length <= 260) return h;
+  if (/^tel:\+?[\d\s().-]{5,30}$/.test(h)) return h.replace(/\s+/g, '');
+  return '';
+}
+
+/** The site settings held to their shape: anything that is not a well-formed value is dropped, never guessed. */
+export function normalizeSite(v: unknown): SiteSettings | undefined {
+  const r = o(v);
+  const out: SiteSettings = {};
+  const description = s(r.description, 300);
+  if (description) out.description = description;
+  const url = safeHref(r.url);
+  if (url.startsWith('https://')) out.url = url.replace(/#.*$/, '');
+  const formAction = safeHref(r.formAction);
+  if (formAction.startsWith('https://') || formAction.startsWith('mailto:')) out.formAction = formAction;
+  if (typeof r.lang === 'string' && /^[a-z]{2,3}(-[a-z0-9]{2,8}){0,2}$/i.test(r.lang.trim())) out.lang = r.lang.trim();
+  const links: Record<string, string> = {};
+  for (const [k, val] of Object.entries(o(r.links)).slice(0, 80)) {
+    const href = safeHref(val);
+    if (href && /^[\w-]{1,48}:[\w.]{1,80}$/.test(k)) links[k] = href;
+  }
+  if (Object.keys(links).length) out.links = links;
+  return Object.keys(out).length ? out : undefined;
 }
 
 // ── small helpers (local: types.ts imports this file) ────────────────
@@ -778,13 +830,14 @@ export function normalizeSpec(v: unknown, moodboard?: Moodboard | null): DesignS
     notes: [...new Set(notes)].slice(0, 8),
     reason: s(r.reason, 200),
     createdAt: typeof r.createdAt === 'number' && r.createdAt > 0 ? Math.round(r.createdAt) : Date.now(),
+    ...((site) => (site ? { site } : {}))(normalizeSite(r.site)),
   };
 }
 
 // ── patches: iteration that touches only what was asked ───────────────
 
-export type PatchOp = 'tokens' | 'look' | 'content' | 'variant' | 'tone' | 'shape' | 'responsive' | 'story' | 'replace' | 'add' | 'remove' | 'move' | 'images' | 'none';
-export const PATCH_OPS: readonly PatchOp[] = ['tokens', 'look', 'content', 'variant', 'tone', 'shape', 'responsive', 'story', 'replace', 'add', 'remove', 'move', 'images', 'none'];
+export type PatchOp = 'tokens' | 'look' | 'content' | 'variant' | 'tone' | 'shape' | 'responsive' | 'story' | 'replace' | 'add' | 'remove' | 'move' | 'images' | 'site' | 'none';
+export const PATCH_OPS: readonly PatchOp[] = ['tokens', 'look', 'content', 'variant', 'tone', 'shape', 'responsive', 'story', 'replace', 'add', 'remove', 'move', 'images', 'site', 'none'];
 
 export interface Patch {
   op: PatchOp;
@@ -806,6 +859,9 @@ export interface Patch {
   rule?: Record<string, unknown>;
   /** a "story" patch: this sequence is (true) or is no longer (false) the one told as the pinned story */
   story?: boolean;
+  /** a "site" patch (the designer's only, never the model's): settings to set; "" or null clears one, and in
+   * `links` a key set to "" or null clears that destination */
+  site?: Record<string, unknown>;
   /** one line: what the change is */
   summary: string;
 }
@@ -830,6 +886,7 @@ export function normalizePatch(v: unknown): Patch {
     breakpoint: (BREAKPOINTS as readonly string[]).includes(r.breakpoint) ? (r.breakpoint as Breakpoint) : r.breakpoint === 'phone' ? 'mobile' : undefined,
     rule: r.rule && typeof r.rule === 'object' && !Array.isArray(r.rule) ? o(r.rule) : undefined,
     story: typeof r.story === 'boolean' ? r.story : undefined,
+    site: r.site && typeof r.site === 'object' && !Array.isArray(r.site) ? o(r.site) : undefined,
     summary: s(r.summary, 200),
   };
 }
@@ -857,6 +914,23 @@ export function applyPatch(spec: DesignSpec, patchIn: Patch, moodboard?: Moodboa
   switch (p.op) {
     case 'none':
       return { ok: false, error: 'No change was asked for.' };
+    case 'site': {
+      if (!p.site) return { ok: false, error: 'No site setting to change.' };
+      const was: Record<string, unknown> = { ...(spec.site ?? {}) };
+      const links: Record<string, unknown> = { ...(spec.site?.links ?? {}) };
+      for (const [k, val] of Object.entries(p.site)) {
+        if (k === 'links') {
+          for (const [lk, lv] of Object.entries(o(val))) {
+            if (lv === '' || lv === null) delete links[lk];
+            else links[lk] = lv;
+          }
+        } else if (val === '' || val === null) delete was[k];
+        else was[k] = val;
+      }
+      const site = normalizeSite({ ...was, links });
+      const { site: _drop, ...rest } = spec;
+      return { ok: true, spec: { ...rest, ...(site ? { site } : {}), version: spec.version + 1, reason: p.summary || 'Site settings', createdAt: Date.now() }, touched: [] };
+    }
     case 'tokens': {
       if (!p.tokens) return { ok: false, error: 'No tokens to change.' };
       const notes: string[] = [];

@@ -63,6 +63,7 @@ import { kineticHeadline, motionCss, scriptedMarks, type MotionMode } from './mo
 import { MOTION_RUNTIME } from './motion-runtime';
 import { SCENE_RUNTIME } from './scene-runtime';
 import { proceduralUri } from './assets';
+import { anchorOf, linkKey, resolveLinks, type Links } from './links';
 
 export interface Credit {
   id: string;
@@ -89,7 +90,26 @@ export interface RenderOptions {
    * which has no sandbox to add it. The canvas, the preview and the checks add it by nonce instead.
    */
   runtime?: boolean;
+  /**
+   * The page as published (an export): its forms send to the destination the designer set (spec.site.formAction)
+   * instead of saying that nothing was sent. The canvas, the preview and the checks never send anything.
+   */
+  live?: boolean;
 }
+
+/**
+ * Where this render's buttons and links go (lib/ux-v0/links.ts), set for the length of one renderDesign call: the
+ * section renderers below draw buttons from many places that do not carry the render's context.
+ */
+let LINKS: Links | null = null;
+/** A link's destination as attributes: where it goes, and a mark when it goes nowhere yet. */
+const linkTo = (section: string, path: string): string => {
+  const l = LINKS?.byKey.get(linkKey(section, path));
+  if (!l) return 'href="#"';
+  return `href="${esc(l.href)}"${l.by === 'none' ? ' data-ux-unlinked=""' : ''}${/^https:/.test(l.href) ? ' rel="noopener"' : ''}`;
+};
+/** The page as published: forms send to the designer's destination (see RenderOptions.live). */
+let LIVE_FORM = '';
 
 // ── text ─────────────────────────────────────────────────────────────
 
@@ -413,8 +433,6 @@ interface Ctx {
   no: string;
   turn: number;
   im: Images;
-  /** where each of the navigation's links goes: a part of this page, or nowhere yet */
-  hrefs?: string[];
   /** the display face's weight range, when it is variable (a sweep of weight needs one) */
   weights?: [number, number] | null;
 }
@@ -428,23 +446,22 @@ const head = (s: Section, c: Record<string, any>, x: Ctx, cls = '') =>
     ? `<div class="section-head${cls ? ` ${cls}` : ''}">${secNo(x)}${eyebrow(s, c.eyebrow)}${c.title ? `<h2 class="h-section" ${attr(s.id, 'title')}>${t(c.title)}</h2>` : ''}${c.intro ? `<p class="lede" ${attr(s.id, 'intro')}>${t(c.intro)}</p>` : ''}</div>`
     : '';
 const btn = (s: Section, path: string, label: unknown, kind: 'primary' | 'secondary') =>
-  label ? `<a class="btn btn-${kind}" href="#" ${attr(s.id, path)}>${t(label)}</a>` : '';
+  label ? `<a class="btn btn-${kind}" ${linkTo(s.id, path)} ${attr(s.id, path)}>${t(label)}</a>` : '';
 const actions = (s: Section, c: Record<string, any>, a = 'primary', b = 'secondary') =>
   c[a] || c[b] ? `<div class="actions">${btn(s, a, c[a], 'primary')}${btn(s, b, c[b], 'secondary')}</div>` : '';
 const num = (i: number) => String(i + 1).padStart(2, '0');
 
 const SECTIONS: Record<string, R> = {
   nav: (s, c, x) => {
-    const href = (i: number) => esc(x.hrefs?.[i] ?? '#');
-    const links = (c.links as string[]).map((l, i) => `<li><a href="${href(i)}" ${attr(s.id, `links.${i}`)}>${t(l)}</a></li>`).join('');
+    const links = (c.links as string[]).map((l, i) => `<li><a ${linkTo(s.id, `links.${i}`)} ${attr(s.id, `links.${i}`)}>${t(l)}</a></li>`).join('');
     // where the links are not shown in the bar (on a phone; always, in the "menu" variant) a Menu button opens them
     // full-screen. The button appears only once SocriaUX's behaviour runtime has bound it (lib/ux-v0/behaviors.ts), so a
     // page without scripts never shows a control that does nothing
-    const big = (c.links as string[]).map((l, i) => `<li><a href="${href(i)}">${t(l)}</a></li>`).join('');
+    const big = (c.links as string[]).map((l, i) => `<li><a ${linkTo(s.id, `links.${i}`)}>${t(l)}</a></li>`).join('');
     const menu = links
-      ? `<button type="button" class="nav-menu" data-ux-menu aria-expanded="false" aria-controls="${esc(s.id)}-menu" hidden>Menu</button><div class="nav-over" id="${esc(s.id)}-menu" data-ux-menu-panel role="dialog" aria-modal="true" aria-label="Menu" hidden><button type="button" class="nav-close" data-ux-menu-close>Close</button><ul class="nav-over-links">${big}</ul>${c.cta ? `<a class="btn btn-primary" href="#">${t(c.cta)}</a>` : ''}</div>`
+      ? `<button type="button" class="nav-menu" data-ux-menu aria-expanded="false" aria-controls="${esc(s.id)}-menu" hidden>Menu</button><div class="nav-over" id="${esc(s.id)}-menu" data-ux-menu-panel role="dialog" aria-modal="true" aria-label="Menu" hidden><button type="button" class="nav-close" data-ux-menu-close>Close</button><ul class="nav-over-links">${big}</ul>${c.cta ? `<a class="btn btn-primary" ${linkTo(s.id, 'cta')}>${t(c.cta)}</a>` : ''}</div>`
       : '';
-    return `<header class="wrap nav-in"><a class="brand" href="#" ${attr(s.id, 'brand')}>${t(c.brand)}</a>${links ? `<nav aria-label="Main"><ul class="nav-links">${links}</ul></nav>` : ''}${c.cta ? btn(s, 'cta', c.cta, 'primary') : ''}${menu}</header>`;
+    return `<header class="wrap nav-in"><a class="brand" ${linkTo(s.id, 'brand')} ${attr(s.id, 'brand')}>${t(c.brand)}</a>${links ? `<nav aria-label="Main"><ul class="nav-links">${links}</ul></nav>` : ''}${c.cta ? btn(s, 'cta', c.cta, 'primary') : ''}${menu}</header>`;
   },
   hero: (s, c, x) => {
     const { im, look } = x;
@@ -558,9 +575,9 @@ const SECTIONS: Record<string, R> = {
           const rings = shapeRings(p.form);
           const ratio = p.ratio ? ` cp-sr-${p.ratio.replace(':', 'x')}` : '';
           if (p.tone === 'line')
-            return `<svg class="cp-shape cp-t-line${ratio}" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="${svgPath(rings, smoothShape(p.form))}" fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>`;
+            return `<svg class="cp-shape cp-t-line${ratio}" ${attr(s.id, path)} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="${svgPath(rings, smoothShape(p.form))}" fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>`;
           const from = p.morph ? morphFrom(rings) : null;
-          return `<div class="cp-shape cp-t-${p.tone}${ratio}${from ? ' cp-morph' : ''}" style="--cp-clip:${clipPolygon(rings)}${from ? `;--cp-from:${from}` : ''}"${from && x.play ? ' data-mo-in=""' : ''} aria-hidden="true"></div>`;
+          return `<div class="cp-shape cp-t-${p.tone}${ratio}${from ? ' cp-morph' : ''}" ${attr(s.id, path)} style="--cp-clip:${clipPolygon(rings)}${from ? `;--cp-from:${from}` : ''}"${from && x.play ? ' data-mo-in=""' : ''} aria-hidden="true"></div>`;
         }
         case 'flow': {
           // words wrapping a shape: the float is the shape (a plane in its tone, or a picture cut to it) and the
@@ -571,7 +588,7 @@ const SECTIONS: Record<string, R> = {
           return `<div class="cp-flow">${float}${p.children.map((ch, i) => piece(ch, `${path}.children.${i}`)).join('')}</div>`;
         }
         case 'button':
-          return p.style === 'link' ? `<a class="cp-link" href="#" ${attr(s.id, `${path}.label`)}>${t(p.label)}</a>` : btn(s, `${path}.label`, p.label, p.style);
+          return p.style === 'link' ? `<a class="cp-link" ${linkTo(s.id, `${path}.label`)} ${attr(s.id, `${path}.label`)}>${t(p.label)}</a>` : btn(s, `${path}.label`, p.label, p.style);
         case 'list': {
           const tag = p.marker === 'number' ? 'ol' : 'ul';
           return `<${tag} class="cp-list cp-m-${p.marker}">${p.items.map((it, i) => `<li ${attr(s.id, `${path}.items.${i}`)}>${t(it)}</li>`).join('')}</${tag}>`;
@@ -736,16 +753,21 @@ const SECTIONS: Record<string, R> = {
     const fields = (c.fields as any[])
       .map((f, i) => {
         const id = `${s.id}-f${i}`;
+        // each answer is sent under a name of its own (a form service reads them by name)
+        const name = ` name="${esc(String(f.label || `field ${i + 1}`).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || `field-${i + 1}`)}-${i + 1}"`;
         const req = f.required ? ' required' : '';
         const label = `<label for="${id}" ${attr(s.id, `fields.${i}.label`)}>${t(f.label)}${f.required ? ' <span class="req" aria-hidden="true">*</span>' : ''}</label>`;
         const ph = f.placeholder ? ` placeholder="${plain(f.placeholder)}"` : '';
-        if (f.type === 'checkbox') return `<div class="field is-check"><input id="${id}" type="checkbox"${req}>${label}</div>`;
-        if (f.type === 'textarea') return `<div class="field">${label}<textarea id="${id}" rows="4"${ph}${req}></textarea></div>`;
-        if (f.type === 'select') return `<div class="field">${label}<select id="${id}"${req}>${((f.options as string[]).length ? (f.options as string[]) : ['Choose one']).map((o) => `<option>${esc(o)}</option>`).join('')}</select></div>`;
-        return `<div class="field">${label}<input id="${id}" type="${esc(f.type || 'text')}"${ph}${req}></div>`;
+        if (f.type === 'checkbox') return `<div class="field is-check"><input id="${id}" type="checkbox"${name} value="yes"${req}>${label}</div>`;
+        if (f.type === 'textarea') return `<div class="field">${label}<textarea id="${id}"${name} rows="4"${ph}${req}></textarea></div>`;
+        if (f.type === 'select') return `<div class="field">${label}<select id="${id}"${name}${req}>${((f.options as string[]).length ? (f.options as string[]) : ['Choose one']).map((o) => `<option>${esc(o)}</option>`).join('')}</select></div>`;
+        return `<div class="field">${label}<input id="${id}" type="${esc(f.type || 'text')}"${name}${ph}${req}></div>`;
       })
       .join('');
-    const form = `<form class="form" action="#" method="post" data-ux-form novalidate><div class="fields">${fields}</div><button type="submit" class="btn btn-primary" ${attr(s.id, 'submit')}>${t(c.submit)}</button>${c.note ? `<p class="small muted" ${attr(s.id, 'note')}>${t(c.note)}</p>` : ''}<p class="fm-done" data-ux-done role="status" tabindex="-1" hidden>Sent. <span class="muted">A prototype: nothing was sent.</span></p></form>`;
+    // published with a destination, the form sends there once its answers are checked; otherwise it says plainly that
+    // nothing was sent (a form never pretends to send)
+    const dest = LIVE_FORM ? ` action="${esc(LIVE_FORM)}" method="post"${LIVE_FORM.startsWith('mailto:') ? ' enctype="text/plain"' : ''} data-ux-live=""` : ' action="#" method="post"';
+    const form = `<form class="form"${dest} data-ux-form novalidate><div class="fields">${fields}</div><button type="submit" class="btn btn-primary" ${attr(s.id, 'submit')}>${t(c.submit)}</button>${c.note ? `<p class="small muted" ${attr(s.id, 'note')}>${t(c.note)}</p>` : ''}<p class="fm-done" data-ux-done role="status" tabindex="-1" hidden>${LIVE_FORM ? 'Sending…' : 'Checked. <span class="muted">This form is not connected yet: nothing was sent.</span>'}</p></form>`;
     return `<div class="wrap form-wrap fm-${s.variant}"><div class="form-head">${secNo(x)}<h2 class="h-section" ${attr(s.id, 'title')}>${t(c.title)}</h2>${c.intro ? `<p class="body-lg" ${attr(s.id, 'intro')}>${t(c.intro)}</p>` : ''}</div>${form}</div>`;
   },
   text: (s, c, x) =>
@@ -754,7 +776,7 @@ const SECTIONS: Record<string, R> = {
     `<footer class="wrap foot">${`<div class="foot-brand"><p class="brand" ${attr(s.id, 'brand')}>${t(c.brand)}</p>${c.tagline ? `<p class="muted" ${attr(s.id, 'tagline')}>${t(c.tagline)}</p>` : ''}</div>`}${(c.columns as any[]).length ? `<div class="foot-cols">${(c.columns as any[])
       .map(
         (col, i) =>
-          `<div>${col.title ? `<p class="foot-title" ${attr(s.id, `columns.${i}.title`)}>${t(col.title)}</p>` : ''}<ul>${(col.links as string[]).map((l, j) => `<li><a href="#" ${attr(s.id, `columns.${i}.links.${j}`)}>${t(l)}</a></li>`).join('')}</ul></div>`
+          `<div>${col.title ? `<p class="foot-title" ${attr(s.id, `columns.${i}.title`)}>${t(col.title)}</p>` : ''}<ul>${(col.links as string[]).map((l, j) => `<li><a ${linkTo(s.id, `columns.${i}.links.${j}`)} ${attr(s.id, `columns.${i}.links.${j}`)}>${t(l)}</a></li>`).join('')}</ul></div>`
       )
       .join('')}</div>` : ''}${c.legal ? `<p class="legal small muted" ${attr(s.id, 'legal')}>${t(c.legal)}</p>` : ''}<!--credits--></footer>`,
   'app-nav': (s, c) =>
@@ -1025,7 +1047,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--body);fon
 img{display:block;max-width:100%}
 figure{margin:0}
 a{color:inherit}
-:focus-visible{outline:2px solid var(--accent-ink);outline-offset:3px}
+:focus-visible{outline:2px solid var(--accent-ink);outline-offset:3px}.skip-link{position:absolute;left:12px;top:-60px;z-index:200;display:inline-flex;align-items:center;min-height:44px;box-sizing:border-box;padding:10px 16px;border-radius:var(--r-btn,6px);background:var(--btn-bg);color:var(--btn-fg);font:600 15px/1.2 var(--body);text-decoration:none}.skip-link:focus{top:12px}
 .wrap{width:min(var(--wrap),100% - 40px);margin-inline:auto}
 .sx{padding-block:var(--space)}
 .sx.pad-s{padding-block:calc(var(--space) * .55)}.sx.pad-l{padding-block:calc(var(--space) * 1.25)}
@@ -1437,7 +1459,7 @@ svg.cp-shape.cp-t-line{clip-path:none;color:var(--text);overflow:visible;backgro
   // the classic look keeps the touches its styles had
   if (L.language === 'classic') {
     add(`.eyebrow{margin-bottom:14px}.hero-sub{margin-top:20px;font-size:clamp(1.1rem,1.6vw,1.3rem)}.lede,.body-lg,.hero-sub{line-height:1.6}.actions{margin-top:28px}.h-section{margin-bottom:14px;line-height:1.1}.hero-text{max-width:780px}`);
-    if (tk.style === 'editorial') add(`.sx+.sx:not(.sx-footer):not(.sx-cta){border-top:1px solid var(--line)}.eyebrow{color:var(--accent-ink)}`);
+    if (tk.style === 'editorial') add(`.sx+.sx:not(.sx-footer):not(.sx-cta),.sx-nav+main>.sx:first-child:not(.sx-cta){border-top:1px solid var(--line)}.eyebrow{color:var(--accent-ink)}`);
     if (tk.style === 'bold') add(`.h-hero{letter-spacing:-.035em;line-height:.98}.eyebrow{color:var(--accent-ink)}`);
     if (tk.style === 'warm') add(`.sx:nth-of-type(even):not(.sx-footer):not(.sx-nav):not([class*=tone-]){background:var(--surface)}`);
     if (tk.style === 'technical') add(`.eyebrow,.axis,.li-meta{font-family:ui-monospace,Menlo,monospace;letter-spacing:.04em}`);
@@ -1484,43 +1506,6 @@ const SHAPE_MOTION_CSS = `.mo-ready [data-mo-in] img.cp-shaped,.mo-ready .cp-sha
 .mo-ready .cp-frag[data-mo-in]>.cp-frag-p{transition:translate calc(var(--mo-d,600ms) * 1.8) var(--mo-e,ease),opacity var(--mo-d,600ms) var(--mo-e,ease)}.mo-ready .cp-frag[data-mo-in]:not(.is-in)>.cp-frag-p{translate:calc(var(--dx) * 4) calc(var(--dy) * 4);opacity:0}
 @keyframes cp-vary{from{font-weight:var(--vw0)}to{font-weight:var(--vw1)}}@media (prefers-reduced-motion:no-preference){@supports (animation-timeline:view()){.mo-ready .cp-vary{animation:cp-vary linear both;animation-timeline:view();animation-range:entry 10% cover 55%}}}`;
 
-/** The anchor a part of the page is given when a link goes to it. */
-const anchorId = (id: string) => `s-${id}`;
-
-/** Words a link may say for a part of the page that does not use them itself. */
-const LINK_KINDS: readonly [RegExp, readonly string[]][] = [
-  [/^(work|projects?|portfolio|selected|case studies|index)$/, ['gallery', 'compose', 'features']],
-  [/^(studio|about|practice|who|story|us|the house|atelier)$/, ['split', 'text', 'quote', 'compose']],
-  [/^(contact|write|enquire|enquiries|get in touch|hello)$/, ['form', 'cta', 'footer']],
-  [/^(journal|news|notes|writing|read|essays?|issue)$/, ['text', 'features', 'compose']],
-  [/^(shop|store|buy|products?|collection|pricing|prices|plans)$/, ['pricing', 'configurator', 'gallery']],
-  [/^(visit|book|booking|reserve|reservations?|hours|tickets?)$/, ['booking', 'form', 'cta']],
-  [/^(menu|food|drinks)$/, ['pricing', 'features', 'text']],
-];
-
-/**
- * Where each of the navigation's links goes: the part of this page it names — by the part's own words (its eyebrow,
- * its title), else by what kind of part answers that word — or nowhere ("#") when the page has no such part.
- */
-function linkTargets(spec: DesignSpec): { hrefs: string[]; ids: Set<string> } {
-  const nav = spec.sections.find((s) => s.kind === 'nav');
-  const links = Array.isArray(nav?.content.links) ? (nav!.content.links as unknown[]).filter((x): x is string => typeof x === 'string') : [];
-  const parts = spec.sections.filter((s) => s.kind !== 'nav');
-  const words = (s: Section) => [s.content.eyebrow, s.content.title, kindDef(s.kind)?.label].filter((x): x is string => typeof x === 'string').join(' ').toLowerCase();
-  const ids = new Set<string>();
-  const hrefs = links.map((l) => {
-    const w = l.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
-    if (!w) return '#';
-    const own = parts.find((s) => s.kind !== 'footer' && new RegExp(`\\b${w.split(' ')[0]}`).test(words(s)));
-    const kinds = LINK_KINDS.find(([re]) => re.test(w))?.[1] ?? [];
-    const target = own ?? kinds.map((k) => parts.find((s) => s.kind === k)).find(Boolean);
-    if (!target) return '#';
-    ids.add(target.id);
-    return `#${anchorId(target.id)}`;
-  });
-  return { hrefs, ids };
-}
-
 /** Draw a spec. `refs`: the project's moodboard references. */
 export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], opts: RenderOptions = {}): Rendered {
   const look = spec.look ?? lookFromTokens(spec.tokens);
@@ -1528,8 +1513,11 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], op
   const play = mode === 'play' && (look.motion?.feel ?? 'still') !== 'still';
   // a picture SocriaUX made is drawn from its recipe here, wherever the page is shown (lib/ux-v0/assets.ts)
   const im = new Images(new Map(refs.filter((r) => r.state !== 'rejected').map((r) => [r.id, r.provider === 'socriaux' && r.proc && !r.url ? { ...r, url: proceduralUri(r.proc) } : r])), look.motifs.includes('captions'), look.frame === 'shaped' && look.form ? look.form : null);
-  // the navigation's links go to the parts of the page they name; those parts are given an anchor
-  const targets = linkTargets(spec);
+  // every button and link goes somewhere real, or is marked as going nowhere yet (lib/ux-v0/links.ts); the parts of
+  // the page they go to are given an anchor
+  const links = resolveLinks(spec);
+  LINKS = links;
+  LIVE_FORM = opts.live && spec.site?.formAction ? spec.site.formAction : '';
   const display = knownFont(spec.tokens.fonts.display);
   const weights: [number, number] | null = display?.variable && display.weights.length === 2 ? [display.weights[0], display.weights[1]] : null;
   let prevKind = '';
@@ -1557,8 +1545,8 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], op
     const edged = look.edges === 'shaped' && look.form && tag === 'section' && !!tone && !app && prevKind !== '' && prevKind !== 'nav';
     prevKind = s.kind;
     const styleAll = [style, edged ? `--edge-clip:${edgeClip(figureFor(look.form!, 'edge', counter + turn, s.id))}` : ''].filter(Boolean).join(';');
-    const anchor = targets.ids.has(s.id) ? ` id="${esc(anchorId(s.id))}"` : '';
-    const html = `<${tag}${anchor} class="sx sx-${s.kind} v-${s.variant}${tone}${pad}${edged ? ' sx-edge' : ''}${sh.cls}${responsiveClasses(s)}" data-ux-section="${esc(s.id)}"${styleAll ? ` style="${styleAll}"` : ''}>${fn(s, s.content, { look, first, play, no, turn: turn++, im, app, lead: s.id === leadId, hrefs: s.kind === 'nav' ? targets.hrefs : undefined, weights })}</${tag}>`;
+    const anchor = links.anchors.has(s.id) ? ` id="${esc(anchorOf(s.id))}"` : '';
+    const html = `<${tag}${anchor} class="sx sx-${s.kind} v-${s.variant}${tone}${pad}${edged ? ' sx-edge' : ''}${sh.cls}${responsiveClasses(s)}" data-ux-section="${esc(s.id)}"${styleAll ? ` style="${styleAll}"` : ''}>${fn(s, s.content, { look, first, play, no, turn: turn++, im, app, lead: s.id === leadId, weights })}</${tag}>`;
     // a running marquee follows the opening statement
     if (!marqueeDone && s.kind === 'hero') {
       marqueeDone = true;
@@ -1575,6 +1563,14 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], op
     ? `<p class="credits">Images: ${credits.map((c) => (c.url ? `<a href="${esc(c.url)}" rel="noreferrer">${esc(c.text)}</a>` : esc(c.text))).join(' · ')}</p>`
     : '';
   let body = blocks.join('\n');
+  // a website's parts between its navigation and its footer are its main content: a landmark for assistive
+  // technology, and the place the skip link (first on the page, shown on focus) goes
+  if (!app) {
+    const navAt = spec.sections.findIndex((x) => x.kind === 'nav');
+    const footAt = spec.sections.findIndex((x) => x.kind === 'footer');
+    const inner = blocks.filter((_, i) => i !== navAt && i !== footAt).join('\n');
+    body = `<a class="skip-link" href="#main">Skip to the content</a>\n${navAt >= 0 ? `${blocks[navAt]}\n` : ''}<main id="main">\n${inner}\n</main>${footAt >= 0 ? `\n${blocks[footAt]}` : ''}`;
+  }
   if (creditHtml) body = body.includes('<!--credits-->') ? body.replace('<!--credits-->', creditHtml) : `${body}\n<div class="sx sx-credits"><div class="wrap">${creditHtml}</div></div>`;
   else body = body.replace('<!--credits-->', '');
 
@@ -1618,19 +1614,87 @@ export function renderDesign(spec: DesignSpec, refs: readonly MoodboardRef[], op
   if (marks.draw) body = body.replace(/<svg class="chart"/g, '<svg data-mo-in="" class="chart"').replace(/<polyline class="line /g, '<polyline pathLength="1" class="mo-draw line ');
 
   const fonts = fontStylesheet([spec.tokens.fonts.display, spec.tokens.fonts.body, ...(look.label === 'mono' ? [look.mono] : [])]);
+  const meta = headMeta(spec, im);
   const style = [css(spec.tokens, look, headlinesOf(spec)), motionCss(look, mode, { app }), play ? SHAPE_MOTION_CSS : '', responsiveCss(spec.sections)].filter(Boolean).join('\n');
   const html = `<!doctype html>
-<html lang="en">
+<html lang="${esc(spec.site?.lang || 'en')}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${plain(spec.title)}</title>
+${meta}
 ${fonts ? `<link rel="stylesheet" href="${esc(fonts)}">` : ''}
 <style>${style}</style>
 </head>
-<body class="s-${spec.tokens.style} look-${esc(look.language)} grid-${look.grid}${look.motion && look.motion.feel !== 'still' ? ` mo mo-${look.motion.feel}` : ''}"${marks.body}>
+<body id="top" class="s-${spec.tokens.style} look-${esc(look.language)} grid-${look.grid}${look.motion && look.motion.feel !== 'still' ? ` mo mo-${look.motion.feel}` : ''}"${marks.body}>
 ${body}${opts.runtime ? `\n<script>${BEHAVIOR_SOURCE}</script>\n<script>${MOTION_RUNTIME}</script>${spec.sections.some((x) => x.kind === 'scene') ? `\n<script>${SCENE_RUNTIME}</script>` : ''}` : ''}
 </body>
 </html>`;
+  LINKS = null;
+  LIVE_FORM = '';
   return { html, css: style, credits };
+}
+
+/**
+ * The page's description for search results and link previews: the designer's own (spec.site.description), else the
+ * page's opening words (its subtitle, intro, text, first paragraph, or a composed opening's lead), never words made
+ * up about the business; with where it came from.
+ */
+export function pageDescription(spec: DesignSpec): { text: string; from: 'set' | 'page' | 'none' } {
+  const set = pageWords(spec.site?.description, 300);
+  if (set) return { text: set, from: 'set' };
+  const opening = spec.sections.find((x) => x.kind === 'hero') ?? spec.sections.find((x) => !['nav', 'footer'].includes(x.kind));
+  const c = (opening?.content ?? {}) as Record<string, unknown>;
+  const firstPara = Array.isArray(c.paragraphs) ? c.paragraphs[0] : '';
+  // a composed opening: its first running words (a lead, else body text), not its headline
+  let composedLead = '';
+  const walk = (p: any) => {
+    if (composedLead || !p || typeof p !== 'object') return;
+    if (p.t === 'text' && (p.role === 'lead' || p.role === 'body') && typeof p.text === 'string') composedLead = p.text;
+    if (Array.isArray(p.children)) p.children.forEach(walk);
+  };
+  walk(c.root);
+  const text = pageWords(c.subtitle) || pageWords(c.intro) || pageWords(c.text) || pageWords(firstPara) || pageWords(composedLead);
+  return { text, from: text ? 'page' : 'none' };
+}
+
+/** Words of the page fit for a description: no placeholder, no emphasis marks, whole words, at most `max` characters. */
+function pageWords(v: unknown, max = 160): string {
+  if (typeof v !== 'string' || /\[[^\]]*\]/.test(v)) return '';
+  const w = v.replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+  if (w.length <= max) return w;
+  const cut = w.slice(0, max - 1);
+  return `${cut.slice(0, cut.lastIndexOf(' ') > 40 ? cut.lastIndexOf(' ') : cut.length).replace(/[,;:.\s]+$/, '')}…`;
+}
+
+/**
+ * What search results and link previews read: the designer's description, else the page's own opening words (never
+ * words SocriaUX made up about the business); Open Graph from the same; a canonical address and the site's address in
+ * the structured data only when the designer set one. The structured data says only what the page itself says: its
+ * name, and its description.
+ */
+function headMeta(spec: DesignSpec, im: Images): string {
+  const description = pageDescription(spec).text;
+  const nav = spec.sections.find((x) => x.kind === 'nav');
+  const name = pageWords((nav?.content as Record<string, unknown> | undefined)?.brand, 80) || pageWords(spec.title, 80);
+  const url = spec.site?.url ?? '';
+  // a photograph at an address of its own can be the preview's picture (made pictures and uploads have no address)
+  const picture = [...im.used.values()].find((r) => /^https:\/\//.test(r.url) && r.provider !== 'socriaux' && r.provider !== 'upload');
+  const title = plain(spec.title);
+  const out = [
+    description ? `<meta name="description" content="${esc(description)}">` : '',
+    `<meta name="theme-color" content="${esc(spec.tokens.colors.background)}">`,
+    url ? `<link rel="canonical" href="${esc(url)}">` : '',
+    `<meta property="og:type" content="website">`,
+    `<meta property="og:title" content="${title}">`,
+    description ? `<meta property="og:description" content="${esc(description)}">` : '',
+    url ? `<meta property="og:url" content="${esc(url)}">` : '',
+    picture ? `<meta property="og:image" content="${esc(picture.url)}">` : '',
+    `<meta name="twitter:card" content="${picture ? 'summary_large_image' : 'summary'}">`,
+  ];
+  const ld: Record<string, string> = { '@context': 'https://schema.org', '@type': 'WebSite', name: name || title };
+  if (url) ld.url = url;
+  if (description) ld.description = description;
+  out.push(`<script type="application/ld+json">${JSON.stringify(ld).replace(/</g, '\\u003c')}</script>`);
+  return out.filter(Boolean).join('\n');
 }

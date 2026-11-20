@@ -456,3 +456,56 @@ export function arrangedOpening(w: OpeningWords, hasImage: boolean, r: () => num
   put(detail, side ? (hasImage ? 5 : 1) : 7, 3, hasImage ? 4 : 3, 1);
   return { t: 'field', rows: 'm', children, cells };
 }
+
+/**
+ * A composed tree with every field's empty rows closed: a row no piece stands in is taken out and the pieces below
+ * move up, the gaps between rows set small. What makes an empty band where the composition left one by accident;
+ * the arrangement (columns, order, overlaps) is kept. Null when nothing would change.
+ */
+export function tightenField(root: Piece): Piece | null {
+  let changed = false;
+  const walk = (p: Piece): Piece => {
+    if (p.t === 'field') {
+      const covered = new Set<number>();
+      for (const c of p.cells) for (let r = c.row; r < c.row + c.rows; r++) covered.add(r);
+      const order = [...covered].sort((a, b) => a - b);
+      const rank = new Map(order.map((r, i) => [r, i + 1]));
+      const cells = p.cells.map((c) => {
+        const row = rank.get(c.row) ?? c.row;
+        let rows = 0;
+        for (let r = c.row; r < c.row + c.rows; r++) if (covered.has(r)) rows++;
+        return { ...c, row, rows: Math.max(1, rows) };
+      });
+      const moved = cells.some((c, i) => c.row !== p.cells[i].row || c.rows !== p.cells[i].rows) || p.rows !== 's';
+      if (moved) changed = true;
+      return { ...p, rows: 's', cells, children: p.children.map(walk) };
+    }
+    return 'children' in p && Array.isArray(p.children) ? ({ ...p, children: p.children.map(walk) } as Piece) : p;
+  };
+  const out = walk(root);
+  return changed ? out : null;
+}
+
+/** A composed tree without the piece at `path` ("root.children.2…"); null when there is no such piece. */
+export function withoutPiece(root: Piece, path: string): Piece | null {
+  const steps = path.split('.');
+  if (steps[0] !== 'root' || steps.length < 3) return null;
+  const idx: number[] = [];
+  for (let i = 1; i < steps.length; i += 2) {
+    if (steps[i] !== 'children' || !/^\d+$/.test(steps[i + 1] ?? '')) return null;
+    idx.push(Number(steps[i + 1]));
+  }
+  const cut = (p: Piece, depth: number): Piece | null => {
+    if (!('children' in p) || !Array.isArray(p.children)) return null;
+    const at = idx[depth];
+    if (at >= p.children.length) return null;
+    if (depth === idx.length - 1) {
+      const children = p.children.filter((_, i) => i !== at);
+      if (p.t === 'field') return { ...p, children, cells: p.cells.filter((_, i) => i !== at) };
+      return { ...p, children } as Piece;
+    }
+    const inner = cut(p.children[at], depth + 1);
+    return inner ? ({ ...p, children: p.children.map((ch, i) => (i === at ? inner : ch)) } as Piece) : null;
+  };
+  return cut(root, 0);
+}

@@ -93,6 +93,12 @@ import { intentOf } from '@/lib/ux-v0/intent';
 import { listProjects } from '@/lib/ux-v0/store';
 import type { PageAudit } from '@/lib/ux-v0/evaluate';
 import { Stage, type SelectMode, type StageHandle } from './Stage';
+import { PublishPanel } from './PublishPanel';
+import { QualityPanel } from './QualityPanel';
+import { regressions } from '@/lib/ux-v0/quality';
+import { confine, describeBack, readScope, type Scope } from '@/lib/ux-v0/scope';
+import { readTargeted } from '@/lib/ux-v0/targeted';
+import { capVersions, describeChanges, restoredVersion } from '@/lib/ux-v0/history';
 import { SAVE_WORDS, useV0Project } from './useV0Project';
 
 type View = 'intent' | 'import' | 'discovery' | 'brief' | 'dna' | 'direction' | 'design';
@@ -161,7 +167,7 @@ function WorkStrip({ work }: { work: Work[] }) {
     </div>
   );
 }
-type Rail = 'brief' | 'questions' | 'reasoning' | 'selection' | 'checks' | 'history' | 'file';
+type Rail = 'brief' | 'questions' | 'reasoning' | 'selection' | 'checks' | 'history' | 'publish' | 'file';
 
 /** What the last look at the drawn design found, and what it fixed on its own. */
 interface Checks {
@@ -172,6 +178,10 @@ interface Checks {
   version: number;
   /** the page as measured at desktop width: what the originality audit reads of the rendered page */
   audit?: PageAudit | null;
+  /** the page as measured at each width (the quality report reads all three) */
+  audits?: { desktop: PageAudit | null; tablet: PageAudit | null; phone: PageAudit | null };
+  /** fixes a repair round took back because they made something worse */
+  undone?: string[];
 }
 
 /**
@@ -661,7 +671,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       const board = { ...now.moodboard, refs: [ref, ...now.moodboard.refs] };
       const res = applyPatch(cur, { op: 'images', sectionId, images: sec2.images.length ? [ref.id, ...sec2.images.slice(1)] : [ref.id], summary: `A photograph for the ${what}` }, board);
       update((p2) => {
-        const specs = res.ok ? [...p2.specs.slice(0, p2.specIndex + 1), { ...res.spec, version: cur.version + 1 }].slice(-30) : p2.specs;
+        const specs = res.ok ? capVersions([...p2.specs.slice(0, p2.specIndex + 1), { ...res.spec, version: cur.version + 1 }], p2.keptVersions) : p2.specs;
         return { ...p2, usage: addUsage(p2.usage, r.data.usage), moodboard: { ...p2.moodboard, refs: [ref, ...p2.moodboard.refs] }, specs, specIndex: specs.length - 1 };
       });
       if (res.ok) say(`The photograph is in place, and on the moodboard with its prompt and model (US$${image.cost.toFixed(2)}).`, 'info', { acts: [{ label: 'Undo', run: () => stepVersion(-1) }] });
@@ -684,7 +694,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const res = applyPatch(s, { op: 'images', sectionId, images, summary: `${PROC_LABEL[kind]} made for the ${(def?.label ?? 'part').toLowerCase()}` }, board);
     if (!res.ok) return say(`That art could not be placed: ${res.error}`, 'error');
     update((p2) => {
-      const specs = [...p2.specs.slice(0, p2.specIndex + 1), { ...res.spec, version: s.version + 1 }].slice(-30);
+      const specs = capVersions([...p2.specs.slice(0, p2.specIndex + 1), { ...res.spec, version: s.version + 1 }], p2.keptVersions);
       return { ...p2, moodboard: { ...p2.moodboard, refs: [ref, ...p2.moodboard.refs.filter((r) => r.id !== ref.id)] }, specs, specIndex: specs.length - 1 };
     });
     say(`Made: ${PROC_LABEL[kind].toLowerCase()} for the ${(def?.label ?? 'part').toLowerCase()}, in this design’s colours. It is on the moodboard with where it came from.`, 'info', {
@@ -807,7 +817,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     if (!doc || !s || !briefEdits.length) return;
     const next = briefToDesign(s, doc, briefEdits);
     update((p2) => {
-      const specs = [...p2.specs.slice(0, p2.specIndex + 1), next].slice(-30);
+      const specs = capVersions([...p2.specs.slice(0, p2.specIndex + 1), next], p2.keptVersions);
       const chosen = p2.direction.chosen ? { ...p2.direction.chosen, tokens: next.tokens, look: next.look, source: 'person' as const } : p2.direction.chosen;
       return { ...p2, specs, specIndex: specs.length - 1, direction: { ...p2.direction, chosen }, brief: { ...p2.brief, approved: true } };
     });
@@ -944,36 +954,56 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   // Drawn offscreen at 1280, 834 and 390 px, measured, read. With `autofix`, the fixes that need no
   // words are applied — at most two rounds, never to what the designer locked or fixed — before
   // anyone sees the page. Otherwise the findings are only reported.
-  const inspect = async (from: DesignSpec, autofix: boolean): Promise<{ spec: DesignSpec; fixed: string[]; ev: Evaluation; audit: PageAudit | null }> => {
+  const inspect = async (from: DesignSpec, autofix: boolean): Promise<{ spec: DesignSpec; fixed: string[]; ev: Evaluation; audit: PageAudit | null; audits: { desktop: PageAudit | null; tablet: PageAudit | null; phone: PageAudit | null }; undone: string[] }> => {
     const locks = current.current.direction.chosen?.locks ?? [];
     let audit: PageAudit | null = null;
+    let audits: { desktop: PageAudit | null; tablet: PageAudit | null; phone: PageAudit | null } = { desktop: null, tablet: null, phone: null };
     const measureAt = async (s: DesignSpec) => {
       const html = renderDesign(s, withUploads(current.current.moodboard.refs, true)).html;
       const [desktop, tablet, phone] = await Promise.all([measurePage(html, 1280, 900, nonce), measurePage(html, 834, 1112, nonce), measurePage(html, 390, 844, nonce)]);
       audit = desktop;
+      audits = { desktop, tablet, phone };
       // and whether it keeps what was decided: the approved direction, the brief's locked parts and rules, the pictures it may place
       return evaluateDesign(s, { desktop, tablet, phone }, locks, { direction: current.current.direction.chosen, brief: current.current.brief.doc, board: current.current.moodboard });
     };
     let spec = from;
     const fixed: string[] = [];
+    const undone: string[] = [];
     let ev = await measureAt(spec);
     for (let round = 0; autofix && round < MAX_REVISION_ROUNDS; round++) {
       const fixes = fixesFor(ev);
       if (!fixes.length) break;
+      const start = spec;
+      const before = ev;
+      const applied: { patch: Patch; section: string }[] = [];
       for (const f of fixes) {
         const res = applyPatch(spec, f.patch, current.current.moodboard);
-        if (res.ok) (spec = res.spec), fixed.push(f.patch.summary);
+        if (res.ok) (spec = res.spec), applied.push({ patch: f.patch, section: f.patch.sectionId ?? f.finding.section });
       }
       ev = await measureAt(spec);
+      // checked for what it broke: a section where a failure appeared, or the findings grew, has its fixes taken back
+      // (the round's other fixes stay), and the page is measured again
+      const worse = new Set(regressions(before, ev));
+      const back = applied.filter((a) => a.section && worse.has(a.section));
+      if (back.length) {
+        spec = start;
+        for (const a of applied.filter((x) => !back.includes(x))) {
+          const res = applyPatch(spec, a.patch, current.current.moodboard);
+          if (res.ok) spec = res.spec;
+        }
+        undone.push(...back.map((a) => a.patch.summary));
+        ev = await measureAt(spec);
+      }
+      fixed.push(...applied.filter((a) => !back.includes(a)).map((a) => a.patch.summary));
     }
-    return { spec, fixed, ev, audit };
+    return { spec, fixed, ev, audit, audits, undone };
   };
 
   /** Check the design as it stands, and say what was found (nothing is changed). */
   const runChecks = async (from: DesignSpec) => {
     setChecks((c) => ({ running: true, ev: c?.ev ?? null, fixed: [], version: from.version }));
     const r = await inspect(from, false);
-    setChecks({ running: false, ev: r.ev, fixed: [], version: from.version, audit: r.audit });
+    setChecks({ running: false, ev: r.ev, fixed: [], version: from.version, audit: r.audit, audits: r.audits });
   };
 
   // ── generating and changing the design ──────────────────────────────
@@ -1007,9 +1037,9 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const kept: DesignSpec | null = checked.fixed.length
       ? { ...checked.spec, version: fresh.version + 1, reason: `Checked at desktop, tablet and phone: ${checked.fixed.length} fix${checked.fixed.length === 1 ? '' : 'es'}`, createdAt: Date.now() }
       : null;
-    setChecks({ running: false, ev: checked.ev, fixed: checked.fixed, version: (kept ?? fresh).version, audit: checked.audit });
+    setChecks({ running: false, ev: checked.ev, fixed: checked.fixed, version: (kept ?? fresh).version, audit: checked.audit, audits: checked.audits, undone: checked.undone });
     update((p2) => {
-      const specs = [...p2.specs, fresh, ...(kept ? [kept] : [])].slice(-30);
+      const specs = capVersions([...p2.specs, fresh, ...(kept ? [kept] : [])], p2.keptVersions);
       const used = r.data.artDirection ?? null;
       return {
         ...p2,
@@ -1055,7 +1085,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       const patch = patches[patches.length - 1];
       const lookChanged = patches.some((pt) => pt.op === 'tokens' || pt.op === 'look');
       update((p2) => {
-        const specs = [...p2.specs.slice(0, p2.specIndex + 1), res.spec].slice(-30);
+        const specs = capVersions([...p2.specs.slice(0, p2.specIndex + 1), res.spec], p2.keptVersions);
         // what the designer changes in the look becomes the direction's: a later generation keeps it
         const chosen = p2.direction.chosen && lookChanged ? { ...p2.direction.chosen, tokens: res.spec.tokens, look: res.spec.look, source: 'person' as const } : p2.direction.chosen;
         return { ...p2, specs, specIndex: specs.length - 1, direction: { ...p2.direction, chosen } };
@@ -1066,6 +1096,27 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     },
     [current, update, say] // eslint-disable-line react-hooks/exhaustive-deps
   );
+
+  /** A whole new version (a change held to what was asked): pushed as one version Undo takes back, then checked. */
+  const applyVersion = (next: DesignSpec, label: string, said = '') => {
+    const p = current.current;
+    const s = currentSpec(p);
+    if (!s) return;
+    const v: DesignSpec = { ...next, version: s.version + 1, reason: label.charAt(0).toUpperCase() + label.slice(1), createdAt: Date.now() };
+    update((p2) => {
+      const specs = capVersions([...p2.specs.slice(0, p2.specIndex + 1), v], p2.keptVersions);
+      return { ...p2, specs, specIndex: specs.length - 1 };
+    });
+    setSelection(null);
+    say(`Changed: ${label}.${said ? ` ${said}` : ''}`, 'info', { acts: [{ label: 'Undo', run: () => stepVersion(-1) }] });
+    runChecks(v);
+  };
+
+  /** A scoped edit counted: one more, and whether it had to be held to what was asked. */
+  const countEdit = (scope: Scope, confined: boolean) => {
+    if (!scope.strict && !scope.keep.length) return;
+    update((p2) => ({ ...p2, edits: { edits: (p2.edits?.edits ?? 0) + 1, confined: (p2.edits?.confined ?? 0) + (confined ? 1 : 0) } }));
+  };
 
   /**
    * A change made by hand (the type, a change asked for in words and read in code): applied at once as a version
@@ -1129,12 +1180,25 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const s = currentSpec(p);
     if (!s) return;
     const imported = !!p.artifact?.type?.startsWith('imported');
+    // what the words allow the change to touch ("only the hero headline", "without changing the layout"): every
+    // change below is held to it (lib/ux-v0/scope.ts)
+    const scope = readScope(comment, s, selection);
+    // a part named and one kind of change (another picture, angular shapes, a compact phone navigation, calmer
+    // motion): done at once in code (lib/ux-v0/targeted.ts)
+    const tq = !imported ? readTargeted(comment, s, p.moodboard, selection, scope) : null;
+    if (tq && !tq.patches.length) return say(`Nothing to change: ${tq.label}.`, 'info');
+    if (tq) {
+      countEdit(scope, false);
+      applyChecked(tq.patches, tq.label);
+      return;
+    }
     // the everyday small changes (a colour, a typeface, the corners, new words, the headline's size) are read in
     // code and done at once — no model, nothing regenerated — asked about first when they touch what the designer
     // locked, leave their design system, or would make text hard to read (lib/ux-v0/quick-edit.ts)
     const qe = !imported ? readQuickEdit(comment, s, selection) : null;
     if (qe && !qe.patches.length) return say(`Nothing to change: ${qe.label}.`, 'info');
     if (qe) {
+      countEdit(scope, false);
       applyChecked(qe.patches, qe.label, qe.concern ? qe.concern.replace(/\s*Make the change anyway\?$/, '') : '');
       return;
     }
@@ -1170,14 +1234,27 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
         ],
       });
     if (!d.applies) return say(d.error ? `That change could not be applied: ${d.error}` : 'SocriaUX could not turn that into a change. Try saying it more specifically.', 'error');
+    // the model's change held to what the words allowed: anything it did beyond that is put back, and said
+    const held = (() => {
+      if (!scope.strict && !scope.keep.length) return null;
+      const tried = applyPatch(s, d.patch, p.moodboard);
+      if (!tried.ok) return null;
+      const c = confine(s, tried.spec, scope);
+      return c.back.length ? c : null;
+    })();
+    const apply = () => {
+      countEdit(scope, !!held);
+      if (held) applyVersion(held.spec, d.understood || d.patch.summary || 'the change', `Kept the rest exactly as it was: put back ${describeBack(held.back, s)}, which the change also touched.`);
+      else applyLocal(d.patch, d.understood);
+    };
     if (d.challenge)
       return say(d.challenge, 'info', {
         acts: [
-          { label: 'Apply anyway', run: () => (applyLocal(d.patch, d.understood), undefined), strong: true },
+          { label: 'Apply anyway', run: () => (apply(), undefined), strong: true },
           { label: 'Keep it as it is', run: () => setNotice(null) },
         ],
       });
-    applyLocal(d.patch, d.understood);
+    apply();
   };
 
   const stepVersion = (dir: -1 | 1) => {
@@ -1196,7 +1273,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     if (!s || !next) return;
     const v = { ...next, version: s.version + 1 };
     update((p2) => {
-      const specs = [...p2.specs.slice(0, p2.specIndex + 1), v].slice(-30);
+      const specs = capVersions([...p2.specs.slice(0, p2.specIndex + 1), v], p2.keptVersions);
       return { ...p2, specs, specIndex: specs.length - 1 };
     });
     say(held ? 'Composition approved. Its arrangement is held: its words and pictures can still change, and SocriaUX asks before rearranging it.' : 'Released. Its composition can be changed again.', 'info', { acts: [{ label: 'Undo', run: () => stepVersion(-1) }] });
@@ -1212,7 +1289,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     if (!s || !next) return;
     const v = { ...next, version: s.version + 1 };
     update((p2) => {
-      const specs = [...p2.specs.slice(0, p2.specIndex + 1), v].slice(-30);
+      const specs = capVersions([...p2.specs.slice(0, p2.specIndex + 1), v], p2.keptVersions);
       return { ...p2, specs, specIndex: specs.length - 1 };
     });
     say(locked ? 'Locked. It stays exactly as it is through new generations and repairs, and SocriaUX asks before changing it.' : 'Unlocked. It can be changed again.', 'info', { acts: [{ label: 'Undo', run: () => stepVersion(-1) }] });
@@ -1468,6 +1545,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
           ...(spec ? [{ id: 'selection' as Rail, label: 'Selection' }] : []),
           ...(spec ? [{ id: 'checks' as Rail, label: checks?.running ? 'Checking…' : 'Checks' }] : []),
           ...(spec ? [{ id: 'history' as Rail, label: 'Versions' }] : []),
+          ...(spec ? [{ id: 'publish' as Rail, label: 'Publish' }] : []),
         ]
       : [
           { id: 'reasoning', label: `Cards${project.cards.length ? ` ${project.cards.filter((c) => c.state !== 'dismissed').length}` : ''}` },
@@ -1954,6 +2032,19 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
             )}
             {rail === 'checks' && spec && (
               <div className="v0-rail-body">
+                {checks?.ev && checks.version === spec.version && (
+                  <QualityPanel
+                    spec={spec}
+                    ev={checks.ev}
+                    audits={checks.audits ?? { desktop: checks.audit ?? null, tablet: null, phone: null }}
+                    originality={originality}
+                    direction={project.direction.chosen}
+                    html={rendered?.html ?? ''}
+                    edits={project.edits ?? null}
+                    undone={checks.undone ?? []}
+                    onPublish={() => setRail('publish')}
+                  />
+                )}
                 {project.direction.chosen && (
                   <section className="v0-cellset">
                     <span className="sb-label">The direction it follows</span>
@@ -2161,12 +2252,63 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                         <li key={`${s.version}-${i}`}>
                           <button type="button" className={`v0-version${i === project.specIndex ? ' is-on' : ''}`} onClick={() => (update((p) => ({ ...p, specIndex: i })), setSelection(null))} aria-current={i === project.specIndex}>
                             <span className="v0-version-n">{s.version}</span>
-                            <span>{s.reason || 'A version'}</span>
+                            <span>
+                              {s.reason || 'A version'}
+                              {(project.keptVersions ?? []).includes(s.version) && <span className="v0-version-kept"> · kept</span>}
+                              {i > 0 && (() => {
+                                const what = describeChanges(project.specs[i - 1], s);
+                                return what.length ? <span className="v0-version-what">{what.slice(0, 3).join('; ')}{what.length > 3 ? `; ${what.length - 3} more` : ''}</span> : null;
+                              })()}
+                            </span>
                           </button>
                         </li>
                       ))}
                   </ol>
                 </section>
+                {spec && (
+                  <section className="v0-cellset" aria-label="This version">
+                    <span className="sb-label">Version {spec.version}</span>
+                    {project.specIndex < project.specs.length - 1 && (
+                      <>
+                        <p className="v0-quiet">
+                          Changed since, in the latest: {describeChanges(spec, project.specs[project.specs.length - 1]).join('; ') || 'nothing'}.
+                        </p>
+                        <button
+                          type="button"
+                          className="sb-link is-meta is-strong"
+                          onClick={() => {
+                            const latest = project.specs[project.specs.length - 1];
+                            const v = restoredVersion(spec, latest.version + 1);
+                            update((p2) => {
+                              const specs = capVersions([...p2.specs, v], p2.keptVersions);
+                              return { ...p2, specs, specIndex: specs.length - 1 };
+                            });
+                            say(`Restored version ${spec.version} as version ${v.version}. Nothing after it is lost: the versions in between are still here.`, 'info', { acts: [{ label: 'Undo', run: () => stepVersion(-1) }] });
+                            runChecks(v);
+                          }}
+                        >
+                          Restore this version
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      className="sb-link is-meta"
+                      aria-pressed={(project.keptVersions ?? []).includes(spec.version)}
+                      onClick={() =>
+                        update((p2) => {
+                          const kept = new Set(p2.keptVersions ?? []);
+                          if (kept.has(spec.version)) kept.delete(spec.version);
+                          else kept.add(spec.version);
+                          return { ...p2, keptVersions: [...kept].slice(-30) };
+                        })
+                      }
+                    >
+                      {(project.keptVersions ?? []).includes(spec.version) ? 'Kept: let it go with the others' : 'Keep this version'}
+                    </button>
+                    <p className="v0-quiet">The last thirty versions are kept, and every version you keep, whatever its age.</p>
+                  </section>
+                )}
                 {spec && spec.notes.length > 0 && (
                   <section className="v0-cellset">
                     <span className="sb-label">Adjusted for you</span>
@@ -2198,29 +2340,27 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                     </ul>
                   </section>
                 )}
-                {rendered && (
-                  <section className="v0-cellset">
-                    <button
-                      type="button"
-                      className="sb-link is-meta is-strong"
-                      onClick={() => {
-                        // the exported page carries its motion (CSS only, with its reduced-motion alternative)
-                        const page = spec && !imported ? renderDesign(spec, frameRefs, { motion: 'play', runtime: true }).html : rendered.html;
-                        const url = URL.createObjectURL(new Blob([page], { type: 'text/html' }));
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `${(spec?.title || project.name).replace(/[^\w-]+/g, '-').toLowerCase()}.html`;
-                        a.click();
-                        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-                        // a downloaded design is an accepted one: what the project cost, per accepted design
-                        if (spec && !imported) update((p) => ({ ...p, usage: acceptDesign(p.usage, spec.version) }));
-                      }}
-                    >
-                      Download the page as HTML
-                    </button>
-                  </section>
-                )}
               </div>
+            )}
+            {rail === 'publish' && spec && !imported && (
+              <PublishPanel
+                spec={spec}
+                refs={frameRefs}
+                context={{ projectName: project.name, direction: project.direction.chosen ? { name: project.direction.chosen.name, language: project.direction.chosen.language, said: project.direction.chosen.strategy?.said ?? [] } : null }}
+                onSite={(site, label) => applyChecked([{ op: 'site', site, summary: label.charAt(0).toUpperCase() + label.slice(1) }], label)}
+                onDownloadPage={() => {
+                  // one file: its motion, its runtime inlined, its forms sending where the designer set
+                  const page = renderDesign(spec, frameRefs, { motion: 'play', runtime: true, live: true }).html;
+                  const url = URL.createObjectURL(new Blob([page], { type: 'text/html' }));
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${(spec.title || project.name).replace(/[^\w-]+/g, '-').toLowerCase()}.html`;
+                  a.click();
+                  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+                  update((p) => ({ ...p, usage: acceptDesign(p.usage, spec.version) }));
+                }}
+                onDownloaded={() => update((p) => ({ ...p, usage: acceptDesign(p.usage, spec.version) }))}
+              />
             )}
             {rail === 'file' && imported && (
               <div className="v0-rail-body">

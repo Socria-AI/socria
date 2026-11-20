@@ -84,3 +84,12 @@ export * from '@/lib/ux-v0/form';
 export * from '@/lib/ux-v0/strategy';
 export * from '@/lib/ux-v0/composer';
 export { holdStrategy, strategyHeld } from '@/lib/ux-v0/arrange';
+// where every button and link goes (website mastery)
+export * from '@/lib/ux-v0/links';
+export * from '@/lib/ux-v0/export-site';
+export * from '@/lib/ux-v0/quality';
+export * from '@/lib/ux-v0/decisions';
+export { tightenField, withoutPiece } from '@/lib/ux-v0/compose';
+export { AREAS, AREA_LABEL, readScope, changesBetween, inScope, confine, describeBack } from '@/lib/ux-v0/scope';
+export { readTargeted, reshape } from '@/lib/ux-v0/targeted';
+export { capVersions, describeChanges, restoredVersion, MAX_VERSIONS } from '@/lib/ux-v0/history';

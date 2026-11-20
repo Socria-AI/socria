@@ -12,8 +12,10 @@
 //             that it is a prototype and no booking was made; "change the time"
 //             goes back. Full times cannot be chosen.
 //   form      required fields and email/phone formats are checked on submit,
-//             each error said beside its field; a valid form shows that it was
-//             "sent", again said to be a prototype.
+//             each error said beside its field. A valid form on a published page
+//             with a destination the designer set (data-ux-live) is submitted there;
+//             anywhere else it says plainly that it is not connected and nothing was
+//             sent.
 //   table     column headers sort the rows (ascending, then descending); a table of six rows or more
 //             filters its rows as you type.
 //   gallery   each picture opens large: previous, next, Escape and the arrow keys, focus returned on close.
@@ -157,6 +159,13 @@ export const BEHAVIOR_SOURCE = String.raw`(function () {
       var done = $(f, '[data-ux-done]');
       var submit = $(f, '[type=submit]');
       if (submit) { submit.setAttribute('aria-busy', 'true'); submit.disabled = true; }
+      // the page as published, with a destination the designer set: the checked answers go there (the browser's
+      // own submission, so a form service's thank-you page or the mail app takes over)
+      if (f.hasAttribute('data-ux-live')) {
+        if (done) done.hidden = false;
+        HTMLFormElement.prototype.submit.call(f);
+        return;
+      }
       setTimeout(function () {
         if (submit) { submit.removeAttribute('aria-busy'); submit.disabled = false; }
         if (done) { done.hidden = false; try { done.focus({ preventScroll: true }); } catch (x) { done.focus(); } }

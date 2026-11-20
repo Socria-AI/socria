@@ -518,6 +518,10 @@ export interface DesignProject {
   specIndex: number;
   /** compositions the designer set aside while exploring (their arrangement signatures): not proposed again */
   compositions?: { rejected: string[] };
+  /** the scoped edits made in words: how many, and how many tried to change more than was asked (put back) */
+  edits?: { edits: number; confined: number };
+  /** versions the designer chose to keep: never let go when older versions are (lib/ux-v0/history.ts) */
+  keptVersions?: number[];
   artifact: Artifact | null;
   cards: ReasoningCard[];
   usage: UsageTotals;
@@ -1095,6 +1099,12 @@ export function normalizeProject(v: unknown, opts: { forSync?: boolean } = {}): 
       arr(obj(r.compositions).rejected)
         .filter((x): x is string => typeof x === 'string' && x.length <= 2000)
         .slice(-60),
+    ),
+    ...((e) => (Number.isFinite(e.edits) && e.edits > 0 ? { edits: { edits: Math.min(1e6, Math.round(e.edits)), confined: Math.max(0, Math.min(Math.round(e.edits), Math.round(Number(e.confined) || 0))) } } : {}))({ edits: Number(obj(r.edits).edits), confined: obj(r.edits).confined }),
+    ...((k) => (k.length ? { keptVersions: k } : {}))(
+      arr(r.keptVersions)
+        .filter((x): x is number => typeof x === 'number' && Number.isInteger(x) && x > 0 && specs.some((sp) => sp.version === x))
+        .slice(0, 30),
     ),
     artifact: normalizeArtifact(r.artifact),
     cards,
