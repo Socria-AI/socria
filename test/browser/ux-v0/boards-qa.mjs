@@ -188,7 +188,7 @@ ok('the design-system overview is on the board, and notes tied by connectors', b
 // ── 13. the website: a real project, linked, live ──
 const siteM = mat(bd, 'Website');
 const site = await projectOf(siteM.projectId);
-ok('13. the website is a project of its own (linked by id, never copied into the board), made by the website generator in the system', site && site.medium !== 'board' && site.specs?.length === 1 && site.specs[0].tokens.fonts.display === bd.system.tokens.fonts.display && !('specs' in siteM), J({ id: siteM.projectId, specs: site?.specs?.length }));
+ok('13. the website is a project of its own (linked by id, never copied into the board), made by the website generator in the system', site && site.medium !== 'board' && site.specs?.length === 1 && site.specs[0].tokens.fonts.display === V.boardSystem.webFacesOf(bd.system.tokens.fonts).display && !('specs' in siteM), J({ id: siteM.projectId, specs: site?.specs?.length, display: site?.specs?.[0]?.tokens.fonts.display, system: bd.system.tokens.fonts.display }));
 await focusMaterial('Website');
 await page.waitForSelector('.bd-site iframe', { timeout: 10000 }).catch(() => {});
 const srcdoc = await page.locator('.bd-site iframe').first().getAttribute('srcdoc').catch(() => '');

@@ -247,14 +247,25 @@ function textBody(n: TextNode, measure: Measure, defs: Defs, override?: { fill: 
   const stroke = override?.stroke ?? (n.stroke ? ` stroke="${n.stroke.color.slice(0, 7)}" stroke-width="${n2(n.stroke.width)}" paint-order="stroke" stroke-linejoin="round"` : '');
   const deco = n.decoration ? ` text-decoration="${n.decoration}"` : '';
   const head = (extra: string) => `<text font-family="${esc(fontStack(n.font))}" font-size="${n2(n.size)}" font-weight="${n.weight}"${n.italic ? ' font-style="italic"' : ''}${extra} ${fill}${stroke}${deco}${textStyle(n)} xml:space="preserve">`;
+  // mixed styles (runs) apply only while the shown letters are the written ones, offset for offset
+  const runs = !!n.runs?.length && shownText(n).length === n.text.length;
+  // a run's own style at an offset, where it differs from the node's: face, weight, slant, colour, decoration
+  const runAttrs = (at: number): string => {
+    const r = n.runs?.find((x) => at >= x.start && at < x.end);
+    if (!r) return '';
+    const st = styleAt(n, at);
+    return [st.font !== n.font ? ` font-family="${esc(fontStack(st.font))}"` : '', st.weight !== n.weight ? ` font-weight="${st.weight}"` : '', st.italic !== !!n.italic ? ` font-style="${st.italic ? 'italic' : 'normal'}"` : '', st.color && !override ? ` ${fillAttrs(st.color)}` : '', r.decoration ? ` text-decoration="${r.decoration === 'none' ? 'none' : r.decoration}"` : ''].join('');
+  };
 
   // along a path: one line, its anchor at `start` along the path
   if (n.path) {
     const pid = defs.id(`tp-${n.id}`);
     defs.push(pid, `<path id="${pid}" d="${textPathD(n)}"/>`);
-    const words = shownText(n).replace(/\n+/g, ' ');
+    const shown = shownText(n);
+    // along the path too, each run keeps its own style
+    const words = runs ? runPieces(n, shown, 0).map((p) => (p.run ? `<tspan${runAttrs(p.at)}>${esc(p.text.replace(/\n+/g, ' '))}</tspan>` : esc(p.text.replace(/\n+/g, ' ')))).join('') : esc(shown.replace(/\n+/g, ' '));
     const offset = n.path.kind === 'circle' ? 50 : n.path.start;
-    return `${head(` letter-spacing="${n2((n.tracking / 1000) * n.size)}" text-anchor="middle"`)}<textPath href="#${pid}" xlink:href="#${pid}" startOffset="${n2(offset)}%">${esc(words)}</textPath></text>`;
+    return `${head(` letter-spacing="${n2((n.tracking / 1000) * n.size)}" text-anchor="middle"`)}<textPath href="#${pid}" xlink:href="#${pid}" startOffset="${n2(offset)}%">${words}</textPath></text>`;
   }
 
   // warped: every letter its own span, shifted, turned or scaled, while the browser still sets each letter's advance
@@ -268,6 +279,16 @@ function textBody(n: TextNode, measure: Measure, defs: Defs, override?: { fill: 
     const lines = L.lines.map((l, li) => {
       const chars = [...l.text];
       const N = chars.length;
+      // each letter's offset in the words as written (the line is its words joined by single spaces), for its run
+      const atOf: number[] = [];
+      l.words.forEach((w, wi) => {
+        if (wi) atOf.push(w.at - 1);
+        let o = w.at;
+        for (const ch of w.text) {
+          atOf.push(o);
+          o += ch.length;
+        }
+      });
       const base = first + li * L.leading + l.para * L.paraGap;
       const W = Math.max(1, l.width);
       let prev = 0;
@@ -297,6 +318,26 @@ function textBody(n: TextNode, measure: Measure, defs: Defs, override?: { fill: 
         rots.push(rot);
         sizes.push(s);
       });
+      if (!sized && runs) {
+        // shifts and turns with mixed styles: a span for each run's piece, carrying its letters' shifts and turns, the
+        // first placing the line, so the line is still one chunk that aligns as a whole and each run keeps its face
+        const groups: { key: number; from: number; to: number }[] = [];
+        chars.forEach((_, i) => {
+          const key = n.runs!.findIndex((x) => atOf[i] >= x.start && atOf[i] < x.end);
+          const g = groups[groups.length - 1];
+          if (g && g.key === key) g.to = i + 1;
+          else groups.push({ key, from: i, to: i + 1 });
+        });
+        const spans = groups.map((g, gi) => {
+          const pos = gi === 0 ? ` x="${n2(ax)}" y="${n2(base + offs[0])}"` : '';
+          const ds = offs.slice(g.from, g.to).map((v, j) => (gi === 0 && j === 0 ? 0 : v));
+          const dy = ds.some((v) => Math.abs(v) > 0.01) ? ` dy="${ds.map(n2).join(' ')}"` : '';
+          const rs = rots.slice(g.from, g.to);
+          const rotate = rs.some((v) => Math.abs(v) > 0.05) ? ` rotate="${rs.map(n2).join(' ')}"` : '';
+          return `<tspan${pos}${dy}${rotate}${runAttrs(atOf[g.from])}>${esc(chars.slice(g.from, g.to).join(''))}</tspan>`;
+        });
+        return spans.join('') || `<tspan x="${n2(ax)}" y="${n2(base)}"> </tspan>`;
+      }
       if (!sized) {
         // shifts and turns as lists on one span: each letter placed, the line's words kept whole in the file
         const dy = offs.slice(1).some((v) => Math.abs(v) > 0.01) ? ` dy="0 ${offs.slice(1).map(n2).join(' ')}"` : '';
@@ -307,7 +348,7 @@ function textBody(n: TextNode, measure: Measure, defs: Defs, override?: { fill: 
       return chars
         .map((ch, i) => {
           const pos = i === 0 ? ` x="${n2(ax)}" y="${n2(base + offs[0])}"` : Math.abs(offs[i]) > 0.01 ? ` dy="${n2(offs[i])}"` : '';
-          return `<tspan${pos}${Math.abs(sizes[i] - 1) > 0.001 ? ` font-size="${n2(n.size * sizes[i])}"` : ''}>${esc(ch)}</tspan>`;
+          return `<tspan${pos}${Math.abs(sizes[i] - 1) > 0.001 ? ` font-size="${n2(n.size * sizes[i])}"` : ''}${runs ? runAttrs(atOf[i]) : ''}>${esc(ch)}</tspan>`;
         })
         .join('');
     });
@@ -315,7 +356,6 @@ function textBody(n: TextNode, measure: Measure, defs: Defs, override?: { fill: 
   }
 
   const track = ` letter-spacing="${n2((n.tracking / 1000) * n.size)}" text-anchor="${anchor}"`;
-  const runs = !!n.runs?.length && shownText(n).length === n.text.length;
   const tspans = L.lines
     .map((l, i) => {
       const y = n2(first + i * L.leading + l.para * L.paraGap);
@@ -329,9 +369,7 @@ function textBody(n: TextNode, measure: Measure, defs: Defs, override?: { fill: 
             pieces.push(esc(p.text));
             continue;
           }
-          const st = styleAt(n, p.at);
-          const attrs = [st.font !== n.font ? ` font-family="${esc(fontStack(st.font))}"` : '', st.weight !== n.weight ? ` font-weight="${st.weight}"` : '', st.italic !== !!n.italic ? ` font-style="${st.italic ? 'italic' : 'normal'}"` : '', st.color && !override ? ` ${fillAttrs(st.color)}` : '', p.run.decoration ? ` text-decoration="${p.run.decoration === 'none' ? 'none' : p.run.decoration}"` : ''].join('');
-          pieces.push(`<tspan${attrs}>${esc(p.text)}</tspan>`);
+          pieces.push(`<tspan${runAttrs(p.at)}>${esc(p.text)}</tspan>`);
         }
       });
       return `<tspan x="${n2(ax)}" y="${y}">${pieces.join('') || ' '}</tspan>`;

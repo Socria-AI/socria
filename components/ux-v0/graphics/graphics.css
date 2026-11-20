@@ -74,8 +74,15 @@
 }
 .gx-field {
   display: grid;
+  /* held to its column: a select sizes itself to its longest option (a long style name), never past the panel's edge */
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
   margin-bottom: 16px;
+}
+.gx-field > select {
+  min-width: 0;
+  width: 100%;
+  text-overflow: ellipsis;
 }
 .gx-field > label,
 .gx-formats legend {
@@ -1358,4 +1365,328 @@
   font-size: 12px;
   max-width: min(560px, calc(100% - 24px));
   z-index: 3;
+}
+
+/* ── the Style Explorer: the design's language, seen and chosen (StyleExplorer.tsx) ── */
+.gx-center {
+  position: relative;
+}
+.gx-explorer {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: var(--sb-paper);
+  overflow: auto;
+  outline: none;
+}
+.gx-explorer-h {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--sb-rule);
+  background: var(--sb-paper);
+}
+.gx-explorer-h h2 {
+  margin: 2px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.gx-explorer-body {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  padding: 14px 18px 28px;
+  font-size: 13px;
+}
+.gx-explorer-body > p {
+  margin: 0;
+  max-width: 72ch;
+}
+.gx-explorer-find {
+  display: grid;
+  gap: 8px;
+}
+.gx-explorer-find input {
+  width: 100%;
+}
+.gx-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.gx-chip {
+  padding: 4px 10px;
+  border: 1px solid var(--sb-rule);
+  border-radius: 999px;
+  background: none;
+  color: var(--sb-ink-70);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.gx-chip.is-on {
+  border-color: var(--sb-ink);
+  background: var(--sb-ink);
+  color: var(--sb-paper);
+}
+.gx-chip:focus-visible {
+  outline: 2px solid var(--sb-moss);
+  outline-offset: 1px;
+}
+.gx-style-grid,
+.gx-compare {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gx-style-grid {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+.gx-compare {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+.gx-style-card {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--sb-rule);
+  border-radius: 8px;
+  background: var(--sb-surface);
+}
+.gx-style-card.is-on {
+  border-color: var(--sb-moss);
+  box-shadow: 0 0 0 1px var(--sb-moss);
+}
+.gx-style-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-height: 320px;
+  overflow: hidden;
+  background: var(--sb-well);
+}
+.gx-style-art svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.gx-style-body {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 10px 12px 12px;
+  font-size: 12.5px;
+}
+.gx-style-name {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.gx-style-era {
+  margin: 0;
+  color: var(--sb-ink-60);
+  font-size: 11.5px;
+}
+.gx-style-desc {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--sb-ink-70);
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.gx-style-traits,
+.gx-style-uses {
+  margin: 0;
+  color: var(--sb-ink-70);
+  font-size: 11.5px;
+}
+.gx-style-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+.gx-compare-cell {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  min-width: 0;
+}
+.gx-ref {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--sb-rule);
+  border-radius: 8px;
+  background: var(--sb-surface);
+}
+.gx-ref-reads {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12.5px;
+}
+.gx-ref-reads b {
+  margin-right: 4px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.gx-ref-dims {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.gx-mine-make {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.gx-mine-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+}
+.gx-mine-row .gx-text {
+  flex: 1 1 160px;
+}
+.gx-mine-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gx-mine-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--sb-rule);
+}
+.gx-mine-list li > span {
+  display: grid;
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.gx-style-says {
+  margin: 0 0 8px;
+  padding-left: 16px;
+  color: var(--sb-ink-70);
+  font-size: 12px;
+}
+.gx-fidelity {
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+.gx-fidelity summary {
+  cursor: pointer;
+  color: var(--sb-ink-70);
+}
+.gx-fidelity summary b {
+  color: var(--sb-ink);
+  font-variant-numeric: tabular-nums;
+}
+.gx-fid-list {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+.gx-fid-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px 26px;
+  align-items: center;
+  gap: 2px 8px;
+}
+.gx-fid-list meter {
+  width: 100%;
+  height: 6px;
+}
+.gx-fid-list b {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.gx-fid-list em {
+  grid-column: 1 / -1;
+  font-style: normal;
+  font-size: 11px;
+}
+.gx-mine-hand {
+  margin: 10px 0;
+  padding: 8px 0;
+  border-top: 1px solid var(--sb-rule);
+  border-bottom: 1px solid var(--sb-rule);
+}
+.gx-mine-hand summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--sb-ink);
+}
+.gx-hand {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  align-items: end;
+  gap: 8px 12px;
+  margin-top: 10px;
+}
+.gx-hand > .sb-btn {
+  justify-self: start;
+}
+.gx-hand-colours {
+  display: flex;
+  gap: 10px;
+}
+.gx-hand-colour {
+  display: grid;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--sb-ink-70);
+}
+.gx-hand-colour input {
+  width: 44px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--sb-rule-2);
+  background: none;
+  cursor: pointer;
+}
+.gx-num.is-range {
+  grid-template-areas: none;
+  grid-template-columns: minmax(0, 1fr);
+}
+.gx-num.is-range > * {
+  grid-area: auto;
+}
+.gx-num.is-range input {
+  width: 100%;
+}
+@media (max-width: 860px) {
+  .gx-explorer {
+    position: fixed;
+  }
 }

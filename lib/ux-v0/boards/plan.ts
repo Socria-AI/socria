@@ -271,15 +271,19 @@ export interface ComposedMaterial {
 }
 
 /** One graphic material composed in the board's system, checked and repaired within bounds, its bindings recorded. */
-export function composeMaterial(m: GraphicMaterial, sys: MasterDesignSystem, ctx: { measure?: Measure; assets?: readonly Asset[]; sibling?: number; turn?: number; seed?: number } = {}): ComposedMaterial {
+export function composeMaterial(m: GraphicMaterial, sys: MasterDesignSystem, ctx: { measure?: Measure; assets?: readonly Asset[]; sibling?: number; order?: number; turn?: number; seed?: number } = {}): ComposedMaterial {
   const assets = (ctx.assets ?? []).filter((a) => m.brief.images.includes(a.id));
   const brief: GraphicBrief = { ...m.brief, images: m.brief.images.filter((id) => assets.some((a) => a.id === id)) };
   const f = formatOf(brief.formats[0]);
   // the board's one vocabulary: every material speaks it, each in its own composition
   const shared = sys.vocabulary ? { vocabulary: sys.vocabulary } : {};
-  const natural = f ? planFor(brief, directionOfSystem(sys), f, { over: shared }) : null;
+  // a system in a design language: each material of the board (and each regeneration) takes the next of the style's
+  // constructions, counted across the board's graphics (not per kind), so a poster, a post and a banner interpret one
+  // DNA, not one layout resized; a style with fewer constructions than materials turns its palette as it comes round
+  const styled = !!sys.style;
+  const natural = f && !styled ? planFor(brief, directionOfSystem(sys), f, { over: shared }) : null;
   const turned = natural ? overrideFor(m, ctx.sibling ?? 0, sys, natural, ctx.turn ?? Math.max(0, ctx.sibling ?? 0)) : undefined;
-  const over = turned || sys.vocabulary ? { ...(turned ?? {}), ...shared } : undefined;
+  const over = styled ? { styleIndex: (ctx.order ?? ctx.sibling ?? 0) + m.variant } : turned || sys.vocabulary ? { ...(turned ?? {}), ...shared } : undefined;
   const made = composeGraphic(brief, directionOfSystem(sys), { measure: ctx.measure, seed: (ctx.seed ?? 7) + m.variant * 13 + (ctx.sibling ?? 0) * 5, assets: [...assets], name: m.name, over });
   const refined = refineDoc(made.doc, ctx.measure);
   const plan = made.plans[0];
@@ -292,6 +296,9 @@ export function composeMaterial(m: GraphicMaterial, sys: MasterDesignSystem, ctx
     fixed: refined.fixed,
   };
 }
+
+/** The index of a material among all the board's graphics: its turn through a design language's constructions. */
+export const graphicIndex = (materials: readonly Material[], m: GraphicMaterial) => materials.filter((x): x is GraphicMaterial => x.type === 'graphic').findIndex((x) => x.id === m.id);
 
 /** The index of a material among its siblings of the same kind (its turn in the sequence of compositions). */
 export const siblingIndex = (materials: readonly Material[], m: GraphicMaterial) => materials.filter((x): x is GraphicMaterial => x.type === 'graphic' && x.brief.kind === m.brief.kind).findIndex((x) => x.id === m.id);

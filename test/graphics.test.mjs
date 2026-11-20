@@ -160,6 +160,21 @@ const dirFor = (purpose, mood, salt, i = 0) => {
   const after = K.checkDoc(r.doc);
   ok('bounded repair: overflow, contrast, safe area and size fixed in at most two rounds; the locked one left; the placeholder left to fill', r.rounds <= 2 && !after.some((f) => ['overflow', 'safe', 'tiny'].includes(f.kind) && f.node !== 'lk') && !after.some((f) => f.node === 'lo' && f.kind === 'contrast') && after.some((f) => f.node === 'lk' && f.kind === 'contrast') && after.some((f) => f.kind === 'placeholder'), J(after.map((f) => `${f.node}:${f.kind}`)));
   ok('…and the words themselves never change', [...D.wordsOf(r.doc).values()].join('|') === [...D.wordsOf(doc).values()].join('|'));
+  // a headline across a dark plane and a light one: no one colour reads on both, so it is given a ground of its own,
+  // just beneath it in its own group (the last resort), and a gradient in the letters is replaced by the colour that reads
+  const split = D.normalizeDoc({ name: 'S', tokens: { colors: { background: '#f4f1ea', text: '#151515' } }, artboards: [{ id: 'ab', name: 'A', width: 1080, height: 1080, background: '#f4f1ea', safe: 60, children: [
+    { id: 'dk', type: 'shape', shape: 'rect', x: 0, y: 0, w: 540, h: 1080, fill: '#151515' },
+    { id: 'mi', type: 'shape', shape: 'rect', x: 540, y: 0, w: 540, h: 1080, fill: '#9a9a9a' },
+    { id: 'hd', type: 'text', role: 'headline', text: 'Across both', size: 110, weight: 800, color: '#7a7a7a', x: 120, y: 420, w: 840, h: 160 },
+    { id: 'gr', type: 'text', role: 'subhead', text: 'Graded words', size: 48, color: '#cccccc', fill: { type: 'linear', angle: 0, stops: [{ at: 0, color: '#d8d8d8' }, { at: 1, color: '#c8c8c8' }] }, x: 600, y: 760, w: 420, h: 70 },
+  ] }] });
+  const sr = K.refineDoc(split);
+  const plate = D.walk(sr.doc.artboards[0]).map((l) => l.node);
+  const at = (id) => plate.findIndex((n) => n.id === id);
+  const ground = plate.find((n) => n.type === 'shape' && /^Ground for/.test(n.name ?? ''));
+  const graded = plate.find((n) => n.id === 'gr');
+  ok('…no one colour reads on everything beneath the words: they are given a ground of their own, just beneath them, and read', !!ground && plate.indexOf(ground) === at('hd') - 1 && !sr.remaining.some((f) => f.node === 'hd' && f.kind === 'contrast'), J({ ground: ground && { x: ground.x, w: ground.w, fill: ground.fill }, left: sr.remaining.map((f) => `${f.node}:${f.kind}`) }));
+  ok('…and a gradient drawn in the letters is replaced by the colour that reads (the colour alone would change nothing on screen)', graded.fill === undefined && !sr.remaining.some((f) => f.node === 'gr' && f.kind === 'contrast'), J({ fill: graded.fill, color: graded.color }));
 }
 
 // ── edits in words ──

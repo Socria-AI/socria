@@ -23,8 +23,10 @@ import { GraphicCanvas, type CanvasHandle } from './GraphicCanvas';
 import { AddPanel, ArtboardsPanel, Inspector, LayersPanel, nodeLabel } from './GraphicPanels';
 import { CeilingInspector, ShapeLibrary } from './CeilingPanels';
 import { download, slug } from './faces';
+import { StyleExplorer, StylePanel } from './StyleExplorer';
+import { useStyleLibrary } from './styleLibrary';
 
-type Tab = 'layers' | 'boards' | 'add' | 'shapes' | 'pictures' | 'brand' | 'versions';
+type Tab = 'layers' | 'boards' | 'add' | 'shapes' | 'pictures' | 'styles' | 'brand' | 'versions';
 export type EditorNote = { tone: 'ok' | 'warn' | 'ask'; text: string } | null;
 export type ChangeMeta = { label: string; version?: boolean; kind: 'edit' | 'undo' | 'redo' };
 
@@ -94,6 +96,8 @@ export function GraphicEditor(props: GraphicEditorProps) {
   const [askWords, setAskWords] = useState('');
   const [pending, setPending] = useState<{ edit: GraphicEdit; doc: GraphicDoc; base: GraphicDoc } | null>(null);
   const [busy, setBusy] = useState('');
+  const [explorer, setExplorer] = useState<{ open: boolean; query?: string }>({ open: false });
+  const { library } = useStyleLibrary();
   const [, setTick] = useState(0);
   const clipboard = useRef<Node[]>([]);
   const zoomRef = useRef<CanvasHandle | null>(null);
@@ -174,7 +178,7 @@ export function GraphicEditor(props: GraphicEditorProps) {
     const words = askWords.trim();
     const cur = docNow();
     if (!words || !board) return;
-    const e = readGraphicEdit(words, cur, { artboard: board.id, selection, dir: props.direction ?? directionOfDoc(cur), measure });
+    const e = readGraphicEdit(words, cur, { artboard: board.id, selection, dir: props.direction ?? directionOfDoc(cur), measure, kind: props.kind, customs: library.styles });
     if (!e) {
       setNote({ tone: 'ask', text: 'SocriaUX could not read that as a change it can make without a model. Try “make the headline bigger”, “increase the contrast”, “move the logo beneath the title”, “use more editorial typography”, “adapt it to a story”, or select an object and change it in the panel on the right.' });
       return;
@@ -198,6 +202,12 @@ export function GraphicEditor(props: GraphicEditorProps) {
       if (fresh) setBoardId(fresh.id);
     }
     setNote(e.question ? { tone: 'ask', text: e.question } : null);
+  };
+  /** A document made elsewhere (a change of style) shown as a preview, to apply or discard like a change in words. */
+  const previewDoc = (next: GraphicDoc, label: string) => {
+    const cur = docNow();
+    setPending({ edit: { ops: [], next, label, scope: 'artboard' }, doc: next, base: cur });
+    setNote(null);
   };
   const applyPending = () => {
     if (!live) return;
@@ -367,6 +377,7 @@ export function GraphicEditor(props: GraphicEditorProps) {
     ['add', 'Add'],
     ['shapes', 'Shapes'],
     ['pictures', 'Pictures'],
+    ['styles', 'Styles'],
     ['brand', 'Brand'],
     ...(props.versions ? ([['versions', 'Versions']] as [Tab, string][]) : []),
   ];
@@ -427,6 +438,9 @@ export function GraphicEditor(props: GraphicEditorProps) {
                 <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => (e.target.files?.[0] && void addPicture(e.target.files[0]), (e.target.value = ''))} />
               </label>
             </section>
+          )}
+          {tab === 'styles' && (
+            <StylePanel doc={doc} board={board} dir={props.direction ?? directionOfDoc(doc)} kind={props.kind} measure={measure} href={href} onPreview={previewDoc} onOps={onOps} onNote={(text, tone) => setNote({ tone: tone ?? 'warn', text })} onExplore={(query) => setExplorer({ open: true, query })} />
           )}
           {tab === 'brand' && (
             <section className="gx-panel" aria-label="Brand">
@@ -605,6 +619,21 @@ export function GraphicEditor(props: GraphicEditorProps) {
             {props.missingUploads.filter((m) => doc.assets.some((a) => a.src === m)).length} picture(s) of this design are not in this browser (they were added on another device): they are left blank, and named in Pictures.
           </p>
         )}
+        <StyleExplorer
+          key={explorer.query ?? ''}
+          open={explorer.open}
+          initialQuery={explorer.query}
+          onClose={() => setExplorer({ open: false })}
+          doc={given}
+          board={given.artboards.find((b) => b.id === board.id) ?? given.artboards[0]}
+          dir={props.direction ?? directionOfDoc(given)}
+          kind={props.kind}
+          measure={measure}
+          href={href}
+          onPreview={previewDoc}
+          onOps={onOps}
+          onNote={(text, tone) => setNote({ tone: tone ?? 'warn', text })}
+        />
         <div className={`gx-stage${live ? ' is-preview' : ''}`}>
           <GraphicCanvas doc={doc} boardId={board.id} selection={selection} measure={measure} href={href} onSelect={(ids) => (setSelection(ids), pathEdit && !ids.includes(pathEdit) && setPathEdit(null))} onCommit={onOps} onEditText={() => window.setTimeout(() => textRef.current?.focus(), 30)} zoomRef={zoomRef} guides={aids.guides} grid={aids.grid} rulers={aids.rulers} pathEdit={pathEdit} onPathEdit={setPathEdit} />
           {pathEdit && (

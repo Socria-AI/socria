@@ -412,7 +412,11 @@ ok('…and with a transparent ground', pngSize(clear.bytes).sig && clear.bytes.l
 const svg = await exportItem('SVG (text kept as text)');
 const svgText = svg.bytes.toString('utf8');
 writeFileSync(`${S}gfx-letters.svg`, svgText);
-ok('22. SVG exported: text kept as text with the exact words, its faces linked, no script, sized in points', /<text/.test(svgText) && svgText.includes('Letters') && /fonts\.googleapis\.com/.test(svgText) && !/<script/i.test(svgText) && /width="[\d.]+pt"/.test(svgText), svgText.slice(0, 200));
+// the headline's words as shown (a style may set them in capitals), each kept as text (lines and runs are spans of their own)
+const headNode = nodes(doc).find((n) => n.type === 'text' && n.role === 'headline');
+const shownHead = headNode ? V.gfxText.shownText(headNode) : 'Letters';
+const svgWords = svgText.replace(/<[^>]+>/g, ' ');
+ok('22. SVG exported: text kept as text with the exact words, its faces linked, no script, sized in points', /<text/.test(svgText) && shownHead.split(/\s+/).every((w) => svgWords.includes(w)) && /fonts\.googleapis\.com/.test(svgText) && !/<script/i.test(svgText) && /width="[\d.]+pt"/.test(svgText), J({ shownHead, start: svgText.slice(0, 160) }));
 const pdf = await exportItem(/^PDF$/);
 writeFileSync(`${S}gfx-letters.pdf`, pdf.bytes);
 const pd = await getDocumentProxy(new Uint8Array(pdf.bytes));

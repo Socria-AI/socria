@@ -24,6 +24,7 @@ import { normalizePaint, parseColor, type Gradient, type Paint as PaintV2 } from
 import { isPxParam, normalizePatternParams, PATTERN_BY_KIND } from './patterns';
 import { asBezierNode, blendPaths, booleanPath, offsetOutline, shapeBezier, shapeInParent, strokeOutline, nodeMatrix, transformPath } from './vectorops';
 import { distortPath, reversePath, simplifyPath, smoothPath, mapPath } from './geometry';
+import { normalizeSelection, type StyleSelection } from './styles/blend';
 
 export const GFX_SCHEMA = 1;
 
@@ -317,6 +318,9 @@ export interface GraphicDoc {
   /** the visual vocabulary the design was composed with (motif primitives, patterns, effects, type treatments):
    * what edits in words and new artboards keep to */
   vocabulary?: Vocabulary;
+  /** the design language the design is built in (styles/*): primary, influences, intensities, lock — kept so a
+   * regeneration or a new artboard speaks it, and so the person's own choices survive both */
+  style?: StyleSelection;
   revision: number;
   updatedAt: number;
 }
@@ -787,6 +791,7 @@ export function normalizeDoc(v: unknown, rep: Repair = { notes: [] }): GraphicDo
     ...((l) => (l.colors || l.fonts ? { locks: { ...(l.colors ? { colors: true } : {}), ...(l.fonts ? { fonts: true } : {}) } } : {}))({ colors: o(r.locks).colors === true, fonts: o(r.locks).fonts === true }),
     ...((sw) => (sw.length ? { swatches: sw } : {}))([...new Set(a(r.swatches).map((c) => parseColor(c)).filter((c): c is string => !!c))].slice(0, 32)),
     ...((v) => (v ? { vocabulary: v } : {}))(vocabularyOf(r.vocabulary)),
+    ...((v) => (v ? { style: v } : {}))(normalizeSelection(r.style)),
     revision: Math.round(num(r.revision, 0, 1e9, 0)),
     updatedAt: typeof r.updatedAt === 'number' && r.updatedAt > 0 ? Math.round(r.updatedAt) : Date.now(),
   };
@@ -877,7 +882,9 @@ export type Op =
   | { op: 'mask'; ids: string[]; mode: 'alpha' | 'luminance'; invert?: boolean; name?: string }
   // the document's own palette and vocabulary
   | { op: 'swatches'; set: string[] }
-  | { op: 'vocabulary'; set: unknown };
+  | { op: 'vocabulary'; set: unknown }
+  // the design language (null clears it)
+  | { op: 'style'; set: unknown };
 
 export type OpResult = { ok: true; doc: GraphicDoc; touched: string[]; notes: string[] } | { ok: false; error: string; locked?: string[] };
 
@@ -1416,6 +1423,16 @@ export function applyOp(doc0: GraphicDoc, op: Op, opts: { force?: boolean } = {}
       const v = vocabularyOf(op.set);
       if (v) doc.vocabulary = v;
       else delete doc.vocabulary;
+      return done([]);
+    }
+    case 'style': {
+      if (op.set === null) {
+        delete doc.style;
+        return done([]);
+      }
+      const v = normalizeSelection(op.set);
+      if (!v) return { ok: false, error: 'That is not a style SocriaUX has.' };
+      doc.style = v;
       return done([]);
     }
   }

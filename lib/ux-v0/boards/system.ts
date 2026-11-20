@@ -12,12 +12,15 @@
 import { normalizeVocabulary, type VisualVocabulary } from '../graphics/vocabulary';
 import { contrastRatio } from '../../ux/audit';
 import { describeForm, normalizeForm, type FormSystem } from '../form';
-import { knownFont, nearestWeight } from '../fonts';
+import { FONTS, knownFont, nearestWeight } from '../fonts';
 import { normalizeDirectionState, type ArtDirection } from '../direction';
 import { applyOps, colour, walk, type Artboard, type GraphicDoc, type Node, type Op, type TextNode, type Tokens } from '../graphics/doc';
 import { graphicDirectionOf, type GraphicDirection } from '../graphics/compose';
 import { refineDoc } from '../graphics/check';
 import type { Measure } from '../graphics/text';
+import { normalizeSelection, type StyleSelection } from '../graphics/styles/blend';
+import { styleById } from '../graphics/styles/registry';
+import { classesOf, type StyleDNA } from '../graphics/styles/schema';
 
 export const COLOUR_TOKENS = ['background', 'surface', 'text', 'muted', 'accent', 'accentText', 'line', 'accent2'] as const;
 export type ColourToken = (typeof COLOUR_TOKENS)[number];
@@ -47,7 +50,7 @@ export interface MasterDesignSystem {
   personality: string[];
   tokens: Tokens;
   weights: { display: number; body: number };
-  type: { case: 'sentence' | 'upper'; tracking: 'tight' | 'normal' | 'wide'; role?: 'structural' | 'editorial' | 'quiet' | 'functional' };
+  type: { case: 'sentence' | 'upper' | 'lower'; tracking: 'tight' | 'normal' | 'wide'; role?: 'structural' | 'editorial' | 'quiet' | 'functional'; trackingValue?: number; lineHeight?: number };
   composition: { axis?: 'orthogonal' | 'diagonal' | 'radial' | 'scattered' | 'layered'; intensity: number; density: 'airy' | 'balanced' | 'dense' };
   shape: FormSystem | null;
   motifs: string[];
@@ -66,6 +69,8 @@ export interface MasterDesignSystem {
   /** the visual vocabulary every material shares (graphics/vocabulary.ts): the same shapes, pattern, treatments and
    * effects, each material executing them in its own composition */
   vocabulary?: VisualVocabulary;
+  /** the design language every material speaks (graphics/styles): one DNA, each material building it its own way */
+  style?: StyleSelection;
 }
 
 /** Which tokens a material's properties are bound to: by node id and property, and by artboard for the ground. */
@@ -85,7 +90,7 @@ const TOKEN_KEYS: readonly TokenKey[] = [...COLOUR_TOKENS, 'display', 'body', 'd
 export function tokenValue(sys: MasterDesignSystem, key: TokenKey): string | number | undefined {
   if (key === 'display' || key === 'body') return sys.tokens.fonts[key];
   if (key === 'displayWeight') return sys.weights.display;
-  if (key === 'case') return sys.type.case === 'upper' ? 'upper' : 'none';
+  if (key === 'case') return sys.type.case === 'upper' || sys.type.case === 'lower' ? sys.type.case : 'none';
   if (key === 'accent2') return sys.tokens.accent2;
   return sys.tokens.colors[key];
 }
@@ -125,7 +130,7 @@ export function rulesOf(sys: MasterDesignSystem, refuses: readonly string[] = []
   const c = sys.tokens.colors;
   const out = [
     `Headlines in ${sys.tokens.fonts.display} ${sys.weights.display}; text in ${sys.tokens.fonts.body}.`,
-    `${sys.type.case === 'upper' ? 'Headlines in capitals' : 'Headlines in sentence case'}, ${sys.type.tracking === 'tight' ? 'tightly tracked' : sys.type.tracking === 'wide' ? 'widely tracked' : 'at normal tracking'}.`,
+    `${sys.type.case === 'upper' ? 'Headlines in capitals' : sys.type.case === 'lower' ? 'Headlines in lower case' : 'Headlines in sentence case'}, ${sys.type.tracking === 'tight' ? 'tightly tracked' : sys.type.tracking === 'wide' ? 'widely tracked' : 'at normal tracking'}.`,
     `The accent (${c.accent}) marks one thing per material: a field, a block or a shape, never running text.`,
     `Ink ${c.text} on ${c.background}${contrastRatio(c.text, c.background) >= 7 ? ' (AAA contrast)' : contrastRatio(c.text, c.background) >= 4.5 ? ' (AA contrast)' : ''}.`,
     ...(sys.shape ? [`Shapes only from the system’s own language: ${describeForm(sys.shape).toLowerCase()}`] : []),
@@ -140,18 +145,60 @@ export function directionOfSystem(sys: MasterDesignSystem): GraphicDirection {
     language: sys.direction.language,
     ...(sys.direction.concept ? { concept: sys.direction.concept } : {}),
     tokens: sys.tokens,
-    look: { case: sys.type.case, tracking: sys.type.tracking, weight: sys.weights.display, motifs: sys.motifs },
+    look: { case: sys.type.case, tracking: sys.type.tracking, weight: sys.weights.display, motifs: sys.motifs, ...(sys.type.trackingValue !== undefined ? { trackingValue: sys.type.trackingValue } : {}), ...(sys.type.lineHeight !== undefined ? { lineHeight: sys.type.lineHeight } : {}) },
     form: sys.shape,
     ...(sys.composition.axis ? { axis: sys.composition.axis } : {}),
     ...(sys.type.role ? { typeRole: sys.type.role } : {}),
     intensity: sys.composition.intensity,
+    ...(sys.style ? { style: sys.style } : {}),
   };
+}
+
+/**
+ * A system given the design language of a styled direction (styles/apply.ts styledDirection): its palette and faces
+ * become the system's tokens, its type habits the system's, and the style itself is kept so every material composes
+ * in it. Without a style (null), the system keeps its tokens and simply stops speaking one.
+ */
+export function systemInStyle(sys: MasterDesignSystem, dir: GraphicDirection | null, customs: readonly StyleDNA[] = []): MasterDesignSystem {
+  if (!dir?.style) {
+    const { style: _drop, ...rest } = sys;
+    return { ...rest, constraints: rulesOf(rest, []) };
+  }
+  const dna = styleById(dir.style.primary, [...(dir.style.customs ?? []), ...customs]);
+  const next: MasterDesignSystem = {
+    ...sys,
+    direction: { name: dir.name, language: sys.direction.language, ...(dir.concept ? { concept: dir.concept.slice(0, 400) } : {}) },
+    tokens: dir.tokens,
+    weights: { display: nearestWeight(dir.tokens.fonts.display, dir.look.weight), body: nearestWeight(dir.tokens.fonts.body, 400) },
+    type: { case: dir.look.case, tracking: dir.look.tracking, ...(sys.type.role ? { role: sys.type.role } : {}), ...(dir.look.trackingValue !== undefined ? { trackingValue: dir.look.trackingValue } : {}), ...(dir.look.lineHeight !== undefined ? { lineHeight: dir.look.lineHeight } : {}) },
+    composition: { ...(dir.axis ? { axis: dir.axis } : {}), intensity: dir.intensity, density: sys.composition.density },
+    style: dir.style,
+  };
+  // the style's own rules join the system's: what it must keep, and the mistakes that break it
+  next.constraints = [...rulesOf(next, []), ...(dna ? [...dna.constraints.essential.slice(0, 2), ...dna.constraints.mistakes.slice(0, 1).map((m) => `Never: ${m.replace(/^./, (c) => c.toLowerCase())}`)] : [])].map((r) => (r.endsWith('.') ? r : `${r}.`)).slice(0, 12);
+  return next;
+}
+
+/**
+ * The faces a website can load for a system's faces: the same face where websites have it; else (a face drawn for
+ * Graphics only, as a design language may choose) the nearest website face of its class, so the website is set in
+ * what the browser of a visitor will really show.
+ */
+export function webFacesOf(f: { display: string; body: string }): { display: string; body: string } {
+  const pick = (face: string, body: boolean): string => {
+    const k = knownFont(face);
+    if (k && (!body || !k.displayOnly)) return k.name;
+    const cls = classesOf(face);
+    const near = FONTS.find((w) => (!body || !w.displayOnly) && classesOf(w.name).some((c) => cls.includes(c)));
+    return near?.name ?? (body ? 'Inter' : 'Fraunces');
+  };
+  return { display: pick(f.display, false), body: pick(f.body, true) };
 }
 
 /** The website direction a website concept is generated in: the one the system came from, with the system's tokens. */
 export function artOfSystem(sys: MasterDesignSystem): ArtDirection | null {
   if (!sys.art) return null;
-  return { ...sys.art, tokens: { ...sys.art.tokens, colors: { ...sys.art.tokens.colors, ...sys.tokens.colors }, fonts: { ...sys.tokens.fonts } } } as ArtDirection;
+  return { ...sys.art, tokens: { ...sys.art.tokens, colors: { ...sys.art.tokens.colors, ...sys.tokens.colors }, fonts: webFacesOf(sys.tokens.fonts) } } as ArtDirection;
 }
 
 /** A system held to its shape; null when it is not one. */
@@ -186,7 +233,13 @@ export function normalizeSystem(v: unknown): MasterDesignSystem | null {
       ...(colour(t.accent2, '') ? { accent2: colour(t.accent2, '') } : {}),
     },
     weights: { display: Math.max(100, Math.min(900, Math.round(Number(o(r.weights).display) / 50) * 50 || 600)), body: Math.max(100, Math.min(900, Math.round(Number(o(r.weights).body) / 50) * 50 || 400)) },
-    type: { case: ty.case === 'upper' ? 'upper' : 'sentence', tracking: ['tight', 'normal', 'wide'].includes(ty.tracking) ? ty.tracking : 'normal', ...(['structural', 'editorial', 'quiet', 'functional'].includes(ty.role) ? { role: ty.role } : {}) },
+    type: {
+      case: ty.case === 'upper' || ty.case === 'lower' ? ty.case : 'sentence',
+      tracking: ['tight', 'normal', 'wide'].includes(ty.tracking) ? ty.tracking : 'normal',
+      ...(['structural', 'editorial', 'quiet', 'functional'].includes(ty.role) ? { role: ty.role } : {}),
+      ...(typeof ty.trackingValue === 'number' && Number.isFinite(ty.trackingValue) ? { trackingValue: Math.max(-100, Math.min(400, Math.round(ty.trackingValue))) } : {}),
+      ...(typeof ty.lineHeight === 'number' && Number.isFinite(ty.lineHeight) ? { lineHeight: Math.max(0.7, Math.min(2, Math.round(ty.lineHeight * 100) / 100)) } : {}),
+    },
     composition: { ...(['orthogonal', 'diagonal', 'radial', 'scattered', 'layered'].includes(co.axis) ? { axis: co.axis } : {}), intensity: Math.max(0, Math.min(100, Math.round(Number(co.intensity) || 0))), density: co.density === 'airy' || co.density === 'dense' ? co.density : 'balanced' },
     shape: r.shape ? normalizeForm(r.shape) ?? null : null,
     motifs: a(r.motifs).map((m) => str(m, 30)).filter(Boolean).slice(0, 8),
@@ -197,6 +250,7 @@ export function normalizeSystem(v: unknown): MasterDesignSystem | null {
     ...(r.source && typeof o(r.source).projectId === 'string' && /^[A-Za-z0-9_-]{1,96}$/.test(o(r.source).projectId) ? { source: { projectId: o(r.source).projectId, name: str(o(r.source).name, 100) } } : {}),
     ...(art ? { art } : {}),
     ...((voc) => (voc ? { vocabulary: voc } : {}))(r.vocabulary ? normalizeVocabulary(r.vocabulary) : null),
+    ...((sel) => (sel ? { style: sel } : {}))(r.style ? normalizeSelection(r.style) : null),
   };
   return sys;
 }
@@ -229,7 +283,7 @@ export function bindingsOf(doc: GraphicDoc, sys: MasterDesignSystem): Bindings {
       }
       if (n.type === 'text' && rec.font === 'display') {
         if (n.weight === nearestWeight(n.font, sys.weights.display)) rec.weight = 'displayWeight';
-        if ((n.case === 'upper') === (sys.type.case === 'upper')) rec.case = 'case';
+        if ((n.case === 'upper' || n.case === 'lower' ? n.case : 'none') === tokenValue(sys, 'case')) rec.case = 'case';
       }
       if (n.type === 'shape') {
         if (typeof n.fill === 'string') {
@@ -284,7 +338,7 @@ const nodeValue = (n: Node, prop: Override['prop']): string => {
   if (prop === 'stroke') return n.type === 'shape' ? hex7(n.stroke?.color) : '';
   if (prop === 'font') return n.type === 'text' || n.type === 'chart' ? n.font : '';
   if (prop === 'weight') return n.type === 'text' ? String(n.weight) : '';
-  if (prop === 'case') return n.type === 'text' ? (n.case === 'upper' ? 'upper' : 'none') : '';
+  if (prop === 'case') return n.type === 'text' ? (n.case === 'upper' || n.case === 'lower' ? n.case : 'none') : '';
   return '';
 };
 const expectedFor = (sys: MasterDesignSystem, token: TokenKey, n?: Node): string => {
@@ -358,7 +412,7 @@ function opsToSystem(doc: GraphicDoc, bindings: Bindings, sys: MasterDesignSyste
             if (n.type === 'text') set.weight = nearestWeight(String(v), Number(set.weight ?? n.weight));
           }
         } else if (prop === 'weight' && n.type === 'text') set.weight = nearestWeight(String(set.font ?? n.font), Number(v));
-        else if (prop === 'case' && n.type === 'text') set.case = v === 'upper' ? 'upper' : null;
+        else if (prop === 'case' && n.type === 'text') set.case = v === 'upper' || v === 'lower' ? v : null;
       }
       if (Object.keys(set).length) ops.push({ op: 'update', id: n.id, set });
     }

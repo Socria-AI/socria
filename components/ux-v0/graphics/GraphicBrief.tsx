@@ -16,6 +16,14 @@ import { renderArtboard } from '@/lib/ux-v0/graphics/render';
 import { refineDoc } from '@/lib/ux-v0/graphics/check';
 import type { Asset } from '@/lib/ux-v0/graphics/doc';
 import type { Measure } from '@/lib/ux-v0/graphics/text';
+import { styleById } from '@/lib/ux-v0/graphics/styles/registry';
+import type { StyleDNA } from '@/lib/ux-v0/graphics/styles/schema';
+
+/** What a direction's design language is, in a line: its period and kind. */
+const styleLine = (id: string, customs?: readonly StyleDNA[]): string => {
+  const s = styleById(id, customs ?? []);
+  return s ? [s.era, s.category === 'custom' ? 'your style' : s.category].filter(Boolean).join(' · ') : id;
+};
 
 export const KIND_LABEL: Record<GraphicKind, string> = {
   poster: 'Poster or flyer',
@@ -404,7 +412,7 @@ export function DirectionsStage({
                 {d.name}
                 {source && i === 0 ? <span className="gx-badge">From {source.name}</span> : null}
               </h2>
-              <p className="gx-dir-lang">{d.language.replace(/-/g, ' ')}</p>
+              <p className="gx-dir-lang">{d.style ? styleLine(d.style.primary, d.style.customs) : d.language.replace(/-/g, ' ')}</p>
               {d.concept && <p className="gx-dir-concept">{d.concept}</p>}
               <p className="gx-swatches" aria-label="Colours">
                 {(['background', 'text', 'accent', 'muted'] as const).map((k) => (

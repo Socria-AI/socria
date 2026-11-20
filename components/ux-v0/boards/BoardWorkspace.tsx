@@ -32,6 +32,9 @@ import { annotate, verifyNotes } from '@/lib/ux-v0/boards/annotate';
 import { evaluateBoard, refineBoardOps } from '@/lib/ux-v0/boards/evaluate';
 import { readBoardEdit, type BoardAction } from '@/lib/ux-v0/boards/edit';
 import { syncSystem, type SyncPlan } from '@/lib/ux-v0/boards/sync';
+import { planRestyle } from '@/lib/ux-v0/boards/style';
+import type { StyleSelection } from '@/lib/ux-v0/graphics/styles/blend';
+import { useStyleLibrary } from '../graphics/styleLibrary';
 import { syncWebsite, websiteConcept, websiteDrift } from '@/lib/ux-v0/boards/website';
 import { boardFile, openBoardFile, systemOverviewSvg } from '@/lib/ux-v0/boards/export';
 import { GraphicEditor, type EditorNote } from '../graphics/GraphicEditor';
@@ -67,6 +70,7 @@ const systemFacesOf = (sys: MasterDesignSystem): Face[] => systemFaces(sys);
 
 export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenProject }: { initial: DesignProject; signedIn: boolean; onExit: () => void; startIntent?: string; onOpenProject: (id: string) => void }) {
   const { project, update, save, current } = useV0Project(initial, signedIn);
+  const { library: styleLibrary } = useStyleLibrary();
   const b: BoardState = project.board ?? emptyBoard();
   const setBoard = useCallback((fn: (x: BoardState) => BoardState) => update((p) => ({ ...p, board: fn(p.board ?? emptyBoard()) })), [update]);
   const boardNow = useCallback(() => current.current.board ?? emptyBoard(), [current]);
@@ -414,6 +418,15 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
     apply([{ op: 'asset', asset: a }, { op: 'node-add', node: { id, type: 'reference', asset: a.id, caption: a.name, x: Math.round((600 - v.x) / v.k), y: Math.round((400 - v.y) / v.k), w, h } }], 'reference picture added');
   };
 
+  // ── the board's design language: planned (rebuilt where untouched, carried through bindings elsewhere), previewed ──
+  const proposeRestyle = (sel: StyleSelection | null, label: string) => {
+    const cur = boardNow();
+    const plan = planRestyle(cur, sel, { measure, customs: styleLibrary.styles, assets: cur.assets });
+    if (!plan) return setNote({ tone: 'warn', text: 'There is no design system to change yet.' });
+    const preview = applyAll(cur, plan.ops);
+    setPending({ kind: 'ops', label: `${label}. ${plan.summary}`, ops: plan.ops, preview });
+  };
+
   // ── the design system: a change proposed, then synced ──
   const proposeSystem = (next: MasterDesignSystem, label: string, reset: Record<string, 'all'> = {}) => {
     const cur = boardNow();
@@ -470,6 +483,7 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
       if (r) setNote({ tone: 'ok', text: `The notes say what is true of each material now: ${r.nodes.filter((n) => n.type === 'note' && n.generated).length} notes, each tied to what it explains.` });
       return;
     }
+    if (a.kind === 'restyle') return proposeRestyle(a.selection, label);
     if (a.kind === 'polish') {
       const ops1 = arrange(cur, 'editorial');
       const b1 = applyAll(cur, ops1);
@@ -938,7 +952,7 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
                   onKeep={keep}
                 />
               )}
-              {tab === 'system' && <SystemPanel board={b} source={sourceName} onPropose={(next, label) => proposeSystem(next, label)} />}
+              {tab === 'system' && <SystemPanel board={b} source={sourceName} onPropose={(next, label) => proposeSystem(next, label)} customs={styleLibrary.styles} onRestyle={proposeRestyle} />}
               {tab === 'add' && (
                 <AddPanel
                   board={b}

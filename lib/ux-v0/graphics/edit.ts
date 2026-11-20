@@ -15,10 +15,12 @@ import { FONTS, graphicFont } from '../fonts';
 import { ensureContrast } from '../spec';
 import { reshape } from '../targeted';
 import { applyOps, boxOnBoard, isLocked, walk, type Artboard, type GraphicDoc, type Located, type Node, type Op, type Role, type TextNode } from './doc';
-import { adaptBoard, type GraphicDirection } from './compose';
+import { adaptBoard, type GraphicDirection, type GraphicKind } from './compose';
 import { formatFromWords } from './formats';
 import { approxMeasure, fitSize, type Measure } from './text';
 import { guarded, guardsOf, readVocabEdit } from './vocabedit';
+import { readStyleEdit, restyleArtboard, typeOps } from './styles/edit';
+import type { StyleDNA } from './styles/schema';
 
 export interface GraphicEdit {
   ops: Op[];
@@ -40,6 +42,10 @@ export interface EditContext {
   /** the direction the design was made in (for adapting to another format) */
   dir?: GraphicDirection | null;
   measure?: Measure;
+  /** what the design is (a poster, a post…): a rebuild in another language keeps it */
+  kind?: GraphicKind;
+  /** the person's own styles, for changes that name them */
+  customs?: readonly StyleDNA[];
 }
 
 const lower = (s: string) => s.toLowerCase().replace(/[’']/g, "'");
@@ -128,6 +134,27 @@ export function readGraphicEdit(words0: string, doc: GraphicDoc, ctx: EditContex
     return e;
   };
 
+  // a change of design language (styles/edit.ts): an influence raised or lowered, a dimension borrowed, an intensity,
+  // flat colour — targeted where it can be, else the artboard rebuilt in the new language, shown before it is applied
+  {
+    const current = doc.style ?? ctx.dir?.style ?? null;
+    const selected = ctx.selection.map((id) => walk(board).find((l) => l.node.id === id)?.node).filter((n): n is Node => !!n);
+    const se = readStyleEdit(words0, doc, { current, selected, customs: ctx.customs });
+    if (se) {
+      const styleOp: Op[] = se.selection && JSON.stringify(se.selection) !== JSON.stringify(current) ? [{ op: 'style', set: se.selection }] : [];
+      if (!se.rebuild) return finish({ ops: [...se.ops, ...styleOp], label: se.label, scope: se.scope });
+      if (current?.locked) return { ops: [], label: se.label, scope: 'artboard', question: `The style is locked for this design (${current.primary.replace(/-/g, ' ')}). Say “unlock the style” to change it.` };
+      if (se.selection && selected.length && selected.every((n) => n.type === 'text')) {
+        const ops = typeOps(doc, selected, se.selection, ctx.customs ?? []);
+        if (ops.length) return finish({ ops, label: `${se.label}, on the selected text only`, scope: 'selection' });
+      }
+      if (se.selection && ctx.dir) {
+        const r = restyleArtboard(doc, board.id, se.selection, { dir: ctx.dir, measure, keepColours: se.keepColours, keepFonts: se.keepFonts, kind: ctx.kind, customs: ctx.customs });
+        if (r) return { ops: [], next: r.doc, label: `${se.label}${r.kept ? ` (${r.kept} locked object${r.kept === 1 ? '' : 's'} kept as ${r.kept === 1 ? 'it was' : 'they were'})` : ''}`, scope: 'artboard' };
+      }
+    }
+  }
+
   // keep: "preserve the logo and all brand colours", "keep the typography"
   if (/\b(preserve|protect|lock|keep)\b/.test(words) && !/\b(make|change|replace|move|turn|create|adapt)\b/.test(words)) {
     const ops: Op[] = [];
@@ -147,7 +174,7 @@ export function readGraphicEdit(words0: string, doc: GraphicDoc, ctx: EditContex
   if (/\b(adapt|resize|make a version|version for|turn it into|reformat)\b/.test(words)) {
     const f = formatFromWords(words);
     if (f && ctx.dir) {
-      const next = adaptBoard(doc, board.id, f.id, ctx.dir, { measure });
+      const next = adaptBoard(doc, board.id, f.id, doc.style ? { ...ctx.dir, style: doc.style } : ctx.dir, { measure });
       if (next) return { ops: [{ op: 'artboard-add', artboard: next, after: board.id }], label: `a ${f.label.toLowerCase()} version, re-laid out (the words kept exactly)`, scope: 'document' };
     }
   }

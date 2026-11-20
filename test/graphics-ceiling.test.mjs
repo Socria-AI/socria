@@ -168,7 +168,7 @@ const nodesOf = (doc) => doc.artboards.flatMap((b) => D.walk(b).map((l) => l.nod
   const t = doc.artboards[0].children[0];
   const svg = svgOf(doc);
   ok('…runs, variable axes (held to the face’s own ranges), OpenType features (only known ones), kerning, underline and an echo', t.runs.length === 2 && t.axes.wdth === 150 && !('opsz' in t.axes) && t.axes.wght === 650 && J(t.features) === J(['smcp']) && /font-variation-settings:'wdth' 150/.test(svg) && /'smcp' 1/.test(svg) && /text-decoration="underline"/.test(svg) && (svg.match(/<text /g) ?? []).length === 4 && /font-weight="900"/.test(svg));
-  ok('…the faces Graphics adds are its own: the website list, its lookups and its Fraunces stylesheet are exactly as they were', V.FONTS.length === 74 && V.GRAPHIC_FONTS.length === 77 && !V.knownFont('Anybody') && V.graphicFont('Anybody')?.kind === 'sans' && V.fontStylesheet(['Fraunces']) === 'https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300..900;1,300..900&display=swap' && /family=Fraunces:ital,opsz,wght,SOFT,WONK@/.test(V.graphicFontStylesheet(['Fraunces'])) && /family=Roboto\+Flex:opsz,slnt,wdth,wght@/.test(V.graphicFontStylesheet(['Roboto Flex'])) && V.fontStylesheet(['Roboto Flex']) === null && J(Object.keys(V.fontAxes('Fraunces'))) === J(['opsz', 'SOFT', 'WONK']) && V.nearestWeight('Fraunces', 840) === 850 && V.fontStack('Recursive').startsWith('"Recursive", system-ui'), V.graphicFontStylesheet(['Fraunces']));
+  ok('…the faces Graphics adds are its own: the website list, its lookups and its Fraunces stylesheet are exactly as they were', V.FONTS.length === 74 && V.GRAPHIC_FONTS.length === 144 && V.GRAPHIC_FONTS.slice(0, 74).every((f, i) => f.name === V.FONTS[i].name) && !V.knownFont('Anybody') && V.graphicFont('Anybody')?.kind === 'sans' && V.fontStylesheet(['Fraunces']) === 'https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300..900;1,300..900&display=swap' && /family=Fraunces:ital,opsz,wght,SOFT,WONK@/.test(V.graphicFontStylesheet(['Fraunces'])) && /family=Roboto\+Flex:opsz,slnt,wdth,wght@/.test(V.graphicFontStylesheet(['Roboto Flex'])) && V.fontStylesheet(['Roboto Flex']) === null && J(Object.keys(V.fontAxes('Fraunces'))) === J(['opsz', 'SOFT', 'WONK']) && V.nearestWeight('Fraunces', 840) === 850 && V.fontStack('Recursive').startsWith('"Recursive", system-ui'), V.graphicFontStylesheet(['Fraunces']));
   const norm = (x) => D.normalizeDoc({ artboards: [{ id: 'a', width: 1000, height: 1000, children: [x] }] }).artboards[0].children[0];
   const para = T.layoutText(norm({ ...base, text: 'One\nTwo', paragraph: 1, autoHeight: true }));
   const noPara = T.layoutText(norm({ ...base, text: 'One\nTwo', autoHeight: true }));
@@ -178,6 +178,14 @@ const nodesOf = (doc) => doc.artboards.flatMap((b) => D.walk(b).map((l) => l.nod
     const sized = kind === 'perspective' || kind === 'bulge';
     ok(`…a ${kind} warp places each letter (the words still one text, labelled whole)`, (w.match(/<text /g) ?? []).length === 1 && /aria-label="Bold words here"/.test(w) && (sized ? (w.match(/<tspan/g) ?? []).length >= 'Bold words here'.length && /font-size="[\d.]+"/.test(w.replace(/<text[^>]*>/, '')) : (w.match(/<tspan/g) ?? []).length === 1 && w.includes('>Bold words here<') && /(dy="0 |rotate=")/.test(w)), w.slice(0, 600));
   }
+  // mixed styles survive a warp and a path: each run keeps its face (a ransom-note headline is its mix of faces)
+  for (const kind of ['stagger', 'wave', 'bulge']) {
+    const w = svgOf(board([{ ...base, warp: { kind, amount: 60 }, runs: [{ start: 5, end: 10, font: 'Bebas Neue', weight: 700, color: '#e5322d' }] }]));
+    const inner = (w.match(/<text[^>]*>([\s\S]*)<\/text>/) ?? [])[1] ?? '';
+    ok(`…a ${kind} warp keeps each run’s face, weight and colour, the line still one text that aligns as a whole`, (w.match(/<text /g) ?? []).length === 1 && /font-family="&quot;Bebas Neue&quot;/.test(inner) && /font-weight="700"/.test(inner) && /#e5322d/i.test(inner) && (inner.match(/ x="/g) ?? []).length === 1 && (kind === 'bulge' || (inner.includes('>words<') && inner.includes('>Bold <'))), inner.slice(0, 700));
+  }
+  const onPath = svgOf(board([{ ...base, path: { kind: 'arc', bend: 40, start: 50 }, runs: [{ start: 0, end: 4, font: 'Bebas Neue' }] }]));
+  ok('…along a path, each run keeps its face too', /<textPath[^>]*><tspan font-family="&quot;Bebas Neue&quot;[^>]*>Bold<\/tspan> words here<\/textPath>/.test(onPath), onPath.slice(0, 700));
   for (const kind of ['arc', 'circle', 'wave', 'custom']) {
     const d = board([{ ...base, path: { kind, bend: 60, start: 50, ...(kind === 'custom' ? { d: 'M0 80 C 30 0, 70 0, 100 80' } : {}) } }]);
     const s = svgOf(d);
@@ -337,7 +345,7 @@ const nodesOf = (doc) => doc.artboards.flatMap((b) => D.walk(b).map((l) => l.nod
     { id: 'g', type: 'group', mask: 'alpha', x: 0, y: 0, w: 100, h: 100, children: [{ id: 'g1', type: 'shape', shape: 'ellipse', x: 0, y: 0, w: 100, h: 100, fill: '#000' }, { id: 'g2', type: 'shape', shape: 'rect', x: 0, y: 0, w: 100, h: 100, fill: '#00f' }] },
   ]);
   const file = X.svgFile(doc, doc.artboards[0]);
-  ok('21. the SVG export carries filters, masks, patterns, blend modes and text as text, and loads the faces the runs use', /<filter /.test(file) && /<mask /.test(file) && /mix-blend-mode:multiply/.test(file) && /<textPath/.test(file) && /Exported words/.test(file) && X.facesOf(doc).includes('Fraunces') && X.facesOf(doc).includes('IBM Plex Mono'));
+  ok('21. the SVG export carries filters, masks, patterns, blend modes and text as text, and loads the faces the runs use', /<filter /.test(file) && /<mask /.test(file) && /mix-blend-mode:multiply/.test(file) && /<textPath/.test(file) && /Exported words/.test(file.replace(/<[^>]+>/g, '')) && X.facesOf(doc).includes('Fraunces') && X.facesOf(doc).includes('IBM Plex Mono'));
   ok('…nothing a document says becomes a script in it', !/<script|javascript:|on\w+=/i.test(file));
 }
 

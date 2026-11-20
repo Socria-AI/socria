@@ -36,6 +36,8 @@ const made = async () => {
   return { brief, sys, board: PL.applyAll(g.board, PL.finishOps(g.board)), res: g.res, seen: g.seen };
 };
 const head = (doc) => D.walk(doc.artboards[0]).map((l) => l.node).find((n) => n.role === 'headline');
+const lum = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)).reduce((a, c, i) => a + c * [0.2126, 0.7152, 0.0722][i], 0);
+const contrast = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
 
 // ── 1. the request read ──
 {
@@ -156,7 +158,9 @@ const T = await made();
   const ov = S.overridesOf(board.materials.find((m) => m.id === p2.id).doc, p2.bindings, sys);
   ok('8. a change made inside one material is a local override of the system, named', ov.length === 1 && ov[0].prop === 'color' && ov[0].value === '#ff00aa', J(ov));
   const e = ED.readBoardEdit('Change the campaign’s accent color to blue', board, { selection: [] });
-  ok('“change the campaign’s accent” is a proposed system change, not a regeneration', e?.action?.kind === 'system' && J(e.action.changed) === J(['accent']), J(e));
+  // the words set on the accent follow it only when their colour no longer reads on the new one
+  const textFollowed = e?.action?.changed?.includes('accentText');
+  ok('“change the campaign’s accent” is a proposed system change, not a regeneration', e?.action?.kind === 'system' && e.action.changed[0] === 'accent' && e.action.changed.every((k) => k === 'accent' || k === 'accentText') && (!textFollowed || contrast(sys.tokens.colors.accentText, e.action.system.tokens.colors.accent) < 4.5), J(e?.action?.changed));
   const plan = SY.syncSystem(board, e.action.system);
   const entry = (name) => plan.entries.find((x) => x.name === name);
   ok('9. the sync names what the change reaches: graphics updated, the mockup follows its design, the website is a project of its own', entry('Poster 1').outcome === 'updated' && entry('Packaging mockup').outcome === 'follows-source' && entry('Website').outcome === 'website' && plan.changed.includes('accent'), J(plan.entries.map((x) => [x.name, x.outcome])));
@@ -290,7 +294,8 @@ const T = await made();
   const rendered = V.renderDesign(r.project.specs[0], r.project.moodboard.refs);
   ok('it renders as a page', rendered.html.includes('Night Market Lisbon') && rendered.html.length > 10000);
   const next = ED.readBoardEdit('Change the campaign’s accent color to blue', { ...PL.startBoard(brief, sys), system: sys }, { selection: [] }).action.system;
-  ok('drift between the website and a changed system is named', J(W.websiteDrift(r.project, next)) === J({ fonts: [], colours: ['accent'] }));
+  const followed = next.tokens.colors.accentText !== sys.tokens.colors.accentText;
+  ok('drift between the website and a changed system is named', J(W.websiteDrift(r.project, next)) === J({ fonts: [], colours: followed ? ['accent', 'accentText'] : ['accent'] }), J(W.websiteDrift(r.project, next)));
   const synced = W.syncWebsite(r.project, next, { fonts: true, colours: true });
   ok('carried into the website as a new version, the earlier one kept', synced.specs.length === 2 && synced.specIndex === 1 && synced.specs[1].tokens.colors.accent === next.tokens.colors.accent && synced.specs[0].tokens.colors.accent === sys.tokens.colors.accent);
   ok('nothing to carry is no new version', W.syncWebsite(synced, next, { fonts: true, colours: true }) === null);

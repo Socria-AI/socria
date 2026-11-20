@@ -51,6 +51,8 @@ export interface GraphicMaterial extends MaterialBase {
   findings?: number;
   /** the designer accepted it with findings left */
   accepted?: boolean;
+  /** the document's revision when it was last composed: a later revision means it was edited since */
+  composed?: number;
 }
 export interface WebsiteMaterial extends MaterialBase {
   type: 'website';
@@ -210,6 +212,7 @@ function materialOf(v: unknown, seen: Set<string>): Material | null {
       ...(str(plan.archetype, 30) ? { plan: { archetype: str(plan.archetype, 30), colour: str(plan.colour, 20), said: a(plan.said).map((x) => str(x, 240)).filter(Boolean).slice(0, 8) } } : {}),
       ...(typeof r.findings === 'number' ? { findings: Math.round(num(r.findings, 0, 999, 0)) } : {}),
       ...(r.accepted === true ? { accepted: true } : {}),
+      ...(typeof r.composed === 'number' && Number.isFinite(r.composed) ? { composed: Math.round(num(r.composed, 0, 1e9, 0)) } : {}),
     };
   }
   if (r.type === 'website') {
@@ -398,7 +401,7 @@ export type BoardOp =
 
 export type BoardResult = { ok: true; board: BoardState; touched: string[] } | { ok: false; error: string; locked?: string[] };
 
-const MATERIAL_FIELDS = new Set(['name', 'purpose', 'status', 'error', 'doc', 'bindings', 'plan', 'findings', 'accepted', 'variant', 'brief', 'role', 'source', 'template', 'view', 'projectId']);
+const MATERIAL_FIELDS = new Set(['name', 'purpose', 'status', 'error', 'doc', 'bindings', 'plan', 'findings', 'accepted', 'variant', 'composed', 'brief', 'role', 'source', 'template', 'view', 'projectId']);
 
 /**
  * One operation applied to a board (see the head of this file): validated against what is there, refused with the

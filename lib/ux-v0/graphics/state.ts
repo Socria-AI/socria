@@ -10,6 +10,7 @@ import { normalizeForm } from '../form';
 import { colour, normalizeAsset, normalizeDoc, type Asset, type GraphicDoc } from './doc';
 import { GRAPHIC_KINDS, type GraphicBrief, type GraphicDirection } from './compose';
 import { formatOf } from './formats';
+import { normalizeSelection } from './styles/blend';
 
 export interface GraphicVersion {
   doc: GraphicDoc;
@@ -104,17 +105,21 @@ export function normalizeGraphicDirection(v: unknown): GraphicDirection | null {
       ...(colour(t.accent2, '') ? { accent2: colour(t.accent2, '') } : {}),
     },
     look: {
-      case: l.case === 'upper' ? 'upper' : 'sentence',
+      case: l.case === 'upper' ? 'upper' : l.case === 'lower' ? 'lower' : 'sentence',
       tracking: ['tight', 'normal', 'wide'].includes(l.tracking) ? l.tracking : 'normal',
       weight: Math.max(100, Math.min(900, Math.round(Number(l.weight) / 100) * 100 || 600)),
       motifs: a(l.motifs).map((m) => str(m, 30)).filter(Boolean).slice(0, 12),
       ...(str(l.frame, 30) ? { frame: str(l.frame, 30) } : {}),
       ...(str(l.buttons, 30) ? { buttons: str(l.buttons, 30) } : {}),
+      ...(typeof l.trackingValue === 'number' && Number.isFinite(l.trackingValue) ? { trackingValue: Math.max(-100, Math.min(400, Math.round(l.trackingValue))) } : {}),
+      ...(typeof l.lineHeight === 'number' && Number.isFinite(l.lineHeight) ? { lineHeight: Math.max(0.7, Math.min(2, Math.round(l.lineHeight * 100) / 100)) } : {}),
     },
     form,
     ...(['orthogonal', 'diagonal', 'radial', 'scattered', 'layered'].includes(r.axis) ? { axis: r.axis } : {}),
     ...(['structural', 'editorial', 'quiet', 'functional'].includes(r.typeRole) ? { typeRole: r.typeRole } : {}),
     intensity: Math.max(0, Math.min(100, Math.round(Number(r.intensity) || 0))),
+    // the design language it speaks, held to the styles SocriaUX has (an unknown one is dropped, the direction kept)
+    ...((sel) => (sel ? { style: sel } : {}))(r.style ? normalizeSelection(r.style) : null),
   };
 }
 

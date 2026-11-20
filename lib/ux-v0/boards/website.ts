@@ -12,7 +12,7 @@ import { briefKey, EMPTY_DIRECTION, type ArtDirection } from '../direction';
 import { emptyMoodboard, makeProject, normalizeBrief, type DesignProject } from '../types';
 import type { BoardBrief } from './model';
 import { websiteAnswer } from './plan';
-import { artOfSystem, type MasterDesignSystem } from './system';
+import { artOfSystem, webFacesOf, type MasterDesignSystem } from './system';
 
 /** The website project of a board (not yet stored: the caller writes it to the project store). */
 export function websiteConcept(brief: BoardBrief, sys: MasterDesignSystem, opts: { name?: string; board?: string } = {}): { ok: true; project: DesignProject } | { ok: false; error: string } {
@@ -33,7 +33,7 @@ export function websiteConcept(brief: BoardBrief, sys: MasterDesignSystem, opts:
       { name: 'Accent text', hex: c.accentText, role: 'accent-text' },
       { name: 'Line', hex: c.line, role: 'line' },
     ],
-    typography: { display: sys.tokens.fonts.display, body: sys.tokens.fonts.body },
+    typography: webFacesOf(sys.tokens.fonts),
     decisions: { colour: 'locked', typography: 'locked' },
   });
   if (!db) return { ok: false, error: 'The board’s words are not enough to brief a website: give it a headline.' };
@@ -58,7 +58,8 @@ export function websiteConcept(brief: BoardBrief, sys: MasterDesignSystem, opts:
 export function websiteDrift(p: DesignProject, sys: MasterDesignSystem): { fonts: string[]; colours: string[] } {
   const spec = p.specs[p.specIndex] ?? p.specs[p.specs.length - 1];
   if (!spec) return { fonts: [], colours: [] };
-  const fonts = (['display', 'body'] as const).filter((k) => spec.tokens.fonts[k] !== sys.tokens.fonts[k]);
+  const web = webFacesOf(sys.tokens.fonts);
+  const fonts = (['display', 'body'] as const).filter((k) => spec.tokens.fonts[k] !== web[k]);
   const colours = (Object.keys(spec.tokens.colors) as (keyof typeof spec.tokens.colors)[]).filter((k) => spec.tokens.colors[k]?.toLowerCase() !== sys.tokens.colors[k]?.toLowerCase());
   return { fonts, colours };
 }
@@ -74,10 +75,11 @@ export function syncWebsite(p: DesignProject, sys: MasterDesignSystem, what: { f
   const fonts = what.fonts && drift.fonts.length > 0;
   const colours = what.colours && drift.colours.length > 0;
   if (!fonts && !colours) return null;
-  const tokens = { ...spec.tokens, fonts: fonts ? { ...sys.tokens.fonts } : spec.tokens.fonts, colors: colours ? { ...spec.tokens.colors, ...sys.tokens.colors } : spec.tokens.colors };
+  const web = webFacesOf(sys.tokens.fonts);
+  const tokens = { ...spec.tokens, fonts: fonts ? { ...web } : spec.tokens.fonts, colors: colours ? { ...spec.tokens.colors, ...sys.tokens.colors } : spec.tokens.colors };
   const version = Math.max(0, ...p.specs.map((s) => s.version)) + 1;
   const said = [fonts ? 'typefaces' : '', colours ? 'colours' : ''].filter(Boolean).join(' and ');
   const next = { ...spec, tokens, version, reason: `The board’s design system carried in: its ${said}`, createdAt: now };
-  const chosen = p.direction.chosen ? ({ ...p.direction.chosen, tokens: { ...p.direction.chosen.tokens, ...(fonts ? { fonts: { ...sys.tokens.fonts } } : {}), ...(colours ? { colors: { ...p.direction.chosen.tokens.colors, ...sys.tokens.colors } } : {}) } } as ArtDirection) : null;
+  const chosen = p.direction.chosen ? ({ ...p.direction.chosen, tokens: { ...p.direction.chosen.tokens, ...(fonts ? { fonts: { ...web } } : {}), ...(colours ? { colors: { ...p.direction.chosen.tokens.colors, ...sys.tokens.colors } } : {}) } } as ArtDirection) : null;
   return { ...p, specs: [...p.specs, next], specIndex: p.specs.length, direction: { ...p.direction, chosen }, updatedAt: now };
 }

@@ -21,6 +21,7 @@ import { accentFor, composeGraphic, graphicDirectionOf, type GraphicBrief, type 
 import { refineDoc } from '@/lib/ux-v0/graphics/check';
 import { canvasMeasure } from '@/lib/ux-v0/graphics/raster';
 import { emptyGraphicState, MAX_GRAPHIC_VERSIONS, type GraphicState, type GraphicVersion } from '@/lib/ux-v0/graphics/state';
+import { styledOptions } from '@/lib/ux-v0/graphics/styles/propose';
 import { GraphicEditor, type EditorNote } from './GraphicEditor';
 import { directionFaces, facesUsed, loadFaces, useAssetUrls, useFaceMeasure } from './faces';
 import { BriefStage, DirectionsStage, briefOf, fieldsOf, KIND_LABEL, type BriefFields, type WebsiteSource } from './GraphicBrief';
@@ -117,7 +118,9 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent }: { 
         decisions: { colour: 'delegated', typography: 'delegated' },
       });
       if (!db) return [];
-      return proposeDirections({ brief: db, salt: project.id, round: r, seen: already, count: 3 }).map((d) => graphicDirectionOf(d));
+      const dirs = proposeDirections({ brief: db, salt: project.id, round: r, seen: already, count: 3 }).map((d) => graphicDirectionOf(d));
+      // each in a design language chosen from the brief (a style it names first), none of them a default
+      return styledOptions(brief, dirs, { salt: `${project.id}|${r}`, seedKey: project.id, seen: already }).options;
     },
     [project.id],
   );
@@ -158,7 +161,7 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent }: { 
     if (siteDir && g.source) return void composeIn(siteDir, brief);
     const options = proposeFor(brief, 0, []);
     setRound(0);
-    setSeen(options.map((o) => o.language));
+    setSeen(options.flatMap((o) => [o.language, ...(o.style ? [o.style.primary] : [])]));
     setG((x) => ({ ...x, brief, options }));
     setView('directions');
   };
@@ -168,7 +171,7 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent }: { 
     const r = round + 1;
     const options = proposeFor(g.brief, r, seen);
     setRound(r);
-    setSeen((s) => [...new Set([...s, ...options.map((o) => o.language)])]);
+    setSeen((s) => [...new Set([...s, ...options.flatMap((o) => [o.language, ...(o.style ? [o.style.primary] : [])])])]);
     setG((x) => ({ ...x, options: siteDir && x.source ? [siteDir, ...options] : options }));
   };
 

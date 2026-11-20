@@ -17,6 +17,9 @@ import { applyOps as applyGfx } from '../graphics/doc';
 import { arrange, presentSize } from './layout';
 import { bounds, nodeOfMaterial, type Arrangement, type BoardOp, type BoardState, type GraphicMaterial, type Material } from './model';
 import { changedTokens, rulesOf, type MasterDesignSystem, type TokenKey } from './system';
+import { readStyleEdit } from '../graphics/styles/edit';
+import type { StyleSelection } from '../graphics/styles/blend';
+import type { GraphicDoc } from '../graphics/doc';
 
 export type BoardAction =
   | { kind: 'add-material'; spec: { kind: GraphicKind; format?: string } }
@@ -24,7 +27,9 @@ export type BoardAction =
   | { kind: 'system'; system: MasterDesignSystem; changed: TokenKey[] }
   | { kind: 'annotate' }
   | { kind: 'polish' }
-  | { kind: 'website-sync'; materials: string[]; fonts: boolean; colours: boolean };
+  | { kind: 'website-sync'; materials: string[]; fonts: boolean; colours: boolean }
+  /** the whole board's design language changed (boards/style.ts planRestyle) */
+  | { kind: 'restyle'; selection: StyleSelection | null };
 
 export interface BoardEdit {
   label: string;
@@ -116,6 +121,13 @@ export function readBoardEdit(words0: string, b: BoardState, ctx: { selection: r
   if (/\b(show|turn on)\b.*\b(notes|annotations)\b/.test(words)) return { label: 'annotations shown', scope: 'board', ops: [{ op: 'annotations', visible: true }] };
   if (/\b(annotat\w*|explain\w*|notes?)\b/.test(words) && /\b(add|write|explain|annotate|regenerate|update|refresh|again)\b/.test(words)) return { label: 'the notes written again from the board’s facts', scope: 'board', action: { kind: 'annotate' } };
 
+  // the campaign's design language: "make the whole campaign more Art Deco", "reduce the brutalist influence"
+  if (sys && /\b(campaign|board|everything|every material|all (the )?materials|whole|across)\b/.test(words)) {
+    const stub = { id: sys.id, name: sys.name, revision: 0, artboards: [], assets: [], tokens: sys.tokens, locks: {}, style: sys.style } as unknown as GraphicDoc;
+    const se = readStyleEdit(words.replace(/\b(the )?(whole )?(campaign|board)\b|\bacross (the )?(board|campaign)\b|\bevery material\b|\ball (the )?materials\b/g, 'this'), stub, { current: sys.style ?? null });
+    if (se && se.selection && JSON.stringify(se.selection) !== JSON.stringify(sys.style ?? null)) return { label: `the campaign’s language: ${se.label}`, scope: 'board', action: { kind: 'restyle', selection: se.selection } };
+  }
+
   // one change to the graphics' vocabulary on several materials at once ("add a grain texture to every material", "use
   // a subtle halftone treatment on the pictures across the board"): the same edit read on each material's own document
   // and applied there, nothing regenerated; a locked material is left as it is
@@ -170,7 +182,8 @@ export function readBoardEdit(words0: string, b: BoardState, ctx: { selection: r
     const hex = pick.toLowerCase() === cur ? SPREAD[(SPREAD.indexOf(pick) + 2) % SPREAD.length] : pick;
     const next = revise(sys, (s) => {
       s.tokens.colors.accent = hex;
-      s.tokens.colors.accentText = onAccent(hex);
+      // the words on the accent keep their colour while it still reads on the new one
+      if (contrastRatio(s.tokens.colors.accentText, hex) < 4.5) s.tokens.colors.accentText = onAccent(hex);
       s.accentWhy = hexed || named ? `the accent changed to ${hexed ?? named![2]} on request` : 'the accent changed on request';
     });
     return { label: `the campaign’s accent changed to ${hex}`, scope: 'system', action: { kind: 'system', system: next, changed: changedTokens(sys, next) } };

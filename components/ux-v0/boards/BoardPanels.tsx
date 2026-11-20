@@ -13,6 +13,9 @@ import { COLOUR_TOKENS, overridesOf, TOKEN_LABEL, type MasterDesignSystem, type 
 import { onAccent, reviseSystem } from '@/lib/ux-v0/boards/edit';
 import type { BoardEvaluation } from '@/lib/ux-v0/boards/evaluate';
 import type { DesignProject } from '@/lib/ux-v0/types';
+import { allStyles, styleById } from '@/lib/ux-v0/graphics/styles/registry';
+import type { StyleSelection } from '@/lib/ux-v0/graphics/styles/blend';
+import type { StyleDNA } from '@/lib/ux-v0/graphics/styles/schema';
 
 const STATUS_WORD: Record<Material['status'], string> = { planned: 'Planned', generating: 'Generating', rendering: 'Rendering', ready: 'Ready', failed: 'Failed' };
 const ARRANGEMENT_LABEL: Record<Arrangement, string> = { editorial: 'Campaign overview', sections: 'Sections', grid: 'Grid', rows: 'Two rows', sequence: 'One sequence' };
@@ -79,7 +82,75 @@ export function MaterialsPanel(p: { board: BoardState; selected: ReadonlySet<str
 
 // ── the design system ──
 
-export function SystemPanel(p: { board: BoardState; onPropose: (next: MasterDesignSystem, label: string) => void; source?: string }) {
+/** The board's design language: one style every material speaks, each in its own construction. */
+function BoardStyle({ sys, customs, onRestyle }: { sys: MasterDesignSystem; customs: readonly StyleDNA[]; onRestyle: (sel: StyleSelection | null, label: string) => void }) {
+  const cur = sys.style ?? null;
+  const [primary, setPrimary] = useState(cur?.primary ?? '');
+  const [secondary, setSecondary] = useState(cur?.secondary ?? '');
+  const [strength, setStrength] = useState(cur?.strength ?? 40);
+  useEffect(() => {
+    setPrimary(cur?.primary ?? '');
+    setSecondary(cur?.secondary ?? '');
+    setStrength(cur?.strength ?? 40);
+  }, [cur?.primary, cur?.secondary, cur?.strength]);
+  const pool = allStyles([...(cur?.customs ?? []), ...customs]);
+  const changed = primary !== (cur?.primary ?? '') || secondary !== (cur?.secondary ?? '') || (secondary && strength !== (cur?.strength ?? 40));
+  const name = (id: string) => styleById(id, [...(cur?.customs ?? []), ...customs])?.name ?? id;
+  return (
+    <>
+      <p className="gx-panel-sub">Design language</p>
+      <p className="v0-quiet">{cur ? `${name(cur.primary)}${cur.secondary ? ` × ${name(cur.secondary)} (${cur.strength}%)` : ''}: every material speaks it, each built its own way.` : 'None: the materials follow the system’s colours and type only.'}</p>
+      <label className="gx-field">
+        <span>Style</span>
+        <select className="v0-select" value={primary} onChange={(e) => setPrimary(e.target.value)}>
+          <option value="">None</option>
+          {pool.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {primary && (
+        <label className="gx-field">
+          <span>Influence</span>
+          <select className="v0-select" value={secondary} onChange={(e) => setSecondary(e.target.value)}>
+            <option value="">None</option>
+            {pool
+              .filter((s) => s.id !== primary)
+              .map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+          </select>
+        </label>
+      )}
+      {primary && secondary && (
+        <label className="gx-field">
+          <span>Blend strength · {strength}%</span>
+          <input type="range" min={0} max={100} step={5} value={strength} onChange={(e) => setStrength(Number(e.target.value))} />
+        </label>
+      )}
+      <div className="bd-row">
+        <button
+          type="button"
+          className="sb-btn is-sm is-primary"
+          disabled={!changed}
+          onClick={() => {
+            const carried = [...(cur?.customs ?? []), ...customs].filter((c) => c.id === primary || c.id === secondary).slice(0, 6);
+            onRestyle(primary ? { primary, strength: secondary ? strength : 0, ...(secondary ? { secondary } : {}), ...(cur?.seedKey ? { seedKey: cur.seedKey } : {}), ...(carried.length ? { customs: carried } : {}) } : null, primary ? `the board in ${name(primary)}${secondary ? ` × ${name(secondary)}` : ''}` : 'the board without a named language');
+          }}
+        >
+          Preview the board in it
+        </button>
+      </div>
+      <p className="v0-quiet">Untouched materials are rebuilt in the language; those you edited keep their arrangement and take its colours and type; locked ones are kept.</p>
+    </>
+  );
+}
+
+export function SystemPanel(p: { board: BoardState; onPropose: (next: MasterDesignSystem, label: string) => void; source?: string; customs?: readonly StyleDNA[]; onRestyle?: (sel: StyleSelection | null, label: string) => void }) {
   const sys = p.board.system;
   const [draft, setDraft] = useState(sys);
   useEffect(() => setDraft(sys), [sys]);
@@ -174,6 +245,7 @@ export function SystemPanel(p: { board: BoardState; onPropose: (next: MasterDesi
         </button>
       </div>
       <p className="v0-quiet">A change is shown first: which materials it reaches, and what each keeps (your local changes are never overwritten without your say). Nothing is composed again.</p>
+      {p.onRestyle && <BoardStyle sys={sys} customs={p.customs ?? []} onRestyle={p.onRestyle} />}
       {sys.constraints.length > 0 && (
         <details className="gx-why">
           <summary>The system’s rules</summary>

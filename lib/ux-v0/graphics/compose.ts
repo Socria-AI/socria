@@ -27,6 +27,10 @@ import { primDefaults, PRIMITIVE_BY_KIND, type Prim } from './geometry';
 import { mixColor, tintPreset, type Gradient, type Paint } from './paint';
 import { isPxParam, PATTERN_BY_KIND } from './patterns';
 import { NEW_ARCHETYPES, vocabularyFor, vocabularyRecord, type InkRole, type PatternUse, type TypeTreatment, type VisualVocabulary } from './vocabulary';
+import { runFor, type StyleRun } from './styles/apply';
+import type { StyleSelection } from './styles/blend';
+import { styleLayouts } from './styles/constructions';
+import { CONSTRUCTIONS, isStyleConstruction, type StyleConstruction } from './styles/schema';
 
 export const GRAPHIC_KINDS = ['poster', 'social', 'carousel', 'ad', 'banner', 'magazine', 'book', 'album', 'card', 'label', 'infographic', 'identity', 'announcement', 'presentation', 'campaign'] as const;
 export type GraphicKind = (typeof GRAPHIC_KINDS)[number];
@@ -66,13 +70,15 @@ export interface GraphicDirection {
   language: string;
   concept?: string;
   tokens: Tokens;
-  look: { case: 'sentence' | 'upper'; tracking: 'tight' | 'normal' | 'wide'; weight: number; motifs?: string[]; frame?: string; buttons?: string };
+  look: { case: 'sentence' | 'upper' | 'lower'; tracking: 'tight' | 'normal' | 'wide'; weight: number; motifs?: string[]; frame?: string; buttons?: string; trackingValue?: number; lineHeight?: number };
   form?: FormSystem | null;
   /** the spatial logic (lib/ux-v0/strategy.ts axis) and how loud the type may be */
   axis?: 'orthogonal' | 'diagonal' | 'radial' | 'scattered' | 'layered';
   typeRole?: 'structural' | 'editorial' | 'quiet' | 'functional';
   /** 0 restrained … 100 expressive */
   intensity: number;
+  /** the design language the direction is built in (styles/*): its construction, palette, faces and vocabulary */
+  style?: StyleSelection;
 }
 
 export interface Plan {
@@ -88,6 +94,13 @@ export interface Plan {
   vocabulary?: VisualVocabulary;
   /** the composition's strategy, decided before placing: what organises it and how full it is */
   strategy?: Strategy;
+  /** the design language it is built in, and the construction it builds with */
+  style?: { id: string; name: string; construction: string; variant: string };
+  /** the style as the composer uses it (not kept with the document) */
+  run?: StyleRun;
+  /** the brief asked for a pattern in so many words ("generative, procedural", "a halftone pattern"): answered in any
+   * language, where the construction leaves room */
+  patternAsked?: boolean;
 }
 
 /** How a composition is organised, said as decisions (the layout system, the type, the picture, the shapes, the
@@ -105,7 +118,7 @@ export interface Strategy {
 }
 
 export const ARCHETYPES = ['type-poster', 'image-full', 'image-split', 'minimal', 'swiss', 'statement', 'masthead', 'book', 'album', 'card', 'label', 'infographic', 'process', 'identity', 'banner', 'carousel', ...NEW_ARCHETYPES] as const;
-export type Archetype = (typeof ARCHETYPES)[number];
+export type Archetype = (typeof ARCHETYPES)[number] | StyleConstruction;
 
 // ── reading a graphic brief from words ──
 
@@ -278,6 +291,8 @@ export interface PlanOverride {
   colour?: Plan['colour'];
   /** a vocabulary given from outside the planner (a Board's shared one, or a model's validated plan) */
   vocabulary?: VisualVocabulary;
+  /** a Board sibling's turn through its style's constructions (material-specific interpretation) */
+  styleIndex?: number;
 }
 const FREE_ARCHETYPES: readonly Archetype[] = ['type-poster', 'image-full', 'image-split', 'minimal', 'swiss', 'statement'];
 const FREE_KINDS: readonly GraphicKind[] = ['poster', 'social', 'ad', 'announcement', 'presentation', 'campaign'];
@@ -393,28 +408,50 @@ export function planFor(brief: GraphicBrief, dir: GraphicDirection, f: Format, o
   else if (colour === 'inverse') said.push('Ink for the ground and the paper for the type: the direction is raw, in two colours.');
   // the visual vocabulary: the style the brief's words (and the direction's language) ask for, and the composition
   // that style wants where the kind allows another (never against a Board's request for a different sibling)
-  const vocab = opts.over?.vocabulary ?? vocabularyFor({ words: brief.purpose, mood: brief.mood, language: dir.language, intensity: dir.intensity, hasImage, seed: `${brief.content.headline}|${dir.name}`, kind: brief.kind });
+  // a design language chosen for the direction: its construction (where the kind lets the composition be chosen) and
+  // its vocabulary; the palette and faces are already the direction's tokens (styles/apply.ts styledDirection)
+  const run = dir.style ? runFor(dir.style, { hasImage, index: opts.over?.styleIndex, tokens: { background: dir.tokens.colors.background, text: dir.tokens.colors.text, accent: dir.tokens.colors.accent, accent2: dir.tokens.accent2 }, fonts: dir.tokens.fonts }) : null;
+  if (run && FREE_KINDS.includes(brief.kind) && aspect <= 2.2) {
+    archetype = (isStyleConstruction(run.construction) ? run.construction : run.construction) as Archetype;
+    said.push(`Built in ${run.name}: ${run.says[0]}`);
+    for (const x of run.says.slice(1, 3)) said.push(x);
+  } else if (run) said.push(`Set in ${run.name}: its type, colour, shapes and surface; this kind keeps its own composition.`);
+  const briefVocab = () => vocabularyFor({ words: brief.purpose, mood: brief.mood, language: dir.language, intensity: dir.intensity, hasImage, seed: `${brief.content.headline}|${dir.name}`, kind: brief.kind });
+  // a brief that names its technique ("generative, procedural", "a halftone pattern") is answered in any language: the
+  // style's own pattern where it has one, else the one the words ask for, in the style's inks
+  const asked = run ? briefVocab() : null;
+  const patternAsked = !!(run && asked && asked.strength >= 2 && asked.pattern);
+  const vocab = run ? (patternAsked ? { ...run.vocab, pattern: run.vocab.pattern ?? asked!.pattern } : run.vocab) : (opts.over?.vocabulary ?? briefVocab());
+  if (patternAsked) said.push(`The brief asks for ${asked!.style} work: a ${vocab.pattern!.gen} pattern is part of the design, in the language’s colours.`);
   let shapes2: Plan['shapes'] = shapes;
   const wanted = vocab.archetype;
   const kindAllows = FREE_KINDS.includes(brief.kind) || (['album', 'book'].includes(brief.kind) && wanted !== null && ['abstract', 'procedural', 'typographic', 'halftone', 'collage', 'organic', 'radial', 'layered', 'cinematic'].includes(wanted));
   // a composition chosen for its style never drops the designer's picture: with a picture, only one that places it
   const placesPicture = ['image-full', 'image-split', 'cinematic', 'halftone', 'collage'].includes(wanted ?? '');
-  if (vocab.strength >= 2 && wanted && wanted !== archetype && !opts.over?.archetype && kindAllows && aspect <= 2.2 && (!wanted.startsWith('image') || hasImage) && (!hasImage || placesPicture)) {
+  if (!run && vocab.strength >= 2 && wanted && wanted !== archetype && !opts.over?.archetype && kindAllows && aspect <= 2.2 && (!wanted.startsWith('image') || hasImage) && (!hasImage || placesPicture)) {
     archetype = wanted as Archetype;
     said.push(`The composition follows the brief’s ${vocab.style} character: ${vocab.says[0]}`);
     if ((NEW_ARCHETYPES as readonly string[]).includes(wanted)) shapes2 = vocab.pattern ? 'pattern' : vocab.motifs.length ? 'motif' : 'none';
-  } else if (vocab.strength >= 1) said.push(`The vocabulary follows the brief’s ${vocab.style} character: ${vocab.says[0]}`);
+  } else if (!run && vocab.strength >= 1) said.push(`The vocabulary follows the brief’s ${vocab.style} character: ${vocab.says[0]}`);
+  if (run && isStyleConstruction(archetype)) {
+    // a Board sibling that comes round to the same construction again takes the palette another way (the paper, then
+    // the ink, then the accent as its ground): one language, several uses of it, never the same design twice
+    const turn = Math.floor((opts.over?.styleIndex ?? 0) / Math.max(1, run.dna.composition.constructions.length)) % 3;
+    colour = turn === 1 ? 'inverse' : turn === 2 ? 'accent-field' : 'ground';
+    if (turn) said.push(turn === 1 ? 'Its ink taken as the ground this time, the paper as the ink.' : 'The accent taken as the ground this time.');
+  }
   // a cinematic frame is dark; a brutalist wall of type is ink or the accent
   if (archetype === 'cinematic' && !DARK_LANGS.includes(dir.language)) colour = 'inverse';
   if (archetype === 'typographic' && vocab.style === 'brutalist' && colour === 'ground') colour = hashOf(brief.content.headline) % 2 ? 'inverse' : 'accent-field';
   const focal: Plan['focal'] = archetype === 'infographic' ? 'data' : archetype === 'album' || archetype === 'abstract' || archetype === 'procedural' ? 'shape' : hasImage && (archetype.startsWith('image') || archetype === 'cinematic' || archetype === 'halftone') ? 'image' : 'type';
   const strategy = strategyOf(archetype, vocab, colour, hasImage);
-  return { archetype, focal, hierarchy: ['headline', 'subhead', 'body', 'meta', 'cta', 'logo'], colour, shapes: shapes2, said, vocabulary: vocab, strategy };
+  return { archetype, focal, hierarchy: ['headline', 'subhead', 'body', 'meta', 'cta', 'logo'], colour, shapes: shapes2, said, vocabulary: vocab, strategy, ...(run ? { run, style: { id: run.id, name: run.name, construction: run.construction, variant: run.variant } } : {}), ...(patternAsked ? { patternAsked: true } : {}) };
 }
 
 /** The strategy a composition follows (see Strategy), from its archetype and its vocabulary. */
 function strategyOf(a: Archetype, v: VisualVocabulary, colour: Plan['colour'], hasImage: boolean): Strategy {
-  const layout: Strategy['layout'] =
+  const built = isStyleConstruction(a) ? CONSTRUCTIONS[a] : null;
+  const layout: Strategy['layout'] = built ? (built.layout as Strategy['layout']) :
     a === 'swiss' || a === 'infographic' || a === 'process' ? 'column' : a === 'modular' || a === 'technical' ? 'modular' : a === 'radial' ? 'radial' : a === 'diagonal' ? 'diagonal' : a === 'collage' ? 'collage' : a === 'layered' || a === 'procedural' ? 'layered' : a === 'typographic' || a === 'type-poster' ? 'typographic' : a === 'image-full' || a === 'cinematic' || a === 'halftone' ? (hasImage ? 'image-dominant' : 'full-bleed') : a === 'image-split' || a === 'banner' ? 'split' : a === 'masthead' ? 'editorial' : a === 'book' || a === 'label' || a === 'card' ? 'centred' : a === 'organic' || a === 'abstract' ? 'freeform' : 'asymmetric';
   return {
     layout,
@@ -425,7 +462,7 @@ function strategyOf(a: Archetype, v: VisualVocabulary, colour: Plan['colour'], h
     space: v.density >= 70 ? 'dense' : v.density <= 25 ? 'generous' : 'balanced',
     density: v.density,
     contrast: v.style === 'soft' || v.style === 'minimal' ? 'soft' : ['brutalist', 'cinematic', 'halftone', 'maximal', 'experimental'].includes(v.style) ? 'high' : 'medium',
-    rhythm: layout === 'radial' ? 'radiating' : layout === 'freeform' || v.style === 'organic' || v.style === 'procedural' ? 'flowing' : layout === 'typographic' ? 'stacked' : layout === 'collage' || layout === 'diagonal' || layout === 'layered' ? 'syncopated' : 'regular',
+    rhythm: built ? (built.rhythm as Strategy['rhythm']) : layout === 'radial' ? 'radiating' : layout === 'freeform' || v.style === 'organic' || v.style === 'procedural' ? 'flowing' : layout === 'typographic' ? 'stacked' : layout === 'collage' || layout === 'diagonal' || layout === 'layered' ? 'syncopated' : 'regular',
   };
 }
 
@@ -437,7 +474,7 @@ export const DARK_LANGS = ['night', 'cinema', 'future'];
 
 // ── the layout ──
 
-interface Ctx {
+export interface Ctx {
   W: number;
   H: number;
   m: number;
@@ -457,6 +494,8 @@ interface Ctx {
   vocab: VisualVocabulary | null;
   /** a second colour that reads against the ground */
   accent2: string;
+  /** the design language (null: none chosen) */
+  style: StyleRun | null;
 }
 
 const TRACK: Record<GraphicDirection['look']['tracking'], number> = { tight: -25, normal: 0, wide: 90 };
@@ -487,6 +526,7 @@ function contextFor(brief: GraphicBrief, dir: GraphicDirection, f: Format, plan:
     print: f.unit === 'pt',
     vocab: plan.vocabulary && plan.vocabulary.strength >= 1 ? plan.vocabulary : null,
     accent2: ((a2) => (contrastRatio(a2, ground) >= 1.5 ? a2 : ensureContrast(a2, ground, 2)))(dir.tokens.accent2 ?? (field ? c.background : mixColor(c.accent, c.text, 0.45).slice(0, 7))),
+    style: plan.run ?? null,
   };
 }
 
@@ -510,12 +550,12 @@ function text(x: Ctx, role: Role, words: string, box: { x: number; y: number; w:
     font: display ? x.dir.tokens.fonts.display : x.dir.tokens.fonts.body,
     weight: display ? Math.min(900, Math.max(300, x.dir.look.weight)) : role === 'meta' || role === 'cta' || role === 'label' ? 600 : 400,
     size: Math.max(minText(x), s.size ?? x.u * 3),
-    lineHeight: display ? 0.95 : 1.35,
-    tracking: display ? TRACK[x.dir.look.tracking] : role === 'label' || role === 'meta' ? 40 : 0,
+    lineHeight: display ? x.dir.look.lineHeight ?? 0.95 : 1.35,
+    tracking: display ? x.dir.look.trackingValue ?? TRACK[x.dir.look.tracking] : role === 'label' || role === 'meta' ? 40 : 0,
     align: 'left',
     valign: 'top',
     color: x.ink,
-    ...(display && x.dir.look.case === 'upper' ? { case: 'upper' as const } : {}),
+    ...(display && x.dir.look.case === 'upper' ? { case: 'upper' as const } : display && x.dir.look.case === 'lower' ? { case: 'lower' as const } : {}),
     ...s,
   };
   // the weight the face really has: within a variable family's range, or the nearest of a static family's weights
@@ -604,6 +644,51 @@ function foot(x: Ctx, color = x.ink): Node[] {
 }
 
 type Layout = (x: Ctx, plan: Plan) => Node[];
+
+/** What the style constructions (styles/constructions-*.ts) build with: the composer's own helpers, handed over
+ * rather than imported, so the constructions stay a module of their own. */
+export interface Kit {
+  text: typeof text;
+  rect: typeof rect;
+  rule: typeof rule;
+  image: typeof image;
+  foot: typeof foot;
+  stack: typeof stack;
+  stackFromFoot: typeof stackFromFoot;
+  footTop: typeof footTop;
+  metaLines: (x: Ctx) => string[];
+  minText: (x: Ctx) => number;
+  primNode: typeof primNode;
+  patternNode: typeof patternNode;
+  cutPicture: typeof cutPicture;
+  plateFor: typeof plateFor;
+  treat: typeof treat;
+  paletteFx: typeof paletteFx;
+  inkOf: (x: Ctx, r: InkRole) => string;
+  pdef: (gen: string, params: Record<string, number>, inks: InkRole[], opacity?: number) => PatternUse;
+  primOf: (kind: string, params?: Record<string, number>) => Prim;
+}
+const KIT: Kit = {
+  text: (...a) => text(...a),
+  rect: (...a) => rect(...a),
+  rule: (...a) => rule(...a),
+  image: (...a) => image(...a),
+  foot: (...a) => foot(...a),
+  stack: (...a) => stack(...a),
+  stackFromFoot: (...a) => stackFromFoot(...a),
+  footTop: (...a) => footTop(...a),
+  metaLines: (x) => metaLines(x),
+  minText: (x) => minText(x),
+  primNode: (...a) => primNode(...a),
+  patternNode: (...a) => patternNode(...a),
+  cutPicture: (...a) => cutPicture(...a),
+  plateFor: (...a) => plateFor(...a),
+  treat: (...a) => treat(...a),
+  paletteFx: (...a) => paletteFx(...a),
+  inkOf: (x, r) => inkOf(x, r),
+  pdef: (gen, params, inks, opacity) => pdef(gen, params, inks, opacity),
+  primOf: (kind, params) => primOf(kind, params),
+};
 
 const LAYOUTS: Record<Archetype, Layout> = {
   'type-poster': (x, plan) => {
@@ -862,6 +947,7 @@ const LAYOUTS: Record<Archetype, Layout> = {
   },
   carousel: (x, plan) => LAYOUTS.statement(x, plan),
   ...newLayouts(),
+  ...styleLayouts(KIT),
 };
 
 /** The artboard for one format (one slide of a carousel), composed (see the head of this file). */
@@ -1044,7 +1130,7 @@ export function composeGraphic(brief: GraphicBrief, dir: GraphicDirection, opts:
       plans.push(r.plan);
     }
   const vocab = plans.find((p) => p.vocabulary && p.vocabulary.strength >= 1)?.vocabulary;
-  const raw = { schema: 1, id: newId('gd'), name: opts.name ?? brief.content.headline.slice(0, 60), direction: { name: dir.name, language: dir.language }, tokens: dir.tokens, artboards: boards, assets: opts.assets ?? [], revision: 1, updatedAt: Date.now(), ...(vocab ? { vocabulary: vocabularyRecord(vocab) } : {}) };
+  const raw = { schema: 1, id: newId('gd'), name: opts.name ?? brief.content.headline.slice(0, 60), direction: { name: dir.name, language: dir.language }, tokens: dir.tokens, artboards: boards, assets: opts.assets ?? [], revision: 1, updatedAt: Date.now(), ...(vocab ? { vocabulary: vocabularyRecord(vocab) } : {}), ...(dir.style ? { style: dir.style } : {}) };
   const doc = normalizeDoc(raw);
   if (!doc) throw new Error('The composition could not be held to the document’s shape.');
   const placeholders = [...new Set(doc.artboards.flatMap((b) => b.children.flatMap((n) => (n.type === 'text' ? n.text.match(/\[[^\]]+\]/g) ?? [] : []))))];
@@ -1278,7 +1364,7 @@ function freeRegion(x: Ctx, out: readonly Node[], where: PatternUse['where']): B
 function dress(x: Ctx, plan: Plan, out: Node[]): Node[] {
   const v = x.vocab;
   if (!v) return out;
-  const own = (NEW_ARCHETYPES as readonly string[]).includes(plan.archetype);
+  const own = (NEW_ARCHETYPES as readonly string[]).includes(plan.archetype) || isStyleConstruction(plan.archetype);
   const strong = v.strength >= 2;
   const fixedKinds = ['infographic', 'process', 'card', 'masthead', 'banner', 'carousel', 'identity', 'label'];
   const head = out.find((n): n is TextNode => n.type === 'text' && n.role === 'headline');
@@ -1310,6 +1396,12 @@ function dress(x: Ctx, plan: Plan, out: Node[]): Node[] {
       const at = out.findIndex((n) => !(n.role === 'background'));
       out.splice(Math.max(0, at), 0, patternNode(x, v.pattern, region, v.pattern.where === 'full' ? { opacity: Math.min(v.pattern.opacity, 0.35) } : {}));
     }
+  } else if (v.pattern && own && plan.patternAsked && !out.some((n) => n.type === 'pattern') && !out.some((n) => n.type === 'image' && n.role === 'background')) {
+    // a construction that drew no pattern, for a brief that asked for one: where it leaves room, else quietly under
+    // the whole frame (the shapes and plates of the construction above it, the checks keeping the words readable)
+    const region = freeRegion(x, out, v.pattern.where);
+    const at = out.findIndex((n) => !(n.role === 'background'));
+    out.splice(Math.max(0, at), 0, patternNode(x, v.pattern, region ?? { x: 0, y: 0, w: x.W, h: x.H }, region && v.pattern.where !== 'full' ? {} : { opacity: Math.min(v.pattern.opacity, 0.3) }));
   }
   if (plan.archetype === 'label' && v.type === 'circle' && strong) {
     const logo = out.find((n): n is TextNode => n.type === 'text' && n.role === 'logo');
@@ -1321,7 +1413,13 @@ function dress(x: Ctx, plan: Plan, out: Node[]): Node[] {
       treat(x, logo, 'circle');
     }
   }
-  if (v.texture.length && !out.some((n) => n.type === 'image' && n.role === 'background' && n.w >= x.W * 0.95 && n.h >= x.H * 0.95)) out.unshift(rect(x, 'background', { x: 0, y: 0, w: x.W, h: x.H }, x.ground, { name: 'Paper', effects: paletteFx(x, v.texture) }));
+  if (v.texture.length && !out.some((n) => n.type === 'image' && n.role === 'background' && n.w >= x.W * 0.95 && n.h >= x.H * 0.95)) {
+    // a construction that lays its own ground (a gradient sky, a field of colour) takes the texture on that ground,
+    // where it shows; otherwise a paper layer of the ground's own colour carries it
+    const field = out.find((n) => n.type === 'shape' && n.role === 'background' && n.x <= 1 && n.y <= 1 && n.w >= x.W * 0.98 && n.h >= x.H * 0.98 && !n.effects?.length);
+    if (field && x.style) (field as Node).effects = paletteFx(x, v.texture);
+    else out.unshift(rect(x, 'background', { x: 0, y: 0, w: x.W, h: x.H }, x.ground, { name: 'Paper', effects: paletteFx(x, v.texture) }));
+  }
   return out;
 }
 

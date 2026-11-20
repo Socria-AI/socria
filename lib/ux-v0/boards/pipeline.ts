@@ -19,8 +19,9 @@ import type { Asset } from '../graphics/doc';
 import { annotate } from './annotate';
 import { arrange, presentSize } from './layout';
 import { applyBoardOps, boardId, emptyBoard, type BoardBrief, type BoardOp, type BoardState, type GraphicMaterial, type Material, type WebsiteMaterial } from './model';
-import { composeMaterial, paletteTurn, planMaterials, siblingIndex, type ComposedMaterial } from './plan';
-import { systemFromDirection, type MasterDesignSystem } from './system';
+import { composeMaterial, graphicIndex, paletteTurn, planMaterials, siblingIndex, type ComposedMaterial } from './plan';
+import { directionOfSystem, systemFromDirection, systemInStyle, type MasterDesignSystem } from './system';
+import { styledOptions } from '../graphics/styles/propose';
 
 /** Three systems for a brief: the art-direction engine's directions, each given the accent the brief suggests. */
 export function proposeSystems(brief: BoardBrief, salt: string, opts: { round?: number; seen?: readonly string[] } = {}): MasterDesignSystem[] {
@@ -35,7 +36,10 @@ export function proposeSystems(brief: BoardBrief, salt: string, opts: { round?: 
     decisions: { colour: 'delegated', typography: 'delegated' },
   });
   if (!db) return [];
-  return proposeDirections({ brief: db, salt, round: opts.round ?? 0, seen: opts.seen ?? [], count: 3 }).map((d) => systemFromDirection(d, { name: brief.name, personality: brief.mood, accentWhy: accent.why }));
+  const systems = proposeDirections({ brief: db, salt, round: opts.round ?? 0, seen: opts.seen ?? [], count: 3 }).map((d) => systemFromDirection(d, { name: brief.name, personality: brief.mood, accentWhy: accent.why }));
+  // each system in a design language chosen from the brief (one it names first): every material will speak it
+  const styled = styledOptions({ purpose: brief.purpose, kind: 'campaign', formats: [], content: brief.content, mood: brief.mood, images: brief.images }, systems.map(directionOfSystem), { salt: `${salt}|${opts.round ?? 0}`, seedKey: salt, seen: opts.seen ?? [] });
+  return systems.map((s, i) => (styled.options[i]?.style ? systemInStyle(s, styled.options[i]) : s));
 }
 
 /** The system of a website project's approved direction (null without one). */
@@ -99,13 +103,14 @@ export async function generate(start: BoardState, deps: GenerateDeps, emit: (op:
     try {
       if (m.type === 'graphic') {
         const sibling = siblingIndex(start.materials, m);
+        const order = Math.max(0, graphicIndex(start.materials, m));
         const turn = Math.max(0, paletteTurn(start.materials, m));
         // composed, then once more in the next variant if high findings remain; then said
         let variant = m.variant;
         let made: ComposedMaterial | null = null;
         for (let attempt = 0; attempt < 2; attempt++) {
           const cur = { ...m, variant };
-          made = deps.compose ? await deps.compose(cur, sibling, turn) : composeMaterial(cur, sys, { measure: deps.measure, assets: start.assets, sibling, turn });
+          made = deps.compose ? await deps.compose(cur, sibling, turn) : composeMaterial(cur, sys, { measure: deps.measure, assets: start.assets, sibling, order, turn });
           if (!made.left.length) break;
           variant++;
         }
@@ -113,7 +118,7 @@ export async function generate(start: BoardState, deps: GenerateDeps, emit: (op:
         await pause();
         if (!made) throw new Error('nothing was composed');
         const bad = made.left.length > 0;
-        emit({ op: 'material-update', id: m.id, set: { doc: made.doc, bindings: made.bindings, plan: made.plan, variant, findings: made.left.length, status: bad ? 'failed' : 'ready', error: bad ? `${made.left.length} problem${made.left.length === 1 ? '' : 's'} the bounded repair could not fix: ${made.left[0].message} Retry it, change its words, or keep it as it is.` : '' } });
+        emit({ op: 'material-update', id: m.id, set: { doc: made.doc, bindings: made.bindings, plan: made.plan, variant, composed: made.doc.revision, findings: made.left.length, status: bad ? 'failed' : 'ready', error: bad ? `${made.left.length} problem${made.left.length === 1 ? '' : 's'} the bounded repair could not fix: ${made.left[0].message} Retry it, change its words, or keep it as it is.` : '' } });
         if (bad) failed++;
         else ready++;
       } else if (m.type === 'website') {
