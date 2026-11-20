@@ -140,7 +140,10 @@ export function lockedTouched(spec: DesignSpec, patch: Patch): string[] {
  * A newly generated design with the previous version's locked sections carried over unchanged: in place of a
  * section of the same id (or, failing that, the same kind), else where it stood. Each is said in the notes.
  */
-export function holdLocked(next: DesignSpec, previous: DesignSpec | null | undefined): { spec: DesignSpec; kept: string[] } {
+export function holdLocked(nextIn: DesignSpec, previous: DesignSpec | null | undefined): { spec: DesignSpec; kept: string[] } {
+  // the site's settings are the designer's (its address, where its forms send, where its buttons go): a new
+  // generation never loses them
+  const next: DesignSpec = previous?.site && !nextIn.site ? { ...nextIn, site: previous.site } : nextIn;
   const locked = (previous?.sections ?? []).filter((s) => s.locked || s.held);
   if (!locked.length) return { spec: next, kept: [] };
   let sections = [...next.sections];

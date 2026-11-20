@@ -172,6 +172,10 @@ export function readIntent(words: string, opts: { override?: Experience | null; 
   }
   const ranked = [...score.entries()].sort((a, b) => b[1] - a[1]);
   let kind: Experience = ranked[0]?.[0] ?? 'site';
+  // "a website … where guests book a table" is a website that takes bookings, not a booking screen: when the
+  // designer says website and no screen is said more strongly than that, the site wins the tie (the booking is still
+  // a requirement, below). "A booking screen" or "choose a time slot" still outweighs it.
+  if (kind !== 'site' && SCREENS.has(kind) && (score.get('site') ?? 0) >= (ranked[0]?.[1] ?? 0)) kind = 'site';
   let source: DesignIntent['source'] = ranked.length ? 'words' : 'default';
   const weak = !ranked.length || ranked[0][1] < 4;
   if (weak && opts.briefKind && (EXPERIENCES as readonly string[]).includes(opts.briefKind)) {

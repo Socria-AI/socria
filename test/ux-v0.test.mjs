@@ -139,7 +139,9 @@ console.log('\n=== the renderer ===');
   ok('a used image is credited on the page', r.credits.length === 1 && r.html.includes('class="credits"') && r.html.includes('A. Photographer'));
   ok('placeholders are drawn as placeholders', r.html.includes('<span class="ph"'));
   ok('fonts are loaded from the list only', r.html.includes('fonts.googleapis.com/css2?family=Fraunces'));
-  ok('the page has no script of its own', !/<script/i.test(r.html.replace(/&lt;script/g, '')));
+  // the one script element is the structured data for search engines: a data block that never runs, its words escaped
+  const ld = r.html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+  ok('the page has no script of its own (only its structured data, which never runs)', !/<script/i.test(r.html.replace(/&lt;script/g, '').replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/, '')) && !!ld && !/</.test(ld[1]) && JSON.parse(ld[1])['@type'] === 'WebSite');
   const app = V.normalizeSpec({
     title: 'Studio', pageType: 'app-screen', platform: 'mobile', tokens: SPEC.tokens,
     sections: [
@@ -2387,7 +2389,7 @@ console.log('\n=== visual originality: shapes constructed, systems derived, comp
   ], { frame: 'shaped', edges: 'shaped' });
   const html = V.renderDesign(drawnSpec, board.refs).html;
   ok('a picture cut to a shape (as a clip-path the motion can grow it into); a picture in fragments, each carrying its part', /class="cp-im cp-shaped" [^>]*style="--cp-clip:polygon\(/.test(html) && /--cp-from:polygon\(/.test(html) && (html.match(/class="cp-frag-p"/g) ?? []).length >= 1 && /class="cp-img cp-r-4x3 cp-frag"/.test(html));
-  ok('planes in the design’s shapes, beneath or over; an outline drawn as a line; ornament steps aside on a phone', /class="cp-shape cp-t-tint" style="--cp-clip:polygon\(/.test(html) && /<svg class="cp-shape cp-t-line"/.test(html) && /cp-z-under cp-orn/.test(html) && /\.cp-cell\.cp-orn\{display:none\}/.test(html));
+  ok('planes in the design’s shapes, beneath or over; an outline drawn as a line; ornament steps aside on a phone', /class="cp-shape cp-t-tint"(?: data-ux-section="[^"]*" data-ux-path="[^"]*")? style="--cp-clip:polygon\(/.test(html) && /<svg class="cp-shape cp-t-line"/.test(html) && /cp-z-under cp-orn/.test(html) && /\.cp-cell\.cp-orn\{display:none\}/.test(html));
   ok('type in the structure: a label standing upright, a turn held to 12°, numerals in outline, words wrapping a shape', /class="eyebrow cp-vert"/.test(html) && /--rot:12deg/.test(html) && /cp-fig-v cp-stroke/.test(html) && /class="cp-float cp-float-end[^"]*" style="shape-outside:polygon\(/.test(html));
   ok('…and on a phone, upright words lie flat and turns are halved', /\.cp-vert\{writing-mode:horizontal-tb;rotate:none\}/.test(html) && /\.cp-rot\{rotate:calc\(var\(--rot\) \* \.5\)\}/.test(html));
   ok('grounds of another tone meet along an edge of the design’s shapes; the library’s pictures cut to its shapes', /class="sx sx-features v-list tone-alt[^"]* sx-edge[^"]*"[^>]*style="[^"]*--edge-clip:polygon\(/.test(html) && /class="g-img cp-shaped"/.test(html));
@@ -2418,6 +2420,192 @@ console.log('\n=== visual originality: shapes constructed, systems derived, comp
   const pp = V.normalizeProc({ kind: 'pattern', seed: 3, ratio: '4:3', palette: ['#f2efe8', '#1c1b18', '#b4532a'], form: fash.form });
   ok('made pictures in the design’s own shapes: a composition of them, and a repeat', pf.form && /<path transform="translate/.test(V.proceduralSvg(pf)) && (V.proceduralSvg(pp).match(/<path /g) ?? []).length >= 20 && V.procId(pf) !== V.procId({ ...pf, form: fash.form }));
   ok('a sculptural form from the system: a block for right angles, ribs for a radial one, twisted as it is kinetic', V.superOf(arch.form).startsWith('4 ') && Number(V.superOf({ ...lab.form, orthogonal: 40, energy: 90 }).split(' ')[8]) > 0 && Number(V.superOf({ ...lab.form, orthogonal: 40 }).split(' ')[0]) >= 8 && /data-form="[\d. ]+"/.test(V.renderDesign(mk([{ id: 's', kind: 'scene', variant: 'stage', content: { title: 'Form', model: 'form' } }]), []).html));
+}
+
+// ── website mastery: links that go somewhere, the site's settings, its head, forms that send, the export ──
+{
+  const siteSpec = V.normalizeSpec({ title: 'Ines Varga', pageType: 'website', tokens: SPEC.tokens, sections: [
+    { id: 'nav', kind: 'nav', variant: 'inline', content: { brand: 'Ines Varga', links: ['Method', 'Contact', 'Press'], cta: 'Write to me' } },
+    { id: 'hero', kind: 'hero', variant: 'centered', content: { title: 'Things broken on purpose', subtitle: 'Collage, print and installation, made by hand in Lisbon.', primary: 'See the method', secondary: 'Get in touch' } },
+    { id: 'method', kind: 'features', variant: 'grid', content: { title: 'Method', items: [{ title: 'Tear', text: 'a' }, { title: 'Set', text: 'b' }, { title: 'Fix', text: 'c' }] } },
+    { id: 'write', kind: 'form', variant: 'stacked', content: { title: 'Write to the studio', fields: [{ label: 'Your name', type: 'text', required: true }, { label: 'Email', type: 'email', required: true }], submit: 'Send' } },
+    { id: 'foot', kind: 'footer', variant: 'simple', content: { brand: 'Ines Varga', columns: [{ title: 'Elsewhere', links: ['Instagram'] }] } },
+  ] }, board);
+  ok('destinations are held to safe shapes: a part of the page, https, mailto, tel; nothing that runs', V.safeHref('#s-method') === '#s-method' && V.safeHref('https://example.com/a?b=1') && V.safeHref('mailto:ines@example.com') && V.safeHref('tel:+351 912 345 678') === 'tel:+351912345678' && !V.safeHref('javascript:alert(1)') && !V.safeHref('http://example.com') && !V.safeHref('data:text/html,x') && !V.safeHref('#"><script>'));
+  const L = V.resolveLinks(siteSpec);
+  const to = (label) => L.all.find((l) => l.label === label);
+  ok('the brand goes to the top; a link goes to the part its words name, else to the kind of part that answers them', to('Ines Varga').href === '#top' && to('Method').href === '#s-method' && to('Contact').href === '#s-write' && to('Get in touch').href === '#s-write' && to('See the method').href === '#s-method', J(L.all.map((l) => `${l.label}→${l.href}`)));
+  ok('…and the ones with nowhere to go are said to go nowhere yet, never sent to "#" as if they worked', to('Press').by === 'none' && to('Instagram').by === 'none' && L.unlinked.length === 2);
+  const html0 = V.renderDesign(siteSpec, board.refs).html;
+  ok('drawn: each destination in place, the parts they go to anchored, the unlinked marked', /<a href="#s-method"[^>]*data-ux-path="links.0"/.test(html0) && /<section id="s-method"/.test(html0) && (html0.match(/data-ux-unlinked=""/g) ?? []).length >= 2 && /<body id="top"/.test(html0));
+  const sitePatch = V.applyPatch(siteSpec, { op: 'site', site: { url: 'https://inesvarga.example.com', formAction: 'https://forms.example.com/f/1', description: 'The studio of Ines Varga.', lang: 'pt-PT', links: { 'foot:columns.0.links.0': 'https://instagram.com/ines', 'nav:links.2': 'javascript:alert(1)' } }, summary: 'Site' }, board);
+  const site = sitePatch.spec.site;
+  ok('the site settings: a version of the design, every value checked (an unsafe destination is dropped, not kept)', sitePatch.ok && site.url === 'https://inesvarga.example.com' && site.lang === 'pt-PT' && site.links['foot:columns.0.links.0'] && !site.links['nav:links.2'], J(site));
+  const cleared = V.applyPatch(sitePatch.spec, { op: 'site', site: { description: '', links: { 'foot:columns.0.links.0': '' } }, summary: 'Clear' }, board).spec.site;
+  ok('…and one setting clears without touching the others', !cleared.description && !cleared.links && cleared.url === site.url && cleared.formAction === site.formAction, J(cleared));
+  ok('a model may not set them: an address or a form service from a model would be an invented fact', V.parseRefine({ patch: { op: 'site', site: { url: 'https://made-up.example.com' } } }, false).patch.op === 'none');
+  const held = V.holdLocked({ ...siteSpec, version: 9 }, sitePatch.spec).spec;
+  ok('a new generation keeps the designer’s site settings', held.site?.url === site.url && held.site?.formAction === site.formAction);
+  const htmlSet = V.renderDesign(sitePatch.spec, board.refs).html;
+  const ldm = htmlSet.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+  ok('the head: the designer’s description, Open Graph, canonical and the site’s address only because it was set, the page’s language', /<meta name="description" content="The studio of Ines Varga\.">/.test(htmlSet) && /<link rel="canonical" href="https:\/\/inesvarga\.example\.com">/.test(htmlSet) && /og:url/.test(htmlSet) && /<html lang="pt-PT">/.test(htmlSet) && JSON.parse(ldm[1]).url === 'https://inesvarga.example.com');
+  ok('…unset, the page’s own opening words stand in, and no address or business fact is invented', /<meta name="description" content="Collage, print and installation, made by hand in Lisbon\.">/.test(html0) && !/rel="canonical"/.test(html0) && !/og:url/.test(html0) && !('url' in JSON.parse(html0.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1])));
+  ok('the form’s answers each have a name; on the canvas it never sends, and says plainly that nothing was sent', /name="your-name-1"/.test(html0) && /name="email-2"/.test(html0) && /<form class="form" action="#"/.test(htmlSet) && /not connected yet: nothing was sent/.test(html0));
+  const liveHtml = V.renderDesign(sitePatch.spec, board.refs, { live: true }).html;
+  ok('…published with a destination, it sends there (checked first by the runtime)', /<form class="form" action="https:\/\/forms\.example\.com\/f\/1" method="post" data-ux-live=""/.test(liveHtml) && /data-ux-live/.test(V.BEHAVIOR_SOURCE));
+  // the brief said website: a website that takes bookings, not a booking screen
+  const said = (objective) => V.readIntent(objective);
+  ok('“a website … where guests book a table” is a website that takes bookings; “a booking screen” is a screen', said('A website for a restaurant where guests book a table and read the menu.').kind === 'site' && said('A website for a restaurant where guests book a table and read the menu.').requirements.some((r) => r.id === 'req-book') && said('A booking screen for a yoga studio').screen === true);
+  // the export: a folder that builds without SocriaUX
+  const ex = V.exportSite(sitePatch.spec, board.refs, { now: Date.UTC(2026, 10, 20) });
+  const paths = ex.files.map((f) => f.path);
+  const index = ex.files.find((f) => f.path === 'index.html').data;
+  ok('the export: the page, its styles, runtimes as files, a build and a preview with no dependencies, docs, the design', ['index.html', 'styles.css', 'js/behaviors.js', 'js/motion.js', 'scripts/build.mjs', 'scripts/preview.mjs', 'package.json', 'README.md', 'CREDITS.md', '.env.example', 'socriaux.json', 'netlify.toml', 'vercel.json'].every((p) => paths.includes(p)) && !JSON.parse(ex.files.find((f) => f.path === 'package.json').data).dependencies, J(paths));
+  ok('…no script runs inline, the styles are a file, the forms send where the designer set', !/<script>/.test(index) && !/<style>/.test(index) && /<link rel="stylesheet" href="styles\.css">/.test(index) && /<script src="js\/behaviors\.js"><\/script>/.test(index) && /action="https:\/\/forms\.example\.com\/f\/1"/.test(index));
+  const made = V.normalizeRef({ ...V.procRef(V.normalizeProc({ kind: 'contour', seed: 2, ratio: '4:3', palette: ['#f2efe8', '#1c1b18', '#b4532a'] }), 'x'), state: 'kept', asContent: true });
+  const withArt = V.normalizeSpec({ ...siteSpec, sections: [...siteSpec.sections.slice(0, 2).map((s) => (s.id === 'hero' ? { ...s, variant: 'split', images: [made.id] } : s)), ...siteSpec.sections.slice(2)] }, V.normalizeMoodboard({ refs: [made] }));
+  const exArt = V.exportSite(withArt, [{ ...made, url: V.proceduralUri(made.proc) }]);
+  ok('…a picture SocriaUX made becomes a file in assets/, the page points at it', exArt.report.assets === 1 && exArt.files.some((f) => /^assets\/art-1\.svg$/.test(f.path) && /<svg/.test(f.data)) && /src="assets\/art-1\.svg"/.test(exArt.files[0].data));
+  const exPlain = V.exportSite(siteSpec, board.refs);
+  ok('…and what is not done yet is said, in the README and by the build: links going nowhere, a form not connected, no address', exPlain.report.todo.some((t) => /nowhere yet/.test(t)) && exPlain.report.todo.some((t) => /does not send anywhere/.test(t)) && /Before it goes live/.test(exPlain.files.find((f) => f.path === 'README.md').data) && /STRICT/.test(exPlain.files.find((f) => f.path === 'scripts/build.mjs').data));
+  const ready = V.siteReadiness(siteSpec);
+  ok('readiness, said plainly: two links nowhere, the form not connected, no address (the page’s own words do for search)', ready.unlinked.length === 2 && ready.forms === 'not-connected' && !ready.url && ready.description.from === 'page' && ready.items.filter((i) => !i.done).length === 3, J(ready.items));
+}
+
+// ── website mastery: accessibility and composition read on the drawn page, gates that no score can buy, decisions kept ──
+{
+  const qSpec = V.normalizeSpec({ title: 'Kepler Lab', pageType: 'website', tokens: SPEC.tokens, sections: [
+    { id: 'nav', kind: 'nav', variant: 'inline', content: { brand: 'Kepler Lab', links: ['Research'], cta: 'Press' } },
+    { id: 'hero', kind: 'hero', variant: 'centered', content: { title: 'Measuring the quiet sky', subtitle: 'An astronomy research group.' } },
+    { id: 'cmp', kind: 'compose', variant: 'free', content: { root: { t: 'field', rows: 'l', children: [{ t: 'text', role: 'title', text: 'Research' }, { t: 'shape', form: { kind: 'organic', seed: 4 }, tone: 'tint', z: 'under' }, { t: 'text', role: 'body', text: 'Three instruments.' }], cells: [[1, 6, 1, 1], [7, 6, 2, 2], [1, 6, 7, 1]] } } },
+    { id: 'foot', kind: 'footer', variant: 'simple', content: { brand: 'Kepler Lab', columns: [] } },
+  ] }, board);
+  const html = V.renderDesign(qSpec, board.refs).html;
+  ok('a website’s content is its main landmark, with a skip link that goes to it', /<a class="skip-link" href="#main">/.test(html) && /<main id="main">/.test(html) && html.indexOf('<main id="main">') > html.indexOf('data-ux-section="nav"') && html.indexOf('</main>') < html.indexOf('data-ux-section="foot"'));
+  ok('a shape plane carries its place in the tree, so a finding (and the canvas) can point at it', /class="cp-shape[^"]*" data-ux-section="cmp" data-ux-path="root\.children\.1"/.test(html));
+  const fieldRoot = qSpec.sections.find((s) => s.id === 'cmp').content.root;
+  const tight = V.tightenField(fieldRoot);
+  ok('an empty band in a composed field is closed: empty rows taken out, the arrangement kept', tight && tight.cells.map((c) => c.row).join(',') === '1,2,4' && tight.cells[1].rows === 2 && tight.rows === 's' && tight.cells.every((c, i) => c.col === fieldRoot.cells[i].col && c.span === fieldRoot.cells[i].span), J(tight?.cells));
+  const cut = V.withoutPiece(fieldRoot, 'root.children.1');
+  ok('one piece taken out by its path, its cell with it; a path that is not there takes nothing', cut.children.length === 2 && cut.cells.length === 2 && !cut.children.some((c) => c.t === 'shape') && V.withoutPiece(fieldRoot, 'root.children.9') === null);
+  // the audit as the frame sends it: a failure of each kind, an empty band and a lone plane
+  const audit = V.normalizeAudit({ width: 1280, viewport: 900, height: 3000, overflowX: 0, bodySize: 17, sections: [], headings: [{ level: 1, size: 64, lines: 2, width: 800, section: 'hero', path: 'title', text: 'Measuring', align: 'left', transform: 'none', family: 'Inter' }], contrast: [], targets: [], images: [], overflow: [], measure: [], style: { gradients: 0, shadows: 0, roundedBoxes: 0, trackedCaps: 0, centred: 0, blocks: 0, emoji: 0, icons: 0, rails: 0, families: { Inter: 10 } }, behaviors: [],
+    a11y: { noAlt: [{ section: 'hero', path: '' }], noName: [], noLabel: [{ section: 'cmp', path: '' }], skips: [{ section: 'cmp', path: 'x', from: 1, to: 3, text: 'Research' }], h1: 2, main: true, lang: 'en', unlinked: [{ section: 'nav', path: 'cta', text: 'Press' }], broken: [{ section: 'nav', path: 'links.0', text: 'Research', href: '#s-gone' }] },
+    voids: [{ section: 'cmp', gap: 520, at: 300, height: 1400 }], lone: [{ section: 'cmp', path: 'root.children.1', share: 18 }] });
+  ok('the audit keeps what the frame measured, held to its shape', audit.a11y.noAlt.length === 1 && audit.a11y.h1 === 2 && audit.voids[0].gap === 520 && audit.lone[0].path === 'root.children.1');
+  const ev = V.evaluateDesign(qSpec, { desktop: audit, tablet: audit, phone: audit });
+  const fk = (k, re) => ev.findings.find((f) => f.kind === k && re.test(f.message));
+  ok('accessibility read as findings: a picture with no alternative, a field with no label, two page titles, a skipped heading', fk('access', /text alternative/) && fk('access', /no label/) && fk('access', /2 page titles/) && fk('access', /jump from level 1 to 3/), J(ev.findings.map((f) => f.message)));
+  ok('a link to a part not on the page is a failure; one that goes nowhere yet is the designer’s to set, said as such', fk('link', /#s-gone/)?.severity === 'high' && /Publish/.test(fk('link', /goes nowhere yet/)?.ask ?? ''));
+  const band = fk('composition', /band with nothing in it/);
+  ok('an empty band is found, with a fix that closes it in code (nothing else moves)', band?.fix?.op === 'content' && band.fix.content.root.rows === 's');
+  const lone = fk('composition', /touches no words and no picture/);
+  ok('a lone shape is offered to be taken away, never taken away without the designer', lone?.manual === true && lone.fix && !V.fixesFor(ev).some((x) => x.finding.id === lone.id));
+  // the quality report: dimensions with weights, gates apart, judgements apart from failures
+  const q = V.qualityReport({ spec: qSpec, ev, audits: { desktop: audit, tablet: audit, phone: audit }, html, edits: { edits: 10, confined: 1 } });
+  ok('quality as six weighted dimensions (the mandate’s starting weights), editing precision measured from scoped edits', q.dimensions.length === 6 && q.dimensions.find((d) => d.id === 'visual').weight === 25 && q.dimensions.find((d) => d.id === 'editing').score === 95 && q.score >= 0 && q.score <= 100, J(q.dimensions));
+  ok('…and gates no score can buy: accessibility and critical function fail here, whatever the score', q.gates.find((g) => g.id === 'accessibility').state === 'fail' && q.gates.find((g) => g.id === 'function').state === 'fail' && !q.releasable);
+  ok('…security passes: no handler in the markup, no script from an address, no link that runs code', q.gates.find((g) => g.id === 'security').state === 'pass' && V.qualityReport({ spec: qSpec, ev, audits: { desktop: audit }, html: '<a href="javascript:x">x</a><script src="https://x.example/a.js"></script>' }).gates.find((g) => g.id === 'security').items.length === 2);
+  ok('…failures are measured, judgements are opinions: a broken link is a failure, an empty band a judgement', q.failures.some((f) => f.kind === 'link') && q.judgements.some((f) => /band with nothing/.test(f.message)) && !q.failures.some((f) => /band with nothing/.test(f.message)));
+  const unmeasured = V.qualityReport({ spec: qSpec, ev: V.evaluateDesign(qSpec, {}), audits: {} });
+  ok('a dimension with nothing measured is left out, not guessed: the others share its weight', unmeasured.dimensions.find((d) => d.id === 'editing').score === null && unmeasured.dimensions.find((d) => d.id === 'function').score === null && unmeasured.gates.every((g) => g.state === 'attention'));
+  ok('weights can be changed (a workshop’s own), held to whole percentages', V.normalizeWeights({ visual: 40.4, originality: 'x' }).visual === 40 && V.normalizeWeights({}).originality === 20);
+  // a repair checked for what it broke
+  const before = { findings: [{ kind: 'overflow', severity: 'high', section: 'hero', message: 'x' }] };
+  const after = { findings: [{ kind: 'contrast', severity: 'high', section: 'cmp', message: 'y' }] };
+  ok('a repair round is checked for what it broke: the section where a new failure appeared is named, the fixed one is not', J(V.regressions(before, after)) === '["cmp"]' && V.regressions(after, after).length === 0);
+  // the decisions of the direction, and whether the design keeps them
+  const dDir = V.proposeDirections({ brief: V.normalizeBrief({ pageType: 'website', objective: 'A portfolio for an experimental artist.', personality: ['raw'], visualDirection: 'Experimental, collage, off-grid.', palette: [], typography: { display: '', body: '' }, decisions: { colour: 'delegated', typography: 'delegated' } }, new Set()), salt: 'decisions' })[0];
+  const dSpec = V.parseGenerate({ title: 'Ines', sections: [{ id: 'nav', kind: 'nav', variant: 'inline', content: { brand: 'Ines', links: ['Work'] } }, { id: 'hero', kind: 'hero', variant: 'centered', content: { title: 'Broken on purpose', subtitle: 'Collage.' } }, { id: 'm', kind: 'features', variant: 'grid', content: { title: 'Method', items: [{ title: 'A', text: 'a' }, { title: 'B', text: 'b' }, { title: 'C', text: 'c' }] } }, { id: 'foot', kind: 'footer', variant: 'simple', content: { brand: 'Ines', columns: [] } }] }, V.normalizeBrief({ pageType: 'website', objective: 'A portfolio for an experimental artist.' }, new Set()), board, 1, 'x', dDir);
+  const dec = V.decisionsOf(dDir, dSpec, null);
+  ok('the direction’s decisions in one record: eleven areas, each with what was decided and how it is held', dec.length === 11 && V.DECISION_AREAS.every((a) => dec.some((d) => d.area === a)) && dec.every((d) => d.value && d.how), J(dec.map((d) => d.area)));
+  ok('…the design generated in it keeps its typography, colour, shapes and motion', ['typography', 'colour', 'shape', 'motion'].every((a) => dec.find((d) => d.area === a).held === true), J(dec.map((d) => `${d.area}:${d.held}`)));
+  const moved = V.decisionsOf(dDir, { ...dSpec, tokens: { ...dSpec.tokens, fonts: { display: 'Comic Neue', body: 'Inter' } } }, null);
+  ok('…a face changed away from the direction is said not to be kept', moved.find((d) => d.area === 'typography').held === false);
+}
+
+// ── website mastery: an edit changes what it was asked to change, ten times over; versions compared, restored, kept ──
+{
+  const made = [0, 1, 2].map((i) => V.normalizeRef({ ...V.procRef(V.normalizeProc({ kind: ['field', 'contour', 'grain'][i], seed: 7 + i, ratio: '4:3', palette: ['#f2efe8', '#1c1b18', '#b4532a'] }), 'x'), state: 'kept', asContent: true }));
+  const mb = V.normalizeMoodboard({ refs: [...board.refs, ...made] });
+  const ids = [...V.usableImages(mb)];
+  const base = V.normalizeSpec({ title: 'Salt & Ember', pageType: 'website', tokens: SPEC.tokens, look: { motion: { feel: 'lively', duration: 700, stagger: 80, distance: 18, ease: 'snappy', entrance: 'rise', headline: 'fade', scroll: true, parallax: 1, hover: 'lift', sections: 'none', nav: true, scrub: 0, story: false, media: 'none', magnetic: false, cursor: 'none', draw: false } }, sections: [
+    { id: 'nav', kind: 'nav', variant: 'inline', content: { brand: 'Salt & Ember', links: ['Menu', 'Book'], cta: 'Book a table' } },
+    { id: 'hero', kind: 'hero', variant: 'split', content: { title: 'Fire, twelve tables', subtitle: 'A small dining room.', primary: 'Book a table', secondary: 'See the menu' }, images: [ids[0]] },
+    { id: 'room', kind: 'split', variant: 'image-right', content: { title: 'The room', text: 'Dark wood and a long table.' }, images: [ids[1]] },
+    { id: 'cmp', kind: 'compose', variant: 'free', content: { root: { t: 'field', rows: 'm', children: [{ t: 'text', role: 'title', text: 'Method' }, { t: 'shape', form: { kind: 'organic', seed: 4 }, tone: 'tint', z: 'under' }, { t: 'text', role: 'body', text: 'Fire first.' }], cells: [[1, 6, 1, 1], [5, 8, 1, 2], [1, 6, 2, 1]] } } },
+    { id: 'menu', kind: 'list', variant: 'menu', content: { title: 'The menu', groups: [{ title: 'Fire', items: [{ name: 'Leeks', price: '14' }] }] } },
+    { id: 'foot', kind: 'footer', variant: 'simple', content: { brand: 'Salt & Ember', columns: [] }, locked: true },
+  ] }, mb);
+  // the scope read from the words
+  const sc1 = V.readScope('Make only the hero headline larger', base, null);
+  ok('“Make only the hero headline larger”: strict, the hero, its size (layout), nothing page-wide', sc1.strict && J(sc1.sections) === '["hero"]' && sc1.areas.includes('layout') && !sc1.areas.includes('type'), J(sc1));
+  const sc2 = V.readScope('Reduce the animation intensity without changing the layout', base, null);
+  ok('“…without changing the layout”: the layout kept, the motion free', sc2.keep.includes('layout') && sc2.areas.includes('motion') && !sc2.strict, J(sc2));
+  const sc3 = V.readScope('Preserve everything except the typography', base, null);
+  ok('“Preserve everything except the typography”: only the typography may change', sc3.strict && J(sc3.areas) === '["type"]', J(sc3));
+  const sc4 = V.readScope('Replace the picture in the second section', base, null);
+  ok('“the second section” is the second part after the navigation', J(sc4.sections) === '["room"]' && sc4.areas.includes('images'), J(sc4));
+  const sc5 = V.readScope('Make this more compact', base, { element: { ux: { section: 'menu', path: 'title' } } });
+  ok('“this” is the selection’s part', J(sc5.sections) === '["menu"]');
+  // a model's over-reaching change, held to the scope
+  const reach = V.applyPatch(base, { op: 'tokens', tokens: { scale: 'spacious', colors: { accent: '#ff0000' } }, summary: 'x' }, mb);
+  const reach2 = V.applyPatch(reach.spec, { op: 'shape', sectionId: 'hero', shape: { scale: 1.2 }, summary: 'y' }, mb);
+  const held = V.confine(base, reach2.spec, sc1);
+  ok('a change that also touched the page’s colours and spacing is held to the hero’s headline: the rest put back, and said', held.back.length === 2 && held.spec.tokens.colors.accent === base.tokens.colors.accent && held.spec.tokens.scale === base.tokens.scale && held.spec.sections.find((s) => s.id === 'hero').shape?.scale === 1.2 && /colours across the page/.test(V.describeBack(held.back, base)), J(held.back));
+  const swapped = V.applyPatch(base, { op: 'replace', sectionId: 'room', section: { ...base.sections.find((s) => s.id === 'room'), variant: 'image-left', content: { title: 'The dining room', text: 'Dark wood and a long table.' } }, summary: 'z' }, mb);
+  const wordsOnly = V.confine(base, swapped.spec, V.readScope('Change only the words in “The room” section', base, null));
+  ok('“only the words”: new words kept, a new arrangement put back', wordsOnly.spec.sections.find((s) => s.id === 'room').content.title === 'The dining room' && wordsOnly.spec.sections.find((s) => s.id === 'room').variant === base.sections.find((s) => s.id === 'room').variant, J(wordsOnly.back));
+  const free = V.confine(base, reach2.spec, V.readScope('Make it warmer', base, null));
+  ok('words that set no scope narrow nothing', free.back.length === 0 && free.spec === reach2.spec);
+
+  // ten consecutive targeted edits: each changes what it names, nothing else; the locked part never moves
+  const shapeSel = { element: { ux: { section: 'cmp', path: 'root.children.1' } } };
+  const heroSel = { element: { ux: { section: 'hero', path: 'title' } } };
+  const steps = [
+    ['Make only the hero headline larger', null, { sections: ['hero'], areas: ['layout'] }],
+    ['Change the button colour to black', null, { sections: [], areas: ['colour'] }],
+    ['Replace the picture in the second section', null, { sections: ['room'], areas: ['images'] }],
+    ['Make the mobile navigation more compact', null, { sections: ['nav'], areas: ['responsive'] }],
+    ['Reduce the animation intensity without changing the layout', null, { sections: [], areas: ['motion'] }],
+    ['Use Instrument Serif for the headlines', null, { sections: [], areas: ['type'] }],
+    ['Change this organic shape into a sharp angular composition', shapeSel, { sections: ['cmp'], areas: ['shape'] }],
+    ['Change the headline to “Cooked over fire”', heroSel, { sections: ['hero'], areas: ['words'] }],
+    ['Rounder corners', null, { sections: [], areas: ['shape'] }],
+    ['Make the shapes more organic', null, { sections: [], areas: ['shape'] }],
+  ];
+  let cur = base;
+  const report = [];
+  for (const [words, sel, want] of steps) {
+    const scope = V.readScope(words, cur, sel);
+    const t = V.readTargeted(words, cur, mb, sel, scope) ?? V.readQuickEdit(words, cur, sel);
+    if (!t || !t.patches.length) {
+      report.push(`${words}: not read (${t?.label ?? 'null'})`);
+      continue;
+    }
+    let next = cur;
+    for (const pt of t.patches) {
+      const r = V.applyPatch(next, pt, mb);
+      if (r.ok) next = r.spec;
+    }
+    const changes = V.changesBetween(cur, next);
+    const outside = changes.filter((c) => !want.areas.includes(c.area) || (want.sections.length && (!c.section || !want.sections.includes(c.section))) || (!want.sections.length && c.section && !['shape', 'colour', 'type', 'motion'].includes(c.area) ? false : false));
+    report.push(`${words}: ${changes.map((c) => `${c.area}${c.section ? `@${c.section}` : ''}`).join(',') || 'nothing'}${outside.length ? ` OUTSIDE ${J(outside)}` : ''}`);
+    cur = next;
+  }
+  const bad = report.filter((r) => /OUTSIDE|not read|: nothing$/.test(r));
+  ok('ten consecutive targeted edits, each read in code and changing only what it names', !bad.length, J(report));
+  ok('…the locked footer never moved, the links still go where they went, the motion is still there (calmer), the shapes are the page’s', J(cur.sections.find((s) => s.id === 'foot')) === J(base.sections.find((s) => s.id === 'foot')) && V.resolveLinks(cur).unlinked.length === V.resolveLinks(base).unlinked.length && cur.look.motion.feel !== 'still' && cur.look.motion.feel !== base.look.motion.feel && cur.sections.length === base.sections.length, `${cur.look.motion.feel}`);
+  ok('…and the page still draws, its anchors in place', /id="s-menu"/.test(V.renderDesign(cur, mb.refs).html) || V.resolveLinks(cur).all.some((l) => l.to === 'menu'));
+
+  // versions: what changed, restored as new, kept through the cap
+  const changed = V.describeChanges(base, cur);
+  ok('what changed between two versions, said by part and kind', changed.some((x) => /colours across the page/.test(x)) && changed.some((x) => /pictures in “The room”/.test(x)) && changed.some((x) => /motion across the page/.test(x)), J(changed));
+  const restored = V.restoredVersion(base, 42);
+  ok('an earlier version restored as a new one: the same design, a new number, said where it came from', restored.version === 42 && /Restored version/.test(restored.reason) && J(restored.sections) === J(base.sections));
+  const many = Array.from({ length: 40 }, (_, i) => ({ ...base, version: i + 1 }));
+  const capped = V.capVersions(many, [3, 7]);
+  ok('thirty versions kept, and the ones the designer kept whatever their age', capped.length === 30 && capped.some((s) => s.version === 3) && capped.some((s) => s.version === 7) && capped[capped.length - 1].version === 40);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

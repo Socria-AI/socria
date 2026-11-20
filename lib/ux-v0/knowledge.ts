@@ -68,6 +68,8 @@ export const DESIGN_PRINCIPLES: readonly Principle[] = [
   { id: 'resp.priority', area: 'responsive', rule: 'On a phone, keep the order of importance, not the desktop’s arrangement.', why: 'A narrow screen is read top to bottom; what matters most must come first.' },
   // accessibility
   { id: 'a11y.contrast', area: 'accessibility', rule: 'Body text at 4.5:1 or more against its ground (7:1 for AAA); large text at 3:1.', why: 'Low contrast excludes people with low vision and everyone in bright light.' },
+  { id: 'a11y.names', area: 'accessibility', rule: 'Name every picture, control and field, and keep headings in order under one page title.', why: 'A screen reader says only what is named; an unnamed button is silence, a skipped heading a missing step.' },
+  { id: 'ix.destination', area: 'interaction', rule: 'Every link and button goes somewhere real, or says it does not yet.', why: 'A button that leads nowhere breaks trust faster than a missing one.' },
   { id: 'a11y.meaning', area: 'accessibility', rule: 'Never let colour or motion carry meaning alone.', why: 'Some people cannot see the colour, or have motion turned off.' },
   // references
   { id: 'ref.aspect', area: 'references', rule: 'Take from a reference only what it is kept for (its light, its type, its pacing), never its subject or layout wholesale.', why: 'Copying a reference reproduces someone else’s answer to someone else’s brief.' },
@@ -97,6 +99,8 @@ export const FINDING_PRINCIPLE: Record<string, string> = {
   fidelity: 'crit.brief',
   motion: 'motion.purpose',
   function: 'ix.task-first',
+  access: 'a11y.names',
+  link: 'ix.destination',
 };
 
 /** Why a finding matters, in one sentence. */

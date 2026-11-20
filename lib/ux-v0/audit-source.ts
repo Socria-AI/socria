@@ -200,6 +200,86 @@ export const AUDIT_SOURCE = String.raw`(function () {
       if (im.naturalWidth > 2000 && shown > 0 && im.naturalWidth > shown * dpr * 3) over++;
     }
     out.weight = { html: de.outerHTML.length, images: imgs.length, oversized: over, inline: inline };
+    // accessibility the browser can tell without a model (the failures axe-core reports most): pictures with no
+    // text alternative, controls with no name, fields with no label, headings that skip a level, page titles,
+    // the main landmark, the page's language; and links that go nowhere yet or to a part that is not there
+    var a11y = { noAlt: [], noName: [], noLabel: [], skips: [], h1: 0, main: !!document.querySelector('main,[role="main"]'), lang: de.getAttribute('lang') || '', unlinked: [], broken: [] };
+    function shownA(el) { if (el.closest('[hidden],[aria-hidden="true"],.ux-lb')) return false; var r0 = el.getBoundingClientRect(); return r0.width > 0 && r0.height > 0; }
+    var ims = document.images;
+    for (var ia = 0; ia < ims.length && a11y.noAlt.length < 8; ia++) if (!ims[ia].hasAttribute('alt') && shownA(ims[ia])) a11y.noAlt.push(where(ims[ia]));
+    var ctl = document.querySelectorAll('a[href],button');
+    for (var ib = 0; ib < ctl.length && a11y.noName.length < 8; ib++) {
+      var c0 = ctl[ib];
+      if (!shownA(c0)) continue;
+      var nm = (c0.getAttribute('aria-label') || c0.textContent || c0.getAttribute('title') || '').trim();
+      if (!nm) { var im0 = c0.querySelector('img[alt]'); nm = im0 ? (im0.getAttribute('alt') || '').trim() : ''; }
+      if (!nm) a11y.noName.push(where(c0));
+    }
+    var fl = document.querySelectorAll('input,select,textarea');
+    for (var ic = 0; ic < fl.length && a11y.noLabel.length < 8; ic++) {
+      var f0 = fl[ic];
+      if (/^(hidden|submit|button|reset|image)$/.test(f0.type) || !shownA(f0)) continue;
+      var lab = (f0.id && document.querySelector('label[for="' + f0.id + '"]')) || f0.closest('label') || f0.getAttribute('aria-label') || f0.getAttribute('aria-labelledby') || f0.getAttribute('title');
+      if (!lab) a11y.noLabel.push(where(f0));
+    }
+    var hs = document.querySelectorAll('h1,h2,h3,h4,h5,h6'), lastLv = 0;
+    for (var ih = 0; ih < hs.length; ih++) {
+      if (!shownA(hs[ih])) continue;
+      var lv = Number(hs[ih].tagName.slice(1));
+      if (lv === 1) a11y.h1++;
+      if (lastLv && lv > lastLv + 1 && a11y.skips.length < 6) { var wh = where(hs[ih]); a11y.skips.push({ section: wh.section, path: wh.path, from: lastLv, to: lv, text: txt(hs[ih].innerText, 60) }); }
+      lastLv = lv;
+    }
+    var an = document.querySelectorAll('a[href]');
+    for (var ie = 0; ie < an.length; ie++) {
+      var hr = an[ie].getAttribute('href') || '', wa = where(an[ie]);
+      if (an[ie].hasAttribute('data-ux-unlinked')) { if (a11y.unlinked.length < 12 && !an[ie].closest('.nav-over')) a11y.unlinked.push({ section: wa.section, path: wa.path, text: txt(an[ie].innerText, 40) }); }
+      else if (hr.charAt(0) === '#' && hr.length > 1 && !document.getElementById(hr.slice(1)) && a11y.broken.length < 8) a11y.broken.push({ section: wa.section, path: wa.path, text: txt(an[ie].innerText, 40), href: hr.slice(0, 80) });
+    }
+    out.a11y = a11y;
+    // composition the eye notices: a part with a wide band where nothing is (no words, picture or shape across
+    // it), and a shape plane standing alone (touching no words and no picture), which reads as a placeholder
+    out.voids = [];
+    out.lone = [];
+    var vh = window.innerHeight || 900;
+    var parts = document.querySelectorAll('.sx[data-ux-section]');
+    for (var iv = 0; iv < parts.length && iv < 20; iv++) {
+      var part = parts[iv];
+      if (/\bsx-(nav|footer)\b/.test(part.className)) continue;
+      var pr = part.getBoundingClientRect();
+      if (pr.height < 240) continue;
+      var stuff = part.querySelectorAll('h1,h2,h3,h4,p,li,figcaption,label,blockquote,a.btn,button,img,svg,canvas,.cp-shape,.cp-figure,.cp-frag,table,form');
+      var spans = [], words = [], pics = [];
+      for (var is = 0; is < stuff.length && is < 400; is++) {
+        var el2 = stuff[is];
+        if (el2.closest('[hidden],[aria-hidden="true"]:not(.cp-shape):not(svg),.nav-over,.ux-lb')) continue;
+        var r2 = el2.getBoundingClientRect();
+        if (r2.width < 2 || r2.height < 2) continue;
+        spans.push([r2.top - pr.top, r2.bottom - pr.top]);
+        if (/^(IMG|CANVAS)$/.test(el2.tagName) || el2.classList.contains('cp-frag')) pics.push(r2);
+        else if (!el2.classList.contains('cp-shape') && el2.tagName !== 'svg' && (el2.textContent || '').trim()) words.push(r2);
+      }
+      if (spans.length) {
+        spans.sort(function (a, b) { return a[0] - b[0]; });
+        var reach = spans[0][1], gap = 0, at = 0;
+        for (var ig = 1; ig < spans.length; ig++) {
+          if (spans[ig][0] > reach) { if (spans[ig][0] - reach > gap) { gap = spans[ig][0] - reach; at = reach; } }
+          if (spans[ig][1] > reach) reach = spans[ig][1];
+        }
+        if (gap > Math.max(220, vh * 0.42)) { var wv = where(part); out.voids.push({ section: wv.section, gap: Math.round(gap), at: Math.round(at), height: Math.round(pr.height) }); }
+      }
+      var planes = part.querySelectorAll('.cp-shape:not(.cp-t-line)');
+      for (var ip = 0; ip < planes.length && out.lone.length < 6; ip++) {
+        var r3 = planes[ip].getBoundingClientRect();
+        if (r3.width * r3.height < 0.04 * pr.width * pr.height) continue;
+        var touches = false, all3 = words.concat(pics);
+        for (var it = 0; it < all3.length && !touches; it++) {
+          var o3 = all3[it];
+          if (Math.min(o3.right, r3.right) - Math.max(o3.left, r3.left) > 8 && Math.min(o3.bottom, r3.bottom) - Math.max(o3.top, r3.top) > 8) touches = true;
+        }
+        if (!touches) { var wl = where(planes[ip]); out.lone.push({ section: wl.section, path: planes[ip].getAttribute('data-ux-path') || wl.path, share: Math.round((100 * r3.width * r3.height) / (pr.width * pr.height)) }); }
+      }
+    }
     return out;
   };
 })();`;

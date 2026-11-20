@@ -354,7 +354,10 @@ export interface RefineResult {
 
 export function parseRefine(raw: unknown, force: boolean): RefineResult {
   const r = obj(raw);
-  const patch = normalizePatch(r.patch);
+  const given = normalizePatch(r.patch);
+  // the site's settings (its address, where its forms send, where its buttons go) are the designer's alone: a model
+  // that sets one would be inventing a fact about the business
+  const patch = given.op === 'site' ? { op: 'none' as const, summary: '' } : given;
   const challenge = force ? '' : clean(r.challenge, 400);
   return {
     understood: clean(r.understood, 240),
