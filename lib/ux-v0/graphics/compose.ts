@@ -31,6 +31,8 @@ import { runFor, type StyleRun } from './styles/apply';
 import type { StyleSelection } from './styles/blend';
 import { styleLayouts } from './styles/constructions';
 import { CONSTRUCTIONS, isStyleConstruction, type StyleConstruction } from './styles/schema';
+import { renderComposition } from './composition/render';
+import { describePlan, FAMILY_BY_ID, type CompositionPlan, type FamilyInfo } from './composition/schema';
 
 export const GRAPHIC_KINDS = ['poster', 'social', 'carousel', 'ad', 'banner', 'magazine', 'book', 'album', 'card', 'label', 'infographic', 'identity', 'announcement', 'presentation', 'campaign'] as const;
 export type GraphicKind = (typeof GRAPHIC_KINDS)[number];
@@ -79,6 +81,8 @@ export interface GraphicDirection {
   intensity: number;
   /** the design language the direction is built in (styles/*): its construction, palette, faces and vocabulary */
   style?: StyleSelection;
+  /** how it is composed (composition/*): planned apart from the style, so one style can be composed many ways */
+  composition?: CompositionPlan;
 }
 
 export interface Plan {
@@ -101,6 +105,8 @@ export interface Plan {
   /** the brief asked for a pattern in so many words ("generative, procedural", "a halftone pattern"): answered in any
    * language, where the construction leaves room */
   patternAsked?: boolean;
+  /** the Composition Plan it is drawn from, when one was planned (composition/schema.ts) */
+  composition?: CompositionPlan;
 }
 
 /** How a composition is organised, said as decisions (the layout system, the type, the picture, the shapes, the
@@ -117,7 +123,7 @@ export interface Strategy {
   rhythm: 'regular' | 'syncopated' | 'radiating' | 'flowing' | 'stacked';
 }
 
-export const ARCHETYPES = ['type-poster', 'image-full', 'image-split', 'minimal', 'swiss', 'statement', 'masthead', 'book', 'album', 'card', 'label', 'infographic', 'process', 'identity', 'banner', 'carousel', ...NEW_ARCHETYPES] as const;
+export const ARCHETYPES = ['type-poster', 'image-full', 'image-split', 'minimal', 'swiss', 'statement', 'masthead', 'book', 'album', 'card', 'label', 'infographic', 'process', 'identity', 'banner', 'carousel', 'composition', ...NEW_ARCHETYPES] as const;
 export type Archetype = (typeof ARCHETYPES)[number] | StyleConstruction;
 
 // ── reading a graphic brief from words ──
@@ -293,6 +299,15 @@ export interface PlanOverride {
   vocabulary?: VisualVocabulary;
   /** a Board sibling's turn through its style's constructions (material-specific interpretation) */
   styleIndex?: number;
+  /** a Composition Plan to draw (the explorer's candidate, a Board material's own, an edit's) */
+  composition?: CompositionPlan;
+}
+
+/** Whether a family can compose this brief in this frame: the kind lets the composition be chosen, a very wide frame
+ * suits it, the picture it needs is there, the numbers it charts were given. */
+export function compositionFits(fam: FamilyInfo, brief: Pick<GraphicBrief, 'kind' | 'images' | 'content'>, aspect: number): boolean {
+  // a strip (a leaderboard, a skyscraper) is past what a composition family can express: the strip layouts set those
+  return FREE_KINDS.includes(brief.kind) && aspect >= 0.3 && (aspect <= 2.2 || (!!fam.wide && aspect <= 4)) && (fam.image !== 'required' || brief.images.length > 0) && (!fam.data || (brief.content.data?.length ?? 0) > 0);
 }
 const FREE_ARCHETYPES: readonly Archetype[] = ['type-poster', 'image-full', 'image-split', 'minimal', 'swiss', 'statement'];
 const FREE_KINDS: readonly GraphicKind[] = ['poster', 'social', 'ad', 'announcement', 'presentation', 'campaign'];
@@ -433,7 +448,18 @@ export function planFor(brief: GraphicBrief, dir: GraphicDirection, f: Format, o
     said.push(`The composition follows the brief’s ${vocab.style} character: ${vocab.says[0]}`);
     if ((NEW_ARCHETYPES as readonly string[]).includes(wanted)) shapes2 = vocab.pattern ? 'pattern' : vocab.motifs.length ? 'motif' : 'none';
   } else if (!run && vocab.strength >= 1) said.push(`The vocabulary follows the brief’s ${vocab.style} character: ${vocab.says[0]}`);
-  if (run && isStyleConstruction(archetype)) {
+  // a composition planned for it (composition/*): its family where the kind lets the composition be chosen, drawn by
+  // the style's own construction when the plan says that construction is this family in this style
+  const cplan = opts.over?.composition ?? dir.composition ?? null;
+  const fam = cplan ? FAMILY_BY_ID.get(cplan.family) : undefined;
+  const composed = !!(cplan && fam && compositionFits(fam, brief, aspect));
+  if (composed && cplan && fam) {
+    const own = cplan.renderer.startsWith('construction:') ? cplan.renderer.slice('construction:'.length) : '';
+    archetype = (own && run && isStyleConstruction(own as Archetype) ? own : 'composition') as Archetype;
+    colour = cplan.colour;
+    said.push(`Composed as ${describePlan(cplan)}: ${fam.description}`);
+  }
+  if (run && isStyleConstruction(archetype) && !composed) {
     // a Board sibling that comes round to the same construction again takes the palette another way (the paper, then
     // the ink, then the accent as its ground): one language, several uses of it, never the same design twice
     const turn = Math.floor((opts.over?.styleIndex ?? 0) / Math.max(1, run.dna.composition.constructions.length)) % 3;
@@ -443,9 +469,9 @@ export function planFor(brief: GraphicBrief, dir: GraphicDirection, f: Format, o
   // a cinematic frame is dark; a brutalist wall of type is ink or the accent
   if (archetype === 'cinematic' && !DARK_LANGS.includes(dir.language)) colour = 'inverse';
   if (archetype === 'typographic' && vocab.style === 'brutalist' && colour === 'ground') colour = hashOf(brief.content.headline) % 2 ? 'inverse' : 'accent-field';
-  const focal: Plan['focal'] = archetype === 'infographic' ? 'data' : archetype === 'album' || archetype === 'abstract' || archetype === 'procedural' ? 'shape' : hasImage && (archetype.startsWith('image') || archetype === 'cinematic' || archetype === 'halftone') ? 'image' : 'type';
+  const focal: Plan['focal'] = composed && fam ? (fam.focal === 'pattern' ? 'shape' : fam.focal) : archetype === 'infographic' ? 'data' : archetype === 'album' || archetype === 'abstract' || archetype === 'procedural' ? 'shape' : hasImage && (archetype.startsWith('image') || archetype === 'cinematic' || archetype === 'halftone') ? 'image' : 'type';
   const strategy = strategyOf(archetype, vocab, colour, hasImage);
-  return { archetype, focal, hierarchy: ['headline', 'subhead', 'body', 'meta', 'cta', 'logo'], colour, shapes: shapes2, said, vocabulary: vocab, strategy, ...(run ? { run, style: { id: run.id, name: run.name, construction: run.construction, variant: run.variant } } : {}), ...(patternAsked ? { patternAsked: true } : {}) };
+  return { archetype, focal, hierarchy: ['headline', 'subhead', 'body', 'meta', 'cta', 'logo'], colour, shapes: shapes2, said, vocabulary: vocab, strategy, ...(run ? { run, style: { id: run.id, name: run.name, construction: run.construction, variant: run.variant } } : {}), ...(patternAsked ? { patternAsked: true } : {}), ...(composed && cplan ? { composition: { ...cplan } } : {}) };
 }
 
 /** The strategy a composition follows (see Strategy), from its archetype and its vocabulary. */
@@ -946,6 +972,16 @@ const LAYOUTS: Record<Archetype, Layout> = {
     return out;
   },
   carousel: (x, plan) => LAYOUTS.statement(x, plan),
+  // a Composition Plan drawn by its family's procedure and held to the rules (composition/render.ts); the relationships
+  // it relied on are kept with the plan's record on the artboard
+  composition: (x, plan) => {
+    if (!plan.composition) return LAYOUTS.statement(x, plan);
+    const r = renderComposition(KIT, x, plan.composition);
+    plan.composition = { ...plan.composition, relations: r.relations };
+    if (r.notes.includes('no picture')) plan.said.push('No picture was given for this picture-led composition: a figure of the language stands where it would be.');
+    if (r.unresolved.length) plan.said.push(`The ${FAMILY_BY_ID.get(plan.composition.family)?.label.toLowerCase() ?? 'chosen'} composition is tight at this size (${r.unresolved.slice(0, 2).join('; ')}); the checks below say what remains.`);
+    return r.nodes;
+  },
   ...newLayouts(),
   ...styleLayouts(KIT),
 };
@@ -988,6 +1024,7 @@ function composeBoard(brief: GraphicBrief, dir: GraphicDirection, f: Format, mea
     bleed: f.bleed,
     safe: f.safe,
     children,
+    ...(plan.composition ? { composition: plan.composition } : {}),
   };
   return { board, plan };
 }
@@ -1143,7 +1180,11 @@ export function contentOf(board: Artboard): { content: GraphicContent; images: s
   const by = (r: Role) => texts.find((t) => t.role === r);
   const style = (t?: TextNode): Partial<TextNode> | undefined => (t ? { font: t.font, weight: t.weight, color: t.color, case: t.case, tracking: t.tracking, italic: t.italic } : undefined);
   const images = board.children.filter((n) => n.type === 'image').map((n) => (n as { asset: string }).asset);
-  const meta = by('meta')?.text.split('\n').flatMap((l) => l.split('  ·  ')).filter(Boolean);
+  // every detail, wherever the composition set it (one block, or a station each on a timeline)
+  const meta = texts
+    .filter((t) => t.role === 'meta')
+    .flatMap((t) => t.text.split('\n').flatMap((l) => l.split('  ·  ')))
+    .filter(Boolean);
   return {
     content: {
       headline: by('headline')?.text ?? by('logo')?.text ?? '',
@@ -1364,7 +1405,7 @@ function freeRegion(x: Ctx, out: readonly Node[], where: PatternUse['where']): B
 function dress(x: Ctx, plan: Plan, out: Node[]): Node[] {
   const v = x.vocab;
   if (!v) return out;
-  const own = (NEW_ARCHETYPES as readonly string[]).includes(plan.archetype) || isStyleConstruction(plan.archetype);
+  const own = (NEW_ARCHETYPES as readonly string[]).includes(plan.archetype) || isStyleConstruction(plan.archetype) || plan.archetype === 'composition';
   const strong = v.strength >= 2;
   const fixedKinds = ['infographic', 'process', 'card', 'masthead', 'banner', 'carousel', 'identity', 'label'];
   const head = out.find((n): n is TextNode => n.type === 'text' && n.role === 'headline');

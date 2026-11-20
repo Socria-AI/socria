@@ -135,3 +135,6 @@ export * as gfxStyleCustom from '@/lib/ux-v0/graphics/styles/custom';
 export * as gfxStyleEvaluate from '@/lib/ux-v0/graphics/styles/evaluate';
 export * as gfxStylePropose from '@/lib/ux-v0/graphics/styles/propose';
 export * as gfxState from '@/lib/ux-v0/graphics/state';
+export * as compSchema from '@/lib/ux-v0/graphics/composition/schema';
+export * as compRender from '@/lib/ux-v0/graphics/composition/render';
+export * as compKit from '@/lib/ux-v0/graphics/composition/kit';

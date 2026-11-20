@@ -183,6 +183,9 @@ export function checkDoc(doc: GraphicDoc, measure: Measure = approxMeasure): GFi
       if (n.type === 'image' && !assets.has(n.asset)) add({ kind: 'missing', severity: 'high', artboard: board.id, node: n.id, message: `The picture of “${name}” is missing.` });
       if (n.type !== 'text') continue;
       const t = n as TextNode;
+      // decorative words (a cropped echo of the headline, set again in full elsewhere): composed to run off the frame
+      // and to sit back, so not read for fit, the safe area, size or contrast
+      if (t.decorative) continue;
       const L = layoutText(t, measure);
       // words along a path: one line, read against the path's own length (their box does not apply)
       if (t.path) {
@@ -287,7 +290,7 @@ export function checkDoc(doc: GraphicDoc, measure: Measure = approxMeasure): GFi
     }
     // words on words: two texts whose set lines cross (turned and vertical texts are composed on purpose and left out)
     const inks = visible
-      .filter((l) => l.node.type === 'text' && !l.node.rotation && !(l.node as TextNode).vertical && !(l.node as TextNode).path)
+      .filter((l) => l.node.type === 'text' && !l.node.rotation && !(l.node as TextNode).vertical && !(l.node as TextNode).path && !l.node.decorative)
       .map((l) => ({ l, a: inkArea(l.node as TextNode, boxOnBoard(l), layoutText(l.node as TextNode, measure)) }));
     for (let i = 0; i < inks.length; i++)
       for (let j = i + 1; j < inks.length; j++) {

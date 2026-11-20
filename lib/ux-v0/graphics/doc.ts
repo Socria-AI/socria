@@ -25,6 +25,7 @@ import { isPxParam, normalizePatternParams, PATTERN_BY_KIND } from './patterns';
 import { asBezierNode, blendPaths, booleanPath, offsetOutline, shapeBezier, shapeInParent, strokeOutline, nodeMatrix, transformPath } from './vectorops';
 import { distortPath, reversePath, simplifyPath, smoothPath, mapPath } from './geometry';
 import { normalizeSelection, type StyleSelection } from './styles/blend';
+import { normalizeCompositionPlan, normalizeMemory, type CompositionPlan, type MemoryEntry } from './composition/schema';
 
 export const GFX_SCHEMA = 1;
 
@@ -65,6 +66,9 @@ export interface Base {
   /** mirrored about the box's centre */
   flipX?: boolean;
   flipY?: boolean;
+  /** drawn as part of the composition, not as content: a cropped echo of the words, a field of figures. The checks
+   * read it as decoration (it may run off the frame; the words are elsewhere in full) */
+  decorative?: boolean;
 }
 
 export interface TextNode extends Base {
@@ -281,6 +285,8 @@ export interface Artboard {
   safe: number;
   children: Node[];
   locked?: boolean;
+  /** how it was composed (composition/schema.ts): a record kept apart from its objects, for exploring and re-composing */
+  composition?: CompositionPlan;
 }
 
 export interface Asset {
@@ -321,6 +327,8 @@ export interface GraphicDoc {
   /** the design language the design is built in (styles/*): primary, influences, intensities, lock — kept so a
    * regeneration or a new artboard speaks it, and so the person's own choices survive both */
   style?: StyleSelection;
+  /** the compositions shown, chosen and turned down for this design (composition/memory.ts), bounded */
+  compositionMemory?: MemoryEntry[];
   revision: number;
   updatedAt: number;
 }
@@ -469,6 +477,7 @@ function baseOf(r: Record<string, any>, seen: Set<string>, prefix: string): Base
     ...(num(r.skewY, -70, 70, 0) ? { skewY: num(r.skewY, -70, 70, 0) } : {}),
     ...(r.flipX === true ? { flipX: true } : {}),
     ...(r.flipY === true ? { flipY: true } : {}),
+    ...(r.decorative === true ? { decorative: true } : {}),
   };
 }
 
@@ -777,6 +786,7 @@ export function normalizeDoc(v: unknown, rep: Repair = { notes: [] }): GraphicDo
         .map((c) => nodeOf(c, seen, assetIds, rep, 0, count))
         .filter((c): c is Node => !!c),
       ...(b.locked === true ? { locked: true } : {}),
+      ...((cp) => (cp ? { composition: cp } : {}))(b.composition ? normalizeCompositionPlan(b.composition) : null),
     });
   }
   if (!artboards.length) return null;
@@ -792,6 +802,7 @@ export function normalizeDoc(v: unknown, rep: Repair = { notes: [] }): GraphicDo
     ...((sw) => (sw.length ? { swatches: sw } : {}))([...new Set(a(r.swatches).map((c) => parseColor(c)).filter((c): c is string => !!c))].slice(0, 32)),
     ...((v) => (v ? { vocabulary: v } : {}))(vocabularyOf(r.vocabulary)),
     ...((v) => (v ? { style: v } : {}))(normalizeSelection(r.style)),
+    ...((m) => (m.length ? { compositionMemory: m } : {}))(normalizeMemory(r.compositionMemory)),
     revision: Math.round(num(r.revision, 0, 1e9, 0)),
     updatedAt: typeof r.updatedAt === 'number' && r.updatedAt > 0 ? Math.round(r.updatedAt) : Date.now(),
   };
@@ -884,7 +895,9 @@ export type Op =
   | { op: 'swatches'; set: string[] }
   | { op: 'vocabulary'; set: unknown }
   // the design language (null clears it)
-  | { op: 'style'; set: unknown };
+  | { op: 'style'; set: unknown }
+  // the compositions shown, chosen and turned down (composition/memory.ts), held to their bound
+  | { op: 'composition-memory'; entries: unknown };
 
 export type OpResult = { ok: true; doc: GraphicDoc; touched: string[]; notes: string[] } | { ok: false; error: string; locked?: string[] };
 
@@ -1140,6 +1153,13 @@ export function applyOp(doc0: GraphicDoc, op: Op, opts: { force?: boolean } = {}
       if (!b) return { ok: false, error: 'That artboard is not in the design.' };
       const allowed = ['name', 'width', 'height', 'background', 'bleed', 'safe', 'dpi', 'locked', 'format', 'unit'];
       for (const [k, v] of Object.entries(op.set)) if (allowed.includes(k)) (b as unknown as Record<string, unknown>)[k] = v;
+      // the record of how it was composed: held to the composition schema, or removed
+      if ('composition' in op.set) {
+        const cp = op.set.composition === null ? null : normalizeCompositionPlan(op.set.composition);
+        if (op.set.composition !== null && !cp) return { ok: false, error: 'That is not a composition plan SocriaUX can use.' };
+        if (cp) b.composition = cp;
+        else delete b.composition;
+      }
       return done([b.id]);
     }
     case 'artboard-duplicate': {
@@ -1423,6 +1443,12 @@ export function applyOp(doc0: GraphicDoc, op: Op, opts: { force?: boolean } = {}
       const v = vocabularyOf(op.set);
       if (v) doc.vocabulary = v;
       else delete doc.vocabulary;
+      return done([]);
+    }
+    case 'composition-memory': {
+      const m = normalizeMemory(op.entries);
+      if (m.length) doc.compositionMemory = m;
+      else delete doc.compositionMemory;
       return done([]);
     }
     case 'style': {
