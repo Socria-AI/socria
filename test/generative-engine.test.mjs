@@ -417,7 +417,8 @@ const a4 = F.formatOf('a4');
     J([t.plans[0].archetype, fam.plans[0].archetype, hand.plans[0].archetype, picked.plans[0].archetype]),
   );
   const card = C.composeGraphic({ ...C.readGraphicBrief('A business card for Ada Lovelace, engineer'), formats: ['business-card'] }, BASE);
-  ok('…and the kinds whose layout the kind decides keep it (a card is a card)', card.plans[0].archetype !== 'generative');
+  // Engine 2.0: a business card is generated too (no fixed card layout), and stays a card: its format, its words, its back
+  ok('…and the kinds that used to have a fixed layout are generated too, keeping what the kind needs (a card is a card)', card.plans[0].archetype === 'generative' && card.doc.artboards.length === 2 && card.doc.artboards[0].format === 'business-card' && [...D.wordsOf(card.doc).values()].some((w) => /Ada Lovelace/.test(w)), J({ a: card.plans[0].archetype, n: card.doc.artboards.length, w: [...D.wordsOf(card.doc).values()] }));
 }
 
 // ── 12. interpretations: independent concepts for the directions step ──

@@ -27,6 +27,7 @@ import { distortPath, reversePath, simplifyPath, smoothPath, mapPath } from './g
 import { normalizeSelection, type StyleSelection } from './styles/blend';
 import { normalizeCompositionPlan, normalizeMemory, type CompositionPlan, type MemoryEntry } from './composition/schema';
 import { normalizeConceptRecord, type ConceptRecord } from './generative/record';
+import { normalizeLogoRecord, type LogoRecord } from './logo/record';
 
 export const GFX_SCHEMA = 1;
 
@@ -70,6 +71,10 @@ export interface Base {
   /** drawn as part of the composition, not as content: a cropped echo of the words, a field of figures. The checks
    * read it as decoration (it may run off the frame; the words are elsewhere in full) */
   decorative?: boolean;
+  /** a linked instance of a shared element (an approved logo: "logo:<concept id>"): rebuilt when the original changes,
+   * unless edited here (its content no longer matches `linkHash`), which is then kept as a local override */
+  link?: string;
+  linkHash?: string;
 }
 
 export interface TextNode extends Base {
@@ -290,6 +295,8 @@ export interface Artboard {
   composition?: CompositionPlan;
   /** the creative concept it was generated from (generative/record.ts): the idea, its structure, the request that made it */
   concept?: ConceptRecord;
+  /** a logo artboard's record (logo/record.ts): the brief, every concept shown, the selected and approved ones */
+  logo?: LogoRecord;
 }
 
 export interface Asset {
@@ -481,6 +488,7 @@ function baseOf(r: Record<string, any>, seen: Set<string>, prefix: string): Base
     ...(r.flipX === true ? { flipX: true } : {}),
     ...(r.flipY === true ? { flipY: true } : {}),
     ...(r.decorative === true ? { decorative: true } : {}),
+    ...(typeof r.link === 'string' && /^logo:[\w-]{1,80}$/.test(r.link) ? { link: r.link, ...(typeof r.linkHash === 'string' && /^[a-z0-9]{1,16}$/.test(r.linkHash) ? { linkHash: r.linkHash } : {}) } : {}),
   };
 }
 
@@ -791,6 +799,7 @@ export function normalizeDoc(v: unknown, rep: Repair = { notes: [] }): GraphicDo
       ...(b.locked === true ? { locked: true } : {}),
       ...((cp) => (cp ? { composition: cp } : {}))(b.composition ? normalizeCompositionPlan(b.composition) : null),
       ...((cr) => (cr ? { concept: cr } : {}))(b.concept ? normalizeConceptRecord(b.concept) : undefined),
+      ...((lr) => (lr ? { logo: lr } : {}))(b.logo ? normalizeLogoRecord(b.logo) : null),
     });
   }
   if (!artboards.length) return null;
@@ -1169,6 +1178,12 @@ export function applyOp(doc0: GraphicDoc, op: Op, opts: { force?: boolean } = {}
         if (op.set.concept !== null && !cr) return { ok: false, error: 'That is not a concept record SocriaUX can use.' };
         if (cr) b.concept = cr;
         else delete b.concept;
+      }
+      if ('logo' in op.set) {
+        const lr = op.set.logo === null ? null : normalizeLogoRecord(op.set.logo);
+        if (op.set.logo !== null && !lr) return { ok: false, error: 'That is not a logo record SocriaUX can use.' };
+        if (lr) b.logo = lr;
+        else delete b.logo;
       }
       return done([b.id]);
     }

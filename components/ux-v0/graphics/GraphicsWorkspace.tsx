@@ -19,11 +19,18 @@ import { proposeDirections } from '@/lib/ux-v0/direction';
 import { newId, type Asset, type GraphicDoc } from '@/lib/ux-v0/graphics/doc';
 import { accentFor, composeGraphic, graphicDirectionOf, type GraphicBrief, type GraphicDirection } from '@/lib/ux-v0/graphics/compose';
 import { interpretations } from '@/lib/ux-v0/graphics/generative/engine';
+import { languageDirection } from '@/lib/ux-v0/graphics/generative/language';
 import { refineDoc } from '@/lib/ux-v0/graphics/check';
 import { canvasMeasure } from '@/lib/ux-v0/graphics/raster';
 import { emptyGraphicState, MAX_GRAPHIC_VERSIONS, type GraphicState, type GraphicVersion } from '@/lib/ux-v0/graphics/state';
 import { styledOptions } from '@/lib/ux-v0/graphics/styles/propose';
-import { GraphicEditor, type EditorNote } from './GraphicEditor';
+import { GraphicEditor, directionOfDoc, type EditorNote } from './GraphicEditor';
+import { LogoConceptsStage } from './LogoPanel';
+import { putProject } from '@/lib/ux-v0/store';
+import { makeProject } from '@/lib/ux-v0/types';
+import { startBoard } from '@/lib/ux-v0/boards/pipeline';
+import type { BoardBrief } from '@/lib/ux-v0/boards/model';
+import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
 import { directionFaces, facesUsed, loadFaces, useAssetUrls, useFaceMeasure } from './faces';
 import { BriefStage, DirectionsStage, briefOf, fieldsOf, KIND_LABEL, type BriefFields, type WebsiteSource } from './GraphicBrief';
 
@@ -34,7 +41,7 @@ const seedOf = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0))
 const pushVersion = (list: GraphicVersion[], doc: GraphicDoc, label: string): GraphicVersion[] => [...list, { doc, label: label.slice(0, 160), at: Date.now() }].slice(-MAX_GRAPHIC_VERSIONS);
 const DEFAULT_NAMES = new Set(['Untitled design', 'Untitled graphic', '']);
 
-export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent }: { initial: DesignProject; signedIn: boolean; onExit: () => void; startIntent?: string }) {
+export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOpenProject }: { initial: DesignProject; signedIn: boolean; onExit: () => void; startIntent?: string; onOpenProject?: (id: string) => void }) {
   const { project, update, save, current } = useV0Project(initial, signedIn);
   const g: GraphicState = project.graphic ?? emptyGraphicState();
   const setG = useCallback((fn: (x: GraphicState) => GraphicState) => update((p) => ({ ...p, graphic: fn(p.graphic ?? emptyGraphicState()) })), [update]);
@@ -123,8 +130,12 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent }: { 
       // each in a design language chosen from the brief (a style it names first), none of them a default; and each an
       // independent interpretation (its own lead and seed), so the three are three concepts, not three colourways
       const options = styledOptions(brief, dirs, { salt: `${project.id}|${r}`, seedKey: project.id, seen: already }).options;
-      const leads = interpretations({ count: options.length, salt: `${project.id}|${r}`, hasImage: brief.images.length > 0, hasData: !!brief.content.data?.length });
-      return options.map((d, i) => ({ ...d, generative: { seed: leads[i].seed, emphasis: leads[i].emphasis, ...(leads[i].unexpected ? { constraints: { unexpected: true } } : {}) } }));
+      // directions are not only styles: the last is a language generated from the brief itself (its temperament and the
+      // things it names give the palette and the faces; no style profile)
+      const generated = languageDirection(brief.purpose || brief.content.headline, brief.mood, `${project.id}|${r}`);
+      const mixed = [...options.slice(0, Math.max(1, options.length - 1)), generated];
+      const leads = interpretations({ count: mixed.length, salt: `${project.id}|${r}`, hasImage: brief.images.length > 0, hasData: !!brief.content.data?.length });
+      return mixed.map((d, i) => ({ ...d, generative: { seed: leads[i].seed, emphasis: leads[i].emphasis, ...(leads[i].unexpected ? { constraints: { unexpected: true } } : {}) } }));
     },
     [project.id],
   );
@@ -157,11 +168,37 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent }: { 
     setView('edit');
   };
 
+  /** A logo brief: concepts explored (no directions, no templates), the first on its artboard, the concepts shown. */
+  const exploreLogo = (brief: GraphicBrief) => {
+    setBusy('Constructing logo concepts from the brief…');
+    setTimeout(() => {
+      const t0 = performance.now();
+      const { doc } = composeGraphic(brief, directionOfDoc({ schema: 1, id: 'x', name: 'x', tokens: { colors: { background: '#f6f4ef', surface: '#ffffff', text: '#16181c', muted: '#5d5a52', accent: '#2b4c6f', accentText: '#ffffff', line: '#d8d3c6' }, fonts: { display: 'Inter', body: 'Inter' } }, artboards: [], assets: [], revision: 0, updatedAt: 0 }), { seed: seedOf(project.id), name: current.current.name });
+      const rec = doc.artboards.find((b) => b.logo)?.logo;
+      const ms = Math.round(performance.now() - t0);
+      setG((x) => ({ ...x, brief, options: [], direction: null, doc, versions: pushVersion(x.versions, doc, 'Logo concepts explored') }));
+      setNote({ tone: 'ok', text: `${rec?.concepts.length ?? 0} logo concepts constructed in ${ms} ms, without a model and without a library of logos.` });
+      setBusy('');
+      setView('directions');
+    }, 0);
+  };
+
+  /** A board made from an approved logo's identity: its materials planned in that system, opened. */
+  const makeBoard = async (sys: MasterDesignSystem) => {
+    const name = sys.name || project.name;
+    const brief: BoardBrief = { purpose: `The ${name} identity in use: a social post, a poster, a business card, a presentation, a website and packaging.`, name, content: { headline: name, ...(g.brief?.content.subhead ? { subhead: g.brief.content.subhead } : {}), brand: name }, mood: sys.personality, materials: [{ kind: 'social', count: 1 }, { kind: 'poster', count: 1 }, { kind: 'card', count: 1 }, { kind: 'presentation', count: 1 }, { kind: 'website', count: 1 }, { kind: 'mockup', count: 1, template: 'box' }], images: [], annotate: true };
+    const p: DesignProject = { ...makeProject('create', `${name} — identity board`), medium: 'board', board: startBoard(brief, sys, { request: brief.purpose }), intent: brief.purpose };
+    await putProject(p);
+    setNote({ tone: 'ok', text: `A board “${p.name}” was made from the identity, its materials planned in the approved logo’s system.${onOpenProject ? ' Opening it.' : ' It is in your designs.'}` });
+    if (onOpenProject) onOpenProject(p.id);
+  };
+
   const continueFromBrief = () => {
     const brief = briefOf(fields, (g.assets ?? []).map((a) => a.id));
     if (!brief) return setError('Write the headline first: SocriaUX composes around your words and never invents them.');
     setError('');
     update((p) => ({ ...p, name: DEFAULT_NAMES.has(p.name) ? brief.content.headline.slice(0, 80) : p.name, intent: p.intent || fields.words.slice(0, 600), graphic: { ...(p.graphic ?? emptyGraphicState()), brief } }));
+    if (brief.kind === 'logo') return exploreLogo(brief);
     if (siteDir && g.source) return void composeIn(siteDir, brief);
     const options = proposeFor(brief, 0, []);
     setRound(0);
@@ -182,9 +219,10 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent }: { 
   /** A document from the editor: the current one, and a version when it says so. */
   const onEditorChange = (next: GraphicDoc, meta: { label: string; version?: boolean }) => setG((x) => ({ ...x, doc: next, ...(meta.version ? { versions: pushVersion(x.versions, next, meta.label) } : {}) }));
 
+  const isLogo = g.brief?.kind === 'logo' && !!g.doc?.artboards.some((b) => b.logo);
   const steps: { id: View; label: string; ok: boolean }[] = [
     { id: 'brief', label: 'Brief', ok: true },
-    { id: 'directions', label: 'Directions', ok: !!g.brief && g.options.length > 0 },
+    isLogo ? { id: 'directions', label: 'Concepts', ok: true } : { id: 'directions', label: 'Directions', ok: !!g.brief && g.options.length > 0 },
     { id: 'edit', label: 'Design', ok: !!g.doc },
   ];
 
@@ -251,7 +289,11 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent }: { 
         />
       )}
 
-      {view === 'directions' && g.brief && (
+      {view === 'directions' && isLogo && g.doc && (
+        <LogoConceptsStage doc={g.doc} measure={measure} onDoc={(next, label) => setG((x) => ({ ...x, doc: next, versions: pushVersion(x.versions, next, label) }))} onDevelop={() => setView('edit')} onBack={() => setView('brief')} />
+      )}
+
+      {view === 'directions' && g.brief && !isLogo && (
         <DirectionsStage brief={g.brief} options={g.options} assets={g.assets ?? []} measure={measure} href={href} source={g.source ?? null} onChoose={(d) => void composeIn(d, g.brief!)} onMore={moreDirections} onBack={() => setView('brief')} />
       )}
 
@@ -275,6 +317,7 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent }: { 
           planNotes={planNotes}
           brand={{ title: g.direction?.name ?? g.doc.direction?.name ?? 'This design', note: g.source ? <p className="v0-quiet">The direction of the website “{g.source.name}”.</p> : undefined }}
           allowOpen
+          onMakeBoard={(sys) => void makeBoard(sys)}
         />
       )}
     </div>

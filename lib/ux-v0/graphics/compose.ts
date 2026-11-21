@@ -33,12 +33,15 @@ import { styleLayouts } from './styles/constructions';
 import { CONSTRUCTIONS, isStyleConstruction, type StyleConstruction } from './styles/schema';
 import { renderComposition } from './composition/render';
 import { refineDoc } from './check';
+import { composeLogo } from './logo/compose';
+import { nameOf } from './logo/brief';
 import { generate, type GenerativeRequest } from './generative/engine';
-import type { CreativeConcept } from './generative/concept';
+import type { ConceptConstraints, CreativeConcept, Emphasis } from './generative/concept';
+import type { Colouring, TypeStrategy } from './generative/principles';
 import { conceptRecord } from './generative/record';
 import { describePlan, FAMILY_BY_ID, type CompositionPlan, type FamilyInfo } from './composition/schema';
 
-export const GRAPHIC_KINDS = ['poster', 'social', 'carousel', 'ad', 'banner', 'magazine', 'book', 'album', 'card', 'label', 'infographic', 'identity', 'announcement', 'presentation', 'campaign'] as const;
+export const GRAPHIC_KINDS = ['poster', 'social', 'carousel', 'ad', 'banner', 'magazine', 'book', 'album', 'card', 'label', 'infographic', 'identity', 'announcement', 'presentation', 'campaign', 'logo'] as const;
 export type GraphicKind = (typeof GRAPHIC_KINDS)[number];
 
 export interface GraphicContent {
@@ -75,6 +78,8 @@ export interface GraphicDirection {
   name: string;
   language: string;
   concept?: string;
+  /** a language generated from the brief itself (palette and faces from its temperament), not a style profile */
+  origin?: 'generated';
   tokens: Tokens;
   look: { case: 'sentence' | 'upper' | 'lower'; tracking: 'tight' | 'normal' | 'wide'; weight: number; motifs?: string[]; frame?: string; buttons?: string; trackingValue?: number; lineHeight?: number };
   form?: FormSystem | null;
@@ -117,6 +122,8 @@ export interface Plan {
   composition?: CompositionPlan;
   /** what the generative engine was asked for, and (once drawn) the concept it worked out */
   generativeRequest?: GenerativeRequest;
+  /** the layout that stood in when the asked-for composition could not be made, and why (never silent) */
+  fallback?: string;
   generative?: { concept: CreativeConcept; signature: string; trace: string[]; unresolved: string[]; problems: string[]; attempts: number };
 }
 
@@ -134,14 +141,15 @@ export interface Strategy {
   rhythm: 'regular' | 'syncopated' | 'radiating' | 'flowing' | 'stacked';
 }
 
-export const ARCHETYPES = ['type-poster', 'image-full', 'image-split', 'minimal', 'swiss', 'statement', 'masthead', 'book', 'album', 'card', 'label', 'infographic', 'process', 'identity', 'banner', 'carousel', 'composition', 'generative', ...NEW_ARCHETYPES] as const;
+export const ARCHETYPES = ['type-poster', 'image-full', 'image-split', 'minimal', 'swiss', 'statement', 'masthead', 'book', 'album', 'card', 'label', 'infographic', 'process', 'identity', 'banner', 'carousel', 'composition', 'generative', 'logo', ...NEW_ARCHETYPES] as const;
 export type Archetype = (typeof ARCHETYPES)[number] | StyleConstruction;
 
 // ── reading a graphic brief from words ──
 
 const KIND_WORDS: readonly [RegExp, GraphicKind][] = [
   [/\bcarousel\b/, 'carousel'],
-  [/\b(brand (identity|board|presentation)|identity (system|board|presentation)|logo and (palette|colours?))\b/, 'identity'],
+  // a logo, or an identity (which starts from a logo): the logo workflow, concepts generated, never a typed name
+  [/\b(logo|logos|logotype|word ?mark|letter ?mark|monogram|brand ?mark|emblem|brand (identity|board|presentation)|visual identity|identity (system|board|presentation))\b/, 'logo'],
   [/\b(infographic|chart|statistic|statistical|data (graphic|visual)|comparison graphic|diagram|timeline|process graphic)\b/, 'infographic'],
   [/\bmagazine\b/, 'magazine'],
   [/\bbook cover\b|\bnovel\b|\bpaperback\b/, 'book'],
@@ -183,6 +191,7 @@ export function readGraphicBrief(words: string, extra: Partial<GraphicBrief> = {
     label: ['label'],
     infographic: ['instagram-portrait'],
     identity: ['presentation'],
+    logo: ['logo-sheet'],
     announcement: ['linkedin'],
     presentation: ['presentation'],
     campaign: ['instagram-square', 'story', 'landscape', 'a4'],
@@ -196,7 +205,12 @@ export function readGraphicBrief(words: string, extra: Partial<GraphicBrief> = {
     .replace(/\b(poster|flyer|graphic|post|carousel|advertisement|ad|banner|cover|card|label|infographic|story|for|an?|the|instagram|linkedin|social media)\b/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  const headline = extra.content?.headline ?? q[0] ?? (subject ? subject.charAt(0).toUpperCase() + subject.slice(1, 60) : '[Headline]');
+  // a logo's headline is the name it is for, exactly as written
+  const logoName = kind === 'logo' ? nameOf(words) : null;
+  // a magazine's first quoted name is its masthead, the next its cover line
+  const masthead = kind === 'magazine' && q.length >= 2 ? q[0] : null;
+  if (masthead) q.shift();
+  const headline = extra.content?.headline ?? logoName ?? q[0] ?? (subject ? subject.charAt(0).toUpperCase() + subject.slice(1, 60) : '[Headline]');
   const dates = (words.match(/\b\d{1,2}(?:[–-]\d{1,2})?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(?:\s+\d{4})?\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:[–-]\d{1,2})?(?:,?\s+\d{4})?\b|\b(?:every|each)\s+(?:mon|tues|wednes|thurs|fri|satur|sun)day(?:\s+in\s+(?:jan|feb|march|april|may|june|july|aug|sept?|oct|nov|dec)[a-z]*)?\b/gi) ?? []).map((d) => d.charAt(0).toUpperCase() + d.slice(1));
   const mood = [...new Set((words.match(/\b(minimal|minimalist|restrained|quiet|luxurious|luxury|bold|loud|experimental|playful|editorial|brutalist|technical|scientific|organic|warm|cinematic|futuristic|retro|corporate|elegant|geometric|maximalist|swiss|calm|raw|daring|premium|friendly|serious)\b/gi) ?? []).map((m) => m.toLowerCase()))];
   return {
@@ -207,6 +221,8 @@ export function readGraphicBrief(words: string, extra: Partial<GraphicBrief> = {
       headline,
       ...(kind === 'carousel' || kind === 'infographic' ? (q.length > 1 ? { items: q.slice(1, 10) } : {}) : { ...(q[1] ? { subhead: q[1] } : {}), ...(q.length > 2 ? { items: q.slice(2, 10) } : {}) }),
       ...(dates.length ? { meta: dates.slice(0, 3) } : {}),
+      ...(logoName ? { brand: logoName } : {}),
+      ...(masthead ? { brand: masthead } : {}),
       ...extra.content,
     },
     mood: extra.mood ?? mood,
@@ -326,6 +342,32 @@ export function compositionFits(fam: FamilyInfo, brief: Pick<GraphicBrief, 'kind
 }
 const FREE_ARCHETYPES: readonly Archetype[] = ['type-poster', 'image-full', 'image-split', 'minimal', 'swiss', 'statement'];
 const FREE_KINDS: readonly GraphicKind[] = ['poster', 'social', 'ad', 'announcement', 'presentation', 'campaign'];
+/** Every kind the generative engine composes (each kind's needs held as constraints, never as a stored layout). A
+ * logo has its own engine (logo/*); the old identity board stays only for projects saved before logos were generated. */
+const GENERATIVE_KINDS: readonly GraphicKind[] = [...FREE_KINDS, 'album', 'book', 'magazine', 'card', 'label', 'banner', 'carousel', 'infographic'];
+/** What each kind asks of a generated design. */
+function kindLead(brief: GraphicBrief, hasImage: boolean): { emphasis?: Emphasis; constraints?: ConceptConstraints; why: string } | null {
+  switch (brief.kind) {
+    case 'album':
+      return { emphasis: hasImage ? 'image' : 'abstract', why: 'An album cover: an image of the music (abstract, or the picture given); the title set as a record label would.' };
+    case 'book':
+      return { emphasis: hasImage ? 'image' : 'type', why: 'A book cover: the title as the image, the author named plainly.' };
+    case 'magazine':
+      return { why: 'A magazine cover: the masthead held across the top; the cover composed beneath it by the engine.' };
+    case 'card':
+      return { emphasis: 'type', constraints: { negativeSpace: 70 }, why: 'A business card: the name first, then the role and how to reach them, in generous space.' };
+    case 'label':
+      return { constraints: { negativeSpace: 70 }, why: 'A label: the product’s name leading, the details small and ordered.' };
+    case 'banner':
+      return { why: 'A banner: composed for its width, read in one glance.' };
+    case 'carousel':
+      return { why: 'A carousel: a cover, one point a slide, one concept carried across them.' };
+    case 'infographic':
+      return brief.content.data?.length ? { emphasis: 'data', why: 'An infographic: the brief’s numbers as the focal chart, the takeaway in words, the source said.' } : { why: 'A diagram: the brief’s points numbered in order; no numbers were given, so none are drawn.' };
+    default:
+      return null;
+  }
+}
 
 export function planFor(brief: GraphicBrief, dir: GraphicDirection, f: Format, opts: { slide?: number; over?: PlanOverride } = {}): Plan {
   const said: string[] = [];
@@ -441,7 +483,7 @@ export function planFor(brief: GraphicBrief, dir: GraphicDirection, f: Format, o
   // the templates engine) is an optional starting point and is honoured as one.
   const engine = opts.over?.engine ?? dir.engine ?? 'generative';
   const handPicked = !!opts.over?.archetype || !!dir.style?.construction || !!(opts.over?.composition ?? dir.composition);
-  const generative = engine === 'generative' && !handPicked && FREE_KINDS.includes(brief.kind) && aspect >= 0.3 && aspect <= 4;
+  const generative = engine === 'generative' && !handPicked && GENERATIVE_KINDS.includes(brief.kind) && aspect >= 0.25 && aspect <= 8.5;
   // the visual vocabulary: the style the brief's words (and the direction's language) ask for, and the composition
   // that style wants where the kind allows another (never against a Board's request for a different sibling)
   // a design language chosen for the direction: its construction (where the kind lets the composition be chosen) and
@@ -482,7 +524,15 @@ export function planFor(brief: GraphicBrief, dir: GraphicDirection, f: Format, o
     colour = cplan.colour;
     said.push(`Composed as ${describePlan(cplan)}: ${fam.description}`);
   }
-  const genReq = generative ? (opts.over?.generative ?? dir.generative ?? {}) : undefined;
+  const lead = generative ? kindLead(brief, hasImage) : null;
+  const base = generative ? (opts.over?.generative ?? dir.generative ?? {}) : undefined;
+  const genReq = base && lead ? { ...base, ...(lead.emphasis && !base.emphasis ? { emphasis: lead.emphasis } : {}), constraints: { ...(lead.constraints ?? {}), ...(base.constraints ?? {}) } } : base;
+  if (generative && lead) {
+    // the kind's own words (said by the old fixed layouts) give way to what the generated design holds to
+    const at = said.findIndex((x) => /^(A carousel|A magazine cover|A book cover|An album cover|A business card|A label|An infographic|A diagram of the steps|A banner)/.test(x));
+    if (at >= 0) said.splice(at, 1);
+    said.unshift(lead.why);
+  }
   if (generative) {
     archetype = 'generative';
     // the engine decides how the palette is used (a field, the ink as ground…) as part of the concept
@@ -1004,8 +1054,27 @@ const LAYOUTS: Record<Archetype, Layout> = {
   carousel: (x, plan) => LAYOUTS.statement(x, plan),
   // a Composition Plan drawn by its family's procedure and held to the rules (composition/render.ts); the relationships
   // it relied on are kept with the plan's record on the artboard
+  // a logo artboard is composed by the logo workflow (logo/compose.ts), never laid out here
+  logo: () => [],
   generative: (x, plan) => {
-    const g0 = generate(KIT, x, plan.generativeRequest ?? {});
+    // a magazine's masthead is held across the top: the engine composes the cover beneath it
+    const band = x.brief.kind === 'magazine' ? Math.round(x.H * 0.16) : 0;
+    const xg = band ? { ...x, H: x.H - band } : x;
+    let g0: ReturnType<typeof generate>;
+    try {
+      g0 = generate(KIT, xg, plan.generativeRequest ?? {});
+    } catch (err) {
+      // never a silent fallback: the plan and the artboard say a simple layout stands in, and why
+      const reason = err instanceof Error ? err.message.slice(0, 160) : 'an unknown error';
+      plan.fallback = reason;
+      plan.said.push(`The generative engine could not compose this (${reason}). A simple statement layout stands in: it is not a generated design. Try another direction or seed.`);
+      return LAYOUTS.statement(x, plan);
+    }
+    if (band) {
+      g0 = { ...g0, nodes: g0.nodes.map((n) => ({ ...n, y: n.y + band })) };
+      const name = x.brief.content.brand || '[Masthead]';
+      g0.nodes.push(text(x, 'logo', name, { x: x.m, y: Math.max(x.m * 0.4, band * 0.12), w: x.W - x.m * 2, h: band * 0.8 }, { size: undefined, font: x.dir.tokens.fonts.display, weight: Math.max(700, x.dir.look.weight), case: 'upper', align: 'center', valign: 'middle', tracking: 20, lineHeight: 0.95 }));
+    }
     // the engine's own readability pass: the document's checks and their bounded repairs (a plate where words straddle
     // grounds no one colour reads on, words fitted to their path), so a generated design leaves here already clean
     // (the designer's pictures stand in by reference, so the normaliser keeps the objects that show them)
@@ -1019,7 +1088,11 @@ const LAYOUTS: Record<Archetype, Layout> = {
     return g.nodes;
   },
   composition: (x, plan) => {
-    if (!plan.composition) return LAYOUTS.statement(x, plan);
+    if (!plan.composition) {
+      plan.fallback = 'no composition plan was given';
+      plan.said.push('No composition plan was given for the chosen family: a simple statement layout stands in, and it is said here rather than shown as the family.');
+      return LAYOUTS.statement(x, plan);
+    }
     const r = renderComposition(KIT, x, plan.composition);
     plan.composition = { ...plan.composition, relations: r.relations };
     if (r.notes.includes('no picture')) plan.said.push('No picture was given for this picture-led composition: a figure of the language stands where it would be.');
@@ -1188,17 +1261,38 @@ export function composeGraphic(brief: GraphicBrief, dir: GraphicDirection, opts:
   const boards: Artboard[] = [];
   const fmts = brief.formats.map((id) => formatOf(id)).filter((f): f is Format => !!f);
   if (!fmts.length) fmts.push(formatOf('instagram-square')!);
-  if (brief.kind === 'identity') {
+  if (brief.kind === 'logo') {
+    // the logo workflow: concepts reasoned from the brief, the selected one on its artboard with the record of all
+    const made = composeLogo(brief, { seed });
+    boards.push(made.board);
+    plans.push({ archetype: 'logo', focal: 'type', hierarchy: ['logo'], colour: 'ground', shapes: 'none', said: made.said });
+  } else if (brief.kind === 'identity') {
     boards.push(...identityBoards(brief, dir, fmts[0], measure, seed));
     plans.push({ ...planFor(brief, dir, fmts[0]), archetype: 'identity' });
   }
   else if (brief.kind === 'carousel') {
     const points = brief.content.items?.length ? brief.content.items : ['[First point]', '[Second point]', '[Third point]'];
     const total = points.length + 2;
-    for (let i = 0; i < total; i++) {
-      const r = composeBoard(brief, dir, fmts[0], measure, seed, { index: i, total, point: points[i - 1] });
-      boards.push(r.board);
-      plans.push(r.plan);
+    // the cover carries the title; the points belong to their own slides
+    const coverBrief: GraphicBrief = { ...brief, content: { ...brief.content, items: undefined } };
+    const cover = composeBoard(coverBrief, dir, fmts[0], measure, seed, { index: 0, total }, opts.over);
+    boards.push(cover.board);
+    plans.push(cover.plan);
+    const gc = cover.plan.generative?.concept;
+    for (let i = 1; i < total; i++) {
+      const last = i === total - 1;
+      if (gc) {
+        // each slide generated in the cover's concept (its spatial principle, type strategy and use of colour), its own
+        // point as its words: one carousel, not one slide repeated
+        const sb: GraphicBrief = { ...brief, kind: 'social', content: { headline: last ? (brief.content.cta ?? brief.content.headline) : points[i - 1], meta: [`${String(i).padStart(2, '0')} / ${String(total - 1).padStart(2, '0')}`], ...(brief.content.brand ? { brand: brief.content.brand } : {}) }, images: [] };
+        const r = composeBoard(sb, dir, fmts[0], measure, seed + i, undefined, { ...(opts.over ?? {}), generative: { seed: `${seed}|slide|${i}`, constraints: { org: gc.org, type: gc.type, colouring: gc.colouring } } });
+        boards.push({ ...r.board, name: last ? 'End' : `Slide ${i}` });
+        plans.push(r.plan);
+      } else {
+        const r = composeBoard(brief, dir, fmts[0], measure, seed, { index: i, total, point: points[i - 1] });
+        boards.push(r.board);
+        plans.push(r.plan);
+      }
     }
   } else if (brief.kind === 'card') {
     const front = composeBoard(brief, dir, fmts[0], measure, seed, undefined, opts.over);
@@ -1258,7 +1352,11 @@ export function adaptBoard(doc: GraphicDoc, boardId: string, formatId: string, d
   const read = contentOf(board);
   if (!read.content.headline) return null;
   const brief: GraphicBrief = { purpose: 'adapted', kind: opts.kind ?? (f.width / f.height > 2.2 ? 'banner' : 'poster'), formats: [f.id], content: read.content, mood: [], images: read.images };
-  const { board: next } = composeBoard(brief, { ...dir, tokens: doc.tokens }, f, opts.measure ?? approxMeasure, 11);
+  // a generated design is adapted in its own concept's type strategy and use of colour (the type style kept), laid out
+  // again for the new format by the engine
+  const c = board.concept;
+  const over: PlanOverride | undefined = c ? { generative: { seed: `adapt|${c.seed}|${f.id}`, constraints: { type: c.type as TypeStrategy, colouring: c.colouring as Colouring } } } : undefined;
+  const { board: next } = composeBoard(brief, { ...dir, tokens: doc.tokens }, f, opts.measure ?? approxMeasure, 11, undefined, over);
   // the type styles the designer set, kept (sizes are the new format's own)
   for (const n of next.children) {
     if (n.type !== 'text' || !n.role) continue;

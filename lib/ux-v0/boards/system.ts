@@ -9,6 +9,9 @@
 // be reset to the system on request. Nothing is regenerated for a token change; the changed materials are checked
 // and repaired within bounds (a wider face may need a smaller headline), never recomposed.
 
+import type { ConceptRecord } from '../graphics/logo/record';
+import { normalizeConceptRecord } from '../graphics/logo/record';
+import { conceptOfMark, insideLinkedLogo, relinkLogo } from '../graphics/logo/link';
 import { normalizeVocabulary, type VisualVocabulary } from '../graphics/vocabulary';
 import { contrastRatio } from '../../ux/audit';
 import { describeForm, normalizeForm, type FormSystem } from '../form';
@@ -57,7 +60,7 @@ export interface MasterDesignSystem {
   /** how pictures are treated, in the direction's words */
   imagery: string;
   /** the wordmark (the identity's name set in the display face) and, when given, a logo picture */
-  logo: { text: string; asset?: string } | null;
+  logo: { text: string; asset?: string; mark?: { concept: ConceptRecord; name: string } } | null;
   /** the rules of use, said plainly: what every material keeps, and what the direction refuses */
   constraints: string[];
   /** why the accent is what it is */
@@ -244,7 +247,15 @@ export function normalizeSystem(v: unknown): MasterDesignSystem | null {
     shape: r.shape ? normalizeForm(r.shape) ?? null : null,
     motifs: a(r.motifs).map((m) => str(m, 30)).filter(Boolean).slice(0, 8),
     imagery: str(r.imagery, 200),
-    logo: r.logo && typeof r.logo === 'object' && str(o(r.logo).text, 80).trim() ? { text: str(o(r.logo).text, 80).trim(), ...(typeof o(r.logo).asset === 'string' && /^[A-Za-z][\w-]{0,47}$/.test(o(r.logo).asset) ? { asset: o(r.logo).asset } : {}) } : null,
+    logo:
+      r.logo && typeof r.logo === 'object' && str(o(r.logo).text, 80).trim()
+        ? {
+            text: str(o(r.logo).text, 80).trim(),
+            ...(typeof o(r.logo).asset === 'string' && /^[A-Za-z][\w-]{0,47}$/.test(o(r.logo).asset) ? { asset: o(r.logo).asset } : {}),
+            // a generated mark: its concept's parameters (it is rebuilt, never stored as a picture)
+            ...((cr) => (cr ? { mark: { concept: cr, name: str(o(r.logo).text, 80).trim() } } : {}))(o(r.logo).mark && typeof o(o(r.logo).mark).concept === 'object' ? normalizeConceptRecord(o(o(r.logo).mark).concept, str(o(r.logo).text, 80).trim()) : null),
+          }
+        : null,
     constraints: a(r.constraints).map((c) => str(c, 240)).filter(Boolean).slice(0, 12),
     ...(str(r.accentWhy, 200) ? { accentWhy: str(r.accentWhy, 200) } : {}),
     ...(r.source && typeof o(r.source).projectId === 'string' && /^[A-Za-z0-9_-]{1,96}$/.test(o(r.source).projectId) ? { source: { projectId: o(r.source).projectId, name: str(o(r.source).name, 100) } } : {}),
@@ -274,6 +285,8 @@ export function bindingsOf(doc: GraphicDoc, sys: MasterDesignSystem): Bindings {
     if (bg) out.boards[b.id] = { background: bg };
     for (const l of walk(b)) {
       const n = l.node;
+      // a linked logo's colours are the logo's own: a token change never recolours it
+      if (n.link || insideLinkedLogo(b, n.id)) continue;
       const rec: Bindings['nodes'][string] = {};
       if (n.type === 'text' || n.type === 'chart') {
         const c = colourTokenOf(sys, n.color);
@@ -494,10 +507,23 @@ function rebindRepaired(before: GraphicDoc, after: GraphicDoc, bindings: Binding
  * still holds the old one; a property that holds something else is the designer's local override and is kept (said);
  * locked properties are kept (said). The document's own palette follows. Then the bounded repair, never a recompose.
  */
-export function propagate(doc: GraphicDoc, bindings: Bindings, from: MasterDesignSystem, to: MasterDesignSystem, measure?: Measure): Propagated {
+export function propagate(doc0: GraphicDoc, bindings: Bindings, from: MasterDesignSystem, to: MasterDesignSystem, measure?: Measure): Propagated {
+  // a new approved logo: every linked instance rebuilt, an edited one kept as a local override
+  let doc = doc0;
+  const logoKept: Propagated['kept'] = [];
+  let logoUpdated = 0;
+  if (to.logo?.mark && to.logo.mark.concept.id !== from.logo?.mark?.concept.id) {
+    const c = conceptOfMark(to.logo.mark);
+    if (c) {
+      const r = relinkLogo(doc, c);
+      doc = r.doc;
+      logoUpdated = r.updated;
+      for (const k of r.kept) logoKept.push({ node: '', name: 'the logo', prop: 'logo', why: k });
+    }
+  }
   const changed = new Set(changedTokens(from, to));
-  if (!changed.size) return { doc, updated: 0, kept: [], fixed: [], repaired: [], bindings };
-  const kept: Propagated['kept'] = [];
+  if (!changed.size) return { doc, updated: logoUpdated, kept: logoKept, fixed: [], repaired: [], bindings };
+  const kept: Propagated['kept'] = [...logoKept];
   const { ops, skipped } = opsToSystem(doc, bindings, to, (node, prop, token) => {
     if (!changed.has(token)) return false;
     const current = 'children' in node && 'width' in node && prop === 'background' ? hex7((node as Artboard).background) : nodeValue(node as Node, prop);

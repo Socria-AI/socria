@@ -79,6 +79,10 @@ export type Instruction =
     } & Common)
   | ({ op: 'echo'; of: EchoOf; word?: number; box: Box; size: number; color: ColourRef; outline?: boolean; align?: 'left' | 'center' | 'right'; font?: 'display' | 'body'; weight?: number } & Common)
   | ({ op: 'details'; box: Box; align: 'left' | 'center' | 'right'; fromFoot?: boolean; scale?: number; color?: ColourRef; sub?: boolean } & Common)
+  /** the brief's numbers drawn as a chart (the data comes from the brief alone: a program can never supply numbers) */
+  | ({ op: 'chart'; box: Box; chart: 'bar' | 'column' | 'line' | 'donut'; color?: ColourRef } & Common)
+  /** the brief's points (items) set as a list, numbered or not (the words come from the brief alone) */
+  | ({ op: 'list'; box: Box; numbered?: boolean; size?: number; align?: 'left' | 'center' | 'right'; color?: ColourRef } & Common)
   | ({ op: 'image'; asset: number; box: Box; mask?: { ellipse: true } | { path: string } | { prim: string; params?: Record<string, number> }; crop?: { x: number; y: number; w: number; h: number }; focus?: { x: number; y: number } } & Common)
   | ({ op: 'pattern'; gen: string | null; box: Box; scale?: number; params?: Record<string, number>; inks: InkRef[]; bound?: 'ellipse' } & Common)
   | ({ op: 'group'; box: Box; children: Instruction[]; clip?: boolean } & Common);
@@ -199,7 +203,7 @@ export function normalizeProgram(raw: unknown, ctx: { images: number }): { progr
   const one = (raw0: unknown, depth: number, where: string): Instruction | null => {
     const e = o(raw0);
     // the bound never drops the brief's own words: only drawn material past it is left out
-    const words = e.op === 'text' || e.op === 'details';
+    const words = e.op === 'text' || e.op === 'details' || e.op === 'list' || e.op === 'chart';
     if (!words && ++count > MAX_ELEMENTS) {
       if (!over) problems.push(`more than ${MAX_ELEMENTS} drawn instructions: the rest are left out (the words are always kept)`);
       over = true;
@@ -313,6 +317,16 @@ export function normalizeProgram(raw: unknown, ctx: { images: number }): { progr
           decorative: true,
         };
       }
+      case 'chart': {
+        const b = box(e.box);
+        if (!b) return (problems.push(`${where}: a chart without a valid box`), null);
+        return { op, box: b, chart: e.chart === 'column' || e.chart === 'line' || e.chart === 'donut' ? e.chart : 'bar', ...(colourRef(e.color) ? { color: colourRef(e.color)! } : {}), ...common(e) };
+      }
+      case 'list': {
+        const b = box(e.box);
+        if (!b) return (problems.push(`${where}: a list without a valid box`), null);
+        return { op, box: b, ...(e.numbered === true ? { numbered: true } : {}), ...(fin(e.size) ? { size: clamp(e.size, 4, M) } : {}), ...(e.align === 'center' || e.align === 'right' ? { align: e.align } : {}), ...(colourRef(e.color) ? { color: colourRef(e.color)! } : {}), ...common(e) };
+      }
       case 'details': {
         const b = box(e.box);
         if (!b) return (problems.push(`${where}: details without a valid box`), null);
@@ -382,7 +396,7 @@ export function normalizeProgram(raw: unknown, ctx: { images: number }): { progr
         if (depth >= MAX_DEPTH) return (problems.push(`${where}: groups nested deeper than ${MAX_DEPTH}`), null);
         const children = e.children.map((c, i) => one(c, depth + 1, `${where}.${i}`)).filter((c): c is Instruction => !!c);
         if (!children.length) return (problems.push(`${where}: an empty group`), null);
-        if (children.some((c) => c.op === 'text' || c.op === 'details')) return (problems.push(`${where}: the brief’s words stay at the top level (they are read back and edited there)`), null);
+        if (children.some((c) => c.op === 'text' || c.op === 'details' || c.op === 'list' || c.op === 'chart')) return (problems.push(`${where}: the brief’s words stay at the top level (they are read back and edited there)`), null);
         return { op, box: b, children, ...(e.clip === true ? { clip: true } : {}), ...common(e), ...deco };
       }
       default:

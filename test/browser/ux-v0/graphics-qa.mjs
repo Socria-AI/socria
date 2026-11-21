@@ -524,13 +524,20 @@ const cpd = await getDocumentProxy(new Uint8Array(cpdf.bytes));
 ok(`24. a multi-artboard export: every slide as a PNG in one .zip (${files.length}), and one PDF page per slide`, files.length === doc.artboards.length && firstPng.sig && firstPng.w === 1080 && cpd.numPages === doc.artboards.length, J({ files: files.length, pages: cpd.numPages, boards: doc.artboards.length }));
 const carouselId = pid();
 
-// ── 7. a brand identity graphic ──
+// ── 7. a brand identity graphic (Engine 2.0: built from a generated, approved logo, never a typed wordmark) ──
 await home();
 await begin('A brand identity board for “Kepler Lab”, a science studio, geometric');
 await page.fill('#gx-brand', 'Kepler Lab');
-await toEditor();
-doc = await docWhere((d) => d.artboards.length >= 4);
-ok('7. a brand identity graphic: the wordmark, palette, typography, shapes and an application, each its own artboard', doc.artboards.length >= 4 && doc.artboards.some((ab) => /Palette/.test(ab.name)) && doc.artboards.some((ab) => /Typography/.test(ab.name)) && doc.artboards.flatMap((ab) => D.walk(ab).map((l) => l.node.text)).includes('Kepler Lab'), J(doc.artboards.map((ab) => ab.name)));
+await page.getByRole('button', { name: /See logo concepts/ }).click();
+await page.waitForSelector('.gx-logo-card', { timeout: 30000 });
+await page.waitForTimeout(800);
+await page.locator('.gx-logo-card').first().getByRole('button', { name: 'Develop this concept' }).click();
+await page.waitForSelector('.gx-logo', { timeout: 30000 });
+await page.getByRole('button', { name: 'Approve this logo' }).click();
+await page.waitForTimeout(800);
+await page.getByRole('button', { name: 'Build the identity' }).click();
+doc = await docWhere((d) => d.artboards.length >= 12, 15000);
+ok('7. a brand identity graphic: a generated logo approved, then its identity sheet (palette, typography, pattern, icons, rules) and its variants, each its own artboard', doc.artboards.length >= 12 && doc.artboards.some((ab) => /identity sheet/.test(ab.name)) && doc.artboards.some((ab) => /Favicon/.test(ab.name)) && doc.artboards.find((ab) => ab.logo)?.logo.brief.name === 'Kepler Lab', J(doc.artboards.map((ab) => ab.name)));
 await shot('07-identity');
 
 // ── 8. a structured infographic ──

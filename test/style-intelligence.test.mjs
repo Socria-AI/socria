@@ -507,7 +507,8 @@ const strip = (v) => JSON.parse(JSON.stringify(v, (k, x) => (k === 'id' || k ===
     made.every((x) => x.doc.style?.primary === sys.style.primary && J(x.doc.tokens) === J(sys.tokens)),
     J(made.map((x) => [x.doc.style?.primary, x.plan.archetype])),
   );
-  const constructions = made.map((x) => x.plan.archetype);
+  // a generated material counts by its concept's structure (principle and type strategy), a fixed one by its archetype
+  const constructions = made.map((x) => (x.plan.archetype === 'generative' && x.doc.artboards[0].concept ? `${x.doc.artboards[0].concept.org}/${x.doc.artboards[0].concept.type}` : x.plan.archetype));
   ok('…each interpreting it in its own way, not one layout resized', new Set(constructions).size >= 2, J(constructions));
   // two posters and two posts in a language with two constructions: counted across the board, not per kind, no two alike
   const sys2 = BS.systemInStyle(sys, AP.styledDirection(BS.directionOfSystem(sys), { primary: 'indian-modernist', strength: 0, seedKey: 'x' }));

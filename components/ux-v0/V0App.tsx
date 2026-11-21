@@ -180,6 +180,7 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
   if (open && open.p.medium === 'graphic') {
     return (
       <GraphicsWorkspace
+        onOpenProject={(id) => openById(id)}
         key={open.p.id}
         initial={open.p}
         signedIn={signedIn}

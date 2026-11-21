@@ -89,8 +89,11 @@ const dirNames = await page
 const dirLangs = await page.locator('.gx-dir .gx-dir-lang').allInnerTexts();
 let proj = await projectOf(pid());
 const optStyles = (proj?.graphic?.options ?? []).map((o) => o.style?.primary);
-ok('1. three directions, each in a different design language chosen from the brief (no house default)', optStyles.length === 3 && optStyles.every(Boolean) && new Set(optStyles).size === 3, J(optStyles));
-ok('…each card says its language’s period and kind', dirLangs.length === 3 && dirLangs.every((l) => /·/.test(l)), J(dirLangs));
+// Engine 2.0: directions are not only style selection: two design languages chosen from the brief, and one language
+// generated from the brief itself (no style profile, no house default)
+const optOrigins = (proj?.graphic?.options ?? []).map((o) => o.origin ?? null);
+ok('1. three directions: two design languages chosen from the brief, one language generated from the brief itself (no house default)', optStyles.length === 3 && optStyles.filter(Boolean).length === 2 && new Set(optStyles.filter(Boolean)).size === 2 && optOrigins.filter((x) => x === 'generated').length === 1, J({ optStyles, optOrigins }));
+ok('…each card says its language: a style’s period and kind, or that it was generated from the brief', dirLangs.length === 3 && dirLangs.every((l) => /·/.test(l)) && dirLangs.some((l) => /Generated from the brief/i.test(l)), J(dirLangs));
 await shot('01-directions');
 await page
   .locator('.gx-dir')

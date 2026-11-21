@@ -131,7 +131,9 @@ const dirFor = (purpose, mood, salt, i = 0) => {
   const noData = C.composeGraphic(C.readGraphicBrief('A process diagram “How a frame is regilded” “Strip” “Size” “Lay the leaf” “Burnish”'), dir);
   ok('…with no numbers, a diagram of the steps given, and no chart', !D.walk(noData.doc.artboards[0]).some((l) => l.node.type === 'chart') && ['Strip', 'Size', 'Lay the leaf', 'Burnish'].every((s) => [...D.wordsOf(noData.doc).values()].includes(s)));
   const id = C.composeGraphic({ ...C.readGraphicBrief('A brand identity board for “Kepler Lab”'), content: { headline: 'Kepler Lab', brand: 'Kepler Lab' } }, dir);
-  ok('an identity board: wordmark, palette, typography, shapes and an application, each its own artboard', J(id.doc.artboards.map((b) => b.name)) === '["Wordmark","Palette","Typography","Shape language","Application"]' || (id.doc.artboards.length >= 4 && id.doc.artboards[0].name === 'Wordmark'), J(id.doc.artboards.map((b) => b.name)));
+  // Engine 2.0: an identity starts from a generated logo (concepts, then the identity built from the approved one), never
+  // from a name typed in a font on a fixed board
+  ok('an identity request starts the logo workflow: a logo artboard carrying its concepts, no typed-wordmark template', id.doc.artboards[0].logo && id.doc.artboards[0].logo.concepts.length >= 8 && !id.doc.artboards.some((b) => b.name === 'Wordmark'), J(id.doc.artboards.map((b) => b.name)));
   const quiet = dirFor('A minimalist poster for an interiors photography exhibition', ['minimal', 'quiet'], 'gfx-t3');
   const calm = C.composeGraphic(C.readGraphicBrief('A minimalist poster “Quiet Rooms”', { mood: ['minimal'] }), quiet);
   const loud = C.composeGraphic(brief, dirFor(brief.purpose, ['bold', 'experimental', 'loud'], 'gfx-t4'));
@@ -301,8 +303,8 @@ const dirFor = (purpose, mood, salt, i = 0) => {
   const idDoc = C.composeGraphic({ ...C.readGraphicBrief('A brand identity board for “Kepler Lab”'), content: { headline: 'Kepler Lab', brand: 'Kepler Lab' } }, dirFor('A science studio', ['technical'], 'id1')).doc;
   const wm = idDoc.artboards[0];
   const bigger = E.readGraphicEdit('make the headline bigger', idDoc, { artboard: wm.id, selection: [] });
-  const wordmark = D.walk(wm).find((l) => l.node.role === 'logo').node;
-  ok('“the headline” of a wordmark board is its wordmark', bigger && bigger.ops.some((o) => o.id === wordmark.id), J(bigger));
+  const logoIds = new Set(D.walk(wm).filter((l) => l.node.role === 'logo').map((l) => l.node.id));
+  ok('“the headline” of a logo board is its logo', bigger && bigger.ops.some((o) => logoIds.has(o.id)), J(bigger));
   const bare = D.normalizeDoc({ artboards: [{ id: 'b', width: 1080, height: 1080, children: [{ id: 'h', type: 'text', role: 'headline', text: 'Plain', x: 64, y: 64, w: 900, h: 200, size: 120, font: 'Inter' }] }] });
   const offer = E.readGraphicEdit('Turn these shapes into an angular geometric pattern', bare, { artboard: 'b', selection: [] });
   const applied = offer && D.applyOps(bare, offer.ops);

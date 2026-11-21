@@ -124,6 +124,7 @@ export function normalizeGraphicDirection(v: unknown): GraphicDirection | null {
     // what the generative engine is asked for (an interpretation's lead and seed), and the engine itself
     ...((g) => (g ? { generative: g } : {}))(r.generative ? normalizeGenerativeRequest(r.generative) : undefined),
     ...(r.engine === 'templates' ? { engine: 'templates' as const } : {}),
+    ...(r.origin === 'generated' ? { origin: 'generated' as const } : {}),
   };
 }
 

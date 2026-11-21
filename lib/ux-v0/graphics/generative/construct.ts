@@ -41,6 +41,8 @@ export interface BuildCtx {
   pattern?: string | null;
   /** a vocabulary given explicitly (a Board's, a model's validated plan): its shapes always appear */
   vocabStrong?: boolean;
+  /** the kind of graphic (an infographic's points lead; elsewhere they support) */
+  kind?: string;
 }
 
 export interface Built {
@@ -69,12 +71,19 @@ function recolour(list: readonly Instruction[], colour: ColourRef): Instruction[
     if (e.op === 'group') return { ...e, children: recolour(e.children, colour) };
     if (e.op === 'line') return { ...e, color: colour };
     if (e.op === 'echo') return { ...e, color: colour };
-    if (e.op === 'image' || e.op === 'text' || e.op === 'details') return e;
+    if (e.op === 'image' || e.op === 'text' || e.op === 'details' || e.op === 'chart' || e.op === 'list') return e;
     if (e.op === 'pattern') return e;
     return { ...e, ...(e.fill !== null ? { fill: colour } : {}), ...(e.stroke ? { stroke: { ...e.stroke, color: colour } } : {}) } as Instruction;
   });
 }
 /** The concept built (see the head of this file). Deterministic for one concept and variant. */
+/** A box held inside the safe area (a chart or a list must be read whole). */
+function inside(b: Box, S: Box, u: number): Box {
+  const x = clamp(b.x, S.x, S.x + S.w - u * 10);
+  const y = clamp(b.y, S.y, S.y + S.h - u * 8);
+  return { x, y, w: Math.max(u * 10, Math.min(b.w, S.x + S.w - x)), h: Math.max(u * 8, Math.min(b.h, S.y + S.h - y)) };
+}
+
 export function construct(b: BuildCtx, c0: CreativeConcept, p: Principles, reading: CreativeReading, variant = 0): Built {
   const r = rng('build', c0.seed, variant);
   const c = variantOf(c0, variant, r.fork('variant'));
@@ -204,7 +213,30 @@ export function construct(b: BuildCtx, c0: CreativeConcept, p: Principles, readi
   });
   let focal: Instruction[] = [];
   const behind: Instruction[] = [];
-  if (c.source === 'image' && b.images > 0) {
+  // numbers given: the chart is the focal material, drawn where the concept puts its focus, clear of the words; the
+  // motif (if any) stays quietly behind. Points given without numbers: they are set as a numbered list there instead
+  const dataZone = clearOf(fz0, zone(sk, 'type'), u);
+  if (reading.constraints.data) {
+    const wide = dataZone.w / Math.max(1, dataZone.h);
+    focal.push({ op: 'chart', box: inside(dataZone, S, u), chart: wide > 1.6 ? 'column' : wide < 0.8 ? 'bar' : r.pick(['bar', 'column', 'donut'] as const), name: 'Chart' });
+    trace.push('the brief’s numbers as the focal chart');
+    if (c.motif && c.motif !== 'glyph') behind.push(...drawMotif(c.motif, mctx(zone(sk, 'quiet') ?? fz0, 0.22)));
+  } else if (reading.constraints.items >= 2 && b.kind === 'infographic') {
+    focal.push({ op: 'list', box: inside(dataZone, S, u), numbered: true, name: 'Points' });
+    trace.push(`the brief’s ${reading.constraints.items} points as a numbered list`);
+  }
+  // points given to another kind (a magazine's cover lines, a poster's programme) support the focal material: a list
+  // in the quiet part of the frame, never instead of the picture or the motif
+  const supportList: Instruction[] = [];
+  // every point given is set (a single takeaway beside a chart too): the brief's words are never dropped
+  if (reading.constraints.items >= 1 && !focal.some((e) => e.op === 'list')) {
+    const spot = zone(sk, 'details') ?? zone(sk, 'quiet') ?? { x: S.x, y: S.y + S.h * 0.62, w: S.w * 0.5, h: S.h * 0.3 };
+    supportList.push({ op: 'list', box: inside(clearOf(spot, zone(sk, 'type'), u), S, u), ...(reading.constraints.items >= 2 ? {} : {}), name: reading.constraints.items === 1 ? 'Takeaway' : 'Points' });
+    trace.push(`the brief’s ${reading.constraints.items} points set beside the concept`);
+  }
+  if (focal.length) {
+    /* the words and numbers lead; no other focal material competes */
+  } else if (c.source === 'image' && b.images > 0) {
     focal = pictures(b, c, sk, fz, paints, r.fork('pictures'), trace);
     if (c.motif && c.motif !== 'glyph') {
       const accentZone = zone(sk, 'quiet') ?? zone(sk, 'type') ?? fz;
@@ -246,7 +278,9 @@ export function construct(b: BuildCtx, c0: CreativeConcept, p: Principles, readi
   // ── the operations, on the focal material ──
   // copies of the material (a second pass, a layer, a repeat, a mirror) only where it is light enough to copy
   const heavy = focal.length > 40;
-  const ops = heavy ? c.operations.filter((o) => !['offset', 'layer', 'repeat', 'mirror'].includes(o)) : c.operations;
+  // a chart or a list is read, never copied, turned or cut
+  const readsAsIs = focal.some((e) => e.op === 'chart' || e.op === 'list');
+  const ops = readsAsIs ? [] : heavy ? c.operations.filter((o) => !['offset', 'layer', 'repeat', 'mirror'].includes(o)) : c.operations;
   if (heavy && ops.length < c.operations.length) trace.push('a dense motif left uncopied');
   if (focal.length && !focal.every((e) => e.op === 'image' && e.box.w >= W * 0.98)) {
     const box = boxAround(focal);
@@ -362,6 +396,7 @@ export function construct(b: BuildCtx, c0: CreativeConcept, p: Principles, readi
     null;
   const typeGradient = p.type.treatments.some((x) => /gradient|chrome|metallic|iridescent/.test(x)) && readable.length && second ? ([readable[0], second] as ColourRef[]) : null;
   el.push(...typeset({ W, H, u, safe: S, sk, c, reading, headline: b.headline, minText: b.minText, r: r.fork('type'), ink: line, gradient: typeGradient }));
+  el.push(...supportList);
   return { program: { schema: PROGRAM_SCHEMA, frame: { w: W, h: H }, ground, elements: el }, sk, sk2, trace };
 }
 

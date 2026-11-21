@@ -25,6 +25,9 @@ import { AddPanel, ArtboardsPanel, Inspector, LayersPanel, nodeLabel } from './G
 import { CeilingInspector, ShapeLibrary } from './CeilingPanels';
 import { download, slug } from './faces';
 import { StyleExplorer, StylePanel } from './StyleExplorer';
+import { LogoTab } from './LogoPanel';
+import { logoEditFromWords } from '@/lib/ux-v0/graphics/logo/session';
+import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
 import { useStyleLibrary } from './styleLibrary';
 
 /** Creative direction in one click: the same words the ask bar reads (generative/edits.ts). */
@@ -42,7 +45,7 @@ const CREATIVE_ACTIONS: readonly [string, string, boolean?][] = [
   ['Four alternatives', 'Show me four different compositions'],
 ];
 
-type Tab = 'layers' | 'concept' | 'boards' | 'add' | 'shapes' | 'pictures' | 'styles' | 'brand' | 'versions';
+type Tab = 'logo' | 'layers' | 'concept' | 'boards' | 'add' | 'shapes' | 'pictures' | 'styles' | 'brand' | 'versions';
 export type EditorNote = { tone: 'ok' | 'warn' | 'ask'; text: string } | null;
 export type ChangeMeta = { label: string; version?: boolean; kind: 'edit' | 'undo' | 'redo' };
 
@@ -83,6 +86,8 @@ export interface GraphicEditorProps {
   toolbarStart?: ReactNode;
   /** after the inspector (what a board says about this material) */
   inspectorExtra?: ReactNode;
+  /** a Board made from an approved logo's identity (offered in the Logo tab when given) */
+  onMakeBoard?: (sys: MasterDesignSystem) => void;
 }
 
 export function GraphicEditor(props: GraphicEditorProps) {
@@ -106,7 +111,7 @@ export function GraphicEditor(props: GraphicEditorProps) {
 
   const [boardId, setBoardId] = useState(given.artboards[0]?.id ?? '');
   const [selection, setSelection] = useState<string[]>([]);
-  const [tab, setTab] = useState<Tab>('layers');
+  const [tab, setTab] = useState<Tab>(() => (given.artboards.some((b) => b.logo) ? 'logo' : 'layers'));
   const [pathEdit, setPathEdit] = useState<string | null>(null);
   const [aids, setAids] = useState({ guides: true, grid: false, rulers: true });
   const [askWords, setAskWords] = useState('');
@@ -194,6 +199,17 @@ export function GraphicEditor(props: GraphicEditorProps) {
     const words = (typeof said === 'string' ? said : askWords).trim();
     const cur = docNow();
     if (!words || !board) return;
+    // on a logo artboard, the logo's own edits (more distinctive, simpler, a new wordmark…) are read first
+    if (board.logo) {
+      const lr = logoEditFromWords(cur, board.id, words);
+      if (lr) {
+        if (lr.doc !== cur) commitDoc(lr.doc, words.slice(0, 80), { version: true });
+        setNote({ tone: lr.ok ? 'ok' : 'warn', text: `${lr.said} Undo takes it back.` });
+        setAskWords('');
+        setTab('logo');
+        return;
+      }
+    }
     const e = readGraphicEdit(words, cur, { artboard: board.id, selection, dir: props.direction ?? directionOfDoc(cur), measure, kind: props.kind, customs: library.styles });
     if (!e) {
       setNote({ tone: 'ask', text: 'SocriaUX could not read that as a change it can make without a model. Try “make the headline bigger”, “increase the contrast”, “move the logo beneath the title”, “use more editorial typography”, “adapt it to a story”, or select an object and change it in the panel on the right.' });
@@ -392,6 +408,7 @@ export function GraphicEditor(props: GraphicEditorProps) {
   const printBleed = doc.artboards.some((b) => b.unit === 'pt' && b.bleed > 0);
   if (!board) return null;
   const tabs: [Tab, string][] = [
+    ...(board.logo ? ([['logo', 'Logo']] as [Tab, string][]) : []),
     ['layers', 'Layers'],
     ['concept', 'Concept'],
     ['boards', 'Artboards'],
@@ -414,6 +431,8 @@ export function GraphicEditor(props: GraphicEditorProps) {
           ))}
         </nav>
         <div className="gx-left-body" role="tabpanel">
+          {tab === 'logo' && board.logo && <LogoTab doc={doc} board={board} measure={measure} onDoc={(next, label) => commitDoc(next, label, { version: true })} onMakeBoard={props.onMakeBoard} />}
+          {tab === 'logo' && !board.logo && <p className="v0-quiet">This artboard is not a logo. Pick the logo artboard in Artboards.</p>}
           {tab === 'layers' && <LayersPanel board={board} selection={selection} onSelect={setSelection} onOps={onOps} />}
           {tab === 'boards' && <ArtboardsPanel doc={doc} boardId={board.id} onPick={(id) => (setBoardId(id), setSelection([]))} onOps={onOps} onAdapt={adapt} />}
           {tab === 'add' && <AddPanel board={board} form={props.direction?.form ?? null} doc={doc} onOps={onOps} onUpload={addPicture} />}

@@ -38,6 +38,7 @@ export const KIND_LABEL: Record<GraphicKind, string> = {
   label: 'Label or packaging',
   infographic: 'Infographic',
   identity: 'Identity board',
+  logo: 'Logo and identity',
   announcement: 'Announcement',
   presentation: 'Presentation slide',
   campaign: 'Campaign, in several formats',
@@ -136,6 +137,7 @@ const DEFAULT_FORMATS: Record<GraphicKind, string[]> = {
   label: ['label'],
   infographic: ['instagram-portrait'],
   identity: ['presentation'],
+  logo: ['logo-sheet'],
   announcement: ['linkedin'],
   presentation: ['presentation'],
   campaign: ['instagram-square', 'story', 'landscape', 'a4'],
@@ -351,7 +353,7 @@ export function BriefStage({
       )}
       <div className="gx-go">
         <button type="button" className="sb-btn is-primary" onClick={onContinue}>
-          {source ? 'Compose it in that direction' : 'See three directions'}
+          {fields.kind === 'logo' ? 'See logo concepts' : source ? 'Compose it in that direction' : 'See three directions'}
         </button>
       </div>
     </div>
@@ -412,7 +414,7 @@ export function DirectionsStage({
                 {d.name}
                 {source && i === 0 ? <span className="gx-badge">From {source.name}</span> : null}
               </h2>
-              <p className="gx-dir-lang">{d.style ? styleLine(d.style.primary, d.style.customs) : d.language.replace(/-/g, ' ')}</p>
+              <p className="gx-dir-lang">{d.style ? styleLine(d.style.primary, d.style.customs) : d.origin === 'generated' ? 'Generated from the brief · no style profile' : d.language.replace(/-/g, ' ')}</p>
               {d.concept && <p className="gx-dir-concept">{d.concept}</p>}
               <p className="gx-swatches" aria-label="Colours">
                 {(['background', 'text', 'accent', 'muted'] as const).map((k) => (

@@ -46,6 +46,8 @@ export const FORMATS: readonly Format[] = [
   { id: 'business-card', label: 'Business card', use: 'print, 85 × 55 mm', width: pt(85), height: pt(55), unit: 'pt', dpi: 300, bleed: pt(3), safe: pt(4), medium: 'print' },
   { id: 'label', label: 'Product label', use: 'print, 100 × 150 mm', width: pt(100), height: pt(150), unit: 'pt', dpi: 300, bleed: pt(2), safe: pt(6), medium: 'print' },
   { id: 'brochure-page', label: 'Brochure page (A5)', use: 'print, one page of a booklet', width: pt(148), height: pt(210), unit: 'pt', dpi: 300, bleed: pt(3), safe: pt(10), medium: 'print' },
+  { id: 'logo-sheet', label: 'Logo sheet', use: 'a logo presented on its ground', width: 1600, height: 1000, unit: 'px', dpi: 72, bleed: 0, safe: 80, medium: 'screen' },
+  { id: 'logo-square', label: 'Logo (square)', use: 'a symbol, an avatar, an app icon', width: 1024, height: 1024, unit: 'px', dpi: 72, bleed: 0, safe: 64, medium: 'screen' },
 ];
 
 const BY_ID = new Map(FORMATS.map((f) => [f.id, f]));

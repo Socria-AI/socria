@@ -69,6 +69,7 @@ export function generate(k: Kit, x: Ctx, req: GenerativeRequest = {}): Generated
       styleMotifs: (x.vocab?.motifs ?? []).map((m) => ({ kind: m.kind, params: { ...m.params } })),
       pattern: x.vocab?.pattern && (x.vocab.strength >= 2 || principles.ornament.density >= 40) ? x.vocab.pattern.gen : null,
       vocabStrong: !x.style && (x.vocab?.strength ?? 0) >= 3,
+      kind: x.brief.kind,
     };
     let best: Omit<Generated, 'attempts' | 'closest' | 'signature'> | null = null;
     for (let v = 0; v < variants; v++) {

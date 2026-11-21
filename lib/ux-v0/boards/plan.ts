@@ -9,10 +9,11 @@
 // not repeat one another (another archetype, another use of the same palette). A website concept is a real website
 // specification built from the same words, through the website pipeline, in the system's direction.
 
+import { conceptOfMark, placeLogo } from '../graphics/logo/link';
 import { composeGraphic, DARK_LANGS, GRID_LANGS, LOUD_LANGS, planFor, QUIET_LANGS, readGraphicBrief, type Archetype, type GraphicBrief, type GraphicContent, type GraphicKind, type Plan, type PlanOverride } from '../graphics/compose';
 import { formatFromWords, formatOf } from '../graphics/formats';
-import { refineDoc, type GFinding } from '../graphics/check';
-import type { Asset, GraphicDoc } from '../graphics/doc';
+import { checkDoc, refineDoc, type GFinding } from '../graphics/check';
+import { applyOps, walk, type Asset, type GraphicDoc } from '../graphics/doc';
 import type { Emphasis } from '../graphics/generative/concept';
 import type { Colouring, Org, TypeStrategy } from '../graphics/generative/principles';
 import type { ConceptRecord } from '../graphics/generative/record';
@@ -315,7 +316,13 @@ export function composeMaterial(m: GraphicMaterial, sys: MasterDesignSystem, ctx
     over = styled ? { styleIndex: (ctx.order ?? ctx.sibling ?? 0) + m.variant } : turned || sys.vocabulary ? { ...(turned ?? {}), ...shared } : undefined;
   }
   const made = composeGraphic(brief, directionOfSystem(sys), { measure: ctx.measure, seed: (ctx.seed ?? 7) + m.variant * 13 + (ctx.sibling ?? 0) * 5, assets: [...assets], name: m.name, over });
-  const refined = refineDoc(made.doc, ctx.measure);
+  // the board's approved logo, placed where the material set the brand's name: linked instances, never redrawn
+  const mark = conceptOfMark(sys.logo?.mark);
+  const withLogo = mark ? placeLogo(made.doc, mark).doc : made.doc;
+  const refined0 = refineDoc(withLogo, ctx.measure);
+  // a word the readability repair took to pure white or black goes back to a system colour that reads as well, so a
+  // later change of the system reaches it (never at the cost of contrast: the checks decide)
+  const refined = { ...refined0, doc: preferTokenColours(refined0.doc, sys, ctx.measure) };
   const plan = made.plans[0];
   return {
     doc: refined.doc,
@@ -325,6 +332,29 @@ export function composeMaterial(m: GraphicMaterial, sys: MasterDesignSystem, ctx
     placeholders: made.placeholders,
     fixed: refined.fixed,
   };
+}
+
+/** Words set in a colour that is no token of the system, moved to the first token that reads as well there (checked by
+ * the document's own contrast check); left as they are when none does. Bounded: the essential words only. */
+export function preferTokenColours(doc: GraphicDoc, sys: MasterDesignSystem, measure?: Measure): GraphicDoc {
+  const tokens = [sys.tokens.colors.text, sys.tokens.colors.background, sys.tokens.colors.accentText, sys.tokens.colors.surface, sys.tokens.colors.accent, sys.tokens.colors.muted, sys.tokens.accent2].filter((c): c is string => typeof c === 'string' && /^#[0-9a-f]{6}/i.test(c)).map((c) => c.slice(0, 7).toLowerCase());
+  const has = new Set(tokens);
+  let cur = doc;
+  const contrastOf = (d: GraphicDoc, id: string) => checkDoc(d, measure).filter((f) => f.node === id && f.kind === 'contrast' && f.severity !== 'low').length;
+  for (const b of doc.artboards)
+    for (const l of walk(b)) {
+      const n = l.node;
+      if (n.type !== 'text' || n.decorative || n.fill || !['headline', 'subhead', 'meta', 'cta', 'body'].includes(n.role ?? '') || has.has(n.color.slice(0, 7).toLowerCase())) continue;
+      const before = contrastOf(cur, n.id);
+      for (const t of tokens) {
+        const r = applyOps(cur, [{ op: 'update', id: n.id, set: { color: t } }]);
+        if (r.ok && contrastOf(r.doc, n.id) <= before) {
+          cur = r.doc;
+          break;
+        }
+      }
+    }
+  return cur;
 }
 
 /** The index of a material among all the board's graphics: its turn through a design language's constructions. */

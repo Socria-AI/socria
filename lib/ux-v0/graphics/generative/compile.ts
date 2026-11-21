@@ -194,6 +194,38 @@ export function compileProgram(cc: CC, prog: DesignProgram, reading: CreativeRea
         if (e.of === 'numeral') fitText(cc, t, e.size);
         return [t];
       }
+      case 'chart': {
+        // the brief's own numbers only: nothing here can supply a value. The kind follows what the numbers are (a share
+        // of 100 is a donut, a run of years or months a line); the program's choice stands otherwise
+        const data = (c.data ?? []).slice(0, 40).map((d) => ({ label: d.label, value: d.value }));
+        if (!data.length) return [];
+        const sum = data.reduce((s2, d) => s2 + d.value, 0);
+        const share = (c.dataUnit === '%' || /%/.test(c.dataUnit ?? '')) && sum >= 95 && sum <= 105 && data.length <= 8;
+        const timeline = data.length >= 4 && data.every((d) => /^(\d{4}|q[1-4]|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i.test(d.label.trim()));
+        const kind = share ? 'donut' : timeline ? 'line' : e.chart === 'donut' ? 'column' : e.chart;
+        // where the numbers come from is said, or asked for: a chart never stands without its source
+        const source = c.dataSource ? `Source: ${c.dataSource}` : '[say where the numbers come from]';
+        const capH = Math.max(cc.k.minText(cc.x) * 1.6, cc.u * 3.2);
+        const chartBox = { ...e.box, h: Math.max(cc.u * 6, e.box.h - capH) };
+        return [
+          { id: newId('c'), type: 'chart', role: 'data', name: 'Chart', chart: kind, data, colors: [col(e.color, pal.accent), pal.accent2 ?? pal.ink, pal.muted], values: true, font: cc.x.dir.tokens.fonts.body, color: pal.ink, ...(c.dataUnit ? { unit: c.dataUnit } : {}), x: chartBox.x, y: chartBox.y, w: chartBox.w, h: chartBox.h, rotation: 0, opacity: 1 } as Node,
+          cc.k.text(cc.x, 'caption', source, { x: e.box.x, y: chartBox.y + chartBox.h + cc.u * 0.4, w: e.box.w, h: capH }, { size: Math.max(cc.k.minText(cc.x), cc.u * 1.8), color: pal.muted, font: cc.x.dir.tokens.fonts.body, weight: 400 }),
+        ];
+      }
+      case 'list': {
+        // each point its own text (editable on its own, its words exactly as given), numbered by a small label
+        const items = (c.items ?? []).slice(0, 12);
+        if (!items.length) return [];
+        const rowH = e.box.h / items.length;
+        const size = e.size ?? Math.max(cc.k.minText(cc.x), Math.min(cc.u * 3.4, rowH * 0.42));
+        const out: Node[] = [];
+        items.forEach((item, i) => {
+          const y = e.box.y + i * rowH;
+          if (e.numbered) out.push(cc.k.text(cc.x, 'label', String(i + 1).padStart(2, '0'), { x: e.box.x, y, w: size * 2.2, h: rowH }, { size: Math.max(cc.k.minText(cc.x), size * 0.62), weight: 600, ...(e.color ? { color: col(e.color) } : {}), font: cc.x.dir.tokens.fonts.body }));
+          out.push(cc.k.text(cc.x, 'body', item, { x: e.box.x + (e.numbered ? size * 2.4 : 0), y, w: e.box.w - (e.numbered ? size * 2.4 : 0), h: rowH }, { size, lineHeight: 1.25, ...(e.align ? { align: e.align } : {}), ...(e.color ? { color: col(e.color) } : {}), font: cc.x.dir.tokens.fonts.body, weight: 500 }));
+        });
+        return out;
+      }
       case 'details': {
         const nodes = info(cc, e.box, {
           align: e.align,
