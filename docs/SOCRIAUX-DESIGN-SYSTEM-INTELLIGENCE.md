@@ -78,7 +78,7 @@ export, so nothing is spent.
 | `lib/ux-v0/dsi/intelligence.ts` | Brand readings (contrast, harmony, saturation, temperature, type pairing and scale, corners, spacing rhythm, logo geometry, a suggested personality), each inferred and never enforced; approve / reject / enforce / reword / add rule; binding rules; the visual language |
 | `lib/ux-v0/dsi/registry.ts` | The record: draft, published versions, sources, sync state, audit; publish (validation blocks, review needs confirmation), rollback (as a new version), discard, rename, archive, duplicate, default, prune (never a pinned version), compare, single-owner permission |
 | `lib/ux-v0/dsi/merge.ts` | Import conflicts (keep, replace, rename with references rewritten, merge, skip), suggestions with reasons; an approved logo is never replaced by default |
-| `lib/ux-v0/dsi/adapters.ts` | The canonical system as the website `DesignSystem`, graphic `Tokens`, Boards `MasterDesignSystem` (identity over the board's expression), linked approved logos, product slots, the brand guard |
+| `lib/ux-v0/dsi/adapters.ts` | The canonical system as the website `DesignSystem`, graphic `Tokens`, Boards `MasterDesignSystem` (identity over the board's expression), linked approved logos, product slots, the brand guard, and `guardedForBrand`: the one order a composition made in a system goes through before it is shown (the approved logo placed, the hard rules resolved, then the document's own checks and repairs on the colours it really has, in the system's palette only) |
 | `lib/ux-v0/dsi/link.ts`, `link-schema.ts` | Projects linked (follow the latest, or pinned), applied, impact previewed, propagated through linked references only (website token slots, a graphic's recorded bindings, a board's bindings), overrides kept, versions saved before, undo, unlink |
 | `lib/ux-v0/dsi/sync.ts` | Three-way sync (base, local, upstream): incoming, conflicts with accept upstream / keep local / merge / create override / defer; managed checks with optional auto-accept of changes nobody made locally |
 | `lib/ux-v0/dsi/exporters.ts` | SocriaUX JSON (lossless), DTCG (modes in `$extensions`, plus one file per mode), Style Dictionary, CSS (themes, `prefers-color-scheme`, a path map for exact round trips), SCSS, guideline summary (Markdown and a printable page), SVG assets |
@@ -90,8 +90,9 @@ export, so nothing is spent.
 
 Integration with existing code (no second architecture): `DesignSystem.link`, `MasterDesignSystem.brand` (with its
 palette and logo rules), `DesignProject.systemLink`, `GraphicState.bindings`, `brand:` linked logo images in graphic
-documents, `placeLogoAsset` in Boards composition, the brand guard in Boards composition, and the badge in the Website,
-Graphics and Boards workspaces. The website pipeline's own `briefWithSystem`, `conformance` and `offSystem`, and Boards'
+documents, `placeLogoAsset` in Boards composition, the brand guard in Boards composition (before the checks), an opt-in
+palette mode for the graphics readability repair (`CheckOpts.palette`: inks and grounds from the system's palette only;
+unchanged when not asked), and the badge in the Website, Graphics and Boards workspaces. The website pipeline's own `briefWithSystem`, `conformance` and `offSystem`, and Boards'
 own `syncSystem` and bindings, do the product-side work.
 
 ## Configuration
@@ -111,7 +112,7 @@ own `syncSystem` and bindings, do the product-side work.
 
 ## Verification
 
-* `node test/run.mjs design-system-intelligence` — 174 checks across the 30 test categories.
+* `node test/run.mjs design-system-intelligence` — 175 checks across the 30 test categories.
 * `node test/run.mjs dsi-route` — 25 checks through the real route handlers (fake Clerk, Supabase and network):
   ownership, cross-account isolation, newer-copy-wins, size limits, the address guard, Figma token handling.
 * `node test/browser/ux-v0/dsi-qa.mjs` — all fifteen acceptance actions in the built app (46 checks), read back from the
@@ -145,7 +146,7 @@ unverified*, *Partially implemented*, *Blocked* or *Not implemented*. "QA" is `d
 | 13 | Brand Intelligence | Implemented and verified | Unit; QA: statements with pages, confirmed vs inferred told apart, an inference reworded becomes the owner's preference (never silently a rule) |
 | 14 | Import Wizard | Implemented and verified | QA: source, categories, real analysis stages, preview, confirm, apply (JSON and PDF). The conflicts step appears only when there are conflicts; the merge plan behind it is unit-tested |
 | 15 | Design System Manager | Implemented and verified | QA: Overview, Tokens, Brand, Assets, Usage, Versions, Sync, Export used; Governance (locks, allowed overrides, review before publishing, restricted assets) and Components unit-tested through their functions |
-| 16 | Graphics integration | Implemented and verified | QA: three directions in the identity, composed with the system's tokens and approved logo, fidelity ≥ 86, update follows; F |
+| 16 | Graphics integration | Implemented and verified | QA: three directions in the identity, composed with the system's tokens and approved logo, fidelity ≥ 86, update follows; F; unit: across 18 compositions no repair leaves a colour off the palette, and every word the readability check flags is a fidelity finding |
 | 17 | Logos integration | Implemented and verified | Approved logo placed as a linked image, never recoloured or distorted, clear space and minimum size held (QA, F); approved SocriaUX logo concepts become approved assets (unit) |
 | 18 | Websites integration | Implemented and verified for an existing website; new website path implemented but unverified in the browser | QA: applied from the manager (new version, old kept), badge with fidelity 100; F, G. A new website takes the system once its brief exists, which needs the questioning routes (a model), not exercised here |
 | 19 | Boards integration | Implemented and verified | QA: a board in the system, three expressions of one identity, every material in the palette with the approved logo, fidelity ≥ 86, each composed its own way; F |
@@ -153,7 +154,7 @@ unverified*, *Partially implemented*, *Blocked* or *Not implemented*. "QA" is `d
 | 21 | Synchronisation | Implemented and verified for file sources; managed sync partial | QA: manual check, change waits for review, a conflict settled by the owner; H: every choice. Managed checks run while SocriaUX is open (client-side); no server scheduler or webhooks |
 | 22 | Versioning and rollback | Implemented and verified | QA: v1–v3 published with review, rollback publishes v2's content as v4; unit (pinned versions never pruned) |
 | 23 | Export | Implemented and verified | QA downloads (DTCG with references and modes, CSS with `var()` and the dark theme); I: DTCG, Style Dictionary and CSS round trips with 0 differences, SocriaUX JSON identical. Composite tokens do not come back from CSS; no Figma write-back |
-| 24 | Tests | Implemented and verified | 174 unit, 25 route, 46 browser checks pass; repository suite and other browser checks for regressions (see Verification) |
+| 24 | Tests | Implemented and verified | 175 unit, 25 route, 46 browser checks pass; repository suite and other browser checks for regressions (see Verification) |
 | 25 | Benchmarks | Implemented and verified | A–I pass (E mocked, said so); `dsi-bench.md` |
 | 26 | Security | Implemented and verified | SVG allowlist rebuild, PDF with scripts off, data-only CSS, no fetch of `@import`, the address guard, Figma token handling, owner-scoped table with RLS (service role only), size and count caps, rate limits, prototype keys refused; unit, route, D |
 | 27 | Performance | Implemented and verified | A–D timings in `dsi-bench.md`; simple references never call a model |
@@ -181,6 +182,10 @@ supported source (a file), roll back, export.
   extracted.
 * The permission model is the application's: one owner per system; there are no shared systems, roles or multi-person
   approvals.
+* Readability is resolved in the system's colours where it can be: in a sweep of 120 compositions across two systems
+  (graphics and board materials), one headline set along a curve over rings of its own colour stayed unreadable — no
+  single colour reads on everything beneath it and a curved line cannot be given a ground. The app's Checks and the
+  fidelity score both say so; the same composition does it without any design system.
 
 ## Remaining technical debt
 

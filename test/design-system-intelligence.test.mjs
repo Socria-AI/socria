@@ -463,6 +463,20 @@ const offBrand = { ...comp.doc, artboards: comp.doc.artboards.map((b) => ({ ...b
 const offF = D.fidelityOfDoc(offBrand, brand.draft);
 ok('an off-brand change is found: the colour and the face, named', offF.findings.some((f) => f.rule === 'palette' && /#ff00ff/.test(f.message)) && offF.findings.some((f) => f.rule === 'faces') && offF.score < 100);
 ok('what the system asks, in words, says compositions are free', /compose freely/.test(D.brandAsks(brand.draft)) && /Do not reuse any layout/.test(D.brandAsks(brand.draft)));
+// readability across many compositions in the brand, the products' own order (the logo, the hard rules, then the
+// document's checks on the colours it really has): words a repair moved are brought back to the palette, and fidelity
+// never calls fine what the app's readability check finds unreadable
+const sweep = [];
+for (let sd = 0; sd < 6; sd++)
+  for (const [kind, words] of kinds.slice(0, 3)) {
+    const b0 = D.readGraphicBrief(words, { kind });
+    const [dir] = D.brandDirections(brand.draft, [D.languageDirection(words, [], `sw${sd}${kind}`)], {});
+    const raw = D.composeGraphic({ ...b0, content: { ...b0.content, brand: brand.draft.identity.name } }, dir, { measure: D.approxMeasure, seed: 3 + sd * 5, name: kind });
+    const doc = D.guardedForBrand(raw.doc, brand.draft, {}, D.approxMeasure).doc;
+    const flagged = new Set(D.checkDoc(doc, D.approxMeasure).filter((f) => f.kind === 'contrast' && f.severity !== 'low').map((f) => f.node));
+    sweep.push({ fid: D.fidelityOfDoc(doc, brand.draft), flagged });
+  }
+ok('across 18 compositions in the brand: no colour left off its palette by a repair, and every word the readability check flags is a fidelity finding too', sweep.every((x) => !x.fid.findings.some((f) => f.rule === 'palette') && (!x.flagged.size || x.fid.findings.some((f) => f.rule === 'contrast'))), J(sweep.map((x) => [x.fid.score, x.flagged.size, x.fid.findings.map((f) => f.message)]).filter((x) => x[0] < 100)));
 
 // ── projects as sources ──
 sec('20 a SocriaUX project as a source');

@@ -19,6 +19,12 @@ import type { Paint } from './doc';
 import { flatten } from './geometry';
 import { apply as applyMat, invert, nodeMatrix, shapeBezier } from './vectorops';
 
+/** What a check may be held to: `palette` — a design held to a system's palette takes its readability repairs (inks and
+ * grounds for words) from that palette only, never pure white or black unless the palette has them. */
+export interface CheckOpts {
+  palette?: readonly string[];
+}
+
 export type GKind = 'overflow' | 'broken-word' | 'safe' | 'contrast' | 'tiny' | 'missing' | 'placeholder' | 'outside' | 'empty' | 'collision';
 
 export interface GFinding {
@@ -155,17 +161,18 @@ function inkArea(t: TextNode, b: { x: number; y: number; w: number; h: number },
   return { x, y, w, h };
 }
 
-/** The colour that reads best on every colour given: the text's own when it is enough, else the best of the inks. */
-export function inkOnAll(own: string, under: readonly string[], need: number, palette: readonly string[] = []): { color: string; ratio: number } {
+/** The colour that reads best on every colour given: the text's own when it is enough, else the best of the inks (only
+ * the palette's, when `only` is set: a design held to a system's palette). */
+export function inkOnAll(own: string, under: readonly string[], need: number, palette: readonly string[] = [], only = false): { color: string; ratio: number } {
   const score = (c: string) => Math.min(...under.map((u) => contrastRatio(c, u)));
   if (score(own) >= need) return { color: own, ratio: score(own) };
-  const cands = [...under.map((u) => ensureContrast(own, u, need)), ...palette, '#111111', '#ffffff'];
+  const cands = only ? [...palette] : [...under.map((u) => ensureContrast(own, u, need)), ...palette, '#111111', '#ffffff'];
   const best = cands.reduce((a, c) => (score(c) > score(a) ? c : a), own);
   return { color: best, ratio: score(best) };
 }
 
 /** Every finding of a document (see the head of this file). */
-export function checkDoc(doc: GraphicDoc, measure: Measure = approxMeasure): GFinding[] {
+export function checkDoc(doc: GraphicDoc, measure: Measure = approxMeasure, opts: CheckOpts = {}): GFinding[] {
   const out: GFinding[] = [];
   const add = (f: Omit<GFinding, 'id'>) => out.push({ ...f, id: `${f.kind}:${f.artboard}:${f.node ?? ''}:${out.length}` });
   const assets = new Set(doc.assets.map((a) => a.id));
@@ -255,11 +262,11 @@ export function checkDoc(doc: GraphicDoc, measure: Measure = approxMeasure): GFi
         const outlined = t.stroke && t.fill !== null && t.stroke.width >= t.size * 0.03 ? t.stroke.color.slice(0, 7) : null;
         const ratio = Math.max(Math.min(...colours.map((c) => contrastRatio(own, c))), outlined ? Math.min(...colours.map((c) => contrastRatio(outlined, c))) : 0);
         if (ratio < need) {
-          const best = inkOnAll(own, colours, need, [doc.tokens.colors.text, doc.tokens.colors.background, doc.tokens.colors.accentText]);
+          const best = opts.palette?.length ? inkOnAll(own, colours, need, opts.palette, true) : inkOnAll(own, colours, need, [doc.tokens.colors.text, doc.tokens.colors.background, doc.tokens.colors.accentText]);
           // when no one colour reads on everything beneath the words, the last resort is a ground of their own: a plate
           // of a palette colour the words already read on, just beneath them in their own group, turned with them
           const plate = (): Op[] | undefined => {
-            const fill = [doc.tokens.colors.background, doc.tokens.colors.text, doc.tokens.colors.surface, '#ffffff', '#111111'].find((c) => /^#[0-9a-f]{6}$/i.test(c) && contrastRatio(own, c) >= need + 0.2);
+            const fill = [doc.tokens.colors.background, doc.tokens.colors.text, doc.tokens.colors.surface, ...(opts.palette?.length ? opts.palette : ['#ffffff', '#111111'])].find((c) => /^#[0-9a-f]{6}$/i.test(c) && contrastRatio(own, c) >= need + 0.2);
             if (!fill) return undefined;
             const pad = Math.max(t.size * 0.22, 4);
             const w = area.w + pad * 2;
@@ -319,9 +326,9 @@ export interface Refined {
 }
 
 /** The fixes applied, checked again, at most `rounds` times, never making it worse (see the head of this file). */
-export function refineDoc(doc: GraphicDoc, measure: Measure = approxMeasure, rounds = 2): Refined {
+export function refineDoc(doc: GraphicDoc, measure: Measure = approxMeasure, rounds = 2, opts: CheckOpts = {}): Refined {
   let cur = doc;
-  let findings = checkDoc(cur, measure);
+  let findings = checkDoc(cur, measure, opts);
   const fixed: string[] = [];
   let r = 0;
   for (; r < rounds; r++) {
@@ -337,7 +344,7 @@ export function refineDoc(doc: GraphicDoc, measure: Measure = approxMeasure, rou
         did.push(f.message);
       }
     }
-    let after = checkDoc(next, measure);
+    let after = checkDoc(next, measure, opts);
     if (!better(findings, after)) {
       // together they made something worse (a word moved onto another): each fix on its own, kept only when it helps
       // and brings no new high finding
@@ -347,7 +354,7 @@ export function refineDoc(doc: GraphicDoc, measure: Measure = approxMeasure, rou
       for (const f of fixable) {
         const res = applyOps(next, f.fix!);
         if (!res.ok) continue;
-        const trial = checkDoc(res.doc, measure);
+        const trial = checkDoc(res.doc, measure, opts);
         if (!better(after, trial)) continue;
         next = res.doc;
         after = trial;

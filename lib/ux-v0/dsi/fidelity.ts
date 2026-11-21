@@ -10,6 +10,8 @@ import { contrastRatio } from '../../ux/audit';
 import type { Artboard, GraphicDoc, ImageNode, Node, TextNode } from '../graphics/doc';
 import { walk } from '../graphics/doc';
 import { backdropAt, clearSpaceIntruders } from '../graphics/brandguard';
+import { checkDoc } from '../graphics/check';
+import { approxMeasure } from '../graphics/text';
 import { productPalette, brandLogo, type AdaptOpts } from './adapters';
 import { assetDocId } from './assets';
 import { hexOf, rgbDistance } from './colour';
@@ -97,6 +99,9 @@ export function fidelityOfDoc(doc: GraphicDoc, c: SystemContent, opts: AdaptOpts
   const caseRule = (hard('headline-case') ?? soft('headline-case'))?.check as Extract<RuleCheck, { kind: 'headline-case' }> | undefined;
   const lowContrast: string[] = [];
   const minContrast = ((hard('min-contrast') ?? soft('min-contrast'))?.check as Extract<RuleCheck, { kind: 'min-contrast' }> | undefined)?.ratio ?? 4.5;
+  // the app's own readability check, sampled where the lines really are (a headline crossing a shape and the ground):
+  // what it finds unreadable is never called fine here
+  const unreadable = new Set(checkDoc(doc, approxMeasure).filter((f) => f.kind === 'contrast' && f.severity !== 'low' && f.node).map((f) => f.node!));
   const logoNodes: { node: ImageNode; board: Artboard }[] = [];
   const namedAsText: string[] = [];
   const name = c.identity.name.trim().toLowerCase();
@@ -130,7 +135,7 @@ export function fidelityOfDoc(doc: GraphicDoc, c: SystemContent, opts: AdaptOpts
           // the words' colour and every coloured run in them, on what is really under them
           const cols = [hexOf(t.color), ...(t.runs ?? []).map((r) => (r.color ? hexOf(r.color) : null))].filter((x): x is string => !!x);
           const under = b.children.some((x) => x.id === t.id) ? backdropAt(b, t) : ground;
-          if (cols.some((col) => contrastRatio(col, under) < (t.size >= 24 ? 3 : minContrast))) lowContrast.push(t.name ?? t.id);
+          if (unreadable.has(t.id) || cols.some((col) => contrastRatio(col, under) < (t.size >= 24 ? 3 : minContrast))) lowContrast.push(t.name ?? t.id);
         }
         if (name && t.role === 'logo' && t.text.trim().toLowerCase() === name) namedAsText.push(t.name ?? t.id);
       }

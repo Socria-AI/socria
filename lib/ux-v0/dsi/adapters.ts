@@ -18,7 +18,9 @@ import type { Asset, GraphicDoc, ImageNode, Node, TextNode, Tokens } from '../gr
 import type { GraphicDirection } from '../graphics/compose';
 import type { MasterDesignSystem } from '../boards/system';
 import { assetDocId, assetHref } from './assets';
-import { respectClearSpace, snapToPalette } from '../graphics/brandguard';
+import { preferPaletteInk, respectClearSpace, snapToPalette } from '../graphics/brandguard';
+import { refineDoc, type GFinding } from '../graphics/check';
+import type { Measure } from '../graphics/text';
 import { dimensionKind } from './classify';
 import { hexOf } from './colour';
 import { bindingRules, visualLanguageOf } from './intelligence';
@@ -356,4 +358,21 @@ export function enforceBrand(doc: GraphicDoc, c: SystemContent, opts: AdaptOpts 
     if (r.panels) notes.push(`A panel set behind the logo to keep its clear space`);
   }
   return { doc: d, notes };
+}
+
+/**
+ * A composition made in the system, made right before it is shown, in one order for every product: its approved logo
+ * placed; the system's hard rules resolved (its palette, the logo's clear space); then the document's own checks and
+ * repairs, judging the colours the design will really have (readability is sampled where the lines are, so a word on a
+ * card that just took a system colour is caught); and a word a repair moved off the palette brought back to a system
+ * colour that reads as well. What cannot be had in the system's colours is left readable and said by the fidelity check.
+ */
+export function guardedForBrand(doc: GraphicDoc, c: SystemContent, opts: AdaptOpts = {}, measure?: Measure): { doc: GraphicDoc; placed: number; notes: string[]; fixed: string[]; remaining: GFinding[] } {
+  const placed = placeBrandLogo(doc, c);
+  const guarded = enforceBrand(placed.doc, c, opts);
+  const pal = brandGuardOf(c, opts).palette;
+  // readability repairs take the system's colours only (an ink or a ground of its palette, never pure white or black)
+  const refined = refineDoc(guarded.doc, measure, 2, pal ? { palette: pal } : {});
+  const inked = pal ? preferPaletteInk(refined.doc, pal, measure) : { doc: refined.doc, moved: 0 };
+  return { doc: inked.doc, placed: placed.placed, notes: guarded.notes, fixed: refined.fixed, remaining: refined.remaining };
 }

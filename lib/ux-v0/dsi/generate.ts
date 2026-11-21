@@ -15,7 +15,7 @@ import type { MasterDesignSystem } from '../boards/system';
 import { composeGraphic, type GraphicBrief, type GraphicDirection } from '../graphics/compose';
 import type { GraphicDoc } from '../graphics/doc';
 import type { Measure } from '../graphics/text';
-import { directionInBrand, enforceBrand, placeBrandLogo, toMasterSystem, type AdaptOpts } from './adapters';
+import { directionInBrand, guardedForBrand, toMasterSystem, type AdaptOpts } from './adapters';
 import { fidelityOfDoc, type Fidelity } from './fidelity';
 import { bindingRules, visualLanguageOf } from './intelligence';
 import { bindForBrand } from './link';
@@ -63,10 +63,8 @@ export function composeInBrand(c: SystemContent, brief: GraphicBrief, base: Grap
   // the brand is named, so its approved logo has a place (the composer sets the name; the logo replaces it)
   const named = brief.content.brand ? brief : { ...brief, content: { ...brief.content, brand: c.identity.name } };
   const composed = composeGraphic(named, direction, { measure: opts.measure, seed: opts.seed, name: opts.name });
-  let doc = composed.doc;
+  // the logo placed, the system's hard rules resolved, then the document's own checks on the colours it really has
+  const doc = guardedForBrand(composed.doc, c, opts, opts.measure).doc;
   const bindings = bindForBrand(doc, direction.look);
-  doc = placeBrandLogo(doc, c).doc;
-  // the system's hard rules resolved before anything is shown (palette only, the logo's clear space)
-  doc = enforceBrand(doc, c, opts).doc;
   return { doc, bindings, fidelity: fidelityOfDoc(doc, c, opts), direction };
 }

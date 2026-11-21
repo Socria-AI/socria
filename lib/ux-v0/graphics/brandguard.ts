@@ -11,7 +11,9 @@
 // graphics can call it alike.
 
 import { contrastRatio } from '../../ux/audit';
-import type { Artboard, GraphicDoc, ImageNode, Node, ShapeNode, TextNode } from './doc';
+import { checkDoc } from './check';
+import { applyOps, walk, type Artboard, type GraphicDoc, type ImageNode, type Node, type ShapeNode, type TextNode } from './doc';
+import type { Measure } from './text';
 
 const hex7 = (v: unknown) => (typeof v === 'string' && /^#[0-9a-f]{6}/i.test(v) ? v.slice(0, 7).toLowerCase() : null);
 const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
@@ -173,4 +175,34 @@ export function respectClearSpace(doc: GraphicDoc, ratio: number, minPx = 0): { 
     return { ...b, children };
   });
   return scaled || panels ? { doc: { ...doc, artboards, revision: doc.revision + 1 }, scaled, panels } : { doc, scaled, panels };
+}
+
+/** Words the readability repair set in a colour outside the palette, moved to the first palette colour that reads as
+ * well there — the document's own contrast check decides, sampled where the lines really are; left as they are when no
+ * system colour does (the fidelity check then says so). Decorative words and linked logos are not touched. */
+export function preferPaletteInk(doc: GraphicDoc, palette: readonly string[], measure?: Measure): { doc: GraphicDoc; moved: number } {
+  const pal = [...new Set(palette.map(hex7).filter((x): x is string => !!x))];
+  if (!pal.length) return { doc, moved: 0 };
+  const onPalette = (h: string) => pal.some((p) => dist(p, h) <= 10);
+  let cur = doc;
+  let moved = 0;
+  const unreadable = (d: GraphicDoc, id: string) => checkDoc(d, measure).filter((f) => f.node === id && f.kind === 'contrast' && f.severity !== 'low').length;
+  for (const b of doc.artboards)
+    for (const l of walk(b)) {
+      const n = l.node;
+      if (n.type !== 'text' || n.decorative || n.link || (n as TextNode).fill) continue;
+      const c = hex7((n as TextNode).color);
+      if (!c || onPalette(c)) continue;
+      const before = unreadable(cur, n.id);
+      // nearest first, so the repair's intent (lighter, darker) is kept where the palette allows
+      for (const p of [...pal].sort((x, y) => dist(x, c) - dist(y, c))) {
+        const r = applyOps(cur, [{ op: 'update', id: n.id, set: { color: p } }]);
+        if (r.ok && unreadable(r.doc, n.id) <= before) {
+          cur = r.doc;
+          moved++;
+          break;
+        }
+      }
+    }
+  return { doc: cur, moved };
 }

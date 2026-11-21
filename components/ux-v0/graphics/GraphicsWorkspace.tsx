@@ -34,7 +34,7 @@ import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
 import { directionFaces, facesUsed, loadFaces, useAssetUrls, useFaceMeasure } from './faces';
 import { BriefStage, DirectionsStage, briefOf, fieldsOf, KIND_LABEL, type BriefFields, type WebsiteSource } from './GraphicBrief';
 import { brandDirections } from '@/lib/ux-v0/dsi/generate';
-import { enforceBrand, placeBrandLogo } from '@/lib/ux-v0/dsi/adapters';
+import { guardedForBrand } from '@/lib/ux-v0/dsi/adapters';
 import { bindForBrand } from '@/lib/ux-v0/dsi/link';
 import { fidelityOfDoc } from '@/lib/ux-v0/dsi/fidelity';
 import { useLinkedSystem } from '../systems/useLinkedSystem';
@@ -161,16 +161,17 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
     // within a design system the brand is named, so its approved logo has a place in the composition
     const named = linked && !brief.content.brand ? { ...brief, content: { ...brief.content, brand: linked.content.identity.name } } : brief;
     const { doc, plans, placeholders } = composeGraphic(named, dir, { measure: m, seed: seedOf(project.id), assets: g.assets ?? [], name: current.current.name });
-    const refined = refineDoc(doc, m);
-    let finalDoc = refined.doc;
+    // within a design system: its approved logo placed and its hard rules resolved first, then the checks and repairs
+    // judge the colours the design will really have (lib/ux-v0/dsi/adapters.ts guardedForBrand)
+    const brand = linked ? guardedForBrand(doc, linked.content, brandOpts, m) : null;
+    const refined = brand ?? refineDoc(doc, m);
+    const finalDoc = refined.doc;
     let bindings = g.bindings;
     let brandLine = '';
-    if (linked) {
+    if (linked && brand) {
       bindings = bindForBrand(finalDoc, dir.look);
-      const placed = placeBrandLogo(finalDoc, linked.content);
-      finalDoc = enforceBrand(placed.doc, linked.content, brandOpts).doc;
       const f = fidelityOfDoc(finalDoc, linked.content, brandOpts);
-      brandLine = `Brand fidelity to ${linked.rec.name}: ${f.score}${placed.placed ? ', with its approved logo' : ''}${f.findings.length ? ` (${f.findings.length} finding${f.findings.length === 1 ? '' : 's'}: ${f.findings[0].message})` : ''}.`;
+      brandLine = `Brand fidelity to ${linked.rec.name}: ${f.score}${brand.placed ? ', with its approved logo' : ''}${f.findings.length ? ` (${f.findings.length} finding${f.findings.length === 1 ? '' : 's'}: ${f.findings[0].message})` : ''}.`;
     }
     const ms = Math.round(performance.now() - t0);
     setG((x) => ({ ...x, brief, direction: dir, doc: finalDoc, ...(bindings ? { bindings } : {}), versions: pushVersion(x.versions, finalDoc, `Composed in “${dir.name}”`) }));

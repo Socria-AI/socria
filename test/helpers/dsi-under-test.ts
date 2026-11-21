@@ -40,4 +40,6 @@ export { svgFile } from '@/lib/ux-v0/graphics/export';
 export { renderArtboard } from '@/lib/ux-v0/graphics/render';
 export { renderDesign } from '@/lib/ux-v0/render';
 export { normalizeSpec } from '@/lib/ux-v0/spec';
-export { snapToPalette, respectClearSpace, clearSpaceIntruders } from '@/lib/ux-v0/graphics/brandguard';
+export { snapToPalette, respectClearSpace, clearSpaceIntruders, preferPaletteInk } from '@/lib/ux-v0/graphics/brandguard';
+export { checkDoc, refineDoc } from '@/lib/ux-v0/graphics/check';
+export { approxMeasure } from '@/lib/ux-v0/graphics/text';

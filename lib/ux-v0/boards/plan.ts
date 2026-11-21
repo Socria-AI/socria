@@ -10,7 +10,7 @@
 // specification built from the same words, through the website pipeline, in the system's direction.
 
 import { conceptOfMark, placeLogo, placeLogoAsset } from '../graphics/logo/link';
-import { respectClearSpace, snapToPalette } from '../graphics/brandguard';
+import { preferPaletteInk, respectClearSpace, snapToPalette } from '../graphics/brandguard';
 import { composeGraphic, DARK_LANGS, GRID_LANGS, LOUD_LANGS, planFor, QUIET_LANGS, readGraphicBrief, type Archetype, type GraphicBrief, type GraphicContent, type GraphicKind, type Plan, type PlanOverride } from '../graphics/compose';
 import { formatFromWords, formatOf } from '../graphics/formats';
 import { checkDoc, refineDoc, type GFinding } from '../graphics/check';
@@ -322,13 +322,16 @@ export function composeMaterial(m: GraphicMaterial, sys: MasterDesignSystem, ctx
   // or an imported approved logo file (a registry design system's), placed as a linked image at its own proportions
   const logoFile = !mark && sys.logo?.asset ? (ctx.assets ?? []).find((a) => a.id === sys.logo!.asset) : undefined;
   const withLogo = mark ? placeLogo(made.doc, mark).doc : logoFile ? placeLogoAsset(made.doc, logoFile, sys.logo!.text).doc : made.doc;
-  // a registry design system's hard rules: its palette only, the logo's clear space (graphics/brandguard.ts)
-  const guarded = sys.brand?.clearSpace ? respectClearSpace(withLogo, sys.brand.clearSpace, sys.brand.minLogo ?? 0).doc : withLogo;
-  const refined0 = refineDoc(guarded, ctx.measure);
+  // a registry design system's hard rules first — its palette only, the logo's clear space (graphics/brandguard.ts) — so
+  // the checks that follow judge the colours the design will really have
+  const snapped = sys.brand?.palette?.length ? snapToPalette(withLogo, sys.brand.palette).doc : withLogo;
+  const guarded = sys.brand?.clearSpace ? respectClearSpace(snapped, sys.brand.clearSpace, sys.brand.minLogo ?? 0).doc : snapped;
+  const refined0 = refineDoc(guarded, ctx.measure, 2, sys.brand?.palette?.length ? { palette: sys.brand.palette } : {});
   // a word the readability repair took to pure white or black goes back to a system colour that reads as well, so a
-  // later change of the system reaches it (never at the cost of contrast: the checks decide)
+  // later change of the system reaches it (never at the cost of contrast: the checks decide); within a registry design
+  // system, any word a repair moved off its palette likewise
   const preferred = preferTokenColours(refined0.doc, sys, ctx.measure);
-  const refined = { ...refined0, doc: sys.brand?.palette?.length ? snapToPalette(preferred, sys.brand.palette).doc : preferred };
+  const refined = { ...refined0, doc: sys.brand?.palette?.length ? preferPaletteInk(preferred, sys.brand.palette, ctx.measure).doc : preferred };
   const plan = made.plans[0];
   return {
     doc: refined.doc,
