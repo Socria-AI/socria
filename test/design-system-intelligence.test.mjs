@@ -314,6 +314,19 @@ ok('generated in the brand: palette, faces and the approved logo; fidelity 100',
 const restricted = { ...brand.draft, governance: { ...brand.draft.governance, restrictedAssets: [fLogo.id] } };
 const compR = D.composeInBrand(restricted, brief, base, { seed: 7, name: 'Poster' });
 ok('a restricted asset is never placed in a design, even an approved logo', D.brandLogo(brand.draft)?.id === fLogo.id && D.brandLogo(restricted) === null && !compR.doc.artboards.some((b) => b.children.some((n) => n.type === 'image' && n.link?.startsWith('brand:'))));
+// the guard judges words on what is really under them once the shapes have their system colours — runs included: an
+// emphasis set in the oat must not vanish on a light card, and stays an emphasis (a colour of the system, not a grey)
+const hdoc = { schema: 1, id: 'h', name: 'H', tokens: D.toGraphicTokens(brand.draft), artboards: [{ id: 'a', name: 'A', width: 1080, height: 1080, unit: 'px', dpi: 72, format: 'custom', background: '#d9632b', bleed: 0, safe: 0, children: [
+  { id: 'card', type: 'shape', name: 'Card', x: 100, y: 500, w: 880, h: 400, rotation: 0, opacity: 1, shape: 'rect', fill: '#f5ece0' },
+  { id: 'hl', type: 'text', name: 'Headline', role: 'headline', x: 150, y: 550, w: 780, h: 300, rotation: 0, opacity: 1, text: 'Walk further, stay dry', font: 'Fraunces', weight: 600, size: 96, lineHeight: 1.1, tracking: 0, align: 'left', valign: 'top', color: '#1d1d1b', runs: [{ start: 5, end: 13, color: '#f3efe6' }] },
+] }], assets: [], revision: 0, updatedAt: 0 };
+const hBefore = D.fidelityOfDoc(hdoc, brand.draft);
+const hGuarded = D.enforceBrand(hdoc, brand.draft).doc;
+const hCard = hGuarded.artboards[0].children.find((n) => n.id === 'card');
+const hRun = hGuarded.artboards[0].children.find((n) => n.id === 'hl').runs[0];
+const hAfter = D.fidelityOfDoc(hGuarded, brand.draft);
+const hue = (h) => ((c) => Math.max(...c) - Math.min(...c))([1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
+ok('a coloured run that would vanish on its ground is found (fidelity reads runs), then made readable by the guard, still an emphasis', hBefore.findings.some((f) => f.rule === 'contrast') && hRun.color !== '#f3efe6' && hRun.color !== '#1d1d1b' && hue(hRun.color) >= 40 && !hAfter.findings.some((f) => f.rule === 'contrast' || f.rule === 'palette'), J({ before: hBefore.findings.map((f) => f.rule), card: hCard.fill, run: hRun.color, after: hAfter.findings.map((f) => f.message) }));
 const logoNode = comp.doc.artboards[0].children.find((n) => n.link?.startsWith('brand:'));
 ok('the logo is a linked image at its own proportions, never redrawn', logoNode && logoNode.type === 'image' && Math.abs(logoNode.w / logoNode.h - fLogo.width / fLogo.height) < 0.02);
 let gp = { ...D.makeProject('create', 'Autumn poster', 1), medium: 'graphic', graphic: { ...D.emptyGraphicState(), brief, direction: comp.direction, doc: comp.doc, bindings: comp.bindings } };

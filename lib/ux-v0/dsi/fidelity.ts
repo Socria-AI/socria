@@ -58,6 +58,11 @@ function paints(n: Node): { prop: string; hex: string }[] {
     const h = hexOf((n as TextNode).color);
     if (h) out.push({ prop: 'color', hex: h });
   }
+  // a run of words in its own colour is a paint like any other
+  if (n.type === 'text') for (const r of (n as TextNode).runs ?? []) {
+    const h = r.color ? hexOf(r.color) : null;
+    if (h) out.push({ prop: 'run', hex: h });
+  }
   if (n.type === 'shape') {
     const h = typeof any.fill === 'string' ? hexOf(any.fill) : null;
     if (h) out.push({ prop: 'fill', hex: h });
@@ -122,9 +127,10 @@ export function fidelityOfDoc(doc: GraphicDoc, c: SystemContent, opts: AdaptOpts
           if (effective !== caseRule.case) caseOff.push(t.name ?? t.id);
         }
         if (ground && t.role !== 'logo') {
-          const col = hexOf(t.color);
+          // the words' colour and every coloured run in them, on what is really under them
+          const cols = [hexOf(t.color), ...(t.runs ?? []).map((r) => (r.color ? hexOf(r.color) : null))].filter((x): x is string => !!x);
           const under = b.children.some((x) => x.id === t.id) ? backdropAt(b, t) : ground;
-          if (col && contrastRatio(col, under) < (t.size >= 24 ? 3 : minContrast)) lowContrast.push(t.name ?? t.id);
+          if (cols.some((col) => contrastRatio(col, under) < (t.size >= 24 ? 3 : minContrast))) lowContrast.push(t.name ?? t.id);
         }
         if (name && t.role === 'logo' && t.text.trim().toLowerCase() === name) namedAsText.push(t.name ?? t.id);
       }

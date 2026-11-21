@@ -24,6 +24,13 @@ import { SystemsApp } from './systems/SystemsApp';
 import { applySystem } from '@/lib/ux-v0/dsi/link';
 import type { SystemRecord } from '@/lib/ux-v0/dsi/registry';
 import { listSystems } from '@/lib/ux-v0/dsi/store';
+import '@/components/brand/socria-brand.css';
+import './ux-v0.css';
+import './home.css';
+import './studio.css';
+import './dna.css';
+import './graphics/graphics.css';
+import './boards/boards.css';
 
 /** A new project built in the workspace's default design system, when one is set and published. */
 async function inDefaultSystem(p: DesignProject): Promise<DesignProject> {
@@ -34,13 +41,6 @@ async function inDefaultSystem(p: DesignProject): Promise<DesignProject> {
     return p;
   }
 }
-import '@/components/brand/socria-brand.css';
-import './ux-v0.css';
-import './home.css';
-import './studio.css';
-import './dna.css';
-import './graphics/graphics.css';
-import './boards/boards.css';
 
 const idFromUrl = () => {
   if (typeof window === 'undefined') return null;

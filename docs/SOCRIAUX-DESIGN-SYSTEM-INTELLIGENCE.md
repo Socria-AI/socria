@@ -82,7 +82,7 @@ export, so nothing is spent.
 | `lib/ux-v0/dsi/link.ts`, `link-schema.ts` | Projects linked (follow the latest, or pinned), applied, impact previewed, propagated through linked references only (website token slots, a graphic's recorded bindings, a board's bindings), overrides kept, versions saved before, undo, unlink |
 | `lib/ux-v0/dsi/sync.ts` | Three-way sync (base, local, upstream): incoming, conflicts with accept upstream / keep local / merge / create override / defer; managed checks with optional auto-accept of changes nobody made locally |
 | `lib/ux-v0/dsi/exporters.ts` | SocriaUX JSON (lossless), DTCG (modes in `$extensions`, plus one file per mode), Style Dictionary, CSS (themes, `prefers-color-scheme`, a path map for exact round trips), SCSS, guideline summary (Markdown and a printable page), SVG assets |
-| `lib/ux-v0/dsi/fidelity.ts`, `lib/ux-v0/graphics/brandguard.ts` | Fidelity of a design to a system (palette, faces, headline case, gradients, accents, contrast on the real backdrop, the approved logo's proportions, cropping, filters, minimum size and clear space); the guard that resolves the hard rules while composing |
+| `lib/ux-v0/dsi/fidelity.ts`, `lib/ux-v0/graphics/brandguard.ts` | Fidelity of a design to a system (palette, faces, headline case, gradients, accents, contrast on the real backdrop — coloured runs of words included — the approved logo's proportions, cropping, filters, minimum size and clear space); the guard that resolves the hard rules while composing: colours moved to the system's, then every text colour and coloured run re-checked on what is really under it (an emphasis keeps a colour of the system's own), the logo's clear space made |
 | `lib/ux-v0/dsi/generate.ts` | Generation within a system: the engine's directions in the system's identity, three board expressions of one identity, a composition placed, bound, guarded and checked |
 | `lib/ux-v0/dsi/store.ts`, `app/api/ux-v0/systems/route.ts` | This browser's store (its own IndexedDB database) and the account copy (owner-scoped table `ux_v0_systems`, newer copy wins, every query on `user_id`) |
 | `app/api/ux-v0/design-system/site/route.ts`, `…/figma/route.ts`, `…/design-system/route.ts` (`raw`) | The website, Figma and GitHub sources, signed in and rate-limited |
@@ -111,7 +111,7 @@ own `syncSystem` and bindings, do the product-side work.
 
 ## Verification
 
-* `node test/run.mjs design-system-intelligence` — 173 checks across the 30 test categories.
+* `node test/run.mjs design-system-intelligence` — 174 checks across the 30 test categories.
 * `node test/run.mjs dsi-route` — 25 checks through the real route handlers (fake Clerk, Supabase and network):
   ownership, cross-account isolation, newer-copy-wins, size limits, the address guard, Figma token handling.
 * `node test/browser/ux-v0/dsi-qa.mjs` — all fifteen acceptance actions in the built app (46 checks), read back from the
@@ -153,7 +153,7 @@ unverified*, *Partially implemented*, *Blocked* or *Not implemented*. "QA" is `d
 | 21 | Synchronisation | Implemented and verified for file sources; managed sync partial | QA: manual check, change waits for review, a conflict settled by the owner; H: every choice. Managed checks run while SocriaUX is open (client-side); no server scheduler or webhooks |
 | 22 | Versioning and rollback | Implemented and verified | QA: v1–v3 published with review, rollback publishes v2's content as v4; unit (pinned versions never pruned) |
 | 23 | Export | Implemented and verified | QA downloads (DTCG with references and modes, CSS with `var()` and the dark theme); I: DTCG, Style Dictionary and CSS round trips with 0 differences, SocriaUX JSON identical. Composite tokens do not come back from CSS; no Figma write-back |
-| 24 | Tests | Implemented and verified | 173 unit, 25 route, 46 browser checks pass; repository suite and other browser checks for regressions (see Verification) |
+| 24 | Tests | Implemented and verified | 174 unit, 25 route, 46 browser checks pass; repository suite and other browser checks for regressions (see Verification) |
 | 25 | Benchmarks | Implemented and verified | A–I pass (E mocked, said so); `dsi-bench.md` |
 | 26 | Security | Implemented and verified | SVG allowlist rebuild, PDF with scripts off, data-only CSS, no fetch of `@import`, the address guard, Figma token handling, owner-scoped table with RLS (service role only), size and count caps, rate limits, prototype keys refused; unit, route, D |
 | 27 | Performance | Implemented and verified | A–D timings in `dsi-bench.md`; simple references never call a model |

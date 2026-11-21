@@ -1,7 +1,8 @@
 // lib/ux-v0/graphics/brandguard.ts — a design system's hard rules resolved in a composed document, before it is shown.
 //
 //   palette only   a colour the composition made that is not in the system (a tint, a mix) goes to the system colour
-//                  nearest it; a text colour to the nearest one that still reads on its ground
+//                  nearest it; a text colour (and every coloured run in it) to the nearest one that still reads on
+//                  what is really under it, once the shapes have their system colours
 //   clear space    an approved logo with something inside its clear space is first scaled down (never below its
 //                  minimum size); if that is not enough, a panel of the ground is set behind it, the logo on top
 //
@@ -19,6 +20,10 @@ const dist = (a: string, b: string) => {
   return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
 };
 const nearest = (h: string, palette: readonly string[]) => palette.reduce((best, p) => (dist(p, h) < dist(best, h) ? p : best), palette[0]);
+const chroma = (h: string) => {
+  const c = rgb(h);
+  return Math.max(...c) - Math.min(...c);
+};
 
 /** The colour under a node's centre: the topmost filled shape drawn before it that covers that point, else the ground. */
 export function backdropAt(b: Pick<Artboard, 'children' | 'background'>, node: Node): string {
@@ -49,15 +54,37 @@ export function snapToPalette(doc: GraphicDoc, palette: readonly string[], opts:
       if (n.type === 'text') {
         if (!texts) return n;
         const t = n as TextNode;
-        const c = hex7(t.color);
-        if (!c || near(c)) return n;
         const need = t.size >= 24 ? 3 : minC;
-        // readable on what is really under the words (a shape, else the ground)
+        // readable on what is really under the words (a shape, else the ground) — judged after the shapes were moved to
+        // the palette, so a card that became the words' own colour is caught; a decorative word (texture, an echo) is
+        // only kept to the palette, never read
         const under = board ? backdropAt(board, n) : ground;
         const readable = pal.filter((p) => contrastRatio(p, under) >= need);
-        const to = readable.length ? nearest(c, readable) : pal.reduce((b, p) => (contrastRatio(p, under) > contrastRatio(b, under) ? p : b), pal[0]);
+        const best = pal.reduce((b, p) => (contrastRatio(p, under) > contrastRatio(b, under) ? p : b), pal[0]);
+        const fix = (col: string | undefined, avoid?: string): string | null => {
+          const c = hex7(col);
+          if (!c) return null;
+          if (t.decorative) return near(c) ? null : nearest(c, pal);
+          if (near(c) && contrastRatio(c, under) >= need) return null;
+          if (!avoid) return readable.length ? nearest(c, readable) : best;
+          // an emphasis keeps standing apart from the words around it: a readable colour of the system's own (not a
+          // grey) where the palette has one, else any readable one that differs
+          const apart = readable.filter((p) => p !== avoid);
+          const hued = apart.filter((p) => chroma(p) >= 40);
+          return hued.length ? nearest(c, hued) : apart.length ? nearest(c, apart) : readable.length ? nearest(c, readable) : best;
+        };
+        const color = fix(t.color);
+        const main = color ?? hex7(t.color) ?? undefined;
+        let runsChanged = false;
+        const runs = t.runs?.map((r) => {
+          const rc = fix(r.color, main);
+          if (rc === null) return r;
+          runsChanged = true;
+          return { ...r, color: rc };
+        });
+        if (color === null && !runsChanged) return n;
         changed++;
-        return { ...t, color: to };
+        return { ...t, ...(color !== null ? { color } : {}), ...(runsChanged ? { runs } : {}) };
       }
       if (n.type === 'shape') {
         if (!shapes) return n;
