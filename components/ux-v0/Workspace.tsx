@@ -100,6 +100,10 @@ import { confine, describeBack, readScope, type Scope } from '@/lib/ux-v0/scope'
 import { readTargeted } from '@/lib/ux-v0/targeted';
 import { capVersions, describeChanges, restoredVersion } from '@/lib/ux-v0/history';
 import { SAVE_WORDS, useV0Project } from './useV0Project';
+import { applySystem } from '@/lib/ux-v0/dsi/link';
+import { fidelityOfTokens } from '@/lib/ux-v0/dsi/fidelity';
+import { useLinkedSystem } from './systems/useLinkedSystem';
+import { SystemBadge } from './systems/SystemBadge';
 
 type View = 'intent' | 'import' | 'discovery' | 'brief' | 'dna' | 'direction' | 'design';
 
@@ -308,6 +312,23 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const started = useRef(false);
 
   const say = useCallback((text: string, kind: Notice['kind'] = 'info', extra: Partial<Notice> = {}) => setNotice({ text, kind, ...extra }), []);
+  // the registry design system the website is built in: its brief is built within it as soon as there is one (the
+  // website pipeline's own briefWithSystem), and a design takes its tokens; a pinned or newer version is the link's say
+  const linked = useLinkedSystem(project.systemLink);
+  useEffect(() => {
+    const p = current.current;
+    if (!linked || !p.systemLink || !p.brief.doc) return;
+    const sys = p.brief.doc.system;
+    if (sys?.link?.id === linked.rec.id && sys.link.version === p.systemLink.version) return;
+    const r = applySystem(p, linked.rec, { pin: p.systemLink.pin });
+    if (r.report.outcome === 'error') return;
+    update(() => r.project);
+    say(r.report.summary);
+  }, [linked, project.brief.doc, project.systemLink?.version]); // eslint-disable-line react-hooks/exhaustive-deps
+  const webFidelity = useMemo(() => {
+    const spec = project.specs[project.specIndex];
+    return linked && spec ? fidelityOfTokens(spec.tokens, linked.content, { mode: project.systemLink?.mode, overrides: project.systemLink?.overrides }) : null;
+  }, [linked, project.specs, project.specIndex, project.systemLink]);
   // what the server said about a call's model or budget: shown at once, and kept in the cost panel
   const [spendNote, setSpendNote] = useState('');
   useEffect(() => {
@@ -1582,6 +1603,16 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
           </nav>
         )}
         <div className="v0-head-r">
+          <SystemBadge
+            project={project}
+            linked={linked}
+            fidelity={webFidelity ? { score: webFidelity.score, findings: webFidelity.findings.length } : null}
+            onApply={(fn) => {
+              const r = fn(current.current);
+              update(() => r.project);
+              say(r.say);
+            }}
+          />
           {project.usage.calls > 0 && <CostPanel usage={project.usage} note={spendNote} calls={calls} />}
           <span className={`v0-save s-${save}`} role="status">
             {SAVE_WORDS[save]}

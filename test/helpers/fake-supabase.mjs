@@ -31,6 +31,8 @@ const PK = {
   mr_ledger: ['user_id', 'id'],
   // supabase/schema.sql: primary key (user_id, scope, counter) — the key every usage write meets
   logos_usage: ['user_id', 'scope', 'counter'],
+  // supabase/schema.sql: a design system's row is its owner's (primary key user_id, id)
+  ux_v0_systems: ['user_id', 'id'],
 };
 
 // Unique indexes beyond the primary key (supabase/schema.sql), as Postgres

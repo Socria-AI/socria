@@ -44,6 +44,8 @@ interface Props {
   onGraphic: (intent: string) => void;
   /** begin a board: many materials in one design system (lib/ux-v0/boards) */
   onBoard: (intent: string) => void;
+  /** the Design System Manager: import, keep and apply design systems */
+  onSystems?: () => void;
   onOpen: (id: string) => void;
   onDelete: (s: ProjectSummary) => void;
 }
@@ -513,6 +515,18 @@ export function Home(p: Props) {
               Make a board <span className="sb-ar">→</span>
             </button>
           </section>
+          {p.onSystems && (
+            <section className="mu-door is-graphic is-system" aria-labelledby="mu-ds-t">
+              <p className="mu-door-k">Or, a design system</p>
+              <h2 className="mu-door-t" id="mu-ds-t">
+                Bring your brand in, and build in it.
+              </h2>
+              <p className="mu-door-b">Tokens, CSS variables, brand guidelines, a website, Figma, logos or one of your projects — kept, versioned and carried into graphics, boards and websites. Your identity; every composition its own.</p>
+              <button type="button" className="sb-link is-go" onClick={p.onSystems}>
+                Design systems <span className="sb-ar">→</span>
+              </button>
+            </section>
+          )}
           {p.error && (
             <p className="v0-error-line mu-error" role="alert">
               {p.error}

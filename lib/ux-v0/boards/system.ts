@@ -74,6 +74,8 @@ export interface MasterDesignSystem {
   vocabulary?: VisualVocabulary;
   /** the design language every material speaks (graphics/styles): one DNA, each material building it its own way */
   style?: StyleSelection;
+  /** the registry design system its identity comes from (lib/ux-v0/dsi): the version applied; the expression stays the board's */
+  brand?: { id: string; version: number; name: string; palette?: string[]; clearSpace?: number; minLogo?: number };
 }
 
 /** Which tokens a material's properties are bound to: by node id and property, and by artboard for the ground. */
@@ -262,6 +264,7 @@ export function normalizeSystem(v: unknown): MasterDesignSystem | null {
     ...(art ? { art } : {}),
     ...((voc) => (voc ? { vocabulary: voc } : {}))(r.vocabulary ? normalizeVocabulary(r.vocabulary) : null),
     ...((sel) => (sel ? { style: sel } : {}))(r.style ? normalizeSelection(r.style) : null),
+    ...(r.brand && typeof o(r.brand).id === 'string' && /^dsys_[\w-]{4,64}$/.test(o(r.brand).id) ? { brand: { id: o(r.brand).id, version: Math.max(0, Math.round(Number(o(r.brand).version) || 0)), name: str(o(r.brand).name, 80), ...((pal) => (pal.length ? { palette: pal } : {}))(a(o(r.brand).palette).filter((x): x is string => typeof x === 'string' && /^#[0-9a-f]{6}$/i.test(x)).map((x) => x.toLowerCase()).slice(0, 64)), ...(Number(o(r.brand).clearSpace) > 0 ? { clearSpace: Math.min(4, Number(o(r.brand).clearSpace)) } : {}), ...(Number(o(r.brand).minLogo) > 0 ? { minLogo: Math.min(2000, Number(o(r.brand).minLogo)) } : {}) } } : {}),
   };
   return sys;
 }

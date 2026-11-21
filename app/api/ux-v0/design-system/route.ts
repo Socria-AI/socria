@@ -1,5 +1,6 @@
 // app/api/ux-v0/design-system/route.ts
 // POST { url } → { system } read from a public GitHub repository's design tokens, CSS variables and guidelines
+// POST { url, raw: true } → { files, ref } the same files, unparsed, for the design system import (lib/ux-v0/dsi)
 //
 // Uploaded files never come here: the browser reads them itself (lib/ux-v0/design-system.ts parseDesignSystem).
 // This route only reaches GitHub, which a browser cannot do for a whole repository in one go: two fixed hosts,
@@ -27,6 +28,9 @@ export async function POST(req: NextRequest) {
   try {
     const got = await fetchSystemFiles(target);
     if ('error' in got) return NextResponse.json({ error: got.error }, { status: got.status });
+    // the files themselves, for the design system import (lib/ux-v0/dsi), which reads them in the browser keeping
+    // references, modes and provenance
+    if (body?.raw === true) return NextResponse.json({ files: got.files, ref: `${target.owner}/${target.repo}${target.dir ? `/${target.dir}` : ''}`, at: target.ref });
     const r = parseDesignSystem(got.files, { kind: 'github', ref: `${target.owner}/${target.repo}${target.dir ? `/${target.dir}` : ''}`, files: [] });
     if (!r.system) return NextResponse.json({ error: r.error }, { status: 422 });
     return NextResponse.json({ system: r.system });

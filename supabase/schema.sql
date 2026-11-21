@@ -1080,6 +1080,22 @@ create table if not exists ux_v0_projects (
 
 create index if not exists ux_v0_projects_user_updated_idx on ux_v0_projects (user_id, updated_at desc);
 
+-- ux_v0_systems: one row per registry design system (lib/ux-v0/dsi/registry.ts): its draft, published versions,
+-- sources, sync state and audit as jsonb, normalised by normalizeRecord before it is written. The browser keeps the
+-- first copy (IndexedDB, socria-ux-v0-systems); this one follows a signed-in designer between devices. One owner per
+-- row: every query filters on user_id, so no system is visible across accounts.
+create table if not exists ux_v0_systems (
+  user_id text not null,
+  id text not null,
+  name text not null default '',
+  doc jsonb not null,
+  created_at bigint not null,
+  updated_at bigint not null,
+  primary key (user_id, id)
+);
+
+create index if not exists ux_v0_systems_user_updated_idx on ux_v0_systems (user_id, updated_at desc);
+
 -- ux_v0_usage: every SocriaUX v0 model call's tokens and price, summed per
 -- person, project and UTC day (lib/ux-v0/usage-server.ts). The daily caps
 -- read it; bump_ux_v0_usage adds to it in one statement.

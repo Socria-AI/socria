@@ -33,9 +33,35 @@ export interface GraphicState {
   source?: { projectId: string; name: string };
   /** the designer's pictures, added with the brief before there is a document (the document then carries them) */
   assets?: Asset[];
+  /** the bindings to a linked registry design system (see DocBindings) */
+  bindings?: DocBindings;
 }
 
 export const MAX_GRAPHIC_VERSIONS = 12;
+
+/** Which design-system token each property of the document is bound to (the same shape as a board material's
+ * bindings, lib/ux-v0/boards/system.ts), recorded when the document was linked to or composed in a registry design
+ * system: only these properties follow a change to it. */
+export interface DocBindings {
+  nodes: Record<string, Partial<Record<'color' | 'fill' | 'stroke' | 'font' | 'weight' | 'case', string>>>;
+  boards: Record<string, { background?: string }>;
+}
+const BIND_PROPS = ['color', 'fill', 'stroke', 'font', 'weight', 'case'];
+const BIND_TOKENS = ['background', 'surface', 'text', 'muted', 'accent', 'accentText', 'line', 'accent2', 'display', 'body', 'displayWeight', 'case'];
+export function normalizeDocBindings(v: unknown): DocBindings | undefined {
+  const r = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, any>) : {};
+  if (!r.nodes && !r.boards) return undefined;
+  const obj = (x: unknown): Record<string, any> => (x && typeof x === 'object' && !Array.isArray(x) ? (x as Record<string, any>) : {});
+  const out: DocBindings = { nodes: {}, boards: {} };
+  for (const [id, props] of Object.entries(obj(r.nodes)).slice(0, 2000)) {
+    if (!/^[\w-]{1,64}$/.test(id)) continue;
+    const rec: Record<string, string> = {};
+    for (const [k, t] of Object.entries(obj(props))) if (BIND_PROPS.includes(k) && BIND_TOKENS.includes(String(t))) rec[k] = String(t);
+    if (Object.keys(rec).length) out.nodes[id] = rec;
+  }
+  for (const [id, b] of Object.entries(obj(r.boards)).slice(0, 200)) if (/^[\w-]{1,64}$/.test(id) && BIND_TOKENS.includes(String(obj(b).background))) out.boards[id] = { background: String(obj(b).background) };
+  return out;
+}
 
 const o = (v: unknown): Record<string, any> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, any>) : {});
 const a = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
@@ -150,6 +176,7 @@ export function normalizeGraphicState(v: unknown): GraphicState | undefined {
     doc,
     versions,
     ...(r.source && typeof r.source === 'object' && typeof o(r.source).projectId === 'string' ? { source: { projectId: str(o(r.source).projectId, 96), name: str(o(r.source).name, 100) } } : {}),
+    ...((bd) => (bd ? { bindings: bd } : {}))(normalizeDocBindings(r.bindings)),
     ...((xs) => (xs.length ? { assets: xs } : {}))(
       a(r.assets)
         .map((x) => normalizeAsset(x))

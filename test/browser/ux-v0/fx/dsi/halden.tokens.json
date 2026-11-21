@@ -1,0 +1,17 @@
+{
+  "color": {
+    "$type": "color",
+    "brand": {
+      "roast": { "$value": "#5b2c1a", "$description": "Roast brown" },
+      "crema": { "$value": "#f4e9d8" },
+      "ink": { "$value": "#1f1a17" },
+      "flame": { "$value": "#e4572e", "$description": "The accent" }
+    },
+    "background": { "$value": "{color.brand.crema}", "$extensions": { "mode": { "dark": "{color.brand.ink}" } } },
+    "text": { "$value": "{color.brand.ink}", "$extensions": { "mode": { "dark": "{color.brand.crema}" } } },
+    "action": { "primary": { "$value": "{color.brand.flame}" } }
+  },
+  "font": { "family": { "display": { "$type": "fontFamily", "$value": "Fraunces" }, "body": { "$type": "fontFamily", "$value": "Inter" } } },
+  "radius": { "md": { "$type": "dimension", "$value": "6px" } },
+  "space": { "$type": "dimension", "2": { "$value": "8px" }, "4": { "$value": "16px" }, "8": { "$value": "32px" } }
+}

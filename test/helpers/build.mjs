@@ -401,6 +401,8 @@ const MODULES = [
   'test/helpers/ux-under-test.ts',
   // SocriaUX v0 (/ux-v0): shapes, spec and patches, renderer, sandbox, inspector, selection, gate, prompts, providers
   'test/helpers/ux-v0-under-test.ts',
+  // SocriaUX Design System Intelligence (lib/ux-v0/dsi): canonical system, tokens, importers, registry, adapters, sync, export
+  'test/helpers/dsi-under-test.ts',
 ];
 
 export async function buildAll() {

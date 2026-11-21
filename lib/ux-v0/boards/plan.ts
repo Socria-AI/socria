@@ -9,7 +9,8 @@
 // not repeat one another (another archetype, another use of the same palette). A website concept is a real website
 // specification built from the same words, through the website pipeline, in the system's direction.
 
-import { conceptOfMark, placeLogo } from '../graphics/logo/link';
+import { conceptOfMark, placeLogo, placeLogoAsset } from '../graphics/logo/link';
+import { respectClearSpace, snapToPalette } from '../graphics/brandguard';
 import { composeGraphic, DARK_LANGS, GRID_LANGS, LOUD_LANGS, planFor, QUIET_LANGS, readGraphicBrief, type Archetype, type GraphicBrief, type GraphicContent, type GraphicKind, type Plan, type PlanOverride } from '../graphics/compose';
 import { formatFromWords, formatOf } from '../graphics/formats';
 import { checkDoc, refineDoc, type GFinding } from '../graphics/check';
@@ -318,11 +319,16 @@ export function composeMaterial(m: GraphicMaterial, sys: MasterDesignSystem, ctx
   const made = composeGraphic(brief, directionOfSystem(sys), { measure: ctx.measure, seed: (ctx.seed ?? 7) + m.variant * 13 + (ctx.sibling ?? 0) * 5, assets: [...assets], name: m.name, over });
   // the board's approved logo, placed where the material set the brand's name: linked instances, never redrawn
   const mark = conceptOfMark(sys.logo?.mark);
-  const withLogo = mark ? placeLogo(made.doc, mark).doc : made.doc;
-  const refined0 = refineDoc(withLogo, ctx.measure);
+  // or an imported approved logo file (a registry design system's), placed as a linked image at its own proportions
+  const logoFile = !mark && sys.logo?.asset ? (ctx.assets ?? []).find((a) => a.id === sys.logo!.asset) : undefined;
+  const withLogo = mark ? placeLogo(made.doc, mark).doc : logoFile ? placeLogoAsset(made.doc, logoFile, sys.logo!.text).doc : made.doc;
+  // a registry design system's hard rules: its palette only, the logo's clear space (graphics/brandguard.ts)
+  const guarded = sys.brand?.clearSpace ? respectClearSpace(withLogo, sys.brand.clearSpace, sys.brand.minLogo ?? 0).doc : withLogo;
+  const refined0 = refineDoc(guarded, ctx.measure);
   // a word the readability repair took to pure white or black goes back to a system colour that reads as well, so a
   // later change of the system reaches it (never at the cost of contrast: the checks decide)
-  const refined = { ...refined0, doc: preferTokenColours(refined0.doc, sys, ctx.measure) };
+  const preferred = preferTokenColours(refined0.doc, sys, ctx.measure);
+  const refined = { ...refined0, doc: sys.brand?.palette?.length ? snapToPalette(preferred, sys.brand.palette).doc : preferred };
   const plan = made.plans[0];
   return {
     doc: refined.doc,

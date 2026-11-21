@@ -15,6 +15,7 @@
 import { normalizeIntent, type DesignIntent } from './intent';
 import { normalizeLayout, type LayoutDecisions } from './layout';
 import { normalizeDesignSystem, type DesignSystem } from './design-system';
+import { normalizeSystemLink, type SystemLink } from './dsi/link-schema';
 import { EMPTY_DIRECTION, normalizeDirectionState, type DirectionState } from './direction';
 import { normalizeDNA, normalizeRefDna, type CreativeDNA, type RefDna } from './dna';
 import { signatureOf, type DesignSignature } from './signature';
@@ -531,6 +532,8 @@ export interface DesignProject {
   graphic?: GraphicState;
   /** a board: its request, its Master Design System, its materials, what is on its canvas (lib/ux-v0/boards/model.ts) */
   board?: BoardState;
+  /** the registry design system it is built in (lib/ux-v0/dsi): which version, pinned or following, and its overrides */
+  systemLink?: SystemLink;
   artifact: Artifact | null;
   cards: ReasoningCard[];
   usage: UsageTotals;
@@ -1122,6 +1125,7 @@ export function normalizeProject(v: unknown, opts: { forSync?: boolean } = {}): 
     ...(r.medium === 'graphic' ? { medium: 'graphic' as const } : r.medium === 'board' ? { medium: 'board' as const } : {}),
     ...((g) => (g && r.medium === 'graphic' ? { graphic: g } : {}))(normalizeGraphicState(r.graphic)),
     ...((bd) => (bd ? { board: bd } : {}))(r.medium === 'board' ? normalizeBoard(r.board) : null),
+    ...((ln) => (ln ? { systemLink: ln } : {}))(normalizeSystemLink(r.systemLink)),
     artifact: normalizeArtifact(r.artifact),
     cards,
     usage: usageTotals(r.usage),

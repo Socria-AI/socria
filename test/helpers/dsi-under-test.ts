@@ -1,0 +1,43 @@
+// SocriaUX Design System Intelligence (lib/ux-v0/dsi): the canonical system, the token engine, the importers, the
+// registry, the product adapters, propagation, sync, export, brand intelligence and fidelity — one bundle, for
+// test/design-system-intelligence.test.mjs and the DSI benchmark.
+export * from '@/lib/ux-v0/dsi/schema';
+export * from '@/lib/ux-v0/dsi/colour';
+export * from '@/lib/ux-v0/dsi/tokens';
+export * from '@/lib/ux-v0/dsi/classify';
+export * from '@/lib/ux-v0/dsi/import-json';
+export * from '@/lib/ux-v0/dsi/css-parse';
+export * from '@/lib/ux-v0/dsi/import-css';
+export * from '@/lib/ux-v0/dsi/figma';
+export * from '@/lib/ux-v0/dsi/registry';
+export * from '@/lib/ux-v0/dsi/merge';
+export * from '@/lib/ux-v0/dsi/assets';
+export * from '@/lib/ux-v0/dsi/guidelines';
+export * from '@/lib/ux-v0/dsi/import-pdf';
+export * from '@/lib/ux-v0/dsi/site';
+export { checkUrl, isPublicIp, resolvePublic, guardedLookup, guardedFetch, extractSite, SITE_LIMITS } from '@/lib/ux-v0/dsi/site-server';
+export { fetchFigmaFile, figmaVersion, tokenOk } from '@/lib/ux-v0/dsi/figma-server';
+export * from '@/lib/ux-v0/dsi/project-extract';
+export * from '@/lib/ux-v0/dsi/intelligence';
+export * from '@/lib/ux-v0/dsi/adapters';
+export * from '@/lib/ux-v0/dsi/link-schema';
+export * from '@/lib/ux-v0/dsi/link';
+export * from '@/lib/ux-v0/dsi/fidelity';
+export * from '@/lib/ux-v0/dsi/exporters';
+export * from '@/lib/ux-v0/dsi/sync';
+export * from '@/lib/ux-v0/dsi/generate';
+// the products the system reaches, for the end-to-end checks
+export { makeProject, normalizeProject } from '@/lib/ux-v0/types';
+export { emptyGraphicState, normalizeGraphicState } from '@/lib/ux-v0/graphics/state';
+export { readGraphicBrief, composeGraphic, graphicDirectionOf } from '@/lib/ux-v0/graphics/compose';
+export { languageDirection } from '@/lib/ux-v0/graphics/generative/language';
+export { emptyBoard, normalizeBoard, applyBoardOps } from '@/lib/ux-v0/boards/model';
+export { readBoardRequest, planMaterials, composeMaterial } from '@/lib/ux-v0/boards/plan';
+export { startBoard, proposeSystems } from '@/lib/ux-v0/boards/pipeline';
+export { syncSystem } from '@/lib/ux-v0/boards/sync';
+export { normalizeDesignSystem, briefWithSystem, conformance } from '@/lib/ux-v0/design-system';
+export { svgFile } from '@/lib/ux-v0/graphics/export';
+export { renderArtboard } from '@/lib/ux-v0/graphics/render';
+export { renderDesign } from '@/lib/ux-v0/render';
+export { normalizeSpec } from '@/lib/ux-v0/spec';
+export { snapToPalette, respectClearSpace, clearSpaceIntruders } from '@/lib/ux-v0/graphics/brandguard';

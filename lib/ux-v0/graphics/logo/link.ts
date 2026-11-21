@@ -6,7 +6,7 @@
 // matches its hash) is kept as a local override and said, never overwritten.
 
 import { contrastRatio } from '../../../ux/audit';
-import type { Artboard, GraphicDoc, GroupNode, Node, TextNode } from '../doc';
+import type { Artboard, Asset, GraphicDoc, GroupNode, ImageNode, Node, TextNode } from '../doc';
 import { hash32 } from '../styles/hash';
 import { readLogoBrief } from './brief';
 import { coloursFor, fitLockup } from './build';
@@ -89,4 +89,32 @@ export function relinkLogo(doc: GraphicDoc, c: LogoConcept): { doc: GraphicDoc; 
 export function insideLinkedLogo(board: Artboard, id: string): boolean {
   const seek = (nodes: Node[], inLogo: boolean): boolean => nodes.some((n) => (n.id === id ? inLogo : n.type === 'group' ? seek(n.children, inLogo || !!n.link) : false));
   return seek(board.children, false);
+}
+
+/**
+ * An approved logo FILE (an imported logo, from a registry design system) placed where a document sets the brand's
+ * name as a logo: a linked image of the file (link "brand:<asset id>"), fitted inside the same box at its own
+ * proportions — never stretched, cropped or recoloured — its asset added once.
+ */
+export function placeLogoAsset(doc: GraphicDoc, asset: Asset, name: string): { doc: GraphicDoc; placed: number } {
+  const want = name.trim().toLowerCase();
+  let placed = 0;
+  const artboards = doc.artboards.map((b) => {
+    const children = b.children.map((n): Node => {
+      if (n.type !== 'text' || n.role !== 'logo' || n.decorative) return n;
+      const t = n as TextNode;
+      if (want && t.text.trim().toLowerCase() !== want) return n;
+      placed++;
+      const box = { x: t.x, y: t.y, w: t.w, h: Math.max(t.h, t.size * 1.2) };
+      const k = Math.min(box.w / Math.max(1, asset.width), box.h / Math.max(1, asset.height));
+      const w = Math.round(asset.width * k * 100) / 100;
+      const h = Math.round(asset.height * k * 100) / 100;
+      const x = t.align === 'center' ? box.x + (box.w - w) / 2 : t.align === 'right' ? box.x + box.w - w : box.x;
+      const img: ImageNode = { id: `${t.id}B`, type: 'image', name: `${name} logo (approved, linked)`, role: 'logo', x, y: box.y + (box.h - h) / 2, w, h, rotation: 0, opacity: 1, asset: asset.id, fit: 'contain', link: `brand:${asset.id}` };
+      return img;
+    });
+    return { ...b, children };
+  });
+  if (!placed) return { doc, placed };
+  return { doc: { ...doc, artboards, assets: [...doc.assets.filter((a) => a.id !== asset.id), asset], revision: doc.revision + 1 }, placed };
 }

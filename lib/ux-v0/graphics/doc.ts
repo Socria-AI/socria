@@ -488,7 +488,7 @@ function baseOf(r: Record<string, any>, seen: Set<string>, prefix: string): Base
     ...(r.flipX === true ? { flipX: true } : {}),
     ...(r.flipY === true ? { flipY: true } : {}),
     ...(r.decorative === true ? { decorative: true } : {}),
-    ...(typeof r.link === 'string' && /^logo:[\w-]{1,80}$/.test(r.link) ? { link: r.link, ...(typeof r.linkHash === 'string' && /^[a-z0-9]{1,16}$/.test(r.linkHash) ? { linkHash: r.linkHash } : {}) } : {}),
+    ...(typeof r.link === 'string' && /^(logo|brand):[\w-]{1,80}$/.test(r.link) ? { link: r.link, ...(typeof r.linkHash === 'string' && /^[a-z0-9]{1,16}$/.test(r.linkHash) ? { linkHash: r.linkHash } : {}) } : {}),
   };
 }
 

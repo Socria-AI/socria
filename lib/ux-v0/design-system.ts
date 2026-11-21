@@ -61,6 +61,8 @@ export interface DesignSystem {
   /** how it was mapped, said plainly (a face drawn with another, a role derived) */
   notes: string[];
   importedAt: number;
+  /** the registry design system it was made from (lib/ux-v0/dsi), and the version applied */
+  link?: { id: string; version: number; name: string };
 }
 
 export interface DSFile {
@@ -430,6 +432,7 @@ export function normalizeDesignSystem(v: unknown): DesignSystem | undefined {
     rules: (Array.isArray(r.rules) ? r.rules : []).map((x: unknown) => str(x, 200)).filter(Boolean).slice(0, 20),
     notes: (Array.isArray(r.notes) ? r.notes : []).map((x: unknown) => str(x, 200)).filter(Boolean).slice(0, 8),
     importedAt: Number.isFinite(r.importedAt) ? r.importedAt : 0,
+    ...(r.link && typeof r.link === 'object' && typeof r.link.id === 'string' && /^dsys_[\w-]{4,64}$/.test(r.link.id) ? { link: { id: r.link.id, version: Math.max(0, Math.round(Number(r.link.version) || 0)), name: str(r.link.name, 80) } } : {}),
   };
 }
 

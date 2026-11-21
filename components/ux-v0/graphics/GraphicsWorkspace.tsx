@@ -33,6 +33,12 @@ import type { BoardBrief } from '@/lib/ux-v0/boards/model';
 import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
 import { directionFaces, facesUsed, loadFaces, useAssetUrls, useFaceMeasure } from './faces';
 import { BriefStage, DirectionsStage, briefOf, fieldsOf, KIND_LABEL, type BriefFields, type WebsiteSource } from './GraphicBrief';
+import { brandDirections } from '@/lib/ux-v0/dsi/generate';
+import { enforceBrand, placeBrandLogo } from '@/lib/ux-v0/dsi/adapters';
+import { bindForBrand } from '@/lib/ux-v0/dsi/link';
+import { fidelityOfDoc } from '@/lib/ux-v0/dsi/fidelity';
+import { useLinkedSystem } from '../systems/useLinkedSystem';
+import { SystemBadge } from '../systems/SystemBadge';
 
 type View = 'brief' | 'directions' | 'edit';
 type Note = EditorNote;
@@ -56,6 +62,10 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
   const [siteDir, setSiteDir] = useState<GraphicDirection | null>(null);
   const [websites, setWebsites] = useState<WebsiteSource[]>([]);
   const [planNotes, setPlanNotes] = useState<string[]>([]);
+  // the registry design system the graphic is built in (identity only: the composition stays the engine's)
+  const linked = useLinkedSystem(project.systemLink);
+  const brandOpts = useMemo(() => ({ mode: project.systemLink?.mode, overrides: project.systemLink?.overrides }), [project.systemLink]);
+  const fidelity = useMemo(() => (linked && g.doc ? fidelityOfDoc(g.doc, linked.content, brandOpts) : null), [linked, g.doc, brandOpts]);
 
   // ── fonts and measuring: the faces of the design and of the directions on offer ──
   const faces = useMemo(() => [...(g.doc ? facesUsed(g.doc) : []), ...g.options.flatMap(directionFaces)], [g.doc, g.options]);
@@ -135,9 +145,11 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
       const generated = languageDirection(brief.purpose || brief.content.headline, brief.mood, `${project.id}|${r}`);
       const mixed = [...options.slice(0, Math.max(1, options.length - 1)), generated];
       const leads = interpretations({ count: mixed.length, salt: `${project.id}|${r}`, hasImage: brief.images.length > 0, hasData: !!brief.content.data?.length });
-      return mixed.map((d, i) => ({ ...d, generative: { seed: leads[i].seed, emphasis: leads[i].emphasis, ...(leads[i].unexpected ? { constraints: { unexpected: true } } : {}) } }));
+      const out = mixed.map((d, i) => ({ ...d, generative: { seed: leads[i].seed, emphasis: leads[i].emphasis, ...(leads[i].unexpected ? { constraints: { unexpected: true } } : {}) } }));
+      // within a design system: each direction keeps its own expression and speaks the system's identity
+      return linked ? brandDirections(linked.content, out, brandOpts) : out;
     },
-    [project.id],
+    [project.id, linked, brandOpts],
   );
 
   /** The design composed in a direction, checked and repaired, as the current document and a version. */
@@ -146,16 +158,29 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
     const changed = await loadFaces(directionFaces(dir));
     const m = canvasMeasure();
     const t0 = performance.now();
-    const { doc, plans, placeholders } = composeGraphic(brief, dir, { measure: m, seed: seedOf(project.id), assets: g.assets ?? [], name: current.current.name });
+    // within a design system the brand is named, so its approved logo has a place in the composition
+    const named = linked && !brief.content.brand ? { ...brief, content: { ...brief.content, brand: linked.content.identity.name } } : brief;
+    const { doc, plans, placeholders } = composeGraphic(named, dir, { measure: m, seed: seedOf(project.id), assets: g.assets ?? [], name: current.current.name });
     const refined = refineDoc(doc, m);
+    let finalDoc = refined.doc;
+    let bindings = g.bindings;
+    let brandLine = '';
+    if (linked) {
+      bindings = bindForBrand(finalDoc, dir.look);
+      const placed = placeBrandLogo(finalDoc, linked.content);
+      finalDoc = enforceBrand(placed.doc, linked.content, brandOpts).doc;
+      const f = fidelityOfDoc(finalDoc, linked.content, brandOpts);
+      brandLine = `Brand fidelity to ${linked.rec.name}: ${f.score}${placed.placed ? ', with its approved logo' : ''}${f.findings.length ? ` (${f.findings.length} finding${f.findings.length === 1 ? '' : 's'}: ${f.findings[0].message})` : ''}.`;
+    }
     const ms = Math.round(performance.now() - t0);
-    setG((x) => ({ ...x, brief, direction: dir, doc: refined.doc, versions: pushVersion(x.versions, refined.doc, `Composed in “${dir.name}”`) }));
+    setG((x) => ({ ...x, brief, direction: dir, doc: finalDoc, ...(bindings ? { bindings } : {}), versions: pushVersion(x.versions, finalDoc, `Composed in “${dir.name}”`) }));
     setPlanNotes([...new Set([...plans.flatMap((p) => p.said), ...(g.source ? [] : [`Colour: ${accentFor(brief, project.id).why}.`])])].slice(0, 9));
     const remaining = refined.remaining.filter((f) => f.severity !== 'low').length;
     setNote({
       tone: placeholders.length || remaining ? 'warn' : 'ok',
       text: [
         `Composed and checked in ${ms} ms, without a model.`,
+        brandLine,
         refined.fixed.length ? `Fixed before showing: ${refined.fixed.slice(0, 3).map((f) => f.replace(/\.$/, '')).join('; ')}.` : '',
         remaining ? `${remaining} thing${remaining === 1 ? '' : 's'} left to look at (Checks, with nothing selected).` : '',
         placeholders.length ? `Still to give: ${placeholders.join(', ')}.` : '',
@@ -250,6 +275,16 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
           ))}
         </nav>
         <div className="v0-head-r">
+          <SystemBadge
+            project={project}
+            linked={linked}
+            fidelity={fidelity ? { score: fidelity.score, findings: fidelity.findings.length } : null}
+            onApply={(fn) => {
+              const r = fn(current.current);
+              update(() => r.project);
+              setNote({ tone: 'ok', text: r.say });
+            }}
+          />
           <span className="gx-free" title="Composition, checks and changes in words run in this browser, without a model.">
             No model calls · $0
           </span>

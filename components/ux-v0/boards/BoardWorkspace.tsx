@@ -38,6 +38,10 @@ import { useStyleLibrary } from '../graphics/styleLibrary';
 import { syncWebsite, websiteConcept, websiteDrift } from '@/lib/ux-v0/boards/website';
 import { boardFile, openBoardFile, systemOverviewSvg } from '@/lib/ux-v0/boards/export';
 import { GraphicEditor, type EditorNote } from '../graphics/GraphicEditor';
+import { brandBoardOptions } from '@/lib/ux-v0/dsi/generate';
+import { logoBoardAsset } from '@/lib/ux-v0/dsi/adapters';
+import { useLinkedSystem } from '../systems/useLinkedSystem';
+import { SystemBadge } from '../systems/SystemBadge';
 import { download, facesUsed, loadFaces, slug, useAssetUrls, useFaceMeasure, type Face } from '../graphics/faces';
 import { BoardCanvas, type BoardCanvasApi } from './BoardCanvas';
 import { AddPanel, BoardInspector, ChecksPanel, MaterialsPanel, SystemPanel, VersionsPanel } from './BoardPanels';
@@ -74,6 +78,17 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
   const b: BoardState = project.board ?? emptyBoard();
   const setBoard = useCallback((fn: (x: BoardState) => BoardState) => update((p) => ({ ...p, board: fn(p.board ?? emptyBoard()) })), [update]);
   const boardNow = useCallback(() => current.current.board ?? emptyBoard(), [current]);
+  // the registry design system the board is built in: its identity fixed, every system option a different expression
+  const linked = useLinkedSystem(project.systemLink);
+  const brandOptions = useCallback(
+    (brief: BoardBrief, round = 0): { options: MasterDesignSystem[]; logo: Asset | null } => {
+      if (!linked) return { options: [], logo: null };
+      const logo = logoBoardAsset(linked.content);
+      const link = { id: linked.rec.id, version: linked.version, name: linked.rec.name };
+      return { options: brandBoardOptions(linked.content, brief, project.id, { round, link, mode: project.systemLink?.mode, overrides: project.systemLink?.overrides, ...(logo ? { assetId: logo.id } : {}) }), logo };
+    },
+    [linked, project.id, project.systemLink],
+  );
   /** A whole new board as the current one, readable at once (the next change in the same moment chains on it). */
   const commitBoard = useCallback(
     (next: BoardState) => {
@@ -307,6 +322,14 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
       setView('system');
       return;
     }
+    if (linked) {
+      // within a design system: the brand is named (its approved logo takes the place), three expressions of its identity
+      const named: BoardBrief = { ...brief, content: { ...brief.content, brand: brief.content.brand || linked.content.identity.name } };
+      const b = brandOptions(named);
+      setBoard((x) => ({ ...x, request: words, brief: named, options: b.options, assets: b.logo ? [...x.assets.filter((a) => a.id !== b.logo!.id), b.logo] : x.assets }));
+      setView('system');
+      return;
+    }
     const options = proposeSystems(brief, project.id);
     setBoard((x) => ({ ...x, request: words, brief, options }));
     setView('system');
@@ -316,7 +339,7 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
     if (!cur.brief) return;
     const seen = cur.options.map((o) => o.direction.language);
     const round = Math.ceil(seen.length / 3);
-    setBoard((x) => ({ ...x, options: proposeSystems(cur.brief!, project.id, { round, seen }) }));
+    setBoard((x) => ({ ...x, options: linked ? brandOptions(cur.brief!, round).options : proposeSystems(cur.brief!, project.id, { round, seen }) }));
   };
   const chooseSystem = async (sys: MasterDesignSystem) => {
     const cur = boardNow();
@@ -759,6 +782,15 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
           ))}
         </nav>
         <div className="v0-head-r">
+          <SystemBadge
+            project={project}
+            linked={linked}
+            onApply={(fn) => {
+              const r = fn(current.current);
+              update(() => r.project);
+              setNote({ tone: 'ok', text: r.say });
+            }}
+          />
           <span className="gx-free" title="Planning, composition, checks, notes and changes in words run in this browser, without a model.">
             No model calls · $0
           </span>

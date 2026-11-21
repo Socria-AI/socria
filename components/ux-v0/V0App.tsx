@@ -20,6 +20,20 @@ import { GraphicsWorkspace } from './graphics/GraphicsWorkspace';
 import { BoardWorkspace } from './boards/BoardWorkspace';
 import { emptyGraphicState } from '@/lib/ux-v0/graphics/state';
 import { emptyBoard } from '@/lib/ux-v0/boards/model';
+import { SystemsApp } from './systems/SystemsApp';
+import { applySystem } from '@/lib/ux-v0/dsi/link';
+import type { SystemRecord } from '@/lib/ux-v0/dsi/registry';
+import { listSystems } from '@/lib/ux-v0/dsi/store';
+
+/** A new project built in the workspace's default design system, when one is set and published. */
+async function inDefaultSystem(p: DesignProject): Promise<DesignProject> {
+  try {
+    const def = (await listSystems()).find((r) => r.isDefault && r.status === 'active' && r.published > 0);
+    return def ? applySystem(p, def).project : p;
+  } catch {
+    return p;
+  }
+}
 import '@/components/brand/socria-brand.css';
 import './ux-v0.css';
 import './home.css';
@@ -32,6 +46,12 @@ const idFromUrl = () => {
   if (typeof window === 'undefined') return null;
   const v = new URLSearchParams(window.location.search).get('p');
   return v && /^[A-Za-z0-9_-]{1,96}$/.test(v) ? v : null;
+};
+/** The Design System Manager in the address: ?ds=1 (the list) or ?ds=<system id>. */
+const systemsFromUrl = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  const v = new URLSearchParams(window.location.search).get('ds');
+  return v === '1' ? '' : v && /^dsys_[\w-]{4,64}$/.test(v) ? v : null;
 };
 
 /**
@@ -58,6 +78,8 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
   const [open, setOpen] = useState<{ p: DesignProject; intent?: string; file?: File | null } | null>(null);
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
+  // the Design System Manager: null closed, '' the list, an id that system
+  const [systems, setSystems] = useState<string | null>(null);
   // the home's plates show imported pages in the same sealed frames as the workspace
   const nonce = useMemo(() => makeNonce(), []);
 
@@ -89,12 +111,21 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
   useEffect(() => {
     refresh().then(() => setReady(true));
     const id = idFromUrl();
-    if (id) openById(id, false);
+    const ds = systemsFromUrl();
+    if (ds !== null) setSystems(ds);
+    else if (id) openById(id, false);
     const onPop = () => {
       const pid = idFromUrl();
-      if (pid) openById(pid, false);
-      else {
+      const sid = systemsFromUrl();
+      if (sid !== null) {
         setOpen(null);
+        setSystems(sid);
+      } else if (pid) {
+        setSystems(null);
+        openById(pid, false);
+      } else {
+        setOpen(null);
+        setSystems(null);
         refresh();
       }
     };
@@ -117,7 +148,8 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
       if (!checked.ok) return setError(checked.error);
     }
     setError('');
-    const p = makeProject(mode, mode === 'critique' && opts.file ? opts.file.name.replace(/\.[a-z0-9]+$/i, '') : '');
+    const p0 = makeProject(mode, mode === 'critique' && opts.file ? opts.file.name.replace(/\.[a-z0-9]+$/i, '') : '');
+    const p = mode === 'create' ? await inDefaultSystem(p0) : p0;
     await putProject(p);
     passage(() => setOpen({ p, ...opts }));
     window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(p.id)}`);
@@ -126,7 +158,7 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
   /** A graphics project (lib/ux-v0/graphics): begun from the words typed on the home, if any. */
   const startGraphic = async (intent: string) => {
     setError('');
-    const p: DesignProject = { ...makeProject('create', 'Untitled graphic'), medium: 'graphic', graphic: emptyGraphicState(), intent: intent.slice(0, 600) };
+    const p = await inDefaultSystem({ ...makeProject('create', 'Untitled graphic'), medium: 'graphic', graphic: emptyGraphicState(), intent: intent.slice(0, 600) });
     await putProject(p);
     passage(() => setOpen({ p, intent }));
     window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(p.id)}`);
@@ -135,10 +167,21 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
   /** A board (lib/ux-v0/boards): many materials in one design system, begun from the words typed on the home. */
   const startBoard = async (intent: string) => {
     setError('');
-    const p: DesignProject = { ...makeProject('create', 'Untitled board'), medium: 'board', board: emptyBoard(), intent: intent.slice(0, 600) };
+    const p = await inDefaultSystem({ ...makeProject('create', 'Untitled board'), medium: 'board', board: emptyBoard(), intent: intent.slice(0, 600) });
     await putProject(p);
     passage(() => setOpen({ p, intent }));
     window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(p.id)}`);
+  };
+
+  /** A new project built in a registry design system: linked (identity from the system), then opened. */
+  const startInSystem = async (kind: 'graphic' | 'board' | 'website', rec: SystemRecord) => {
+    const base = makeProject('create', `${rec.name} ${kind}`);
+    const p0: DesignProject = kind === 'graphic' ? { ...base, medium: 'graphic', graphic: emptyGraphicState() } : kind === 'board' ? { ...base, medium: 'board', board: emptyBoard() } : base;
+    const { project } = applySystem(p0, rec);
+    await putProject(project);
+    setSystems(null);
+    passage(() => setOpen({ p: project }));
+    window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(project.id)}`);
   };
 
   const remove = async (s: ProjectSummary) => {
@@ -159,6 +202,25 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
     }
     refresh();
   };
+
+  if (systems !== null && !open) {
+    return (
+      <SystemsApp
+        signedIn={signedIn}
+        initialId={systems || null}
+        onExit={() => {
+          passage(() => setSystems(null));
+          refresh();
+          window.history.pushState(null, '', '/ux-v0');
+        }}
+        onOpenProject={(id) => {
+          setSystems(null);
+          openById(id);
+        }}
+        onNewProject={(kind, rec) => void startInSystem(kind, rec)}
+      />
+    );
+  }
 
   if (open && open.p.medium === 'board') {
     return (
@@ -226,6 +288,10 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
       onCritique={(file) => start('critique', { file })}
       onGraphic={(intent) => startGraphic(intent)}
       onBoard={(intent) => startBoard(intent)}
+      onSystems={() => {
+        passage(() => setSystems(''));
+        window.history.pushState(null, '', '/ux-v0?ds=1');
+      }}
       onOpen={(id) => openById(id)}
       onDelete={remove}
     />
