@@ -328,7 +328,9 @@ const STUDIO_PANEL = 'l5a-s-new';
 const DOCK_KEY = 'socria.logos3.dock.v1';
 /** the chats bar and header, hidden from the top-right control — per browser */
 const CHROME_KEY = 'socria.logos.chrome.v1';
-import { readDrift, type DriftVerdict } from '@/lib/topic-drift';
+import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
+import { addNote, driftOf, keepThread, keptHere, objectiveOf, readKeepInMind, readRestate, refineGoal, restate, sanitizeObjective, workOf, type Objective } from '@/lib/logos6/objective';
+import { ObjectiveLine } from './logos6/ObjectiveLine';
 import {
   MATH_FADE_MS,
   readMathSignal,
@@ -903,6 +905,10 @@ export function LogosApp({
   // a press away, and what was said and made fills the view
   const ideasOn = useMemo(() => ideasWanted(messages.filter((m) => m.role === 'user').map((m) => (typeof m.content === 'string' ? m.content : ''))).show, [messages]);
   const map = active?.map ?? EMPTY_MAP;
+  // ONE CHAT, ONE OBJECTIVE (lib/logos6/objective.ts): what this chat is for — the one it holds, or, for a chat from
+  // before objectives, read from how it began — and what it holds for it, from the chat itself
+  const activeObjective = useMemo(() => (active ? objectiveOf(active, active.updatedAt || 1) : null), [active]);
+  const activeWork = useMemo(() => (active ? workOf(active) : null), [active]);
 
   // ── DOCUMENTS (lib/docs) ──────────────────────────────────────────
   // Every document this line of thinking was given, as it was read. The
@@ -1089,7 +1095,7 @@ export function LogosApp({
   // ── wrong-chat ────────────────────────────────────────────────────
   // Held rather than acted on: the message is sent and answered either way,
   // and the note is an offer beside it, never a gate in front of it.
-  const [drift, setDrift] = useState<(DriftVerdict & { text: string }) | null>(null);
+  const [drift, setDrift] = useState<(DriftVerdict & { text: string; goal?: string }) | null>(null);
   const [driftDismissals, setDriftDismissals] = useState(0);
   useEffect(() => {
     try {
@@ -2819,6 +2825,30 @@ export function LogosApp({
     ]);
     switchSession(fresh.id);
     void send(d.text);
+  }
+
+  /**
+   * THE OBJECTIVE, CHANGED (lib/logos6/objective.ts): written to the chat's own map, so it is saved, synced and
+   * restored as the map is. `null` takes it off (the chat then reads it from how it began again).
+   */
+  function setObjectiveOf(sid: string | null, next: Objective | null, save = true) {
+    if (!sid) return;
+    const put = <M extends { objective?: Objective }>(m: M): M => {
+      const { objective: _drop, ...rest } = m;
+      return (next ? { ...rest, objective: next } : rest) as M;
+    };
+    if (sid === activeIdRef.current) mapRef.current = put(mapRef.current);
+    patchSession(sid, (x) => ({ ...x, map: put(x.map ?? EMPTY_MAP) }), save);
+  }
+
+  /** "Keep it here": the subject a message was about is part of this chat's objective, and is not offered as separate again. */
+  function keepDriftHere() {
+    const d = drift;
+    const sid = activeIdRef.current;
+    const here = sid ? sessionsRef.current.find((x) => x.id === sid) : null;
+    const o = here ? objectiveOf(here, Date.now()) : null;
+    if (d?.goal && o && sid) setObjectiveOf(sid, keepThread(o, d.goal));
+    dismissDrift();
   }
 
   /**
@@ -5418,14 +5448,20 @@ export function LogosApp({
     // Once, here, on the message as sent — never while typing. The reply
     // proceeds regardless; this only decides whether a note appears beside it.
     const s0 = sessionsRef.current.find((x) => x.id === activeIdRef.current);
+    // the chat's objective names what it is about better than its title does (lib/logos6/objective.ts)
+    const o0 = s0 ? objectiveOf(s0, Date.now()) : null;
     const v = readDrift({
       message: content,
-      title: s0?.title === UNTITLED ? undefined : s0?.title,
+      title: [s0?.title === UNTITLED ? '' : s0?.title ?? '', o0?.goal ?? ''].filter(Boolean).join(' — ') || undefined,
       recent: (s0?.messages ?? []).map((m) => m.content),
       context: s0?.map?.context,
       dismissals: driftDismissals,
     });
-    setDrift(v.flag ? { ...v, text: content } : null);
+    // …or a different objective altogether: a goal of its own that shares nothing with this chat's, or a change of
+    // subject said in so many words. Only an offer (a separate chat); the message is answered here either way.
+    const objDrift =
+      !v.flag && o0 && s0 && driftDismissals < DRIFT_DISMISS_LIMIT && !keptHere(content, o0) && !togetherReadOnly ? driftOf(content, o0, workOf(s0), Date.now(), s0.messages.slice(-12).map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n')) : null;
+    setDrift(v.flag ? { ...v, text: content } : objDrift ? { flag: true, reason: 'a different objective', goal: objDrift, text: content } : null);
 
     // POINT & ASK: what is selected as it is sent — described from canonical
     // state (lib/workspace/focus.ts), told to the reply, and kept on the
@@ -5486,6 +5522,15 @@ export function LogosApp({
     // the conversation as it stands now, with this turn — others' words included
     const next = sessionsRef.current.find((x) => x.id === sid)?.messages ?? [...before, sent];
     chronRef.current = [...chronRef.current, sent];
+    // ONE CHAT, ONE OBJECTIVE: established from the first message (or, for a chat from before objectives, from how it
+    // began), kept on the chat's map and saved with this turn; and what the chat holds for it, told to Core
+    const sHere = sessionsRef.current.find((x) => x.id === sid) ?? null;
+    let objHere = sHere ? sanitizeObjective(sHere.map?.objective) : null;
+    if (sHere && !objHere && !togetherReadOnly) {
+      objHere = objectiveOf({ ...sHere, messages: next }, Date.now());
+      if (objHere) setObjectiveOf(sid, objHere, false);
+    }
+    const workHere = sHere ? workOf({ messages: next, map: sHere.map }) : null;
     setBusy(true);
     setBusyFor(sid);
     busyForRef.current = sid;
@@ -5579,6 +5624,8 @@ export function LogosApp({
             const dg = digestOf(mapRef.current);
             return dg ? { mapDigest: dg } : {};
           })(),
+          // what this chat is for, and what it holds for it (lib/logos6/objective.ts) — re-sanitised on the server
+          ...(objHere && workHere ? { objective: { objective: objHere, work: workHere, ...(objDrift ? { drift: objDrift } : {}) } } : {}),
           ...(s0?.messages.length && s0.updatedAt ? { resumedAfterMs: Math.max(0, Date.now() - s0.updatedAt) } : {}),
           // the learning ledger kept in this browser (lib/logos5/learning.ts): what was learned and when, so an
           // explanation can bring back what is due or recall what was met before — never anywhere but here
@@ -5809,11 +5856,18 @@ export function LogosApp({
           const opening = here.messages.slice(0, 2).map((m) => ({ role: m.role, content: m.content }));
           void (async () => {
             try {
-              const r = await fetch('/api/extract-memory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ titleOnly: true, titleStyle: 'topic', messages: opening }) });
+              const r = await fetch('/api/extract-memory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ titleOnly: true, titleStyle: 'topic', objective: true, messages: opening }) });
               if (!r.ok) return;
-              const t = acceptTitle((await r.json())?.suggestedTitle, firstUser.content);
+              const named = await r.json();
+              const t = acceptTitle(named?.suggestedTitle, firstUser.content);
               const now = sessionsRef.current.find((x) => x.id === sid);
               if (t && now && auto(now)) renameSession(sid, t);
+              // …and what it is for, better phrased than the first message's reading — never over their own words
+              const held = now ? sanitizeObjective(now.map?.objective) : null;
+              if (held && typeof named?.suggestedObjective === 'string') {
+                const better = refineGoal(held, named.suggestedObjective);
+                if (better !== held) setObjectiveOf(sid, better);
+              }
             } catch {
               /* the deterministic title stands */
             }
@@ -6288,6 +6342,26 @@ export function LogosApp({
    * conversation (home, another line of thinking): nothing is written in it.
    */
   function localCommand(text: string): { said: string; post?: boolean; fill?: string } | null {
+    // THE OBJECTIVE, IN WORDS (lib/logos6/objective.ts): "change the objective to passing the final", "our goal is now to
+    // ship v2", "keep in mind that the exam is open-book" — done here, said back, nothing sent to a model
+    const sidHere = activeIdRef.current;
+    const hereNow = sidHere ? sessionsRef.current.find((x) => x.id === sidHere) : null;
+    if (hereNow && !togetherReadOnly) {
+      const restated = readRestate(text);
+      const objNow = objectiveOf(hereNow, Date.now());
+      if (restated) {
+        const next = restate(objNow, restated, Date.now());
+        if (next) {
+          setObjectiveOf(sidHere, next);
+          return { said: `This chat’s objective is now “${next.goal}”. Everything here so far stays with it.` };
+        }
+      }
+      const keep = objNow ? readKeepInMind(text) : null;
+      if (keep && objNow) {
+        setObjectiveOf(sidHere, addNote(objNow, 'fact', keep, Date.now()));
+        return { said: `Kept with this chat’s objective: “${keep}”.` };
+      }
+    }
     const wc = readWorkspaceCommand(text, commandContext());
     if (wc) return doWorkspaceCommand(wc);
     // "capture: call the landlord" — kept in Quick Capture for later, not sent anywhere
@@ -8944,15 +9018,23 @@ export function LogosApp({
           {drift && (
             <div className="lg-drift" role="note">
               <span className="lg-drift-text">
-                That reads like {drift.domain === 'code' ? 'a coding' : `a ${drift.domain}`} question,
-                and this line of thinking has been about something else. Did you mean it here?
+                {drift.goal ? (
+                  <>
+                    That sounds like a separate objective — “{drift.goal}”. This chat is for “{activeObjective?.goal ?? 'something else'}”. Keep it here, or give it its own chat?
+                  </>
+                ) : (
+                  <>
+                    That reads like {drift.domain === 'code' ? 'a coding' : `a ${drift.domain}`} question,
+                    and this line of thinking has been about something else. Did you mean it here?
+                  </>
+                )}
               </span>
               <span className="lg-drift-acts">
-                <button type="button" className="lg-drift-stay" onClick={dismissDrift}>
+                <button type="button" className="lg-drift-stay" onClick={drift.goal ? keepDriftHere : dismissDrift}>
                   Keep it here
                 </button>
                 <button type="button" className="lg-drift-move" onClick={moveDriftToNewChat}>
-                  Move to a new chat
+                  {drift.goal ? 'Start a new chat for it' : 'Move to a new chat'}
                 </button>
               </span>
               <button
@@ -9729,6 +9811,22 @@ export function LogosApp({
   ) : null;
   const l5Dock = (
       <div className="l5-dock" ref={pinRef}>
+      {/* WHAT THIS CHAT IS FOR (components/logos6/ObjectiveLine.tsx): the objective, and what the chat holds for it */}
+      {active && (
+        <ObjectiveLine
+          objective={activeObjective}
+          work={activeWork}
+          empty={!messages.some((m) => m.role === 'user')}
+          readOnly={togetherReadOnly}
+          narrow={narrow}
+          onSet={(goal, outcome) => {
+            const next = restate(activeObjective, goal, Date.now(), outcome);
+            if (next) setObjectiveOf(activeIdRef.current, next);
+          }}
+          onForgetNote={(t) => activeObjective && setObjectiveOf(activeIdRef.current, { ...activeObjective, notes: (activeObjective.notes ?? []).filter((n) => n.t !== t) })}
+          onOpen={(v) => openFull(v)}
+        />
+      )}
       {convoNotes}
       {nudgeOpen && <GuestNudge inline open signUpHref={signUpHref} />}
       {/* Socria Voice, while it listens: what it hears and does, over the box it speaks into */}

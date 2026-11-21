@@ -17,6 +17,7 @@ import { sanitizeSpace, type ObjectSpace } from './objects';
 import { WHY_NOT_ANSWER } from './why-not-answer';
 import { WRONG_CHAT } from './wrong-chat';
 import { sanitizeHistory, type MapHistory } from './map-history';
+import { sanitizeObjective, type Objective } from './logos6/objective';
 
 import {
   buildingLine,
@@ -446,6 +447,13 @@ export interface LogosEdge {
 export interface ThinkingMap {
   nodes: LogosNode[];
   edges: LogosEdge[];
+  /**
+   * WHAT THIS CHAT IS FOR (Logos 6, lib/logos6/objective.ts): the objective the person is working towards here —
+   * "Master Calculus I" — in their words or read from how the chat began. Kept on the map because the map is the
+   * conversation's own record, saved and restored with it; a map pass never writes it (lib/logos6/protect.ts
+   * carries it over).
+   */
+  objective?: Objective;
   /**
    * WHAT THE DIAGRAM IS OF, in a few words — "The water cycle", "How a bill
    * becomes law" — when the map draws a subject (Logos 5). The person's own
@@ -1045,10 +1053,12 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
     .slice(-40);
 
   const title = str(raw.title, MAX_TITLE);
+  const objective = sanitizeObjective(raw.objective);
   return {
     nodes,
     edges,
     ...(title ? { title } : {}),
+    ...(objective ? { objective } : {}),
     ...(removed.length ? { removed } : {}),
     ...(history ? { history } : {}),
     ...(Number.isFinite(raw.drawnAt) && raw.drawnAt > 0 ? { drawnAt: Math.floor(raw.drawnAt) } : {}),

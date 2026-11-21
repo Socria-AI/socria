@@ -23,7 +23,18 @@ const placed = (n: LogosNode) => !!n.hand || !!n.finding || authored(n.mind);
 const theirs = (e: LogosEdge) => e.status === 'confirmed' || e.kind === 'structure';
 
 /** The landed map, with what the person placed kept and what the pass cannot know carried over. */
-export function keepPlaced(prev: Pick<ThinkingMap, 'nodes' | 'edges' | 'removed'> | null | undefined, next: ThinkingMap): ThinkingMap {
+export function keepPlaced(prev: (Pick<ThinkingMap, 'nodes' | 'edges' | 'removed'> & Partial<Pick<ThinkingMap, 'objective'>>) | null | undefined, next: ThinkingMap): ThinkingMap {
+  const kept = keepPlacedCards(prev, next);
+  // THE OBJECTIVE (lib/logos6/objective.ts) is the chat's, never the pass's: the chat's own is carried over every pass —
+  // including the first map of a chat that has no cards yet — and whatever a pass's output said about one is dropped.
+  // A map with nothing to change is returned as it came.
+  if (prev?.objective) return kept.objective === prev.objective ? kept : { ...kept, objective: prev.objective };
+  if (!kept.objective) return kept;
+  const { objective: _fromPass, ...out } = kept;
+  return out;
+}
+
+function keepPlacedCards(prev: Pick<ThinkingMap, 'nodes' | 'edges' | 'removed'> | null | undefined, next: ThinkingMap): ThinkingMap {
   if (!prev?.nodes?.length) return next;
   const removed = new Set([...(prev.removed ?? []), ...(next.removed ?? [])]);
   const prevById = new Map(prev.nodes.map((n) => [n.id, n]));

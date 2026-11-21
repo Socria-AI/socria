@@ -41,6 +41,7 @@ import { FEEDBACK_URL } from '@/lib/feedback';
 import { MapGlyph } from './MapGlyph';
 import { NodeTile } from './NodeTile';
 import { relTime, type LogosSession } from '@/lib/logos-sessions';
+import { objectiveOf } from '@/lib/logos6/objective';
 import {
   cleanTitle,
   groupRail,
@@ -276,6 +277,8 @@ export function LogosRail({
       <span className="s-gap" aria-hidden="true" />
     );
     const count = item.nodes ? <span className="n">{item.nodes}</span> : null;
+    // what the chat is for (lib/logos6/objective.ts), in its tooltip: the title says what it is about
+    const aim = Array.isArray((item as { messages?: unknown }).messages) ? objectiveOf(item as unknown as Parameters<typeof objectiveOf>[0], item.updatedAt || 1)?.goal ?? null : null;
     const fileable = canFile && (isChat ? !!onMoveChat : !!onMoveSession);
     const inProject = filed(item) ? item.projectId! : null;
 
@@ -294,8 +297,10 @@ export function LogosRail({
           // this is the same row.
           title={
             item.title +
+            (aim && aim !== item.title ? ` — objective: ${aim}` : '') +
             (item.updatedAt ? ` · ${relTime(item.updatedAt)}` : '')
           }
+          aria-label={aim && aim !== item.title ? `${item.title}, objective: ${aim}` : undefined}
         >
           {mark}
           <span className="t">{item.title}</span>

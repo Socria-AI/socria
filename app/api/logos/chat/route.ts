@@ -158,6 +158,7 @@ import type { LedgerRow, MRSettings } from '@/lib/mr/types';
 import { NO_LOOKUP_FACT, renderNoResearch, renderResearch, type Research } from '@/lib/core4/web';
 import { LIST_ASK } from '@/lib/runtime/asks';
 import { SPOKEN_TURN } from '@/lib/voice/speech';
+import { objectiveBlock, recallBlock, recallEarlier, sanitizeObjectiveTurn } from '@/lib/logos6/objective';
 
 /** The turn asked for code, JSON, a schema or a config: a fenced json block in the reply is then theirs (lib/inline-ui.ts InlineContext.code). */
 const CODE_ASKED = /\b(?:json|yaml|toml|schema|config(?:uration)?\s+file|payload|api\s+response|code|snippet|script|regex|sql|function|class|endpoint)\b/i;
@@ -1365,6 +1366,13 @@ export const POST = withMeter(async function POST(req: NextRequest) {
     // LOGOS 6: A CHANGE TO AN ARTIFACT THEY CAN SEE is made to that artifact, in place (lib/artifact-focus.ts) — the
     // kept one open in Artifacts, else the element in Socria's last reply. Only when the words plainly ask for a change.
     const editTarget = asksToChange(last.content) ? editTargetOf({ text: last.content, space: sanitizeSpace(body?.objects) ?? null, inHand: body?.inHand, messages }) : null;
+    // LOGOS 6 — ONE CHAT, ONE OBJECTIVE (lib/logos6/objective.ts): what this chat is for and what it holds for it (sent by
+    // the browser from the conversation itself, re-sanitised here), and the turns older than the recent window that bear
+    // on this message — so a long chat stays one piece of work and nothing already said is asked for again
+    const objectiveTurn = sanitizeObjectiveTurn(body?.objective);
+    const earlier = recallEarlier(filtered, filtered.length - kept.length, String(last.content ?? ''), {
+      also: objectiveTurn ? [objectiveTurn.objective.goal, ...(objectiveTurn.objective.threads ?? [])].join(' ') : '',
+    });
     const turnContext =
       // When this turn is, where they are: the date and time in their own time zone (lib/runtime/epistemic.ts nowLine)
       nowLine(Date.now(), body?.tz) +
@@ -1437,6 +1445,9 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       (twoPeople ? collabBlock(collabPeople) : '') +
       // …and when one of them asked Socria directly, it answers that person.
       (addressed ? addressedBlock(addressed) : '') +
+      // what this chat is for, what it holds, and the earlier turns that bear on this message
+      objectiveBlock(objectiveTurn) +
+      recallBlock(earlier) +
       // ONCE. This was appended twice, so everything Socria remembers about
       // the person reached the model as two identical blocks — twice the
       // tokens, and twice the weight against the guidance above it.
