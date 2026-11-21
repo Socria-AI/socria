@@ -178,7 +178,8 @@ const names = bd.materials.map((m) => m.name);
 ok('2–3. one board of mixed formats: 2 posters, 2 Instagram posts, a product label, a website, a packaging mockup, all made', J(names) === J(['Poster 1', 'Poster 2', 'Instagram post 1', 'Instagram post 2', 'Product label', 'Website', 'Packaging mockup']) && bd.materials.every((m) => m.status === 'ready'), J(bd.materials.map((m) => [m.name, m.status])));
 const graphics = bd.materials.filter((m) => m.type === 'graphic');
 ok('one system: every graphic’s headline is set in the system’s display face, its palette the system’s', graphics.every((m) => head(m.doc)?.font === bd.system.tokens.fonts.display && m.doc.tokens.colors.accent === bd.system.tokens.colors.accent), J(graphics.map((m) => head(m.doc)?.font)));
-const sig = (m) => `${m.plan.archetype}|${m.doc.artboards[0].background}`;
+// a material's composition: its concept's structure and use of the palette (or, for a kind with a fixed layout, its archetype)
+const sig = (m) => ((c) => (c ? `${c.org}/${c.type}|${c.colouring}` : `${m.plan.archetype}|${m.doc.artboards[0].background}`))(m.doc.artboards[0].concept);
 ok('coherence without repetition: the two posters, and the two posts, are different compositions', sig(mat(bd, 'Poster 1')) !== sig(mat(bd, 'Poster 2')) && sig(mat(bd, 'Instagram post 1')) !== sig(mat(bd, 'Instagram post 2')), J(graphics.map(sig)));
 ok('the formats are their own: A4 posters, a square and a portrait post', mat(bd, 'Poster 1').doc.artboards[0].unit === 'pt' && mat(bd, 'Instagram post 1').doc.artboards[0].width === 1080 && mat(bd, 'Instagram post 2').doc.artboards[0].height > 1080);
 const chips = await page.locator('.bd-mat .bd-chip').allInnerTexts();

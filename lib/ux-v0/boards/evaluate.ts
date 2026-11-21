@@ -8,6 +8,7 @@
 
 import { checkDoc } from '../graphics/check';
 import { walk, type TextNode } from '../graphics/doc';
+import { decodeSignature, similarity, TOO_SIMILAR } from '../graphics/generative/evaluate';
 import type { Measure } from '../graphics/text';
 import { annotate, verifyNotes } from './annotate';
 import { arrange, collisions } from './layout';
@@ -120,7 +121,12 @@ export function evaluateBoard(b: BoardState, ctx: { measure?: Measure; websites?
       const q = ready[j];
       if (p.brief.kind !== q.brief.kind) continue;
       pairs++;
-      const same = p.plan?.archetype === q.plan?.archetype && hex7(p.doc!.artboards[0]?.background) === hex7(q.doc!.artboards[0]?.background) && p.brief.formats[0] === q.brief.formats[0];
+      // one design twice: the same structure (by the generated designs' signatures), else the same composition and ground
+      const sp = p.doc!.artboards[0]?.concept?.signature;
+      const sq = q.doc!.artboards[0]?.concept?.signature;
+      const dp = sp ? decodeSignature(sp) : null;
+      const dq = sq ? decodeSignature(sq) : null;
+      const same = p.brief.formats[0] === q.brief.formats[0] && (dp && dq ? similarity(dp, dq) >= TOO_SIMILAR : p.plan?.archetype === q.plan?.archetype && hex7(p.doc!.artboards[0]?.background) === hex7(q.doc!.artboards[0]?.background));
       if (same) {
         repeats++;
         add({ kind: 'repetition', severity: 'medium', material: q.id, message: `${q.name} has the same composition and ground as ${p.name}: one design twice. Regenerate one to differ.`, fix: 'regenerate' });

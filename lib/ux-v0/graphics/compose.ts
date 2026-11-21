@@ -19,7 +19,7 @@ import { hasItalic, nearestWeight } from '../fonts';
 import type { ShapeRecipe } from '../shape';
 import { ensureContrast } from '../spec';
 import type { Artboard, ChartDatum, GraphicDoc, Node, Role, TextNode, Tokens } from './doc';
-import { newId, normalizeDoc } from './doc';
+import { newId, normalizeDoc, walk } from './doc';
 import { formatFromWords, formatOf, type Format } from './formats';
 import { approxMeasure, fitSize, layoutText, type Measure } from './text';
 import { effectDefaults, type Effect } from './effects';
@@ -32,6 +32,10 @@ import type { StyleSelection } from './styles/blend';
 import { styleLayouts } from './styles/constructions';
 import { CONSTRUCTIONS, isStyleConstruction, type StyleConstruction } from './styles/schema';
 import { renderComposition } from './composition/render';
+import { refineDoc } from './check';
+import { generate, type GenerativeRequest } from './generative/engine';
+import type { CreativeConcept } from './generative/concept';
+import { conceptRecord } from './generative/record';
 import { describePlan, FAMILY_BY_ID, type CompositionPlan, type FamilyInfo } from './composition/schema';
 
 export const GRAPHIC_KINDS = ['poster', 'social', 'carousel', 'ad', 'banner', 'magazine', 'book', 'album', 'card', 'label', 'infographic', 'identity', 'announcement', 'presentation', 'campaign'] as const;
@@ -83,6 +87,10 @@ export interface GraphicDirection {
   style?: StyleSelection;
   /** how it is composed (composition/*): planned apart from the style, so one style can be composed many ways */
   composition?: CompositionPlan;
+  /** what the generative engine is asked for (generative/*): a seed, a lead, constraints; the default engine */
+  generative?: GenerativeRequest;
+  /** 'templates' composes from the stored layouts (an optional starting point); the default is the generative engine */
+  engine?: 'generative' | 'templates';
 }
 
 export interface Plan {
@@ -107,6 +115,9 @@ export interface Plan {
   patternAsked?: boolean;
   /** the Composition Plan it is drawn from, when one was planned (composition/schema.ts) */
   composition?: CompositionPlan;
+  /** what the generative engine was asked for, and (once drawn) the concept it worked out */
+  generativeRequest?: GenerativeRequest;
+  generative?: { concept: CreativeConcept; signature: string; trace: string[]; unresolved: string[]; problems: string[]; attempts: number };
 }
 
 /** How a composition is organised, said as decisions (the layout system, the type, the picture, the shapes, the
@@ -123,7 +134,7 @@ export interface Strategy {
   rhythm: 'regular' | 'syncopated' | 'radiating' | 'flowing' | 'stacked';
 }
 
-export const ARCHETYPES = ['type-poster', 'image-full', 'image-split', 'minimal', 'swiss', 'statement', 'masthead', 'book', 'album', 'card', 'label', 'infographic', 'process', 'identity', 'banner', 'carousel', 'composition', ...NEW_ARCHETYPES] as const;
+export const ARCHETYPES = ['type-poster', 'image-full', 'image-split', 'minimal', 'swiss', 'statement', 'masthead', 'book', 'album', 'card', 'label', 'infographic', 'process', 'identity', 'banner', 'carousel', 'composition', 'generative', ...NEW_ARCHETYPES] as const;
 export type Archetype = (typeof ARCHETYPES)[number] | StyleConstruction;
 
 // ── reading a graphic brief from words ──
@@ -301,6 +312,10 @@ export interface PlanOverride {
   styleIndex?: number;
   /** a Composition Plan to draw (the explorer's candidate, a Board material's own, an edit's) */
   composition?: CompositionPlan;
+  /** a request for the generative engine (a Board material's own lead, an edit's constraints, an interpretation) */
+  generative?: GenerativeRequest;
+  /** 'templates': the stored layouts as the starting point */
+  engine?: 'generative' | 'templates';
 }
 
 /** Whether a family can compose this brief in this frame: the kind lets the composition be chosen, a very wide frame
@@ -421,12 +436,20 @@ export function planFor(brief: GraphicBrief, dir: GraphicDirection, f: Format, o
     said.push(colour === 'accent-field' ? 'The same palette used differently: the accent takes the whole ground here.' : colour === 'inverse' ? 'The same palette used differently: ink for the ground, the paper for the type.' : 'The same palette used differently: the campaign’s own ground, the accent kept for one element.');
   } else if (colour === 'accent-field') said.push('The frame is the direction’s accent: a loud language, given the whole ground.');
   else if (colour === 'inverse') said.push('Ink for the ground and the paper for the type: the direction is raw, in two colours.');
+  // the default engine: a design generated from a concept worked out for this brief (generative/*), not a stored layout.
+  // A layout chosen by hand (a Board's archetype, a style's construction picked in the explorer, a composition family,
+  // the templates engine) is an optional starting point and is honoured as one.
+  const engine = opts.over?.engine ?? dir.engine ?? 'generative';
+  const handPicked = !!opts.over?.archetype || !!dir.style?.construction || !!(opts.over?.composition ?? dir.composition);
+  const generative = engine === 'generative' && !handPicked && FREE_KINDS.includes(brief.kind) && aspect >= 0.3 && aspect <= 4;
   // the visual vocabulary: the style the brief's words (and the direction's language) ask for, and the composition
   // that style wants where the kind allows another (never against a Board's request for a different sibling)
   // a design language chosen for the direction: its construction (where the kind lets the composition be chosen) and
   // its vocabulary; the palette and faces are already the direction's tokens (styles/apply.ts styledDirection)
   const run = dir.style ? runFor(dir.style, { hasImage, index: opts.over?.styleIndex, tokens: { background: dir.tokens.colors.background, text: dir.tokens.colors.text, accent: dir.tokens.colors.accent, accent2: dir.tokens.accent2 }, fonts: dir.tokens.fonts }) : null;
-  if (run && FREE_KINDS.includes(brief.kind) && aspect <= 2.2) {
+  if (run && generative) {
+    said.push(`Set in ${run.name} as principles — its type, colour, geometry, surface and what it avoids — never as a fixed layout.`);
+  } else if (run && FREE_KINDS.includes(brief.kind) && aspect <= 2.2) {
     archetype = (isStyleConstruction(run.construction) ? run.construction : run.construction) as Archetype;
     said.push(`Built in ${run.name}: ${run.says[0]}`);
     for (const x of run.says.slice(1, 3)) said.push(x);
@@ -443,7 +466,7 @@ export function planFor(brief: GraphicBrief, dir: GraphicDirection, f: Format, o
   const kindAllows = FREE_KINDS.includes(brief.kind) || (['album', 'book'].includes(brief.kind) && wanted !== null && ['abstract', 'procedural', 'typographic', 'halftone', 'collage', 'organic', 'radial', 'layered', 'cinematic'].includes(wanted));
   // a composition chosen for its style never drops the designer's picture: with a picture, only one that places it
   const placesPicture = ['image-full', 'image-split', 'cinematic', 'halftone', 'collage'].includes(wanted ?? '');
-  if (!run && vocab.strength >= 2 && wanted && wanted !== archetype && !opts.over?.archetype && kindAllows && aspect <= 2.2 && (!wanted.startsWith('image') || hasImage) && (!hasImage || placesPicture)) {
+  if (!generative && !run && vocab.strength >= 2 && wanted && wanted !== archetype && !opts.over?.archetype && kindAllows && aspect <= 2.2 && (!wanted.startsWith('image') || hasImage) && (!hasImage || placesPicture)) {
     archetype = wanted as Archetype;
     said.push(`The composition follows the brief’s ${vocab.style} character: ${vocab.says[0]}`);
     if ((NEW_ARCHETYPES as readonly string[]).includes(wanted)) shapes2 = vocab.pattern ? 'pattern' : vocab.motifs.length ? 'motif' : 'none';
@@ -459,6 +482,13 @@ export function planFor(brief: GraphicBrief, dir: GraphicDirection, f: Format, o
     colour = cplan.colour;
     said.push(`Composed as ${describePlan(cplan)}: ${fam.description}`);
   }
+  const genReq = generative ? (opts.over?.generative ?? dir.generative ?? {}) : undefined;
+  if (generative) {
+    archetype = 'generative';
+    // the engine decides how the palette is used (a field, the ink as ground…) as part of the concept
+    colour = 'ground';
+    for (let i = said.length - 1; i >= 0; i--) if (/^(The frame is the direction’s accent|Ink for the ground|The same palette used differently)/.test(said[i])) said.splice(i, 1);
+  }
   if (run && isStyleConstruction(archetype) && !composed) {
     // a Board sibling that comes round to the same construction again takes the palette another way (the paper, then
     // the ink, then the accent as its ground): one language, several uses of it, never the same design twice
@@ -471,7 +501,7 @@ export function planFor(brief: GraphicBrief, dir: GraphicDirection, f: Format, o
   if (archetype === 'typographic' && vocab.style === 'brutalist' && colour === 'ground') colour = hashOf(brief.content.headline) % 2 ? 'inverse' : 'accent-field';
   const focal: Plan['focal'] = composed && fam ? (fam.focal === 'pattern' ? 'shape' : fam.focal) : archetype === 'infographic' ? 'data' : archetype === 'album' || archetype === 'abstract' || archetype === 'procedural' ? 'shape' : hasImage && (archetype.startsWith('image') || archetype === 'cinematic' || archetype === 'halftone') ? 'image' : 'type';
   const strategy = strategyOf(archetype, vocab, colour, hasImage);
-  return { archetype, focal, hierarchy: ['headline', 'subhead', 'body', 'meta', 'cta', 'logo'], colour, shapes: shapes2, said, vocabulary: vocab, strategy, ...(run ? { run, style: { id: run.id, name: run.name, construction: run.construction, variant: run.variant } } : {}), ...(patternAsked ? { patternAsked: true } : {}), ...(composed && cplan ? { composition: { ...cplan } } : {}) };
+  return { archetype, focal, hierarchy: ['headline', 'subhead', 'body', 'meta', 'cta', 'logo'], colour, shapes: shapes2, said, vocabulary: vocab, strategy, ...(run ? { run, style: { id: run.id, name: run.name, construction: run.construction, variant: run.variant } } : {}), ...(patternAsked ? { patternAsked: true } : {}), ...(composed && cplan ? { composition: { ...cplan } } : {}), ...(genReq ? { generativeRequest: genReq } : {}) };
 }
 
 /** The strategy a composition follows (see Strategy), from its archetype and its vocabulary. */
@@ -974,6 +1004,20 @@ const LAYOUTS: Record<Archetype, Layout> = {
   carousel: (x, plan) => LAYOUTS.statement(x, plan),
   // a Composition Plan drawn by its family's procedure and held to the rules (composition/render.ts); the relationships
   // it relied on are kept with the plan's record on the artboard
+  generative: (x, plan) => {
+    const g0 = generate(KIT, x, plan.generativeRequest ?? {});
+    // the engine's own readability pass: the document's checks and their bounded repairs (a plate where words straddle
+    // grounds no one colour reads on, words fitted to their path), so a generated design leaves here already clean
+    // (the designer's pictures stand in by reference, so the normaliser keeps the objects that show them)
+    const stand = x.brief.images.filter((id) => /^[A-Za-z][\w-]{0,47}$/.test(id)).map((id) => ({ id, kind: 'image', src: `upload:${id.slice(0, 96)}`, width: 1000, height: 1000, name: id }));
+    const tmp = normalizeDoc({ name: 'generated', tokens: x.dir.tokens, assets: stand, artboards: [{ id: 'gen', name: 'gen', width: x.W, height: x.H, unit: x.f.unit, dpi: x.f.dpi, safe: x.f.safe, bleed: x.f.bleed, format: x.f.id, background: x.ground, children: g0.nodes }] });
+    const repaired = tmp ? refineDoc(tmp, x.measure).doc.artboards[0]?.children : null;
+    const g = { ...g0, nodes: repaired?.length ? repaired : g0.nodes };
+    plan.generative = { concept: g.concept, signature: g.signature, trace: g.trace, unresolved: g.unresolved, problems: g.problems, attempts: g.attempts };
+    plan.said.push(`Concept: ${g.concept.idea}`, g.concept.artDirection, ...g.reading.said.slice(0, 2));
+    if (g.unresolved.length) plan.said.push(`Tight at this size (${g.unresolved.slice(0, 2).join('; ')}); the checks below say what remains.`);
+    return g.nodes;
+  },
   composition: (x, plan) => {
     if (!plan.composition) return LAYOUTS.statement(x, plan);
     const r = renderComposition(KIT, x, plan.composition);
@@ -1020,11 +1064,13 @@ function composeBoard(brief: GraphicBrief, dir: GraphicDirection, f: Format, mea
     unit: f.unit,
     dpi: f.dpi,
     format: f.id,
-    background: x.ground,
+    // a generated design lays its own ground (the paper, the accent as a field, the ink): the artboard takes it
+    background: plan.archetype === 'generative' ? ((g) => (g && g.type === 'shape' && typeof g.fill === 'string' ? g.fill.slice(0, 7) : x.ground))(children.find((n) => n.role === 'background' && n.type === 'shape' && n.w >= x.W * 0.98 && n.h >= x.H * 0.98 && typeof (n as { fill?: unknown }).fill === 'string' && (n as { name?: string }).name === 'Ground')) : x.ground,
     bleed: f.bleed,
     safe: f.safe,
     children,
     ...(plan.composition ? { composition: plan.composition } : {}),
+    ...(plan.generative ? { concept: conceptRecord(plan.generative.concept, plan.generative.signature, { seed: String(plan.generativeRequest?.seed ?? plan.generative.concept.seed), ...(plan.generativeRequest?.emphasis ? { emphasis: plan.generativeRequest.emphasis } : {}), ...(plan.generativeRequest?.constraints ? { constraints: plan.generativeRequest.constraints } : {}) }) } : {}),
   };
   return { board, plan };
 }
@@ -1179,7 +1225,8 @@ export function contentOf(board: Artboard): { content: GraphicContent; images: s
   const texts = board.children.filter((n): n is TextNode => n.type === 'text');
   const by = (r: Role) => texts.find((t) => t.role === r);
   const style = (t?: TextNode): Partial<TextNode> | undefined => (t ? { font: t.font, weight: t.weight, color: t.color, case: t.case, tracking: t.tracking, italic: t.italic } : undefined);
-  const images = board.children.filter((n) => n.type === 'image').map((n) => (n as { asset: string }).asset);
+  // every picture, wherever the composition put it (a masked or cut picture sits in a group)
+  const images = [...new Set(walk(board).filter((l) => l.node.type === 'image').map((l) => (l.node as { asset: string }).asset))] as string[];
   // every detail, wherever the composition set it (one block, or a station each on a timeline)
   const meta = texts
     .filter((t) => t.role === 'meta')
@@ -1405,7 +1452,7 @@ function freeRegion(x: Ctx, out: readonly Node[], where: PatternUse['where']): B
 function dress(x: Ctx, plan: Plan, out: Node[]): Node[] {
   const v = x.vocab;
   if (!v) return out;
-  const own = (NEW_ARCHETYPES as readonly string[]).includes(plan.archetype) || isStyleConstruction(plan.archetype) || plan.archetype === 'composition';
+  const own = (NEW_ARCHETYPES as readonly string[]).includes(plan.archetype) || isStyleConstruction(plan.archetype) || plan.archetype === 'composition' || plan.archetype === 'generative';
   const strong = v.strength >= 2;
   const fixedKinds = ['infographic', 'process', 'card', 'masthead', 'banner', 'carousel', 'identity', 'label'];
   const head = out.find((n): n is TextNode => n.type === 'text' && n.role === 'headline');

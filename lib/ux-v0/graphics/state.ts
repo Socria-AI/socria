@@ -11,6 +11,7 @@ import { colour, normalizeAsset, normalizeDoc, type Asset, type GraphicDoc } fro
 import { GRAPHIC_KINDS, type GraphicBrief, type GraphicDirection } from './compose';
 import { formatOf } from './formats';
 import { normalizeSelection } from './styles/blend';
+import { normalizeGenerativeRequest } from './generative/record';
 
 export interface GraphicVersion {
   doc: GraphicDoc;
@@ -120,6 +121,9 @@ export function normalizeGraphicDirection(v: unknown): GraphicDirection | null {
     intensity: Math.max(0, Math.min(100, Math.round(Number(r.intensity) || 0))),
     // the design language it speaks, held to the styles SocriaUX has (an unknown one is dropped, the direction kept)
     ...((sel) => (sel ? { style: sel } : {}))(r.style ? normalizeSelection(r.style) : null),
+    // what the generative engine is asked for (an interpretation's lead and seed), and the engine itself
+    ...((g) => (g ? { generative: g } : {}))(r.generative ? normalizeGenerativeRequest(r.generative) : undefined),
+    ...(r.engine === 'templates' ? { engine: 'templates' as const } : {}),
   };
 }
 

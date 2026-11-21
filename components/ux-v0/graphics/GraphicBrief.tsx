@@ -419,9 +419,10 @@ export function DirectionsStage({
                   <span key={k} style={{ background: d.tokens.colors[k] }} title={`${k} ${d.tokens.colors[k]}`} />
                 ))}
               </p>
+              {p.plan?.generative ? <p className="gx-dir-idea">{p.plan.generative.concept.idea}</p> : null}
               <p className="v0-quiet">
                 {d.tokens.fonts.display} and {d.tokens.fonts.body}
-                {p.plan ? ` · ${p.plan.archetype.replace(/-/g, ' ')} composition` : ''}
+                {p.plan ? (p.plan.generative ? ` · ${p.plan.generative.concept.emphasis === 'type' ? 'type-led' : p.plan.generative.concept.emphasis === 'image' ? 'image-led' : `${p.plan.generative.concept.emphasis}`} concept` : ` · ${p.plan.archetype.replace(/-/g, ' ')} composition`) : ''}
                 {p.boards > 1 ? ` · ${p.boards} artboards` : ''}
               </p>
               {p.plan?.said.length ? (

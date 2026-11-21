@@ -26,6 +26,7 @@ import { asBezierNode, blendPaths, booleanPath, offsetOutline, shapeBezier, shap
 import { distortPath, reversePath, simplifyPath, smoothPath, mapPath } from './geometry';
 import { normalizeSelection, type StyleSelection } from './styles/blend';
 import { normalizeCompositionPlan, normalizeMemory, type CompositionPlan, type MemoryEntry } from './composition/schema';
+import { normalizeConceptRecord, type ConceptRecord } from './generative/record';
 
 export const GFX_SCHEMA = 1;
 
@@ -287,6 +288,8 @@ export interface Artboard {
   locked?: boolean;
   /** how it was composed (composition/schema.ts): a record kept apart from its objects, for exploring and re-composing */
   composition?: CompositionPlan;
+  /** the creative concept it was generated from (generative/record.ts): the idea, its structure, the request that made it */
+  concept?: ConceptRecord;
 }
 
 export interface Asset {
@@ -787,6 +790,7 @@ export function normalizeDoc(v: unknown, rep: Repair = { notes: [] }): GraphicDo
         .filter((c): c is Node => !!c),
       ...(b.locked === true ? { locked: true } : {}),
       ...((cp) => (cp ? { composition: cp } : {}))(b.composition ? normalizeCompositionPlan(b.composition) : null),
+      ...((cr) => (cr ? { concept: cr } : {}))(b.concept ? normalizeConceptRecord(b.concept) : undefined),
     });
   }
   if (!artboards.length) return null;
@@ -1159,6 +1163,12 @@ export function applyOp(doc0: GraphicDoc, op: Op, opts: { force?: boolean } = {}
         if (op.set.composition !== null && !cp) return { ok: false, error: 'That is not a composition plan SocriaUX can use.' };
         if (cp) b.composition = cp;
         else delete b.composition;
+      }
+      if ('concept' in op.set) {
+        const cr = op.set.concept === null ? undefined : normalizeConceptRecord(op.set.concept);
+        if (op.set.concept !== null && !cr) return { ok: false, error: 'That is not a concept record SocriaUX can use.' };
+        if (cr) b.concept = cr;
+        else delete b.concept;
       }
       return done([b.id]);
     }

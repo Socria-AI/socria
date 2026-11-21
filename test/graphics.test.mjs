@@ -135,7 +135,9 @@ const dirFor = (purpose, mood, salt, i = 0) => {
   const quiet = dirFor('A minimalist poster for an interiors photography exhibition', ['minimal', 'quiet'], 'gfx-t3');
   const calm = C.composeGraphic(C.readGraphicBrief('A minimalist poster “Quiet Rooms”', { mood: ['minimal'] }), quiet);
   const loud = C.composeGraphic(brief, dirFor(brief.purpose, ['bold', 'experimental', 'loud'], 'gfx-t4'));
-  ok('restraint and expression are not the same design: the minimal poster has fewer, smaller marks than the loud one', calm.plans[0].archetype !== loud.plans[0].archetype && D.walk(calm.doc.artboards[0]).length <= D.walk(loud.doc.artboards[0]).length, `${calm.plans[0].archetype} vs ${loud.plans[0].archetype}`);
+  const calmC = calm.plans[0].generative?.concept;
+  const loudC = loud.plans[0].generative?.concept;
+  ok('restraint and expression are not the same design: the minimal poster is conceived with more room and fewer, smaller marks than the loud one', calmC && loudC && calmC.negativeSpace > loudC.negativeSpace && calmC.density < loudC.density && D.walk(calm.doc.artboards[0]).length <= D.walk(loud.doc.artboards[0]).length, J([calmC && [calmC.negativeSpace, calmC.density], loudC && [loudC.negativeSpace, loudC.density]]));
   const same = C.composeGraphic(brief, dir);
   ok('deterministic: the same brief and direction make the same composition (ids aside)', J(same.doc.artboards[0].children.map((n) => [n.type, n.role, Math.round(n.x), Math.round(n.y)])) === J(out.doc.artboards[0].children.map((n) => [n.type, n.role, Math.round(n.x), Math.round(n.y)])));
   // adaptation: the words and pictures carried, re-laid out, never stretched
@@ -216,7 +218,8 @@ const dirFor = (purpose, mood, salt, i = 0) => {
 {
   const doc = C.composeGraphic(C.readGraphicBrief('A poster “Quiet Rooms” 4 March 2027'), dirFor('A minimalist poster', ['minimal'], 'gfx-x1')).doc;
   const svg = X.svgFile(doc, doc.artboards[0]);
-  ok('SVG export: an XML file with the faces linked, text kept as text, dimensions in points for print', svg.startsWith('<?xml') && /@import url\('https:\/\/fonts\.googleapis\.com/.test(svg) && svg.includes('Quiet Rooms') && /width="595[.\d]*pt"/.test(svg));
+  // the words as text: each word is in the file as characters (an accented word may sit in a span of its own)
+  ok('SVG export: an XML file with the faces linked, text kept as text, dimensions in points for print', svg.startsWith('<?xml') && /@import url\('https:\/\/fonts\.googleapis\.com/.test(svg) && /<text[\s>]/.test(svg) && /quiet/i.test(svg.replace(/<[^>]+>/g, ' ')) && /rooms/i.test(svg.replace(/<[^>]+>/g, ' ')) && /width="595[.\d]*pt"/.test(svg));
   // a real (tiny) JPEG, so the PDF is a PDF a reader opens
   const jpeg = Uint8Array.from(Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/yQALCAABAAEBAREA/8wABgAQEAX/2gAIAQEAAD8A0s8g/9k=', 'base64'));
   const pdf = X.pdfFromPages([{ jpeg, px: 1, py: 1, w: 595.3, h: 841.9, bleed: 8.5 }, { jpeg, px: 1, py: 1, w: 810, h: 1440, bleed: 0 }], { title: 'Quiet (Rooms)', now: Date.UTC(2026, 10, 20) });
@@ -287,10 +290,12 @@ const dirFor = (purpose, mood, salt, i = 0) => {
 
   // the brief's mood outranks the direction's volume: an experimental brief is not composed quiet
   const gal = { ...dirFor('A white cube gallery', ['quiet'], 'g1'), language: 'gallery', intensity: 10 };
-  const exp = C.planFor(C.readGraphicBrief('A poster for “Unsaid Shapes”, an abstract art exhibition, experimental'), gal, F.formatOf('a4'));
-  const calm = C.planFor(C.readGraphicBrief('A poster for “Unsaid Shapes”, quiet'), gal, F.formatOf('a4'));
-  const minimalDoc = C.composeGraphic(C.readGraphicBrief('A poster for “Unsaid Shapes”, quiet'), gal).doc;
-  ok('an experimental brief in a quiet language is not composed quiet; a quiet one is, and keeps one deliberate mark', exp.archetype !== 'minimal' && calm.archetype === 'minimal' && D.walk(minimalDoc.artboards[0]).some((l) => l.node.role === 'motif' && l.node.w > minimalDoc.artboards[0].width * 0.25), J([exp.archetype, calm.archetype]));
+  const expMade = C.composeGraphic(C.readGraphicBrief('A poster for “Unsaid Shapes”, an abstract art exhibition, experimental'), gal);
+  const calmMade = C.composeGraphic(C.readGraphicBrief('A poster for “Unsaid Shapes”, quiet'), gal);
+  const exp = expMade.plans[0].generative?.concept;
+  const calm = calmMade.plans[0].generative?.concept;
+  const minimalDoc = calmMade.doc;
+  ok('an experimental brief in a quiet language is conceived more experimentally than a quiet one; the quiet one keeps more room and one deliberate mark', exp && calm && exp.experimentation > calm.experimentation && calm.negativeSpace >= exp.negativeSpace && D.walk(minimalDoc.artboards[0]).some((l) => l.node.role === 'motif' && l.node.w > minimalDoc.artboards[0].width * 0.25), J([exp && [exp.experimentation, exp.negativeSpace], calm && [calm.experimentation, calm.negativeSpace]]));
 
   // “the headline” of a wordmark board is its wordmark; with no shapes to turn, a pattern is offered, not forced
   const idDoc = C.composeGraphic({ ...C.readGraphicBrief('A brand identity board for “Kepler Lab”'), content: { headline: 'Kepler Lab', brand: 'Kepler Lab' } }, dirFor('A science studio', ['technical'], 'id1')).doc;

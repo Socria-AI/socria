@@ -15,6 +15,7 @@ import { formatOf, sizeLabel } from '@/lib/ux-v0/graphics/formats';
 import { adaptBoard, type GraphicDirection, type GraphicKind } from '@/lib/ux-v0/graphics/compose';
 import { checkDoc, refineDoc } from '@/lib/ux-v0/graphics/check';
 import { readGraphicEdit, type GraphicEdit } from '@/lib/ux-v0/graphics/edit';
+import { changedConcepts, remember } from '@/lib/ux-v0/graphics/generative/memory';
 import { nativeFile, openNativeFile, svgFile } from '@/lib/ux-v0/graphics/export';
 import { embeddedAssets, exportBoardImage, exportPdf } from '@/lib/ux-v0/graphics/raster';
 import { MAX_GRAPHIC_VERSIONS, type GraphicVersion } from '@/lib/ux-v0/graphics/state';
@@ -26,7 +27,22 @@ import { download, slug } from './faces';
 import { StyleExplorer, StylePanel } from './StyleExplorer';
 import { useStyleLibrary } from './styleLibrary';
 
-type Tab = 'layers' | 'boards' | 'add' | 'shapes' | 'pictures' | 'styles' | 'brand' | 'versions';
+/** Creative direction in one click: the same words the ask bar reads (generative/edits.ts). */
+const CREATIVE_ACTIONS: readonly [string, string, boolean?][] = [
+  ['Rethink the composition', 'Keep the style but completely rethink the composition'],
+  ['Something unexpected', 'Make something visually unexpected'],
+  ['Another direction', 'Use a completely different creative direction'],
+  ['Keep the type, change the rest', 'Keep the typography and change everything else'],
+  ['Less conventional', 'Don’t use a conventional poster layout'],
+  ['Picture first', 'Make the image the primary visual element', true],
+  ['An abstract motif', 'Use an original abstract motif'],
+  ['Not generic', 'Create something that doesn’t look like a typical AI-generated graphic'],
+  ['More room', 'Use more negative space'],
+  ['Headline central', 'Make the headline the central element'],
+  ['Four alternatives', 'Show me four different compositions'],
+];
+
+type Tab = 'layers' | 'concept' | 'boards' | 'add' | 'shapes' | 'pictures' | 'styles' | 'brand' | 'versions';
 export type EditorNote = { tone: 'ok' | 'warn' | 'ask'; text: string } | null;
 export type ChangeMeta = { label: string; version?: boolean; kind: 'edit' | 'undo' | 'redo' };
 
@@ -174,8 +190,8 @@ export function GraphicEditor(props: GraphicEditorProps) {
   };
 
   // ── a change asked in words: read into operations, previewed, then applied or discarded ──
-  const ask = () => {
-    const words = askWords.trim();
+  const ask = (said?: string) => {
+    const words = (typeof said === 'string' ? said : askWords).trim();
     const cur = docNow();
     if (!words || !board) return;
     const e = readGraphicEdit(words, cur, { artboard: board.id, selection, dir: props.direction ?? directionOfDoc(cur), measure, kind: props.kind, customs: library.styles });
@@ -213,15 +229,19 @@ export function GraphicEditor(props: GraphicEditorProps) {
     if (!live) return;
     const p = live;
     setPending(null);
-    commitDoc(p.doc, p.edit.label, { version: true });
+    // a new concept applied is remembered as chosen (generative/memory.ts)
+    commitDoc(remember(p.doc, changedConcepts(p.base, p.doc), 'selected'), p.edit.label, { version: true });
     setNote({ tone: 'ok', text: `Applied: ${p.edit.label}. Undo takes it back.` });
     setAskWords('');
   };
   const discardPending = () => {
     const cur = docNow();
+    const turnedDown = live ? changedConcepts(live.base, live.doc) : [];
     setPending(null);
     if (!cur.artboards.some((b) => b.id === boardId)) setBoardId(cur.artboards[0].id);
-    setNote({ tone: 'ok', text: 'Discarded: the design is as it was.' });
+    // a concept turned down is remembered, so the next rethink stays away from its structure
+    if (turnedDown.length) commitDoc(remember(cur, turnedDown, 'rejected'), 'remembered: not like this', { version: false });
+    setNote({ tone: 'ok', text: turnedDown.length ? 'Discarded: the design is as it was, and that concept is remembered as not wanted.' : 'Discarded: the design is as it was.' });
   };
 
   const adapt = (formatId: string) => {
@@ -373,6 +393,7 @@ export function GraphicEditor(props: GraphicEditorProps) {
   if (!board) return null;
   const tabs: [Tab, string][] = [
     ['layers', 'Layers'],
+    ['concept', 'Concept'],
     ['boards', 'Artboards'],
     ['add', 'Add'],
     ['shapes', 'Shapes'],
@@ -441,6 +462,38 @@ export function GraphicEditor(props: GraphicEditorProps) {
           )}
           {tab === 'styles' && (
             <StylePanel doc={doc} board={board} dir={props.direction ?? directionOfDoc(doc)} kind={props.kind} measure={measure} href={href} onPreview={previewDoc} onOps={onOps} onNote={(text, tone) => setNote({ tone: tone ?? 'warn', text })} onExplore={(query) => setExplorer({ open: true, query })} />
+          )}
+          {tab === 'concept' && (
+            <section className="gx-panel gx-concept" aria-label="Concept">
+              <p className="gx-panel-h">Concept</p>
+              {board.concept ? (
+                <>
+                  <p className="gx-concept-idea">{board.concept.idea}</p>
+                  <p className="v0-quiet">{board.concept.artDirection}</p>
+                  <dl className="gx-concept-dl">
+                    {(Object.entries(board.concept.strategies) as [string, string][])
+                      .filter(([, v]) => v)
+                      .map(([k, v]) => (
+                        <div key={k}>
+                          <dt>{k}</dt>
+                          <dd>{v}</dd>
+                        </div>
+                      ))}
+                  </dl>
+                </>
+              ) : (
+                <p className="v0-quiet">This artboard was not generated from a concept (a template, an adaptation or a design made by hand). The actions below generate one for it.</p>
+              )}
+              <p className="gx-panel-sub">Direct it</p>
+              <div className="gx-concept-acts">
+                {CREATIVE_ACTIONS.filter(([, , needsPicture]) => !needsPicture || doc.assets.length > 0).map(([label, words]) => (
+                  <button key={label} type="button" className="sb-btn is-sm" onClick={() => ask(words)} disabled={!!pending} title={words}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="v0-quiet">Each is shown first; apply or discard it. The words, pictures, style and anything locked are kept.</p>
+            </section>
           )}
           {tab === 'brand' && (
             <section className="gx-panel" aria-label="Brand">

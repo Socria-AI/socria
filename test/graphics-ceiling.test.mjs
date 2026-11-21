@@ -247,7 +247,8 @@ const nodesOf = (doc) => doc.artboards.flatMap((b) => D.walk(b).map((l) => l.nod
   const dir = C.graphicDirectionOf(V.proposeDirections({ brief: V.normalizeBrief({ pageType: 'website', objective: 'A garden', personality: [], visualDirection: 'A garden', palette: [], typography: { display: '', body: '' }, decisions: { colour: 'delegated', typography: 'delegated' } }, new Set()), salt: 'ai' })[0]);
   const brief = C.readGraphicBrief('A poster for “Night Garden”, a night walk');
   const made = C.composeGraphic(brief, dir, { over: { vocabulary: { ...plan.vocabulary, strength: 5 } } });
-  ok('…and composed with: the plan’s composition and shapes appear in the design', made.plans[0].archetype === 'organic' && nodesOf(made.doc).some((n) => n.prim?.kind === 'blob') && nodesOf(made.doc).some((n) => n.type === 'pattern' && n.gen === 'waves'));
+  // the plan's vocabulary (its shapes, its pattern) is spoken; the arrangement is the engine's own concept
+  ok('…and composed with: the plan’s shapes and pattern appear in the design, in a composition the engine conceived', !!made.plans[0].generative && nodesOf(made.doc).some((n) => n.prim?.kind === 'blob') && nodesOf(made.doc).some((n) => n.type === 'pattern' && n.gen === 'waves'), J({ arch: made.plans[0].archetype, prims: nodesOf(made.doc).filter((n) => n.prim).map((n) => n.prim.kind), patterns: nodesOf(made.doc).filter((n) => n.type === 'pattern').map((n) => n.gen) }));
   ok('…a plan with an unknown style is refused (null), said', CAP.validateVisualPlan({ style: 'vaporwave-9000' }).vocabulary === null);
   const doc = board([{ id: 'a', type: 'shape', shape: 'rect', x: 0, y: 0, w: 10, h: 10, fill: '#000' }]);
   const bad1 = CAP.validateOps(doc, [{ op: 'update', id: 'a', set: { opacity: 0.5 } }, { op: 'rm -rf' }]);
@@ -327,7 +328,8 @@ const nodesOf = (doc) => doc.artboards.flatMap((b) => D.walk(b).map((l) => l.nod
   const graphics = b.materials.filter((m) => m.type === 'graphic' && m.doc);
   const kinds = graphics.map((m) => nodesOf(m.doc).filter((n) => n.prim).map((n) => n.prim.kind));
   ok('20. a board’s system carries one vocabulary (organic), and its materials speak it', b.system.vocabulary?.style === 'organic' && graphics.length >= 4 && graphics.every((m) => m.doc.vocabulary?.motifs.length) && kinds.filter((k) => k.length).length >= 3, J({ style: b.system.vocabulary?.style, kinds, res: res?.failed }));
-  const archetypes = new Set(graphics.map((m) => m.plan?.archetype));
+  // each material's own composition: its own concept's structure (or, where a kind keeps a fixed layout, its archetype)
+  const archetypes = new Set(graphics.map((m) => (m.doc.artboards[0].concept ? `${m.doc.artboards[0].concept.org}/${m.doc.artboards[0].concept.type}` : m.plan?.archetype)));
   ok('…each in its own composition (same identity, different execution)', archetypes.size >= 2, J([...archetypes]));
   const before = J(graphics.map((m) => m.doc.artboards[0].children.length));
   const e = BE.readBoardEdit('Add a grain texture to every material', b, { selection: [] });
@@ -387,7 +389,8 @@ const nodesOf = (doc) => doc.artboards.flatMap((b) => D.walk(b).map((l) => l.nod
 {
   const { composeAll } = await import('./browser/ux-v0/gfx-ceiling-briefs.mjs');
   const rows = composeAll(V, 'unit');
-  const arch = new Set(rows.map((r) => r.made.plans[0]?.archetype));
+  // a generated design counts by its concept's structure (principle and type strategy); a fixed kind by its archetype
+  const arch = new Set(rows.map((r) => (r.made.plans[0]?.generative ? `${r.made.plans[0].generative.concept.org}/${r.made.plans[0].generative.concept.type}` : r.made.plans[0]?.archetype)));
   const styles = new Set(rows.map((r) => r.made.plans[0]?.vocabulary?.style));
   ok('the thirty benchmark briefs take at least fifteen compositions and fifteen styles', arch.size >= 15 && styles.size >= 15, J({ arch: [...arch], styles: [...styles] }));
   const words = rows.every((r) => nodesOf(r.made.doc).some((n) => n.type === 'text' && n.text.includes(r.brief.content.headline)));

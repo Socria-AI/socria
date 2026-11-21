@@ -71,11 +71,14 @@ export function planRestyle(
       });
       continue;
     }
+    // the material's own composition kept through the change of language: its concept's structure replayed
+    const was = m.doc.artboards[0]?.concept;
     const made = composeMaterial(m, next, {
       measure: opts.measure,
       assets: opts.assets ?? b.assets,
       sibling: Math.max(0, siblingIndex(b.materials, m)),
       order: Math.max(0, graphicIndex(b.materials, m)),
+      ...(was ? { replay: { ...was.request, keys: { org: was.org, type: was.type, colouring: was.colouring, focal: was.focal } } } : {}),
     });
     regenerated.push({
       id: m.id,

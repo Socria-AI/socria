@@ -356,8 +356,9 @@ let bd = await boardReady((x) => x.materials.length && x.materials.every((m) => 
 const mats = bd.materials.filter((m) => m.type === 'graphic');
 ok(
   '…every material speaks it, each built its own way',
-  mats.every((m) => m.doc?.style?.primary === bd.system.style.primary) && new Set(mats.map((m) => `${m.plan?.archetype}|${m.doc?.artboards[0].background}`)).size === mats.length,
-  J(mats.map((m) => [m.doc?.style?.primary, m.plan?.archetype])),
+  // each material its own concept (structure and use of the palette), the one language shared
+  mats.every((m) => m.doc?.style?.primary === bd.system.style.primary) && new Set(mats.map((m) => ((c) => (c ? `${c.org}/${c.type}|${c.colouring}` : `${m.plan?.archetype}|${m.doc?.artboards[0].background}`))(m.doc?.artboards[0].concept))).size === mats.length,
+  J(mats.map((m) => [m.doc?.style?.primary, m.doc?.artboards[0].concept?.org, m.doc?.artboards[0].concept?.type, m.doc?.artboards[0].concept?.colouring])),
 );
 // the panel's tab, not the header's step of the same name (which goes back to choosing a system)
 await page.locator('.bd-left .gx-tab', { hasText: /^System$/ }).click();

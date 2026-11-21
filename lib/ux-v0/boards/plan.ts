@@ -13,6 +13,11 @@ import { composeGraphic, DARK_LANGS, GRID_LANGS, LOUD_LANGS, planFor, QUIET_LANG
 import { formatFromWords, formatOf } from '../graphics/formats';
 import { refineDoc, type GFinding } from '../graphics/check';
 import type { Asset, GraphicDoc } from '../graphics/doc';
+import type { Emphasis } from '../graphics/generative/concept';
+import type { Colouring, Org, TypeStrategy } from '../graphics/generative/principles';
+import type { ConceptRecord } from '../graphics/generative/record';
+
+const FREE_GRAPHICS = ['poster', 'social', 'ad', 'announcement', 'campaign', 'presentation'];
 import type { Measure } from '../graphics/text';
 import { bindingsOf, directionOfSystem, type Bindings, type MasterDesignSystem } from './system';
 import { boardId, type BoardBrief, type GraphicMaterial, type Material, type MaterialRole, type MaterialSpec, type MockupMaterial, type MockupTemplate, type WebsiteMaterial } from './model';
@@ -271,7 +276,14 @@ export interface ComposedMaterial {
 }
 
 /** One graphic material composed in the board's system, checked and repaired within bounds, its bindings recorded. */
-export function composeMaterial(m: GraphicMaterial, sys: MasterDesignSystem, ctx: { measure?: Measure; assets?: readonly Asset[]; sibling?: number; order?: number; turn?: number; seed?: number } = {}): ComposedMaterial {
+/** A Board's free graphics each lead with something different (type, a picture, an abstract idea…), in turn. */
+export function materialLead(m: GraphicMaterial, order: number): Emphasis {
+  const leads: Emphasis[] = m.brief.images.length ? ['type', 'image', 'abstract', 'collage', 'geometric', 'organic'] : ['type', 'abstract', 'geometric', 'organic'];
+  return leads[(order + m.variant) % leads.length];
+}
+const COLOURING_TURN: Colouring[] = ['figure-ground', 'field', 'inverse'];
+
+export function composeMaterial(m: GraphicMaterial, sys: MasterDesignSystem, ctx: { measure?: Measure; assets?: readonly Asset[]; sibling?: number; order?: number; turn?: number; seed?: number; avoid?: readonly string[]; replay?: ConceptRecord['request'] & { keys?: Pick<ConceptRecord, 'org' | 'type' | 'colouring' | 'focal'> } } = {}): ComposedMaterial {
   const assets = (ctx.assets ?? []).filter((a) => m.brief.images.includes(a.id));
   const brief: GraphicBrief = { ...m.brief, images: m.brief.images.filter((id) => assets.some((a) => a.id === id)) };
   const f = formatOf(brief.formats[0]);
@@ -281,9 +293,27 @@ export function composeMaterial(m: GraphicMaterial, sys: MasterDesignSystem, ctx
   // constructions, counted across the board's graphics (not per kind), so a poster, a post and a banner interpret one
   // DNA, not one layout resized; a style with fewer constructions than materials turns its palette as it comes round
   const styled = !!sys.style;
-  const natural = f && !styled ? planFor(brief, directionOfSystem(sys), f, { over: shared }) : null;
-  const turned = natural ? overrideFor(m, ctx.sibling ?? 0, sys, natural, ctx.turn ?? Math.max(0, ctx.sibling ?? 0)) : undefined;
-  const over = styled ? { styleIndex: (ctx.order ?? ctx.sibling ?? 0) + m.variant } : turned || sys.vocabulary ? { ...(turned ?? {}), ...shared } : undefined;
+  const dirOf = directionOfSystem(sys);
+  // the default engine: each material its own concept (its own lead, seed and use of the palette, away from its
+  // siblings' structures), the system's identity shared; a replay keeps a material's composition through a change of
+  // tokens or language
+  const generative = dirOf.engine !== 'templates' && FREE_GRAPHICS.includes(m.brief.kind);
+  let over: PlanOverride | undefined;
+  if (generative) {
+    const order = ctx.order ?? ctx.sibling ?? 0;
+    const turn = ctx.turn ?? order;
+    const replay = ctx.replay;
+    over = {
+      ...shared,
+      generative: replay
+        ? { seed: replay.seed, ...(replay.emphasis ? { emphasis: replay.emphasis as Emphasis } : {}), constraints: { ...(replay.keys ? { org: replay.keys.org as Org, type: replay.keys.type as TypeStrategy, colouring: replay.keys.colouring as Colouring, focal: replay.keys.focal } : {}) } }
+        : { seed: `${m.id}|${m.variant}|${turn}`, emphasis: materialLead(m, order), avoidSignatures: [...(ctx.avoid ?? [])], constraints: { colouring: COLOURING_TURN[(turn + m.variant) % COLOURING_TURN.length] } },
+    };
+  } else {
+    const natural = f && !styled ? planFor(brief, dirOf, f, { over: shared }) : null;
+    const turned = natural ? overrideFor(m, ctx.sibling ?? 0, sys, natural, ctx.turn ?? Math.max(0, ctx.sibling ?? 0)) : undefined;
+    over = styled ? { styleIndex: (ctx.order ?? ctx.sibling ?? 0) + m.variant } : turned || sys.vocabulary ? { ...(turned ?? {}), ...shared } : undefined;
+  }
   const made = composeGraphic(brief, directionOfSystem(sys), { measure: ctx.measure, seed: (ctx.seed ?? 7) + m.variant * 13 + (ctx.sibling ?? 0) * 5, assets: [...assets], name: m.name, over });
   const refined = refineDoc(made.doc, ctx.measure);
   const plan = made.plans[0];

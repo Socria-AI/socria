@@ -110,10 +110,11 @@ export async function generate(start: BoardState, deps: GenerateDeps, emit: (op:
         let made: ComposedMaterial | null = null;
         for (let attempt = 0; attempt < 2; attempt++) {
           const cur = { ...m, variant };
-          made = deps.compose ? await deps.compose(cur, sibling, turn) : composeMaterial(cur, sys, { measure: deps.measure, assets: start.assets, sibling, order, turn });
+          made = deps.compose ? await deps.compose(cur, sibling, turn) : composeMaterial(cur, sys, { measure: deps.measure, assets: start.assets, sibling, order, turn, avoid: seen.slice() });
           if (!made.left.length) break;
           variant++;
         }
+        if (made?.doc.artboards[0]?.concept?.signature) seen.push(made.doc.artboards[0].concept.signature);
         emit({ op: 'material-update', id: m.id, set: { status: 'rendering' } });
         await pause();
         if (!made) throw new Error('nothing was composed');
@@ -133,6 +134,8 @@ export async function generate(start: BoardState, deps: GenerateDeps, emit: (op:
     }
   };
   // a bounded pool: at most `concurrency` materials in progress at once
+  // the structures already on the board, so each new material is composed away from its siblings'
+  const seen: string[] = start.materials.flatMap((m) => (m.type === 'graphic' && m.doc && !todo.includes(m) ? [m.doc.artboards[0]?.concept?.signature ?? ''] : [])).filter(Boolean);
   const queue = [...graphicsAndSites];
   const workers = Array.from({ length: Math.max(1, Math.min(opts.concurrency ?? 3, queue.length || 1)) }, async () => {
     while (queue.length && !opts.signal?.aborted) await one(queue.shift()!);

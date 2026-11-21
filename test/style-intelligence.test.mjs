@@ -258,14 +258,16 @@ const strip = (v) => JSON.parse(JSON.stringify(v, (k, x) => (k === 'id' || k ===
     return { a, b, ca: A.plans[0].archetype, cb: B.plans[0].archetype, sim: EV.layoutSimilarity(sa, sb), shapesA: sa.shapes.join(), shapesB: sb.shapes.join() };
   });
   ok(
-    '6. the primary style decides the construction: different styles, different constructions, different layouts and shapes',
-    diffs.every((d) => d.ca !== d.cb && d.sim < 0.8 && d.shapesA !== d.shapesB),
+    '6. the primary style shapes the design as principles: different styles, different layouts and shapes (no fixed construction)',
+    diffs.every((d) => d.sim < 0.8 && d.shapesA !== d.shapesB),
     J(diffs),
   );
+  // the stored constructions are still there, as an optional starting point: the templates engine builds them
+  const tdiffs = pairs.map(([a, b]) => ({ a, b, ca: compose({ ...styled(a), engine: 'templates' }).plans[0].archetype, cb: compose({ ...styled(b), engine: 'templates' }).plans[0].archetype }));
   ok(
-    '…each built in the style’s own construction',
-    diffs.every((d) => REG.styleById(d.a).composition.constructions.includes(d.ca) && REG.styleById(d.b).composition.constructions.includes(d.cb)),
-    J(diffs),
+    '…and with the templates engine as a starting point, each is built in the style’s own construction',
+    tdiffs.every((d) => d.ca !== d.cb && REG.styleById(d.a).composition.constructions.includes(d.ca) && REG.styleById(d.b).composition.constructions.includes(d.cb)),
+    J(tdiffs),
   );
 }
 
@@ -520,8 +522,9 @@ const strip = (v) => JSON.parse(JSON.stringify(v, (k, x) => (k === 'id' || k ===
     sys2,
   );
   const made2 = board2.materials.filter((m) => m.type === 'graphic').map((m) => BPL.composeMaterial(m, sys2, { sibling: BPL.siblingIndex(board2.materials, m), order: BPL.graphicIndex(board2.materials, m) }));
-  const builds = made2.map((x) => `${x.plan.archetype}|${x.plan.colour}`);
-  ok('…counted across the board: two posters and two posts in a two-construction language are four different builds', made2.length === 4 && new Set(builds).size === 4, J(builds));
+  // four materials, four concepts: each its own structure and use of the palette (by concept, never one layout resized)
+  const builds = made2.map((x) => ((c) => (c ? `${c.org}/${c.type}|${c.colouring}` : `${x.plan.archetype}|${x.plan.colour}`))(x.doc.artboards[0].concept));
+  ok('…counted across the board: two posters and two posts are four different builds', made2.length === 4 && new Set(builds).size === 4, J(builds));
 }
 
 // ── 17. local overrides stay intact ──
@@ -634,8 +637,8 @@ const strip = (v) => JSON.parse(JSON.stringify(v, (k, x) => (k === 'id' || k ===
   );
   const first = compose(opts.options[0], b);
   ok(
-    'integration: a brief that names a style is offered it first, built in its construction',
-    opts.options[0].style?.primary === 'art-deco' && first.plans[0].archetype === 'deco-axial' && new Set(opts.options.map((o) => o.style?.primary)).size === 3,
+    'integration: a brief that names a style is offered it first, composed in it from a concept of its own',
+    opts.options[0].style?.primary === 'art-deco' && first.doc.style?.primary === 'art-deco' && !!first.plans[0].generative && new Set(opts.options.map((o) => o.style?.primary)).size === 3,
     J({ why: opts.why, archetype: first.plans[0].archetype }),
   );
   const open = PR.styledOptions(briefOf(), [BASE, BASE, BASE], { salt: 'open', seedKey: 'open' });
@@ -750,7 +753,8 @@ const strip = (v) => JSON.parse(JSON.stringify(v, (k, x) => (k === 'id' || k ===
     J({ gen: patternOf(lent)?.gen, said: lent.plans[0].said.slice(-2) }),
   );
   const plain = compose(styled('bauhaus'));
-  ok('…and a brief that names no technique gets none added', !plain.plans[0].patternAsked && !patternOf(plain), J({ asked: plain.plans[0].patternAsked }));
+  // no technique named: none is asked for; a pattern can still be part of a concept's own material, and is then said
+  ok('…and a brief that names no technique gets none added by request (any pattern is the concept’s own, said)', !plain.plans[0].patternAsked && (!patternOf(plain) || /pattern|halftone|dots|field/i.test((plain.plans[0].generative?.trace ?? []).join(' ') + (plain.plans[0].generative?.concept.idea ?? ''))), J({ asked: plain.plans[0].patternAsked, trace: plain.plans[0].generative?.trace }));
 }
 
 // ── the same brief in all 75: genuinely different interpretations, bounded and fast ──
@@ -762,12 +766,13 @@ const strip = (v) => JSON.parse(JSON.stringify(v, (k, x) => (k === 'id' || k ===
   });
   const ms = (performance.now() - t0) / rows.length;
   const rep = EV.repetition(rows.map((r) => r.sig));
-  const constructions = new Set(rows.map((r) => r.plan.archetype));
+  // each a concept of its own: counted by structure (principle, type strategy, motif), never by a stored construction
+  const constructions = new Set(rows.map((r) => ((c) => (c ? `${c.org}/${c.type}/${c.motif ?? '-'}` : r.plan.archetype))(r.doc.artboards[0].concept)));
   const faces = new Set(rows.flatMap((r) => r.sig.faces));
   ok(
-    'all 75: at least 40 different constructions, at least 50 faces, and no two designs differing only in colour',
+    'all 75: at least 40 different structures, at least 50 faces, and no two designs differing only in colour',
     constructions.size >= 40 && faces.size >= 50 && rep.colourOnly.length === 0,
-    J({ constructions: constructions.size, faces: faces.size, colourOnly: rep.colourOnly }),
+    J({ structures: constructions.size, faces: faces.size, colourOnly: rep.colourOnly }),
   );
   ok('…their layouts are mostly unlike each other (mean similarity of the occupancy maps under 0.5)', rep.meanSimilarity < 0.5, rep.meanSimilarity);
   const words = rows.filter((r) => !nodesOf(r.doc).some((n) => n.type === 'text' && n.text === 'Signal & Form') || !nodesOf(r.doc).some((n) => n.type === 'text' && n.text.includes('Lisbon Design Centre')));

@@ -17,9 +17,10 @@ import { reshape } from '../targeted';
 import { applyOps, boxOnBoard, isLocked, walk, type Artboard, type GraphicDoc, type Located, type Node, type Op, type Role, type TextNode } from './doc';
 import { adaptBoard, type GraphicDirection, type GraphicKind } from './compose';
 import { formatFromWords } from './formats';
-import { approxMeasure, fitSize, type Measure } from './text';
+import { approxMeasure, fitSize, layoutText, type Measure } from './text';
 import { guarded, guardsOf, readVocabEdit } from './vocabedit';
 import { readStyleEdit, restyleArtboard, typeOps } from './styles/edit';
+import { readCreativeEdit, recomposeArtboard } from './generative/edits';
 import type { StyleDNA } from './styles/schema';
 
 export interface GraphicEdit {
@@ -134,6 +135,17 @@ export function readGraphicEdit(words0: string, doc: GraphicDoc, ctx: EditContex
     return e;
   };
 
+  // creative direction (generative/edits.ts): "rethink the composition", "something unexpected", "keep the typography
+  // and change everything else", "move the focus to the bottom-right"… a new concept, or the current one replayed with
+  // one change; the words, pictures, style and locked objects kept, as one step that undoes
+  {
+    const ce = readCreativeEdit(words0);
+    if (ce && ctx.dir && board.format) {
+      const r = recomposeArtboard(doc, board.id, ce, { dir: ctx.dir, kind: ctx.kind, measure });
+      if (r) return { ops: [], next: r.doc, label: r.label, scope: ce.explore ? 'document' : 'artboard' };
+    }
+  }
+
   // a change of design language (styles/edit.ts): an influence raised or lowered, a dimension borrowed, an intensity,
   // flat colour — targeted where it can be, else the artboard rebuilt in the new language, shown before it is applied
   {
@@ -232,11 +244,35 @@ export function readGraphicEdit(words0: string, doc: GraphicDoc, ctx: EditContex
     const t = targets(doc, board, words, ctx.selection, ['text', 'shape', 'image']);
     if (!t.list.length) return null;
     const k = bigger ? 1.2 : 1 / 1.2;
-    const ops: Op[] = t.list.map((l) =>
-      l.node.type === 'text'
-        ? ({ op: 'update', id: l.node.id, set: { size: Math.round(l.node.size * k * 10) / 10, h: Math.round(l.node.h * k * 10) / 10, w: bigger ? Math.min(board.width - board.safe - boxOnBoard(l).x, l.node.w * 1.1) : l.node.w } } as Op)
-        : ({ op: 'resize', id: l.node.id, x: l.node.x - (l.node.w * (k - 1)) / 2, y: l.node.y - (l.node.h * (k - 1)) / 2, w: l.node.w * k, h: l.node.h * k } as Op),
-    );
+    // larger words never break mid-word: the box widens (moving left where the right edge stops it) to hold the widest
+    // word, and the size stops where even the full measure cannot
+    const grown = (l: Located): Op => {
+      const n = l.node as TextNode;
+      let size = Math.round(n.size * k * 10) / 10;
+      const widest = (s: number) => Math.max(0, ...(n.case === 'upper' ? n.text.toUpperCase() : n.text).split(/\s+/).filter(Boolean).map((w) => layoutText({ ...n, text: w, runs: undefined, size: s, w: 1e5, autoHeight: false }, measure).widest));
+      const measureW = board.width - board.safe * 2;
+      if (bigger && widest(size) > measureW) size = Math.max(n.size, Math.floor(size * (measureW / widest(size)) * 0.97 * 10) / 10);
+      const need = bigger ? widest(size) + size * 0.1 : 0;
+      const nested = l.parents.length > 0 || !!n.rotation || !!n.path;
+      let w = n.w;
+      let x = n.x;
+      if (bigger && nested) {
+        // turned, on a path or in a group: the run grows along its own direction, a little; the size stops before a word
+        // would break
+        const room = n.w * 1.3;
+        if (widest(size) + size * 0.1 > room) size = Math.max(n.size, Math.floor(size * (room / (widest(size) + size * 0.1)) * 0.97 * 10) / 10);
+        w = Math.max(n.w, Math.min(room, widest(size) + size * 0.1));
+      } else if (bigger) {
+        const avail = board.width - board.safe - boxOnBoard(l).x;
+        w = Math.max(Math.min(avail, n.w * 1.1), Math.min(need, avail));
+        if (need > avail) {
+          x = Math.max(board.safe, board.width - board.safe - need);
+          w = Math.min(measureW, need);
+        }
+      }
+      return { op: 'update', id: n.id, set: { size, h: Math.round(n.h * (size / n.size) * 10) / 10, w: Math.round(w * 10) / 10, ...(x !== n.x ? { x: Math.round(x * 10) / 10 } : {}) } } as Op;
+    };
+    const ops: Op[] = t.list.map((l) => (l.node.type === 'text' ? grown(l) : ({ op: 'resize', id: l.node.id, x: l.node.x - (l.node.w * (k - 1)) / 2, y: l.node.y - (l.node.h * (k - 1)) / 2, w: l.node.w * k, h: l.node.h * k } as Op)));
     return finish({ ops, label: `${t.list.length === 1 ? (t.list[0].node.name ?? 'it').toLowerCase() : `${t.list.length} objects`} ${bigger ? 'larger' : 'smaller'}`, scope: t.scope });
   }
 

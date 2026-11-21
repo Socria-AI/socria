@@ -186,6 +186,22 @@ ok('…an A4 print artboard in points, with bleed and a safe area', doc.artboard
 ok('…composed and checked without a model, and said so', /without a model/.test(await noteText()) && modelCalls.length === 0, await noteText());
 await shot('03-editor');
 
+// ── the concept the design was generated from, and creative direction in one click ──
+await tab('Concept');
+await page.waitForSelector('.gx-concept-idea', { timeout: 10000 });
+const conceptIdea = await page.locator('.gx-concept-idea').innerText();
+await shot('03-concept');
+ok('the Concept tab says the idea the design was generated from, its art direction and its strategies', conceptIdea.length > 40 && (await page.locator('.gx-concept-dl dt').count()) >= 5 && !!doc.artboards[0].concept?.idea, conceptIdea.slice(0, 160));
+const beforeRethink = await docWhere(() => true);
+await page.locator('.gx-concept-acts button', { hasText: 'Rethink the composition' }).click();
+await page.waitForSelector('.gx-pending', { timeout: 15000 });
+await shot('03-concept-rethink');
+ok('…a creative direction in one click is shown first, as a preview to apply or discard', (await page.locator('.gx-pending').count()) === 1);
+await page.locator('.gx-pending').getByRole('button', { name: /^Discard/ }).click();
+const afterDiscard = await docWhere((d) => (d.compositionMemory ?? []).some((m) => m.verdict === 'rejected'));
+ok('…discarded: the design exactly as it was, and that concept remembered as not wanted', J(afterDiscard.artboards[0].children.map((n) => n.id)) === J(beforeRethink.artboards[0].children.map((n) => n.id)) && afterDiscard.compositionMemory.some((m) => m.verdict === 'rejected'));
+doc = afterDiscard;
+
 // ── 9. upload and position a picture ──
 const artifactsBefore = await artifactIds();
 await tab('Add');
@@ -306,8 +322,10 @@ const beforeGroup = await docWhere(() => true);
 await layer('Subhead').click();
 await layer('Meta').click({ modifiers: ['Shift'] });
 await page.locator('.gx-right button', { hasText: /^Group$/ }).click();
-doc = await docWhere((d) => d.artboards[0].children.some((n) => n.type === 'group'));
-const grp = doc.artboards[0].children.find((n) => n.type === 'group');
+// the group just made (a generated design may hold groups of its own: turned or cut material), waited for itself
+const holdsWords = (n) => n.type === 'group' && n.children.some((c) => c.role === 'subhead');
+doc = await docWhere((d) => d.artboards[0].children.some(holdsWords));
+const grp = doc.artboards[0].children.find(holdsWords);
 const onBoard = (d, r) => {
   const b = D.boxOnBoard(D.locate(d, role(d, r).id));
   return [Math.round(b.x * 10) / 10, Math.round(b.y * 10) / 10];
@@ -317,8 +335,8 @@ await page.locator('.gx-right button', { hasText: /^Ungroup$/ }).click().catch(a
   await layer(grp.name ?? 'Group').click();
   await page.locator('.gx-right button', { hasText: /^Ungroup$/ }).click();
 });
-doc = await docWhere((d) => !d.artboards[0].children.some((n) => n.type === 'group'));
-ok('…and ungrouped: both back on the artboard where they were', !doc.artboards[0].children.some((n) => n.type === 'group') && !!role(doc, 'subhead') && !!role(doc, 'meta') && Math.abs(role(doc, 'subhead').x - resized.x) < 0.05, J(shape(role(doc, 'subhead'))));
+doc = await docWhere((d) => !d.artboards[0].children.some(holdsWords));
+ok('…and ungrouped: both back on the artboard where they were', !doc.artboards[0].children.some(holdsWords) && !!role(doc, 'subhead') && !!role(doc, 'meta') && Math.abs(role(doc, 'subhead').x - resized.x) < 0.05, J(shape(role(doc, 'subhead'))));
 
 // ── 14. lock an object, change what is around it ──
 await tab('Layers');

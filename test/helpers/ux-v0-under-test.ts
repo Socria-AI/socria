@@ -138,3 +138,15 @@ export * as gfxState from '@/lib/ux-v0/graphics/state';
 export * as compSchema from '@/lib/ux-v0/graphics/composition/schema';
 export * as compRender from '@/lib/ux-v0/graphics/composition/render';
 export * as compKit from '@/lib/ux-v0/graphics/composition/kit';
+// the generative engine: reading, principles, concepts, programs, construction, evaluation, the engine itself
+export * as genReading from '@/lib/ux-v0/graphics/generative/reading';
+export * as genPrinciples from '@/lib/ux-v0/graphics/generative/principles';
+export * as genConcept from '@/lib/ux-v0/graphics/generative/concept';
+export * as genProgram from '@/lib/ux-v0/graphics/generative/program';
+export * as genEvaluate from '@/lib/ux-v0/graphics/generative/evaluate';
+export * as genEngine from '@/lib/ux-v0/graphics/generative/engine';
+export * as genRecord from '@/lib/ux-v0/graphics/generative/record';
+export * as genLexicon from '@/lib/ux-v0/graphics/generative/lexicon';
+export * as genValidate from '@/lib/ux-v0/graphics/generative/validate';
+export * as genEdits from '@/lib/ux-v0/graphics/generative/edits';
+export * as genMemory from '@/lib/ux-v0/graphics/generative/memory';

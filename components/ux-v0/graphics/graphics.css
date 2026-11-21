@@ -1690,3 +1690,11 @@
     position: fixed;
   }
 }
+
+/* the concept a design was generated from, and creative direction in one click */
+.gx-concept-idea { font-size: 0.95rem; line-height: 1.4; margin: 0.2rem 0 0.4rem; }
+.gx-concept-dl { display: grid; gap: 0.35rem; margin: 0.5rem 0 0.75rem; font-size: 0.78rem; }
+.gx-concept-dl dt { text-transform: capitalize; opacity: 0.6; font-size: 0.7rem; letter-spacing: 0.04em; }
+.gx-concept-dl dd { margin: 0; line-height: 1.35; }
+.gx-concept-acts { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.25rem 0 0.5rem; }
+.gx-dir-idea { font-size: 0.82rem; line-height: 1.38; margin: 0.25rem 0; }

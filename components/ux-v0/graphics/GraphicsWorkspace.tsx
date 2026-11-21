@@ -18,6 +18,7 @@ import { normalizeBrief, type DesignProject } from '@/lib/ux-v0/types';
 import { proposeDirections } from '@/lib/ux-v0/direction';
 import { newId, type Asset, type GraphicDoc } from '@/lib/ux-v0/graphics/doc';
 import { accentFor, composeGraphic, graphicDirectionOf, type GraphicBrief, type GraphicDirection } from '@/lib/ux-v0/graphics/compose';
+import { interpretations } from '@/lib/ux-v0/graphics/generative/engine';
 import { refineDoc } from '@/lib/ux-v0/graphics/check';
 import { canvasMeasure } from '@/lib/ux-v0/graphics/raster';
 import { emptyGraphicState, MAX_GRAPHIC_VERSIONS, type GraphicState, type GraphicVersion } from '@/lib/ux-v0/graphics/state';
@@ -119,8 +120,11 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent }: { 
       });
       if (!db) return [];
       const dirs = proposeDirections({ brief: db, salt: project.id, round: r, seen: already, count: 3 }).map((d) => graphicDirectionOf(d));
-      // each in a design language chosen from the brief (a style it names first), none of them a default
-      return styledOptions(brief, dirs, { salt: `${project.id}|${r}`, seedKey: project.id, seen: already }).options;
+      // each in a design language chosen from the brief (a style it names first), none of them a default; and each an
+      // independent interpretation (its own lead and seed), so the three are three concepts, not three colourways
+      const options = styledOptions(brief, dirs, { salt: `${project.id}|${r}`, seedKey: project.id, seen: already }).options;
+      const leads = interpretations({ count: options.length, salt: `${project.id}|${r}`, hasImage: brief.images.length > 0, hasData: !!brief.content.data?.length });
+      return options.map((d, i) => ({ ...d, generative: { seed: leads[i].seed, emphasis: leads[i].emphasis, ...(leads[i].unexpected ? { constraints: { unexpected: true } } : {}) } }));
     },
     [project.id],
   );

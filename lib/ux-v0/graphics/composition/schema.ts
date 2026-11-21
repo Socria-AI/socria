@@ -1188,7 +1188,7 @@ export function normalizeMemory(v: unknown): MemoryEntry[] {
   const out: MemoryEntry[] = [];
   for (const raw of arr(v)) {
     const r = o(raw);
-    if (typeof r.family !== 'string' || (!FAMILY_BY_ID.has(r.family) && !/^construction:[a-z0-9-]{2,40}$/.test(r.family))) continue;
+    if (typeof r.family !== 'string' || (!FAMILY_BY_ID.has(r.family) && !/^construction:[a-z0-9-]{2,40}$/.test(r.family) && !/^generative:[a-z-]{2,30}$/.test(r.family))) continue;
     const sig = typeof r.sig === 'string' ? r.sig.replace(/[^a-z0-9.|:,=_-]/gi, '').slice(0, 400) : '';
     if (!sig) continue;
     out.push({
