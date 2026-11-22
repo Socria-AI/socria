@@ -1171,7 +1171,7 @@ export function ARMode({
           <span className="arm-confirm-h">
             {camera === 'on' ? 'Thumbs up to confirm · open hand to cancel' : 'Nothing has happened yet'}
             {voiceOn ? ' · or say “yes”' : ''}
-            {armed.action !== 'delete' ? ' · opens in the Logic Map' : ''}
+            {armed.action !== 'delete' ? ' · opens in the Mind Map' : ''}
           </span>
           <span className="arm-confirm-b">
             <button type="button" className="arm-btn is-primary" onClick={confirm}>

@@ -11,11 +11,13 @@ import { Logos2Workspace } from './Logos2Workspace';
 import './logos2.css';
 import { pageMetadata } from '@/lib/seo';
 
+// A prototype of the archived Logos 2 workspace (docs: Earlier Socria). It stays at its address for anyone with a link,
+// out of search: its physics is /surfaces', which is indexed, and its history is /docs/logos-2.
 export const metadata: Metadata = pageMetadata({
   path: '/logos2',
   title: 'Logos 2 — a workspace you arrange',
-  description:
-    'Every pane closes and comes back. A Thinking Map, a transcript, and a working surface where the physics is real: a Kerr black hole with integrated geodesics, the thermal history of the universe, and gravity as an N-body integration.',
+  description: 'A prototype of the Logos 2 workspace, an earlier Socria: a Thinking Map, a transcript and a working surface, each pane closed and brought back.',
+  noindex: true,
 });
 
 export default function Logos2Page() {

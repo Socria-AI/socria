@@ -31,6 +31,21 @@
 // another call was still unanswered as it was asked (globalThis.__contractLatency, in ms, keeps each call
 // in flight that long, so two passes meant to run together can be seen to).
 // globalThis.__contractReasoning sets the reasoning tokens each effort spends.
+//
+// THE RESPONSES API (`client.responses.create`), held to its own contract:
+// Chat's names (`max_tokens`, `max_completion_tokens`, `messages`,
+// `response_format`, `reasoning_effort`) are refused; the cap is
+// `max_output_tokens` and reasoning counts against it (an answer cut by it
+// comes back `status: "incomplete"`); `reasoning.effort` must be one the model
+// has, and a model without reasoning refuses `reasoning`; a temperature needs
+// effort none; `text.format` json_object needs the word JSON in the
+// instructions: the real API checks only the input); a strict json_schema must close every object
+// (additionalProperties false, every property required); a model listed in
+// globalThis.__contractNoSchema refuses json_schema. An answer is `output`
+// items (a message with output_text parts) and `usage` in the Responses shape
+// (input_tokens, output_tokens with reasoning_tokens) — no `output_text`, which
+// the real SDK adds on the client. A scripted { refusal: "…" } answers with a
+// refusal part. Calls are recorded in __contractCalls with api "responses".
 
 export const CONTRACT = {
   'gpt-4o-mini': { family: 'classic' },
@@ -103,8 +118,129 @@ function contentFor(p, j) {
   return typeof next === 'string' ? next : JSON.stringify(next);
 }
 
+/** Every object in a strict schema closed: additionalProperties false and every property required. */
+function strictProblem(schema, path = 'schema') {
+  if (!schema || typeof schema !== 'object') return null;
+  if (Array.isArray(schema.anyOf)) {
+    for (const [i, s] of schema.anyOf.entries()) {
+      const p = strictProblem(s, `${path}.anyOf[${i}]`);
+      if (p) return p;
+    }
+  }
+  const types = [].concat(schema.type ?? []);
+  if (types.includes('object')) {
+    if (schema.additionalProperties !== false) return `${path}: additionalProperties must be false`;
+    const props = Object.keys(schema.properties ?? {});
+    const req = new Set(schema.required ?? []);
+    const missing = props.find((k) => !req.has(k));
+    if (missing) return `${path}: '${missing}' must be in required`;
+    for (const k of props) {
+      const p = strictProblem(schema.properties[k], `${path}.${k}`);
+      if (p) return p;
+    }
+  }
+  if (types.includes('array')) return strictProblem(schema.items, `${path}[]`);
+  return null;
+}
+
+const textOfInput = (p) => `${p.instructions ?? ''} ${typeof p.input === 'string' ? p.input : JSON.stringify(p.input ?? '')}`;
+
+/** A Responses call as the real API would judge it. */
+export function judgeResponses(p) {
+  const model = String(p?.model ?? '');
+  const c = CONTRACT[model];
+  if (!c || (globalThis.__contractUnavailable ?? []).includes(model)) {
+    return { error: apiError(404, `The model \`${model}\` does not exist or you do not have access to it.`, { code: 'model_not_found' }) };
+  }
+  for (const k of ['max_tokens', 'max_completion_tokens', 'messages', 'response_format', 'reasoning_effort']) {
+    if (p[k] !== undefined) return { error: apiError(400, `Unsupported parameter: '${k}'.`, { param: k, code: 'unsupported_parameter' }) };
+  }
+  const format = p.text?.format;
+  // the real API looks for the word in the INPUT messages only, never in the instructions (found by the live smoke run)
+  if (format?.type === 'json_object' && !/json/i.test(typeof p.input === 'string' ? p.input : JSON.stringify(p.input ?? ''))) {
+    return { error: apiError(400, "Response input messages must contain the word 'json' in some form to use 'text.format' of type 'json_object'.", { param: 'input' }) };
+  }
+  if (format?.type === 'json_schema') {
+    if ((globalThis.__contractNoSchema ?? []).includes(model)) return { error: apiError(400, "Invalid parameter: 'text.format' of type 'json_schema' is not supported with this model.", { param: 'text.format' }) };
+    const problem = format.strict ? strictProblem(format.schema) : null;
+    if (problem) return { error: apiError(400, `Invalid schema for response_format '${format.name}': ${problem}.`, { param: 'text.format.schema' }) };
+  }
+  if (c.family === 'classic') {
+    if (p.reasoning !== undefined) return { error: apiError(400, "Unsupported parameter: 'reasoning.effort' is not supported with this model.", { param: 'reasoning.effort', code: 'unsupported_parameter' }) };
+    return { model, family: 'classic', effort: null, budget: p.max_output_tokens ?? 16384, reasoning: 0 };
+  }
+  const effort = p.reasoning?.effort ?? c.effort;
+  if (!c.efforts.includes(effort)) {
+    return { error: apiError(400, `Unsupported value: 'reasoning.effort' does not support '${effort}' with this model. Supported values are: ${c.efforts.map((e) => `'${e}'`).join(', ')}.`, { param: 'reasoning.effort', code: 'unsupported_value' }) };
+  }
+  for (const k of ['temperature', 'top_p']) {
+    if (p[k] !== undefined && p[k] !== 1 && effort !== 'none') {
+      return { error: apiError(400, `Unsupported parameter: '${k}' is not supported with this model.`, { param: k, code: 'unsupported_parameter' }) };
+    }
+  }
+  const budget = p.max_output_tokens ?? 100000;
+  const reasoning = Math.min(budget, (globalThis.__contractReasoning ?? REASONING)[effort] ?? 0);
+  return { model, family: 'reasoning', effort, budget, reasoning };
+}
+
+async function answerResponses(p, entry) {
+  const j = judgeResponses(p);
+  if (j.error) {
+    entry.outcome = `${j.error.status} ${j.error.param ?? j.error.code ?? ''}`.trim();
+    throw j.error;
+  }
+  const g = globalThis;
+  const next = typeof g.__contractContent === 'function' ? g.__contractContent(p, j) : (g.__contractScript ??= []).shift();
+  if (next instanceof Error) throw next;
+  const refusal = next && typeof next === 'object' && typeof next.refusal === 'string' ? next.refusal : null;
+  const text = refusal != null ? '' : next === undefined ? '' : typeof next === 'string' ? next : JSON.stringify(next);
+  const w = within(text, j);
+  entry.outcome = refusal != null ? 'refusal' : w.finish === 'stop' ? 'ok' : w.content ? 'cut' : 'empty';
+  entry.effort = j.effort;
+  entry.budget = j.budget;
+  const usage = {
+    input_tokens: tokensOf(textOfInput(p)),
+    input_tokens_details: { cached_tokens: 0 },
+    output_tokens: w.out + j.reasoning,
+    output_tokens_details: { reasoning_tokens: j.reasoning },
+  };
+  usage.total_tokens = usage.input_tokens + usage.output_tokens;
+  const content = refusal != null ? [{ type: 'refusal', refusal }] : [{ type: 'output_text', text: w.content, annotations: [] }];
+  const res = {
+    id: `resp_${(g.__contractCalls ?? []).length}`,
+    object: 'response',
+    model: j.model,
+    status: w.finish === 'stop' ? 'completed' : 'incomplete',
+    incomplete_details: w.finish === 'stop' ? null : { reason: 'max_output_tokens' },
+    output: [...(j.reasoning ? [{ type: 'reasoning', id: 'rs_1', summary: [] }] : []), { type: 'message', role: 'assistant', status: 'completed', content }],
+    usage,
+  };
+  if (p.stream) {
+    return (async function* () {
+      yield { type: 'response.created', response: { ...res, status: 'in_progress', output: [], usage: null } };
+      if (w.content) yield { type: 'response.output_text.delta', delta: w.content };
+      yield { type: res.status === 'completed' ? 'response.completed' : 'response.incomplete', response: res };
+    })();
+  }
+  return res;
+}
+
 export default class OpenAI {
   constructor() {
+    this.responses = {
+      create: async (p) => {
+        const g = globalThis;
+        const entry = { api: 'responses', model: p?.model, params: p, outcome: null, overlapped: (g.__contractInFlight ?? 0) > 0 };
+        (g.__contractCalls ??= []).push(entry);
+        g.__contractInFlight = (g.__contractInFlight ?? 0) + 1;
+        try {
+          if (Number(g.__contractLatency) > 0) await new Promise((r) => setTimeout(r, Number(g.__contractLatency)));
+          return await answerResponses(p, entry);
+        } finally {
+          g.__contractInFlight--;
+        }
+      },
+    };
     this.chat = {
       completions: {
         create: async (p) => {

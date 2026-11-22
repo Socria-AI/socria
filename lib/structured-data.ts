@@ -25,8 +25,21 @@ type Ld = Record<string, unknown>;
 const ORG_ID = `${SITE_URL}/#organization`;
 const SITE_ID = `${SITE_URL}/#website`;
 
-/** Where Socria is, elsewhere — the profiles the site itself links to. */
-export const SAME_AS = ['https://www.linkedin.com/company/socria', 'https://instagram.com/socriaai'];
+/** Where Socria is, elsewhere — exactly the profiles the site itself links to (components/site/chrome.tsx ELSEWHERE). */
+export const SAME_AS = ['https://www.linkedin.com/company/socria', 'https://www.instagram.com/socriaai', 'https://www.tiktok.com/@socriaai'];
+
+/**
+ * What Socria does, as the homepage's "What it does" section says it (components/site/Landing.tsx CAPABILITIES): the
+ * same six things, so the structured data never claims what the page does not show. Only what is on for everyone.
+ */
+export const FEATURES = [
+  'A conversation that asks before it answers when the thinking is the point, and does facts and mechanical work directly',
+  'A Logic Map of your reasoning: claims, assumptions, open questions and evidence',
+  'Interactive graphs, models and diagrams you can move',
+  'One objective per conversation, with what it holds: decisions, questions, sources and milestones',
+  'Documents read with citations limited to the passages given and the sources actually read',
+  'Practice from your own material: quizzes from your notes, and hints instead of answers when learning maths',
+] as const;
 
 export function organizationLd(): Ld {
   return {
@@ -71,8 +84,10 @@ export function softwareApplicationLd(): Ld {
     description: DEFAULT_DESCRIPTION,
     image: absoluteUrl(ogImagePath('home')),
     publisher: { '@id': ORG_ID },
+    featureList: [...FEATURES],
     offers: [
-      // there is no free plan: every account starts with a seven-day trial (lib/trial.ts), then Socria One
+      // the homepage's two plans, as it shows them: Free (every account starts with the day's free tokens, the guest
+      // preview needs no account — lib/entitlements.ts freePlanSentence), and Socria One at its one price
       { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: currency, url: absoluteUrl('/sign-up') },
       {
         '@type': 'Offer',

@@ -20,13 +20,95 @@
 // test reads the two as the one prompt they are (./prompt.mjs).
 import { systemOf } from './prompt.mjs';
 
+// The Responses API (SocriaUX on GPT-6.1 Sol, lib/ux-v0/ask.ts): the same script, recorded in the same
+// list, answered in the Responses shape (output items, usage as input_tokens / output_tokens).
+const responsesUsage = (u) =>
+  u
+    ? {
+        usage: {
+          input_tokens: u.prompt_tokens ?? 0,
+          input_tokens_details: { cached_tokens: u.prompt_tokens_details?.cached_tokens ?? 0 },
+          output_tokens: u.completion_tokens ?? 0,
+          output_tokens_details: { reasoning_tokens: u.completion_tokens_details?.reasoning_tokens ?? 0 },
+        },
+      }
+    : {};
+
+/** Never answer: wait until the call's signal aborts (the SDK then throws APIUserAbortError), or a minute. */
+const hang = (opts) =>
+  new Promise((_, reject) => {
+    const signal = opts?.signal;
+    const stop = () => reject(Object.assign(new Error('Request was aborted.'), { name: 'APIUserAbortError' }));
+    if (signal?.aborted) return stop();
+    const t = setTimeout(() => reject(Object.assign(new Error('Request timed out.'), { name: 'APIConnectionTimeoutError' })), 60_000);
+    signal?.addEventListener?.('abort', () => (clearTimeout(t), stop()), { once: true });
+  });
+
+// a 1×1 PNG: what the fake image model answers unless a test scripts something else (globalThis.__imagesScript)
+const TINY_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
 export default class OpenAI {
   constructor() {
+    this.responses = {
+      create: async (p, opts) => {
+        const g = globalThis;
+        (g.__logosCalls ??= []).push(p);
+        (g.__logosOptions ??= []).push(opts ?? null);
+        if ((g.__logosRefuse ?? []).includes(p.model))
+          throw Object.assign(new Error(`The model \`${p.model}\` does not exist or you do not have access to it.`), { status: 404, code: 'model_not_found' });
+        // a model listed in globalThis.__logosSlow does not answer within a call's time limit: the SDK's timeout
+        if ((g.__logosSlow ?? []).includes(p.model) && opts?.timeout) throw Object.assign(new Error('Request timed out.'), { name: 'APIConnectionTimeoutError' });
+        // a model listed in globalThis.__logosHang never answers (a stalled provider): only the call's abort signal ends it
+        if ((g.__logosHang ?? []).includes(p.model)) await hang(opts);
+        const next = (g.__logosScript ??= []).shift();
+        if (next instanceof Error) throw next;
+        const text = next === undefined ? '' : typeof next === 'string' ? next : JSON.stringify(next);
+        const res = { object: 'response', model: p.model, status: 'completed', output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text }] }], ...responsesUsage(g.__logosUsage) };
+        // a streamed call (SocriaUX's routes, lib/ux-v0/ask.ts): the same answer as the Responses API's events
+        if (p.stream) {
+          const step = Number(g.__logosChunk) > 0 ? Number(g.__logosChunk) : text.length || 1;
+          return (async function* () {
+            yield { type: 'response.created', response: { ...res, status: 'in_progress', output: [], usage: null } };
+            for (let i = 0; i < text.length; i += step) yield { type: 'response.output_text.delta', delta: text.slice(i, i + step) };
+            yield { type: 'response.completed', response: res };
+          })();
+        }
+        return res;
+      },
+    };
+    // the Images API: one picture per call, recorded like any other call
+    this.images = {
+      generate: async (p, opts = {}) => {
+        const g = globalThis;
+        (g.__logosCalls ??= []).push({ images: p });
+        const next = (g.__imagesScript ?? []).shift();
+        if (next instanceof Error) throw next;
+        if (opts.signal?.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+        return { created: 1, data: [{ b64_json: typeof next === 'string' ? next : TINY_PNG }] };
+      },
+    };
     this.chat = {
       completions: {
-        create: async (p) => {
+        create: async (p, opts) => {
           const g = globalThis;
           (g.__logosCalls ??= []).push(p);
+          (g.__logosOptions ??= []).push(opts ?? null);
+          if ((g.__logosSlow ?? []).includes(p.model) && opts?.timeout) throw Object.assign(new Error('Request timed out.'), { name: 'APIConnectionTimeoutError' });
+          if ((g.__logosHang ?? []).includes(p.model)) await hang(opts);
+          // a streamed JSON call (SocriaUX's routes, lib/ux-v0/ask.ts): the next scripted answer, in deltas, its usage last
+          if (p.stream && p.response_format?.type === 'json_object') {
+            if ((g.__logosRefuse ?? []).includes(p.model))
+              throw Object.assign(new Error(`The model \`${p.model}\` does not exist or you do not have access to it.`), { status: 404, code: 'model_not_found' });
+            const next = (g.__logosScript ??= []).shift();
+            if (next instanceof Error) throw next;
+            const text = next === undefined ? '' : typeof next === 'string' ? next : JSON.stringify(next);
+            const step = Number(g.__logosChunk) > 0 ? Number(g.__logosChunk) : text.length || 1;
+            return (async function* () {
+              for (let i = 0; i < text.length; i += step) yield { choices: [{ delta: { content: text.slice(i, i + step) } }] };
+              yield { choices: [{ delta: {}, finish_reason: 'stop' }] };
+              if (g.__logosUsage && p.stream_options?.include_usage) yield { choices: [], usage: g.__logosUsage };
+            })();
+          }
           if (p.stream) {
             if ((g.__logosRefuse ?? []).includes(p.model))
               throw Object.assign(new Error(`The model \`${p.model}\` does not exist or you do not have access to it.`), { status: 404, code: 'model_not_found' });

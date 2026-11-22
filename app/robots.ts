@@ -35,9 +35,14 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: '*',
         allow: '/',
         // Nothing behind sign-in, and nothing that is a person's own work.
-        // Share links (/s/…) stay crawlable so the noindex on them is seen;
-        // a blocked page can still be listed from a link to it.
-        disallow: ['/api/', '/chat', '/account', '/studio', '/logos-5-internal'],
+        // Robots.txt is not what protects any of it (signing in is), and it
+        // cannot keep an address out of an index: a blocked page can still be
+        // listed from a link to it. So the app itself (/chat, where every
+        // "Start a conversation" leads) and share links (/s/…) stay crawlable,
+        // and the noindex they carry — in their metadata and on every response
+        // (next.config.js) — is what is read. Closed here only what no crawler
+        // has any business fetching at all.
+        disallow: ['/api/', '/account', '/studio', '/logos-5-internal'],
       },
     ],
     sitemap: `${siteUrl}/sitemap.xml`,

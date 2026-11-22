@@ -1,45 +1,108 @@
 'use client';
-// components/ux-v0/V0App.tsx — SocriaUX v0 at /ux-v0: two ways in, and the designs kept.
+// components/ux-v0/V0App.tsx — SocriaUX at /ux-v0: one place to begin anything, and everything kept.
 //
-// Create: say what you want to make. Critique: bring a design. Everything is
-// kept in this browser first (lib/ux-v0/store.ts) and, for a signed-in
-// designer, follows them to other devices. The open design is in the address
-// (?p=<id>), so a reload or the back button lands where they were.
+// The home (studio/StudioHome.tsx) is one composer: what to make, said in words, with pictures, files and links; the
+// words are read to know what kind of work it is. Every work begins as a conversation kept on its project
+// (studio/ProjectConversation.tsx): real references looked for on the internet, only the questions that matter,
+// answered with choices drawn from those references and the person's words. When there is enough, the same project
+// becomes the work, in the workspace its engine already has (graphics, boards, websites, critique), with the
+// conversation docked beside it; a design attached to critique opens its critique at once, and a design system's
+// conversation hands over to the import. Everything made is in its own view (?work=1). Everything is kept in this
+// browser first (lib/ux-v0/store.ts) and, for a signed-in designer, follows them to other devices. The open work is in
+// the address (?p=<id>), so a reload or the back button lands where they were.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { deleteProject, getProject, listProjects, putProject } from '@/lib/ux-v0/store';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { makeNonce } from '@/lib/ux-v0/sandbox';
+import { deleteArtifacts, deleteProject, getProject, listProjects, putProject } from '@/lib/ux-v0/store';
 import { makeProject, normalizeProject, type DesignProject, type ProjectSummary } from '@/lib/ux-v0/types';
-import { checkFile } from './files';
 import { Workspace } from './Workspace';
+import { StudioHome, type BeginRequest } from './studio/StudioHome';
+import { YourWork } from './studio/YourWork';
+import { ProjectConversation } from './studio/ProjectConversation';
+import type { RemoteWork } from './studio/Collection';
+import { attachFiles, conversationProject, critiqueProject, startFrom } from './studio/begin';
+import { usableSystems } from './studio/SystemPicker';
+import type { WizardStart } from './systems/ImportWizard';
+import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
+import { GraphicsWorkspace } from './graphics/GraphicsWorkspace';
+import { BoardWorkspace } from './boards/BoardWorkspace';
+import { emptyGraphicState } from '@/lib/ux-v0/graphics/state';
+import { emptyBoard } from '@/lib/ux-v0/boards/model';
+import { SystemsApp } from './systems/SystemsApp';
+import { applySystem } from '@/lib/ux-v0/dsi/link';
+import type { SystemRecord } from '@/lib/ux-v0/dsi/registry';
+import { listSystems } from '@/lib/ux-v0/dsi/store';
 import '@/components/brand/socria-brand.css';
 import './ux-v0.css';
+import './home.css';
+import './studio.css';
+import './dna.css';
+import './graphics/graphics.css';
+import './boards/boards.css';
+import './studio/studio-home.css';
 
 const idFromUrl = () => {
   if (typeof window === 'undefined') return null;
   const v = new URLSearchParams(window.location.search).get('p');
   return v && /^[A-Za-z0-9_-]{1,96}$/.test(v) ? v : null;
 };
+/** Everything made, in its own view: ?work=1. */
+const workFromUrl = () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('work') === '1';
+/** The Design System Manager in the address: ?ds=1 (the list) or ?ds=<system id>. */
+const systemsFromUrl = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  const v = new URLSearchParams(window.location.search).get('ds');
+  return v === '1' ? '' : v && /^dsys_[\w-]{4,64}$/.test(v) ? v : null;
+};
 
-const ago = (t: number) => {
-  const s = (Date.now() - t) / 1000;
-  if (s < 3600) return `${Math.max(1, Math.round(s / 60))} min ago`;
-  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
-  return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+/**
+ * Moving between the home and a work: a short cross-fade where the browser
+ * offers view transitions, the plain swap where it does not or where the
+ * visitor has asked for less motion.
+ */
+const passage = (change: () => void) => {
+  type Passage = { ready?: Promise<unknown>; finished?: Promise<unknown>; updateCallbackDone?: Promise<unknown> };
+  const d = document as Document & { startViewTransition?: (cb: () => void) => Passage };
+  if (typeof d.startViewTransition !== 'function' || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return change();
+  try {
+    const t = d.startViewTransition(() => flushSync(change));
+    // a passage cut short by the next one still makes its change; only the fade is skipped
+    for (const p of [t?.ready, t?.finished, t?.updateCallbackDone]) p?.catch(() => undefined);
+  } catch {
+    change();
+  }
 };
 
 export function V0App({ signedIn }: { signedIn: boolean }) {
   const [list, setList] = useState<ProjectSummary[]>([]);
-  const [remote, setRemote] = useState<{ id: string; name: string; updatedAt: number }[]>([]);
+  const [remote, setRemote] = useState<RemoteWork[]>([]);
   const [open, setOpen] = useState<{ p: DesignProject; intent?: string; file?: File | null } | null>(null);
-  const [intent, setIntent] = useState('');
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
-  // the design whose deletion is being asked about: the app's own inline confirm, never the browser's dialog
-  const [deleting, setDeleting] = useState<string | null>(null);
-  const [dropping, setDropping] = useState(false);
-  const fileInput = useRef<HTMLInputElement>(null);
+  // the Design System Manager: null closed, '' the list, an id that system
+  const [systems, setSystems] = useState<string | null>(null);
+  // everything made, in its own view (the home is one question)
+  const [work, setWork] = useState(false);
+  // the home's plates show imported pages in the same sealed frames as the workspace
+  const nonce = useMemo(() => makeNonce(), []);
+  // the design systems in this browser (and the account's): offered for every kind of work
+  const [dsList, setDsList] = useState<SystemRecord[]>([]);
+  // the one chosen on the home (undefined: not chosen, so the workspace's default)
+  const [homeSystem, setHomeSystem] = useState<string | null | undefined>(undefined);
+  // an import begun in a conversation, handed to the Design System Manager
+  const [startImport, setStartImport] = useState<(WizardStart & { next?: string }) | null>(null);
 
   const refresh = useCallback(async () => setList(await listProjects()), []);
+  const refreshSystems = useCallback(async () => {
+    try {
+      setDsList(await listSystems());
+    } catch {
+      /* no systems kept here */
+    }
+  }, []);
+  const defaultSystem = usableSystems(dsList).find((r) => r.isDefault)?.id ?? null;
+  const chosenSystem = homeSystem === undefined ? defaultSystem : homeSystem;
 
   const openById = useCallback(
     async (id: string, push = true) => {
@@ -57,7 +120,8 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
         }
       }
       if (!p) return setError('That design is not in this browser.');
-      setOpen({ p });
+      const found = p;
+      passage(() => setOpen({ p: found }));
       if (push) window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(id)}`);
     },
     [signedIn]
@@ -65,13 +129,25 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
 
   useEffect(() => {
     refresh().then(() => setReady(true));
+    void refreshSystems();
     const id = idFromUrl();
-    if (id) openById(id, false);
+    const ds = systemsFromUrl();
+    if (ds !== null) setSystems(ds);
+    else if (id) openById(id, false);
+    else if (workFromUrl()) setWork(true);
     const onPop = () => {
       const pid = idFromUrl();
-      if (pid) openById(pid, false);
-      else {
+      const sid = systemsFromUrl();
+      setWork(workFromUrl());
+      if (sid !== null) {
         setOpen(null);
+        setSystems(sid);
+      } else if (pid) {
+        setSystems(null);
+        openById(pid, false);
+      } else {
+        setOpen(null);
+        setSystems(null);
         refresh();
       }
     };
@@ -87,30 +163,172 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
       .catch(() => undefined);
   }, [signedIn, open]);
 
-  const start = async (mode: 'create' | 'critique', opts: { intent?: string; file?: File | null } = {}) => {
-    // a file that cannot be imported is refused here, before it leaves an empty project behind
-    if (opts.file) {
-      const checked = await checkFile(opts.file);
-      if (!checked.ok) return setError(checked.error);
-    }
-    setError('');
-    const p = makeProject(mode, mode === 'critique' && opts.file ? opts.file.name.replace(/\.[a-z0-9]+$/i, '') : '');
-    await putProject(p);
-    setOpen({ p, ...opts });
+  const home = () => {
+    passage(() => (setOpen(null), setWork(false)));
+    refresh();
+    void refreshSystems();
+    window.history.pushState(null, '', '/ux-v0');
+  };
+  const toWork = () => {
+    passage(() => (setOpen(null), setWork(true)));
+    refresh();
+    window.history.pushState(null, '', '/ux-v0?work=1');
+  };
+  const openNew = (p: DesignProject, file?: File | null, intent?: string) => {
+    passage(() => setOpen({ p, ...(file ? { file } : {}), ...(intent ? { intent } : {}) }));
     window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(p.id)}`);
+  };
+  const toSystems = (ask?: (WizardStart & { next?: string }) | null) => {
+    setStartImport(ask ?? null);
+    setOpen(null);
+    passage(() => setSystems(''));
+    window.history.pushState(null, '', '/ux-v0?ds=1');
+  };
+  /** A conversation's project, gone when its work is not a project (a design system's import). */
+  const dropConversation = async (id: string) => {
+    await deleteProject(id);
+    if (signedIn) await fetch(`/api/ux-v0/projects?id=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => undefined);
+  };
+
+  /** The home's request: a conversation about it, kept as a project from the first word. A design brought to critique
+   * is the whole request, so its critique opens at once (a file it cannot take is refused before anything is kept). */
+  const beginStudio = async (r: BeginRequest): Promise<'refused' | void> => {
+    setError('');
+    if (r.mode === 'critique' && r.files.length) {
+      const c = await critiqueProject(r.files[0], r.prompt);
+      if (!c.ok) {
+        setError(c.error);
+        return 'refused';
+      }
+      await putProject(c.project);
+      return openNew(c.project, r.files[0]);
+    }
+    const at = await attachFiles(r.files, { critique: r.mode === 'critique', hold: r.mode === 'system' });
+    if (at.error) {
+      setError(at.error);
+      return;
+    }
+    const p = conversationProject(r.mode, r.prompt, { modeBy: r.modeBy, attachments: at.attachments, systemId: chosenSystem });
+    await putProject(p);
+    openNew(p);
+  };
+
+  /** A conversation with enough in it: the same project becomes the work, in its workspace. */
+  const startConversation = async (p: DesignProject, st: NonNullable<DesignProject['studio']>, websiteSystems: readonly MasterDesignSystem[]): Promise<string | null> => {
+    const r = startFrom(p, st, { systems: dsList, websiteSystems });
+    if (!r.ok) return r.error;
+    if (r.kind === 'import') {
+      await dropConversation(p.id);
+      toSystems({ kind: r.ask.kind, files: r.ask.files, url: r.ask.url, projectId: r.ask.projectId, parts: r.ask.parts, next: r.ask.next });
+      return null;
+    }
+    await putProject(r.project);
+    passage(() => setOpen({ p: r.project, ...(r.file ? { file: r.file } : {}) }));
+    return null;
+  };
+
+  /** A new project built in a registry design system: linked (identity from the system), then opened. */
+  const startInSystem = async (kind: 'graphic' | 'board' | 'website', rec: SystemRecord) => {
+    const base = makeProject('create', `${rec.name} ${kind}`);
+    const p0: DesignProject = kind === 'graphic' ? { ...base, medium: 'graphic', graphic: emptyGraphicState() } : kind === 'board' ? { ...base, medium: 'board', board: emptyBoard() } : base;
+    const { project } = applySystem(p0, rec);
+    await putProject(project);
+    setSystems(null);
+    passage(() => setOpen({ p: project }));
+    window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(project.id)}`);
   };
 
   const remove = async (s: ProjectSummary) => {
-    setDeleting(null);
     const p = await getProject(s.id);
     const artifactId = p?.artifact?.type === 'imported' ? p.artifact.id : undefined;
     await deleteProject(s.id, artifactId);
+    // the designer's own references go with the project, and a graphic's own pictures
+    const gfx = p?.graphic ? [...(p.graphic.assets ?? []), ...(p.graphic.doc?.assets ?? []), ...p.graphic.versions.flatMap((v) => v.doc.assets)].map((a) => a.src).filter((src) => src.startsWith('upload:')).map((src) => src.slice('upload:'.length)) : [];
+    // a board's own pictures (its references, its materials', its versions'); its website stays, a project of its own
+    if (p?.board) {
+      const states = [p.board, ...p.board.versions.map((v) => v.state)];
+      gfx.push(...states.flatMap((st) => [...st.assets, ...st.materials.flatMap((m) => (m.type === 'graphic' && m.doc ? m.doc.assets : []))]).map((a) => a.src).filter((src) => src.startsWith('upload:')).map((src) => src.slice('upload:'.length)));
+    }
+    // a conversation's own pictures (those not yet placed in a work)
+    gfx.push(...(p?.studio?.attachments ?? []).map((a) => a.upload ?? '').filter(Boolean));
+    await deleteArtifacts([...new Set([...(p?.moodboard.refs.filter((r) => r.provider === 'upload').map((r) => r.providerId) ?? []), ...gfx])]);
     if (signedIn) {
       await fetch(`/api/ux-v0/projects?id=${encodeURIComponent(s.id)}`, { method: 'DELETE' }).catch(() => undefined);
       if (artifactId && p?.artifact?.type === 'imported' && p.artifact.kept === 'account') await fetch(`/api/files/original/${artifactId}`, { method: 'DELETE' }).catch(() => undefined);
     }
     refresh();
   };
+
+  if (systems !== null && !open) {
+    return (
+      <SystemsApp
+        signedIn={signedIn}
+        initialId={systems || null}
+        startImport={startImport}
+        onImportTaken={() => setStartImport(null)}
+        onExit={() => {
+          passage(() => setSystems(null));
+          refresh();
+          void refreshSystems();
+          window.history.pushState(null, '', '/ux-v0');
+        }}
+        onOpenProject={(id) => {
+          setSystems(null);
+          openById(id);
+        }}
+        onNewProject={(kind, rec) => void startInSystem(kind, rec)}
+      />
+    );
+  }
+
+  if (open && open.p.studio?.status === 'discovering') {
+    return (
+      <ProjectConversation
+        key={open.p.id}
+        initial={open.p}
+        signedIn={signedIn}
+        nonce={nonce}
+        systems={dsList}
+        onStart={startConversation}
+        onExit={home}
+        onManageSystems={() => toSystems(null)}
+      />
+    );
+  }
+
+  if (open && open.p.medium === 'board') {
+    return (
+      <BoardWorkspace
+        key={open.p.id}
+        initial={open.p}
+        signedIn={signedIn}
+        startIntent={open.intent}
+        onOpenProject={(id) => openById(id)}
+        onExit={() => {
+          passage(() => setOpen(null));
+          refresh();
+          window.history.pushState(null, '', '/ux-v0');
+        }}
+      />
+    );
+  }
+
+  if (open && open.p.medium === 'graphic') {
+    return (
+      <GraphicsWorkspace
+        onOpenProject={(id) => openById(id)}
+        key={open.p.id}
+        initial={open.p}
+        signedIn={signedIn}
+        startIntent={open.intent}
+        onExit={() => {
+          passage(() => setOpen(null));
+          refresh();
+          window.history.pushState(null, '', '/ux-v0');
+        }}
+      />
+    );
+  }
 
   if (open) {
     return (
@@ -121,7 +339,7 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
         startIntent={open.intent}
         startFile={open.file}
         onExit={() => {
-          setOpen(null);
+          passage(() => setOpen(null));
           refresh();
           window.history.pushState(null, '', '/ux-v0');
         }}
@@ -132,144 +350,20 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
   const local = new Set(list.map((x) => x.id));
   const elsewhere = remote.filter((r) => !local.has(r.id));
 
+  if (work) return <YourWork signedIn={signedIn} ready={ready} list={list} elsewhere={elsewhere} nonce={nonce} onOpen={(id) => openById(id)} onDelete={remove} onNew={home} onSystems={() => toSystems(null)} />;
+
   return (
-    <div className="v0 v0-home-page sb">
-      <header className="v0-head">
-        <div className="v0-head-l">
-          <a className="v0-home" href="/">
-            <img src="/socria-mark.png" alt="" width={20} height={20} />
-            <span className="v0-brand">
-              Socria<em>UX</em>
-            </span>
-            <span className="v0-tag">v0</span>
-          </a>
-        </div>
-        <div className="v0-head-r">
-          {signedIn ? (
-            <a className="sb-link is-meta" href="/account">
-              Account
-            </a>
-          ) : (
-            <a className="sb-link is-meta is-strong" href="/sign-in?redirect_url=/ux-v0">
-              Sign in
-            </a>
-          )}
-        </div>
-      </header>
-      <main className="v0-landing">
-        <section className="v0-way">
-          <span className="sb-label">Create</span>
-          <h1 className="v0-intent-q">What do you want to make?</h1>
-          <p className="v0-body">SocriaUX asks before it designs: a few precise questions, a moodboard of real, licensed imagery, and a brief you approve. Then it generates the design — and you question and change it.</p>
-          <div className="sb-compose-line v0-intent-line">
-            <textarea
-              rows={2}
-              value={intent}
-              placeholder="A premium coffee shop website, for…"
-              aria-label="What do you want to make?"
-              onChange={(e) => setIntent(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey && intent.trim()) {
-                  e.preventDefault();
-                  start('create', { intent: intent.trim() });
-                }
-              }}
-            />
-            <button type="button" className="sb-btn is-primary" onClick={() => start('create', { intent: intent.trim() })} disabled={!intent.trim()}>
-              Begin
-            </button>
-          </div>
-        </section>
-        <section
-          className={`v0-way v0-way-drop${dropping ? ' is-over' : ''}`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDropping(true);
-          }}
-          onDragLeave={() => setDropping(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDropping(false);
-            const f = e.dataTransfer.files?.[0];
-            if (f) start('critique', { file: f });
-          }}
-        >
-          <span className="sb-label">Critique</span>
-          <h2 className="v0-way-title">Bring a design to look at closely.</h2>
-          <p className="v0-body">HTML, PNG, JPG or SVG — choose one, or drop it here. Select an element or drag across an area, say what you see, and reason it through.</p>
-          <button type="button" className="sb-link is-go" onClick={() => fileInput.current?.click()}>
-            Choose a file <span className="sb-ar">→</span>
-          </button>
-        </section>
-        {error && (
-          <p className="v0-error-line" role="alert">
-            {error}
-          </p>
-        )}
-        <section className="v0-list" aria-label="Your designs">
-          <span className="sb-label">Your designs</span>
-          {ready && !list.length && !elsewhere.length && <p className="v0-empty">None yet. They are kept in this browser{signedIn ? ' and with your account' : '; sign in to keep them across devices'}.</p>}
-          <ul>
-            {list.map((s) =>
-              deleting === s.id ? (
-                <li key={s.id} className="sb-row v0-list-row">
-                  <div
-                    className="v0-confirm"
-                    role="group"
-                    aria-label={`Delete ${s.name}`}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') (e.stopPropagation(), setDeleting(null));
-                    }}
-                  >
-                    <p>
-                      Delete “{s.name}” and its cards? It goes from this browser{signedIn ? ' and from your account' : ''}, and cannot be brought back.
-                    </p>
-                    <div className="v0-confirm-acts">
-                      <button type="button" className="sb-btn is-sm is-danger is-solid" onClick={() => remove(s)}>
-                        Delete it
-                      </button>
-                      <button type="button" className="sb-btn is-sm" autoFocus onClick={() => setDeleting(null)}>
-                        Keep it
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              ) : (
-                <li key={s.id} className="sb-row v0-list-row">
-                  <button type="button" className="v0-list-open" onClick={() => openById(s.id)}>
-                    <span className="v0-cell-title">{s.name}</span>
-                    <span className="v0-quiet">
-                      {s.mode === 'create' ? 'Create' : 'Critique'} · {s.cards} card{s.cards === 1 ? '' : 's'} · {ago(s.updatedAt)}
-                    </span>
-                  </button>
-                  <button type="button" className="sb-link is-meta" onClick={() => setDeleting(s.id)}>
-                    Delete
-                  </button>
-                </li>
-              )
-            )}
-            {elsewhere.map((s) => (
-              <li key={s.id} className="sb-row v0-list-row">
-                <button type="button" className="v0-list-open" onClick={() => openById(s.id)}>
-                  <span className="v0-cell-title">{s.name}</span>
-                  <span className="v0-quiet">From another device · {ago(s.updatedAt)}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      </main>
-      <input
-        ref={fileInput}
-        type="file"
-        accept=".html,.htm,.png,.jpg,.jpeg,.svg,text/html,image/png,image/jpeg,image/svg+xml"
-        hidden
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) start('critique', { file: f });
-          e.target.value = '';
-        }}
-      />
-    </div>
+    <StudioHome
+      signedIn={signedIn}
+      list={list}
+      error={error}
+      systems={dsList}
+      systemId={chosenSystem}
+      onSystem={(id) => setHomeSystem(id)}
+      onBegin={beginStudio}
+      onSystems={() => toSystems(null)}
+      onWork={toWork}
+      onOpen={(id) => openById(id)}
+    />
   );
 }

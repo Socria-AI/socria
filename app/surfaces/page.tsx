@@ -16,7 +16,7 @@ export const metadata: Metadata = pageMetadata({
   title: 'Working surfaces — Socria Logos',
   absolute: true,
   description:
-    'A Kerr black hole with integrated geodesics and a Doppler-coloured disc, the thermal history of the universe, and gravity as an N-body integration. Every control moves the physics.',
+    'Physics you can move: a Kerr black hole with integrated geodesics, the thermal history of the universe, and gravity as an N-body integration.',
 });
 
 export default function SurfacesPage() {
@@ -33,6 +33,8 @@ export default function SurfacesPage() {
           zoom, drag the bar under each to make it taller.
         </p>
       </header>
+      {/* the three surfaces each title themselves (h3); this names the set, for the page's outline */}
+      <h2 className="sr-only">Three surfaces: a black hole, the early universe and gravity</h2>
       <div className="sfx-grid">
         <BlackHoleSurface />
         <BigBangSurface />

@@ -1,0 +1,46 @@
+/* components/logos6/objective.css — the objective over the chatbox (ObjectiveLine.tsx): one quiet line that never
+   wraps, an editor in place, and what the chat holds, in the house terms (l5-controls.css): words, hairlines, one serif
+   name. */
+
+.logos-root .l6o { position: relative; margin: 0 0 8px; }
+.logos-root .l6o-row { display: flex; flex-wrap: nowrap; align-items: baseline; gap: 4px 10px; min-width: 0; margin: 0; font-size: 12.5px; color: var(--c-ink-60, rgba(35, 36, 31, 0.66)); }
+.logos-root .l6o-row > .l6o-k { flex: none; font-size: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; }
+.logos-root .l6o-k { font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-ink-45, rgba(35, 36, 31, 0.5)); }
+.logos-root .l6o-goal { flex: 0 1 auto; min-width: 0; max-width: min(46ch, 100%); overflow: hidden; padding: 0; border: 0; background: none; font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif); font-style: italic; font-size: 16px; line-height: 1.25; color: var(--c-ink, #23241f); text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.logos-root span.l6o-goal { cursor: default; }
+.logos-root button.l6o-goal:hover { text-decoration: underline; text-decoration-color: var(--c-ink-25, rgba(35, 36, 31, 0.25)); text-underline-offset: 3px; }
+.logos-root .l6o-goal:focus-visible,
+.logos-root .l6o-edit input:focus-visible { outline: 2px solid var(--c-moss, #354620); outline-offset: 2px; }
+.logos-root .l6o-holds { flex: none; margin-left: auto; font-size: 12px; white-space: nowrap; }
+
+.logos-root .l6o-edit { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 14px; }
+.logos-root .l6o-field { display: flex; flex: 1 1 220px; flex-direction: column; gap: 3px; }
+.logos-root .l6o-edit input { width: 100%; padding: 6px 10px; border: 1px solid var(--c-rule, rgba(53, 70, 32, 0.14)); border-radius: 6px; background: var(--c-paper, #f5f3eb); font: inherit; font-size: 14px; color: var(--c-ink, #23241f); }
+.logos-root .l6o-acts { display: inline-flex; gap: 12px; padding-bottom: 6px; }
+
+.logos-root .l6o-panel { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 30; width: min(440px, 100%); max-height: min(520px, var(--l6o-room, 60vh)); overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px; border: 1px solid var(--c-rule, rgba(53, 70, 32, 0.14)); border-radius: 10px; background: var(--c-paper, #f5f3eb); box-shadow: 0 16px 40px -18px rgba(0, 0, 0, 0.28); }
+.logos-root .l6o-outcome { margin: 0 0 10px; font-size: 13px; color: var(--c-ink, #23241f); }
+.logos-root .l6o-sec { padding: 8px 0; border-top: 1px solid var(--c-rule, rgba(53, 70, 32, 0.14)); }
+.logos-root .l6o-sec:first-child { border-top: 0; padding-top: 0; }
+.logos-root .l6o-sec .l6o-k { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.logos-root .l6o-go { font-size: 11.5px; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.logos-root .l6o-sec ul { margin: 6px 0 0; padding: 0 0 0 16px; font-size: 13px; line-height: 1.45; color: var(--c-ink, #23241f); }
+.logos-root .l6o-sec li + li { margin-top: 2px; }
+.logos-root .l6o-x { margin-left: 8px; font-size: 11.5px; }
+
+/* a phone: the goal keeps the room it can, the counts their own; the panel the line's width, still opening up from the
+   line. (It was fixed to the screen 140px from the foot, a guess at the box's height: over a taller box — a draft, a
+   hint — it covered the very line that opened it, and the top of the box.) */
+.logos-root .l6o.is-narrow .l6o-row > .l6o-k { display: none; }
+.logos-root .l6o.is-narrow .l6o-panel { left: 0; right: 0; width: auto; }
+
+@media (forced-colors: active) {
+  .logos-root .l6o-panel { border-color: CanvasText; }
+}
+
+/* milestones: theirs to tick off */
+.logos-root .l6o-steps { list-style: none; padding-left: 0 !important; }
+.logos-root .l6o-steps label { display: inline-flex; align-items: baseline; gap: 8px; cursor: pointer; }
+.logos-root .l6o-steps input { accent-color: var(--c-moss, #354620); }
+.logos-root .l6o-steps .is-done { color: var(--c-ink-45, rgba(35, 36, 31, 0.5)); text-decoration: line-through; }
+.logos-root .l6o-addstep input { width: 100%; margin-top: 6px; padding: 5px 9px; border: 1px solid var(--c-rule, rgba(53, 70, 32, 0.14)); border-radius: 6px; background: var(--c-paper, #f5f3eb); font: inherit; font-size: 13px; }

@@ -41,9 +41,11 @@ import { FEEDBACK_URL } from '@/lib/feedback';
 import { MapGlyph } from './MapGlyph';
 import { NodeTile } from './NodeTile';
 import { relTime, type LogosSession } from '@/lib/logos-sessions';
+import { objectiveOf } from '@/lib/logos6/objective';
 import {
   cleanTitle,
   groupRail,
+  latestOf,
   mergeRail,
   searchRail,
   shouldShowSearch,
@@ -196,6 +198,8 @@ export function LogosRail({
   const railHits = railFiltering ? searchRail(allRail, query, mapsOnly) : allRail.filter((i) => !filed(i));
   const railGroups = groupRail(railHits);
   const railHasMaps = allRail.some((i) => i.nodes > 0);
+  // the conversation last touched, marked quietly (lib/session-rail.ts latestOf)
+  const latestId = useMemo(() => latestOf(allRail), [allRail]);
   const canFile = !!projects && (!!onMoveSession || !!onMoveChat);
 
   const toggleFolder = (id: string) =>
@@ -273,6 +277,8 @@ export function LogosRail({
       <span className="s-gap" aria-hidden="true" />
     );
     const count = item.nodes ? <span className="n">{item.nodes}</span> : null;
+    // what the chat is for (lib/logos6/objective.ts), in its tooltip: the title says what it is about
+    const aim = Array.isArray((item as { messages?: unknown }).messages) ? objectiveOf(item as unknown as Parameters<typeof objectiveOf>[0], item.updatedAt || 1)?.goal ?? null : null;
     const fileable = canFile && (isChat ? !!onMoveChat : !!onMoveSession);
     const inProject = filed(item) ? item.projectId! : null;
 
@@ -291,11 +297,14 @@ export function LogosRail({
           // this is the same row.
           title={
             item.title +
+            (aim && aim !== item.title ? ` — objective: ${aim}` : '') +
             (item.updatedAt ? ` · ${relTime(item.updatedAt)}` : '')
           }
+          aria-label={aim && aim !== item.title ? `${item.title}, objective: ${aim}` : undefined}
         >
           {mark}
           <span className="t">{item.title}</span>
+          {item.id === latestId && <span className="s-latest" title="Your most recent conversation" aria-label="most recent" />}
           {count}
         </button>
         {/* Rename and delete belong to the surface that owns the row: a chat's

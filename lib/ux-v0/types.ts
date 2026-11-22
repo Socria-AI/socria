@@ -12,8 +12,19 @@
 // model's output — and returns a value the rest of the code can trust, or a
 // safe default. None of them throws. docs/SOCRIAUX-V0.md has the plan.
 
-import { normalizeSpec, type DesignSpec } from './spec';
+import { normalizeIntent, type DesignIntent } from './intent';
+import { normalizeLayout, type LayoutDecisions } from './layout';
+import { normalizeDesignSystem, type DesignSystem } from './design-system';
+import { normalizeSystemLink, type SystemLink } from './dsi/link-schema';
+import { normalizeStudio, type StudioState } from './studio/schema';
+import { EMPTY_DIRECTION, normalizeDirectionState, type DirectionState } from './direction';
+import { normalizeDNA, normalizeRefDna, type CreativeDNA, type RefDna } from './dna';
+import { signatureOf, type DesignSignature } from './signature';
+import { normalizeProc, procId, type ProcSpec } from './assets';
+import { GRIDS, normalizeMotion, normalizeSpec, type DesignSpec, type Motion } from './spec';
 import { bodyFont, displayFont } from './fonts';
+import { normalizeGraphicState, type GraphicState } from './graphics/state';
+import { normalizeBoard, type BoardState } from './boards/model';
 
 // ── small helpers ────────────────────────────────────────────────────
 
@@ -191,11 +202,22 @@ export interface Reasoning {
 
 export interface Usage {
   model: string;
+  /** every input token billed, the cached ones included */
   input: number;
+  /** of `input`, the ones the provider read from its prompt cache (billed at its cached price) */
   cached: number;
+  /** every output token billed, the reasoning included */
   output: number;
+  /** of `output`, the ones spent reasoning, when the provider says (never shown to anyone, but billed) */
+  reasoning?: number;
   /** US$; null when the model has no published price */
   cost: number | null;
+  /** the stage and tier the call was routed to, and its reasoning effort (lib/ux-v0/model.ts routeFor) */
+  stage?: CallKind;
+  tier?: 'economy' | 'premium';
+  effort?: string;
+  /** the operation's time on the server, from its arrival to its answer (ms, measured) */
+  ms?: number;
 }
 
 export interface CardTurn {
@@ -227,10 +249,20 @@ export type Provider = 'unsplash' | 'openverse' | 'pexels';
 export const PROVIDERS: readonly Provider[] = ['unsplash', 'openverse', 'pexels'];
 export type RefState = 'proposed' | 'kept' | 'rejected';
 
+/**
+ * What a reference is for. A photograph may be kept for its light, a spread
+ * for its typography, a building for its composition, a clip for its pacing:
+ * the designer says which (or SocriaUX reads it from their note), and only
+ * that is taken from it. "imagery" is the subject itself.
+ */
+export const REF_ASPECTS = ['atmosphere', 'colour', 'typography', 'composition', 'imagery', 'texture', 'motion'] as const;
+export type RefAspect = (typeof REF_ASPECTS)[number];
+
 export interface MoodboardRef {
-  /** provider:id */
+  /** provider:id (an upload: upload:<file id>) */
   id: string;
-  provider: Provider;
+  /** a licensed library, the designer's own upload (kept in this browser's file store), or a picture SocriaUX made for this project (lib/ux-v0/assets.ts) */
+  provider: Provider | 'upload' | 'socriaux';
   providerId: string;
   url: string;
   thumb: string;
@@ -252,6 +284,34 @@ export interface MoodboardRef {
   query: string;
   state: RefState;
   addedAt: number;
+  /** what to take from it; none means its overall atmosphere */
+  take?: RefAspect[];
+  /** what to leave behind: "this typography, not the palette" */
+  leave?: RefAspect[];
+  /** a reference to steer away from */
+  avoid?: boolean;
+  /** a key reference: it counts most */
+  key?: boolean;
+  /** the designer's own words about it */
+  note?: string;
+  /**
+   * The picture may appear in the design itself. References inspire; only a
+   * picture the designer marks as content is placed on the page. (Absent on
+   * references kept before the distinction existed, which stay usable.)
+   */
+  asContent?: boolean;
+  /** colours sampled from it, most present first */
+  swatches?: string[];
+  /** an upload can be a picture or a moving reference (a clip or an animated GIF) */
+  media?: 'image' | 'video';
+  /** its design DNA, measured from its pixels (lib/ux-v0/ref-dna.ts) and kept so it is never measured again */
+  dna?: RefDna;
+  /** a picture SocriaUX made: its recipe (drawn wherever it is shown, never stored as pixels) */
+  proc?: ProcSpec;
+  /** why a made picture exists: the part that asked for it */
+  reason?: string;
+  /** where its subject is, as a share of its width and height (0–100): what stays in view however it is cropped */
+  focus?: { x: number; y: number };
 }
 
 export interface Palette {
@@ -311,6 +371,8 @@ export interface DiscoveryQuestion {
   multi: boolean;
   answer: string;
   skipped: boolean;
+  /** left to SocriaUX: "you decide" */
+  delegated?: boolean;
   askedAt: number;
 }
 
@@ -335,6 +397,32 @@ export const PALETTE_ROLES: readonly PaletteRole[] = ['background', 'surface', '
 export type PageType = 'website' | 'app-screen';
 export type Platform = 'web' | 'mobile';
 
+// ── the brief as a creative specification ────────────────────────────
+
+/** The parts of a brief a decision can be made about. */
+export const BRIEF_PARTS = ['audience', 'experience', 'personality', 'colour', 'typography', 'layout', 'imagery', 'motion', 'function', 'accessibility', 'responsive', 'rules'] as const;
+export type BriefPart = (typeof BRIEF_PARTS)[number];
+/**
+ * Where a decision stands. Proposed: SocriaUX suggested it. Approved: the
+ * designer agrees (and the model is told so). Locked: a rule, applied to every
+ * direction and never changed by SocriaUX. Delegated: SocriaUX decides.
+ */
+export const DECISIONS = ['proposed', 'approved', 'locked', 'delegated'] as const;
+export type Decision = (typeof DECISIONS)[number];
+
+/** Exact specifications, for a designer who wants them. Each one reaches the look the renderer draws. */
+export interface BriefSpec {
+  /** the modular type scale: each step is this times the one below */
+  ratio?: number;
+  density?: 'compact' | 'comfortable' | 'spacious';
+  grid?: (typeof GRIDS)[number];
+  width?: 'narrow' | 'standard' | 'wide';
+  corners?: 'none' | 'soft' | 'round';
+  motion?: Motion;
+  /** the contrast every text must reach: AA 4.5:1, AAA 7:1 */
+  contrast?: 'AA' | 'AAA';
+}
+
 export interface DesignBrief {
   objective: string;
   audience: string;
@@ -350,18 +438,68 @@ export interface DesignBrief {
   openQuestions: string[];
   pageType: PageType;
   platform: Platform;
+  /** how it should feel to use, in a sentence */
+  experience?: string;
+  /** where each decision stands */
+  decisions?: Partial<Record<BriefPart, Decision>>;
+  /** hard rules the design must follow; everything else is a preference */
+  rules?: string[];
+  accessibility?: string[];
+  responsive?: string[];
+  spec?: BriefSpec;
+  /** what is being made (lib/ux-v0/intent.ts): the experience, its task and its requirements, with stable ids */
+  intent?: DesignIntent;
+  /** the layout decisions (lib/ux-v0/layout.ts): what leads, the arrangement, the alignment, the pictures; the rest varies */
+  layout?: LayoutDecisions;
+  /** the designer's own design system (lib/ux-v0/design-system.ts): built within, checked against */
+  system?: DesignSystem;
+  /** optional parts the designer added to the brief */
+  parts?: BriefPart[];
 }
 
 // ── usage ────────────────────────────────────────────────────────────
 
-export type CallKind = 'discover' | 'direction' | 'brief' | 'refine-brief' | 'generate' | 'refine' | 'critique';
-export const CALL_KINDS: readonly CallKind[] = ['discover', 'direction', 'brief', 'refine-brief', 'generate', 'refine', 'critique'];
+export type CallKind = 'discover' | 'direction' | 'brief' | 'refine-brief' | 'art-direction' | 'generate' | 'refine' | 'critique' | 'image';
+export const CALL_KINDS: readonly CallKind[] = ['discover', 'direction', 'brief', 'refine-brief', 'art-direction', 'generate', 'refine', 'critique', 'image'];
+
+/** What each stage is, in words, for the cost panel, the settings and the report. */
+export const STAGE_LABEL: Record<CallKind, string> = {
+  discover: 'Questions',
+  direction: 'Moodboard direction',
+  brief: 'Brief',
+  'refine-brief': 'Brief revision',
+  'art-direction': 'Art direction',
+  generate: 'Generation',
+  refine: 'Refinement',
+  critique: 'Critique',
+  // a picture made by an image model (lib/ux-v0/image-gen-server.ts): priced and capped apart from the text stages
+  image: 'Images',
+};
+
+export interface StageSpend {
+  calls: number;
+  /** US$, as the provider reported it (measured) */
+  cost: number;
+  /** of those calls, how many ran on the premium model */
+  premium: number;
+  /** the time they took on the server (ms, measured; from when it was recorded) */
+  ms?: number;
+}
 
 export interface UsageTotals {
   calls: number;
   input: number;
   output: number;
   cost: number;
+  /** of `input`, read from the provider's prompt cache; of `output`, spent reasoning (measured, when reported) */
+  cached?: number;
+  reasoning?: number;
+  /** what each stage cost: the questions, the brief, art direction, generation… (measured) */
+  byStage?: Partial<Record<CallKind, StageSpend>>;
+  /** the design versions the designer accepted by downloading them: cost per accepted design is cost / accepted */
+  accepted?: number[];
+  /** the time the calls took on the server (ms, measured; from when it was recorded) */
+  ms?: number;
 }
 
 // ── the project ──────────────────────────────────────────────────────
@@ -375,9 +513,31 @@ export interface DesignProject {
   discovery: Discovery;
   moodboard: Moodboard;
   brief: { doc: DesignBrief | null; approved: boolean; version: number };
+  /** the art direction: proposed options, the designer's notes and locks, and the one approved (lib/ux-v0/direction.ts) */
+  direction: DirectionState;
+  /** the Creative DNA (lib/ux-v0/dna.ts): derived from the brief and references, set and locked by the designer */
+  dna?: CreativeDNA;
   /** generated designs: every version, newest last; specIndex is the one shown */
   specs: DesignSpec[];
   specIndex: number;
+  /** compositions the designer set aside while exploring (their arrangement signatures): not proposed again */
+  compositions?: { rejected: string[] };
+  /** the scoped edits made in words: how many, and how many tried to change more than was asked (put back) */
+  edits?: { edits: number; confined: number };
+  /** versions the designer chose to keep: never let go when older versions are (lib/ux-v0/history.ts) */
+  keptVersions?: number[];
+  /** what is being made: a website (the default), a graphic (lib/ux-v0/graphics), or a board of many materials in one
+   * design system (lib/ux-v0/boards) */
+  medium?: 'website' | 'graphic' | 'board';
+  /** a graphic's brief, directions, document and versions (lib/ux-v0/graphics/state.ts) */
+  graphic?: GraphicState;
+  /** a board: its request, its Master Design System, its materials, what is on its canvas (lib/ux-v0/boards/model.ts) */
+  board?: BoardState;
+  /** the registry design system it is built in (lib/ux-v0/dsi): which version, pinned or following, and its overrides */
+  systemLink?: SystemLink;
+  /** the studio conversation it was begun in (lib/ux-v0/studio): what was asked for, every decision since, the
+   * conversation itself; read by the workspace the work continues in */
+  studio?: StudioState;
   artifact: Artifact | null;
   cards: ReasoningCard[];
   usage: UsageTotals;
@@ -390,10 +550,32 @@ export interface ProjectSummary {
   id: string;
   name: string;
   mode: ProjectMode;
+  /** a graphic, not a website: what kind of graphic (poster, carousel, cover, …) */
+  graphic?: string;
+  /** a board, not a website: how many materials it holds */
+  board?: number;
   intent: string;
   updatedAt: number;
   cards: number;
   hasDesign: boolean;
+  /** what the home's wall label says about it */
+  createdAt: number;
+  /** how far it has come: questions, a brief, a direction, a design (or an imported file) */
+  stage: 'begun' | 'discovery' | 'brief' | 'direction' | 'design' | 'imported';
+  /** versions of the generated design */
+  versions: number;
+  /** a website or an app screen, once there is a brief */
+  pageType: PageType | null;
+  /** an imported file's kind */
+  medium: ArtifactKind | null;
+  /** its design's signature, so a new design can be checked against it (lib/ux-v0/signature.ts) */
+  signature?: DesignSignature;
+  /** the art direction the design follows */
+  direction: string;
+  /** up to three kept moodboard thumbnails: the studies behind a work in progress */
+  studies: string[];
+  /** begun in the studio: its kind, and whether it is still in conversation */
+  studio?: { mode: StudioState['mode']; status: StudioState['status'] };
 }
 
 // ── normalisers ──────────────────────────────────────────────────────
@@ -547,7 +729,12 @@ export function normalizeUsage(v: unknown): Usage | null {
     input: num(r.input, 0, 1e8, 0),
     cached: num(r.cached, 0, 1e8, 0),
     output: num(r.output, 0, 1e8, 0),
+    ...(typeof r.reasoning === 'number' && r.reasoning > 0 ? { reasoning: num(r.reasoning, 0, 1e8, 0) } : {}),
     cost: typeof r.cost === 'number' && Number.isFinite(r.cost) && r.cost >= 0 ? r.cost : null,
+    ...((CALL_KINDS as readonly string[]).includes(r.stage as string) ? { stage: r.stage as CallKind } : {}),
+    ...(r.tier === 'economy' || r.tier === 'premium' ? { tier: r.tier } : {}),
+    ...(typeof r.effort === 'string' && /^[a-z]{2,8}$/.test(r.effort) ? { effort: r.effort } : {}),
+    ...(typeof r.ms === 'number' && r.ms > 0 ? { ms: num(r.ms, 0, 6e5, 0) } : {}),
   };
 }
 
@@ -582,18 +769,77 @@ export function normalizeCard(v: unknown): ReasoningCard | null {
   };
 }
 
+/** A focal point held to the picture: whole percentages; the centre is no focal point at all. */
+function focusOf(v: unknown): { focus?: { x: number; y: number } } {
+  const f = obj(v);
+  if (typeof f.x !== 'number' || typeof f.y !== 'number' || !Number.isFinite(f.x) || !Number.isFinite(f.y)) return {};
+  const x = Math.max(0, Math.min(100, Math.round(f.x)));
+  const y = Math.max(0, Math.min(100, Math.round(f.y)));
+  return x === 50 && y === 50 ? {} : { focus: { x, y } };
+}
+
 export function normalizeRef(v: unknown): MoodboardRef | null {
   const r = obj(v);
-  const provider = oneOf(r.provider, PROVIDERS, 'openverse');
-  const url = httpsUrl(r.url);
-  const providerId = clean(r.providerId, 80);
-  if (!url || !providerId) return null;
+  // a picture SocriaUX made: its recipe is the picture; its id is the recipe's
+  if (r.provider === 'socriaux') {
+    const proc = normalizeProc(r.proc);
+    if (!proc) return null;
+    const providerId = procId(proc);
+    return {
+      id: `socriaux:${providerId}`,
+      provider: 'socriaux',
+      providerId,
+      proc,
+      url: '',
+      thumb: '',
+      width: num(r.width, 0, 100000, 0),
+      height: num(r.height, 0, 100000, 0),
+      color: hex(r.color),
+      title: clean(r.title, 200) || 'Made by SocriaUX',
+      creator: 'SocriaUX',
+      creatorUrl: '',
+      sourceUrl: '',
+      license: 'Made by SocriaUX for this project (no third-party rights)',
+      licenseUrl: '',
+      attribution: 'Made by SocriaUX for this project',
+      downloadPing: '',
+      category: oneOf(r.category, MOOD_CATEGORIES, 'imagery'),
+      query: '',
+      state: oneOf(r.state, ['proposed', 'kept', 'rejected'] as const, 'kept'),
+      addedAt: time(r.addedAt, Date.now()),
+      asContent: r.asContent !== false,
+      ...(clean(r.reason, 200) ? { reason: clean(r.reason, 200) } : {}),
+      ...focusOf(r.focus),
+      ...(r.key === true ? { key: true } : {}),
+      ...((dna) => (dna ? { dna } : {}))(normalizeRefDna(r.dna)),
+    };
+  }
+  const upload = r.provider === 'upload';
+  const provider: MoodboardRef['provider'] = upload ? 'upload' : oneOf(r.provider, PROVIDERS, 'openverse');
+  // an upload's picture lives in this browser's file store, found by its id; its address is made when it is shown
+  const url = upload ? '' : httpsUrl(r.url);
+  const providerId = upload ? (typeof r.providerId === 'string' && /^[a-f0-9]{32}$/.test(r.providerId) ? r.providerId : '') : clean(r.providerId, 80);
+  if ((!url && !upload) || !providerId) return null;
+  const aspects = (x: unknown): RefAspect[] => [...new Set(arr(x).filter((a): a is RefAspect => (REF_ASPECTS as readonly string[]).includes(a as string)))];
+  const take = aspects(r.take);
+  const leave = aspects(r.leave).filter((a) => !take.includes(a));
+  const swatches = arr(r.swatches).map(hex).filter((x): x is string => !!x).slice(0, 6);
   return {
+    ...(take.length ? { take } : {}),
+    ...(leave.length ? { leave } : {}),
+    ...(r.avoid === true ? { avoid: true } : {}),
+    ...(r.key === true ? { key: true } : {}),
+    ...(clean(r.note, 400) ? { note: clean(r.note, 400) } : {}),
+    ...(typeof r.asContent === 'boolean' ? { asContent: r.asContent } : {}),
+    ...(swatches.length ? { swatches } : {}),
+    ...(r.media === 'video' ? { media: 'video' as const } : {}),
+    ...((dna) => (dna ? { dna } : {}))(normalizeRefDna(r.dna)),
+    ...focusOf(r.focus),
     id: `${provider}:${providerId}`,
     provider,
     providerId,
     url,
-    thumb: httpsUrl(r.thumb) || url,
+    thumb: upload ? '' : httpsUrl(r.thumb) || url,
     width: num(r.width, 0, 100000, 0),
     height: num(r.height, 0, 100000, 0),
     color: hex(r.color),
@@ -641,6 +887,8 @@ export function normalizeTypePair(v: unknown): TypePair | null {
  * it is shown), never a library's long legal sentence.
  */
 export function creditText(r: Pick<MoodboardRef, 'provider' | 'title' | 'creator' | 'license'>): string {
+  if (r.provider === 'upload') return `${r.title ? `“${r.title}”, ` : ''}your own reference`;
+  if (r.provider === 'socriaux') return `${r.title ? `“${r.title}”, ` : ''}made by SocriaUX for this project`;
   const by = r.creator ? ` by ${r.creator}` : '';
   if (r.provider === 'unsplash') return `Photo${by} on Unsplash`;
   if (r.provider === 'pexels') return `Photo${by} on Pexels`;
@@ -694,6 +942,7 @@ export function normalizeQuestion(v: unknown): DiscoveryQuestion | null {
     multi: r.multi === true,
     answer: str(r.answer, LIMITS.answer).trim(),
     skipped: r.skipped === true,
+    ...(r.delegated === true ? { delegated: true } : {}),
     askedAt: time(r.askedAt, Date.now()),
   };
 }
@@ -748,7 +997,42 @@ export function normalizeBrief(v: unknown, keptRefIds?: ReadonlySet<string>): De
     openQuestions: strings(r.openQuestions, 6, 200),
     pageType: oneOf(r.pageType, ['website', 'app-screen'] as const, 'website'),
     platform: oneOf(r.platform, ['web', 'mobile'] as const, 'web'),
+    ...briefExtras(r),
   };
+}
+
+/** The specification parts of a brief, kept only where they say something. */
+function briefExtras(r: Record<string, any>): Partial<DesignBrief> {
+  const out: Partial<DesignBrief> = {};
+  const experience = clean(r.experience, 400);
+  if (experience) out.experience = experience;
+  const d = obj(r.decisions);
+  const decisions: Partial<Record<BriefPart, Decision>> = {};
+  for (const k of BRIEF_PARTS) if ((DECISIONS as readonly string[]).includes(d[k]) && d[k] !== 'proposed') decisions[k] = d[k];
+  if (Object.keys(decisions).length) out.decisions = decisions;
+  for (const k of ['rules', 'accessibility', 'responsive'] as const) {
+    const xs = strings(r[k], 12, 240);
+    if (xs.length) out[k] = xs;
+  }
+  const sp = obj(r.spec);
+  const spec: BriefSpec = {};
+  if (typeof sp.ratio === 'number' && Number.isFinite(sp.ratio)) spec.ratio = Math.round(Math.max(1.125, Math.min(1.618, sp.ratio)) * 1000) / 1000;
+  if (['compact', 'comfortable', 'spacious'].includes(sp.density)) spec.density = sp.density;
+  if ((GRIDS as readonly string[]).includes(sp.grid)) spec.grid = sp.grid;
+  if (['narrow', 'standard', 'wide'].includes(sp.width)) spec.width = sp.width;
+  if (['none', 'soft', 'round'].includes(sp.corners)) spec.corners = sp.corners;
+  if (sp.motion && typeof sp.motion === 'object') spec.motion = normalizeMotion(sp.motion);
+  if (sp.contrast === 'AA' || sp.contrast === 'AAA') spec.contrast = sp.contrast;
+  if (Object.keys(spec).length) out.spec = spec;
+  const intent = normalizeIntent(r.intent);
+  if (intent) out.intent = intent;
+  const layout = normalizeLayout(r.layout);
+  if (layout) out.layout = layout;
+  const system = normalizeDesignSystem(r.system);
+  if (system) out.system = system;
+  const parts = strings(r.parts, BRIEF_PARTS.length, 20).filter((x): x is BriefPart => (BRIEF_PARTS as readonly string[]).includes(x));
+  if (parts.length) out.parts = [...new Set(parts)];
+  return out;
 }
 
 export function normalizeArtifact(v: unknown): Artifact | null {
@@ -774,7 +1058,20 @@ export function normalizeArtifact(v: unknown): Artifact | null {
 
 const usageTotals = (v: unknown): UsageTotals => {
   const r = obj(v);
-  return { calls: num(r.calls, 0, 1e7, 0), input: num(r.input, 0, 1e12, 0), output: num(r.output, 0, 1e12, 0), cost: num(r.cost, 0, 1e7, 0) };
+  const out: UsageTotals = { calls: num(r.calls, 0, 1e7, 0), input: num(r.input, 0, 1e12, 0), output: num(r.output, 0, 1e12, 0), cost: num(r.cost, 0, 1e7, 0) };
+  if (num(r.cached, 0, 1e12, 0)) out.cached = num(r.cached, 0, 1e12, 0);
+  if (num(r.reasoning, 0, 1e12, 0)) out.reasoning = num(r.reasoning, 0, 1e12, 0);
+  if (num(r.ms, 0, 1e12, 0)) out.ms = num(r.ms, 0, 1e12, 0);
+  const by: Partial<Record<CallKind, StageSpend>> = {};
+  for (const [k, x] of Object.entries(obj(r.byStage))) {
+    if (!(CALL_KINDS as readonly string[]).includes(k)) continue;
+    const o = obj(x);
+    by[k as CallKind] = { calls: num(o.calls, 0, 1e7, 0), cost: num(o.cost, 0, 1e7, 0), premium: num(o.premium, 0, 1e7, 0), ...(num(o.ms, 0, 1e12, 0) ? { ms: num(o.ms, 0, 1e12, 0) } : {}) };
+  }
+  if (Object.keys(by).length) out.byStage = by;
+  const accepted = (Array.isArray(r.accepted) ? r.accepted : []).filter((x): x is number => Number.isInteger(x) && x > 0 && x < 1e6);
+  if (accepted.length) out.accepted = [...new Set(accepted)].slice(-200);
+  return out;
 };
 
 export function emptyDiscovery(): Discovery {
@@ -816,8 +1113,26 @@ export function normalizeProject(v: unknown, opts: { forSync?: boolean } = {}): 
     discovery: normalizeDiscovery(r.discovery),
     moodboard,
     brief: { doc: normalizeBrief(b.doc, kept.size ? kept : undefined), approved: b.approved === true, version: num(b.version, 0, 1e4, 0) },
+    direction: normalizeDirectionState(r.direction),
+    ...((dna) => (dna && Object.keys(dna.dims).length ? { dna } : {}))(normalizeDNA(r.dna)),
     specs,
     specIndex: specs.length ? num(r.specIndex, 0, specs.length - 1, specs.length - 1) : -1,
+    ...((rej) => (rej.length ? { compositions: { rejected: rej } } : {}))(
+      arr(obj(r.compositions).rejected)
+        .filter((x): x is string => typeof x === 'string' && x.length <= 2000)
+        .slice(-60),
+    ),
+    ...((e) => (Number.isFinite(e.edits) && e.edits > 0 ? { edits: { edits: Math.min(1e6, Math.round(e.edits)), confined: Math.max(0, Math.min(Math.round(e.edits), Math.round(Number(e.confined) || 0))) } } : {}))({ edits: Number(obj(r.edits).edits), confined: obj(r.edits).confined }),
+    ...((k) => (k.length ? { keptVersions: k } : {}))(
+      arr(r.keptVersions)
+        .filter((x): x is number => typeof x === 'number' && Number.isInteger(x) && x > 0 && specs.some((sp) => sp.version === x))
+        .slice(0, 30),
+    ),
+    ...(r.medium === 'graphic' ? { medium: 'graphic' as const } : r.medium === 'board' ? { medium: 'board' as const } : {}),
+    ...((g) => (g && r.medium === 'graphic' ? { graphic: g } : {}))(normalizeGraphicState(r.graphic)),
+    ...((bd) => (bd ? { board: bd } : {}))(r.medium === 'board' ? normalizeBoard(r.board) : null),
+    ...((ln) => (ln ? { systemLink: ln } : {}))(normalizeSystemLink(r.systemLink)),
+    ...((st) => (st ? { studio: st } : {}))(normalizeStudio(r.studio)),
     artifact: normalizeArtifact(r.artifact),
     cards,
     usage: usageTotals(r.usage),
@@ -837,6 +1152,7 @@ export function makeProject(mode: ProjectMode, name: string, now = Date.now()): 
     discovery: emptyDiscovery(),
     moodboard: emptyMoodboard(),
     brief: { doc: null, approved: false, version: 0 },
+    direction: { ...EMPTY_DIRECTION, options: [], seen: [] },
     specs: [],
     specIndex: -1,
     artifact: null,
@@ -849,14 +1165,58 @@ export function makeProject(mode: ProjectMode, name: string, now = Date.now()): 
 }
 
 export function summarize(p: DesignProject): ProjectSummary {
+  const imported = p.artifact?.type === 'imported' ? p.artifact : null;
+  const g = p.medium === 'graphic' ? p.graphic : undefined;
+  const bd = p.medium === 'board' ? p.board : undefined;
+  const stage: ProjectSummary['stage'] = bd
+    ? bd.materials.some((m) => m.status === 'ready')
+      ? 'design'
+      : bd.system
+        ? 'direction'
+        : bd.brief
+          ? 'brief'
+          : 'begun'
+    : g
+    ? g.doc
+      ? 'design'
+      : g.options.length
+        ? 'direction'
+        : g.brief
+          ? 'brief'
+          : 'begun'
+    : imported
+    ? 'imported'
+    : p.specs.length
+      ? 'design'
+      : p.direction.options.length && p.brief.approved
+        ? 'direction'
+        : p.brief.doc
+          ? 'brief'
+          : p.intent
+            ? 'discovery'
+            : 'begun';
   return {
     id: p.id,
     name: p.name,
     mode: p.mode,
+    ...(p.medium === 'graphic' ? { graphic: g?.brief?.kind ?? 'graphic' } : {}),
+    ...(bd ? { board: bd.materials.length } : {}),
     intent: p.intent.slice(0, 160),
     updatedAt: p.updatedAt,
     cards: p.cards.length,
     hasDesign: !!p.artifact || p.specs.length > 0,
+    createdAt: p.createdAt,
+    stage,
+    versions: bd ? bd.versions.length : g ? g.versions.length : p.specs.length,
+    pageType: p.brief.doc?.pageType ?? currentSpec(p)?.pageType ?? null,
+    medium: imported ? imported.kind : null,
+    direction: bd ? bd.system?.direction.name ?? '' : g ? g.direction?.name ?? '' : p.direction.chosen?.name ?? '',
+    ...((spec) => (spec && !imported ? { signature: signatureOf(spec, p.id, p.name) } : {}))(currentSpec(p)),
+    studies: p.moodboard.refs
+      .filter((r) => r.state === 'kept' && r.thumb)
+      .slice(0, 3)
+      .map((r) => r.thumb),
+    ...(p.studio ? { studio: { mode: p.studio.mode, status: p.studio.status } } : {}),
   };
 }
 
@@ -868,5 +1228,57 @@ export function currentSpec(p: DesignProject): DesignSpec | null {
 /** Add one call's usage to a project's totals. */
 export function addUsage(t: UsageTotals, u: Usage | null): UsageTotals {
   if (!u) return t;
-  return { calls: t.calls + 1, input: t.input + u.input, output: t.output + u.output, cost: Math.round((t.cost + (u.cost ?? 0)) * 1e6) / 1e6 };
+  const round = (n: number) => Math.round(n * 1e6) / 1e6;
+  const out: UsageTotals = { ...t, calls: t.calls + 1, input: t.input + u.input, output: t.output + u.output, cost: round(t.cost + (u.cost ?? 0)) };
+  if (u.cached) out.cached = (t.cached ?? 0) + u.cached;
+  if (u.reasoning) out.reasoning = (t.reasoning ?? 0) + u.reasoning;
+  if (u.ms) out.ms = (t.ms ?? 0) + u.ms;
+  if (u.stage) {
+    const was = t.byStage?.[u.stage] ?? { calls: 0, cost: 0, premium: 0 };
+    const ms = (was.ms ?? 0) + (u.ms ?? 0);
+    out.byStage = { ...(t.byStage ?? {}), [u.stage]: { calls: was.calls + 1, cost: round(was.cost + (u.cost ?? 0)), premium: was.premium + (u.tier === 'premium' ? 1 : 0), ...(ms ? { ms } : {}) } };
+  }
+  return out;
+}
+
+/** The project's spend with one more design version accepted (downloaded). */
+export function acceptDesign(t: UsageTotals, version: number): UsageTotals {
+  return { ...t, accepted: [...new Set([...(t.accepted ?? []), version])].slice(-200) };
+}
+
+/** What each accepted design cost, on average (measured spend over accepted versions), or null before any. */
+export function costPerAccepted(t: UsageTotals): number | null {
+  const n = t.accepted?.length ?? 0;
+  return n ? Math.round((t.cost / n) * 1e6) / 1e6 : null;
+}
+
+/**
+ * What it took to reach each accepted design, on average, from what was measured: the money (text and pictures
+ * apart), the attempts (designs generated, changes worked out by a model), and the time the calls took. Null
+ * before a design is accepted. Pictures from an image model are their own line, never folded into text.
+ */
+export interface AcceptedEconomics {
+  accepted: number;
+  cost: number;
+  text: number;
+  images: number;
+  generations: number;
+  refinements: number;
+  /** seconds of server time per accepted design; null when no call recorded its time */
+  seconds: number | null;
+}
+export function acceptedEconomics(t: UsageTotals): AcceptedEconomics | null {
+  const n = t.accepted?.length ?? 0;
+  if (!n) return null;
+  const r6 = (x: number) => Math.round(x * 1e6) / 1e6;
+  const images = t.byStage?.image?.cost ?? 0;
+  return {
+    accepted: n,
+    cost: r6(t.cost / n),
+    text: r6(Math.max(0, t.cost - images) / n),
+    images: r6(images / n),
+    generations: Math.round(((t.byStage?.generate?.calls ?? 0) / n) * 10) / 10,
+    refinements: Math.round(((t.byStage?.refine?.calls ?? 0) / n) * 10) / 10,
+    seconds: t.ms ? Math.round(t.ms / n / 100) / 10 : null,
+  };
 }

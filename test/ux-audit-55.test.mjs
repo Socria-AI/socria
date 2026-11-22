@@ -45,7 +45,7 @@ ok('the floating guest note never sits over a dialog (it showed above Search\'s 
 ok('  in the one space the inline note is paper — it floats over the canvas there', /\.ls-chat \.l5-guestnudge\.is-inline \{[^}]*background-color: var\(--c-paper\);/.test(r2));
 
 console.log('\n=== one name for each thing ===');
-ok('the space\'s row says Files and Artifacts — the names of the views and the menus — not Brought and Made', /KIND_NAMES: Record<SpaceKind, string> = \{ all: 'Everything', ideas: 'Ideas', brought: 'Files', made: 'Artifacts', words: 'Words' \}/.test(spaceTsx));
+ok('the space\'s row says Files and Artifacts — the names of the views and the menus — not Brought and Made (and the ideas are the Mind Map, Logos 6)', /KIND_NAMES: Record<SpaceKind, string> = \{ all: 'Everything', ideas: 'Mind Map', brought: 'Files', made: 'Artifacts', words: 'Words' \}/.test(spaceTsx));
 ok('the board\'s column is "Files and artifacts"', /Files and artifacts · /.test(read('components/logos5/L5Board.tsx')) && !/Brought and made/.test(read('components/logos5/L5Board.tsx')));
 ok('the conversation view is called Conversation (as "Read as a conversation" and the split already said), not Chat', /chat: 'Conversation',\n  \/\/ Logos 5: the view is called Files/.test(read('lib/logos5/views.ts')));
 ok('the Logic Map is never "the Thinking Map" to the person: the asking-about source, the limit note, the panel, the poster, privacy', !/'Thinking Map'/.test(app) && !/Your free Thinking Map/.test(app) && /eyebrow: context \? `Logic Map · \$\{context\}` : 'Logic Map'/.test(read('components/MapPoster.tsx')) && /your Logic Maps, your drafts/.test(read('components/DataPrivacyPanel.tsx')));

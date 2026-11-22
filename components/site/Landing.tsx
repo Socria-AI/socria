@@ -1,7 +1,13 @@
 // components/site/Landing.tsx — the homepage, from `Socria Landing` in the
 // design project: the cover with Logos 5 framed under it, one conversation
-// with the cards it drew in the margin, three things people bring, the plans,
-// and the close.
+// with the cards it drew in the margin, what it does, three things people
+// bring, the plans, and the close.
+//
+// What it does (CAPABILITIES) is the page's plain account of the product, for
+// a newcomer and for a search engine alike: six things, each true of Logos 5
+// for everyone (nothing behind a switch), each a link to where it is
+// explained. lib/structured-data.ts FEATURES says the same six, so the
+// structured data never claims what the page does not show.
 //
 // A server component. The only parts that run in the browser are the map's
 // edges (measured from where the cards land) and the three demos, which play
@@ -15,7 +21,7 @@
 import { Button, LogosNode, SpreadHead } from '@/components/ds';
 import { freePlanSentence, onePlanSentence } from '@/lib/entitlements';
 import { priceLabel, SOCRIA_ONE } from '@/lib/socria-one';
-import { INERT, ONE, SiteFoot, SiteMast, SitePage, START } from './chrome';
+import { EXPLORE, INERT, ONE, SiteA, SiteFoot, SiteMast, SitePage, START } from './chrome';
 import { Ico } from './icons';
 import { MapEdges, type MapEdge } from './MapEdges';
 import { UseCase, type UseCaseProps } from './UseCase';
@@ -81,6 +87,49 @@ const USES: (UseCaseProps & { id: string })[] = [
     caption: 'What you are actually trying to say, found by being asked.',
   },
 ];
+
+/** What it does: six things, each true for everyone, each a way into where it is explained. */
+const CAPABILITIES: { title: string; text: string; href: string; link: string }[] = [
+  {
+    title: 'Asks before it answers',
+    text: 'When the thinking is the point, Socria asks the question you skipped first: which rule you used, what you are assuming. Facts and mechanical work it simply does.',
+    href: '/socratic-ai',
+    link: 'Socratic AI, explained',
+  },
+  {
+    title: 'Your reasoning, on a map',
+    text: 'As you talk, the Logic Map fills in: claims, assumptions, open questions and the evidence for each. Move it, connect it, correct it. The map is yours.',
+    href: '/docs/thinking-map',
+    link: 'The Logic Map',
+  },
+  {
+    title: 'Pictures you can move',
+    text: 'Where a picture helps, the reply is one you can work in: a graph you can drive, a supply curve you can shift, a model whose numbers are computed, not guessed.',
+    href: '/docs/mathematics',
+    link: 'Graphs and models',
+  },
+  {
+    title: 'One conversation, one objective',
+    text: 'Each conversation keeps what it is for and what it has gathered: decisions, open questions, sources, and milestones only you tick off.',
+    href: '/docs/logos-5',
+    link: 'How Logos 5 works',
+  },
+  {
+    title: 'Citations that point at something real',
+    text: 'Give it a paper or a chapter. A reply may cite only the passages it was given and the sources it actually read; a citation to anything else is taken out.',
+    href: '/docs/drafts-grounding',
+    link: 'Reading and grounding',
+  },
+  {
+    title: 'Practice from your own material',
+    text: 'Ask for a quiz on what you are studying and it is made from your own notes and slides. Working a maths problem to learn it, you get hints, not answers, until you choose to see the solution.',
+    href: '/for-students',
+    link: 'Socria for students',
+  },
+];
+
+/** How many things What it does says — the structured data's featureList says as many (test/seo.test.mjs). */
+export const CAPABILITIES_COUNT = CAPABILITIES.length;
 
 /** The landing's cover picture: Logos 5 with the Logic Map open and the conversation beside it. */
 function Shot() {
@@ -272,6 +321,8 @@ export function Landing() {
           <div className="s-cover-in">
             <div className="s-cover-top">
               <h1 id="s-cover-h">
+                {/* what Socria is, in the words someone searching would use; the line under it is the voice */}
+                <span className="s-cover-k">Socria · The Human-First AI that helps you think for yourself</span>{' '}
                 Come out <em>sharper.</em>
               </h1>
               <div className="s-cover-side">
@@ -332,16 +383,41 @@ export function Landing() {
           </div>
         </section>
 
+        <section className="s-sec s-does-sec" aria-labelledby="s-does-h">
+          <div className="s-wrap s-does-in">
+            <div className="s-band-head">
+              <SpreadHead num="II." name="What it does" />
+              <h2 className="s-display" id="s-does-h">
+                A thinking environment, <em>not an answer machine.</em>
+              </h2>
+            </div>
+            <p className="s-does-lede">
+              Most chatbots are built to answer as fast as they can. Socria is built so you understand the answer,
+              and need it less next time.
+            </p>
+            <div className="s-does">
+              {CAPABILITIES.map((c) => (
+                <div key={c.title} className="s-does-item">
+                  <h3>{c.title}</h3>
+                  <p>{c.text}</p>
+                  <SiteA l={{ href: c.href, label: `${c.link} →`, className: 's-does-go' }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <section className="s-sec s-band" aria-label="What people bring">
           <div className="s-wrap s-uses-in">
             <div className="s-uses-head">
               <div className="s-band-head">
-                <SpreadHead num="II." name="What people bring" />
+                <SpreadHead num="III." name="What people bring" />
                 <h2 className="s-display">Anything you bring, you leave better at.</h2>
               </div>
               <p>
                 A chapter you have to know by Thursday, a proposal due Monday, a letter you keep not writing. Socria
-                reads what you give it and asks the question you skipped.
+                reads what you give it and asks the question you skipped.{' '}
+                <SiteA l={{ href: EXPLORE.href, label: 'See five of them, in the product →', className: 's-does-go' }} />
               </p>
             </div>
             <div className="s-uses">
@@ -354,7 +430,8 @@ export function Landing() {
 
         <section className="s-sec s-plans-sec" aria-label="Plans">
           <div className="s-wrap s-plans-in">
-            <SpreadHead num="III." name="Plans" />
+            <SpreadHead num="IV." name="Plans" />
+            <h2 className="sr-only">Plans</h2>
             <div className="s-plans">
               <div className="s-plan">
                 <h3>Free</h3>

@@ -327,7 +327,7 @@ export function LinkPicker({
     return cards.filter((c) => c.id !== exclude && c.text.trim()).map((c) => ({ k: 'card' as const, id: c.id, label: c.text.slice(0, 120) }));
   }, [mode, docs, map, cards, exclude]);
   const shown = items.filter((i) => !needle || i.label.toLowerCase().includes(needle) || (i.quote ?? '').toLowerCase().includes(needle)).slice(0, 80);
-  const title = mode === 'doc' ? 'Link a passage from your files' : mode === 'node' ? 'Link an idea on the Logic Map' : 'Link another card';
+  const title = mode === 'doc' ? 'Link a passage from your files' : mode === 'node' ? 'Link an idea on the Mind Map' : 'Link another card';
   const empty =
     mode === 'doc'
       ? 'No documents have been read in this conversation on this device yet. Add one in Components, then link its passages here.'

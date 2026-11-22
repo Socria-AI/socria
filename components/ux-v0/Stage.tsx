@@ -66,6 +66,8 @@ export const Stage = forwardRef<StageHandle, Props>(function Stage(p, ref) {
   const [space, setSpace] = useState(false);
   const pan = useRef<{ sx: number; sy: number; cam: Camera } | null>(null);
   const fittedFor = useRef('');
+  /** the zoom the last fit set: while the camera keeps it, a resize fits again */
+  const fitK = useRef<number | null>(null);
   const W = p.width;
   const H = p.kind === 'image' ? p.height ?? 800 : pageH;
 
@@ -74,8 +76,10 @@ export const Stage = forwardRef<StageHandle, Props>(function Stage(p, ref) {
     if (!el) return;
     const vw = el.clientWidth;
     const vh = el.clientHeight;
-    const k = clampZoom(Math.min(1, (vw - 96) / Math.max(1, W)));
-    const y = H * k < vh - 96 ? (vh - H * k) / 2 : 48;
+    const pad = vw < 600 ? 32 : 96;
+    const k = clampZoom(Math.min(1, (vw - pad) / Math.max(1, W)));
+    const y = H * k < vh - 96 ? (vh - H * k) / 2 : pad / 2;
+    fitK.current = k;
     setCam({ x: (vw - W * k) / 2, y, k });
   }, [W, H]);
 
@@ -92,6 +96,22 @@ export const Stage = forwardRef<StageHandle, Props>(function Stage(p, ref) {
     fittedFor.current = key;
     fitWidth();
   }, [p.artifactId, W, fitWidth]);
+
+  // …and when the stage itself changes width (a window made narrower, a phone turned), unless the designer
+  // has zoomed since: a design fitted at 1440 px is not left at 67% on a phone, off the side of the screen
+  useEffect(() => {
+    const el = wrap.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let last = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      const w = el.clientWidth;
+      if (Math.abs(w - last) < 24) return;
+      last = w;
+      if (fitK.current == null || Math.abs(camNow.current.k - fitK.current) < 1e-6) fitWidth();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fitWidth]);
 
   useEffect(() => {
     p.onZoom?.(cam.k);

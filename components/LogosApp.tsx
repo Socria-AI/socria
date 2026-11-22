@@ -231,6 +231,8 @@ import { OPENING, SPLIT_NAMES, VIEW_LABELS, afterSend, besideSide, chatSideFor, 
 import { acceptTitle } from '@/lib/logos5/title';
 import { needsMap, routeTurn, tableInReply, turnsSince, type TurnRoute } from '@/lib/runtime/orchestrate';
 import { ideasWanted } from '@/lib/runtime/ideas-wanted';
+import { readVisualAsk, type Scene, type SceneArtifact } from '@/lib/visual/intent';
+import { activeKey, onPage, select as visSelectBus, selection as visSelection, sequence, takeChanges } from '@/components/inline/visual-bus';
 import type { Hit, IndexDoc } from '@/lib/runtime/representation';
 import { effectSaid, linksOf, turnEffect } from '@/lib/logos5/linking';
 import { L5Message, L5Pending, type L5Effect } from './logos5/L5Message';
@@ -295,7 +297,11 @@ import { compareAsked, compareText, sanitizeCompare, type Disagreement, type Doc
 import { isTheirs, weightOf } from '@/lib/logos6/support';
 import { stateOf } from '@/lib/challenge/challenge';
 import { useThemeGuard } from '@/components/account/ThemePicker';
-import { LENSES, isMadeLens, type LensId, type MadeLens } from '@/lib/logos-layout';
+import { LENSES, ideaLenses, isMadeLens, type LensId, type MadeLens } from '@/lib/logos-layout';
+import { ThinkingCanvas } from '@/components/logos6/ThinkingCanvas';
+import { useNavSide } from '@/components/logos5/nav-side';
+import { NavMover } from '@/components/logos5/NavMover';
+import { canvasLine, nodeVid } from '@/lib/logos6/canvas-visual';
 
 // AR MODE (components/logos5/ARMode.tsx) is fetched when it is opened, never with the page: most people
 // never open it, and nobody should pay for the camera code and the hand geometry in every load of /chat.
@@ -322,7 +328,13 @@ const STUDIO_PANEL = 'l5a-s-new';
 const DOCK_KEY = 'socria.logos3.dock.v1';
 /** the chats bar and header, hidden from the top-right control — per browser */
 const CHROME_KEY = 'socria.logos.chrome.v1';
-import { readDrift, type DriftVerdict } from '@/lib/topic-drift';
+import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
+import { addMilestone, addNote, driftOf, keepThread, keptHere, objectiveOf, tickMilestone, readKeepInMind, readRestate, refineGoal, restate, sanitizeObjective, workOf, type Objective } from '@/lib/logos6/objective';
+import { ObjectiveLine } from './logos6/ObjectiveLine';
+import { omniHint, pickCandidate, readOmnibox, replyAsked, type OmniContext, type OmniIntent, type OmniNode } from '@/lib/logos6/omnibox';
+import { edgeIdOf, structureProposal, type CanvasMode, type StructureMove } from '@/lib/logos6/graph';
+import { cardFor, workItemsOf, type WorkItem } from '@/lib/logos6/work';
+import { focusOf } from '@/lib/logos6/focus-context';
 import {
   MATH_FADE_MS,
   readMathSignal,
@@ -723,6 +735,10 @@ export function LogosApp({
   }, [initialInput]);
   /** the Mind view in place of the map: how this chat connects to everything else */
   const [mindOpen, setMindOpen] = useState(false);
+  // MIND MAP 2.0 (Logos 6): the canvas leads; another drawing of the same map (a flow, a timeline…) when chosen
+  const [drawLens, setDrawLens] = useState<LensId | null>(null);
+  // WHERE THE VIEWS SIT (Logos 6): a rail on the left by default, the top or the right if moved (one choice everywhere)
+  const [navSide, setNavSide] = useNavSide();
   /** this send is onboarding's sentence (no longer a gift: one of the month's conversations like any other) */
   const autoSentRef = useRef(false);
   const [drafts, setDrafts] = useState<Draft[]>([]);
@@ -886,11 +902,19 @@ export function LogosApp({
     [sessions, activeId]
   );
   const messages = active?.messages ?? [];
+  /** The newest reply's id: its elements are fresh for a few minutes (a change drawn to be shown plays once). */
+  const lastReplyId = (ms: readonly Msg[]) => [...ms].reverse().find((x) => x.role === 'assistant')?.id;
   // MIND MAPS WHEN THEY HELP (lib/runtime/ideas-wanted.ts): the ideas are spread across the Everything view when the
   // person asked for them, the subject has a shape, or they are thinking something through; otherwise they are folded,
   // a press away, and what was said and made fills the view
   const ideasOn = useMemo(() => ideasWanted(messages.filter((m) => m.role === 'user').map((m) => (typeof m.content === 'string' ? m.content : ''))).show, [messages]);
   const map = active?.map ?? EMPTY_MAP;
+  // ONE CHAT, ONE OBJECTIVE (lib/logos6/objective.ts): what this chat is for — the one it holds, or, for a chat from
+  // before objectives, read from how it began — and what it holds for it, from the chat itself
+  const activeObjective = useMemo(() => (active ? objectiveOf(active, active.updatedAt || 1) : null), [active]);
+  const activeWork = useMemo(() => (active ? workOf(active) : null), [active]);
+  // THE CHAT'S WORK ON THE CANVAS (lib/logos6/work.ts): its artifacts, quizzes and sources, where they already live
+  const workItems = useMemo(() => (active ? workItemsOf(active) : []), [active]);
 
   // ── DOCUMENTS (lib/docs) ──────────────────────────────────────────
   // Every document this line of thinking was given, as it was read. The
@@ -1077,7 +1101,20 @@ export function LogosApp({
   // ── wrong-chat ────────────────────────────────────────────────────
   // Held rather than acted on: the message is sent and answered either way,
   // and the note is an offer beside it, never a gate in front of it.
-  const [drift, setDrift] = useState<(DriftVerdict & { text: string }) | null>(null);
+  const [drift, setDrift] = useState<(DriftVerdict & { text: string; goal?: string }) | null>(null);
+  // ── THE OMNIBOX (lib/logos6/omnibox.ts) ──────────────────────────
+  // What the chatbox does on its own, never a model's: a thought kept as theirs, a note on a card, a connection or a
+  // structure proposed for them to confirm, a milestone. What the canvas is asked to show for it, what is proposed,
+  // which card they are being asked to choose, and "Ask Socria instead" for the message being typed.
+  const [canvasAsk, setCanvasAsk] = useState<{ mode?: CanvasMode; node?: string; edge?: string; n: number } | null>(null);
+  const [proposal, setProposal] = useState<{ moves: StructureMove[] } | null>(null);
+  const [omniPick, setOmniPick] = useState<{ sid: string; from: OmniNode; candidates: OmniNode[]; relation: Extract<OmniIntent, { kind: 'connect' }>['relation'] } | null>(null);
+  const [omniOff, setOmniOff] = useState(false);
+  const [thoughtKept, setThoughtKept] = useState<{ sid: string; text: string } | null>(null);
+  // the word that a thought was kept goes as soon as they write again: it has been seen
+  useEffect(() => {
+    if (input.trim()) setThoughtKept((k) => (k ? null : k));
+  }, [input]);
   const [driftDismissals, setDriftDismissals] = useState(0);
   useEffect(() => {
     try {
@@ -2807,6 +2844,157 @@ export function LogosApp({
     ]);
     switchSession(fresh.id);
     void send(d.text);
+  }
+
+  /**
+   * THE OBJECTIVE, CHANGED (lib/logos6/objective.ts): written to the chat's own map, so it is saved, synced and
+   * restored as the map is. `null` takes it off (the chat then reads it from how it began again).
+   */
+  function setObjectiveOf(sid: string | null, next: Objective | null, save = true) {
+    if (!sid) return;
+    const put = <M extends { objective?: Objective }>(m: M): M => {
+      const { objective: _drop, ...rest } = m;
+      return (next ? { ...rest, objective: next } : rest) as M;
+    };
+    if (sid === activeIdRef.current) mapRef.current = put(mapRef.current);
+    patchSession(sid, (x) => ({ ...x, map: put(x.map ?? EMPTY_MAP) }), save);
+  }
+
+  /** What the Omnibox reads a message against: was it asked for, is something waiting, what is selected, what is there. */
+  function omniContext(attaching: boolean): OmniContext {
+    const sid = activeIdRef.current;
+    const here = sid ? sessionsRef.current.find((x) => x.id === sid) : null;
+    const reply = [...(here?.messages ?? [])].reverse().find((m) => m.role === 'assistant');
+    const nodes = (mapRef.current?.nodes ?? []).map((n) => ({ id: n.id, label: n.label, type: n.type, ...(n.hand ? { hand: true } : {}), ...(n.origin ? { origin: n.origin } : {}) }));
+    const picked = visSelection();
+    const selNode = sid && picked?.key === `map:${sid}` ? nodes.find((n) => nodeVid(n.id) === picked.id) ?? null : null;
+    return {
+      asked: replyAsked(typeof reply?.content === 'string' ? reply.content : '', reply?.explain?.q ?? null),
+      awaiting: !!guessFor || !!(quizAskRef.current && quizAskRef.current.sid === sid),
+      attaching,
+      selected: selNode ? { id: selNode.id, label: selNode.label } : null,
+      nodes,
+    };
+  }
+
+  /** The canvas, shown on the Mind Map, in a way of working, on a card or a line. */
+  function showOnCanvas(ask: { mode?: CanvasMode; node?: string; edge?: string }) {
+    setCanvasAsk((a) => ({ ...ask, n: (a?.n ?? 0) + 1 }));
+    openFull('logic_map');
+  }
+
+  /** A connection proposed: a suggested line, drawn dashed, opened for them to confirm, change or dismiss. */
+  function proposeLine(from: OmniNode, to: OmniNode, relation: Extract<OmniIntent, { kind: 'connect' }>['relation']): string {
+    const done = editMap([{ op: 'link', from: from.id, to: to.id, relation, status: 'suggested', why: 'You asked to connect these; confirm it, change its kind, or dismiss it.' }]);
+    if (!done) return `“${from.label}” and “${to.label}” are already connected — open the line on the Mind Map to see it.`;
+    showOnCanvas({ edge: edgeIdOf({ from: from.id, to: to.id, relation }) });
+    return `Proposed a connection: “${from.label}” ${relation === 'relates' ? 'relates to' : relation.replace(/_/g, ' ')} “${to.label}”. It is open on the Mind Map, dashed until you confirm it — change its kind or dismiss it there.`;
+  }
+
+  /**
+   * THE OMNIBOX'S OWN WORK (lib/logos6/omnibox.ts): what this message is, of the things done here rather than by a
+   * model — a thought kept as theirs (no reply), a note on the selected card, a connection or a structure proposed for
+   * them to confirm, a milestone. Null for everything else, which goes the way it always went.
+   */
+  function omniCommand(text: string): { said: string; thought?: boolean } | null {
+    const sid = activeIdRef.current;
+    if (!sid || togetherReadOnly) return null;
+    // the card they were asked to choose, chosen
+    const pending = omniPick && omniPick.sid === sid ? omniPick : null;
+    if (pending) {
+      setOmniPick(null);
+      const to = pickCandidate(text, pending.candidates);
+      if (to) return { said: proposeLine(pending.from, to, pending.relation) };
+    }
+    const i = readOmnibox(text, omniContext(false));
+    if (i.kind === 'thought') {
+      const already = (mapRef.current?.nodes ?? []).find((n) => mapKeyOf(n.label) === mapKeyOf(i.label));
+      // the chatbox is where an idea is made: its words, its kind, and the card it sits inside ("…inside Monopoly")
+      if (!already && !editMap([{ op: 'add', node: { label: i.label, type: i.type, hand: true }, ...(i.inside ? { parent: i.inside.id } : {}) }])) return null;
+      if (already && i.inside && i.inside.id !== already.id) editMap([{ op: 'parent', id: already.id, parent: i.inside.id }]);
+      setThoughtKept({ sid, text });
+      l6track('idea_added', {});
+      return { said: '', thought: true };
+    }
+    if (i.kind === 'note') {
+      const n = (mapRef.current?.nodes ?? []).find((x) => x.id === i.target.id);
+      if (!n) return null;
+      const notes = [n.mind?.notes, i.text].filter(Boolean).join('\n');
+      if (!editMap([{ op: 'mind', id: n.id, set: { notes, edited: Date.now() } }])) return null;
+      return { said: `Added to the notes on “${n.label}”.` };
+    }
+    if (i.kind === 'connect') {
+      if (!i.from) return { said: 'Which card do you mean by that? Select it on the Mind Map (or name it in its own words), then say it again.' };
+      if (i.to) return { said: proposeLine(i.from, i.to, i.relation) };
+      if (!i.candidates.length) return { said: `Nothing on the map fits that yet. Name the card in its own words, or add it first.` };
+      setOmniPick({ sid, from: i.from, candidates: i.candidates, relation: i.relation });
+      return { said: `Connect “${i.from.label}” to which? ${i.candidates.map((c, k) => `${k + 1}. “${c.label}”`).join('  ')} — choose below, or say which.` };
+    }
+    if (i.kind === 'organize') {
+      const moves = structureProposal(mapRef.current);
+      setProposal({ moves });
+      showOnCanvas({ mode: 'structure' });
+      return {
+        said: moves.length
+          ? `Proposed a structure from the lines already on your map: ${moves.length === 1 ? 'one card' : `${moves.length} cards`} placed inside others. It is on the Mind Map, in Structure — nothing moves until you apply it.`
+          : 'Nothing on the map says yet what sits inside what. In Structure you can move cards in with Tab and out with Shift+Tab, or connect them first and ask again.',
+      };
+    }
+    if (i.kind === 'milestone') {
+      const here = sessionsRef.current.find((x) => x.id === sid);
+      const o = here ? objectiveOf(here, Date.now()) : null;
+      if (!o) return { said: 'Say what this chat is working towards first; milestones belong to its objective.' };
+      const next = i.done ? tickMilestone(o, i.text, Date.now()) : addMilestone(o, i.text, Date.now());
+      if (!next) return { said: `No milestone here matches “${i.text}”.` };
+      setObjectiveOf(sid, next);
+      return { said: i.done ? `Ticked off: “${i.text}”.` : `Milestone added to “${o.goal}”: “${i.text}”. Tick it off when you have done it.` };
+    }
+    return null;
+  }
+
+  /** A structure proposed, applied (their structure from now on) or put away. */
+  function onProposal(apply: boolean) {
+    const p = proposal;
+    setProposal(null);
+    if (apply && p?.moves.length) {
+      const done = editMap(p.moves.map((m) => ({ op: 'parent' as const, id: m.id, parent: m.parent })));
+      if (done) noteL6(`Applied: ${p.moves.length === 1 ? 'one card' : `${p.moves.length} cards`} placed in the structure — yours to change.`);
+    }
+  }
+
+  /** One of the chat's works, in focus: the artifact or quiz in Artifacts, the document as it was read, a picture in Files. */
+  function openWork(w: WorkItem) {
+    // opened from the canvas: closing it comes back to the canvas, where it was left
+    returnToMapRef.current = true;
+    if (w.obj) {
+      const o = objOf(spaceOf(mapRef.current), w.obj);
+      return showArtifact(o?.kind === 'scene' ? `s:${w.obj}` : `d:${w.obj}`);
+    }
+    if (w.doc) {
+      const id = documentDisplay(w.doc);
+      if (id) return showArtifact(`d:${id}`);
+    }
+    openFull('content');
+  }
+
+  /** One of the chat's works, placed on the canvas: a card that stands for it — one thing, never a copy. */
+  function placeWork(w: WorkItem, at: [number, number]) {
+    const obj = w.obj ?? (w.doc ? documentDisplay(w.doc) : null);
+    if (!obj) return;
+    if (!editMap([{ op: 'add', node: cardFor(w, obj, at) }])) return;
+    const n = (sessionsRef.current.find((x) => x.id === activeIdRef.current)?.map?.nodes ?? []).find((x) => x.obj === obj);
+    // shown where it was put: in Ideas, opened
+    if (n) setCanvasAsk((a) => ({ mode: 'ideas', node: n.id, n: (a?.n ?? 0) + 1 }));
+  }
+
+  /** "Keep it here": the subject a message was about is part of this chat's objective, and is not offered as separate again. */
+  function keepDriftHere() {
+    const d = drift;
+    const sid = activeIdRef.current;
+    const here = sid ? sessionsRef.current.find((x) => x.id === sid) : null;
+    const o = here ? objectiveOf(here, Date.now()) : null;
+    if (d?.goal && o && sid) setObjectiveOf(sid, keepThread(o, d.goal));
+    dismissDrift();
   }
 
   /**
@@ -5146,7 +5334,22 @@ export function LogosApp({
         if (done.fill) slotRef.current = { fill: done.fill, at: Date.now() };
         return done.said;
       }
+      // THE OMNIBOX (lib/logos6/omnibox.ts): a thought kept as theirs with no reply; a note, a connection, a structure,
+      // a milestone done here and said back. "Ask Socria instead" (omniOff) sends it to Socria as it is.
+      const own = omniOff || via === 'voice' ? null : omniCommand(content);
+      setOmniOff(false);
+      if (own) {
+        setError(null);
+        clearBox();
+        setReplyTo(null);
+        if (own.thought) {
+          const sent = postTurn({ id: newMsgId(), at: Date.now(), role: 'user', content: said0, via: 'thought' }, true);
+          chronRef.current = [...chronRef.current, sent];
+        } else postPair(...pairOf(own.said));
+        return own.said;
+      }
     }
+    setThoughtKept(null);
 
     const objTurn = takeObjects(content, atts);
 
@@ -5406,14 +5609,20 @@ export function LogosApp({
     // Once, here, on the message as sent — never while typing. The reply
     // proceeds regardless; this only decides whether a note appears beside it.
     const s0 = sessionsRef.current.find((x) => x.id === activeIdRef.current);
+    // the chat's objective names what it is about better than its title does (lib/logos6/objective.ts)
+    const o0 = s0 ? objectiveOf(s0, Date.now()) : null;
     const v = readDrift({
       message: content,
-      title: s0?.title === UNTITLED ? undefined : s0?.title,
+      title: [s0?.title === UNTITLED ? '' : s0?.title ?? '', o0?.goal ?? ''].filter(Boolean).join(' — ') || undefined,
       recent: (s0?.messages ?? []).map((m) => m.content),
       context: s0?.map?.context,
       dismissals: driftDismissals,
     });
-    setDrift(v.flag ? { ...v, text: content } : null);
+    // …or a different objective altogether: a goal of its own that shares nothing with this chat's, or a change of
+    // subject said in so many words. Only an offer (a separate chat); the message is answered here either way.
+    const objDrift =
+      !v.flag && o0 && s0 && driftDismissals < DRIFT_DISMISS_LIMIT && !keptHere(content, o0) && !togetherReadOnly ? driftOf(content, o0, workOf(s0), Date.now(), s0.messages.slice(-12).map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n')) : null;
+    setDrift(v.flag ? { ...v, text: content } : objDrift ? { flag: true, reason: 'a different objective', goal: objDrift, text: content } : null);
 
     // POINT & ASK: what is selected as it is sent — described from canonical
     // state (lib/workspace/focus.ts), told to the reply, and kept on the
@@ -5425,6 +5634,10 @@ export function LogosApp({
       : workspaceOn
         ? describeFocus(focusRef.current, mapRef.current, docsRef.current)
         : null;
+    // WHAT IS ON SCREEN (lib/visual): their words read against the pictures drawn now — "highlight the demand curve"
+    // is done before Socria answers; a reference that fits two parts is left for Socria to ask about; the part they
+    // selected and what changed since they last wrote go with the message (never every frame)
+    const visNow = visualNoteFor(content);
     const didNow: DidItem[] = Object.values(didRef.current)
       .sort((a, b) => a.at - b.at)
       .slice(-4)
@@ -5443,6 +5656,7 @@ export function LogosApp({
       ...(via ? { via } : {}),
       // what they did with the replies' elements since they last wrote, as the box showed it
       ...(didNow.length ? { did: didNow } : {}),
+      ...(visNow ? { vis: visNow } : {}),
     };
     // said once: the box is clear of it for what comes next (a turn that fails gives it back)
     if (didNow.length) setDidPending({});
@@ -5469,6 +5683,15 @@ export function LogosApp({
     // the conversation as it stands now, with this turn — others' words included
     const next = sessionsRef.current.find((x) => x.id === sid)?.messages ?? [...before, sent];
     chronRef.current = [...chronRef.current, sent];
+    // ONE CHAT, ONE OBJECTIVE: established from the first message (or, for a chat from before objectives, from how it
+    // began), kept on the chat's map and saved with this turn; and what the chat holds for it, told to Core
+    const sHere = sessionsRef.current.find((x) => x.id === sid) ?? null;
+    let objHere = sHere ? sanitizeObjective(sHere.map?.objective) : null;
+    if (sHere && !objHere && !togetherReadOnly) {
+      objHere = objectiveOf({ ...sHere, messages: next }, Date.now());
+      if (objHere) setObjectiveOf(sid, objHere, false);
+    }
+    const workHere = sHere ? workOf({ messages: next, map: sHere.map }) : null;
     setBusy(true);
     setBusyFor(sid);
     busyForRef.current = sid;
@@ -5562,6 +5785,14 @@ export function LogosApp({
             const dg = digestOf(mapRef.current);
             return dg ? { mapDigest: dg } : {};
           })(),
+          // the card or line selected on the Mind Map, as the map holds it (lib/logos6/focus-context.ts)
+          ...(() => {
+            const picked = visSelection();
+            const f = picked && picked.key === `map:${sid}` ? focusOf(mapRef.current, picked.id, workItemsOf({ messages: next, map: mapRef.current })) : null;
+            return f ? { canvasFocus: f } : {};
+          })(),
+          // what this chat is for, and what it holds for it (lib/logos6/objective.ts) — re-sanitised on the server
+          ...(objHere && workHere ? { objective: { objective: objHere, work: workHere, ...(objDrift ? { drift: objDrift } : {}) } } : {}),
           ...(s0?.messages.length && s0.updatedAt ? { resumedAfterMs: Math.max(0, Date.now() - s0.updatedAt) } : {}),
           // the learning ledger kept in this browser (lib/logos5/learning.ts): what was learned and when, so an
           // explanation can bring back what is due or recall what was met before — never anywhere but here
@@ -5792,11 +6023,18 @@ export function LogosApp({
           const opening = here.messages.slice(0, 2).map((m) => ({ role: m.role, content: m.content }));
           void (async () => {
             try {
-              const r = await fetch('/api/extract-memory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ titleOnly: true, titleStyle: 'topic', messages: opening }) });
+              const r = await fetch('/api/extract-memory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ titleOnly: true, titleStyle: 'topic', objective: true, messages: opening }) });
               if (!r.ok) return;
-              const t = acceptTitle((await r.json())?.suggestedTitle, firstUser.content);
+              const named = await r.json();
+              const t = acceptTitle(named?.suggestedTitle, firstUser.content);
               const now = sessionsRef.current.find((x) => x.id === sid);
               if (t && now && auto(now)) renameSession(sid, t);
+              // …and what it is for, better phrased than the first message's reading — never over their own words
+              const held = now ? sanitizeObjective(now.map?.objective) : null;
+              if (held && typeof named?.suggestedObjective === 'string') {
+                const better = refineGoal(held, named.suggestedObjective);
+                if (better !== held) setObjectiveOf(sid, better);
+              }
             } catch {
               /* the deterministic title stands */
             }
@@ -6234,6 +6472,14 @@ export function LogosApp({
   }, [activeId]);
 
   function recentIdea(): Touched | null {
+    // the card pressed on the Mind Map is "this", "that" and "it" in their next words (the visual bus) — "add an idea
+    // called … inside this", "rename that to …"
+    const sid = activeIdRef.current;
+    const picked = visSelection();
+    if (sid && picked?.key === `map:${sid}`) {
+      const n = mapRef.current.nodes.find((x) => nodeVid(x.id) === picked.id);
+      if (n) return { id: n.id, label: n.label };
+    }
     const f = focusRef.current;
     if (f?.kind === 'node') {
       const n = mapRef.current.nodes.find((x) => x.id === f.id);
@@ -6271,17 +6517,50 @@ export function LogosApp({
    * conversation (home, another line of thinking): nothing is written in it.
    */
   function localCommand(text: string): { said: string; post?: boolean; fill?: string } | null {
+    // THE OBJECTIVE, IN WORDS (lib/logos6/objective.ts): "change the objective to passing the final", "our goal is now to
+    // ship v2", "keep in mind that the exam is open-book" — done here, said back, nothing sent to a model
+    const sidHere = activeIdRef.current;
+    const hereNow = sidHere ? sessionsRef.current.find((x) => x.id === sidHere) : null;
+    if (hereNow && !togetherReadOnly) {
+      const restated = readRestate(text);
+      const objNow = objectiveOf(hereNow, Date.now());
+      if (restated) {
+        const next = restate(objNow, restated, Date.now());
+        if (next) {
+          setObjectiveOf(sidHere, next);
+          return { said: `This chat’s objective is now “${next.goal}”. Everything here so far stays with it.` };
+        }
+      }
+      const keep = objNow ? readKeepInMind(text) : null;
+      if (keep && objNow) {
+        setObjectiveOf(sidHere, addNote(objNow, 'fact', keep, Date.now()));
+        return { said: `Kept with this chat’s objective: “${keep}”.` };
+      }
+    }
     const wc = readWorkspaceCommand(text, commandContext());
     if (wc) return doWorkspaceCommand(wc);
     // "capture: call the landlord" — kept in Quick Capture for later, not sent anywhere
     const kept = LOGOS4.capture ? readCapture(text) : null;
     if (kept) return { said: keepCapture(kept) };
+    // THE MIND MAP, OPEN (Logos 6): "highlight opportunity cost", "focus on the frontier" — shown on the canvas,
+    // here, as a press would; nothing is sent to a model (lib/visual/intent.ts, the canvas's own address)
+    const scene = visualScene();
+    const onCanvas = scene.artifacts.some((a) => a.key.startsWith('map:'));
+    if (onCanvas) {
+      const ask = readVisualAsk(text, scene);
+      if (ask?.kind === 'act' && ask.key.startsWith('map:')) {
+        sequence(ask.key, ask.actions, 'you');
+        return { said: ask.said };
+      }
+    }
     // "select the rent idea": the card in hand, as a press would put it (Point & Ask)
     const sel = readMapSelect(text, mapRef.current);
     if (sel) {
       if ('refused' in sel) return { said: sel.refused };
       setFocus({ kind: 'node', id: sel.node.id });
       touchedRef.current = { id: sel.node.id, label: sel.node.label };
+      // …and on the canvas, when it is open: the same card selected there ("this")
+      if (onCanvas && activeIdRef.current) visSelectBus(`map:${activeIdRef.current}`, nodeVid(sel.node.id));
       return { said: `Selected “${sel.node.label}” — what you ask next is about it.` };
     }
     // their writing, when it is open: an edit said instead of typed
@@ -7301,6 +7580,46 @@ export function LogosApp({
     openInline(msg, n, spec, { edit: true });
   }
 
+  /**
+   * The pictures on screen as a scene (lib/visual/intent.ts): each as it stands now — its parts, its parameters, its
+   * step — newest first, with what is selected and what was last touched.
+   */
+  function visualScene(): Scene {
+    const msgs = sessionsRef.current.find((x) => x.id === activeIdRef.current)?.messages ?? [];
+    const order = new Map(msgs.map((m, i) => [m.id, i]));
+    const arts: SceneArtifact[] = onPage().map(({ art, values }) => {
+      const [mid, n] = art.key.split(':');
+      const msg = msgs.find((m) => m.id === mid);
+      const spec = msg ? specsIn(msg.content)[Number(n)] ?? undefined : undefined;
+      const picked = msg?.ui?.[n]?.picked;
+      return { ...art, values, ...(spec ? { spec } : {}), ...(typeof picked === 'number' ? { at: picked + 1 } : {}) };
+    });
+    const rank = (k: string) => (k.startsWith('quiz:') ? -1 : (order.get(k.split(':')[0]) ?? -1) * 10 + Number(k.split(':')[1] ?? 0));
+    arts.sort((a, b) => rank(b.key) - rank(a.key));
+    return { artifacts: arts, selection: visSelection(), active: activeKey() };
+  }
+  /** Their message, read against the scene: acted on, or noted for Socria — and what changed since they last wrote. */
+  function visualNoteFor(text: string): Msg['vis'] | undefined {
+    const scene = visualScene();
+    if (!scene.artifacts.length) return undefined;
+    const ask = readVisualAsk(text, scene);
+    const note: NonNullable<Msg['vis']> = {};
+    if (ask?.kind === 'act') {
+      sequence(ask.key, ask.actions, 'you');
+      note.done = [ask.said];
+    } else if (ask?.kind === 'ambiguous') note.ask = ask.candidates.map((c) => `${c.label} on “${c.title}”`).join(' or ');
+    else if (ask?.kind === 'cannot') note.cannot = ask.said;
+    const sel = ask?.kind === 'about' && ask.id ? { key: ask.key, id: ask.id } : scene.selection;
+    const selArt = sel ? scene.artifacts.find((a) => a.key === sel.key) : null;
+    const selPart = selArt?.elements.find((e) => e.id === sel!.id);
+    if (selArt && selPart) note.sel = `${selPart.label} (${selPart.id}) on “${selArt.title}”`;
+    const changes = takeChanges();
+    if (changes.length) note.changes = changes;
+    // the Mind Map open (it is not in the conversation): its cards by exact id, so a reply can point at one
+    if (scene.artifacts.some((a) => a.type === 'map') && mapRef.current.nodes.length) note.on = canvasLine(mapRef.current, 'open');
+    return Object.keys(note).length ? note : undefined;
+  }
+
   /** What was done with one of a reply's inline elements, merged into what is kept with that message. */
   function keepInline(msg: Msg, n: number, s: InlineState) {
     if (!msg.id) return;
@@ -7549,6 +7868,19 @@ export function LogosApp({
   // which is the chatbox. The turn being read is open in full above the chatbox: the newest, unless another was pressed;
   // folded, every turn is on the board.
   const [boardBeside, setBoardBeside] = useState<'content' | 'artifacts' | 'logic_map' | null>(null);
+  // WORK OPENED FROM THE CANVAS (the Omnibox's workspace, lib/logos6/work.ts): in focus beside the board, and when it is
+  // closed the canvas comes back as it was — the same quiz or artifact, so nothing is lost either way
+  const returnToMapRef = useRef(false);
+  const besideWasRef = useRef<typeof boardBeside>(null);
+  useEffect(() => {
+    const was = besideWasRef.current;
+    besideWasRef.current = boardBeside;
+    if (!returnToMapRef.current) return;
+    if ((was === 'artifacts' || was === 'content') && boardBeside === null) {
+      returnToMapRef.current = false;
+      setBoardBeside('logic_map');
+    } else if (boardBeside === 'logic_map') returnToMapRef.current = false;
+  }, [boardBeside]);
   /** the one view (the space or the board) is what is drawn: read by the handlers that open things, set each render */
   const oneViewRef = useRef(false);
   const boardBesideRef = useRef(boardBeside);
@@ -8546,7 +8878,7 @@ export function LogosApp({
         return { title: 'Conversation' };
       case 'map': {
         const lens = p.config?.lens ? LENSES.find((l) => l.id === p.config!.lens)?.label : null;
-        return { title: 'Logic Map', sub: lens ?? (map.context ? CONTEXT_LABEL[map.context] : undefined) };
+        return { title: 'Mind Map', sub: lens ?? (map.context ? CONTEXT_LABEL[map.context] : undefined) };
       }
       case 'model': {
         const v = p.config?.view && doc ? wsFacts.docs.find((d) => d.id === doc.id)?.views.find((x) => x.id === p.config!.view) : null;
@@ -8756,6 +9088,11 @@ export function LogosApp({
 
   // The notes under the conversation — the Answer Guard, One, the style note, the map's limit, the
   // drift offer, a read-only share — shared by Logos 4's dock and Logos 5's column.
+  // one note over the box at a time (UX): a choice waiting on them, then an offer about the message just sent, then
+  // the word that a thought was kept
+  const showPick = !!omniPick && omniPick.sid === activeId;
+  const showDrift = !!drift && !showPick;
+  const showKept = !!thoughtKept && thoughtKept.sid === activeId && !showPick && !drift;
   const convoNotes = (
     <>
           {/* Answer Guard: while learning math, Logos gives hints, not
@@ -8869,20 +9206,85 @@ export function LogosApp({
             </div>
           )}
 
-          {/* An offer, after the fact. The message was sent and answered;
-              this only asks whether it landed where it was meant to. */}
-          {drift && (
-            <div className="lg-drift" role="note">
+          {/* THE OMNIBOX (lib/logos6/omnibox.ts): a thought kept as theirs, with no reply — said once, quietly, with the
+              one way to a reply. Only one note stands over the box at a time: a choice to make first, then an offer
+              about the message just sent, then this; and it goes as soon as they type again. */}
+          {showKept && thoughtKept && (
+            <div className="lg-drift l6-kept" role="status">
               <span className="lg-drift-text">
-                That reads like {drift.domain === 'code' ? 'a coding' : `a ${drift.domain}`} question,
-                and this line of thinking has been about something else. Did you mean it here?
+                Kept as your thought, on{' '}
+                <button type="button" className="l6-kept-map" onClick={() => showOnCanvas({})} title="See it on the Mind Map">
+                  the Mind Map
+                </button>
+                . No reply unless you ask.
               </span>
               <span className="lg-drift-acts">
-                <button type="button" className="lg-drift-stay" onClick={dismissDrift}>
+                <button
+                  type="button"
+                  className="lg-drift-stay"
+                  onClick={() => {
+                    const k = thoughtKept;
+                    setThoughtKept(null);
+                    setOmniOff(true);
+                    void send(`What do you make of this thought of mine: “${k.text.replace(/\s+/g, ' ').trim()}”`);
+                  }}
+                >
+                  Ask Socria about it
+                </button>
+              </span>
+              <button type="button" className="lg-drift-x" onClick={() => setThoughtKept(null)} aria-label="Dismiss">
+                ×
+              </button>
+            </div>
+          )}
+          {showPick && omniPick && (
+            <div className="lg-drift l6-pick" role="group" aria-label={`Connect “${omniPick.from.label}” to which card?`}>
+              <span className="lg-drift-text">Connect “{omniPick.from.label}” to which?</span>
+              <span className="lg-drift-acts">
+                {omniPick.candidates.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="lg-drift-stay"
+                    onClick={() => {
+                      const pk = omniPick;
+                      setOmniPick(null);
+                      const said = proposeLine(pk.from, c, pk.relation);
+                      noteL6(said);
+                    }}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </span>
+              <button type="button" className="lg-drift-x" onClick={() => setOmniPick(null)} aria-label="Dismiss">
+                ×
+              </button>
+            </div>
+          )}
+
+          {/* An offer, after the fact. The message was sent and answered;
+              this only asks whether it landed where it was meant to. */}
+          {showDrift && drift && (
+            <div className="lg-drift" role="note">
+              <span className="lg-drift-text">
+                {drift.goal ? (
+                  <>
+                    That sounds like a separate objective — “{drift.goal}”. This chat is for “{activeObjective?.goal ?? 'something else'}”. Keep it here, or give it its own chat?
+                  </>
+                ) : (
+                  <>
+                    That reads like {drift.domain === 'code' ? 'a coding' : `a ${drift.domain}`} question,
+                    and this line of thinking has been about something else. Did you mean it here?
+                  </>
+                )}
+              </span>
+              <span className="lg-drift-acts">
+                <button type="button" className="lg-drift-stay" onClick={drift.goal ? keepDriftHere : dismissDrift}>
                   Keep it here
                 </button>
                 <button type="button" className="lg-drift-move" onClick={moveDriftToNewChat}>
-                  Move to a new chat
+                  {drift.goal ? 'Start a new chat for it' : 'Move to a new chat'}
                 </button>
               </span>
               <button
@@ -8904,11 +9306,60 @@ export function LogosApp({
           )}
     </>
   );
+  /**
+   * THE MIND MAP (Logos 6, components/logos6/ThinkingCanvas.tsx): Ideas, Logic and Structure as three ways of working
+   * on the one map. Every change is an edit of the map (editMap), so it is saved, undoable, and the same in the
+   * Everything view and every drawing of it.
+   */
+  const MERGED_LENSES: readonly LensId[] = ['graph', 'structure', 'tensions', 'evidence'];
+  const otherDrawings = ideaLenses(map).filter((l) => !MERGED_LENSES.includes(l));
+  const mindCanvas = (drawingsEl?: ReactNode) => (
+    <ThinkingCanvas
+      key={`tc-${activeId ?? ''}`}
+      map={map}
+      onEdits={(edits) => void editMap(edits)}
+      mapKey={activeId ?? undefined}
+      busy={mapping}
+      readOnly={togetherReadOnly}
+      narrow={narrow}
+      lit={mapLit}
+      // the Omnibox's asks and proposals, and the chat's work on the canvas (lib/logos6/omnibox.ts, work.ts)
+      ask={canvasAsk}
+      proposal={proposal}
+      onProposal={onProposal}
+      work={workItems}
+      onOpenWork={openWork}
+      onPlaceWork={togetherReadOnly ? undefined : placeWork}
+      onAsk={togetherReadOnly ? undefined : (n) => askAboutNode({ id: n.id })}
+      onAskLine={
+        togetherReadOnly
+          ? undefined
+          : (t) => {
+              setInput(t);
+              focusComposer();
+            }
+      }
+      drawings={drawingsEl}
+    />
+  );
+  const drawingsPicker = otherDrawings.length ? (
+    <label className="tc-drawings">
+      <span className="tc-hint">Also drawn as</span>
+      <select value="" onChange={(e) => e.target.value && setDrawLens(e.target.value as LensId)} aria-label="See the map drawn another way">
+        <option value="">a flow, a timeline…</option>
+        {otherDrawings.map((l) => (
+          <option key={l} value={l}>
+            {LENSES.find((x) => x.id === l)?.label ?? l}
+          </option>
+        ))}
+      </select>
+    </label>
+  ) : null;
   const mapBody = ({ lens, primary, shapes }: { lens?: string; primary: boolean; shapes?: 'ideas' | MadeLens }) => (
     <>
           <header className="lg-panel-head">
             <span className="lg-panel-title">
-              {shapes && shapes !== 'ideas' ? LENSES.find((l) => l.id === shapes)?.label : 'Logic Map'}
+              {shapes && shapes !== 'ideas' ? LENSES.find((l) => l.id === shapes)?.label : 'Mind Map'}
               {/* What kind of thinking this turned out to be — read from the
                   conversation, never chosen from a menu. */}
               {map.context && <em className="lg-panel-context">{CONTEXT_LABEL[map.context]}</em>}
@@ -9045,9 +9496,22 @@ export function LogosApp({
                 }}
               />
             </div>
+          ) : l5 && shapes === 'ideas' && !drawLens && !(lens && !MERGED_LENSES.includes(lens as LensId)) ? (
+            // the person's own thinking: the Mind Map, its three ways of working, the other drawings a step away
+            <div className="lg-mind-canvas">{mindCanvas(drawingsPicker)}</div>
           ) : (
+          <>
+          {l5 && shapes === 'ideas' && (drawLens || lens) && (
+            <p className="lg-drawing-back">
+              <button type="button" className="l5-link is-go" onClick={() => setDrawLens(null)}>
+                <span className="l5-ar" aria-hidden="true">←</span> The Mind Map
+              </button>
+              <span className="tc-hint">The same cards, drawn as {(LENSES.find((x) => x.id === (drawLens ?? lens))?.label ?? 'a drawing').toLowerCase()}.</span>
+            </p>
+          )}
           <ThinkingMap
-            key={`tm-${lens ?? ''}`}
+            key={`tm-${drawLens ?? lens ?? ''}`}
+            {...(l5 && shapes === 'ideas' ? { hide: MERGED_LENSES } : {})}
             emptyNote={mapsLockedNote}
             // where the person put this line of thinking's cards, kept for it
             layoutKey={activeId}
@@ -9071,7 +9535,7 @@ export function LogosApp({
               else next.add(id);
               return next;
             })}
-            initialLens={lens as LensId | undefined}
+            initialLens={(l5 && shapes === 'ideas' && drawLens ? drawLens : lens) as LensId | undefined}
             shapes={shapes}
             workspace={workspaceOn}
             onSelectNode={(id) => {
@@ -9122,6 +9586,7 @@ export function LogosApp({
             // revision). The state lands at once; the save trails the drag.
             onModelEdited={stableModelEdited}
           />
+          </>
           )}
           {primary && (<>
           <ExplorePanel
@@ -9601,8 +10066,46 @@ export function LogosApp({
       </button>
     </p>
   ) : null;
+  // WHAT ENTER WILL DO, said while it is typed (the Omnibox): a thought kept with no reply, a connection or a structure
+  // proposed, a quiz made — and "Ask Socria instead" wherever the box would act on its own
+  const omniPreview = useMemo(() => {
+    if (!l5 || !activeId || omniOff || togetherReadOnly) return null;
+    const t = input.trim();
+    if (t.length < 4) return null;
+    if (asksForQuiz(t)) return { said: 'A quiz from this chat’s material — it opens in the workspace' };
+    const i = readOmnibox(t, omniContext(false));
+    const said = omniHint(i);
+    if (said) return { said, ...(i.kind === 'thought' || i.kind === 'connect' || i.kind === 'organize' ? { onInstead: () => setOmniOff(true) } : {}) };
+    // an idea added in so many words ("add an idea called … inside …", lib/map-edit.ts readMapAdd): said before Enter too
+    const add = readMapAdd(t, mapRef.current, recentIdea());
+    return add && 'edits' in add ? { said: add.said.replace(/^Added /, 'Add ').replace(/\.$/, '') } : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [input, omniOff, l5, activeId, map, messages, togetherReadOnly, guessFor]);
   const l5Dock = (
       <div className="l5-dock" ref={pinRef}>
+      {/* WHAT THIS CHAT IS FOR (components/logos6/ObjectiveLine.tsx): the objective, and what the chat holds for it */}
+      {active && (
+        <ObjectiveLine
+          objective={activeObjective}
+          work={activeWork}
+          readOnly={togetherReadOnly}
+          narrow={narrow}
+          onSet={(goal, outcome) => {
+            const next = restate(activeObjective, goal, Date.now(), outcome);
+            if (next) setObjectiveOf(activeIdRef.current, next);
+          }}
+          onForgetNote={(t) => activeObjective && setObjectiveOf(activeIdRef.current, { ...activeObjective, notes: (activeObjective.notes ?? []).filter((n) => n.t !== t) })}
+          onMilestone={(t, done) => {
+            const next = activeObjective ? tickMilestone(activeObjective, t, Date.now(), done) : null;
+            if (next) setObjectiveOf(activeIdRef.current, next);
+          }}
+          onAddMilestone={(t) => {
+            const next = activeObjective ? addMilestone(activeObjective, t, Date.now()) : null;
+            if (next) setObjectiveOf(activeIdRef.current, next);
+          }}
+          onOpen={(v) => openFull(v)}
+        />
+      )}
       {convoNotes}
       {nudgeOpen && <GuestNudge inline open signUpHref={signUpHref} />}
       {/* Socria Voice, while it listens: what it hears and does, over the box it speaks into */}
@@ -9631,6 +10134,7 @@ export function LogosApp({
         value={input}
         onChange={setInput}
         {...(L6.addIdea && activeId && !togetherReadOnly ? { onAddIdea: addIdea } : {})}
+        intent={omniPreview}
         focusSignal={composerFocus}
         mathAvailable={mathAvailable}
         mathTopic={mathTopic}
@@ -10050,7 +10554,7 @@ export function LogosApp({
     { label: 'Sent', state: 'done' as const },
     ...(turnInfo?.headers && turnInfo.sources ? [{ label: `Found ${turnInfo.sources} ${turnInfo.sources === 1 ? 'source' : 'sources'} to check it against`, state: 'done' as const }] : []),
     { label: turnInfo?.headers ? 'Writing the reply' : 'Socria is reading it', state: 'now' as const },
-    ...(mapping ? [{ label: 'Drawing the Logic Map', state: 'now' as const }] : []),
+    ...(mapping ? [{ label: 'Drawing the Mind Map', state: 'now' as const }] : []),
   ];
   /** One message as the conversation draws it — in the thread, and, in one view, in the sheet above the chatbox. */
   const msgEl = (m: Msg, i: number, go?: ReactNode, opts?: { listen?: boolean }) => {
@@ -10390,8 +10894,10 @@ export function LogosApp({
           if (!msg) continue;
           if (el.kept) kept.add(el.kept);
           const state = sanitizeInlineState(msg.ui);
-          // what this reply's elements point at is lit across their cards (components/inline/marks.ts)
+          // what this reply's elements point at is lit across their cards (components/inline/marks.ts); each is
+          // addressable as "<id>:<n>" (lib/visual) — the same artifact here, enlarged, and in the conversation
           const scope = (msg.id && markScopes(messages).get(msg.id)) || msg.id;
+          const fresh = msg.id === lastReplyId(messages) && typeof msg.at === 'number' && Date.now() - msg.at < 180_000;
           const noun = ELEMENT_NOUN[el.spec.type] ?? 'Element';
           const said = describeInline(el.spec, state?.[el.n]);
           cards.push({
@@ -10401,7 +10907,7 @@ export function LogosApp({
             kicker: el.lane === 'practice' ? 'Practice' : `Artifact · ${noun}`,
             title: el.title,
             turn: el.turn,
-            preview: <InlineBlock spec={el.spec} open={false} n={el.n} host={{ state, live: false, resolve: (n: number) => resolveInline(msg, n), scope }} renderInline={(t, k) => <RichInline text={t} math keyBase={`bd-${el.key}-${k}`} />} />,
+            preview: <InlineBlock spec={el.spec} open={false} n={el.n} host={{ state, live: false, resolve: (n: number) => resolveInline(msg, n), scope, id: msg.id, fresh }} renderInline={(t, k) => <RichInline text={t} math keyBase={`bd-${el.key}-${k}`} />} />,
             // USED IN PLACE (Logos 6, the Everything view): the element itself, at full size and live — as it now stands
             // when it was kept (one identity) — and what is done with it kept as it is in the conversation
             live: (
@@ -10409,7 +10915,7 @@ export function LogosApp({
                 spec={el.spec}
                 open={false}
                 n={el.n}
-                host={{ state, live: true, resolve: (n: number) => resolveInline(msg, n), ...(!togetherReadOnly ? { onState: (n: number, st: InlineState) => keepInline(msg, n, st) } : {}), scope }}
+                host={{ state, live: true, resolve: (n: number) => resolveInline(msg, n), ...(!togetherReadOnly ? { onState: (n: number, st: InlineState) => keepInline(msg, n, st) } : {}), scope, id: msg.id, fresh }}
                 renderInline={(t, k) => <RichInline text={t} math keyBase={`bdl-${el.key}-${k}`} />}
               />
             ),
@@ -10600,6 +11106,33 @@ export function LogosApp({
               ideas={sIdeas}
               edges={map.edges}
               ideasFolded={!ideasOn}
+              // MIND MAP 2.0: the Mind Map entry opens the canvas in place; its other drawings open beside
+              mindMap={mindCanvas(
+                otherDrawings.length ? (
+                  <label className="tc-drawings">
+                    <span className="tc-hint">Also drawn as</span>
+                    <select
+                      value=""
+                      aria-label="See the map drawn another way, beside"
+                      onChange={(e) => {
+                        const l = e.target.value as LensId;
+                        if (!l) return;
+                        setDrawLens(l);
+                        openStage();
+                        if (wsLayout && !panelsOf(wsLayout).some((x) => x.type === 'map')) changeLayout(openBeside(wsLayout, { type: 'map' }, wsFacts).layout);
+                        setStudyTab('logic_map');
+                      }}
+                    >
+                      <option value="">a flow, a timeline…</option>
+                      {otherDrawings.map((l) => (
+                        <option key={l} value={l}>
+                          {LENSES.find((x) => x.id === l)?.label ?? l}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : undefined
+              )}
               brought={sBrought}
               made={sMade}
               turns={turns}
@@ -10895,12 +11428,12 @@ export function LogosApp({
             key: 'map',
             lane: 'ideas',
             tone: 'map',
-            kicker: `Logic Map · ${map.nodes.length} ${map.nodes.length === 1 ? 'idea' : 'ideas'}`,
+            kicker: `Mind Map · ${map.nodes.length} ${map.nodes.length === 1 ? 'idea' : 'ideas'}`,
             title: '',
             turn: firstReply,
             preview: mapEl,
             full: () => mapEl,
-            onAsk: () => aim('the Logic Map', 'this line of thinking', map.nodes.slice(0, 10).map((n) => `${n.type}: ${n.label}`)),
+            onAsk: () => aim('the Mind Map', 'this line of thinking', map.nodes.slice(0, 10).map((n) => `${n.type}: ${n.label}`)),
             onOpen: () => openFull('logic_map'),
           });
         }
@@ -10911,8 +11444,10 @@ export function LogosApp({
           if (!msg) continue;
           if (el.kept) kept.add(el.kept);
           const state = sanitizeInlineState(msg.ui);
-          // what this reply's elements point at is lit across their cards (components/inline/marks.ts)
+          // what this reply's elements point at is lit across their cards (components/inline/marks.ts); each is
+          // addressable as "<id>:<n>" (lib/visual) — the same artifact here, enlarged, and in the conversation
           const scope = (msg.id && markScopes(messages).get(msg.id)) || msg.id;
+          const fresh = msg.id === lastReplyId(messages) && typeof msg.at === 'number' && Date.now() - msg.at < 180_000;
           const noun = ELEMENT_NOUN[el.spec.type] ?? 'Element';
           const draw = (live: boolean) => (
             <InlineBlock
@@ -10921,6 +11456,8 @@ export function LogosApp({
               n={el.n}
               host={{
                 scope,
+                id: msg.id,
+                fresh,
                 state,
                 live,
                 resolve: (n: number) => resolveInline(msg, n),
@@ -11160,6 +11697,7 @@ export function LogosApp({
       )}
     <L5Switch
       label="Views"
+      after={!narrow ? <NavMover side={navSide} onSide={setNavSide} compact /> : undefined}
       value={oneView ? pageFocus : zoomed ? '' : studyTab}
       // on the board the tabs move the camera (each brings its part forward); elsewhere they open the view
       onChange={(v) => (oneView ? moveCamera(v as Viewport) : openFull(v as Viewport))}
@@ -11181,6 +11719,7 @@ export function LogosApp({
       onRail={() => upToMap(() => setL5List(true))}
       railOpen={l5Home && l5List}
       switcher={switchEl}
+      switchSide={navSide}
       onSearch={phone ? undefined : () => setSearchOpen(Date.now())}
       memory={cloud ? <MindButton onOpen={() => setL5Mind(true)} waiting={memWaiting} /> : null}
       presence={

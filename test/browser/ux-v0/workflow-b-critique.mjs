@@ -1,6 +1,6 @@
 // Workflow B (Critique), end to end, with the model scripted: an HTML import in its sandbox (what it cannot reach),
 // element and area selection, a card and its follow-up, a PNG crop with its one-time thumbnail, a reload.
-import { chromium, S, FX, ROOT, BASE, underTest } from './env.mjs';
+import { chromium, S, FX, ROOT, BASE, underTest, beginWith } from './env.mjs';
 const out = (m) => console.log(m);
 const b = await chromium.launch();
 const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
@@ -32,6 +32,7 @@ await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
 await page.screenshot({ path: S + 'v0-01-home.png' });
 // import HTML (Critique)
 await page.locator('input[type=file]').setInputFiles(FX + 'existing-design.html');
+await beginWith(page);
 await page.waitForSelector('iframe.v0-frame', { timeout: 20000 });
 await page.waitForTimeout(1800);
 await page.screenshot({ path: S + 'v0-02-imported.png' });
@@ -79,6 +80,7 @@ out('file tab: ' + (await page.locator('.v0-rail-scroll').innerText()).replace(/
 // PNG critique
 await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
 await page.locator('input[type=file]').setInputFiles(FX + 'existing-design.png');
+await beginWith(page);
 await page.waitForSelector('img.v0-image', { timeout: 15000 });
 await page.waitForTimeout(800);
 const im = await page.locator('img.v0-image').boundingBox();
@@ -98,7 +100,8 @@ await page.locator('.v0-compose textarea').fill('And the hero buttons?');
 await page.locator('.v0-compose .sb-btn.is-primary').click();
 await page.waitForFunction(() => document.querySelectorAll('.v0-card .v0-turn').length >= 2, null, { timeout: 8000 });
 out('second png request thumb: ' + (critiques.at(-1).thumb ? 'sent' : 'not sent') + ', summary: ' + (critiques.at(-1).summary || '').slice(0, 60));
-// reload keeps everything
+// reload keeps everything that was saved (the header says when: a save waits at most 1.5 s)
+await page.waitForFunction(() => !/Saving/.test(document.querySelector('.v0-save')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForSelector('img.v0-image', { timeout: 15000 });
 out('after reload: cards=' + (await page.locator('.v0-card').count()) + ' url=' + page.url());

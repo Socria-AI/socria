@@ -89,7 +89,7 @@ export function Focus(p: FocusProps) {
     { label: 'Deeper', on: p.onDeeper },
     { label: 'Explain it back', on: p.onExplainBack },
     { label: 'Check against my sources', on: p.onCheckSources },
-    { label: 'Show on the Logic Map', on: p.onShowOnMap },
+    { label: 'Show on the Mind Map', on: p.onShowOnMap },
     { label: 'Copy link', on: p.onCopyLink },
   ];
   return (

@@ -1,0 +1,1016 @@
+/* components/ux-v0/dna.css — the Creative DNA step, its fingerprint, the directions compared, the Originality Audit.
+ *
+ * SocriaUX's own interface, in its brand layer's tokens (paper, ink, moss; Cormorant for its voice, Geist for the
+ * controls): the tool, never the design. Nothing here reaches a generated page — those are drawn by
+ * lib/ux-v0/render.ts from the design's own tokens. The controls are drawn as a studio's instruments: hairline
+ * tracks, one ink mark, the position said in a word in Socria's voice.
+ */
+
+/* ── the fingerprint ─────────────────────────────────────────────── */
+.dna-glyph {
+  display: inline-grid;
+  gap: 4px;
+  width: 92px;
+  vertical-align: middle;
+}
+.dna-glyph.is-md {
+  width: 140px;
+  gap: 6px;
+}
+.dna-glyph-row {
+  position: relative;
+  height: 7px;
+}
+.dna-glyph-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 3px;
+  height: 1px;
+  background: var(--sb-rule-2);
+}
+.dna-glyph-mark,
+.dna-glyph-ghost {
+  position: absolute;
+  top: 0;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+.dna-glyph-mark {
+  background: var(--sb-ink);
+}
+.dna-glyph-ghost {
+  border: 1.5px solid var(--sb-moss-tone);
+  background: var(--sb-paper);
+}
+
+/* ── the step ────────────────────────────────────────────────────── */
+.dna-studio {
+  padding-top: clamp(24px, 3vw, 44px);
+}
+.dna-title {
+  max-width: 20ch;
+  font-size: clamp(34px, 4.2vw, 58px);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+}
+.dna-lede {
+  max-width: 62ch;
+  color: var(--sb-ink-70);
+}
+.dna-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin: 22px 0 0;
+  padding: 14px 0;
+  border-top: 1px solid var(--sb-ink);
+  border-bottom: 1px solid var(--sb-rule);
+}
+.dna-summary-words {
+  font-family: var(--sb-voice);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+.dna-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
+  gap: clamp(28px, 4vw, 64px);
+  max-width: 1120px;
+  margin: 8px auto 0;
+  align-items: start;
+}
+.dna-dims {
+  display: grid;
+}
+.dna-dim {
+  padding: 20px 0 18px;
+  border-bottom: 1px solid var(--sb-rule);
+}
+.dna-dim-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.dna-dim-label {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--sb-ink-70);
+}
+.dna-dim-word {
+  flex: 1 1 auto;
+  font-family: var(--sb-voice);
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+.dna-dim.is-own .dna-dim-word {
+  font-style: italic;
+}
+.dna-lock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--sb-ink-45);
+  cursor: pointer;
+  transition: background var(--sb-fast) var(--sb-ease), color var(--sb-fast) var(--sb-ease);
+}
+.dna-lock:hover {
+  background: var(--sb-well);
+  color: var(--sb-ink);
+}
+.dna-lock.is-on {
+  background: var(--sb-ink);
+  color: var(--sb-paper);
+}
+.dna-lock:focus-visible {
+  outline: 2px solid var(--sb-moss);
+  outline-offset: 2px;
+}
+.dna-range {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) 84px;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+.dna-end {
+  font-size: 12px;
+  color: var(--sb-ink-60);
+}
+.dna-end:last-child {
+  text-align: right;
+}
+.dna-range input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  background: linear-gradient(var(--sb-ink), var(--sb-ink)) 0 50% / var(--v, 50%) 2px no-repeat, linear-gradient(var(--sb-rule-2), var(--sb-rule-2)) 0 50% / 100% 1px no-repeat;
+  cursor: pointer;
+}
+.dna-range input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--sb-ink);
+  box-shadow: 0 0 0 4px var(--sb-paper), 0 0 0 5px var(--sb-rule-2);
+  transition: transform var(--sb-fast) var(--sb-ease);
+}
+.dna-range input[type='range']::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--sb-ink);
+  box-shadow: 0 0 0 4px var(--sb-paper), 0 0 0 5px var(--sb-rule-2);
+}
+.dna-range input[type='range']:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+.dna-range input[type='range']:focus-visible {
+  outline: none;
+}
+.dna-range input[type='range']:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px var(--sb-paper), 0 0 0 6px var(--sb-moss);
+}
+.dna-range input[type='range']:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 4px var(--sb-paper), 0 0 0 6px var(--sb-moss);
+}
+.dna-dim.is-locked .dna-range input[type='range']::-webkit-slider-thumb {
+  border-radius: 4px;
+}
+.dna-dim.is-locked .dna-range input[type='range']::-moz-range-thumb {
+  border-radius: 4px;
+}
+.dna-dim-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 14px;
+  margin-top: 10px;
+}
+.dna-src {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  font-size: 12.5px;
+  color: var(--sb-ink-70);
+}
+.dna-src-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sb-ink-25);
+  transform: translateY(-1px);
+}
+.dna-src.s-designer .dna-src-dot {
+  background: var(--sb-ink);
+}
+.dna-src.s-brief .dna-src-dot {
+  background: var(--sb-moss-tone);
+}
+.dna-src.s-references .dna-src-dot {
+  background: var(--sb-lake);
+}
+.dna-why {
+  color: var(--sb-ink-60);
+}
+.dna-dim-acts {
+  display: inline-flex;
+  gap: 12px;
+}
+.dna-draws {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--sb-ink-60);
+}
+.dna-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 18px 0;
+}
+.dna-side {
+  position: sticky;
+  top: 16px;
+  display: grid;
+  gap: 28px;
+}
+.dna-figure {
+  margin: 20px 0 0;
+}
+.dna-figure figcaption {
+  margin-top: 8px;
+}
+.dna-specimen {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 1 / 1.15;
+  border-radius: 10px;
+  background: var(--sb-surface);
+  box-shadow: var(--sb-float);
+}
+.dna-specimen iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+.dna-refs-note {
+  margin: 6px 0 12px;
+  max-width: 52ch;
+}
+.dna-ref-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dna-ref {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.dna-ref.is-avoid .dna-ref-pic {
+  opacity: 0.55;
+}
+.dna-ref-pic {
+  display: block;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--sb-well);
+}
+.dna-ref-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.dna-ref-body {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.dna-ref-title {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dna-ref-said {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--sb-ink-70);
+}
+.dna-ref-said.is-failed {
+  color: var(--sb-burgundy);
+}
+.dna-aspects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.dna-aspect {
+  padding: 2px 9px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sb-well);
+  color: var(--sb-ink-70);
+  font: inherit;
+  font-size: 11.5px;
+  line-height: 1.6;
+  cursor: pointer;
+  transition: background var(--sb-fast) var(--sb-ease), color var(--sb-fast) var(--sb-ease);
+}
+.dna-aspect:hover {
+  background: var(--sb-well-hover);
+}
+.dna-aspect.is-take {
+  background: var(--sb-moss);
+  color: var(--sb-paper);
+}
+.dna-aspect.is-leave {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--sb-burgundy);
+  color: var(--sb-burgundy);
+  text-decoration: line-through;
+}
+.dna-aspect:focus-visible {
+  outline: 2px solid var(--sb-moss);
+  outline-offset: 1px;
+}
+.dna-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 22px;
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid var(--sb-rule);
+}
+
+/* ── the directions: the DNA they lean from, what each explores, how they differ ── */
+.ad-dna-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  max-width: 1120px;
+  margin: 18px auto 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--sb-rule);
+}
+.ad-dna-strip-words {
+  font-family: var(--sb-voice);
+  font-size: 19px;
+  font-weight: 500;
+}
+.ad-dna {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0 4px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.ad-dna-text b {
+  font-weight: 600;
+}
+.ad-compare,
+.ad-combine {
+  max-width: 1120px;
+  margin: 14px auto 0;
+  border-top: 1px solid var(--sb-rule);
+}
+.ad-compare > summary,
+.ad-combine > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  padding: 12px 0;
+  cursor: pointer;
+  list-style: none;
+}
+.ad-compare > summary::-webkit-details-marker,
+.ad-combine > summary::-webkit-details-marker {
+  display: none;
+}
+.ad-compare > summary::after,
+.ad-combine > summary::after {
+  content: 'Compare';
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ad-compare[open] > summary::after,
+.ad-combine[open] > summary::after {
+  content: 'Close';
+}
+.ad-compare-note {
+  margin: 0 0 10px;
+  max-width: 72ch;
+}
+.ad-compare-scroll {
+  overflow-x: auto;
+  padding-bottom: 12px;
+}
+.ad-compare-t {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.ad-compare-t th,
+.ad-compare-t td {
+  padding: 10px 14px 10px 0;
+  border-bottom: 1px solid var(--sb-rule);
+  text-align: left;
+  vertical-align: top;
+}
+.ad-compare-t thead th {
+  font-weight: 600;
+  color: var(--sb-ink-70);
+  border-bottom-color: var(--sb-ink);
+}
+.ad-compare-t tbody th {
+  width: 150px;
+  font-weight: 600;
+}
+.ad-compare-mark {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--sb-ink-45);
+}
+.ad-compare-t tr.is-distinct .ad-compare-mark {
+  color: var(--sb-moss);
+}
+
+/* ── the canvas: its DNA, its originality ────────────────────────── */
+.dna-canvas .dna-glyph {
+  width: 100%;
+  max-width: 240px;
+  margin: 8px 0 6px;
+}
+.orig-scores {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 10px 0 12px;
+}
+.orig-score {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'n l' 'bar bar';
+  align-items: baseline;
+  column-gap: 8px;
+  row-gap: 5px;
+}
+.orig-score b {
+  grid-area: n;
+  font-family: var(--sb-voice);
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.orig-score-l {
+  grid-area: l;
+  font-size: 12px;
+  color: var(--sb-ink-70);
+}
+.orig-bar {
+  grid-area: bar;
+  height: 2px;
+  background: var(--sb-rule);
+}
+.orig-bar i {
+  display: block;
+  height: 100%;
+  background: var(--sb-ink);
+}
+.orig-list {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+.orig-list li {
+  display: grid;
+  gap: 3px;
+  padding-left: 12px;
+  border-left: 2px solid var(--sb-burgundy);
+}
+.orig-list li.is-allowed {
+  border-left-color: var(--sb-rule-2);
+}
+.orig-k {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--sb-ink-70);
+}
+.orig-foot {
+  margin-top: 10px;
+}
+
+@media (max-width: 960px) {
+  .dna-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dna-side {
+    position: static;
+  }
+}
+@media (max-width: 520px) {
+  .dna-range {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: 'range range' 'lo hi';
+    row-gap: 4px;
+  }
+  .dna-range input[type='range'] {
+    grid-area: range;
+  }
+  .dna-end:first-child {
+    grid-area: lo;
+  }
+  .dna-end:last-child {
+    grid-area: hi;
+  }
+  .dna-dim-word {
+    font-size: 22px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dna-lock,
+  .dna-aspect,
+  .dna-range input[type='range']::-webkit-slider-thumb {
+    transition: none;
+  }
+}
+
+/* ── the canvas's motion panel ───────────────────────────────────── */
+.v0-motion-panel {
+  width: min(440px, 92vw);
+}
+.mp {
+  display: grid;
+  gap: 10px;
+}
+.mp-row {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.mp-row .sb-seg {
+  grid-column: 2 / 4;
+  justify-self: start;
+  flex-wrap: wrap;
+}
+.mp-row .v0-select {
+  grid-column: 2 / 4;
+}
+.mp-l {
+  font-weight: 600;
+  color: var(--sb-ink-70);
+}
+.mp-v {
+  min-width: 56px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--sb-ink-60);
+}
+.mp-row input[type='range'] {
+  width: 100%;
+  accent-color: var(--sb-ink);
+}
+.mp-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 4px;
+}
+.mp-toggle {
+  padding: 4px 11px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sb-well);
+  color: var(--sb-ink-70);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.mp-toggle.is-on {
+  background: var(--sb-ink);
+  color: var(--sb-paper);
+}
+.mp-toggle:focus-visible {
+  outline: 2px solid var(--sb-moss);
+  outline-offset: 2px;
+}
+
+/* the section editor's made-art choices */
+.v0-edit-arts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 4px 0 6px;
+}
+
+/* the section editor's rules at other widths */
+.v0-edit-bp {
+  display: grid;
+  gap: 2px;
+  margin: 6px 0 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--sb-rule);
+}
+.v0-edit-bp-said {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+}
+
+/* combining two directions */
+.ad-combine > summary::after {
+  content: 'Combine';
+}
+.ad-combine-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 4px 2px 10px;
+}
+.ad-combine-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ad-combine-groups {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.ad-combine-groups legend {
+  float: left;
+  margin-right: 4px;
+  padding: 0;
+}
+.ad-combine-groups .mp-toggle {
+  display: inline-flex;
+  align-items: center;
+}
+.ad-combine-groups .mp-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.ad-combine-groups .mp-toggle:focus-within {
+  outline: 2px solid var(--sb-moss);
+  outline-offset: 2px;
+}
+.ad-combine-body > .v0-quiet {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+/* where a picture's subject is: nine places */
+.v0-focal {
+  display: inline-grid;
+  grid-template-columns: repeat(3, 18px);
+  gap: 3px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--sb-well);
+}
+.v0-focal-dot {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: var(--sb-paper);
+  cursor: pointer;
+}
+.v0-focal-dot.is-on {
+  background: var(--sb-ink);
+}
+.v0-focal-dot:focus-visible {
+  outline: 2px solid var(--sb-moss);
+  outline-offset: 1px;
+}
+.v0-focal-dot:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* other compositions for one part: alternatives that differ in structure, drawn small */
+.v0-explore {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sb-line, rgba(0, 0, 0, 0.12));
+}
+.v0-nudges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.v0-nudge {
+  font: inherit;
+  font-size: 12px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--sb-line, rgba(0, 0, 0, 0.18));
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.v0-nudge.is-on {
+  background: var(--sb-ink);
+  border-color: var(--sb-ink);
+  color: var(--sb-paper);
+}
+.v0-nudge:focus-visible,
+.v0-alt-pick input:focus-visible {
+  outline: 2px solid var(--sb-moss);
+  outline-offset: 2px;
+}
+.v0-alts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+.v0-alt {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--sb-line, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+}
+.v0-alt.is-picked {
+  border-color: var(--sb-ink);
+}
+.v0-alt-frame {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--sb-well);
+}
+.v0-alt-frame iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+.v0-alt-label {
+  margin: 0;
+  font-weight: 600;
+  font-size: 13px;
+}
+.v0-alt-diff {
+  margin: 0;
+  padding-left: 1.1em;
+  font-size: 12px;
+  color: var(--sb-muted, #555);
+}
+.v0-alt-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.v0-alt-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  min-height: 32px;
+}
+
+/* a direction's shapes, drawn small on its card */
+.ad-form-strip {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  margin: 8px 0 4px;
+  color: var(--sb-ink);
+}
+
+/* ── Publish: what stands in the way, the site's settings, where each link goes, the downloads ── */
+.v0-publish .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.v0-pub-ready,
+.v0-pub-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.v0-pub-ready li {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 6px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.v0-pub-ready li.is-todo {
+  color: var(--sb-ink);
+}
+.v0-pub-ready li.is-done {
+  color: var(--sb-ink-60);
+}
+.v0-pub-mark {
+  font-weight: 700;
+  color: var(--sb-moss);
+}
+.v0-pub-ready li.is-todo .v0-pub-mark {
+  color: var(--sb-ink);
+}
+.v0-pub-field {
+  display: grid;
+  gap: 6px;
+}
+.v0-pub-field + .v0-pub-field {
+  margin-top: 10px;
+}
+.v0-pub-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--sb-burgundy);
+}
+.v0-pub-links li {
+  display: grid;
+  gap: 6px;
+  padding: 8px 0;
+  border-top: 1px solid var(--sb-rule, rgba(0, 0, 0, 0.12));
+}
+.v0-pub-links li.is-todo .v0-pub-link-l {
+  font-weight: 600;
+}
+.v0-pub-link-l {
+  font-size: 14px;
+}
+.v0-pub-links .v0-select {
+  max-width: 100%;
+}
+
+/* ── Checks: release gates, quality dimensions, decisions kept ── */
+.v0-quality .sr-only,
+.v0-decisions .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.v0-gates,
+.v0-dims {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.v0-gate {
+  padding: 8px 10px;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--sb-rule-2);
+  font-size: 14px;
+}
+.v0-gate-h {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.v0-gate-s {
+  font-weight: 600;
+}
+.v0-gate.is-pass .v0-gate-s {
+  color: var(--sb-moss);
+}
+.v0-gate.is-fail {
+  box-shadow: inset 0 0 0 1.5px var(--sb-burgundy);
+}
+.v0-gate.is-fail .v0-gate-s {
+  color: var(--sb-burgundy);
+}
+.v0-gate .v0-plain {
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+.v0-dims li {
+  display: grid;
+  grid-template-columns: 1fr 64px 28px;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 14px;
+}
+.v0-dims li.is-unmeasured {
+  opacity: 0.7;
+}
+.v0-dim-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--sb-well);
+  overflow: hidden;
+}
+.v0-dim-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--sb-moss);
+}
+.v0-dim-n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.v0-dim-basis {
+  grid-column: 1 / -1;
+  font-size: 12.5px;
+}
+.v0-decisions summary {
+  cursor: pointer;
+  list-style: none;
+}
+.v0-decisions summary::-webkit-details-marker {
+  display: none;
+}
+.v0-decision-list li {
+  display: grid;
+  gap: 2px;
+  padding: 6px 0;
+  border-top: 1px solid var(--sb-rule, rgba(0, 0, 0, 0.12));
+  font-size: 14px;
+}
+.v0-decision-list li.is-broken .v0-decision-h {
+  color: var(--sb-burgundy);
+}
+
+/* ── Versions: what changed, kept versions ── */
+.v0-version-what {
+  display: block;
+  font-size: 12.5px;
+  color: var(--sb-ink-60);
+  line-height: 1.4;
+  margin-top: 2px;
+}
+.v0-version-kept {
+  color: var(--sb-moss);
+  font-weight: 600;
+}

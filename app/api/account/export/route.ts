@@ -254,6 +254,16 @@ export async function GET(req: NextRequest) {
     .from('ux_v0_usage').select('project_id, day, calls, generations, input_tokens, output_tokens, cost_usd').eq('user_id', userId).order('day', { ascending: false });
   const uxV0UsageErr = missingTable(uxV0UsageRaw) ? null : uxV0UsageRaw;
   out.designUsageV0 = uxV0Usage ?? [];
+  // …and call by call: the stage, tier and model, the tokens and the cost (no prompt or design is in this table)
+  const { data: uxV0Calls, error: uxV0CallsRaw } = await db
+    .from('ux_v0_calls').select('project_id, at, day, stage, tier, model, api, effort, input_tokens, cached_tokens, output_tokens, cost_usd, downgraded').eq('user_id', userId).order('at', { ascending: false });
+  const uxV0CallsErr = missingTable(uxV0CallsRaw) ? null : uxV0CallsRaw;
+  out.designCallsV0 = uxV0Calls ?? [];
+  // …and their design systems, whole: tokens, brand rules, approved assets, every published version and its history
+  const { data: uxV0Systems, error: uxV0SystemsRaw } = await db
+    .from('ux_v0_systems').select('id, name, doc, created_at, updated_at').eq('user_id', userId).order('updated_at', { ascending: false });
+  const uxV0SystemsErr = missingTable(uxV0SystemsRaw) ? null : uxV0SystemsRaw;
+  out.designSystemsV0 = uxV0Systems ?? [];
 
   // Metacognitive Regulation's intervention ledger: which condition each turn
   // ran under, what MR decided, how it went and what its integrity checks
@@ -374,6 +384,8 @@ export async function GET(req: NextRequest) {
     ['designProjects', uxProjectsErr],
     ['designProjectsV0', uxV0ProjectsErr],
     ['designUsageV0', uxV0UsageErr],
+    ['designCallsV0', uxV0CallsErr],
+    ['designSystemsV0', uxV0SystemsErr],
     ['mrLedger', mrLedgerErr],
     ['roomSeats', roomSeatsErr],
     ['rooms', roomsErr],

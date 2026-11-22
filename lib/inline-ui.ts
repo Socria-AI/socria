@@ -253,6 +253,20 @@ export interface GraphSpec {
   /** under the Answer Guard: the lines are drawn, the numbers that would answer it are not */
   quiet?: true;
   predict?: PredictSpec;
+  /** a change played when it first appears and on Play: one of its own parameters moving to `to` (AnimateSpec) */
+  animate?: AnimateSpec;
+}
+/**
+ * A CHANGE TO PLAY (Logos 6, lib/visual/actions.ts). One of the element's own parameters moving from where it starts
+ * to `to` — a secant's end closing on the tangent's point, the number of rectangles growing, demand shifting — so what
+ * moves is the model itself, every frame a state it can be in. Checked when read: the parameter exists, `to` is inside
+ * its range and on its step, it is a change, and a secant's two ends never meet.
+ */
+export interface AnimateSpec {
+  param: string;
+  to: number;
+  /** what the change is, said beside Play */
+  label?: string;
 }
 /**
  * A POINT ON THE PICTURE, CHECKED AGAINST THE CURVE. Its x (and y) are numbers or formulas in the parameters, so it
@@ -309,6 +323,8 @@ export interface SimSpec {
   params: ParamSpec[];
   readouts?: ReadoutSpec[];
   predict?: PredictSpec;
+  /** a change to play: one parameter moving (a launch angle swept) */
+  animate?: AnimateSpec;
 }
 /** A question with an answer they work out: the answer is a formula the engine evaluates, never a number asserted. */
 export interface CheckPart {
@@ -450,6 +466,8 @@ export interface VectorsSpec {
   params: ParamSpec[];
   resultant: boolean;
   unit?: string;
+  /** a change to play: one parameter moving (a force turning, growing) */
+  animate?: AnimateSpec;
 }
 /**
  * AN ALGORITHM, STEP BY STEP. The state after each step — the cells of an array (or a stack, a queue), the ones it is
@@ -1039,6 +1057,7 @@ function sanitizeGraph(r: Record<string, unknown>): GraphSpec | null {
   // the first curve's name stays even when it is the only curve ("demand", with a point dragged along it)
   const label = line(r.label, L.label);
   const highlights = sanitizeHighlights(r.highlights ?? r.callouts, names, vals, x);
+  const animate = sanitizeAnimate(r.animate ?? r.play, params, chord);
   return {
     type: 'graph',
     ...(title ? { title } : {}),
@@ -1058,7 +1077,29 @@ function sanitizeGraph(r: Record<string, unknown>): GraphSpec | null {
     ...(highlights.length ? { highlights } : {}),
     ...(r.quiet === true ? { quiet: true as const } : {}),
     ...(predict ? { predict } : {}),
+    ...(animate ? { animate } : {}),
   };
+}
+
+/**
+ * A change to play, checked (AnimateSpec): its parameter named, `to` a number inside the range and on the step, a change
+ * from where it starts — and, for a secant's end, never onto the other end (no slope is defined there).
+ */
+export function sanitizeAnimate(raw: unknown, params: readonly ParamSpec[], chord?: [string, string] | null): AnimateSpec | null {
+  const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
+  if (!o) return null;
+  const name = typeof o.param === 'string' ? o.param.trim().toLowerCase() : '';
+  const p = params.find((q) => q.name === name);
+  const want = typeof o.to === 'number' ? o.to : typeof o.to === 'string' && o.to.trim() !== '' ? Number(o.to) : NaN;
+  if (!p || !Number.isFinite(want)) return null;
+  const snap = (v: number) => Number(Math.min(p.max, Math.max(p.min, Math.round((v - p.min) / p.step) * p.step + p.min)).toFixed(6));
+  let to = snap(want);
+  const mate = chord ? (chord[0] === name ? chord[1] : chord[1] === name ? chord[0] : null) : null;
+  const mv = mate ? params.find((q) => q.name === mate)?.value : undefined;
+  if (mv !== undefined && Math.abs(to - mv) < 1e-9) to = snap(mv + (p.value >= mv ? p.step : -p.step));
+  if (Math.abs(to - p.value) < 1e-9 || (mv !== undefined && Math.abs(to - mv) < 1e-9)) return null;
+  const label = line(o.label, L.label);
+  return { param: name, to, ...(label ? { label } : {}) };
 }
 
 /** Forces at a point: one to five vectors, each a size and a direction that are numbers or formulas in the parameters. */
@@ -1080,7 +1121,8 @@ function sanitizeVectors(r: Record<string, unknown>): VectorsSpec | null {
   }
   if (!vectors.length) return null;
   const title = line(r.title, L.title), body = line(r.body, L.label), unit = line(r.unit, L.unit);
-  return { type: 'vectors', ...(title ? { title } : {}), ...(body ? { body } : {}), vectors, params, resultant: r.resultant !== false, ...(unit ? { unit } : {}) };
+  const animate = sanitizeAnimate(r.animate ?? r.play, params);
+  return { type: 'vectors', ...(title ? { title } : {}), ...(body ? { body } : {}), vectors, params, resultant: r.resultant !== false, ...(unit ? { unit } : {}), ...(animate ? { animate } : {}) };
 }
 /** The sum of the vectors at these values: its components, size and direction (degrees, −180 to 180). */
 export function vectorSum(spec: VectorsSpec, values: Record<string, number>): { parts: { label: string; mag: number; angle: number; x: number; y: number }[]; x: number; y: number; mag: number; angle: number } {
@@ -1165,7 +1207,8 @@ function sanitizeSim(r: Record<string, unknown>): SimSpec | null {
   const readouts = sanitizeReadouts(r.readouts, names, vals);
   const predict = sanitizePredict(r.predict);
   const title = line(r.title, L.title);
-  return { type: 'sim', ...(title ? { title } : {}), x: xe, y: ye, t: [t0, t1], view: { x: vx, y: vy }, params, ...(readouts.length ? { readouts } : {}), ...(predict ? { predict } : {}) };
+  const animate = sanitizeAnimate(r.animate ?? r.play, params);
+  return { type: 'sim', ...(title ? { title } : {}), x: xe, y: ye, t: [t0, t1], view: { x: vx, y: vy }, params, ...(readouts.length ? { readouts } : {}), ...(predict ? { predict } : {}), ...(animate ? { animate } : {}) };
 }
 
 function sanitizeCheckPart(raw: unknown): CheckPart | null {
@@ -2072,7 +2115,11 @@ export function contentAsText(content: string): string {
     if (spec) return inlinePlainText(spec);
     const edit = parseEditSpec(body);
     return edit ? editLine(edit) : '';
-  }).replace(/\n{3,}/g, '\n\n').trim();
+  })
+    // words that point at the picture (lib/rich-text.ts VIS_LINK) are copied as their words
+    .replace(/\[([^\]\n]{1,200})\]\((vis:[^\s)]{1,240})\)/g, '$1')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 /**

@@ -49,7 +49,6 @@
 /* ── over the box: an offer in words ────────────────────────────────────────────────────────────────────────── */
 .logos-root .l6-offer { display: flex; flex-wrap: wrap; align-items: center; gap: 0 16px; margin: 0 0 6px; }
 .logos-root .l6-note { margin: 0 0 6px; font-size: 12.5px; color: var(--c-ink-60); }
-.logos-root .l6-addidea { margin-left: 12px; }
 
 /* ── Focus: the app's sheet (components/one/one-sheet.css), its rows ───────────────────────────────────────── */
 .logos-root .l6-focus { z-index: 96; }

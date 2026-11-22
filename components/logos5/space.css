@@ -141,6 +141,11 @@
 /* ── the chatbox: a box at the foot of the space ── */
 .logos-root .ls-chat { position: absolute; left: 50%; bottom: 18px; z-index: 5; transform: translateX(-50%); width: min(760px, calc(100% - 48px)); display: flex; flex-direction: column; gap: 8px; }
 .logos-root .ls::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; height: 150px; background: linear-gradient(to bottom, rgba(var(--c-paper-rgb, 245, 243, 235), 0), var(--c-paper) 46%); pointer-events: none; }
+/* the chat box's own ground over the board: what sits over the box (the objective, a note, the Enter hint) is read on
+   the paper, never across a card scrolled beneath it — the fade above is a fixed height, and the box is not. The
+   ground is the box's own size, so it grows with whatever is over it, and soft at its edges, so the board fades into
+   it rather than stops. (A phone's box is a bar with a ground of its own.) */
+.logos-root .ls:not(.is-phone) .ls-chat::before { content: ''; position: absolute; inset: 0 0 -18px; z-index: -1; border-radius: 18px; background: var(--c-paper); box-shadow: 0 0 22px 14px var(--c-paper); pointer-events: none; }
 .logos-root .ls-answering { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px; border: 1px solid rgba(var(--c-moss-rgb), 0.3); border-radius: 6px; background: #eef1e6; font-size: 12.5px; color: var(--c-moss); max-width: 100%; }
 .logos-root .ls-answering b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 420px; }
 .logos-root .ls-answering-x { width: 20px; height: 20px; padding: 0; border: 0; background: none; color: var(--c-ink-45); font-size: 14px; line-height: 1; cursor: pointer; }
@@ -363,3 +368,46 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 .logos-root .ls-hero.is-live > .ls-made-acts { justify-self: start; }
 /* the reply under a made element keeps to words: its Keep and Edit are on the element's card */
 .logos-root .ls-bub.has-hero .ln-keep-row { display: none; }
+
+/* ── WHERE THE VIEWS SIT (Logos 6): a rail on the left by default, the top or the right if moved (nav-side.ts) ── */
+.logos-root .ls.has-nav-left { flex-direction: row; }
+.logos-root .ls.has-nav-right { flex-direction: row-reverse; }
+.logos-root .ls-kinds.is-side-left,
+.logos-root .ls-kinds.is-side-right { flex-direction: column; align-items: stretch; gap: 2px; width: 196px; height: auto; padding: 18px 12px 16px; border-bottom: 0; overflow-x: hidden; overflow-y: auto; }
+.logos-root .ls-kinds:is(.is-side-left, .is-side-right) { position: relative; z-index: 6; background-color: var(--c-paper); padding-bottom: 28px; }
+.logos-root .ls-kinds.is-side-left { border-right: 1px solid var(--c-rule); }
+.logos-root .ls-kinds.is-side-right { border-left: 1px solid var(--c-rule); }
+.logos-root .ls-kinds:is(.is-side-left, .is-side-right) .ls-kd { justify-content: flex-start; gap: 10px; padding: 9px 10px; border-radius: 10px; }
+.logos-root .ls-kinds:is(.is-side-left, .is-side-right) .ls-kd.is-on { box-shadow: inset 3px 0 0 var(--c-moss); background: rgba(var(--c-moss-rgb, 53, 70, 32), 0.08); }
+.logos-root .ls-kinds:is(.is-side-left, .is-side-right) .ls-c { margin-left: auto; }
+.logos-root .ls-kinds:is(.is-side-left, .is-side-right) .ls-sp { flex: 1 1 18px; }
+.logos-root .ls-kinds:is(.is-side-left, .is-side-right) :is(.ls-zoom-keys, .ls-putback, .ls-focus, .ls-logicmap, .ls-page, .ls-navmove) { align-self: flex-start; margin: 4px 6px 0; }
+.logos-root .ls-kinds:is(.is-side-left, .is-side-right) .ls-page { white-space: normal; }
+.logos-root .ls.has-nav-left .ls-chat { left: calc(50% + 98px); width: min(760px, calc(100% - 196px - 48px)); }
+.logos-root .ls.has-nav-right .ls-chat { left: calc(50% - 98px); width: min(760px, calc(100% - 196px - 48px)); }
+/* MOVE THE VIEWS (NavMover.tsx). The button stays in sight: along the top it holds the end of the row (the row scrolls
+   sideways when it has more than fits, and the button used to scroll away with it), in a rail it holds the rail's
+   foot. Its choices float over the page at a place worked out from the button, so no row, rail or bar can clip them
+   (the row along the top did: the menu hung below it and was cut off). Not scoped to the app's root, so the choices
+   look the same wherever they are drawn; .lg-tokens on them gives them the colours. */
+.logos-root .ls-navmove { position: relative; align-self: center; }
+.logos-root .ls-kinds.is-side-top .ls-navmove { position: sticky; right: 0; z-index: 2; display: flex; align-items: center; align-self: stretch; padding-left: 14px; background-color: var(--c-paper); box-shadow: 40px 0 0 var(--c-paper); }
+.logos-root .ls-kinds.is-side-top .ls-navmove::before { content: ''; position: absolute; top: 0; bottom: 0; right: 100%; width: 28px; background: linear-gradient(to right, transparent, var(--c-paper)); pointer-events: none; }
+.logos-root .ls-kinds:is(.is-side-left, .is-side-right) .ls-navmove { position: sticky; bottom: 0; z-index: 2; background-color: var(--c-paper); }
+.logos-root .ls-navmove-b { font-size: 12.5px; color: var(--c-ink-60); white-space: nowrap; }
+.ls-navmove-menu.is-floating { position: fixed; z-index: 1000; display: flex; gap: 4px; margin: 0; padding: 6px; border: 1px solid var(--c-rule); border-radius: 10px; background: var(--c-paper); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16); }
+.ls-navmove-menu.is-floating button { padding: 5px 10px; border: 1px solid transparent; border-radius: 6px; background: none; font: inherit; font-size: 12.5px; color: var(--c-ink); cursor: pointer; }
+.ls-navmove-menu.is-floating button:hover { background: rgba(var(--c-moss-rgb, 53, 70, 32), 0.06); }
+.ls-navmove-menu.is-floating button[aria-pressed='true'] { border-color: var(--c-moss); background: rgba(var(--c-moss-rgb, 53, 70, 32), 0.08); }
+.ls-navmove-menu.is-floating button:focus-visible, .logos-root .ls-navmove-b:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+
+/* ── THE MIND MAP, in place (Logos 6): the same cards, in Ideas, Logic or Structure ── */
+.logos-root .ls.has-mind .ls-canvas, .logos-root .ls.has-mind .ls-feed { display: none; }
+/* the Mind Map stops where the chat box begins: the box's measured height (--ls-foot, L5Space), and its gap */
+.logos-root .ls-mind { position: relative; flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding-bottom: calc(var(--ls-foot, 94px) + 24px); }
+.logos-root .ls-mind > .tc { flex: 1; min-height: 0; }
+/* the space gives the map a frame of its own height: the map's body gives way inside it rather than run on under the
+   chat box on a short screen, at every width (its floors in thinking-canvas.css, 360px and a phone's 160px, are for a
+   panel that grows with what is in it) */
+.logos-root .ls-mind .tc .tc-body { min-height: 0; }
+.logos-root .ls-mind.is-phone { padding-bottom: calc(var(--ls-foot, 128px) + 8px); }

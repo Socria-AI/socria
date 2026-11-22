@@ -109,6 +109,17 @@ export async function deleteProject(id: string, artifactId?: string): Promise<vo
   if (artifactId) await tx(db, 'artifacts', 'readwrite', (s) => s.delete(artifactId)).catch(() => undefined);
 }
 
+/** Let go of files: a project's uploaded references when the project goes. */
+export async function deleteArtifacts(ids: readonly string[]): Promise<void> {
+  if (!ids.length) return;
+  const db = await open();
+  if (!db) {
+    for (const id of ids) memory.artifacts.delete(id);
+    return;
+  }
+  for (const id of ids) await tx(db, 'artifacts', 'readwrite', (s) => s.delete(id)).catch(() => undefined);
+}
+
 export async function putArtifact(rec: ArtifactRecord): Promise<StoreResult> {
   const db = await open();
   if (!db) {

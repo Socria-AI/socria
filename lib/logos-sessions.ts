@@ -65,7 +65,7 @@ export interface LogosMsg {
    * said, not typed — Socria Voice (lib/voice/speech.ts): marked with a microphone, and read generously for a
    * misheard word; or 'quiz': a request the quiz took (lib/quiz), so the reply engine does not quiz in words too
    */
-  via?: 'voice' | 'quiz';
+  via?: 'voice' | 'quiz' | 'thought';
   /** the web pages this reply was given to read (lib/chat-thread.ts cleanWebSources) — listed under it, never their text */
   sources?: { query: string; list: WebSourceRef[] };
   /**
@@ -74,6 +74,12 @@ export interface LogosMsg {
    * answer checked. Shown over their words, and told to Socria with them.
    */
   did?: { from: string; said: string }[];
+  /**
+   * What was on screen when they wrote this (lib/visual/context.ts VisNote): what was done for it (a curve
+   * highlighted, demand shifted), the part they had selected, the changes since they last wrote, a reference that
+   * fitted more than one part. Told to Socria with their words; never their words.
+   */
+  vis?: { done?: string[]; sel?: string; changes?: string[]; ask?: string; cannot?: string; on?: string };
   /**
    * What Socria's reply did, as the explanation engine planned it (lib/runtime/explain.ts ThreadNote): enum
    * codes for the moves, the rung, the question it left — kept only if the reply really asked it — and the

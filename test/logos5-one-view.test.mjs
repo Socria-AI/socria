@@ -137,7 +137,7 @@ const board = (o = {}) => html(h(O.L5Board, { turns: T, reading: 2, cards, map: 
 const b = board();
 ok('three columns, no bar: no filters, no zoom tray, no Back to chat, no floating sheet', /class="lp cam-chat"/.test(b) && /lp-col lp-map l5-dots/.test(b) && /lp-col lp-convo/.test(b) && /lp-col lp-made/.test(b) && !/Everything|Back to chat|lcv-bar|lob-tray|lob-sheet|aria-label="Zoom"/.test(b));
 ok('the dot grid only behind the Logic Map', (b.match(/l5-dots/g) || []).length === 1);
-ok('the Logic Map: its count — the lit ideas say which turn, no label needed', b.includes('Logic Map · 7 ideas') && !b.includes('Turn iii lit'));
+ok('the Mind Map: its count — the lit ideas say which turn, no label needed', b.includes('Mind Map · 7 ideas') && !b.includes('Turn iii lit'));
 ok('  an idea says what it does to another, in a line', b.includes('<span class="lp-node-rel">conflicts with <em>Interval doesn’t start at 0</em></span>'));
 ok('  the one asked about says so in its label', /lp-node-k">Step<span class="lp-node-asking"> · asking about<\/span>/.test(b));
 ok('  the question first; steps on a rail — done, now, ahead; the lit one marked; the asked-about one pressed', /lp-node is-question/.test(b) && /lp-steps/.test(b) && /lp-step is-done/.test(b) && /lp-step is-now/.test(b) && /lp-step is-ahead/.test(b) && /lp-node is-step is-lit is-picked" aria-pressed="true"/.test(b));

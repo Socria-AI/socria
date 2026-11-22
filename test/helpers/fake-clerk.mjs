@@ -2,7 +2,8 @@
 // what a user is called and which verified addresses they hold. A test fills
 // globalThis.__users = { id: { firstName, emails: ['a@x.com'] } }.
 export function auth() {
-  return { userId: globalThis.__uid ?? null };
+  // globalThis.__orgId: the active organisation, as Clerk gives it to a member working in one
+  return { userId: globalThis.__uid ?? null, orgId: globalThis.__orgId ?? null };
 }
 // The first address is the primary one, as it is for an account made with it.
 // `unverified: ['b@x.com']` lists addresses on the account that were never confirmed.

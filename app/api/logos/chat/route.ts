@@ -134,6 +134,10 @@ import {
 } from '@/lib/runtime';
 import { runResearch } from '@/lib/core4/web-server';
 import { contentAsText, contentForCheck, contentForHistory, didLine, gateInlineBlock, sanitizeDid, sanitizeInlineState, type InlineContext } from '@/lib/inline-ui';
+import { catalogueOf, sanitizeVisNote, visNoteLine, visualBlock } from '@/lib/visual/context';
+
+/** The forms a reply can point into while it explains (lib/visual/elements.ts): offered, they bring the marker rule. */
+const VISUAL_FORMS = new Set(['graph', 'sim', 'vectors', 'trace', 'steps', 'diagram', 'sequence', 'equation']);
 import { GUEST_COOKIE, GUEST_LIMIT, guestMay } from '@/lib/guest-pass';
 import { TRIAL_ENDED_COOKIE, guestAfterTrial } from '@/lib/trial';
 import { GUEST_TURNS, GUEST_TURNS_LIMIT, guestTurnsUsed } from '@/lib/guest-limits';
@@ -154,6 +158,8 @@ import type { LedgerRow, MRSettings } from '@/lib/mr/types';
 import { NO_LOOKUP_FACT, renderNoResearch, renderResearch, type Research } from '@/lib/core4/web';
 import { LIST_ASK } from '@/lib/runtime/asks';
 import { SPOKEN_TURN } from '@/lib/voice/speech';
+import { objectiveBlock, recallBlock, recallEarlier, sanitizeObjectiveTurn } from '@/lib/logos6/objective';
+import { canvasFocusBlock, sanitizeCanvasFocus } from '@/lib/logos6/focus-context';
 
 /** The turn asked for code, JSON, a schema or a config: a fenced json block in the reply is then theirs (lib/inline-ui.ts InlineContext.code). */
 const CODE_ASKED = /\b(?:json|yaml|toml|schema|config(?:uration)?\s+file|payload|api\s+response|code|snippet|script|regex|sql|function|class|endpoint)\b/i;
@@ -358,7 +364,14 @@ export const POST = withMeter(async function POST(req: NextRequest) {
         typeof m.content === 'string'
     );
     const clipped = filtered.map((m: any, i: number) =>
-      i === filtered.length - 1 ? m : { ...m, content: m.content.slice(0, m.role === 'user' ? MAX_INPUT_LEN : MAX_HISTORY_REPLY_LEN) }
+      i === filtered.length - 1
+        ? m
+        : {
+            ...m,
+            // a thought they kept on their map with no reply (the Omnibox, lib/logos6/omnibox.ts): context, read as such —
+            // not a question left unanswered
+            content: (m.role === 'user' && m.via === 'thought' ? '(A thought of theirs, kept on their map; no reply was asked for.) ' : '') + m.content.slice(0, m.role === 'user' ? MAX_INPUT_LEN : MAX_HISTORY_REPLY_LEN),
+          }
     );
     let budget = MAX_HISTORY_TOTAL;
     let from = clipped.length;
@@ -465,7 +478,12 @@ export const POST = withMeter(async function POST(req: NextRequest) {
         // answer checked — in the model's copy only: one bracketed line before their words, so it is
         // read as what happened, never as what they said (lib/inline-ui.ts didLine).
         const did = m.role === 'user' ? sanitizeDid(m.did) : undefined;
-        const rendered = did && rendered0 ? `${didLine(did)}\n${rendered0}` : rendered0;
+        // …and what was on screen (lib/visual/context.ts): what was done for this message, what they selected, what
+        // changed — one more bracketed line, read as what happened, never as their words
+        const vis = m.role === 'user' ? sanitizeVisNote(m.vis) : undefined;
+        const visLine = vis ? visNoteLine(vis) : '';
+        const rendered1 = did && rendered0 ? `${didLine(did)}\n${rendered0}` : rendered0;
+        const rendered = visLine && rendered1 ? `${visLine}\n${rendered1}` : rendered1;
         const name = twoPeople && m.role === 'user' ? cleanPerson(m.by?.name) : '';
         // A turn that replies to a particular message says which, in the
         // model's copy only: one fixed-format line, quoted and clipped
@@ -1356,6 +1374,13 @@ export const POST = withMeter(async function POST(req: NextRequest) {
     // LOGOS 6: A CHANGE TO AN ARTIFACT THEY CAN SEE is made to that artifact, in place (lib/artifact-focus.ts) — the
     // kept one open in Artifacts, else the element in Socria's last reply. Only when the words plainly ask for a change.
     const editTarget = asksToChange(last.content) ? editTargetOf({ text: last.content, space: sanitizeSpace(body?.objects) ?? null, inHand: body?.inHand, messages }) : null;
+    // LOGOS 6 — ONE CHAT, ONE OBJECTIVE (lib/logos6/objective.ts): what this chat is for and what it holds for it (sent by
+    // the browser from the conversation itself, re-sanitised here), and the turns older than the recent window that bear
+    // on this message — so a long chat stays one piece of work and nothing already said is asked for again
+    const objectiveTurn = sanitizeObjectiveTurn(body?.objective);
+    const earlier = recallEarlier(filtered, filtered.length - kept.length, String(last.content ?? ''), {
+      also: objectiveTurn ? [objectiveTurn.objective.goal, ...(objectiveTurn.objective.threads ?? [])].join(' ') : '',
+    });
     const turnContext =
       // When this turn is, where they are: the date and time in their own time zone (lib/runtime/epistemic.ts nowLine)
       nowLine(Date.now(), body?.tz) +
@@ -1428,6 +1453,11 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       (twoPeople ? collabBlock(collabPeople) : '') +
       // …and when one of them asked Socria directly, it answers that person.
       (addressed ? addressedBlock(addressed) : '') +
+      // the card or line selected on their Mind Map, as it is held (lib/logos6/focus-context.ts)
+      canvasFocusBlock(sanitizeCanvasFocus(body?.canvasFocus)) +
+      // what this chat is for, what it holds, and the earlier turns that bear on this message
+      objectiveBlock(objectiveTurn) +
+      recallBlock(earlier) +
       // ONCE. This was appended twice, so everything Socria remembers about
       // the person reached the model as two identical blocks — twice the
       // tokens, and twice the weight against the guidance above it.
@@ -1446,6 +1476,9 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       // …and how to make it understood (lib/runtime/explain.ts): read against the shape above, so nothing is said
       // twice — none for a direct answer or what is not here yet (mrMoveOf), a few lines of this turn's facts otherwise
       (mrMove === 'unseen' ? '' : renderTurnGuidance(explain, presentation, { said: { retrieval: assist.retrieval, selfExplain: assist.selfExplain } })) +
+      // …and the pictures on screen, each part by its id, and how a reply points at them while it explains
+      // (lib/visual/context.ts): only when there is a picture to point at, on screen or offered to this reply
+      visualBlock(catalogueOf(kept), (presentation.forms ?? []).some((f: string) => VISUAL_FORMS.has(f))) +
       // …and the course it is in, when one is (lib/teaching/use.ts)
       courseBlock +
       // What may be asserted on what (epistemic.ts) — then, last, what was computed.

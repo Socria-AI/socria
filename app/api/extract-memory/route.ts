@@ -105,6 +105,12 @@ export async function POST(req: NextRequest) {
     // concept — "Anatomy – Nervous System Review" — never the request itself
     // ("Help me study for this big bio test tomorrow night please").
     const topic = body?.titleStyle === 'topic';
+    // LOGOS 6 (lib/logos6/objective.ts): with the title, what the person is working towards in this chat — only when
+    // the opening says it or plainly implies it; the browser keeps its own reading otherwise
+    const withObjective = topic && body?.objective === true;
+    const objectiveAsk = withObjective
+      ? ' Also name what the person is working towards in this conversation, as a short goal that starts with a verb, 2–8 words — e.g. "Master Calculus I", "Prepare for the board presentation", "Ship the SocriaUX beta" — only when their opening states or clearly implies one; otherwise "". Return JSON: {"suggestedTitle":"...","objective":"..."}'
+      : '';
     try {
       const openai = tracked(new OpenAI({ apiKey }), topic ? 'logos/title' : 'core/extract-memory');
       const completion = await openai.chat.completions.create({
@@ -115,18 +121,20 @@ export async function POST(req: NextRequest) {
             content: topic
               ? 'Name the topic of this conversation as a concise academic or conceptual title of 3–7 words — e.g. "Anatomy – Nervous System Review", "Thermodynamics – Carnot Cycle", "Pricing a Bakery in Austin". ' +
                 'Use "Subject – Topic" when a subject is clear. Name what it is ABOUT, never the request ("Help me…", "Can you…"), never the deadline or the mood. ' +
-                'No quotes, no trailing punctuation, never generic ("New chat", "Discussion", "Question"). Return JSON: {"suggestedTitle":"..."}'
+                'No quotes, no trailing punctuation, never generic ("New chat", "Discussion", "Question"). ' +
+                (objectiveAsk || 'Return JSON: {"suggestedTitle":"..."}')
               : 'Give this conversation a short, specific title (3–7 words) naming what it is about, in the person\'s terms. ' +
                 'No quotes, no trailing punctuation, never generic ("New chat", "Discussion"). Return JSON: {"suggestedTitle":"..."}',
           },
           { role: 'user', content: opening },
         ],
         temperature: 0.2,
-        max_tokens: 40,
+        max_tokens: withObjective ? 80 : 40,
         response_format: { type: 'json_object' },
       });
       const parsed = JSON.parse(completion.choices?.[0]?.message?.content || '{}');
-      return NextResponse.json({ memory: currentMemory, suggestedTitle: sanitizeSuggestedTitle(parsed?.suggestedTitle) });
+      const suggestedObjective = withObjective && typeof parsed?.objective === 'string' ? parsed.objective.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100) || null : null;
+      return NextResponse.json({ memory: currentMemory, suggestedTitle: sanitizeSuggestedTitle(parsed?.suggestedTitle), ...(withObjective ? { suggestedObjective } : {}) });
     } catch (e) {
       console.error('extract-memory (title) error:', e);
       return NextResponse.json({ memory: currentMemory, suggestedTitle: null });

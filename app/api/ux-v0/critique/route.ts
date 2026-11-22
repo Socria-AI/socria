@@ -7,38 +7,32 @@
 // the whole design, whose reading is returned and kept so it is never sent
 // again. What comes back is held to evidence by the critique gate before the
 // designer sees it. Nothing is stored here: the card lives in the project.
+//
+// A short question about one selected part is economy work; a question about the whole design, or an image of
+// a whole page, is premium (lib/ux-v0/model.ts critiqueTier). The operation itself is lib/ux-v0/stage-server.ts.
 
-import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
-import { auth } from '@clerk/nextjs/server';
-import { tracked } from '@/lib/openai-usage';
-import { enforceRateLimit } from '@/lib/rate-limit';
-import { resolvePlanForRequest } from '@/lib/socria-one-server';
-import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
+import { NextRequest } from 'next/server';
 import { withMeter } from '@/lib/token-meter';
-import { askJson } from '@/lib/ux-v0/ask';
+import { formatFor } from '@/lib/ux-v0/schemas';
 import { critiqueSystem, critiqueUser, gateReasoning, type CritiqueInput } from '@/lib/ux-v0/critique';
-import { MAX_TOKENS, socriauxLadder } from '@/lib/ux-v0/model';
-import { bad, failed, imageDataUrl, noModel, projectIdOf, readBody, signInFirst } from '@/lib/ux-v0/route-kit';
+import { MAX_TOKENS, critiqueTier } from '@/lib/ux-v0/model';
+import { bad, imageDataUrl, projectIdOf, readBodyPrinted } from '@/lib/ux-v0/route-kit';
+import { admit, refuse, runStage } from '@/lib/ux-v0/stage-server';
 import { normalizeBrief, normalizeCard, normalizeSelection, VIEWPORTS, type CardTurn } from '@/lib/ux-v0/types';
-import { recordUsage, underCaps } from '@/lib/ux-v0/usage-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export const POST = withMeter(async function POST(req: NextRequest) {
-  const { userId } = auth();
-  if (!userId) return signInFirst();
-  const limited = await enforceRateLimit(req, userId, 'aux');
-  if (limited) return limited;
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return noModel();
+  const a = await admit(req);
+  if (!a.ok) return a.res;
 
-  const body = await readBody(req);
-  if (!body) return bad('A selection and a comment are needed.');
+  const { body, print } = await readBodyPrinted(req);
+  if (!body) return refuse(req, bad('A selection and a comment are needed.'));
   const selection = normalizeSelection(body.selection);
   const comment = typeof body.comment === 'string' ? body.comment.trim().slice(0, 2000) : '';
-  if (!selection || !comment) return bad('A selection and a comment are needed.');
+  if (!selection || !comment) return refuse(req, bad('A selection and a comment are needed.'));
   // the card's earlier turns, through the card normaliser so nothing unshaped reaches the prompt
   const card = normalizeCard({ selection, turns: Array.isArray(body.history) && body.history.length ? body.history : [{ comment }] });
   const history: CardTurn[] = Array.isArray(body.history) && body.history.length ? card?.turns ?? [] : [];
@@ -56,38 +50,28 @@ export const POST = withMeter(async function POST(req: NextRequest) {
     viewport: VIEWPORTS.includes(body.viewport) ? body.viewport : null,
     wantsSummary: !!thumb,
   };
-  const projectId = projectIdOf(body.projectId);
-
-  const caps = await underCaps(userId, 'critique');
-  if (!caps.ok) return NextResponse.json({ error: caps.error, limit: true }, { status: 429 });
-
-  const plan = await resolvePlanForRequest(req, userId);
-  const sleep = await sleepGate(req, userId, plan);
-  if (sleep.refuse) return sleep.refuse;
-  if (sleep.meter) meterFor(sleep.meter);
-
-  const openai = tracked(new OpenAI({ apiKey }), 'ux-v0/critique');
   const images: { url: string; detail: 'low' | 'high' }[] = [];
   if (selection.crop) images.push({ url: selection.crop.dataUrl, detail: 'high' });
   if (thumb) images.push({ url: thumb, detail: 'low' });
+  const complexity = critiqueTier(comment, selection, !!thumb);
 
-  try {
-    const asked = await askJson(openai, socriauxLadder(), {
+  return runStage(req, { userId: a.userId, orgId: a.orgId, projectId: projectIdOf(body.projectId), fingerprint: print }, {
+    stage: 'critique',
+    operation: 'critique',
+    label: 'ux-v0/critique',
+    prompt: {
       system: critiqueSystem(),
       user: critiqueUser(input),
       maxTokens: MAX_TOKENS.critique,
       temperature: 0.4,
       images,
-      label: 'critique',
-    });
-    const gated = gateReasoning(asked.json, input);
-    await recordUsage(userId, projectId, 'critique', asked.usage);
-    return NextResponse.json({ reasoning: gated.reasoning, artifactSummary: gated.artifactSummary, demoted: gated.demoted, usage: asked.usage });
-  } catch (e) {
-    // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure
-    const resting = sleepAnswer(e);
-    if (resting) return resting;
-    console.error('ux-v0 critique failed:', e instanceof Error ? e.message : e);
-    return failed();
-  }
+      format: formatFor('critique'),
+      tier: complexity.tier,
+      extraChars: (selection.crop ? 3000 : 0) + (thumb ? 400 : 0),
+    },
+    finish: (asked) => {
+      const gated = gateReasoning(asked.json, input);
+      return { body: { reasoning: gated.reasoning, artifactSummary: gated.artifactSummary, demoted: gated.demoted, complexity } };
+    },
+  });
 });

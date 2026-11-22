@@ -81,9 +81,14 @@ const OWNED_TABLES = [
   // SocriaUX (/ux): their design projects — artboards, annotations, the
   // reasoning map, research notes — one jsonb document per project.
   'ux_projects',
-  // SocriaUX v0 (/ux-v0): their design projects, and what their calls cost.
+  // SocriaUX v0 (/ux-v0): their design projects, and what their calls cost
+  // (by day, and call by call: stage, tier, model, tokens, cost).
   'ux_v0_projects',
   'ux_v0_usage',
+  'ux_v0_calls',
+  // …and their design systems (Design System Intelligence): tokens, brand rules, approved assets and versions,
+  // one jsonb document per system. A copy kept only in their browser never reached the server.
+  'ux_v0_systems',
 ] as const;
 
 /**
@@ -96,6 +101,8 @@ const OWNED_TABLES = [
 const LATE_TABLES = new Set<string>([
   'ux_v0_projects',
   'ux_v0_usage',
+  'ux_v0_calls',
+  'ux_v0_systems',
   'ux_projects',
   'lifecycle_emails',
   'mind_nodes',

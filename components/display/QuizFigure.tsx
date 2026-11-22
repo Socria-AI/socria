@@ -28,6 +28,8 @@ import { QUIZ_MODE_SAID, QUESTION_TYPE_SAID, type Graded, type QuizFigure as Fig
 import type { FigureProps } from '@/components/objects/figures';
 import { MathText } from '@/components/TeX';
 import { useDisplay } from './DisplayShell';
+import { emphClass, useRegister, useVisual, reducedMotion, type VisState } from '@/components/inline/visual-bus';
+import { quizArtifact } from '@/lib/visual/elements';
 import './quiz.css';
 
 type S = QuizState;
@@ -510,6 +512,15 @@ async function finishGrades(p: FigureProps, s: S, act: Act): Promise<boolean> {
 function Review({ p, s, live, act }: { p: FigureProps; s: S; live: boolean; act: Act }) {
   const r = useMemo(() => reviewOf(reviewInputOf(s)), [s]);
   const [showRight, setShowRight] = useState(false);
+  // VISUAL ACTIONS (lib/visual): each question and the answer given can be pointed at — "question 4's incorrect step"
+  // is shown here, never changed (the quiz is not edited to be highlighted)
+  const vkey = `quiz:${p.obj.id}`;
+  const vis = useVisual(vkey);
+  useRegister(vkey, () => quizArtifact(vkey, s.title, r.items.map((it) => ({ n: it.n, topic: it.q.topic, outcome: it.outcome, yours: it.yours, correct: it.correct }))), () => ({}));
+  const pointedRight = r.items.some((it) => it.outcome === 'right' && vis.emph?.ids.includes(`question:${it.n}`));
+  useEffect(() => {
+    if (pointedRight) setShowRight(true);
+  }, [pointedRight]);
   const [open, setOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -583,7 +594,7 @@ function Review({ p, s, live, act }: { p: FigureProps; s: S; live: boolean; act:
           <section className="qz-missed" aria-label="Questions you missed">
             <p className="qz-label">Questions you missed</p>
             {r.missed.map((it) => (
-              <ReviewCard key={it.q.id} it={it} open={open === it.q.id} live={live} onToggle={() => setOpen((x) => (x === it.q.id ? null : it.q.id))} onDive={(how) => (act('look', { q: it.q.id }), ws('deep-dive', it.q.id, how))} />
+              <ReviewCard key={it.q.id} it={it} vis={vis} open={open === it.q.id} live={live} onToggle={() => setOpen((x) => (x === it.q.id ? null : it.q.id))} onDive={(how) => (act('look', { q: it.q.id }), ws('deep-dive', it.q.id, how))} />
             ))}
           </section>
         )
@@ -593,7 +604,7 @@ function Review({ p, s, live, act }: { p: FigureProps; s: S; live: boolean; act:
           <button type="button" className="qz-link" onClick={() => setShowRight((x) => !x)} aria-expanded={showRight}>
             {showRight ? 'Hide' : 'Show'} the ones you got right ({r.items.filter((it) => it.outcome === 'right').length})
           </button>
-          {showRight && r.items.filter((it) => it.outcome === 'right').map((it) => <ReviewCard key={it.q.id} it={it} open={false} live={false} onToggle={() => {}} onDive={() => {}} />)}
+          {showRight && r.items.filter((it) => it.outcome === 'right').map((it) => <ReviewCard key={it.q.id} it={it} vis={vis} open={false} live={false} onToggle={() => {}} onDive={() => {}} />)}
         </section>
       )}
       {live && (
@@ -623,11 +634,16 @@ function Review({ p, s, live, act }: { p: FigureProps; s: S; live: boolean; act:
   );
 }
 
-function ReviewCard({ it, open, live, onToggle, onDive }: { it: ReviewItem; open: boolean; live: boolean; onToggle: () => void; onDive: (how: 'reasoning' | 'similar' | 'concept') => void }) {
+function ReviewCard({ it, vis, open, live, onToggle, onDive }: { it: ReviewItem; vis?: VisState; open: boolean; live: boolean; onToggle: () => void; onDive: (how: 'reasoning' | 'similar' | 'concept') => void }) {
   const helped = it.outcome === 'helped';
   const wrong = it.outcome === 'wrong' || it.outcome === 'partial' || helped;
+  const ref = useRef<HTMLElement>(null);
+  const lit = !!vis?.emph?.ids.includes(`question:${it.n}`);
+  useEffect(() => {
+    if (lit && (vis?.emph?.op === 'focus' || vis?.emph?.op === 'highlight')) ref.current?.scrollIntoView?.({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
+  }, [lit, vis?.emph?.n]);
   return (
-    <article className={`qz-rc ${wrong ? 'is-wrong' : 'is-right'}`} aria-label={`Question ${it.n}: ${it.q.topic}`}>
+    <article ref={ref} className={`qz-rc ${wrong ? 'is-wrong' : 'is-right'}${vis ? emphClass(vis, `question:${it.n}`) : ''}`} aria-label={`Question ${it.n}: ${it.q.topic}`} aria-current={lit || undefined}>
       <p className="qz-rc-meta">
         <span className="qz-q-n">Question {it.n}</span>
         <span className="qz-chip">{it.q.topic}</span>
@@ -638,7 +654,7 @@ function ReviewCard({ it, open, live, onToggle, onDive }: { it: ReviewItem; open
       </p>
       {it.q.figure && <QuizPlot fig={it.q.figure} small />}
       <dl className="qz-rc-ans">
-        <div className={wrong ? 'is-wrong' : 'is-right'}>
+        <div className={`${wrong ? 'is-wrong' : 'is-right'}${vis?.emph?.ids.includes(`question:${it.n}/yours`) ? ' is-vlit' : ''}`}>
           <dt>{helped ? 'Your first answer' : 'Your answer'}</dt>
           <dd>{it.yours ?? 'No answer'}</dd>
         </div>

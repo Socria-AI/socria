@@ -24,16 +24,17 @@
 // regardless of what the extractor did. Trust rule: the person's edit is not
 // a suggestion.
 
-import type { LogosNodeStatus, LogosRelation, LogosNode, ThinkingMap } from './logos';
-import { DRAWING_LIMITS, MAP_LABEL_MAX, NODE_TYPES, RELATIONS, mapCaps, sanitizeNodeEvidence, sanitizeNodeFinding } from './logos';
+import type { LogosNodeStatus, LogosRelation, LogosNode, NodeMind, ThinkingMap } from './logos';
+import { DRAWING_LIMITS, MAP_LABEL_MAX, NODE_TYPES, RELATIONS, mapCaps, sanitizeEdgeExtra, sanitizeNodeEvidence, sanitizeNodeFinding, sanitizeNodeMind } from './logos';
+import { wouldCycle } from './logos6/graph';
 import { withDrawing, type Drawing } from './logos5/drawing';
 
 export type MapEdit =
   | { op: 'remove'; id: string }
   | { op: 'rename'; id: string; label: string }
   | { op: 'status'; id: string; status: LogosNodeStatus }
-  | { op: 'link'; from: string; to: string; relation?: LogosRelation }
-  | { op: 'unlink'; from: string; to: string }
+  | { op: 'link'; from: string; to: string; relation?: LogosRelation; /** Mind Map 2.0: drawn by the person (confirmed), and why */ status?: 'confirmed' | 'suggested'; why?: string }
+  | { op: 'unlink'; from: string; to: string; /** Mind Map 2.0: only the line of this kind (a line of structure, or a relation), not every line between the two */ was?: LogosRelation; kind?: 'structure' | 'meaning' }
   /** a node the person chose to take — a Socria suggestion keeps origin 'socria'; a part added to a drawing, 'drawn' */
   | {
       op: 'add';
@@ -51,8 +52,14 @@ export type MapEdit =
         hand?: true;
         /** Logos 6: the passages it rests on (lib/logos6/evidence.ts) */
         evidence?: LogosNode['evidence'];
+        /** Mind Map 2.0: what it carries beyond its label (meaning, notes, where it was put…) */
+        mind?: NodeMind;
+        /** Logos 6: the artifact, quiz or document it stands for on the canvas (an object in the map's workspace) */
+        obj?: string;
       };
       near?: string;
+      /** Mind Map 2.0: the card it sits inside (a line of structure) */
+      parent?: string;
       /** what the line to `near` means (default 'relates'), and whether it runs from `near` to the new card */
       rel?: LogosRelation;
       fromNear?: boolean;
@@ -77,7 +84,20 @@ export type MapEdit =
   /** a drawing put on the map — a reply's diagram opened there (lib/logos5/drawing.ts); the drawing before gives way */
   | { op: 'drawing'; drawing: Drawing }
   /** Logos 6: the passages a card rests on in their documents, kept as pointers (lib/logos6/evidence.ts) */
-  | { op: 'evidence'; id: string; evidence: NonNullable<LogosNode['evidence']> };
+  | { op: 'evidence'; id: string; evidence: NonNullable<LogosNode['evidence']> }
+  // ── MIND MAP 2.0 (Logos 6, lib/logos6/graph.ts): one map, three ways of working with it ──
+  /** what a card carries beyond its label; a field set to '' (or []) is cleared */
+  | { op: 'mind'; id: string; set: Partial<NodeMind> }
+  /** where the person put a card in Ideas or in Logic (Structure is laid out from the tree) */
+  | { op: 'place'; id: string; mode: 'ideas' | 'logic'; x: number; y: number }
+  /** the card a card sits inside (a line of structure; null: the top level). A loop is refused. */
+  | { op: 'parent'; id: string; parent: string | null }
+  /** a card's place among its siblings in Structure */
+  | { op: 'order'; id: string; order: number }
+  /** a branch folded or opened in Structure */
+  | { op: 'fold'; id: string; folded: boolean }
+  /** why a line holds, what bears it out, and whether the person confirms it (the line of kind `was`, when two join the same cards) */
+  | { op: 'explain'; from: string; to: string; was?: LogosRelation; why?: string; evidence?: string[]; status?: 'confirmed' | 'suggested' };
 
 /** The most labels a map remembers removing. Past this the oldest is forgotten. */
 export const MAX_REMOVED = 40;
@@ -134,6 +154,8 @@ export interface EditOutcome {
 }
 
 const quote = (s: string) => `“${s}”`;
+/** What each of a card's fields is called, in the sentence an edit is said in. */
+const MIND_SAID: Record<string, string> = { subtitle: 'its subtitle', meaning: 'what it means', why: 'why it matters', notes: 'your notes', tags: 'its tags', sources: 'its sources', assumptions: 'its assumptions', props: 'its fields', tone: 'its tone', shape: 'its shape' };
 
 export function applyMapEdits(map: ThinkingMap, edits: readonly MapEdit[]): EditOutcome {
   const caps = mapCaps(map);
@@ -182,9 +204,11 @@ export function applyMapEdits(map: ThinkingMap, edits: readonly MapEdit[]): Edit
       if (!a || !b) { refused.push(`Both ends of a connection have to be on the map.`); continue; }
       if (a.id === b.id) { refused.push(`A node cannot be connected to itself.`); continue; }
       const relation = edit.relation ?? 'relates';
-      const dup = edges.some((e) => (e.from === a.id && e.to === b.id) || (e.from === b.id && e.to === a.id));
+      // a line of structure between the two is not a line of meaning: one can be drawn beside it (Mind Map 2.0)
+      const dup = edges.some((e) => e.kind !== 'structure' && ((e.from === a.id && e.to === b.id) || (e.from === b.id && e.to === a.id)));
       if (!dup && edges.length >= caps.edges) { refused.push(`The map holds ${caps.edges} connections, and has them. Cut one first, and this one can go in.`); continue; }
-      if (!dup) edges = [...edges, { from: a.id, to: b.id, relation, strength: 'normal' }];
+      const extra = sanitizeEdgeExtra({ status: edit.status, why: edit.why });
+      if (!dup) edges = [...edges, { from: a.id, to: b.id, relation, strength: 'normal', ...extra }];
       applied.push({ edit, said: dup ? `${quote(a.label)} and ${quote(b.label)} were already connected.` : `Connected ${quote(a.label)} to ${quote(b.label)}.` });
     } else if (edit.op === 'add') {
       const label = edit.node.label.replace(/\s+/g, ' ').trim().slice(0, MAX_LABEL);
@@ -203,7 +227,9 @@ export function applyMapEdits(map: ThinkingMap, edits: readonly MapEdit[]): Edit
       // LOGOS 6: a kept finding is Socria's for good; a card added by hand is marked so the map pass keeps it
       const finding = edit.node.finding && edit.node.origin === 'socria' ? sanitizeNodeFinding(edit.node.finding) : undefined;
       const evidence = sanitizeNodeEvidence(edit.node.evidence);
-      nodes = [...nodes, { id, type: edit.node.type, label, status: 'open', ...(edit.node.role ? { role: edit.node.role } : {}), ...(edit.node.origin ? { origin: edit.node.origin } : {}), ...extra, ...(finding ? { finding } : {}), ...(edit.node.hand ? { hand: true as const } : {}), ...(evidence ? { evidence } : {}) }];
+      const mind = sanitizeNodeMind(edit.node.mind);
+      nodes = [...nodes, { id, type: edit.node.type, label, status: 'open', ...(edit.node.role ? { role: edit.node.role } : {}), ...(edit.node.origin ? { origin: edit.node.origin } : {}), ...extra, ...(finding ? { finding } : {}), ...(edit.node.hand ? { hand: true as const } : {}), ...(evidence ? { evidence } : {}), ...(mind ? { mind } : {}), ...(typeof edit.node.obj === 'string' && /^[A-Za-z0-9_]{1,16}$/.test(edit.node.obj) ? { obj: edit.node.obj } : {}) }];
+      if (edit.parent && byId(edit.parent)) edges = [...edges, { from: id, to: edit.parent, relation: 'part_of', strength: 'normal', kind: 'structure' }];
       // A removal of the same wording is forgotten: they asked for it back.
       removed = removed.filter((r) => r !== keyOf(label));
       if (edit.near && byId(edit.near)) {
@@ -222,7 +248,10 @@ export function applyMapEdits(map: ThinkingMap, edits: readonly MapEdit[]): Edit
       const a = byId(edit.from), b = byId(edit.to);
       if (!a || !b) { refused.push(`Both ends of a connection have to be on the map.`); continue; }
       const before = edges.length;
-      edges = edges.filter((e) => !((e.from === a.id && e.to === b.id) || (e.from === b.id && e.to === a.id)));
+      const between = (e: (typeof edges)[number]) => (e.from === a.id && e.to === b.id) || (e.from === b.id && e.to === a.id);
+      // a line of structure and a line of meaning between the same cards are different lines: one can go alone
+      const matches = (e: (typeof edges)[number]) => (edit.kind === 'structure' ? e.kind === 'structure' : edit.kind === 'meaning' ? e.kind !== 'structure' : true) && (!edit.was || e.relation === edit.was);
+      edges = edges.filter((e) => !(between(e) && matches(e)));
       applied.push({ edit, said: edges.length < before ? `Disconnected ${quote(a.label)} from ${quote(b.label)}.` : `${quote(a.label)} and ${quote(b.label)} were not connected.` });
     } else if (edit.op === 'retype') {
       const n = byId(edit.id);
@@ -264,6 +293,78 @@ export function applyMapEdits(map: ThinkingMap, edits: readonly MapEdit[]): Edit
       edges = edges.map((e, i) => (i === at ? e1 : e));
       const says = e1.label ? `now says ${quote(e1.label)}` : edit.label !== undefined ? 'says nothing now' : `is now ${e1.relation.replace(/_/g, ' ')}`;
       applied.push({ edit, said: `The line from ${quote(a.label)} to ${quote(b.label)} ${says}.` });
+    } else if (edit.op === 'mind') {
+      const n = byId(edit.id);
+      if (!n) { refused.push(`Nothing on the map has the id ${edit.id}.`); continue; }
+      // a field set to '' or [] is cleared; everything else is merged, then cleaned as a whole
+      const merged: Record<string, unknown> = { ...(n.mind ?? {}) };
+      for (const [k, v] of Object.entries(edit.set as Record<string, unknown>)) {
+        if (v === '' || v === null || v === undefined || (Array.isArray(v) && !v.length) || v === false) delete merged[k];
+        else merged[k] = v;
+      }
+      const mind = sanitizeNodeMind(merged);
+      nodes = nodes.map((x) => {
+        if (x.id !== n.id) return x;
+        const { mind: _old, ...rest } = x;
+        return mind ? { ...rest, mind } : (rest as LogosNode);
+      });
+      const what = Object.keys(edit.set).filter((k) => k !== 'edited' && k !== 'made');
+      applied.push({ edit, said: `Updated ${quote(n.label)}${what.length === 1 ? ` (${MIND_SAID[what[0]] ?? what[0]})` : ''}.` });
+    } else if (edit.op === 'place') {
+      const n = byId(edit.id);
+      if (!n) { refused.push(`Nothing on the map has the id ${edit.id}.`); continue; }
+      if (!Number.isFinite(edit.x) || !Number.isFinite(edit.y)) { refused.push(`A card cannot go nowhere.`); continue; }
+      const slot = edit.mode === 'logic' ? 'l' : 'i';
+      const pos = { ...(n.mind?.pos ?? {}), [slot]: [Math.round(edit.x), Math.round(edit.y)] as [number, number] };
+      const mind = sanitizeNodeMind({ ...(n.mind ?? {}), pos });
+      nodes = nodes.map((x) => (x.id === n.id ? { ...x, ...(mind ? { mind } : {}) } : x));
+      applied.push({ edit, said: `Moved ${quote(n.label)}.` });
+    } else if (edit.op === 'parent') {
+      const n = byId(edit.id);
+      if (!n) { refused.push(`Nothing on the map has the id ${edit.id}.`); continue; }
+      const p = edit.parent ? byId(edit.parent) : null;
+      if (edit.parent && !p) { refused.push(`Nothing on the map has the id ${edit.parent}.`); continue; }
+      // the lines of structure without this card's own: then a loop is checked against what would remain
+      const others = edges.filter((e) => !(e.kind === 'structure' && e.from === n.id));
+      if (p && wouldCycle({ edges: others }, n.id, p.id)) { refused.push(`${quote(n.label)} cannot sit inside ${quote(p.label)}: ${quote(p.label)} already sits inside it.`); continue; }
+      edges = p ? [...others, { from: n.id, to: p.id, relation: 'part_of', strength: 'normal', kind: 'structure' }] : others;
+      // at the top level by hand: no parent is inferred for it either
+      const merged: Record<string, unknown> = { ...(n.mind ?? {}) };
+      if (p) delete merged.top;
+      else merged.top = true;
+      const mind = sanitizeNodeMind(merged);
+      nodes = nodes.map((x) => {
+        if (x.id !== n.id) return x;
+        const { mind: _old, ...rest } = x;
+        return mind ? { ...rest, mind } : (rest as LogosNode);
+      });
+      applied.push({ edit, said: p ? `Put ${quote(n.label)} inside ${quote(p.label)}.` : `Put ${quote(n.label)} at the top level.` });
+    } else if (edit.op === 'order' || edit.op === 'fold') {
+      const n = byId(edit.id);
+      if (!n) { refused.push(`Nothing on the map has the id ${edit.id}.`); continue; }
+      const merged: Record<string, unknown> = { ...(n.mind ?? {}) };
+      if (edit.op === 'order') merged.order = edit.order;
+      else if (edit.folded) merged.folded = true;
+      else delete merged.folded;
+      const mind = sanitizeNodeMind(merged);
+      nodes = nodes.map((x) => {
+        if (x.id !== n.id) return x;
+        const { mind: _old, ...rest } = x;
+        return mind ? { ...rest, mind } : (rest as LogosNode);
+      });
+      applied.push({ edit, said: edit.op === 'order' ? `Moved ${quote(n.label)} among its siblings.` : edit.folded ? `Folded ${quote(n.label)}.` : `Opened ${quote(n.label)}.` });
+    } else if (edit.op === 'explain') {
+      const a = byId(edit.from), b = byId(edit.to);
+      if (!a || !b) { refused.push(`Both ends of a connection have to be on the map.`); continue; }
+      const kindOk = (e: (typeof edges)[number]) => !edit.was || e.relation === edit.was;
+      let at = edges.findIndex((e) => e.from === a.id && e.to === b.id && kindOk(e));
+      if (at < 0) at = edges.findIndex((e) => e.from === b.id && e.to === a.id && kindOk(e));
+      if (at < 0) { refused.push(`${quote(a.label)} and ${quote(b.label)} are not connected.`); continue; }
+      const e0 = edges[at];
+      const extra = sanitizeEdgeExtra({ ...e0, ...(edit.why !== undefined ? { why: edit.why } : {}), ...(edit.evidence !== undefined ? { evidence: edit.evidence } : {}), ...(edit.status ? { status: edit.status } : {}) });
+      const { why: _w, evidence: _e, status: _s, confidence: _c, ...base } = e0;
+      edges = edges.map((e, i) => (i === at ? { ...base, ...extra } : e));
+      applied.push({ edit, said: edit.status === 'confirmed' && e0.status !== 'confirmed' ? `Confirmed the line from ${quote(a.label)} to ${quote(b.label)}.` : `Explained the line from ${quote(a.label)} to ${quote(b.label)}.` });
     } else if (edit.op === 'drawing') {
       const put = withDrawing({ ...map, nodes, edges, removed, title: out0.title, building: out0.building }, edit.drawing);
       if ('refused' in put) { refused.push(put.refused); continue; }
@@ -489,7 +590,34 @@ function hubOf(map: ThinkingMap): LogosNode | null {
   return [...map.nodes].sort((a, b) => (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0))[0];
 }
 
-/** An idea to add, in words: what it says, what kind, and what it hangs from. */
+// "…inside Monopoly", "…within this": the card the new one sits inside (a line of structure, as Structure draws it).
+// Read only when what follows names one card plainly (the whole of its name, or every word of what is said in it), or
+// "this", "it", "that" — the idea last touched or selected. Otherwise the words are the idea's own: "add an idea called
+// thinking inside the box" is that idea, whatever is on the map.
+const INSIDE = /^(.+?)\s+(?:inside(?:\s+of)?|within)\s+(?:the\s+)?(?:(?:node|idea|branch|card)\s+)?["“']?(.+?)["”']?$/i;
+const THIS_ONE = /^(?:this|that|it|this one|that one|(?:this|that) (?:node|idea|branch|card))$/i;
+
+/** The card "inside …" names: exactly, else the one card holding every word said; null when it names none plainly. */
+export function insideOf(map: ThinkingMap, phrase: string, recent?: Touched | null): Found {
+  const p = phrase.trim();
+  if (THIS_ONE.test(p)) {
+    const n = recent ? map.nodes.find((x) => x.id === recent.id) : null;
+    return n ? { node: n } : null;
+  }
+  const key = keyOf(p);
+  if (!key) return null;
+  const exact = map.nodes.filter((n) => keyOf(n.label) === key);
+  if (exact.length) return exact.length === 1 ? { node: exact[0] } : { ambiguous: exact };
+  const want = tokens(p);
+  if (!want.length) return null;
+  const all = map.nodes.filter((n) => {
+    const have = new Set(tokens(n.label));
+    return want.every((t) => have.has(t));
+  });
+  return all.length === 1 ? { node: all[0] } : all.length > 1 ? { ambiguous: all } : null;
+}
+
+/** An idea to add, in words: what it says, what kind, and what it hangs from (or sits inside). */
 export function readMapAdd(text: string, map: ThinkingMap, recent?: Touched | null): Command | Refusal | null {
   const t = text.replace(/\s+/g, ' ').trim();
   if (!t || t.length > 220) return null;
@@ -505,22 +633,36 @@ export function readMapAdd(text: string, map: ThinkingMap, recent?: Touched | nu
       refused: `What should the new ${word === 'question' ? 'question' : word === 'branch' ? 'branch' : 'idea'} say?`,
       fill: `add ${another ? 'another' : 'a'} ${word} called {}${m[3] ? ` to ${m[3]}` : ''}`,
     };
+  // "…inside Monopoly": a card inside another, as Structure draws it — when it names one plainly
+  let inside: LogosNode | null = null;
+  let words = label;
+  const ins = m[3] ? null : INSIDE.exec(label);
+  if (ins) {
+    const f = insideOf(map, ins[2], recent);
+    if (f && 'ambiguous' in f) return { refused: `${quote(ins[2])} could mean more than one card: ${f.ambiguous.map((n) => quote(n.label)).join(', ')}. Which one?` };
+    if (f) {
+      inside = f.node;
+      words = ins[1].trim();
+    }
+  }
+  // what it hangs from: the card named after "to …", else (a branch, another) the idea last touched — never as well as
+  // the card it sits inside
   let near: LogosNode | null = null;
-  if (m[3]) {
+  if (!inside && m[3]) {
     const f = findNode(map, m[3]);
     if (f && 'ambiguous' in f) return { refused: `${quote(m[3])} could mean more than one thing on the map: ${f.ambiguous.map((n) => quote(n.label)).join(', ')}. Which one?` };
     if (!f) return { refused: `Nothing on the map is called ${quote(m[3])}.` };
     near = f.node;
-  } else if (word === 'branch' || word === 'subidea' || word === 'child' || another) {
+  } else if (!inside && (word === 'branch' || word === 'subidea' || word === 'child' || another)) {
     const anchor = another ? (recent?.near ?? recent?.id) : recent?.id;
     near = (anchor ? map.nodes.find((n) => n.id === anchor) : null) ?? hubOf(map);
   }
-  const type: LogosNode['type'] = word === 'question' || /\?\s*$/.test(label) ? 'question' : word === 'claim' ? 'claim' : 'idea';
-  const clean = label.replace(/\?\s*$/, type === 'question' ? '?' : '');
+  const type: LogosNode['type'] = word === 'question' || /\?\s*$/.test(words) ? 'question' : word === 'claim' ? 'claim' : 'idea';
+  const clean = words.replace(/\?\s*$/, type === 'question' ? '?' : '');
   return {
     // the person's own idea: no origin is theirs (a Socria suggestion carries 'socria')
-    edits: [{ op: 'add', node: { label: clean, type, hand: true }, ...(near ? { near: near.id } : {}) }],
-    said: `Added ${quote(clean)} to the map${near ? `, from ${quote(near.label)}` : ''}.`,
+    edits: [{ op: 'add', node: { label: clean, type, hand: true }, ...(inside ? { parent: inside.id } : near ? { near: near.id } : {}) }],
+    said: inside ? `Added ${quote(clean)} inside ${quote(inside.label)}.` : `Added ${quote(clean)} to the map${near ? `, from ${quote(near.label)}` : ''}.`,
   };
 }
 

@@ -211,7 +211,7 @@ export const VOICE_HELP: readonly { group: string; says: readonly string[] }[] =
     ],
   },
   {
-    group: 'The Logic Map',
+    group: 'The Mind Map',
     says: [
       '“Add a branch called cost” · “Add another branch about time”',
       '“Select the rent idea” … “Challenge this”',

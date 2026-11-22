@@ -518,3 +518,8 @@
 .app-root .chat-aside-back:hover,.app-root .chat-aside-back:focus-visible{border-color:var(--moss);outline:none}
 .app-root .chat-aside-error{margin:12px clamp(16px,3vw,28px) 0;font-size:.88rem;color:var(--danger, #9b2c2c)}
 .app-root.chat-aside > :last-child{flex:1;min-height:0}
+
+/* THE MOST RECENT CONVERSATION (Logos 6): a quiet dot after its title — said to a screen reader, never colour alone
+   (it is a mark of its own, beside the title, and its name is "most recent") */
+.app-root .s-row .s-latest { flex: none; align-self: center; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--moss-700, #354620); opacity: 0.75; box-shadow: 0 0 0 2px rgba(var(--moss-rgb, 53, 70, 32), 0.14); }
+.app-root .s-row.on .s-latest { opacity: 0.5; }

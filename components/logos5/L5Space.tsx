@@ -40,6 +40,8 @@ import {
   type IdeaEdgeLite,
   type SpaceKind,
 } from '@/lib/logos5/ideas';
+import { useNavSide, type NavSide } from './nav-side';
+import { NavMover } from './NavMover';
 import './space.css';
 // Revision IV: colour by kind, Socria's question in a gold panel, four columns on a 1440 screen, the arrival
 import './space-colour.css';
@@ -90,7 +92,8 @@ export interface SpaceThing {
 }
 
 // the same names the views and the menus use: what you brought is Files, what Socria made is Artifacts
-const KIND_NAMES: Record<SpaceKind, string> = { all: 'Everything', ideas: 'Ideas', brought: 'Files', made: 'Artifacts', words: 'Words' };
+// Logos 6: "Ideas" is the Mind Map — the ideas, their logic and their structure on one canvas (components/logos6/)
+const KIND_NAMES: Record<SpaceKind, string> = { all: 'Everything', ideas: 'Mind Map', brought: 'Files', made: 'Artifacts', words: 'Words' };
 
 function KindGlyph({ k }: { k: SpaceKind }) {
   const p = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.1 } as const;
@@ -162,6 +165,7 @@ export function L5Space({
   spaceId = null,
   empty = null,
   ideasFolded = false,
+  mindMap = null,
 }: {
   ideas: SpaceIdea[];
   edges: IdeaEdgeLite[];
@@ -205,8 +209,18 @@ export function L5Space({
    * (lib/runtime/ideas-wanted.ts). What was said and what was made fill it; the ideas are a press away.
    */
   ideasFolded?: boolean;
+  /**
+   * MIND MAP 2.0 (Logos 6): the canvas the Mind Map entry opens in place — the same cards and lines, with Ideas, Logic
+   * and Structure as ways of working on them (components/logos6/ThinkingCanvas.tsx). Absent: the ideas come forward
+   * on the space as before.
+   */
+  mindMap?: ReactNode;
 }) {
   const [kind, setKind] = useState<SpaceKind>('all');
+  // WHERE THE VIEWS SIT (Logos 6): a rail on the left by default; the top or the right if moved; the top on a phone
+  const [navPick, setNavPick] = useNavSide();
+  const navSide: NavSide = narrow ? 'top' : navPick;
+  const mindOn = kind === 'ideas' && !!mindMap;
   // MIND MAPS WHEN THEY HELP: folded, the ideas (and the lines between them) are drawn only while "Ideas" is chosen
   const folded = ideasFolded && kind !== 'ideas' && allIdeas.length > 0;
   const ideas = folded ? NO_IDEAS : allIdeas;
@@ -1048,10 +1062,11 @@ export function L5Space({
         </article>
       )}
       {/* SOCRIA'S BUBBLE: the reply in words, its own bubble pointing at the idea — the one place it is a conversation */}
-      <div className={`ls-bub${open ? ' has-tail' : ''}${openHero ? ' has-hero' : ''}${earlier > 0 ? ' has-earlier' : ''}`} aria-label="Socria’s reply">
+      <div className={`ls-bub${open ? ' has-tail' : ''}${openHero ? ' has-hero' : ''}${earlier > 0 ? ' has-earlier' : ''}${t?.thought ? ' is-thought' : ''}`} aria-label={t?.thought ? 'Your thought' : 'Socria’s reply'}>
         <span className="ls-bub-who">
-          <span className="ls-bub-name">Socria</span>
-          {openTurn !== null && <span className="ls-tn">{t?.pending ? 'thinking…' : openTurn === turns.length - 1 ? 'just now' : `turn ${roman(openTurn + 1)}`}</span>}
+          {/* a thought kept as theirs (the Omnibox): theirs, on the Mind Map, with no reply waiting */}
+          <span className="ls-bub-name">{t?.thought ? 'Your thought' : 'Socria'}</span>
+          {openTurn !== null && <span className="ls-tn">{t?.thought ? 'on the Mind Map · no reply' : t?.pending ? 'thinking…' : openTurn === turns.length - 1 ? 'just now' : `turn ${roman(openTurn + 1)}`}</span>}
           {earlier > 0 && (
             // the replies before this one, stacked under it: pressed, every reply opens as a thread
             <button type="button" className="ls-earlier" aria-expanded={threadOn} onClick={() => setThreadOn((v) => !v)}>
@@ -1060,7 +1075,7 @@ export function L5Space({
             </button>
           )}
         </span>
-        <div className="ls-body">{openBody}</div>
+        <div className="ls-body">{t?.thought ? <p className="ls-tsay">{t.asked}</p> : openBody}</div>
       </div>
       {words(openKey)}
     </div>
@@ -1128,10 +1143,10 @@ export function L5Space({
                   onBlur={() => setHoverTurn((h) => (h === r.index ? null : h))}
                 >
                   <span className="ls-bub-who">
-                    <span className="ls-bub-name">Socria</span>
-                    <span className="ls-tn">{turn.pending ? 'thinking…' : r.index === turns.length - 1 ? 'just now' : roman(r.index + 1)}</span>
+                    <span className="ls-bub-name">{turn.thought ? 'Your thought' : 'Socria'}</span>
+                    <span className="ls-tn">{turn.thought ? 'on the Mind Map' : turn.pending ? 'thinking…' : r.index === turns.length - 1 ? 'just now' : roman(r.index + 1)}</span>
                   </span>
-                  {turn.pending ? <p className="ls-tsay">Replying…</p> : said && <p className="ls-tsay"><MathText>{said}</MathText></p>}
+                  {turn.thought ? <p className="ls-tsay">{turn.asked}</p> : turn.pending ? <p className="ls-tsay">Replying…</p> : said && <p className="ls-tsay"><MathText>{said}</MathText></p>}
                   {asks && !turn.pending && <p className="ls-task"><MathText>{asks}</MathText></p>}
                   {(r.made.length > 0 || madeHere.length > 0) && (
                     <span className="ls-tchips">
@@ -1181,7 +1196,7 @@ export function L5Space({
     words: `${turns.length} ${turns.length === 1 ? 'turn' : 'turns'}`,
   };
   const kindsEl = (
-    <nav className="ls-kinds" aria-label="Bring forward">
+    <nav className={`ls-kinds is-side-${navSide}`} aria-label="Views">
       {/* a kind with nothing in it is not offered ("Files 0" brought nothing forward); the one chosen always stays */}
       {(['all', 'ideas', 'brought', 'made', 'words'] as SpaceKind[]).filter((k) => k === 'all' || k === kind || (k === 'words' ? turns.length > 0 : Number(counts[k]) > 0)).map((k) => (
         <button
@@ -1233,14 +1248,16 @@ export function L5Space({
           Focus
         </button>
       )}
-      {onLogicMap && (
-        <button type="button" className="l5-link ls-logicmap" title="The Logic Map, beside" onClick={onLogicMap}>
-          Logic Map
+      {/* (the Logic Map's own button is gone: the Mind Map is in the row, and its other drawings are in it) */}
+      {onLogicMap && !mindMap && (
+        <button type="button" className="l5-link ls-logicmap" title="The Mind Map, beside" onClick={onLogicMap}>
+          Mind Map
         </button>
       )}
       <button type="button" className="l5-link is-go ls-page" onClick={onPage}>
         {narrow ? 'As a conversation' : 'Read as a conversation'} <span className="l5-ar">→</span>
       </button>
+      {!narrow && <NavMover side={navSide} onSide={setNavPick} />}
     </nav>
   );
   const chatEl = (
@@ -1260,8 +1277,9 @@ export function L5Space({
     const rows = trailRows(turns, fromMsg, ideas);
     const list = (ns: SpaceIdea[]) => ns.map((n) => ideaEl(n, true));
     return (
-      <div ref={rootRef} className={`ls is-phone${threadOn ? ' has-thread' : ''}`}>
+      <div ref={rootRef} className={`ls is-phone${threadOn ? ' has-thread' : ''}${mindOn ? ' has-mind' : ''}`}>
         {kindsEl}
+        {mindOn && <div className="ls-mind is-phone">{mindMap}</div>}
         <div className="ls-feed" ref={scrollRef}>
           {kind === 'all' && seeding && <div className="ls-seeds-box is-narrow">{empty}</div>}
           {kind === 'all' && !seeding && (
@@ -1338,11 +1356,12 @@ export function L5Space({
   return (
     <div
       ref={rootRef}
-      className={`ls is-${kind}${arriving ? ' is-arriving' : ''}${threadOn ? ' has-thread' : ''}${hoverTurn !== null ? ' is-hovering' : ''}${zoom !== 1 ? ' is-zoomed' : ''}`}
+      className={`ls is-${kind} has-nav-${navSide}${mindOn ? ' has-mind' : ''}${arriving ? ' is-arriving' : ''}${threadOn ? ' has-thread' : ''}${hoverTurn !== null ? ' is-hovering' : ''}${zoom !== 1 ? ' is-zoomed' : ''}`}
       // the lines start drawing once the last card has settled
       style={{ ['--ls-base' as string]: `${(ideas.length + brought.length + made.length + (placed ? 0 : 1)) * 70 + 300}ms`, ['--ls-k' as string]: String(zoom) }}
     >
       {kindsEl}
+      {mindOn && <div className="ls-mind">{mindMap}</div>}
       <div
         className="ls-canvas l5-dots"
         ref={scrollRef}

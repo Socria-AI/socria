@@ -366,6 +366,10 @@ const MODULES = [
   'test/helpers/universal-map-under-test.ts',
   // adaptive response rendering: the inline vocabulary, its planner, its gate and its components
   'test/helpers/inline-under-test.tsx',
+  // Mind Map 2.0: one graph, three ways of working with it (lib/logos6/graph.ts, the canvas)
+  'test/helpers/mindmap-under-test.tsx',
+  'test/helpers/objective-under-test.tsx',
+  'test/helpers/omnibox-under-test.tsx',
   // what to make, seen before it is chosen: the gallery, its templates, the artifacts the map draws
   'test/helpers/make-under-test.tsx',
   // four views, four jobs: routing, the shape a reply may take, Content's write-ups, made-when-asked
@@ -398,6 +402,10 @@ const MODULES = [
   'test/helpers/ux-under-test.ts',
   // SocriaUX v0 (/ux-v0): shapes, spec and patches, renderer, sandbox, inspector, selection, gate, prompts, providers
   'test/helpers/ux-v0-under-test.ts',
+  // SocriaUX Design System Intelligence (lib/ux-v0/dsi): canonical system, tokens, importers, registry, adapters, sync, export
+  'test/helpers/dsi-under-test.ts',
+  // SocriaUX studio (lib/ux-v0/studio): intent recognition, adaptive discovery, the creative context, engine mappings
+  'test/helpers/studio-under-test.ts',
 ];
 
 export async function buildAll() {

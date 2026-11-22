@@ -49,6 +49,11 @@
 .logos-root .l5 .l5v-top.is-narrow .l5-switch-i { flex: 1 1 0; height: 44px; justify-content: center; }
 .logos-root .l5 .l5v-top-l { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .logos-root .l5 .l5v-top-c { display: flex; align-items: stretch; justify-content: center; min-width: 0; }
+/* a phone: the way back and the tabs are wider than the screen, so the row scrolls, from its start, as the space's
+   own tabs do. Centred, a row wider than its box spills off BOTH sides, and what went past the left edge — "← The
+   space" — could not be reached at all. */
+.logos-root .l5 .l5v-top.is-narrow .l5v-top-c { justify-content: flex-start; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding-right: 28px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+.logos-root .l5 .l5v-top.is-narrow .l5v-top-c::-webkit-scrollbar { display: none; }
 .logos-root .l5 :is(.l5v-top-r, .l5-head-end) { display: flex; align-items: center; justify-content: flex-end; gap: 22px; min-width: 0; }
 .logos-root .l5 :is(.l5v-top .l5v-rule, .l5-head-rule) { width: 1px; height: 20px; background: var(--c-rule-2); }
 /* the breadcrumb: "Sessions" (a word that opens the list) / the line's name in serif italic */
@@ -67,6 +72,21 @@
 /* the tabs fill the bar: the chosen one underlined at its foot */
 .logos-root .l5 .l5v-top:not(.is-narrow) .l5v-top-c .l5-switch { height: 56px; gap: 28px; }
 .logos-root .l5 .l5v-top:not(.is-narrow) .l5v-top-c .l5-switch-i { height: 56px; }
+/* a laptop-wide bar (about 1000–1280px) with the switch in the middle: the controls at the end keep the room they
+   need (they used to spill left over the switch), the name gives way first, and the bar tightens — the switch's
+   spacing, the wordmark (the mark stays), the key beside Search (Search stays) — so the name keeps some of its room */
+.logos-root .l5 .l5v-top.is-sw-top:not(.is-narrow) { grid-template-columns: minmax(0, 1fr) auto minmax(max-content, 1fr); }
+@media (max-width: 1279px) {
+  .logos-root .l5 .l5v-top.is-sw-top:not(.is-narrow) .l5v-top-c .l5-switch { gap: 18px; }
+  .logos-root .l5 .l5v-top.is-sw-top:not(.is-narrow) .l5v-top-c .l5-tospace { margin-right: 14px; padding-right: 14px; }
+  .logos-root .l5 .l5v-top.is-sw-top:not(.is-narrow) .l5v-home-w { display: none; }
+  .logos-root .l5 .l5v-top.is-sw-top:not(.is-narrow) .l5v-search .l5-kbd { display: none; }
+}
+@media (max-width: 1139px) {
+  .logos-root .l5 .l5v-top.is-sw-top:not(.is-narrow) { column-gap: 14px; padding: 0 14px; }
+  .logos-root .l5 .l5v-top.is-sw-top:not(.is-narrow) .l5v-top-r { gap: 14px; }
+  .logos-root .l5 .l5v-top.is-sw-top:not(.is-narrow) .l5v-top-c .l5-switch { gap: 14px; }
+}
 /* the words at the end: Search (and its key, .l5-kbd), Sessions on the map, the way back from Memory — one word each,
    13.5 in ink 70, ink when pointed at or open */
 .logos-root .l5 :is(.l5v-search, .l5-head-end .l5-unibtn) { gap: 8px; color: var(--c-ink-70); }
@@ -165,15 +185,18 @@
 /* the foot */
 .logos-root .l5 .lg-composer.is-ruled .l5-ctools.l5-compose-foot {
   display: flex;
+  flex-wrap: wrap; /* a phone: the guide's ways out take their own line rather than sit on "+ Add…" */
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 2px 16px;
   min-height: 28px;
   margin: 0;
   font-size: 12.5px;
   color: var(--c-ink-60);
 }
-.logos-root .l5 .lg-composer.is-ruled .l5-ctools-start { display: inline-flex; align-items: center; gap: 14px; min-width: 0; }
+/* the start of the foot wraps: on a small phone "+ Add…", the length dial and "Add as idea" are more than one line,
+   and squeezed onto one the dial shrank to its chevron under "Add as idea" */
+.logos-root .l5 .lg-composer.is-ruled .l5-ctools-start { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 14px; min-width: 0; }
 .logos-root .l5 .lg-composer.is-ruled .l5-ctools-end { display: inline-flex; align-items: center; gap: 18px; margin-left: auto; }
 .logos-root .l5 .lg-composer.is-ruled .lg-plus > .l5-link { min-height: 28px; font-size: 12.5px; font-weight: 500; color: var(--c-ink-60); }
 .logos-root .l5 .lg-composer.is-ruled .lg-plus > .l5-link:hover,

@@ -86,6 +86,7 @@ const anchorsOk = {
 };
 ok('each anchor is drawn by the app', TIPS.every((t) => anchorsOk[t.id] === true), JSON.stringify(anchorsOk));
 ok('the Make tip sits above the whole box, never over where someone types', TIPS.find((t) => t.id === 'l5.make')?.avoid === '.l5-dock' && /a\.closest\(tip\.avoid\)/.test(read('components/logos5/L5Tip.tsx')));
+ok('…and so do the cards on the box\'s + menu: never over its notes (a thought kept, the objective)', ['f.guide', 'f.capture'].every((id) => TIPS.find((t) => t.id === id)?.avoid === '.l5-dock'));
 
 console.log('\n=== the ledger, and what is kept ===');
 ok('a broken ledger reads as fresh', JSON.stringify(parseLedger('{nope')) === '{"lastTipAt":0,"lastFeatureAt":0}' && JSON.stringify(parseLedger(JSON.stringify({ lastTipAt: -4, lastFeatureAt: 'x' }))) === '{"lastTipAt":0,"lastFeatureAt":0}');

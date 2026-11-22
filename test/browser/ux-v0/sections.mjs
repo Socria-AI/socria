@@ -23,6 +23,19 @@ const contentFor = (def) => {
   const c = Object.fromEntries(Object.entries(def.fields).map(([k, f]) => [k, sample(f, k, k.length)]));
   if (def.kind === 'chart') { c.labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']; c.series = [{ name: 'Visits', values: [3, 5, 4, 7, 6] }]; }
   if (def.kind === 'table') { c.columns = ['Name', 'Time', 'Seats']; c.rows = [{ cells: ['Ada', '8:00', '4'], status: 'Booked' }, { cells: ['Ben', '9:30', '2'], status: 'Waiting' }]; }
+  // a composed section: every piece, boxes on each ground (so their words are measured on them too)
+  if (def.kind === 'compose')
+    c.root = { t: 'stack', dir: 'col', gap: 'l', children: [
+      { t: 'grid', cols: [5, 7], gap: 'l', align: 'end', children: [
+        { t: 'stack', dir: 'col', gap: 'm', children: [{ t: 'text', role: 'eyebrow', text: 'Since 1998' }, { t: 'text', role: 'title', text: 'Rooms for *thinking*, built slowly' }, { t: 'text', role: 'lead', text: 'An architecture studio for houses, schools and small public buildings.' }, { t: 'stack', dir: 'row', gap: 's', children: [{ t: 'button', label: 'See the work', style: 'primary' }, { t: 'button', label: 'Write to us', style: 'link' }] }] },
+        { t: 'stack', dir: 'col', gap: 's', children: [{ t: 'image', at: 0, ratio: '4:3' }, { t: 'text', role: 'caption', text: 'The library at Kew, 2019, 1,240 m²' }] },
+      ] },
+      { t: 'grid', cols: [1, 1, 1], gap: 'm', children: [
+        { t: 'box', tone: 'accent', pad: 'm', children: [{ t: 'figure', value: '42', label: 'projects built' }, { t: 'button', label: 'See them', style: 'primary' }] },
+        { t: 'box', tone: 'invert', pad: 'm', children: [{ t: 'text', role: 'heading', text: 'Schools' }, { t: 'text', role: 'body', text: 'Twelve, all still in use.' }, { t: 'button', label: 'Read about them', style: 'secondary' }] },
+        { t: 'box', tone: 'alt', pad: 'm', children: [{ t: 'list', items: ['Houses', 'Schools', 'Libraries'], marker: 'rule' }, { t: 'rule' }, { t: 'text', role: 'quote', text: 'They listened before they drew.' }] },
+      ] },
+    ] };
   if (def.kind === 'form') c.fields = [{ label: 'Your name', type: 'text', required: true }, { label: 'Email', type: 'email', required: true }, { label: 'How many?', type: 'select', options: ['2', '4', '6'] }, { label: 'Notes', type: 'textarea' }, { label: 'Keep me posted', type: 'checkbox' }];
   return c;
 };
@@ -31,7 +44,11 @@ const PALETTES = {
   ochre: { background: '#fffaf0', surface: '#ffffff', text: '#2a2620', muted: '#77706a', accent: '#e8a33d', accentText: '#ffffff', line: '#efe6d6' },
   night: { background: '#14161a', surface: '#1d2026', text: '#f2f0ea', muted: '#a8a49a', accent: '#d9b25f', accentText: '#14161a', line: '#2c3038' },
 };
-const RUNS = (process.env.RUNS || 'editorial:roast,bold:roast,warm:roast,technical:roast,minimal:roast,editorial:ochre,bold:ochre,warm:night').split(',').map((x) => x.split(':'));
+// the classic styles, then every visual language (look:<id>) — each section on a ground of its own, so every tone is drawn
+const PALS = ['roast', 'ochre', 'night'];
+const LOOKS = V.LANGUAGES.map((l, i) => `look-${l.id}:${PALS[i % 3]}`);
+const RUNS = (process.env.RUNS || ['editorial:roast,bold:roast,warm:roast,technical:roast,minimal:roast,editorial:ochre,bold:ochre,warm:night', ...LOOKS].join(',')).split(',').map((x) => x.split(':'));
+const SAMPLE = V.normalizeBrief({ pageType: 'website', objective: 'A sample', personality: ['warm'], palette: [], typography: { display: 'Fraunces', body: 'Inter' } }, new Set());
 let tokens;
 const b = await chromium.launch();
 const ctx = await b.newContext();
@@ -43,13 +60,23 @@ page.on('pageerror', (e) => errs.push(e.message));
 const report = [];
 let checked = 0;
 for (const [style, pal] of RUNS) {
-tokens = { colors: PALETTES[pal], fonts: { display: 'Instrument Serif', body: 'Inter' }, scale: 'comfortable', radius: 'soft', style, imageTreatment: 'natural' };
+let look;
+if (style.startsWith('look-')) {
+  const d = V.buildDirection(V.languageOf(style.slice(5)), SAMPLE, { seed: 7, faithful: false });
+  tokens = { ...d.tokens, colors: PALETTES[pal] };
+  look = { ...d.look, accent2: d.look.accent2 ? '#3f7c85' : '' };
+} else {
+  tokens = { colors: PALETTES[pal], fonts: { display: 'Instrument Serif', body: 'Inter' }, scale: 'comfortable', radius: 'soft', style, imageTreatment: 'natural' };
+  look = undefined;
+}
+let vi = 0;
 for (const def of V.LIBRARY) {
   for (const variant of def.variants) {
+    const tone = look ? V.TONES[vi++ % V.TONES.length] : undefined;
     const app = !def.pages.includes('website');
-    const wantImgs = def.kind === 'gallery' ? 4 : def.images[1] > 0 ? 1 : 0;
-    const sec = { id: 's', kind: def.kind, variant, content: contentFor(def), images: refs.slice(0, wantImgs).map((r) => r.id) };
-    const raw = { title: 'Check', pageType: app ? 'app-screen' : 'website', platform: 'web', tokens, sections: app && def.kind !== 'app-nav' ? [{ id: 'nav', kind: 'app-nav', variant: 'topbar', content: { brand: 'Studio', items: ['Today', 'Classes', 'Profile'] }, images: [] }, sec] : [sec] };
+    const wantImgs = def.kind === 'gallery' ? 4 : Math.max(def.images[0], def.images[1] > 0 ? 1 : 0);
+    const sec = { id: 's', kind: def.kind, variant, content: contentFor(def), images: refs.slice(0, wantImgs).map((r) => r.id), tone };
+    const raw = { title: 'Check', pageType: app ? 'app-screen' : 'website', platform: 'web', tokens, look, sections: app && def.kind !== 'app-nav' ? [{ id: 'nav', kind: 'app-nav', variant: 'topbar', content: { brand: 'Studio', items: ['Today', 'Classes', 'Profile'] }, images: [] }, sec] : [sec] };
     const spec = V.normalizeSpec(raw, { refs, seen: refs.map((r) => r.id), queries: [], palettes: [], type: [] });
     const tag = `${style}:${pal} ${def.kind}/${variant}`;
     if (!spec || !spec.sections.some((x) => x.kind === def.kind)) { report.push(`${tag}: did not survive normalisation`); continue; }
@@ -62,7 +89,23 @@ for (const def of V.LIBRARY) {
       await page.setContent(doc, { waitUntil: 'networkidle' });
       const r = await page.evaluate((mobile) => {
         const lum = (c) => { const m = c.match(/[\d.]+/g); if (!m) return null; const [r, g, b, a = 1] = m.map(Number); if (a < 0.99) return null; const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
-        const bgOf = (el) => { for (let n = el; n; n = n.parentElement) { const cs = getComputedStyle(n); if (cs.backgroundImage !== 'none' || n.tagName === 'IMG') return 'image'; const c = cs.backgroundColor; const m = c.match(/[\d.]+/g); if (m && (m[3] === undefined || Number(m[3]) > 0.99)) return c; } return 'rgb(255,255,255)'; };
+        const bgOf = (el) => {
+          for (let n = el; n; n = n.parentElement) {
+            const cs = getComputedStyle(n);
+            if (cs.backgroundImage !== 'none' || n.tagName === 'IMG') return 'image';
+            const c = cs.backgroundColor;
+            const m = c.match(/[\d.]+/g);
+            if (m && (m[3] === undefined || Number(m[3]) > 0.99)) return c;
+            // a translucent dark backing over a picture (a caption on a photograph): its worst case, over pure white
+            const fig = n.closest('figure');
+            if (m && Number(m[3]) >= 0.3 && fig && fig.querySelector('img')) {
+              const a = Number(m[3]);
+              const mixc = (v) => Math.round(Number(v) * a + 255 * (1 - a));
+              return `rgb(${mixc(m[0])}, ${mixc(m[1])}, ${mixc(m[2])})`;
+            }
+          }
+          return 'rgb(255,255,255)';
+        };
         const bad = [];
         const seen = new Set();
         for (const el of document.querySelectorAll('body *')) {

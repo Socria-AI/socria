@@ -19,10 +19,10 @@ const after = (text, now, narrow = false, o = {}) => V.afterSend(V.routeTurn({ t
 
 console.log('\n=== views: the four, and where a line of thinking opens ===');
 ok('the four views, in Alex’s order', J(V.VIEW_ORDER) === J(['chat', 'content', 'artifacts', 'logic_map']));
-ok('named Conversation, Files, Artifacts, Logic Map — 5.5 calls Content "Files" (its id stays content), and the conversation what it is everywhere', J(Object.values(V.VIEW_LABELS)) === J(['Conversation', 'Files', 'Artifacts', 'Logic Map']) && 'content' in V.VIEW_LABELS);
+ok('named Conversation, Files, Artifacts, Mind Map — 5.5 calls Content "Files" (its id stays content), the conversation what it is everywhere, and Logos 6 the Logic Map with Ideas and Structure the Mind Map (its id stays logic_map)', J(Object.values(V.VIEW_LABELS)) === J(['Conversation', 'Files', 'Artifacts', 'Mind Map']) && 'content' in V.VIEW_LABELS && 'logic_map' in V.VIEW_LABELS);
 ok('a line of thinking opens on Chat, nothing beside it', same(V.OPENING, S('chat')));
 ok('Split View puts the views themselves beside each other — no panels of its own', J(Object.keys(V.SPLIT_NAMES)) === J(['chat', 'content', 'artifacts', 'logic_map']) && V.SPLIT_SECTIONS === undefined);
-ok('…each named as its tab is (the conversation, beside, is "Conversation")', J(Object.values(V.SPLIT_NAMES)) === J(['Conversation', 'Files', 'Artifacts', 'Logic Map']));
+ok('…each named as its tab is (the conversation, beside, is "Conversation")', J(Object.values(V.SPLIT_NAMES)) === J(['Conversation', 'Files', 'Artifacts', 'Mind Map']));
 
 console.log('\n=== rule A: a conversation is read in Chat; the Logic Map never opens for it ===');
 for (const t of ['what is tax incidence?', 'I think the plan works because rent is low', 'ok', 'why does that follow?']) {

@@ -76,6 +76,16 @@ const FIXED: Record<string, OgCard> = {
     title: 'The Socria Charter.',
     line: 'The machines work for us. Not the other way around.',
   },
+  'socratic-ai': {
+    kicker: 'Socratic AI',
+    title: 'The AI that asks before it answers.',
+    line: 'It asks the question you skipped, so the thinking stays yours — and it still answers.',
+  },
+  'for-students': {
+    kicker: 'Socria for students',
+    title: 'Study with an AI that makes you think.',
+    line: 'Problem sets, essays, readings and exams — with the work left yours.',
+  },
   transfer: {
     kicker: 'UT Austin · Fall 2026 transfers',
     title: 'Who got in, and with what.',

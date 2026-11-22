@@ -9,6 +9,7 @@ import { sanitizeChallenge } from '@/lib/challenge/challenge';
 import { sanitizeSourceCheck } from '@/lib/logos6/evidence';
 import { sanitizeCompare } from '@/lib/logos6/disagree';
 import { sanitizeDid, sanitizeInlineState } from '@/lib/inline-ui';
+import { sanitizeVisNote } from '@/lib/visual/context';
 import { sanitizeThreadNote } from '@/lib/runtime/explain';
 import { cleanAboutRef, cleanAt, cleanMsgId, cleanReplyRef, cleanWebSources, type ReplyRef } from '@/lib/chat-thread';
 import { NextRequest, NextResponse } from 'next/server';
@@ -82,9 +83,12 @@ function sanitizeMessages(raw: unknown): Msg[] {
       // Point & Ask: what the turn was about, as selected when it was sent
       const about = m.role === 'user' ? cleanAboutRef(m.about) : undefined;
       // said rather than typed (Socria Voice): the conversation marks it with a microphone
-      const via = m.role === 'user' && (m.via === 'voice' || m.via === 'quiz') ? m.via : undefined;
+      // …or kept as a thought of theirs, with no reply (the Omnibox, lib/logos6/omnibox.ts)
+      const via = m.role === 'user' && (m.via === 'voice' || m.via === 'quiz' || m.via === 'thought') ? m.via : undefined;
       // what they had done with a reply's elements when they wrote it (lib/inline-ui.ts) — shown over their words
       const did = m.role === 'user' ? sanitizeDid(m.did) : undefined;
+      // what was on screen when they wrote it (lib/visual/context.ts): shaped and clipped, context only
+      const vis = m.role === 'user' ? sanitizeVisNote(m.vis) : undefined;
       // the web pages a reply read, listed under it — addresses and titles, never their text
       const sources = m.role === 'assistant' ? cleanWebSources(m.sources) : undefined;
       // what the reply did, as the explanation engine planned it: enum codes and a concept, nothing else (lib/runtime/explain.ts)
@@ -98,6 +102,7 @@ function sanitizeMessages(raw: unknown): Msg[] {
         ...(about ? { about } : {}),
         ...(via ? { via } : {}),
         ...(did ? { did } : {}),
+        ...(vis ? { vis } : {}),
         ...(sources ? { sources } : {}),
         ...(attachments.length ? { attachments } : {}),
         ...(by ? { by } : {}),

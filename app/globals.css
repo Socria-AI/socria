@@ -970,7 +970,7 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 .blog-page .posts { padding: 0 var(--edge) clamp(56px, 7vw, 100px); }
 .blog-page .posts .inner { display: flex; flex-direction: column; gap: clamp(28px, 3vw, 40px); max-width: 1320px; margin: 0 auto; }
 .blog-page .posts .grid-head { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; flex-wrap: wrap; border-bottom: 2px solid var(--ink); padding-bottom: 18px; }
-.blog-page .posts .grid-head h3 { font-size: clamp(1.6rem, 3vw, 2.4rem); }
+.blog-page .posts .grid-head h2 { font-size: clamp(1.6rem, 3vw, 2.4rem); }
 .blog-page .posts .grid-head .nt { font-size: 0.8rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-40); }
 .blog-page .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(24px, 2.4vw, 38px); }
 @media (max-width: 960px) { .blog-page .grid { grid-template-columns: repeat(2, 1fr); } }
@@ -983,7 +983,7 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 .blog-page .card .meta-top { display: flex; align-items: center; gap: 0.7em; margin-top: 18px; }
 .blog-page .card .pill { font-size: 0.68rem; letter-spacing: 0.15em; text-transform: uppercase; font-weight: 600; color: var(--moss-700); }
 .blog-page .card .rt { font-size: 0.72rem; color: var(--ink-40); margin-left: auto; }
-.blog-page .card h4 { font-family: var(--serif); font-size: clamp(1.45rem, 2vw, 1.85rem); line-height: 1.06; margin-top: 12px; letter-spacing: -0.01em; }
+.blog-page .card h3 { font-family: var(--serif); font-size: clamp(1.45rem, 2vw, 1.85rem); line-height: 1.06; margin-top: 12px; letter-spacing: -0.01em; }
 .blog-page .card .ex { margin-top: 12px; font-size: 0.96rem; line-height: 1.5; color: var(--ink-60); }
 .blog-page .card .by { margin-top: 16px; font-size: 0.8rem; color: var(--ink-40); display: flex; align-items: center; gap: 0.6em; }
 .blog-page .card .by .nb { color: var(--ink-60); font-weight: 500; }
@@ -5036,7 +5036,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) :is(.logo
 .logos-root .lg-style-back { position: absolute; inset: 0; background: var(--lg-dim); }
 .logos-root .lg-style-sheet {
   position: relative; z-index: 1;
-  width: min(480px, 100%); max-height: calc(100vh - 40px); overflow-y: auto;
+  width: min(480px, 100%); max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px); overflow-y: auto;
   padding: 24px;
   background: var(--lg-paper); border: 1px solid var(--lg-line); border-radius: var(--lg-r-dialog);
   box-shadow: var(--l5-shadow-up);

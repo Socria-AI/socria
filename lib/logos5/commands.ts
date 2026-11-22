@@ -190,7 +190,7 @@ export function readWorkspaceCommand(text: string, ctx: CommandContext): Workspa
 }
 
 /** What a command says it did, in the conversation. */
-export const VIEW_SAID: Record<Viewport, string> = { chat: 'the conversation', content: 'Content', artifacts: 'Artifacts', logic_map: 'the Logic Map' };
+export const VIEW_SAID: Record<Viewport, string> = { chat: 'the conversation', content: 'Content', artifacts: 'Artifacts', logic_map: 'the Mind Map' };
 
 /**
  * Why a view cannot go beside, said — or null when it can. Split View offers

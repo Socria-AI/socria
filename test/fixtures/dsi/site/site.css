@@ -1,0 +1,25 @@
+@import url("https://fonts.example/fraunces.css");
+:root {
+  --color-crust: #b4532a;
+  --color-flour: #fbf6ee;
+  --color-rye: #2a211b;
+  --color-oat: #e9dcc6;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-4: 16px;
+  --radius-card: 12px;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-body: "Inter", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --color-flour: #1d1813; --color-rye: #f3ece2; }
+}
+html, body { background: var(--color-flour); color: var(--color-rye); font-family: var(--font-body); font-size: 16px; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.01em; }
+h1 { font-size: 56px; }
+h2 { font-size: 32px; }
+a { color: var(--color-crust); }
+.button { background: var(--color-crust); color: #fff; border-radius: 999px; padding: 12px 20px; }
+.card { background: #fff; border-radius: var(--radius-card); padding: var(--space-4); box-shadow: 0 2px 8px rgba(42, 33, 27, 0.12); }
+nav a { margin: 0 8px; }
+@media print { body { color: #000; } }

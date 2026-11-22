@@ -28,7 +28,7 @@ const ID = /^[A-Za-z0-9_-]{1,96}$/;
 export async function GET(req: NextRequest) {
   const { userId } = auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const limited = await enforceRateLimit(req, userId, 'aux');
+  const limited = await enforceRateLimit(req, userId, 'uxsync');
   if (limited) return limited;
   let db;
   try {
@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const { userId } = auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const limited = await enforceRateLimit(req, userId, 'aux');
+  const limited = await enforceRateLimit(req, userId, 'uxsync');
   if (limited) return limited;
   const text = await req.text().catch(() => '');
   if (text.length > MAX_DOC) return NextResponse.json({ error: 'This project is too large to sync; it is kept in this browser.', tooLarge: true }, { status: 413 });
@@ -88,7 +88,7 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const { userId } = auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const limited = await enforceRateLimit(req, userId, 'aux');
+  const limited = await enforceRateLimit(req, userId, 'uxsync');
   if (limited) return limited;
   const id = req.nextUrl.searchParams.get('id') ?? '';
   if (!ID.test(id)) return NextResponse.json({ error: 'bad id' }, { status: 400 });

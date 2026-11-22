@@ -444,7 +444,7 @@ const MONOPOLY_ASK = /\b(?:monopol\w+|marginal\s+revenue|mr\s*=\s*mc|price[- ]se
 const FORCES_ASK = /\b(?:forces?\s+(?:on|acting|diagram)|free[- ]body|net\s+force|resultant|vectors?\s+(?:add|sum|addition|components?)|add(?:ing)?\s+(?:two\s+|the\s+|these\s+)?vectors|(?:tension|normal\s+force|friction)\b[^.?!]{0,60}\b(?:force|block|box|incline|slope|rope)|inclined?\s+plane|equilibrium\s+of\s+forces|(?:balanced|unbalanced)\s+forces|newton'?s\s+(?:first|second|third)\s+law)\b/i;
 /** An algorithm worked through: the steps it takes on some data. */
 const ALGO_ASK = /\b(?:(?:a\s+|the\s+)?(?:stack|queue)s?\b(?!\s+(?:overflow|exchange|trace|of\s+(?:paper|books|cards)))|(?:bubble|insertion|selection|merge|quick|heap|counting|radix)\s*sort|sorting\s+algorithm|binary\s+search|linear\s+search|two[- ]pointers?|sliding\s+window|(?:breadth|depth)[- ]first\s+search|bfs|dfs|dijkstra|euclid(?:'s|ean)?\s+algorithm|stack\s+(?:push|pop)|push\s+and\s+pop|queue\s+(?:enqueue|dequeue)|fibonacci\s+(?:with|using)\s+dynamic|dynamic\s+programming)\b/i;
-const ALGO_HOW = /\b(?:how\s+(?:does|do|is)|walk\s+(?:me\s+)?through|step\s+(?:by|through)|trace|show\s+(?:me\s+)?(?:how|the\s+steps)|explain|visuali[sz]e|work(?:s)?)\b/i;
+const ALGO_HOW = /\b(?:how\s+(?:does|do|is)|walk\s+(?:me\s+)?through|step\s+(?:by|through)|trace|show\s+(?:me\s+)?(?:how|the\s+steps)|show\s+(?:me\s+)?(?:a\s+|the\s+)?(?:binary|linear|bubble|insertion|selection|merge|quick|heap)|animat\w*|run\s+(?:a\s+|the\s+)?|explain|visuali[sz]e|work(?:s)?)\b/i;
 
 /** A subject to see whole: a mind map asked for, or how its parts fit together. */
 const MIND_ASK = /\b(?:mind[- ]?map|concept[- ]map|map\s+(?:out|it\s+out)|(?:the\s+)?(?:big|whole)\s+picture\s+of|how\s+(?:do|does)\s+[^?]{3,80}?\s+(?:all\s+)?(?:fit|connect|relate|tie)\s+(?:together|to\s+each\s+other))\b/i;
@@ -455,7 +455,9 @@ const SURPLUS_ASK = /\b(?:consumer|producer)\s+surplus\b/i;
 const AVERAGE_RATE = /\b(?:mean\s+value\s+theorem|mvt|rolle'?s\s+theorem|average\s+(?:rate|slope|velocity|speed)|secant(?:\s+lines?)?)\b/i;
 /** Curves that meet and shift: a market, a tax, a price control — never a supply chain. */
 const MARKET_SURE =
-  /\b(?:supply\s+and\s+demand|demand\s+and\s+supply|supply\s+curves?|demand\s+curves?|(?:supply|demand)\s+shifts?|shifts?\s+in\s+(?:supply|demand)|price\s+(?:ceilings?|floors?|controls?|caps?)|rent\s+control|minimum\s+wages?|tax(?:es)?\s+on\s+(?:sellers|buyers|producers|consumers|suppliers|goods|imports)|tax\s+incidence|who\s+(?:really\s+)?(?:pays|bears)\s+(?:a|the)\s+(?:\w+\s+)?tax|tariffs?|subsid(?:y|ies|ise|ize|ised|ized)|deadweight(?:\s+loss)?|market\s+equilibrium|equilibrium\s+(?:price|quantity))\b|\btax(?:es)?\b[^.?!]{0,40}\b(?:raise|raises|push|pushes|increase|increases)\s+(?:the\s+)?prices?\b/i;
+  /\b(?:supply\s+and\s+demand|demand\s+and\s+supply|supply\s+curves?|demand\s+curves?|(?:supply|demand)\s+shifts?|shifts?\s+in\s+(?:supply|demand)|(?:supply|demand)\s+(?:increases?|decreases?|rises?|falls?|goes\s+(?:up|down)|drops?)|(?:an?\s+)?(?:increase|decrease|rise|fall|drop)\s+in\s+(?:supply|demand)|price\s+(?:ceilings?|floors?|controls?|caps?)|rent\s+control|minimum\s+wages?|tax(?:es)?\s+on\s+(?:sellers|buyers|producers|consumers|suppliers|goods|imports)|tax\s+incidence|who\s+(?:really\s+)?(?:pays|bears)\s+(?:a|the)\s+(?:\w+\s+)?tax|tariffs?|subsid(?:y|ies|ise|ize|ised|ized)|deadweight(?:\s+loss)?|market\s+equilibrium|equilibrium\s+(?:price|quantity))\b|\btax(?:es)?\b[^.?!]{0,40}\b(?:raise|raises|push|pushes|increase|increases)\s+(?:the\s+)?prices?\b/i;
+/** A distribution that changes with its parameters: a graph to change (n in a sampling distribution, σ, a mean). */
+const STATS_CURVE = /\b(?:sampling\s+distributions?|normal\s+distributions?|bell\s+curves?|standard\s+error|central\s+limit\s+theorem|binomial\s+distributions?|exponential\s+distributions?|probability\s+density|sample\s+size)\b/i;
 const MARKET_SOFT = /\b(?:equilibrium|shortages?|surplus(?:es)?|break[- ]?even)\b/i;
 const ECON = /\b(?:price|prices|market|markets|buyers|sellers|consumers|producers|economy|economics|goods|costs?|revenue)\b/i;
 /** A quantity that changes along a curve: elasticity — of demand, not of rubber. */
@@ -544,6 +546,7 @@ export function planPresentation(i: PresentationInput): Presentation {
   const technical = domain === 'engineering' || domain === 'creative' || domain === 'writing';
   const mathy = domain === 'math' || domain === 'learning' || FORMULA.test(t) || MATH_MARK.test(t);
   const mathRel =
+    STATS_CURVE.test(t) ||
     MATH_SURE.test(t) || MATH_MARK.test(t) || FORMULA.test(t) || (EXP_CURVE.test(t) && domain !== 'business') || (!FINANCE.test(t) && (mathWords(t) >= 2 || (mathWords(t) >= 1 && (domain === 'math' || domain === 'learning') && !technical)));
   const rate = ((RATE_SURE.test(t) && !FINANCE.test(t)) || (RATE_SOFT.test(t) && mathy)) && !NOT_RATE.test(t);
   const livedOn = /\bhow\s+(?:do|can|could|would|will)\s+(?:i|we|you)\s+(?:survive|live|get\s+by|pay|qualify|earn|make\s+ends\s+meet|afford)\b/i.test(t);
@@ -657,7 +660,7 @@ export function planPresentation(i: PresentationInput): Presentation {
   // ("draw a free body diagram" is asking to see it, not to make something of their own)
   if (liveOk && !i.guard && !i.ownReasoning && (work !== 'creation' || /\b(?:draw|show|sketch)\b/i.test(t)) && FORCES_ASK.test(t) && !offered.includes('graph') && !offered.includes('sim')) offer('vectors', 'vectors:forces');
   // an algorithm, asked how it works: its steps on a small example, to step through (never code they are writing)
-  if (liveOk && !i.ownReasoning && work !== 'creation' && work !== 'diagnosis' && ALGO_ASK.test(t) && ALGO_HOW.test(t) && !/```/.test(t)) offer('trace', 'trace:algorithm');
+  if (liveOk && !i.ownReasoning && work !== 'creation' && work !== 'diagnosis' && ALGO_ASK.test(t) && (ALGO_HOW.test(t) || /^\s*(?:can you |please )?(?:show|run|animate|play)\b/i.test(raw)) && !/```/.test(t)) offer('trace', 'trace:algorithm');
   // a claim to check: the verdict, and the parts it rests on to open and doubt (not laid out under the guard)
   if (claim && !i.guard) offer('claim', 'claim:inspect', /\?\s*$/.test(t) ? 'strong' : 'soft');
   // a choice that is theirs: a decision they weigh, not one that leans for them — with Socria's read, once, when asked

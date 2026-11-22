@@ -316,10 +316,10 @@ export function L5Board({
   return (
     <div ref={rootRef} className={`lp cam-${camera}${narrow ? ' is-phone' : ''}${besideOpen ? ' is-split' : ''}${slim && !besideOpen ? ' has-slim' : ''}`}>
       {/* THE LOGIC MAP: one column that reads the turn in view */}
-      <section className={`lp-col lp-map l5-dots${dim('map')}`} data-part="map" aria-label="Logic Map">
+      <section className={`lp-col lp-map l5-dots${dim('map')}`} data-part="map" aria-label="Mind Map">
         <header className="lp-head">
-          <button type="button" className="lp-head-k" onClick={map?.onOpen} disabled={!map} title="Open the Logic Map beside the page, to edit it">
-            <span className="l5-label">{map?.title ? <>Logic Map · {map.title}</> : <>Logic Map · {ideaCount} {ideaCount === 1 ? 'idea' : 'ideas'}</>}</span>
+          <button type="button" className="lp-head-k" onClick={map?.onOpen} disabled={!map} title="Open the Mind Map beside the page, to edit it">
+            <span className="l5-label">{map?.title ? <>Mind Map · {map.title}</> : <>Mind Map · {ideaCount} {ideaCount === 1 ? 'idea' : 'ideas'}</>}</span>
           </button>
         </header>
         {map && shelves ? (

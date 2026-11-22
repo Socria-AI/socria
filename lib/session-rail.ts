@@ -269,3 +269,13 @@ export function mergeRail<L extends RailRow & { id: string }, C extends RailRow 
   // used to swap places between renders.
   return out.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0) || a.id.localeCompare(b.id));
 }
+
+/**
+ * THE MOST RECENT ONE (Logos 6): the row last touched — the conversation the person was most recently in — so the rail
+ * can mark it quietly. Null when there is nothing, or nothing has a time. A tie goes to the first in the list.
+ */
+export function latestOf<T extends { id: string; updatedAt?: number }>(items: readonly T[]): string | null {
+  let best: T | null = null;
+  for (const it of items) if (typeof it.updatedAt === 'number' && it.updatedAt > 0 && (!best || it.updatedAt > (best.updatedAt ?? 0))) best = it;
+  return best ? best.id : null;
+}

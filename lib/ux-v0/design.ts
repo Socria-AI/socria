@@ -15,9 +15,19 @@
 //             designer decides; a change of direction is offered as a new
 //             generation rather than squeezed into a patch.
 
+import { fitToIntent } from './fit';
+import { EXPERIENCE_LABEL, intentOf, pageTypeFor, structureRule } from './intent';
+import { layoutBrief } from './layout';
+import { holdArrangement, holdStrategy } from './arrange';
+import { tellsRule } from './tells';
+import { systemBrief } from './design-system';
+import { designFromDirection, directionBrief, formed, LOCK_LABEL, planLayout, type ArtDirection, type LockGroup } from './direction';
+import { dnaBrief, type CreativeDNA } from './dna';
 import { normQ, readQueries } from './discovery';
 import { fontMenu } from './fonts';
-import { libraryMenu, normalizePatch, normalizeSpec, specDigest, type DesignSpec, type Patch } from './spec';
+import { knowledgeBrief } from './knowledge';
+import { avoidRefs, contentRefs, describeRef, inspirationRefs, isContent } from './references';
+import { BUTTONS, CONTAINERS, GRIDS, LABELS, libraryMenu, MOTIFS, normalizePatch, normalizeSpec, specDigest, TONES, type DesignSpec, type Patch } from './spec';
 import {
   normalizeBrief,
   obj,
@@ -33,11 +43,46 @@ import {
 
 const VOICE = 'Voice: plain, calm, precise. No emoji, no exclamation marks, no hype words ("powerful", "seamless", "revolutionary").';
 
+/** What the designer decided, said plainly: rules are not preferences, and delegated parts are the model's. */
+function briefDecisions(b: DesignBrief): string {
+  const dec = Object.entries(b.decisions ?? {});
+  const rules = b.rules ?? [];
+  if (!dec.length && !rules.length && !b.accessibility?.length && !b.responsive?.length) return '';
+  const by = (k: string) => dec.filter(([, v]) => v === k).map(([p]) => p);
+  return [
+    rules.length ? `RULES (non-negotiable: never break one, whatever else asks): ${rules.join('; ')}.` : '',
+    by('locked').length || by('approved').length ? `DECIDED BY THE DESIGNER (follow exactly): ${[...by('locked'), ...by('approved')].join(', ')}.` : '',
+    by('delegated').length ? `LEFT TO YOU (decide well, and say what you chose in the copy's voice, not in notes): ${by('delegated').join(', ')}.` : '',
+    b.accessibility?.length ? `ACCESSIBILITY: ${b.accessibility.join('; ')}.` : '',
+    b.responsive?.length ? `ON SMALLER SCREENS: ${b.responsive.join('; ')}.` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** Pictures the design may place: the ones the designer marked as content. */
 function keptRefs(m: Moodboard): string {
-  const kept = m.refs.filter((r) => r.state === 'kept');
-  if (!kept.length) return 'none kept';
+  const kept = contentRefs(m);
+  if (!kept.length) return 'none: no picture is marked for the page. Use variants that need no picture, and never invent an image id.';
   return kept
     .map((r) => `- [${r.id}] ${r.category}: ${r.title || r.query}${r.width && r.height ? ` (${r.width > r.height * 1.15 ? 'landscape' : r.height > r.width * 1.15 ? 'portrait' : 'square'})` : ''}${r.color ? `, dominant ${r.color}` : ''}`)
+    .join('\n');
+}
+
+/**
+ * References that inspire: what to take from each and what to leave, in the
+ * designer's words. They shape tone, composition, type, colour and copy; they
+ * are never placed on the page.
+ */
+function inspiration(m: Moodboard): string {
+  const like = inspirationRefs(m).filter((r) => !isContent(r) || r.note || r.take?.length || r.leave?.length);
+  const away = avoidRefs(m);
+  if (!like.length && !away.length) return '';
+  return [
+    like.length ? `REFERENCES THAT INSPIRE (take only what each says; never place them, never copy them literally):\n${like.slice(0, 16).map((r) => `- ${describeRef(r)}`).join('\n')}` : '',
+    away.length ? `REFERENCES TO STEER AWAY FROM:\n${away.slice(0, 8).map((r) => `- ${describeRef(r)}`).join('\n')}` : '',
+  ]
+    .filter(Boolean)
     .join('\n');
 }
 
@@ -70,11 +115,17 @@ The brief:
 - visualDirection: the look and feel, concretely (light, density, imagery, texture, contrast).
 - palette: 5–7 colours as hex, each with a distinct role from: background, surface, text, muted, accent, accent-text, line. Text must read on background (aim for 7:1), muted text 4.5:1, accent-text on accent 4.5:1. Draw on kept palettes when there are any.
 - typography: display and body, chosen ONLY from: ${fontMenu()}. Say why in "rationale".
+- Choose colours and type from this subject's own world, not from what generated pages share. ${tellsRule()} A palette and type the designer described are theirs: follow them exactly.
 - layoutDirection: structure and rhythm.
 - functionalRequirements: what it must do (sections, forms, flows).
-- references: ids of kept moodboard references the design should draw on (only ids given to you).
+- references: ids of the pictures marked for the page that the design should show (only ids listed under PICTURES MARKED FOR THE PAGE; an empty list when none are). Inspiring references shape the other fields: say in visualDirection and layoutDirection what is taken from them.
 - openQuestions: what is still undecided.
-- pageType: "website" or "app-screen"; platform: "web" or "mobile".${
+- experience: how it should feel to use, in one sentence (optional).
+- rules: ONLY constraints the designer stated as musts or nevers ("no animation", "must work without images"), each short; omit otherwise.
+- accessibility, responsive: short notes, only where the designer or the audience makes them matter (optional).
+- pageType: "website" or "app-screen"; platform: "web" or "mobile".
+- experienceKind: what is being made, one of site, booking, checkout, dashboard, form, flow, app, editorial, portfolio, interactive, data. A booking screen is "booking", not "site"; a website ABOUT a booking app is "site".
+${refining ? 'Parts the designer approved or locked (in "decisions") stay exactly as they are; "delegated" parts are yours to decide.\n' : ''}${
     refining
       ? `
 - moodboardQueries: ONLY when this change moves the visual direction (light, imagery, texture, mood): 1–3 searches for licensed photo libraries that show the new direction, each {"category": "imagery|texture|composition", "query": "two or three words, a concrete subject first"}, none repeating a search already used. Otherwise [].`
@@ -91,7 +142,8 @@ export function briefUser(input: BriefInput): string {
     `WHAT THEY WANT TO MAKE: “${input.intent}”`,
     input.understanding.summary ? `UNDERSTOOD: ${input.understanding.summary}` : '',
     answers.length ? `THEIR ANSWERS:\n${answers.join('\n')}` : '',
-    `KEPT MOODBOARD REFERENCES:\n${keptRefs(input.moodboard)}`,
+    inspiration(input.moodboard),
+    `PICTURES MARKED FOR THE PAGE:\n${keptRefs(input.moodboard)}`,
     keptTaste(input.moodboard),
     input.current ? `THE BRIEF AS IT STANDS:\n${JSON.stringify(input.current)}` : '',
     input.instruction ? `CHANGE: “${input.instruction}”` : '',
@@ -101,7 +153,7 @@ export function briefUser(input: BriefInput): string {
 }
 
 export function parseBrief(raw: unknown, moodboard: Moodboard): DesignBrief | null {
-  const kept = new Set(moodboard.refs.filter((r) => r.state === 'kept').map((r) => r.id));
+  const kept = new Set(contentRefs(moodboard).map((r) => r.id));
   return normalizeBrief(raw, kept);
 }
 
@@ -118,37 +170,99 @@ export interface GenerateInput {
   moodboard: Moodboard;
   /** a new direction asked for in words, when regenerating */
   direction: string;
+  /** the project's Creative DNA (lib/ux-v0/dna.ts): what it asks of the sections and the copy */
+  dna?: CreativeDNA | null;
 }
 
-export function generateSystem(brief: DesignBrief): string {
-  return `You are SocriaUX's design generator. Turn the approved brief into a design specification that a renderer draws. You do not write HTML: you choose tokens and sections from the library below and write their content.
+/** What generated pages do by habit, and this one must not do unless the direction asks for it. */
+const NOT_GENERIC = `Avoid the generic generated page:
+- No stock phrases: never "unlock", "elevate", "empower", "seamless", "transform your", "welcome to", "your journey", "discover the power", "cutting-edge", "next-level", "world-class", "revolutionise", "game-changer", "supercharge", "leverage".
+- Headlines say something only this brand could say: a particular, a number, a place, a promise. Short. One may emphasise a single word by wrapping it in *asterisks*.
+- Do not open every section with an eyebrow label; use one only where it adds information (a date, a place, a category), at most on half the sections.
+- Not a three-icon card grid by default: use features only for genuinely parallel points, and the variant the direction prefers.
+- Vary the structure: no two neighbouring sections of the same kind; not the stock order hero → features → pricing → questions → call to action unless this brief needs exactly that.
+- ${tellsRule()}
+- Structure is information: numbering, eyebrows and dividers only where they say something true (number steps only when the order matters).
+- When no section in the library draws the arrangement the design needs (an opening at an uneven proportion, a figure set against the words, three unequal columns), compose it from pieces: a "compose" section. Keep it simple: two or three levels, words that say something, one title. When the direction's composition says it is composed from pieces, open with a compose section.`;
+
+/**
+ * The generator's instructions. They open with what is the same for every project of this kind of page — the
+ * role, the library, the rules that always hold, the knowledge against generic pages and the voice — and only
+ * then say what this project is. A provider reads a long prefix it has seen before from its prompt cache (at a
+ * tenth of the price on GPT-6.1 Sol, and sooner): with the project first, two projects shared almost nothing
+ * (58 tokens of about 3,300, test/browser/ux-v0/perf-bench.mjs); with it last, they share the whole first part.
+ */
+export function generateSystem(brief: DesignBrief, dir0: ArtDirection | null = null): string {
+  // the direction with its shapes and its compositional strategy, as the page will be held to them
+  const dir = dir0 ? formed(dir0, brief) : null;
+  // WHAT IS BEING MADE decides the structure, not a page type: a booking screen is the booking itself
+  const intent = intentOf(brief);
+  const pageType = pageTypeFor(intent, brief.pageType);
+  const musts = intent.requirements.filter((r) => r.required);
+  const tokens = dir
+    ? '- Tokens and the look are already decided by the approved art direction above: do not write "tokens".'
+    : "- Tokens: colors {background, surface, text, muted, accent, accentText, line} from the brief's palette roles; fonts {display, body} from the brief's typography; scale compact|comfortable|spacious; radius none|soft|round; style editorial|minimal|bold|warm|technical; imageTreatment natural|muted|warm|mono — all chosen to express the brief's personality and visual direction.";
+  const shared = `You are SocriaUX's design generator. Turn the approved brief into a design specification that a renderer draws. You do not write HTML: you choose sections from the library below and write their content (and the tokens, only when no art direction is given).
 
 THE LIBRARY (only these kinds, variants and fields; * marks required):
-${libraryMenu(brief.pageType)}
+${libraryMenu(pageType)}
 
-Rules:
-- Tokens: colors {background, surface, text, muted, accent, accentText, line} from the brief's palette roles; fonts {display, body} from the brief's typography; scale compact|comfortable|spacious; radius none|soft|round; style editorial|minimal|bold|warm|technical; imageTreatment natural|muted|warm|mono — all chosen to express the brief's personality and visual direction.
-- Structure: ${brief.pageType === 'website' ? 'a nav first, a footer last; 5–9 sections between them, in the order a visitor needs them; one primary action, repeated at most twice.' : 'an app-nav first (tabbar for mobile, sidebar or topbar for web), then an app-header, then the content the screen exists for.'}
-- Copy: real, specific to this brief, in the brand's voice. Never lorem ipsum. Headlines short and concrete. Facts you were not given — prices, addresses, dates, numbers, opening hours, people's names — are written as [bracketed placeholders] (e.g. "[Opening hours]", "[£ price]"); never invent them. A testimonial without a real source uses "[Customer name]".
+Rules that always hold:
+- Copy: real, specific to this brief, in the voice the art direction describes (with none, the brand's voice). Never lorem ipsum. Headlines short and concrete. Facts you were not given — prices, addresses, dates, numbers, opening hours, people's names — are written as [bracketed placeholders] (e.g. "[Opening hours]", "[£ price]"); never invent them. A testimonial without a real source uses "[Customer name]".
 - Images: only the moodboard ids listed below, in "images" on the sections that take them; prefer landscape for wide slots and portrait for tall ones. If there are none, choose variants that need no image.
 - Every section has a short unique id (lowercase, hyphenated), a kind, a variant, content and images.
 
-${VOICE}
-Respond with ONE JSON object: {"title": "...", "pageType": "${brief.pageType}", "platform": "${brief.platform}", "tokens": {...}, "sections": [{"id": "...", "kind": "...", "variant": "...", "content": {...}, "images": ["..."]}]}`;
+${NOT_GENERIC}
+
+${VOICE}`;
+  const project = `THIS PROJECT
+${dir ? `
+${directionBrief(dir, pageType)}${dir.compose ? `\nIts composition for the task: ${Object.entries(dir.compose).map(([k, v]) => `${k} as "${v}"`).join(', ')}.` : ''}${dir.order?.length ? `\nIts order of importance: ${dir.order.join(', then ')}.` : ''}${dir.lead ? `\nWhat leads the page, straight after the navigation: the ${dir.lead}.` : ''}
+${knowledgeBrief(dir.look)}
+` : ''}
+WHAT IT IS: ${EXPERIENCE_LABEL[intent.kind]}. Task: ${intent.task}.${musts.length ? `\nWHAT IT MUST DO (every one, by id):\n${musts.map((r) => `- ${r.id}: ${r.text}${r.component ? ` (the ${r.component} component)` : ''}`).join('\n')}` : ''}${intent.prohibitions.length ? `\nRULED OUT BY THE DESIGNER: ${intent.prohibitions.join('; ')}.` : ''}
+
+Rules for this project:
+${tokens}
+${structureRule(intent, pageType)}${layoutBrief(brief.layout, intent) ? `\n- ${layoutBrief(brief.layout, intent)}` : ''}
+
+Respond with ONE JSON object: {"title": "...", "pageType": "${pageType}", "platform": "${brief.platform}", ${dir ? '' : '"tokens": {...}, '}"sections": [{"id": "...", "kind": "...", "variant": "...", "content": {...}, "images": ["..."]}]}`;
+  return `${shared}\n\n${project}`;
 }
 
 export function generateUser(input: GenerateInput): string {
   return [
-    `THE APPROVED BRIEF:\n${JSON.stringify(input.brief)}`,
-    `MOODBOARD IMAGES YOU MAY USE (id, category, subject, orientation):\n${keptRefs(input.moodboard)}`,
+    `THE APPROVED BRIEF:\n${JSON.stringify({ ...input.brief, system: undefined })}`,
+    briefDecisions(input.brief),
+    systemBrief(input.brief.system),
+    `PICTURES YOU MAY PLACE (id, category, subject, orientation):\n${keptRefs(input.moodboard)}`,
+    inspiration(input.moodboard),
     input.direction ? `A NEW DIRECTION THE DESIGNER ASKED FOR: “${input.direction}”` : '',
+    dnaBrief(input.dna),
   ]
     .filter(Boolean)
     .join('\n\n');
 }
 
-export function parseGenerate(raw: unknown, brief: DesignBrief, moodboard: Moodboard, version: number, reason: string): DesignSpec | null {
+/**
+ * The model's answer as a spec. With an approved art direction, the tokens and
+ * the look are the direction's (whatever the model wrote), and the page is
+ * planned for rhythm (direction.ts planLayout).
+ */
+export function parseGenerate(raw: unknown, brief: DesignBrief, moodboard: Moodboard, version: number, reason: string, dir0: ArtDirection | null = null): DesignSpec | null {
+  const dir = dir0 ? formed(dir0, brief) : null;
   const r = obj(raw);
+  const intent = intentOf(brief);
+  const pageType = pageTypeFor(intent, brief.pageType);
+  // whatever the model wrote, the design does what the intent requires (lib/ux-v0/fit.ts)
+  const fit = (spec: DesignSpec | null) => (spec ? fitToIntent(spec, intent, { brief, dir }).spec : null);
+  if (dir) {
+    const { tokens, look } = designFromDirection(dir);
+    const spec = normalizeSpec({ ...r, tokens, look, pageType, platform: brief.platform, version, reason, createdAt: Date.now() }, moodboard);
+    const fitted = fit(spec ? planLayout(spec) : null);
+    // the opening the reading asked for, then the parts the strategy composes, held whatever the model wrote
+    return fitted ? holdStrategy(holdArrangement(fitted, dir, moodboard), dir, moodboard) : null;
+  }
   const pal = Object.fromEntries(brief.palette.map((p) => [p.role, p.hex]));
   const t = obj(r.tokens);
   const colors = obj(t.colors);
@@ -165,7 +279,7 @@ export function parseGenerate(raw: unknown, brief: DesignBrief, moodboard: Moodb
     },
     fonts: { display: obj(t.fonts).display ?? brief.typography.display, body: obj(t.fonts).body ?? brief.typography.body },
   };
-  return normalizeSpec({ ...r, tokens, pageType: brief.pageType, platform: brief.platform, version, reason, createdAt: Date.now() }, moodboard);
+  return fit(normalizeSpec({ ...r, tokens, pageType, platform: brief.platform, version, reason, createdAt: Date.now() }, moodboard));
 }
 
 // ── changing it ──────────────────────────────────────────────────────
@@ -178,6 +292,10 @@ export interface RefineInput {
   comment: string;
   /** the designer has seen SocriaUX's concern and wants the change anyway */
   force: boolean;
+  /** what the designer locked in the art direction */
+  locks?: readonly LockGroup[];
+  /** the project's Creative DNA: what it says, and what is locked in it */
+  dna?: CreativeDNA | null;
 }
 
 export function refineSystem(): string {
@@ -185,6 +303,11 @@ export function refineSystem(): string {
 
 Patch operations (the "op"):
 - "tokens": change design tokens — {"tokens": {"colors": {...}, "fonts": {...}, "scale"|"radius"|"style"|"imageTreatment": ...}} (fonts only from: ${fontMenu()}).
+- "look": change how the page is composed — {"look": {any of: "ratio" (type scale 1.15–1.7), "weight" (100–900), "case" sentence|upper, "emphasis" italic|accent|underline|highlight|none, "label" ${LABELS.join('|')}, "grid" ${GRIDS.join('|')}, "align" left|center, "width" narrow|standard|wide, "containers" ${CONTAINERS.join('|')}, "rules" none|hairline|heavy, "buttons" ${BUTTONS.join('|')}, "motifs" [${MOTIFS.join(', ')}]}}.
+- "tone": set the ground one section sits on, or its spacing — {"sectionId", "tone": ${TONES.join('|')}, "pad": s|m|l}.
+- "shape": how one booking or hero is set, the rest of it kept — {"sectionId", "shape": {…}}. A booking: "side" start|end (where its summary card, day grid or panel sits), "times" tiles|rows|pills, "summary" card|inline|bar (a bar keeps the choice beside the confirm action), "ratio" 0.3–0.62 (the narrower column's share), "density" airy|even|dense, "align" left|center. A hero: "align" left|center, "side" start|end (where the words sit), "valign" top|middle|bottom (over a full picture), "measure" 0.45–1 (how wide the words run), "scale" 0.82–1.25 (the headline's size), "ratio" 0.36–0.64 (the words' share beside a picture).
+- "responsive": set one section apart at a narrower width, the desktop kept as it is — {"sectionId", "breakpoint": "tablet"|"mobile", "rule": {any of: "hide" true, "align" start|center, "pad" s|m|l, "media" first|last (where its picture sits once its parts stack), "type" s|l (its headings smaller or larger)}}; a rule set to null goes back to the desktop's. Use it when the comment names phones, mobile or tablets.
+- "story": tell one sequence of three to six points (a features section) as the page’s pinned story, or stop — {"sectionId", "story": true|false}.
 - "content": change fields of one section — {"sectionId", "content": {only the fields that change}}.
 - "variant": switch one section's variant — {"sectionId", "variant"}.
 - "images": change which moodboard images one section uses — {"sectionId", "images": [ids]}.
@@ -208,9 +331,12 @@ export function refineUser(input: RefineInput): string {
     : 'THE SELECTION: none — the comment is about the whole design.';
   return [
     input.brief ? `THE BRIEF: objective — ${input.brief.objective}; audience — ${input.brief.audience}; personality — ${input.brief.personality.join(', ')}.` : '',
+    systemBrief(input.brief?.system),
     `THE DESIGN NOW:\n${specDigest(input.spec)}`,
-    `MOODBOARD IMAGES AVAILABLE:\n${keptRefs(input.moodboard)}`,
+    `PICTURES THAT MAY BE PLACED:\n${keptRefs(input.moodboard)}`,
     where,
+    input.locks?.length ? `LOCKED IN THE ART DIRECTION (the designer decided these): ${input.locks.map((g) => LOCK_LABEL[g]).join(', ')}. If the comment asks to change one, make the patch but say in "challenge" that it changes a locked decision.` : '',
+    dnaBrief(input.dna),
     `THE COMMENT: “${input.comment}”`,
     `force: ${input.force}`,
   ]
@@ -228,7 +354,10 @@ export interface RefineResult {
 
 export function parseRefine(raw: unknown, force: boolean): RefineResult {
   const r = obj(raw);
-  const patch = normalizePatch(r.patch);
+  const given = normalizePatch(r.patch);
+  // the site's settings (its address, where its forms send, where its buttons go) are the designer's alone: a model
+  // that sets one would be inventing a fact about the business
+  const patch = given.op === 'site' ? { op: 'none' as const, summary: '' } : given;
   const challenge = force ? '' : clean(r.challenge, 400);
   return {
     understood: clean(r.understood, 240),

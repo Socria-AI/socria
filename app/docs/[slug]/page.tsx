@@ -38,7 +38,7 @@ export function generateMetadata({ params }: { params: { slug: string } }): Meta
     path: docPath(page.slug),
     title: `${page.title} — Socria Docs`,
     absolute: true,
-    description: page.blurb,
+    description: page.description ?? page.blurb,
     og: `docs/${page.slug}`,
   });
 }

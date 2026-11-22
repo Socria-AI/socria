@@ -7,9 +7,9 @@ import { pageMetadata } from '@/lib/seo';
 
 export const metadata: Metadata = pageMetadata({
   path: '/charter',
-  title: 'The Socria Charter',
+  title: 'The Socria Charter: Human-First AI',
   description:
-    'The founding constitution of Socria: artificial intelligence built for one purpose, human enhancement. The machines work for us. Not the other way around.',
+    'Socria’s founding constitution: Human-First AI, built for one purpose, human enhancement. The machines work for us. Not the other way around.',
   og: 'charter',
 });
 

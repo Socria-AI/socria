@@ -1,7 +1,9 @@
 // Workflow A (Create), end to end, with the model and the image libraries scripted:
-// intent → question → moodboard (keep, remove, replace) → answer → brief → generate → change → undo → critique → versions.
-import { chromium, S, FX, ROOT, BASE, underTest } from './env.mjs';
+// intent → question → moodboard (keep, remove, replace) → answer → brief → art direction (three, asked again, one
+// changed and taken) → generate → checks → change → undo → critique → versions.
+import { chromium, S, FX, ROOT, BASE, underTest, websiteWorkspace } from './env.mjs';
 import { readFileSync } from 'node:fs';
+const V = await underTest();
 const out = (m) => console.log(m);
 const b = await chromium.launch();
 const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
@@ -27,7 +29,7 @@ const LIB = {
   texture: [IMG('marble', 'texture', 'Marble counter'), IMG('ceramic', 'texture', 'Handmade ceramic', 1400, 1400), IMG('beans', 'texture', 'Roasted beans')],
   composition: [IMG('grid', 'composition', 'Editorial spread, asymmetric grid', 1600, 1000)],
 };
-const calls = { discover: [], images: [], brief: [], generate: [], refine: [], critique: [] };
+const calls = { discover: [], images: [], brief: [], direct: [], generate: [], refine: [], critique: [] };
 await ctx.route('**/api/ux-v0/**', async (r) => {
   const url = r.request().url();
   const body = JSON.parse(r.request().postData() || '{}');
@@ -46,11 +48,22 @@ await ctx.route('**/api/ux-v0/**', async (r) => {
     const kept = body.moodboard.refs.filter((x) => x.state === 'kept').map((x) => x.id);
     return r.fulfill({ json: { brief: { objective: 'Bring neighbours in on weekday mornings by showing the ritual: the first light, the pour, the long table.', audience: 'Neighbours within a ten-minute walk who come for the ritual, not the speed; often on a phone on the way in.', userGoals: ['See what is on this morning', 'Know when it opens', 'Book the long table for a group'], personality: ['unhurried', 'warm', 'exact'], visualDirection: 'Editorial and warm: big serif headlines, morning photography with warmth, paper tones, generous whitespace, no rounded corners.', palette: [{ name: 'Paper', hex: '#f4efe6', role: 'background' }, { name: 'Cream', hex: '#fbf8f2', role: 'surface' }, { name: 'Roast', hex: '#221c17', role: 'text' }, { name: 'Ash', hex: '#6b6157', role: 'muted' }, { name: 'Walnut', hex: '#5b3a24', role: 'accent' }, { name: 'Milk', hex: '#fbf8f2', role: 'accent-text' }, { name: 'Line', hex: '#e2d8c9', role: 'line' }], typography: { display: 'Instrument Serif', body: 'Inter', rationale: 'A condensed editorial serif for the voice; Inter for menus and times that must read at a glance.' }, layoutDirection: 'A full-bleed morning image, then the story, the menu as a printed card, a gallery, and one booking form.', functionalRequirements: ['This morning’s menu with prices', 'Opening hours', 'Book the long table'], references: kept, openQuestions: ['Real prices and hours'], pageType: 'website', platform: 'web' }, usage } });
   }
+  if (url.endsWith('/direct')) {
+    calls.direct.push(body);
+    // as the route does: the engine's three, with the (scripted) model's words laid over them
+    const ask = { ...body, brief: V.normalizeBrief(body.brief), base: body.base ? V.normalizeDirection(body.base) : null };
+    const names = ['Printed morning', 'Long table', 'First light'];
+    const written = { directions: names.map((name, i) => ({ candidate: i + 1, name, concept: `${name}: a direction written for Halcyon’s mornings.` })) };
+    return r.fulfill({ json: { usage, options: V.parseDirections(written, ask, V.proposeDirections(ask)) } });
+  }
   if (url.endsWith('/generate')) {
     calls.generate.push(body);
-    return r.fulfill({ json: { placeholders: ['[Opening hours]', '[£ price]'], usage, spec: {
+    // the server applies the approved direction's tokens and look, whatever the model wrote
+    const art = body.artDirection;
+    return r.fulfill({ json: { placeholders: ['[Opening hours]', '[£ price]'], usage, artDirection: art, spec: {
+      ...(art ? { look: art.look } : {}),
       version: body.version, pageType: 'website', platform: 'web', title: 'Halcyon — coffee for slow mornings', reason: 'Generated from the approved brief', createdAt: Date.now(), notes: [],
-      tokens: { colors: { background: '#f4efe6', surface: '#fbf8f2', text: '#221c17', muted: '#6b6157', accent: '#5b3a24', accentText: '#fbf8f2', line: '#e2d8c9' }, fonts: { display: 'Instrument Serif', body: 'Inter' }, scale: 'spacious', radius: 'none', style: 'editorial', imageTreatment: 'warm' },
+      tokens: art ? art.tokens : { colors: { background: '#f4efe6', surface: '#fbf8f2', text: '#221c17', muted: '#6b6157', accent: '#5b3a24', accentText: '#fbf8f2', line: '#e2d8c9' }, fonts: { display: 'Instrument Serif', body: 'Inter' }, scale: 'spacious', radius: 'none', style: 'editorial', imageTreatment: 'warm' },
       sections: [
         { id: 'nav', kind: 'nav', variant: 'inline', content: { brand: 'Halcyon', links: ['This morning', 'The room', 'Visit'], cta: 'Book the long table' }, images: [] },
         { id: 'hero', kind: 'hero', variant: 'full-bleed', content: { eyebrow: 'Open from [Opening hours]', title: 'Coffee for slow mornings', subtitle: 'Single-origin beans roasted on Tuesdays, poured for the neighbourhood every day.', primary: 'See this morning’s menu', secondary: 'Book the long table' }, images: ['openverse:cafe-bar'] },
@@ -76,8 +89,8 @@ await ctx.route('**/api/ux-v0/**', async (r) => {
 });
 
 await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
-await page.locator('.v0-intent-line textarea').fill('A website for my independent coffee house');
-await page.getByRole('button', { name: 'Begin' }).click();
+// the model-led website workspace's own way in (its questions, references, brief and directions)
+await websiteWorkspace(page, 'A website for my independent coffee house');
 await page.waitForSelector('.v0-question .v0-q-text', { timeout: 15000 });
 await page.waitForSelector('.v0-tile img', { timeout: 15000 });
 await page.waitForTimeout(1200);
@@ -105,8 +118,36 @@ await page.waitForSelector('.v0-brief', { timeout: 10000 });
 out('brief asked with kept refs: ' + calls.brief[0].moodboard.refs.filter((x) => x.state === 'kept').length);
 await page.waitForTimeout(600);
 await page.screenshot({ path: S + 'v0-12-brief.png' });
-await page.getByRole('button', { name: 'Approve and generate' }).click();
-await page.waitForSelector('iframe.v0-frame', { timeout: 15000 });
+// art direction: three directions, drawn as specimens; one taken, one part of it changed (and so kept)
+await page.getByRole('button', { name: 'Approve and set the Creative DNA' }).click();
+// the Creative DNA step (optional): SocriaUX's reading, one click on to the directions
+await page.waitForSelector('.dna-studio', { timeout: 10000 });
+out('creative DNA: ' + (await page.locator('.dna-summary-words').innerText()));
+await page.getByRole('button', { name: 'Explore directions' }).click();
+await page.waitForSelector('.v0-dir', { timeout: 10000 });
+await page.waitForTimeout(1500);
+const dirs = await page.$$eval('.v0-dir', (els) => els.map((e) => [e.querySelector('.v0-dir-text > .sb-label')?.textContent, e.querySelector('.v0-cell-title')?.textContent]));
+out('directions: ' + JSON.stringify(dirs));
+out('direct asked with the brief: ' + (calls.direct[0]?.brief?.objective ?? '').slice(0, 40));
+await page.screenshot({ path: S + 'v0-12b-direction.png', fullPage: false });
+// the designer writes their own direction and asks again: three new languages
+await page.locator('.v0-direct-own textarea').fill('more like a printed museum guide');
+await page.getByRole('button', { name: 'Show three for this' }).click();
+await page.waitForTimeout(1200);
+const again = await page.$$eval('.v0-dir-text > .sb-label', (els) => els.map((e) => e.textContent));
+out('asked again: ' + JSON.stringify(again) + ' round=' + calls.direct.at(-1)?.round + ' notes=' + calls.direct.at(-1)?.notes);
+// change the second one's buttons, which keeps its surfaces, then use it
+const second = page.locator('.v0-dir').nth(1);
+await second.getByText('Change any part of it').click();
+await second.getByRole('combobox', { name: 'Buttons' }).selectOption('underline');
+out('second now keeps: ' + (await second.locator('.v0-dir-locks').innerText().catch(() => '—')));
+const t0 = Date.now();
+await second.getByRole('button', { name: 'Use this direction' }).click();
+await page.waitForSelector('iframe.v0-frame', { timeout: 30000 });
+// the model is scripted and answers at once: this is the time the checks at desktop and phone widths take
+out('generated, checked and shown in ' + (Date.now() - t0) + ' ms');
+const sent = calls.generate.at(-1).artDirection;
+out('generate followed the direction: ' + (sent ? `${sent.language} · buttons ${sent.look.buttons} · locks ${sent.locks.join(',')}` : 'none'));
 await page.waitForTimeout(3000);
 await page.screenshot({ path: S + 'v0-13-design.png' });
 const fr = () => page.frames().find((f) => f.url() === 'about:srcdoc');
@@ -125,6 +166,7 @@ await p2.waitForTimeout(500);
 await p2.screenshot({ path: S + 'v0-15-page-mobile.png', fullPage: true });
 await p2.close();
 // change: select the headline, say what to change
+const firstBody = (await fr().evaluate(() => document.body.innerHTML)).replace(/loading="eager"/g, 'loading="lazy"').replace(/ style=""/g, '');
 await page.frameLocator('iframe.v0-frame').locator('h1').click();
 await page.waitForSelector('.v0-sel', { timeout: 5000 });
 out('selected: ' + (await page.locator('.v0-sel-label').innerText()));
@@ -137,6 +179,8 @@ await page.screenshot({ path: S + 'v0-16-changed.png' });
 await page.getByRole('button', { name: 'Undo' }).first().click();
 await page.waitForTimeout(1500);
 out('after undo h1: ' + (await fr().locator('h1').innerText()));
+const undoneBody = (await fr().evaluate(() => document.body.innerHTML)).replace(/loading="eager"/g, 'loading="lazy"').replace(/ style=""/g, '');
+out('undo restores the page exactly: ' + (undoneBody === firstBody) + (undoneBody === firstBody ? '' : ` (${firstBody.length} vs ${undoneBody.length}; first difference at ${[...firstBody].findIndex((c, i) => c !== undoneBody[i])}: …${firstBody.slice([...firstBody].findIndex((c, i) => c !== undoneBody[i]) - 60, [...firstBody].findIndex((c, i) => c !== undoneBody[i]) + 60)}… vs …${undoneBody.slice([...firstBody].findIndex((c, i) => c !== undoneBody[i]) - 60, [...firstBody].findIndex((c, i) => c !== undoneBody[i]) + 60)}…)`));
 // ask about it
 await page.getByRole('button', { name: 'Redo' }).click();
 await page.waitForTimeout(1200);
@@ -146,6 +190,11 @@ await page.locator('.v0-compose textarea').fill('Does this headline do its job?'
 await page.locator('.v0-compose .sb-btn.is-primary').click();
 await page.waitForSelector('.v0-card .v0-read', { timeout: 8000 });
 out('critique on generated: kind=' + calls.critique[0].kind + ' section digest=' + (calls.critique[0].section || '').slice(0, 60));
+// the checks: drawn offscreen at desktop and phone, measured, findings in the rail
+await page.getByRole('tab', { name: /Check/ }).click();
+await page.waitForFunction(() => !document.querySelector('.v0-rail-tabs')?.textContent?.includes('Checking'), null, { timeout: 30000 });
+out('checks: ' + (await page.locator('.v0-scores').innerText().catch(() => 'none')).replace(/\s+/g, ' ') + ' · ' + (await page.locator('.v0-rail-body [role=status]').first().innerText().catch(() => '')));
+await page.screenshot({ path: S + 'v0-16b-checks.png' });
 await page.getByRole('tab', { name: 'Versions' }).click();
 out('versions: ' + (await page.locator('.v0-version').allInnerTexts()).join(' | '));
 out('tabs: ' + JSON.stringify(await page.$$eval('.v0-rail-tabs .sb-seg-item', (els) => els.map((e) => [e.textContent, e.getAttribute('aria-selected'), getComputedStyle(e).boxShadow]))));

@@ -1080,6 +1080,22 @@ create table if not exists ux_v0_projects (
 
 create index if not exists ux_v0_projects_user_updated_idx on ux_v0_projects (user_id, updated_at desc);
 
+-- ux_v0_systems: one row per registry design system (lib/ux-v0/dsi/registry.ts): its draft, published versions,
+-- sources, sync state and audit as jsonb, normalised by normalizeRecord before it is written. The browser keeps the
+-- first copy (IndexedDB, socria-ux-v0-systems); this one follows a signed-in designer between devices. One owner per
+-- row: every query filters on user_id, so no system is visible across accounts.
+create table if not exists ux_v0_systems (
+  user_id text not null,
+  id text not null,
+  name text not null default '',
+  doc jsonb not null,
+  created_at bigint not null,
+  updated_at bigint not null,
+  primary key (user_id, id)
+);
+
+create index if not exists ux_v0_systems_user_updated_idx on ux_v0_systems (user_id, updated_at desc);
+
 -- ux_v0_usage: every SocriaUX v0 model call's tokens and price, summed per
 -- person, project and UTC day (lib/ux-v0/usage-server.ts). The daily caps
 -- read it; bump_ux_v0_usage adds to it in one statement.
@@ -1117,6 +1133,50 @@ begin
     updated_at = p_at;
 end;
 $$;
+
+-- ux_v0_calls: one row per SocriaUX model call, for cost by stage and by tier.
+-- What the provider reported (tokens, priced: measured, never estimated), the
+-- stage and tier it was routed to (lib/ux-v0/model.ts routeFor), the model that
+-- answered and its effort, and whether the budget moved it to the economy
+-- model. No prompt, answer or design is stored here. A deployment without the
+-- table still works: the per-day totals above are kept as before.
+create table if not exists ux_v0_calls (
+  id bigint generated always as identity primary key,
+  user_id text not null,
+  project_id text not null,
+  at bigint not null,
+  day text not null,
+  stage text not null,
+  tier text not null,
+  model text not null,
+  api text not null default 'chat',
+  effort text not null default 'default',
+  input_tokens bigint not null default 0,
+  cached_tokens bigint not null default 0,
+  output_tokens bigint not null default 0,
+  cost_usd numeric(14, 6),
+  downgraded boolean not null default false
+);
+
+create index if not exists ux_v0_calls_user_day_idx on ux_v0_calls (user_id, day);
+create index if not exists ux_v0_calls_project_idx on ux_v0_calls (user_id, project_id);
+
+-- Each call's operation record (lib/ux-v0/telemetry.ts) and the designer's organisation (a Clerk organisation:
+-- a club, a class, a studio), for diagnostics and organisation budgets (SOCRIAUX_ORG_DAILY_USD,
+-- SOCRIAUX_ORG_MONTHLY_USD). Added to an existing table in place; the app writes rows without these columns
+-- until they exist, and holds no organisation budget until org_id does.
+alter table ux_v0_calls add column if not exists org_id text;
+alter table ux_v0_calls add column if not exists operation_id text;
+alter table ux_v0_calls add column if not exists operation text;
+alter table ux_v0_calls add column if not exists outcome text;
+alter table ux_v0_calls add column if not exists retries integer not null default 0;
+alter table ux_v0_calls add column if not exists reasoning_tokens bigint not null default 0;
+alter table ux_v0_calls add column if not exists queued_ms integer;
+alter table ux_v0_calls add column if not exists ttft_ms integer;
+alter table ux_v0_calls add column if not exists model_ms integer;
+alter table ux_v0_calls add column if not exists total_ms integer;
+alter table ux_v0_calls add column if not exists cancelled boolean not null default false;
+create index if not exists ux_v0_calls_org_day_idx on ux_v0_calls (org_id, day) where org_id is not null;
 
 -- ── Socria events: RSVP and attendance ─────────────────────────────────
 --

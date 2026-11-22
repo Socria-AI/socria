@@ -480,6 +480,28 @@ export function freshness(at: number, now: number): number {
   return Math.max(0, Math.min(1, 1 - days / 60));
 }
 
+/**
+ * How a conversation blinks on the Universal Map (Logos 6): the newer, the more often — every 2.6s for one touched
+ * today, every 6.2s for one two months old or more — at a phase of its own, worked out from its id, so the map's
+ * conversations never blink together and each one always blinks the same way. Seconds; `delay` is negative (already
+ * part-way through its beat), so a map that has just come in is twinkling at once rather than all starting together.
+ */
+export function blinkOf(id: string, at: number, now: number): { every: number; delay: number } {
+  const every = Math.round((6.2 - 3.6 * freshness(at, now)) * 100) / 100;
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
+  const phase = ((h >>> 0) % 997) / 997;
+  return { every, delay: -Math.round(phase * every * 100) / 100 };
+}
+
+/** How many conversations blink at most: each one is a layer of its own while it does (measured on the map). */
+export const BLINK_MAX = 40;
+
+/** The conversations that blink: the most recently active, at most `max`, newest first, ties by id. */
+export function blinkers(tiles: readonly Pick<Tile, 'id' | 'at'>[], max = BLINK_MAX): Set<string> {
+  return new Set([...tiles].sort((a, b) => b.at - a.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).slice(0, Math.max(0, max)).map((t) => t.id));
+}
+
 // ── keys: the nearest conversation that way ──────────────────────────
 
 export type Way = 'left' | 'right' | 'up' | 'down';
