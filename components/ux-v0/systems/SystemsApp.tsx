@@ -22,7 +22,7 @@ import { addToken, blocking, canOverride, isAlias, removeToken, renameToken, res
 import { deleteSystem, listSystems, pullSystems, pushSystem, putSystem, removeFromAccount } from '@/lib/ux-v0/dsi/store';
 import { getProject, listProjects, putProject } from '@/lib/ux-v0/store';
 import type { DesignProject, ProjectSummary } from '@/lib/ux-v0/types';
-import { AssetThumb, ImportWizard } from './ImportWizard';
+import { AssetThumb, ImportWizard, type WizardStart } from './ImportWizard';
 import './systems.css';
 
 const TABS = ['Overview', 'Tokens', 'Brand', 'Assets', 'Components', 'Governance', 'Usage', 'Versions', 'Sync', 'Export'] as const;
@@ -60,11 +60,15 @@ async function svgToPng(svg: string, width: number): Promise<Blob | null> {
   });
 }
 
-export function SystemsApp(p: { signedIn: boolean; initialId?: string | null; onExit: () => void; onOpenProject: (id: string) => void; onNewProject: (kind: 'graphic' | 'board' | 'website', rec: SystemRecord) => void }) {
+export function SystemsApp(p: { signedIn: boolean; initialId?: string | null; onExit: () => void; onOpenProject: (id: string) => void; onNewProject: (kind: 'graphic' | 'board' | 'website', rec: SystemRecord) => void; startImport?: (WizardStart & { next?: string }) | null; onImportTaken?: () => void }) {
   const [records, setRecords] = useState<SystemRecord[]>([]);
   const [selected, setSelected] = useState<string | null>(p.initialId ?? null);
   const [tab, setTab] = useState<Tab>('Overview');
-  const [wizard, setWizard] = useState<{ intoId?: string } | null>(null);
+  // an import begun in the studio's conversation opens at once, with what the conversation settled
+  const [wizard, setWizard] = useState<{ intoId?: string; initial?: WizardStart; next?: string } | null>(() => (p.startImport ? { initial: p.startImport, next: p.startImport.next } : null));
+  useEffect(() => {
+    if (p.startImport) p.onImportTaken?.();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [archived, setArchived] = useState(false);
   const [notice, setNotice] = useState('');
@@ -229,15 +233,19 @@ export function SystemsApp(p: { signedIn: boolean; initialId?: string | null; on
           records={records}
           projects={projects}
           intoId={wizard.intoId}
+          initial={wizard.initial ?? null}
           onCancel={() => setWizard(null)}
           onDone={async (d) => {
             await save(d.record, d.created ? `${d.record.name} created.` : `Imported into ${d.record.name}’s draft.`);
             setSelected(d.record.id);
           }}
           onApply={(r) => {
+            const next = wizard.next;
             setWizard(null);
             setSelected(r.id);
             setTab('Usage');
+            // what the conversation said would be made first, begun in the new system
+            if (next === 'graphic' || next === 'board' || next === 'website') p.onNewProject(next, r);
           }}
         />
       )}

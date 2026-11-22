@@ -88,6 +88,10 @@ export interface GraphicEditorProps {
   inspectorExtra?: ReactNode;
   /** a Board made from an approved logo's identity (offered in the Logo tab when given) */
   onMakeBoard?: (sys: MasterDesignSystem) => void;
+  /** a change asked in words elsewhere (the studio's conversation beside the workspace), read as if typed here */
+  inbox?: { id: number; words: string } | null;
+  /** what came of a change asked in words, said back to where it was asked */
+  onAsked?: (said: string) => void;
 }
 
 export function GraphicEditor(props: GraphicEditorProps) {
@@ -199,12 +203,16 @@ export function GraphicEditor(props: GraphicEditorProps) {
     const words = (typeof said === 'string' ? said : askWords).trim();
     const cur = docNow();
     if (!words || !board) return;
+    const tell = (tone: 'ok' | 'warn' | 'ask', text: string, show = true) => {
+      if (show) setNote({ tone, text });
+      props.onAsked?.(text);
+    };
     // on a logo artboard, the logo's own edits (more distinctive, simpler, a new wordmark…) are read first
     if (board.logo) {
       const lr = logoEditFromWords(cur, board.id, words);
       if (lr) {
         if (lr.doc !== cur) commitDoc(lr.doc, words.slice(0, 80), { version: true });
-        setNote({ tone: lr.ok ? 'ok' : 'warn', text: `${lr.said} Undo takes it back.` });
+        tell(lr.ok ? 'ok' : 'warn', `${lr.said} Undo takes it back.`);
         setAskWords('');
         setTab('logo');
         return;
@@ -212,18 +220,18 @@ export function GraphicEditor(props: GraphicEditorProps) {
     }
     const e = readGraphicEdit(words, cur, { artboard: board.id, selection, dir: props.direction ?? directionOfDoc(cur), measure, kind: props.kind, customs: library.styles });
     if (!e) {
-      setNote({ tone: 'ask', text: 'SocriaUX could not read that as a change it can make without a model. Try “make the headline bigger”, “increase the contrast”, “move the logo beneath the title”, “use more editorial typography”, “adapt it to a story”, or select an object and change it in the panel on the right.' });
+      tell('ask', 'SocriaUX could not read that as a change it can make without a model. Try “make the headline bigger”, “increase the contrast”, “move the logo beneath the title”, “use more editorial typography”, “adapt it to a story”, or select an object and change it in the panel on the right.');
       return;
     }
     if (e.question && !e.ops.length && !e.next) {
-      setNote({ tone: 'ask', text: e.question });
+      tell('ask', e.question);
       return;
     }
     let next: GraphicDoc | null = e.next ?? null;
     if (!next) {
       const r = applyOps(cur, e.ops);
       if (!r.ok) {
-        setNote({ tone: 'warn', text: `Nothing changed: ${r.error}` });
+        tell('warn', `Nothing changed: ${r.error}`);
         return;
       }
       next = r.doc;
@@ -234,7 +242,13 @@ export function GraphicEditor(props: GraphicEditorProps) {
       if (fresh) setBoardId(fresh.id);
     }
     setNote(e.question ? { tone: 'ask', text: e.question } : null);
+    props.onAsked?.(`Previewing: ${e.label}. Apply or Discard it under the canvas.${e.question ? ` ${e.question}` : ''}`);
   };
+  // a change asked in the conversation beside the workspace, read as if typed here
+  const inboxId = props.inbox?.id;
+  useEffect(() => {
+    if (props.inbox?.words) ask(props.inbox.words);
+  }, [inboxId]); // eslint-disable-line react-hooks/exhaustive-deps
   /** A document made elsewhere (a change of style) shown as a preview, to apply or discard like a change in words. */
   const previewDoc = (next: GraphicDoc, label: string) => {
     const cur = docNow();

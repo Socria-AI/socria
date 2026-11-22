@@ -42,6 +42,8 @@ import { brandBoardOptions } from '@/lib/ux-v0/dsi/generate';
 import { logoBoardAsset } from '@/lib/ux-v0/dsi/adapters';
 import { useLinkedSystem } from '../systems/useLinkedSystem';
 import { SystemBadge } from '../systems/SystemBadge';
+import { StudioRail, useRailReply } from '../studio/StudioRail';
+import { prefsOf, systemsWithPrefs } from '@/lib/ux-v0/studio/apply';
 import { download, facesUsed, loadFaces, slug, useAssetUrls, useFaceMeasure, type Face } from '../graphics/faces';
 import { BoardCanvas, type BoardCanvasApi } from './BoardCanvas';
 import { AddPanel, BoardInspector, ChecksPanel, MaterialsPanel, SystemPanel, VersionsPanel } from './BoardPanels';
@@ -303,6 +305,9 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
     [boardNow, makeWebsite, refreshMeasure, setBoard],
   );
 
+  // the palette and faces chosen in the studio's conversation, held by the systems proposed (never a design system's)
+  const heldToStudio = (xs: MasterDesignSystem[]) => (project.studio ? systemsWithPrefs(xs, prefsOf(project.studio)) : xs);
+
   // ── the brief → systems → the board ──
   const readWords = () => {
     const r = readBoardRequest(words);
@@ -330,7 +335,7 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
       setView('system');
       return;
     }
-    const options = proposeSystems(brief, project.id);
+    const options = heldToStudio(proposeSystems(brief, project.id));
     setBoard((x) => ({ ...x, request: words, brief, options }));
     setView('system');
   };
@@ -339,7 +344,7 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
     if (!cur.brief) return;
     const seen = cur.options.map((o) => o.direction.language);
     const round = Math.ceil(seen.length / 3);
-    setBoard((x) => ({ ...x, options: linked ? brandOptions(cur.brief!, round).options : proposeSystems(cur.brief!, project.id, { round, seen }) }));
+    setBoard((x) => ({ ...x, options: linked ? brandOptions(cur.brief!, round).options : heldToStudio(proposeSystems(cur.brief!, project.id, { round, seen })) }));
   };
   const chooseSystem = async (sys: MasterDesignSystem) => {
     const cur = boardNow();
@@ -522,8 +527,8 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
       return setPending({ kind: 'confirm', label, text: `Carry the system’s ${[a.fonts ? 'typefaces' : '', a.colours ? 'colours' : ''].filter(Boolean).join(' and ')} into the website as a new version of it? The current version is kept in its history.`, run: () => void syncWebsites(a.materials, { fonts: a.fonts, colours: a.colours }) });
     }
   };
-  const ask = () => {
-    const w = askWords.trim();
+  const ask = (said?: string) => {
+    const w = (typeof said === 'string' ? said : askWords).trim();
     if (!w) return;
     const e = readBoardEdit(w, boardNow(), { selection });
     if (!e) return setNote({ tone: 'ask', text: 'SocriaUX could not read that as a change to the board without a model. Try “arrange these materials into two rows”, “make the posters slightly larger on the board”, “move the mockups to the right side”, “change the accent to green”, “regenerate only the second poster”, “add annotations explaining the visual system”.' });
@@ -758,7 +763,44 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
   ];
   const sourceName = b.system?.source?.name;
 
+  // ── a board begun in the studio: its brief came from the conversation, so its systems are proposed at once ──
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (autoStarted.current) return;
+    if (project.systemLink && !linked) return;
+    autoStarted.current = true;
+    if (project.studio?.status !== 'started' || !b.brief || b.options.length || b.system) return;
+    void continueFromBrief();
+  }, [linked]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── the conversation beside the board: words go to the board's own changes in words ──
+  const heard = useMemo(() => (pending ? { text: pending.kind === 'ops' ? `Previewing: ${pending.label}. Apply or Discard it under the board.` : pending.kind === 'confirm' ? pending.text : `Previewing the system change: ${pending.label}.` } : note ? { text: note.text } : null), [pending, note]);
+  const waitReply = useRailReply(heard, (h) => h.text);
+  const railAsk = async (said: string): Promise<string | null> => {
+    const low = said.toLowerCase();
+    if (view === 'board' && b.system) {
+      const wait = waitReply();
+      ask(said);
+      return wait;
+    }
+    if (view === 'system' && b.options.length) {
+      const ord = [/\b(first|1st|one|1)\b/, /\b(second|2nd|two|2)\b/, /\b(third|3rd|three|3)\b/].findIndex((re) => re.test(low));
+      if (/\b(more|others?|another|different|again)\b/.test(low)) {
+        moreSystems();
+        return 'More systems, kept apart from those you have seen.';
+      }
+      if (ord >= 0 && b.options[ord]) {
+        void chooseSystem(b.options[ord]);
+        return `Making the board in “${b.options[ord].direction.name}”: every material composed in it, at most three at a time.`;
+      }
+      return 'Choose the system the board is made in — say “the first one”, or “more” for others.';
+    }
+    return 'Finish the brief and continue: the systems follow from it.';
+  };
+
   return (
+    <>
+    {project.studio && <StudioRail studio={project.studio} onStudio={(fn) => update((p) => (p.studio ? { ...p, studio: fn(p.studio) } : p))} onAsk={railAsk} placeholder={view === 'board' ? 'Ask the board: “arrange these into two rows”, “change the accent to green”…' : view === 'system' ? '“The first one”, or “more”' : 'Say what to change'} systemName={linked?.rec.name ?? null} />}
     <div className="v0 sb gx bd">
       <header className="v0-head">
         <div className="v0-head-l">
@@ -1188,6 +1230,7 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
         </div>
       )}
     </div>
+    </>
   );
 }
 

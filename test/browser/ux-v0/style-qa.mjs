@@ -75,7 +75,9 @@ const library = () => page.evaluate(() => JSON.parse(localStorage.getItem('socri
 console.log('=== SocriaUX Style Intelligence, by hand, in the built app ===');
 await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
 await page.fill('textarea[aria-label="What do you want to make?"]', 'A poster for “Signal & Form”, a creative technology exhibition, “Where code becomes craft”, 12–28 March 2027, Lisbon Design Centre');
-await page.getByRole('button', { name: /Make a graphic/ }).click();
+await page.getByRole('radio', { name: 'Graphic', exact: true }).click();
+await page.getByRole('button', { name: 'Begin' }).click();
+await page.getByRole('button', { name: 'Write the brief yourself' }).click();
 await page.waitForSelector('.gx-brief', { timeout: 15000 });
 await page.getByRole('button', { name: /See three directions/ }).click();
 await page.waitForSelector('.gx-dir', { timeout: 15000 });
@@ -332,7 +334,9 @@ ok('10. after a reload the design still speaks its style, and one’s own styles
 // ── a board's design language ──
 await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
 await page.fill('textarea[aria-label="What do you want to make?"]', 'Create a campaign for “Signal & Form”, “Where code becomes craft”, 12–28 March 2027: two posters and two Instagram graphics.');
-await page.getByRole('button', { name: /Make a board/ }).click();
+await page.getByRole('radio', { name: 'Board', exact: true }).click();
+await page.getByRole('button', { name: 'Begin' }).click();
+await page.getByRole('button', { name: 'Write the brief yourself' }).click();
 await page.waitForSelector('.bd-brief', { timeout: 15000 });
 await page.getByRole('button', { name: /Propose design systems/ }).click();
 await page.waitForSelector('.bd-sys', { timeout: 15000 });

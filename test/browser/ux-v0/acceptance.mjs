@@ -108,6 +108,7 @@ const dropFile = async (selector, make, arg) => {
 // A — an HTML page: every kind of element, the highlight through zoom and pan, a card's area, the viewport, forged messages, hover, axe
 await part('html kinds', async () => {
   await page.goto(HOME, { waitUntil: 'networkidle' });
+  await page.getByRole('radio', { name: 'Critique', exact: true }).click();
   await page.locator('input[type=file]').setInputFiles(FX + 'kinds.html');
   await page.waitForSelector('iframe.v0-frame', { timeout: 20000 });
   await page.waitForTimeout(1800);
@@ -192,6 +193,7 @@ await part('html kinds', async () => {
 await part('images', async () => {
   const makePng = async ([w, h]) => { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); const gr = g.createLinearGradient(0, 0, w, h); gr.addColorStop(0, '#5b3a24'); gr.addColorStop(1, '#f4efe6'); g.fillStyle = gr; g.fillRect(0, 0, w, h); g.fillStyle = '#fff'; g.fillRect(w * 0.1, h * 0.1, w * 0.3, h * 0.2); const blob = await new Promise((r) => c.toBlob(r, 'image/png')); const d = new DataTransfer(); d.items.add(new File([blob], `shot-${w}.png`, { type: 'image/png' })); return d; };
   await page.goto(HOME, { waitUntil: 'networkidle' });
+  await page.getByRole('radio', { name: 'Critique', exact: true }).click();
   await dropFile('.v0-way-drop', makePng, [4000, 2500]);
   await page.waitForSelector('img.v0-image', { timeout: 15000 });
   await page.waitForTimeout(700);
@@ -223,6 +225,7 @@ await part('images', async () => {
   check('an area is measured in the image’s own pixels, at any zoom', Math.abs(w1 - w2) <= 12 && Math.abs(h1 - h2) <= 12 && Math.abs(w1 - 1200) <= 24, `${a1} | ${a2}`);
   // a tiny icon is drawn at its size, centred, not blown up
   await page.goto(HOME, { waitUntil: 'networkidle' });
+  await page.getByRole('radio', { name: 'Critique', exact: true }).click();
   await dropFile('.v0-way-drop', makePng, [16, 16]);
   await page.waitForSelector('img.v0-image', { timeout: 15000 });
   await page.waitForTimeout(700);
@@ -241,6 +244,7 @@ await part('retina crop', async () => {
     const seen = [];
     await p2.route('**/api/ux-v0/critique', (r) => { seen.push(JSON.parse(r.request().postData())); return r.fulfill({ json: { reasoning: { read: 'ok', verdict: 'works', questions: [], principles: [], issues: [], alternatives: [], basis: '' }, artifactSummary: 'x', usage: { model: 'gpt-6-luna', input: 1, cached: 0, output: 1, cost: 0 } } }); });
     await p2.goto(HOME, { waitUntil: 'networkidle' });
+    await p2.getByRole('radio', { name: 'Critique', exact: true }).click();
     await p2.locator('input[type=file]').setInputFiles(FX + 'existing-design.png');
     await p2.waitForSelector('img.v0-image', { timeout: 15000 });
     await p2.waitForTimeout(700);
@@ -269,6 +273,10 @@ await part('create acceptance', async () => {
   await page.goto(HOME, { waitUntil: 'networkidle' });
   await page.locator('.v0-intent-line textarea').fill('A website for a small bakery');
   await page.getByRole('button', { name: 'Begin' }).click();
+  // the studio's conversation comes first; the model-led website workspace is its own way in from it
+  await page.waitForSelector('.sd-conv', { timeout: 15000 });
+  if (!(await page.getByRole('button', { name: 'Plan it in the workspace' }).isVisible())) await page.getByRole('button', { name: /Decisions/ }).click();
+  await page.getByRole('button', { name: 'Plan it in the workspace' }).click();
   const asked = await page.waitForFunction(() => /Sign in/i.test(document.querySelector('.v0-notice, .v0-error-line, [role=alert]')?.textContent || ''), null, { timeout: 8000 }).then(() => true).catch(() => false);
   check('signed out, the first model call asks the person to sign in (and nothing breaks)', asked && /\?p=uxv0_/.test(page.url()), (await page.locator('.v0-notice, [role=alert]').first().innerText().catch(() => '')).slice(0, 100));
   await page.unroute('**/api/ux-v0/discover');
@@ -278,6 +286,10 @@ await part('create acceptance', async () => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('.v0-intent-line textarea').fill('A website for my independent coffee house');
   await page.getByRole('button', { name: 'Begin' }).click();
+  // the studio's conversation comes first; the model-led website workspace is its own way in from it
+  await page.waitForSelector('.sd-conv', { timeout: 15000 });
+  if (!(await page.getByRole('button', { name: 'Plan it in the workspace' }).isVisible())) await page.getByRole('button', { name: /Decisions/ }).click();
+  await page.getByRole('button', { name: 'Plan it in the workspace' }).click();
   await page.waitForSelector('.v0-question', { timeout: 15000 });
   await page.waitForTimeout(800);
   const o = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);

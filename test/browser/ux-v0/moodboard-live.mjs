@@ -29,6 +29,10 @@ const settle = async () => { await page.waitForTimeout(300); await page.waitForF
 await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
 await page.locator('.v0-intent-line textarea').fill('A website for my independent coffee house');
 await page.getByRole('button', { name: 'Begin' }).click();
+// the studio's conversation comes first; the model-led website workspace is its own way in from it
+await page.waitForSelector('.sd-conv', { timeout: 15000 });
+if (!(await page.getByRole('button', { name: 'Plan it in the workspace' }).isVisible())) await page.getByRole('button', { name: /Decisions/ }).click();
+await page.getByRole('button', { name: 'Plan it in the workspace' }).click();
 await page.waitForSelector('.v0-tile img', { timeout: 60000 });
 await settle();
 const tiles = () => page.locator('.v0-tile').count();

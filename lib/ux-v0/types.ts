@@ -16,6 +16,7 @@ import { normalizeIntent, type DesignIntent } from './intent';
 import { normalizeLayout, type LayoutDecisions } from './layout';
 import { normalizeDesignSystem, type DesignSystem } from './design-system';
 import { normalizeSystemLink, type SystemLink } from './dsi/link-schema';
+import { normalizeStudio, type StudioState } from './studio/schema';
 import { EMPTY_DIRECTION, normalizeDirectionState, type DirectionState } from './direction';
 import { normalizeDNA, normalizeRefDna, type CreativeDNA, type RefDna } from './dna';
 import { signatureOf, type DesignSignature } from './signature';
@@ -534,6 +535,9 @@ export interface DesignProject {
   board?: BoardState;
   /** the registry design system it is built in (lib/ux-v0/dsi): which version, pinned or following, and its overrides */
   systemLink?: SystemLink;
+  /** the studio conversation it was begun in (lib/ux-v0/studio): what was asked for, every decision since, the
+   * conversation itself; read by the workspace the work continues in */
+  studio?: StudioState;
   artifact: Artifact | null;
   cards: ReasoningCard[];
   usage: UsageTotals;
@@ -570,6 +574,8 @@ export interface ProjectSummary {
   direction: string;
   /** up to three kept moodboard thumbnails: the studies behind a work in progress */
   studies: string[];
+  /** begun in the studio: its kind, and whether it is still in conversation */
+  studio?: { mode: StudioState['mode']; status: StudioState['status'] };
 }
 
 // ── normalisers ──────────────────────────────────────────────────────
@@ -1126,6 +1132,7 @@ export function normalizeProject(v: unknown, opts: { forSync?: boolean } = {}): 
     ...((g) => (g && r.medium === 'graphic' ? { graphic: g } : {}))(normalizeGraphicState(r.graphic)),
     ...((bd) => (bd ? { board: bd } : {}))(r.medium === 'board' ? normalizeBoard(r.board) : null),
     ...((ln) => (ln ? { systemLink: ln } : {}))(normalizeSystemLink(r.systemLink)),
+    ...((st) => (st ? { studio: st } : {}))(normalizeStudio(r.studio)),
     artifact: normalizeArtifact(r.artifact),
     cards,
     usage: usageTotals(r.usage),
@@ -1209,6 +1216,7 @@ export function summarize(p: DesignProject): ProjectSummary {
       .filter((r) => r.state === 'kept' && r.thumb)
       .slice(0, 3)
       .map((r) => r.thumb),
+    ...(p.studio ? { studio: { mode: p.studio.mode, status: p.studio.status } } : {}),
   };
 }
 

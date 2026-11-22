@@ -57,7 +57,7 @@ const NOUNS: readonly [string, MaterialSpec['kind'], { format?: string; template
 const countOf = (w: string | undefined, plural: boolean) => (w ? COUNT_WORDS[w] ?? (Number(w) || 1) : plural ? 2 : 1);
 
 /** A board request read (see the head of this file): the materials, the campaign's words, where the system comes from. */
-export function readBoardRequest(words: string): BoardBrief & { fromWebsite: boolean } {
+export function readBoardRequest(words: string, opts: { defaults?: boolean } = {}): BoardBrief & { fromWebsite: boolean } {
   let rest = ` ${words.toLowerCase().replace(/[“”]/g, '"')} `;
   // quoted words are the campaign's own words, never materials
   rest = rest.replace(/"[^"]*"|‘[^’]*’/g, (m) => ' '.repeat(m.length));
@@ -82,7 +82,8 @@ export function readBoardRequest(words: string): BoardBrief & { fromWebsite: boo
     const mix: MaterialSpec[] = [{ kind: 'poster', count: Math.ceil(n / 2) }, { kind: 'social', count: Math.max(0, Math.ceil((n - Math.ceil(n / 2)) / 2)) }, { kind: 'banner', count: Math.max(0, n - Math.ceil(n / 2) - Math.ceil((n - Math.ceil(n / 2)) / 2)) }];
     specs.push(...mix.filter((s) => s.count > 0).map((s, i) => ({ ...s, at: i })));
   }
-  if (!specs.length) specs.push({ kind: 'poster', count: 2, at: 0 }, { kind: 'social', count: 2, at: 1 });
+  // nothing named: two posters and two posts (unless the caller asks for only what was named)
+  if (!specs.length && opts.defaults !== false) specs.push({ kind: 'poster', count: 2, at: 0 }, { kind: 'social', count: 2, at: 1 });
   // a printed size named for the posters
   const fmt = formatFromWords(words);
   for (const s of specs) if (s.kind === 'poster' && fmt && fmt.unit === 'pt' && !s.format) s.format = fmt.id;

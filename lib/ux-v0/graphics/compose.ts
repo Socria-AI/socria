@@ -165,6 +165,9 @@ const KIND_WORDS: readonly [RegExp, GraphicKind][] = [
   [/\b(poster|flyer|leaflet|event graphic|gig|exhibition|festival|concert)\b/, 'poster'],
 ];
 
+/** The kind of graphic the words name outright, or null when they name none (readGraphicBrief then assumes a poster). */
+export const graphicKindNamed = (words: string): GraphicKind | null => KIND_WORDS.find(([re]) => re.test(words.toLowerCase()))?.[1] ?? null;
+
 /** Quoted words, in order: double quotes (curly or straight) pair cleanly; a single quote opens only after a space or
  * the start and closes only before a space or punctuation, so an apostrophe inside a word ("Earth’s") never ends one. */
 const QUOTE = /“([^”]{2,160})”|"([^"]{2,160})"|(?<![\p{L}\p{N}])[‘']((?:[^‘’']|[’'](?=\p{L}))+?)[’'](?![\p{L}\p{N}])/gu;

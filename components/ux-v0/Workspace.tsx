@@ -104,6 +104,7 @@ import { applySystem } from '@/lib/ux-v0/dsi/link';
 import { fidelityOfTokens } from '@/lib/ux-v0/dsi/fidelity';
 import { useLinkedSystem } from './systems/useLinkedSystem';
 import { SystemBadge } from './systems/SystemBadge';
+import { StudioRail, useRailReply } from './studio/StudioRail';
 
 type View = 'intent' | 'import' | 'discovery' | 'brief' | 'dna' | 'direction' | 'design';
 
@@ -1577,7 +1578,26 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const vpWidth = VIEWPORT_WIDTH[project.viewport];
   const isPage = !!doc;
 
+  // ── the studio's conversation beside the workspace: words go where the composer would send them ──
+  const heard = useMemo(() => (notice ? { text: notice.text } : null), [notice]);
+  const waitReply = useRailReply(heard, (h) => h.text);
+  const railAsk = async (words: string): Promise<string | null> => {
+    const wait = waitReply(20000);
+    if (view === 'discovery') {
+      if (currentQuestion) await answer(currentQuestion.id, words);
+      else await discoverTurn({ remark: words });
+    } else if (view === 'brief') await writeBrief(words);
+    else if (view === 'design' && (doc || fileUrl)) {
+      if (spec && !imported && composeMode === 'change' && !activeCard) await refine(words);
+      else await comment(words);
+    } else return 'Open the design first: changes are made on the canvas, and kept here.';
+    // what the workspace said back, if it said anything a moment after
+    return Promise.race([wait, new Promise<string | null>((res) => window.setTimeout(() => res(null), 1800))]).then((r) => r ?? (view === 'design' ? 'Done: it is on the canvas.' : null));
+  };
+
   return (
+    <>
+    {project.studio && <StudioRail studio={project.studio} onStudio={(fn) => update((p) => (p.studio ? { ...p, studio: fn(p.studio) } : p))} onAsk={railAsk} placeholder={project.mode === 'critique' ? 'Ask about the part you selected' : spec ? 'Say what to change: “make the headline shorter”, “warmer accent”…' : 'Say what to change'} systemName={linked?.rec.name ?? null} />}
     <div className="v0 sb">
       <header className="v0-head">
         <div className="v0-head-l">
@@ -2465,6 +2485,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
         }}
       />
     </div>
+    </>
   );
 }
 

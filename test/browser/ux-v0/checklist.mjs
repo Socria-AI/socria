@@ -114,6 +114,7 @@ const comment = async (text) => {
 // 1 — the home refuses what it cannot import, before any project exists (2.1)
 await part('home refusals', async () => {
   await page.goto(HOME, { waitUntil: 'networkidle' });
+  await page.getByRole('radio', { name: 'Critique', exact: true }).click();
   const tries = [
     ['notes.txt', 'text/plain', Buffer.from('hello'), /imports HTML, PNG, JPG and SVG/],
     ['empty.png', 'image/png', Buffer.alloc(0), /empty/],
@@ -150,6 +151,7 @@ await part('svg import', async () => {
 // 3 — JPG: drawn, area-selected, cropped (2.5, 3.3, 3.5); zoom keys (1.6)
 await part('jpg import and zoom keys', async () => {
   await page.goto(HOME, { waitUntil: 'networkidle' });
+  await page.getByRole('radio', { name: 'Critique', exact: true }).click();
   await page.locator('input[type=file]').setInputFiles(FX + 'cafe-bar.jpg');
   await page.waitForSelector('img.v0-image', { timeout: 15000 });
   await page.waitForTimeout(600);
@@ -186,6 +188,7 @@ await part('jpg import and zoom keys', async () => {
 // 4 — HTML: step up to the parent, clear with Esc, tablet viewport (3.1, 2.4)
 await part('html parent, clear, tablet', async () => {
   await page.goto(HOME, { waitUntil: 'networkidle' });
+  await page.getByRole('radio', { name: 'Critique', exact: true }).click();
   await page.locator('input[type=file]').setInputFiles(FX + 'existing-design.html');
   await page.waitForSelector('iframe.v0-frame', { timeout: 20000 });
   await page.waitForTimeout(1500);
@@ -274,6 +277,10 @@ await part('create details', async () => {
   calls.discover.length = 0; calls.brief.length = 0; calls.images.length = 0;
   await page.locator('.v0-intent-line textarea').fill('A website for my independent coffee house');
   await page.getByRole('button', { name: 'Begin' }).click();
+  // the studio's conversation comes first; the model-led website workspace is its own way in from it
+  await page.waitForSelector('.sd-conv', { timeout: 15000 });
+  if (!(await page.getByRole('button', { name: 'Plan it in the workspace' }).isVisible())) await page.getByRole('button', { name: /Decisions/ }).click();
+  await page.getByRole('button', { name: 'Plan it in the workspace' }).click();
   await page.waitForSelector('.v0-tile img', { timeout: 15000 });
   await page.waitForTimeout(600);
   const nd = calls.discover.length;
@@ -333,6 +340,7 @@ await part('create details', async () => {
 // 8 — a file dropped on the home's Critique way opens (2.1)
 await part('home drop', async () => {
   await page.goto(HOME, { waitUntil: 'networkidle' });
+  await page.getByRole('radio', { name: 'Critique', exact: true }).click();
   const dt = await page.evaluateHandle(() => { const d = new DataTransfer(); d.items.add(new File(['<!doctype html><title>Dropped</title><main><h1>Dropped page</h1><a href="#" class="btn">Go</a></main>'], 'dropped.html', { type: 'text/html' })); return d; });
   await page.dispatchEvent('.v0-way-drop', 'dragover', { dataTransfer: dt });
   check('a file held over Critique marks it', await page.locator('.v0-way-drop.is-over').count() === 1);
@@ -352,6 +360,7 @@ await part('home drop', async () => {
 // 9 — a file that passes its checks but cannot be read explains why; the import view takes a drop (2.6, 2.1)
 await part('unreadable image, then a drop', async () => {
   await page.goto(HOME, { waitUntil: 'networkidle' });
+  await page.getByRole('radio', { name: 'Critique', exact: true }).click();
   const broken = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from('this is not the rest of a PNG')]);
   await page.locator('input[type=file]').setInputFiles({ name: 'cut-off.png', mimeType: 'image/png', buffer: broken });
   await page.waitForSelector('.v0-import', { timeout: 10000 });
@@ -367,6 +376,7 @@ await part('unreadable image, then a drop', async () => {
 // 10 — when the browser's storage is full, the design still opens and the person is told (1.3)
 await part('storage full', async () => {
   await page.goto(HOME, { waitUntil: 'networkidle' });
+  await page.getByRole('radio', { name: 'Critique', exact: true }).click();
   await page.evaluate(() => { window.__quota = true; });
   await page.locator('input[type=file]').setInputFiles(FX + 'marble.jpg');
   await page.waitForSelector('img.v0-image', { timeout: 15000 });
@@ -378,6 +388,7 @@ await part('storage full', async () => {
 // 11 — a model failure keeps the comment and offers to try again (6.6)
 await part('model failure', async () => {
   await page.goto(HOME, { waitUntil: 'networkidle' });
+  await page.getByRole('radio', { name: 'Critique', exact: true }).click();
   await page.locator('input[type=file]').setInputFiles(FX + 'existing-design.html');
   await page.waitForSelector('iframe.v0-frame', { timeout: 20000 });
   await page.waitForTimeout(1500);

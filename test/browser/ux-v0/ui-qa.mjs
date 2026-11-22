@@ -120,6 +120,10 @@ const shootAll = async (name) => {
 await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
 await page.locator('.v0-intent-line textarea').fill(WORDS);
 await page.getByRole('button', { name: 'Begin' }).click();
+// the studio's conversation comes first; the model-led website workspace is its own way in from it
+await page.waitForSelector('.sd-conv', { timeout: 15000 });
+if (!(await page.getByRole('button', { name: 'Plan it in the workspace' }).isVisible())) await page.getByRole('button', { name: /Decisions/ }).click();
+await page.getByRole('button', { name: 'Plan it in the workspace' }).click();
 await page.waitForSelector('.v0-question', { timeout: 20000 });
 await page.waitForTimeout(1200);
 await shootAll('1-questions');

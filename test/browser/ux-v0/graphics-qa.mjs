@@ -106,13 +106,15 @@ const ask = async (words) => {
 };
 const home = async () => {
   await page.locator('.v0-home').click();
-  await page.waitForSelector('.mu-entrance', { timeout: 15000 });
+  await page.waitForSelector('.sd-home', { timeout: 15000 });
   await page.waitForTimeout(400);
 };
-/** A new graphic from the home: the words typed, the brief shown. */
+/** A new graphic from the home: the words typed, the kind chosen, the brief written by hand (the studio's own way in). */
 const begin = async (words) => {
   await page.fill('textarea[aria-label="What do you want to make?"]', words);
-  await page.getByRole('button', { name: /Make a graphic/ }).click();
+  await page.getByRole('radio', { name: 'Graphic', exact: true }).click();
+  await page.getByRole('button', { name: 'Begin' }).click();
+  await page.getByRole('button', { name: 'Write the brief yourself' }).click();
   await page.waitForSelector('.gx-brief', { timeout: 15000 });
   await page.waitForTimeout(500);
 };

@@ -10,7 +10,7 @@
 // (GraphicEditor.tsx) is shared with the graphic materials of a board. The project is saved like a website
 // (useV0Project).
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SAVE_WORDS, useV0Project } from '../useV0Project';
 import { addUpload } from '../uploads';
 import { getProject, listProjects } from '@/lib/ux-v0/store';
@@ -39,6 +39,8 @@ import { bindForBrand } from '@/lib/ux-v0/dsi/link';
 import { fidelityOfDoc } from '@/lib/ux-v0/dsi/fidelity';
 import { useLinkedSystem } from '../systems/useLinkedSystem';
 import { SystemBadge } from '../systems/SystemBadge';
+import { StudioRail, useRailReply } from '../studio/StudioRail';
+import { directionsWithPrefs, prefsOf, withTreatment } from '@/lib/ux-v0/studio/apply';
 
 type View = 'brief' | 'directions' | 'edit';
 type Note = EditorNote;
@@ -136,7 +138,10 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
         decisions: { colour: 'delegated', typography: 'delegated' },
       });
       if (!db) return [];
-      const dirs = proposeDirections({ brief: db, salt: project.id, round: r, seen: already, count: 3 }).map((d) => graphicDirectionOf(d));
+      // what the studio's conversation decided reaches the engine as its own inputs: the designer's values (Creative
+      // DNA), what to avoid, their words for the look
+      const prefs = project.studio ? prefsOf(project.studio) : null;
+      const dirs = proposeDirections({ brief: db, salt: project.id, round: r, seen: already, count: 3, ...(project.dna ? { dna: project.dna } : {}), ...(prefs?.avoid.length ? { avoid: prefs.avoid.join('. ') } : {}), ...(prefs?.styleWords ? { notes: prefs.styleWords } : {}) }).map((d) => graphicDirectionOf(d));
       // each in a design language chosen from the brief (a style it names first), none of them a default; and each an
       // independent interpretation (its own lead and seed), so the three are three concepts, not three colourways
       const options = styledOptions(brief, dirs, { salt: `${project.id}|${r}`, seedKey: project.id, seen: already }).options;
@@ -146,10 +151,12 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
       const mixed = [...options.slice(0, Math.max(1, options.length - 1)), generated];
       const leads = interpretations({ count: mixed.length, salt: `${project.id}|${r}`, hasImage: brief.images.length > 0, hasData: !!brief.content.data?.length });
       const out = mixed.map((d, i) => ({ ...d, generative: { seed: leads[i].seed, emphasis: leads[i].emphasis, ...(leads[i].unexpected ? { constraints: { unexpected: true } } : {}) } }));
+      // the palette, faces and composition chosen in the conversation (never over a design system's identity)
+      const held = prefs ? directionsWithPrefs(out, prefs, { keepIdentity: !!linked }) : out;
       // within a design system: each direction keeps its own expression and speaks the system's identity
-      return linked ? brandDirections(linked.content, out, brandOpts) : out;
+      return linked ? brandDirections(linked.content, held, brandOpts) : held;
     },
-    [project.id, linked, brandOpts],
+    [project.id, project.studio, project.dna, linked, brandOpts],
   );
 
   /** The design composed in a direction, checked and repaired, as the current document and a version. */
@@ -160,7 +167,10 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
     const t0 = performance.now();
     // within a design system the brand is named, so its approved logo has a place in the composition
     const named = linked && !brief.content.brand ? { ...brief, content: { ...brief.content, brand: linked.content.identity.name } } : brief;
-    const { doc, plans, placeholders } = composeGraphic(named, dir, { measure: m, seed: seedOf(project.id), assets: g.assets ?? [], name: current.current.name });
+    const composed = composeGraphic(named, dir, { measure: m, seed: seedOf(project.id), assets: g.assets ?? [], name: current.current.name });
+    const { plans, placeholders } = composed;
+    // the person's own pictures, treated as they chose in the conversation (the engine's own effects; changeable after)
+    const doc = project.studio ? withTreatment(composed.doc, prefsOf(project.studio)) : composed.doc;
     // within a design system: its approved logo placed and its hard rules resolved first, then the checks and repairs
     // judge the colours the design will really have (lib/ux-v0/dsi/adapters.ts guardedForBrand)
     const brand = linked ? guardedForBrand(doc, linked.content, brandOpts, m) : null;
@@ -242,6 +252,51 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
     setG((x) => ({ ...x, options: siteDir && x.source ? [siteDir, ...options] : options }));
   };
 
+  // ── a work begun in the studio: its brief came from the conversation, so the directions (or the logo concepts)
+  // follow at once, as they would from Continue ──
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (autoStarted.current) return;
+    // within a design system, its identity first (it loads a moment after the workspace opens)
+    if (project.systemLink && !linked) return;
+    autoStarted.current = true;
+    const b = g.brief;
+    if (project.studio?.status !== 'started' || !b || g.options.length || g.doc) return;
+    if (b.kind === 'logo') return exploreLogo(b);
+    const options = proposeFor(b, 0, []);
+    setSeen(options.flatMap((o) => [o.language, ...(o.style ? [o.style.primary] : [])]));
+    setG((x) => ({ ...x, options }));
+    setView('directions');
+    setNote({ tone: 'ok', text: 'Three directions from the conversation: your words, in what you chose. Choose one to develop.' });
+  }, [linked]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── the conversation beside the workspace: words go to the editor (or choose among the directions) ──
+  const [inbox, setInbox] = useState<{ id: number; words: string } | null>(null);
+  const [asked, setAsked] = useState<{ text: string } | null>(null);
+  const waitReply = useRailReply(asked, (a) => a.text);
+  const railAsk = async (words: string): Promise<string | null> => {
+    if (view === 'edit' && g.doc) {
+      const wait = waitReply();
+      setInbox((i) => ({ id: (i?.id ?? 0) + 1, words }));
+      return wait;
+    }
+    if (view === 'directions' && !isLogo && g.brief) {
+      const low = words.toLowerCase();
+      const ord = [/\b(first|1st|one|1)\b/, /\b(second|2nd|two|2)\b/, /\b(third|3rd|three|3)\b/, /\b(fourth|4th|four|4)\b/].findIndex((re) => re.test(low));
+      if (/\b(more|others?|another|different|new ones?|again)\b/.test(low)) {
+        moreDirections();
+        return 'Three more directions, kept apart from those you have seen.';
+      }
+      if (ord >= 0 && g.options[ord]) {
+        void composeIn(g.options[ord], g.brief);
+        return `Composing in “${g.options[ord].name}”. Then change anything by hand, or here in words.`;
+      }
+      return 'Choose one of the directions to develop — say “the second one”, or “more” for three others.';
+    }
+    if (view === 'directions' && isLogo) return 'Choose a concept and develop it; then ask for any change here in words.';
+    return 'Finish the brief on the left and continue: the directions follow from it.';
+  };
+
   /** A document from the editor: the current one, and a version when it says so. */
   const onEditorChange = (next: GraphicDoc, meta: { label: string; version?: boolean }) => setG((x) => ({ ...x, doc: next, ...(meta.version ? { versions: pushVersion(x.versions, next, meta.label) } : {}) }));
 
@@ -253,6 +308,8 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
   ];
 
   return (
+    <>
+    {project.studio && <StudioRail studio={project.studio} onStudio={(fn) => update((p) => (p.studio ? { ...p, studio: fn(p.studio) } : p))} onAsk={railAsk} placeholder={view === 'edit' ? 'Say what to change: “make the headline bigger”, “warmer colours”…' : view === 'directions' ? '“The second one”, or “more”' : 'Say what to change'} systemName={linked?.rec.name ?? null} />}
     <div className="v0 sb gx">
       <header className="v0-head">
         <div className="v0-head-l">
@@ -354,8 +411,11 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
           brand={{ title: g.direction?.name ?? g.doc.direction?.name ?? 'This design', note: g.source ? <p className="v0-quiet">The direction of the website “{g.source.name}”.</p> : undefined }}
           allowOpen
           onMakeBoard={(sys) => void makeBoard(sys)}
+          inbox={inbox}
+          onAsked={(t) => setAsked({ text: t })}
         />
       )}
     </div>
+    </>
   );
 }

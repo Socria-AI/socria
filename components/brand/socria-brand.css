@@ -1,41 +1,41 @@
-/* components/brand/socria-brand.css — the Socria brandbook (Version 2, November 2026), as code.
+/* components/brand/socria-brand.css — the Socria design system, as code, for SocriaUX (/ux and /ux-v0).
  *
- * Tried first on SocriaUX (/ux and /ux-v0) only, everything scoped under `.sb`, so the rest of the
- * product keeps the Logos system until the brand is adopted. What the brandbook asks, in short:
+ * Everything scoped under `.sb`. What the system asks, in short (Socria · The Design System, Brand Book Edition No. 1):
  *
- *   colour    each colour has one job, never mood. Paper is the ground, ink every word, moss the
- *             person (deep moss #354620 for moss text and the one filled control), apricot the
- *             question, lake the evidence, burgundy what Socria adds. Cobalt, plum and ochre are
- *             accents and never lead. Text is ink or paper.
- *   type      two faces. Cormorant Garamond Medium is Socria's voice (wordmark, headlines, its
- *             questions), 20px and up, no bold, medium italic for the one word a sentence turns
- *             on. Geist is the person, the
- *             interface and the record: body 15, your words 500, labels 600 13, evidence 500 12
- *             tabular. Titles tracked −1.5%. Sentence case; headlines end with a full stop.
- *   form      surfaces, not outlines: a card's kind lives in its glyph and its tint. Pills for every
- *             control, no boxed buttons, no capitals. Segmented, not underlined: the chosen tab sits
- *             on paper. Only what floats casts a shadow, soft and low. Solid colour only for what
- *             needs the person. Flat colour; no gradients, glows, blur or grain.
- *   kinds     circle idea (moss), arch question (apricot), quarter file (lake), diamond objection
- *             (cobalt), square made (burgundy).
- *   motion    hover and press 120ms, open and close 200ms, cards rearrange 320ms; ease out, no bounce.
+ *   colour    moss is the brand; everything else supports it. One primary colour on one paper: moss #5e7633, the
+ *             app's paper #f5f3eb (never pure white, except the composer), ink #20201b. Secondary text is ink at an
+ *             opacity, never a grey. Moss 700 #465a26 for moss text at small sizes and the focus ring. Every other
+ *             colour has one job: rust #9c5b3c is friction (an objection, a destructive confirmation), prussian
+ *             #26485a is research (a file, evidence), forest #1a2410 the quieter, heavier exception, gold #b8a26b a
+ *             single ornament. No more than two background colours in one composition; no gradients but washes.
+ *   type      Instrument Serif, weight 400 only, for anything said — headlines, Socria's questions, statements;
+ *             emphasis is italic and moss, never bold. Inter for anything operated — body, labels, buttons, numbers.
+ *             Sentence case; headlines end with a full stop.
+ *   form      hairlines divide; the composer is the one white surface (16px, one corner squared); every action is a
+ *             pill; the primary pill is ink and turns moss on hover, with a 2px lift. Shadows rare, long and low.
+ *   kinds     circle idea (moss), arch question (moss 700 on moss 100), quarter file (prussian), diamond objection
+ *             (rust), square made (forest).
+ *   motion    one curve, cubic-bezier(.16, 1, .3, 1); nothing bounces, nothing spins; reduced motion removes it.
+ *
+ * The token names are kept from the first SocriaUX brand layer, so every screen follows without being rewritten;
+ * the colours they name are now the system's.
  */
 
 .sb {
   /* the palette */
-  --sb-paper: #faf9f6;
+  --sb-paper: #f5f3eb;
   --sb-ink: #20201b;
-  --sb-moss: #354620;
-  --sb-moss-rgb: 53, 70, 32;
-  --sb-moss-hover: #2a381a;
+  --sb-moss: #465a26;
+  --sb-moss-rgb: 70, 90, 38;
+  --sb-moss-hover: var(--sb-moss-tone);
   --sb-moss-tone: #5e7633;
-  --sb-burgundy: #7b2633;
-  --sb-apricot: #f0a35e;
-  --sb-peach: #f2b38c;
-  --sb-lake: #3f7c85;
-  --sb-cobalt: #1c3faa;
-  --sb-plum: #6e2f52;
-  --sb-ochre: #d19a2a;
+  --sb-burgundy: #9c5b3c;
+  --sb-apricot: #e4eada;
+  --sb-peach: #e9e5d9;
+  --sb-lake: #26485a;
+  --sb-cobalt: #9c5b3c;
+  --sb-plum: #1a2410;
+  --sb-ochre: #b8a26b;
 
   /* ink at the strengths text may take (each still reads at 4.5:1 or more on paper and on white) */
   --sb-ink-70: rgba(32, 32, 27, 0.78);
@@ -45,32 +45,36 @@
 
   /* surfaces: white cards on paper, a quiet well for pills and segmented tracks, hairlines where a rule is needed */
   --sb-surface: #ffffff;
-  --sb-well: #edece6;
-  --sb-well-hover: #e3e2db;
-  --sb-rule: rgba(32, 32, 27, 0.1);
-  --sb-rule-2: rgba(32, 32, 27, 0.18);
+  /* moss 50: the person's own words in a conversation; forest: the quieter, heavier exception */
+  --sb-moss-50: #edf0e4;
+  --sb-forest: #1a2410;
+  --sb-moss-100: #e4eada;
+  --sb-well: #ebe7dc;
+  --sb-well-hover: #e2ddcf;
+  --sb-rule: #e7e2d3;
+  --sb-rule-2: #ded8c6;
 
   /* kind tints: the card's kind in its surface */
-  --sb-tint-idea: #e7ebdc;
-  --sb-tint-file: #e0eaeb;
-  --sb-tint-objection: #e3e7f4;
-  --sb-tint-made: #f3e4e4;
-  --sb-tint-question: #fbe6d2;
+  --sb-tint-idea: #e4eada;
+  --sb-tint-file: #e9e5d9;
+  --sb-tint-objection: #e9e5d9;
+  --sb-tint-made: #e9e5d9;
+  --sb-tint-question: #e4eada;
 
   /* only what floats casts a shadow: soft and low */
-  --sb-float: 0 10px 28px -14px rgba(32, 32, 27, 0.32), 0 2px 6px -3px rgba(32, 32, 27, 0.1);
+  --sb-float: 0 1px 2px rgba(35, 36, 31, 0.04), 0 14px 28px -16px rgba(35, 36, 31, 0.32);
   --sb-r-card: 16px;
   --sb-r-field: 12px;
 
-  --sb-voice: var(--font-cormorant), 'Cormorant Garamond', Garamond, Georgia, serif;
-  /* Cormorant is drawn only at Medium: every voice setting asks for 500 */
-  --sb-voice-weight: 500;
-  --sb-ui: var(--font-geist), system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --sb-voice: var(--font-serif), 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  /* Instrument Serif is drawn at 400 only: emphasis is italic and moss, never bold */
+  --sb-voice-weight: 400;
+  --sb-ui: var(--font-sans), Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   --sb-fast: 120ms;
   --sb-open: 200ms;
   --sb-move: 320ms;
-  --sb-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --sb-ease: cubic-bezier(0.16, 1, 0.3, 1);
 
   font-family: var(--sb-ui);
   font-size: 15px;
@@ -159,11 +163,13 @@
   background: var(--sb-well-hover);
 }
 .sb .sb-btn.is-primary {
-  background: var(--sb-moss);
+  background: var(--sb-ink);
   color: var(--sb-paper);
+  transition: background-color var(--sb-fast) var(--sb-ease), color var(--sb-fast) var(--sb-ease), transform var(--sb-fast) var(--sb-ease);
 }
 .sb .sb-btn.is-primary:hover:not(:disabled) {
   background: var(--sb-moss-hover);
+  transform: translateY(-2px);
 }
 .sb .sb-btn.is-sm {
   min-height: 30px;
@@ -287,8 +293,9 @@
 }
 /* solid colour only for what needs the person: the question waiting on them */
 .sb .sb-card.is-question {
-  background: var(--sb-apricot);
+  background: var(--sb-tint-question);
   color: var(--sb-ink);
+  box-shadow: inset 0 0 0 1px rgba(var(--sb-moss-rgb), 0.22);
 }
 .sb .sb-floating {
   box-shadow: var(--sb-float);
@@ -307,10 +314,10 @@
   width: 12px;
   height: 6px;
   border-radius: 12px 12px 0 0;
-  background: var(--sb-apricot);
+  background: var(--sb-moss);
 }
 .sb .sb-card.is-question .sb-glyph.is-question {
-  background: var(--sb-ink);
+  background: var(--sb-moss);
 }
 .sb .sb-glyph.is-file {
   width: 9px;
@@ -329,7 +336,7 @@
   width: 8px;
   height: 8px;
   border-radius: 0;
-  background: var(--sb-burgundy);
+  background: var(--sb-forest);
 }
 
 /* ── fields and the composer ─────────────────────────────────────── */

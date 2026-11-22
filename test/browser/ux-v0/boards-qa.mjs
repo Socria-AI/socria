@@ -143,7 +143,9 @@ await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
 // ── 1. a board, begun from the home ──
 const REQUEST = 'Create a launch campaign for “Night Market Lisbon”, “Food, music and makers after dark”, every Friday in July: two posters, two Instagram graphics, a website and a product mockup. Annotate the important design decisions.';
 await page.fill('textarea[aria-label="What do you want to make?"]', REQUEST);
-await page.getByRole('button', { name: /Make a board/ }).click();
+await page.getByRole('radio', { name: 'Board', exact: true }).click();
+await page.getByRole('button', { name: 'Begin' }).click();
+await page.getByRole('button', { name: 'Write the brief yourself' }).click();
 await page.waitForSelector('.bd-brief', { timeout: 15000 });
 await page.waitForTimeout(600);
 let proj = await projectOf(pid());
@@ -477,7 +479,9 @@ ok('…the home lists the board as a board (its materials counted) and the websi
 
 // ── dozens of materials stay light: virtualization and level of detail ──
 await page.fill('textarea[aria-label="What do you want to make?"]', 'For “Harbour Week”, “Ten days on the water”: twelve posters, twelve Instagram graphics and twelve stories');
-await page.getByRole('button', { name: /Make a board/ }).click();
+await page.getByRole('radio', { name: 'Board', exact: true }).click();
+await page.getByRole('button', { name: 'Begin' }).click();
+await page.getByRole('button', { name: 'Write the brief yourself' }).click();
 await page.waitForSelector('.bd-brief', { timeout: 15000 });
 await page.getByRole('button', { name: /Propose design systems/ }).click();
 await page.waitForSelector('.bd-sys', { timeout: 15000 });

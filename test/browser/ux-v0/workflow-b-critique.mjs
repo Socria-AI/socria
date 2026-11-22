@@ -29,6 +29,7 @@ await ctx.route('**/api/ux-v0/critique', async (r) => {
 });
 
 await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
+await page.getByRole('radio', { name: 'Critique', exact: true }).click();
 await page.screenshot({ path: S + 'v0-01-home.png' });
 // import HTML (Critique)
 await page.locator('input[type=file]').setInputFiles(FX + 'existing-design.html');
@@ -78,6 +79,7 @@ out('file tab: ' + (await page.locator('.v0-rail-scroll').innerText()).replace(/
 
 // PNG critique
 await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
+await page.getByRole('radio', { name: 'Critique', exact: true }).click();
 await page.locator('input[type=file]').setInputFiles(FX + 'existing-design.png');
 await page.waitForSelector('img.v0-image', { timeout: 15000 });
 await page.waitForTimeout(800);

@@ -10,12 +10,26 @@
 import { parseGenerate } from '../design';
 import { briefKey, EMPTY_DIRECTION, type ArtDirection } from '../direction';
 import { emptyMoodboard, makeProject, normalizeBrief, type DesignProject } from '../types';
+import type { DesignIntent } from '../intent';
 import type { BoardBrief } from './model';
 import { websiteAnswer } from './plan';
 import { artOfSystem, webFacesOf, type MasterDesignSystem } from './system';
 
 /** The website project of a board (not yet stored: the caller writes it to the project store). */
-export function websiteConcept(brief: BoardBrief, sys: MasterDesignSystem, opts: { name?: string; board?: string } = {}): { ok: true; project: DesignProject } | { ok: false; error: string } {
+export function websiteConcept(
+  brief: BoardBrief,
+  sys: MasterDesignSystem,
+  opts: {
+    name?: string;
+    board?: string;
+    /** what the website brief also knows (the studio's conversation): who it is for, what it must do, how it should feel */
+    brief?: { audience?: string; userGoals?: string[]; functionalRequirements?: string[]; experience?: string; intent?: DesignIntent };
+    /** working sections it must have (a booking, a form), set before the footer in the order given */
+    sections?: Record<string, unknown>[];
+    /** where the website was made, said on its first version */
+    note?: string;
+  } = {},
+): { ok: true; project: DesignProject } | { ok: false; error: string } {
   const art = artOfSystem(sys);
   if (!art) return { ok: false, error: 'This design system has no art direction a website can be built in. Choose one of the proposed systems.' };
   const c = sys.tokens.colors;
@@ -35,10 +49,20 @@ export function websiteConcept(brief: BoardBrief, sys: MasterDesignSystem, opts:
     ],
     typography: webFacesOf(sys.tokens.fonts),
     decisions: { colour: 'locked', typography: 'locked' },
+    ...(opts.brief?.audience ? { audience: opts.brief.audience.slice(0, 600) } : {}),
+    ...(opts.brief?.userGoals?.length ? { userGoals: opts.brief.userGoals.slice(0, 8) } : {}),
+    ...(opts.brief?.functionalRequirements?.length ? { functionalRequirements: opts.brief.functionalRequirements.slice(0, 12) } : {}),
+    ...(opts.brief?.experience ? { experience: opts.brief.experience.slice(0, 300) } : {}),
+    ...(opts.brief?.intent ? { intent: opts.brief.intent } : {}),
   });
   if (!db) return { ok: false, error: 'The board’s words are not enough to brief a website: give it a headline.' };
   const moodboard = emptyMoodboard();
-  const spec = parseGenerate(websiteAnswer(brief, sys), db, moodboard, 1, `Made on the board “${opts.board ?? brief.name}”, in its design system`, art);
+  const answer = websiteAnswer(brief, sys);
+  if (opts.sections?.length) {
+    const foot = answer.sections.findIndex((x) => x.kind === 'footer');
+    answer.sections.splice(foot < 0 ? answer.sections.length : foot, 0, ...opts.sections);
+  }
+  const spec = parseGenerate(answer, db, moodboard, 1, opts.note ?? `Made on the board “${opts.board ?? brief.name}”, in its design system`, art);
   if (!spec) return { ok: false, error: 'The website could not be composed from the board’s words.' };
   const name = (opts.name ?? `${brief.name} website`).slice(0, 80);
   const base = makeProject('create', name);

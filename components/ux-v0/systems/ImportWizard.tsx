@@ -13,7 +13,7 @@
 //
 // Files are read in this browser; a website, Figma and GitHub go through SocriaUX's routes (signed in). No model.
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { analyzeBrand } from '@/lib/ux-v0/dsi/intelligence';
 import { approveAsset, importAsset } from '@/lib/ux-v0/dsi/assets';
 import { census, topCategory } from '@/lib/ux-v0/dsi/classify';
@@ -79,14 +79,30 @@ function filterCategories(c: SystemContent, cats: ReadonlySet<Cat>): SystemConte
   return { ...c, tokens, roles, components: cats.has('components') ? c.components : [], assets: cats.has('assets') ? c.assets : [], intelligence: cats.has('rules') ? c.intelligence : [] };
 }
 
-export function ImportWizard(p: { signedIn: boolean; records: readonly SystemRecord[]; projects: readonly ProjectSummary[]; intoId?: string; onCancel: () => void; onDone: (d: WizardDone) => void; onApply: (rec: SystemRecord) => void }) {
-  const [step, setStep] = useState(0);
-  const [kind, setKind] = useState<Kind | null>(null);
-  const [files, setFiles] = useState<File[]>([]);
-  const [url, setUrl] = useState('');
+/** What the studio's conversation already settled: where the system is, its files or address, the parts wanted. */
+export interface WizardStart {
+  kind: string;
+  files: File[];
+  url: string;
+  projectId: string;
+  parts: string[];
+}
+
+const isKind = (k: string): k is Kind => SOURCES.some((x) => x.kind === k);
+
+export function ImportWizard(p: { signedIn: boolean; records: readonly SystemRecord[]; projects: readonly ProjectSummary[]; intoId?: string; onCancel: () => void; onDone: (d: WizardDone) => void; onApply: (rec: SystemRecord) => void; initial?: WizardStart | null }) {
+  const given = p.initial && isKind(p.initial.kind) ? p.initial : null;
+  const givenReady = !!given && (['json', 'css', 'pdf', 'assets'].includes(given.kind) ? given.files.length > 0 : given.kind === 'project' ? !!given.projectId : given.url.trim().length > 3);
+  const [step, setStep] = useState(givenReady ? 1 : 0);
+  const [kind, setKind] = useState<Kind | null>(given ? (given.kind as Kind) : null);
+  const [files, setFiles] = useState<File[]>(given?.files ?? []);
+  const [url, setUrl] = useState(given?.url ?? '');
   const [token, setToken] = useState('');
-  const [projectId, setProjectId] = useState('');
-  const [cats, setCats] = useState<Set<Cat>>(new Set(CATS.map((c) => c[0])));
+  const [projectId, setProjectId] = useState(given?.kind === 'project' ? given.projectId : '');
+  const [cats, setCats] = useState<Set<Cat>>(() => {
+    const wanted = (given?.parts ?? []).filter((x): x is Cat => CATS.some((c) => c[0] === x));
+    return new Set(wanted.length ? wanted : CATS.map((c) => c[0]));
+  });
   const [into, setInto] = useState<string>(p.intoId ?? 'new');
   const [stages, setStages] = useState<Stage[]>([]);
   const [error, setError] = useState('');
@@ -320,6 +336,14 @@ export function ImportWizard(p: { signedIn: boolean; records: readonly SystemRec
 
   const cen = merged ? census(merged.content) : null;
   const colours = merged ? Object.values(merged.content.tokens).filter((t) => t.type === 'color').slice(0, 48) : [];
+
+  // what the conversation settled, the parts already chosen: read at once, without asking the same again
+  const auto = useRef(givenReady && (given?.parts.length ?? 0) > 0);
+  useEffect(() => {
+    if (!auto.current) return;
+    auto.current = false;
+    void analyse();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="ds-wizard" role="dialog" aria-modal="true" aria-labelledby="ds-wiz-t">

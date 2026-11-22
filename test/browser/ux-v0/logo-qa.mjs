@@ -53,7 +53,9 @@ await page.fill(
   'textarea[aria-label="What do you want to make?"]',
   'Design a logo for “Tidewell”, a water-quality monitoring service for coastal towns. Calm, trustworthy, precise. Values: clarity, care, community. Used on an app icon, signage and vans.',
 );
-await page.getByRole('button', { name: /Make a graphic/ }).click();
+await page.getByRole('radio', { name: 'Logo', exact: true }).click();
+await page.getByRole('button', { name: 'Begin' }).click();
+await page.getByRole('button', { name: 'Write the brief yourself' }).click();
 await page.waitForSelector('.gx-brief', { timeout: 15000 });
 await page.waitForTimeout(500);
 ok('a logo brief is read as a logo (the kind chosen from the words)', (await page.locator('#gx-kind').inputValue()) === 'logo', await page.locator('#gx-kind').inputValue());
