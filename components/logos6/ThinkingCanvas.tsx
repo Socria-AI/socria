@@ -207,16 +207,20 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
   // fit the map in view when the way of working changes, or the map first arrives. In a narrow space (a phone, a
   // narrow pane) the cards stay legible — no smaller than 0.7 — and a map that does not fit at that size starts from
   // its top left, to be moved about. Fit, pressed, shows all of it however small.
-  const fit = (all = false) => {
+  const fitView = (all = false) => {
     const el = hostRef.current;
-    if (!el || mode === 'structure') return;
+    if (!el || mode === 'structure') return null;
     const W = el.clientWidth || 800, H = el.clientHeight || 520;
     const least = !all && W < 560 ? 0.7 : 0.35;
     const k = Math.max(least, Math.min(1.15, Math.min(W / bounds.w, H / bounds.h)));
     const x = bounds.w * k <= W ? (W - bounds.w * k) / 2 - bounds.minX * k : -bounds.minX * k;
     const y = bounds.h * k <= H ? (H - bounds.h * k) / 2 - bounds.minY * k : -bounds.minY * k;
-    setView({ k, x, y });
     return { k, x, y };
+  };
+  const fit = (all = false) => {
+    const v = fitView(all);
+    if (v) setView(v);
+    return v;
   };
   // the view the last automatic fit made: while the view is still that one, the person has not moved it
   const fitted = useRef<{ k: number; x: number; y: number } | null>(null);
@@ -236,13 +240,31 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
       views.current[mode] = undefined;
     }
   }, [mode, map.nodes.length]);
-  // the cards are measured after that first fit (and again once the faces load), and their real heights make the map
-  // taller than the fit allowed for — its last row out of view. Fitted again then, but only while the view is still the
-  // one the fit made: never once the person has moved or zoomed it.
+  // FITTED AGAIN, WHILE UNTOUCHED. The cards are measured after that first fit (and again once the faces load), and
+  // their real heights make the map taller than the fit allowed for; the frame can change size under it too (the chat
+  // box below grows with a draft or a hint, the window is resized). Either way the last row went out of view. So the map
+  // is fitted again then, but only while the view is still the one the fit made, never once the person has moved or
+  // zoomed it. Compared in the view's own update, which sees the latest view even when the measured heights are drawn
+  // before the first fit's view has been (comparing with the view last drawn, it never matched, and nothing was refitted).
+  const refitRef = useRef<() => void>(() => {});
+  refitRef.current = () => {
+    const next = fitView();
+    if (!next) return;
+    setView((cur) => {
+      const f = fitted.current;
+      if (!f || Math.abs(cur.k - f.k) > 1e-6 || Math.abs(cur.x - f.x) > 0.5 || Math.abs(cur.y - f.y) > 0.5) return cur;
+      fitted.current = next;
+      return next;
+    });
+  };
+  useEffect(() => refitRef.current(), [heights]);
   useEffect(() => {
-    const f = fitted.current, v = viewRef.current;
-    if (f && Math.abs(v.k - f.k) < 1e-6 && Math.abs(v.x - f.x) < 0.5 && Math.abs(v.y - f.y) < 0.5) fitted.current = fit() ?? null;
-  }, [heights]);
+    const el = hostRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const watch = new ResizeObserver(() => refitRef.current());
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [mode]);
 
   /** Select a card or a line: opened in the inspector, and "this" for the person's next message. */
   function choose(next: Sel) {

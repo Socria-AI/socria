@@ -87,7 +87,8 @@ console.log('\n=== the Mind Map: every card laid out at the height it is drawn =
   const tc = read('components/logos6/ThinkingCanvas.tsx');
   ok('the canvas measures its cards before paint, when the map or the way of working changes, and once the faces load', /useLayoutEffect\(\(\) => measureRef\.current\(\), \[map, mode\]\)/.test(tc) && /document\.fonts\?\.ready\?\.then\(\(\) => live && measureRef\.current\(\)\)/.test(tc));
   ok('…lays out by what it measured', /logicPlaces\(map, heightOf\) : ideasPlaces\(map, heightOf\)/.test(tc));
-  ok('…and fits the map again once the cards are measured, only while the view is still the fit\'s own', /fitted\.current = fit\(\) \?\? null;\n      views\.current\[mode\] = undefined;\n    \}\n  \}, \[mode, map\.nodes\.length\]\);/.test(tc) && /if \(f && Math\.abs\(v\.k - f\.k\) < 1e-6[^\n]*fitted\.current = fit\(\) \?\? null;\n  \}, \[heights\]\);/.test(tc));
+  ok('…and fits the map again once the cards are measured, and when its frame changes size, only while the view is still the fit\'s own', /fitted\.current = fit\(\) \?\? null;\n      views\.current\[mode\] = undefined;\n    \}\n  \}, \[mode, map\.nodes\.length\]\);/.test(tc) && /useEffect\(\(\) => refitRef\.current\(\), \[heights\]\);/.test(tc) && /const watch = new ResizeObserver\(\(\) => refitRef\.current\(\)\);/.test(tc));
+  ok('…the "still the fit\'s own" test made in the view\'s own update, which sees the latest view (the view last drawn could be older than the fit, and nothing was refitted)', /setView\(\(cur\) => \{\n      const f = fitted\.current;\n      if \(!f \|\| Math\.abs\(cur\.k - f\.k\) > 1e-6/.test(tc));
 }
 
 console.log('\n=== a line between two cards: drawn to the edge, said between them ===');
