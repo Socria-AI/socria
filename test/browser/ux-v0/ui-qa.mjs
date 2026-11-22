@@ -10,7 +10,7 @@
 //
 //   UXV0_FORWARD=1 UXV0_BASE=http://127.0.0.1:3100 node test/browser/ux-v0/ui-qa.mjs   (against `next start`)
 import { readFileSync } from 'node:fs';
-import { chromium, S, FX, ROOT, BASE, underTest } from './env.mjs';
+import { chromium, S, FX, ROOT, BASE, underTest, websiteWorkspace } from './env.mjs';
 
 const V = await underTest();
 let pass = 0;
@@ -118,12 +118,8 @@ const shootAll = async (name) => {
 };
 
 await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
-await page.locator('.v0-intent-line textarea').fill(WORDS);
-await page.getByRole('button', { name: 'Begin' }).click();
-// the studio's conversation comes first; the model-led website workspace is its own way in from it
-await page.waitForSelector('.sd-conv', { timeout: 15000 });
-if (!(await page.getByRole('button', { name: 'Plan it in the workspace' }).isVisible())) await page.getByRole('button', { name: /Decisions/ }).click();
-await page.getByRole('button', { name: 'Plan it in the workspace' }).click();
+// the model-led website workspace's own way in (its questions, references, brief and directions)
+await websiteWorkspace(page, WORDS);
 await page.waitForSelector('.v0-question', { timeout: 20000 });
 await page.waitForTimeout(1200);
 await shootAll('1-questions');

@@ -1,13 +1,15 @@
 'use client';
 // components/ux-v0/V0App.tsx — SocriaUX at /ux-v0: one place to begin anything, and everything kept.
 //
-// The home (studio/StudioHome.tsx) asks what to make — a graphic, a website, a logo, a design system, a board or a
-// critique, chosen or read from the words — and every work begins as a conversation kept on its project
-// (studio/ProjectConversation.tsx): only the questions that matter, answered with choices drawn by the engines. When
-// there is enough, the same project becomes the work, in the workspace its engine already has (graphics, boards,
-// websites, critique), with its conversation beside it; a design system's conversation hands over to the import.
-// Everything is kept in this browser first (lib/ux-v0/store.ts) and, for a signed-in designer, follows them to other
-// devices. The open work is in the address (?p=<id>), so a reload or the back button lands where they were.
+// The home (studio/StudioHome.tsx) is one composer: what to make, said in words, with pictures, files and links; the
+// words are read to know what kind of work it is. Every work begins as a conversation kept on its project
+// (studio/ProjectConversation.tsx): real references looked for on the internet, only the questions that matter,
+// answered with choices drawn from those references and the person's words. When there is enough, the same project
+// becomes the work, in the workspace its engine already has (graphics, boards, websites, critique), with the
+// conversation docked beside it; a design attached to critique opens its critique at once, and a design system's
+// conversation hands over to the import. Everything made is in its own view (?work=1). Everything is kept in this
+// browser first (lib/ux-v0/store.ts) and, for a signed-in designer, follows them to other devices. The open work is in
+// the address (?p=<id>), so a reload or the back button lands where they were.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -16,13 +18,12 @@ import { deleteArtifacts, deleteProject, getProject, listProjects, putProject } 
 import { makeProject, normalizeProject, type DesignProject, type ProjectSummary } from '@/lib/ux-v0/types';
 import { Workspace } from './Workspace';
 import { StudioHome, type BeginRequest } from './studio/StudioHome';
+import { YourWork } from './studio/YourWork';
 import { ProjectConversation } from './studio/ProjectConversation';
 import type { RemoteWork } from './studio/Collection';
 import { attachFiles, conversationProject, critiqueProject, startFrom } from './studio/begin';
-import { heldFile } from './studio/held';
 import { usableSystems } from './studio/SystemPicker';
 import type { WizardStart } from './systems/ImportWizard';
-import { said } from '@/lib/ux-v0/studio/schema';
 import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
 import { GraphicsWorkspace } from './graphics/GraphicsWorkspace';
 import { BoardWorkspace } from './boards/BoardWorkspace';
@@ -46,6 +47,8 @@ const idFromUrl = () => {
   const v = new URLSearchParams(window.location.search).get('p');
   return v && /^[A-Za-z0-9_-]{1,96}$/.test(v) ? v : null;
 };
+/** Everything made, in its own view: ?work=1. */
+const workFromUrl = () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('work') === '1';
 /** The Design System Manager in the address: ?ds=1 (the list) or ?ds=<system id>. */
 const systemsFromUrl = (): string | null => {
   if (typeof window === 'undefined') return null;
@@ -79,6 +82,8 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
   const [ready, setReady] = useState(false);
   // the Design System Manager: null closed, '' the list, an id that system
   const [systems, setSystems] = useState<string | null>(null);
+  // everything made, in its own view (the home is one question)
+  const [work, setWork] = useState(false);
   // the home's plates show imported pages in the same sealed frames as the workspace
   const nonce = useMemo(() => makeNonce(), []);
   // the design systems in this browser (and the account's): offered for every kind of work
@@ -129,9 +134,11 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
     const ds = systemsFromUrl();
     if (ds !== null) setSystems(ds);
     else if (id) openById(id, false);
+    else if (workFromUrl()) setWork(true);
     const onPop = () => {
       const pid = idFromUrl();
       const sid = systemsFromUrl();
+      setWork(workFromUrl());
       if (sid !== null) {
         setOpen(null);
         setSystems(sid);
@@ -157,10 +164,15 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
   }, [signedIn, open]);
 
   const home = () => {
-    passage(() => setOpen(null));
+    passage(() => (setOpen(null), setWork(false)));
     refresh();
     void refreshSystems();
     window.history.pushState(null, '', '/ux-v0');
+  };
+  const toWork = () => {
+    passage(() => (setOpen(null), setWork(true)));
+    refresh();
+    window.history.pushState(null, '', '/ux-v0?work=1');
   };
   const openNew = (p: DesignProject, file?: File | null, intent?: string) => {
     passage(() => setOpen({ p, ...(file ? { file } : {}), ...(intent ? { intent } : {}) }));
@@ -178,23 +190,27 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
     if (signedIn) await fetch(`/api/ux-v0/projects?id=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => undefined);
   };
 
-  /** The home's request: a conversation about it, kept as a project from the first word. */
-  const beginStudio = async (r: BeginRequest) => {
+  /** The home's request: a conversation about it, kept as a project from the first word. A design brought to critique
+   * is the whole request, so its critique opens at once (a file it cannot take is refused before anything is kept). */
+  const beginStudio = async (r: BeginRequest): Promise<'refused' | void> => {
     setError('');
+    if (r.mode === 'critique' && r.files.length) {
+      const c = await critiqueProject(r.files[0], r.prompt);
+      if (!c.ok) {
+        setError(c.error);
+        return 'refused';
+      }
+      await putProject(c.project);
+      return openNew(c.project, r.files[0]);
+    }
     const at = await attachFiles(r.files, { critique: r.mode === 'critique', hold: r.mode === 'system' });
-    if (at.error) return setError(at.error);
+    if (at.error) {
+      setError(at.error);
+      return;
+    }
     const p = conversationProject(r.mode, r.prompt, { modeBy: r.modeBy, attachments: at.attachments, systemId: chosenSystem });
     await putProject(p);
     openNew(p);
-  };
-
-  /** A design brought to critique from the home: it is the whole request, so the critique opens at once. */
-  const critiqueNow = async (file: File, words: string) => {
-    setError('');
-    const r = await critiqueProject(file, words);
-    if (!r.ok) return setError(r.error);
-    await putProject(r.project);
-    openNew(r.project, file);
   };
 
   /** A conversation with enough in it: the same project becomes the work, in its workspace. */
@@ -209,29 +225,6 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
     await putProject(r.project);
     passage(() => setOpen({ p: r.project, ...(r.file ? { file: r.file } : {}) }));
     return null;
-  };
-
-  /** The workspace's own way in, without the questions: the brief written there (a website's planned there). */
-  const writeBrief = async (p: DesignProject) => {
-    const st = p.studio;
-    if (!st) return;
-    if (st.mode === 'system') {
-      const files = (st.answers['s.input']?.values ?? []).map((id) => heldFile(id)).filter((f): f is File => !!f);
-      await dropConversation(p.id);
-      return toSystems({ kind: st.answers['s.source']?.values?.[0] ?? '', files, url: st.answers['s.input']?.fields?.url ?? '', projectId: '', parts: [] });
-    }
-    const now = Date.now();
-    const started = said({ ...st, status: 'started', startedAt: now, via: 'hand' }, { from: 'socria', kind: 'note', text: st.mode === 'website' ? 'Planned in the website workspace from here: its own questions, references, brief and directions.' : 'The brief is yours to write in the workspace; this conversation stays beside it.', at: now });
-    let next: DesignProject =
-      st.mode === 'graphic' || st.mode === 'logo'
-        ? { ...p, medium: 'graphic', graphic: p.graphic ?? emptyGraphicState(), studio: started }
-        : st.mode === 'board'
-          ? { ...p, medium: 'board', board: p.board ?? emptyBoard(), studio: started }
-          : { ...p, intent: '', studio: started };
-    const rec = st.systemId ? usableSystems(dsList).find((x) => x.id === st.systemId) : undefined;
-    if (rec) next = applySystem(next, rec).project;
-    await putProject(next);
-    passage(() => setOpen({ p: next, intent: st.prompt || p.intent }));
   };
 
   /** A new project built in a registry design system: linked (identity from the system), then opened. */
@@ -297,7 +290,6 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
         nonce={nonce}
         systems={dsList}
         onStart={startConversation}
-        onWriteBrief={(p) => void writeBrief(p)}
         onExit={home}
         onManageSystems={() => toSystems(null)}
       />
@@ -358,22 +350,20 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
   const local = new Set(list.map((x) => x.id));
   const elsewhere = remote.filter((r) => !local.has(r.id));
 
+  if (work) return <YourWork signedIn={signedIn} ready={ready} list={list} elsewhere={elsewhere} nonce={nonce} onOpen={(id) => openById(id)} onDelete={remove} onNew={home} onSystems={() => toSystems(null)} />;
+
   return (
     <StudioHome
       signedIn={signedIn}
-      ready={ready}
       list={list}
-      elsewhere={elsewhere}
       error={error}
-      nonce={nonce}
       systems={dsList}
       systemId={chosenSystem}
       onSystem={(id) => setHomeSystem(id)}
       onBegin={beginStudio}
-      onCritique={(file, words) => void critiqueNow(file, words)}
       onSystems={() => toSystems(null)}
+      onWork={toWork}
       onOpen={(id) => openById(id)}
-      onDelete={remove}
     />
   );
 }

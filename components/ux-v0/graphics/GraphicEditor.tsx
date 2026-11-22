@@ -92,6 +92,12 @@ export interface GraphicEditorProps {
   inbox?: { id: number; words: string } | null;
   /** what came of a change asked in words, said back to where it was asked */
   onAsked?: (said: string) => void;
+  /** the work alone: the panels put away (the properties come back while something is selected) */
+  focus?: boolean;
+  /** offered as “Edit by hand” / “Focus on the work” when given */
+  onFocus?: (focus: boolean) => void;
+  /** words are taken elsewhere (the conversation beside the workspace): no ask bar of its own, only what it previews */
+  hideAsk?: boolean;
 }
 
 export function GraphicEditor(props: GraphicEditorProps) {
@@ -207,6 +213,18 @@ export function GraphicEditor(props: GraphicEditorProps) {
       if (show) setNote({ tone, text });
       props.onAsked?.(text);
     };
+    // a preview waiting: “apply” or “discard” said in words settles it
+    if (live && /^\s*(apply( it)?|yes|keep( it)?|do it|ok(ay)?|looks good|perfect)\b/i.test(words)) {
+      const label = live.edit.label;
+      applyPending();
+      tell('ok', `Applied: ${label}. Undo takes it back.`, false);
+      return;
+    }
+    if (live && /^\s*(discard( it)?|no\b|undo|cancel|not that|never ?mind)/i.test(words)) {
+      discardPending();
+      tell('ok', 'Discarded: the design is as it was.', false);
+      return;
+    }
     // on a logo artboard, the logo's own edits (more distinctive, simpler, a new wordmark…) are read first
     if (board.logo) {
       const lr = logoEditFromWords(cur, board.id, words);
@@ -434,9 +452,10 @@ export function GraphicEditor(props: GraphicEditorProps) {
     ...(props.versions ? ([['versions', 'Versions']] as [Tab, string][]) : []),
   ];
 
+  const focus = !!props.focus;
   return (
-    <div className="gx-ws">
-      <aside className="gx-left" aria-label="Layers, artboards and adding">
+    <div className={`gx-ws${focus ? ' is-focus' : ''}${focus && !selection.length && !pathEdit ? ' no-right' : ''}`}>
+      <aside className="gx-left" aria-label="Layers, artboards and adding" hidden={focus}>
         <nav className="gx-tabs" role="tablist" aria-label="Panels">
           {tabs.map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={tab === id} className={`gx-tab${tab === id ? ' is-on' : ''}`} onClick={() => setTab(id)}>
@@ -606,6 +625,11 @@ export function GraphicEditor(props: GraphicEditorProps) {
       <main className="gx-center">
         <div className="v0-toolbar gx-toolbar" role="toolbar" aria-label="Canvas">
           {props.toolbarStart}
+          {props.onFocus && (
+            <button type="button" className={`sb-btn is-sm${focus ? '' : ' is-quiet'} gx-focus-btn`} aria-pressed={!focus} onClick={() => props.onFocus?.(!focus)} title={focus ? 'Show the layers, the panels and the properties' : 'Put the panels away and keep the work in front'}>
+              {focus ? 'Edit by hand' : 'Focus on the work'}
+            </button>
+          )}
           <span className="v0-zoom">
             <button type="button" className="sb-link is-meta" onClick={undo} disabled={!past.current.length} title="Undo (⌘Z)">
               Undo
@@ -732,7 +756,8 @@ export function GraphicEditor(props: GraphicEditorProps) {
           )}
           {live && <span className="gx-preview-tag">Preview</span>}
         </div>
-        <div className="gx-askbar">
+        {(!props.hideAsk || live || note) && (
+        <div className={`gx-askbar${props.hideAsk ? ' is-quiet' : ''}`}>
           {live ? (
             <div className="gx-pending" role="status">
               <span>
@@ -745,7 +770,7 @@ export function GraphicEditor(props: GraphicEditorProps) {
                 Discard
               </button>
             </div>
-          ) : (
+          ) : props.hideAsk ? null : (
             <form
               className="gx-ask"
               onSubmit={(e) => {
@@ -774,9 +799,10 @@ export function GraphicEditor(props: GraphicEditorProps) {
             </p>
           )}
         </div>
+        )}
       </main>
 
-      <aside className="gx-right" aria-label="Properties">
+      <aside className="gx-right" aria-label="Properties" hidden={focus && !selection.length && !pathEdit}>
         <Inspector doc={doc} board={board} selected={selected} findings={findings} onOps={onOps} onFix={(f) => f.fix && onOps(f.fix, `fixed: ${f.message}`)} onFixAll={fixAll} textRef={textRef} />
         <CeilingInspector doc={doc} board={board} selected={selected} onOps={onOps} measure={measure} onPathEdit={(id) => (id && setSelection([id]), setPathEdit(id))} />
         {props.kindLabel && (

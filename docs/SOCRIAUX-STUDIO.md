@@ -1,11 +1,182 @@
-# SocriaUX — the studio: one conversation, every capability
+# SocriaUX — one conversation: describe, explore, make, refine
 
-> What do you want to make? — SocriaUX asks first, shows you the choices, and starts when it has enough.
+> What do you want to make? — SocriaUX understands what you want, explores it with you through real inspiration,
+> and makes the work itself, original and editable, without ever leaving the conversation.
 
-This document records the audit made before the studio was built, the architecture that followed from it, what was
-built, how it is verified, and what is not done.
+This document records how the experience is built: the audit behind the redesign, what was stripped away, what
+replaced it, the data it keeps, how it is verified, and what it does not do. The first studio (one conversation in
+front of six capabilities) is kept at the end as its own audit.
 
-## Phase A — audit (before anything was changed)
+## The redesign — audit and decisions
+
+The first studio already began every work in a conversation. Audited against "one conversation, immersive creative
+discovery, real internet inspiration, original generative execution", this is what still stood in the way:
+
+| Where | What was there | What it did to the experience | Now |
+| --- | --- | --- | --- |
+| Home | Seven kind-of-work pills (Any + six), a card per kind with examples, a "pick up where you left off" grid, the whole collection below | A dashboard to read past before saying anything; the kind of work chosen from a menu | One composer. The words are read; the collection has its own view (`?work=1`); three quiet text links lead back to what was in progress |
+| Home | A critique "door" that replaced the composer | A second way of starting | A design attached with words that say so opens its critique at once |
+| Questioning | "The look": style cards from the 75-profile style library (`selectStyles`), plus one generated | A preset style selector, forced first | Gone. The look comes from references the person likes, and from their words |
+| Questioning | Palettes: the chosen style's palette and four classic pairs | Predefined colour palettes | Proposed from the colours read out of the references liked (together, then each), then from the words' temperament |
+| Questioning | Type: the chosen style's faces and classic pairings | Preset type | Faces the liked references' influences carry, then voices the generative language finds for the words |
+| Questioning | A board's "direction" cards | A preset look for a campaign | Gone; references, then the systems the board engine proposes from the brief |
+| Questioning | No inspiration from outside the engines | Nothing real to react to | Real references found on Openverse as the conversation opens (below) |
+| Conversation | "Write the brief yourself" / "Plan it in the workspace" | Disconnected tools one click from the conversation | Removed: the conversation is the way in |
+| Conversation | One column: transcript, then the question card, decisions in a side panel | The question competing with the transcript | The conversation on the left, the question large on the right, what is taking shape under it; decisions in a drawer |
+| Workspaces | The conversation rail on the right, docked only from 1600 px | The conversation a guest in the workspace | On the left, where it began; docked from 1280 px, open by default for work begun in conversation |
+| Workspaces | A second place to type beside the rail (the graphic ask bar, the board ask bar, the page composer) | Two conversations | While the rail is open it is the one place to type; the workspace's own bar returns when it is put away |
+| Workspaces | The graphic editor's layers and inspector always out | The generated work not the focus | The work alone in front; the properties come out while something is selected; "Edit by hand" brings every panel out |
+| Workspaces | The steps of the old forms (Brief; Discovery · Brief · DNA · Direction for a site) | Workflows already done in conversation, offered again | Hidden for work begun in conversation (kept for work begun by hand) |
+
+Nothing was reskinned in place of a change: each row above is a different interaction, and the code behind the
+removed parts (style cards, classic pairs, the brief escape hatches, the mode pills, the home's collection, the
+critique door) is deleted, not hidden.
+
+## What was built
+
+### The home — one composer (`components/ux-v0/studio/StudioHome.tsx`)
+
+- "What do you want to *make*?", one line saying how it goes, and one white composer (16 px corners, one at 6 px):
+  describe it, paste a brief (it grows to fit), paste a screenshot (brought in as a picture, the words left as words),
+  attach files or pictures, drop them, add a link. The design system it is made in appears only when one is kept
+  here. Nothing else: no kinds of work, no palettes, styles, templates or examples, no feature cards.
+- The words are read live ("Reads as poster"); a close call or no signal is asked about — the six kinds offered, the
+  likeliest first — and no project is made before it is known.
+- A quiet line under the composer leads back to up to three works, those still in conversation first; everything
+  made lives in **Your work** (`studio/YourWork.tsx`, `?work=1`): the collection, searchable, delete asked in place.
+
+### Research — real references from the internet (`lib/ux-v0/studio/research.ts`)
+
+- **When.** As soon as a conversation about a graphic, logo, website or board opens, SocriaUX searches; again when the
+  kind of work changes (what was liked stays liked; what was only found for the other kind goes); again whenever the
+  person searches for other words, or asks for "more like this" on a reference they like.
+- **Where.** Openverse (openly licensed works gathered from Flickr, Wikimedia Commons, museums and more), asked from
+  the person's browser as openverse.org itself does: no key, the person's own allowance, nothing through SocriaUX's
+  servers, nothing paid.
+- **What.** Two to four short searches per brief (`researchPlan`): its subject and kind ("coffee roastery logo"), its
+  temperament ("bold poster"), a style it names, and the craft ("typography poster", "web design"). Each is asked as
+  written and then in shorter forms while it finds nothing, one after another; results are ranked for a designer
+  (posters, type, print, layout before snapshots), repeats removed.
+- **Honest.** The conversation says exactly what happened — where it looked, for what, how many it found — or that
+  the library was busy or unreachable, or found nothing. Nothing is ever put in place of a result, and a search that
+  did not happen is never claimed (`researchSaid`, `researchStatus`; checked against the record in the tests).
+- **Cited.** Every reference shows its title, creator, licence and where it was found, with a link to the page it
+  came from; the decisions drawer and the conversation beside the work credit the references that guide it.
+- **Inspiration, not assets.** A reference is never placed in a work. What reaches the engines is what the person
+  liked about it: the colours read from its picture (`sampleSwatches`, only for references liked for their colour or
+  as a whole), the influences its own words name (`interpretStyle`), its temperament (`readFacts`).
+
+### Questioning — a creative director, not a survey (`lib/ux-v0/studio/discovery.ts`, `options.ts`, `controls.tsx`)
+
+- **What the words say is not asked.** It is said back, recorded as "from your words", and changeable.
+- **References as a question.** "Which of these feel right?": a wall of real work, each with **Like**, **Not this**,
+  and — once liked — what it is liked *for* (colour, type, composition, mood, imagery). Several can be liked, and
+  their influences combine; those turned down can be seen and brought back; other words can be searched for; the
+  person can describe what they are after instead, skip, or leave it to SocriaUX. It comes after the questions that
+  give the search its meaning (a graphic's feel, a logo's form, what a site must do), so the search has usually
+  returned by the time it is asked; while it has not, the wall says it is searching.
+- **Nothing preset.** Colour is proposed from the references liked (together, then each by name) and from the
+  person's words; type from the faces the references' influences carry and voices found for the words; a website's
+  three looks are proposed by the board engine for the words and held to those colours. The person can always pick
+  their own colours, take them from their own picture, or name a typeface.
+- **Adaptive, never overwhelming.** The accessible questions first, then "I have enough to begin" with what starting
+  will do; *Keep refining* opens the finer ones. A typographic logo is asked about its lettering, a symbol what it
+  should call to mind; a board with a website what the site must do; inside a design system, colour and type are not
+  asked at all.
+- **Skip, back, revise, surprise.** Every optional question can be skipped or left to SocriaUX; *Surprise me* leaves
+  every remaining choice to SocriaUX and begins (only the person's own words are never invented); *Back* offers the
+  last answer again; any decision can be opened again from the path, the transcript or the decisions; words typed
+  answer the question, run a command, change the kind of work, or change earlier decisions.
+- **What is taking shape.** Under the question: the references liked, the colour they (or the person) give, the type,
+  the feel and the influences — read from the very preferences the engines will be given (`studio/Vision.tsx`).
+
+### One surface (`studio/Conversation.tsx`, `studio/StudioRail.tsx`, the workspaces)
+
+- **While exploring:** the conversation on the left, with its own reply composer; the question large on the right,
+  what is taking shape under it; the decisions in a drawer. On a phone it is one column, the question brought into
+  view, the reply kept at hand.
+- **Once making:** the same project becomes the work in its engine's workspace, and the conversation moves to a rail
+  on the left — docked from 1280 px (the work moves aside), over the left side below that; open by default for work
+  begun in conversation (a critique keeps its own cards as its conversation). While it is open it is the one place to
+  type: words go to the workspace's own way of taking them (a graphic's change in words, previewed on the work; a
+  board's; a page's refinement; a critique's question), and "apply" or "discard" settles a preview. The answers are
+  kept in the same transcript, from the first sentence to the latest change.
+- **The work first:** a graphic opens on the work alone (no layers, no inspector until something is selected); "Edit by
+  hand" brings every panel out, "Focus on the work" puts them away.
+- **Generation stays the engines':** a graphic's three directions are composed from scratch by the generative engine
+  (`composeGraphic`, `proposeDirections`) in the colours and faces arrived at; a logo's concepts are constructed
+  (`explore`); a board's systems proposed (`proposeSystems`); a website made whole and working (`startWebsite`). No
+  template is selected anywhere; everything stays editable by hand and in words.
+
+### Critique and design systems
+
+- A design attached with words that say so ("critique this") is the whole request: the critique opens at once, the
+  words kept with it; a file that cannot be critiqued is refused on the home, said why, and let go. Said in words
+  alone, the conversation asks for the design first.
+- Files that read as a design system (tokens, guidelines, a Figma link) open the import with the source and files
+  already given; the conversation, having handed over, is not kept as a project.
+
+## Data
+
+`DesignProject.studio` (`lib/ux-v0/studio/schema.ts`), optional and normalised on read, so no migration. Besides the
+kind of work, the opening words, every answer (values, the person's own text, numbers, fields, skipped or left to
+SocriaUX, and where it came from), the transcript, what was brought in, the design system, the depth and the status:
+
+- `references` (at most 60): each with its provider, id, title, creator, the page it came from, where Openverse found
+  it, the picture's address (https only, no credentials), size, licence and its address, tags, the search that found
+  it, the person's verdict (*proposed*, *liked*, *rejected*), what it is liked for, and the colours read from it.
+  Liked and turned-down references are always kept when more are found (`mergeReferences`).
+- `research`: the log of every search (at most 20 kept): the words, the library, how many were found, the error when
+  there was one, and when.
+
+## Verification
+
+Nothing in the conversation calls a model. The research is the only thing that leaves the browser, and only to
+Openverse.
+
+| Check | Result |
+| --- | --- |
+| `test/studio.test.mjs` — intent, facts, the record; research planning (subjects, kinds, temperament, short searches), ranking and repeats, the honest log on success, on nothing found, on a busy library (429), on an unreachable one, and in shorter forms after a failure (recorded Openverse response shapes, no network), the status line, merging and capping, credits, references held to their shape (https only, no credentials, bounded); every kind's questions with references in place of presets; colour and type proposed from the references liked (and only for what they were liked for) and from the words; the person's own palette outranking them; website looks in the references' colours; adaptivity, depth, skip, back, you decide, surprise me, reopen, free text, revising in words, picture treatments, every engine reached | 148 passed, 0 failed |
+| `test/browser/ux-v0/studio-qa.mjs` against the production build — the home as one composer (and nothing else on it), a pasted screenshot, a question instead of a guess, the design system offered only when there is one; **live research on Openverse** (24 references found on the final run, and the conversation's line said 24, matching what was kept; each the library's own picture, credited, its source opening apart); then a recorded library for the references question (like, not this, brought back, what each is liked for, colours read from the pictures, search again, more like this), colour and type proposed from the references, the two panes and what is taking shape, reopening from the decisions, a change in words, a reload with nothing searched twice; the start into graphic, logo, website and board with the conversation docked on the left as the one place to type, the work alone in front, a change previewed and applied in words, *Edit by hand*, credits beside the work; critique (an attached design opening at once, a file refused and let go, a critique asked in words); a design system; a work in a design system; a change of kind midway (searched afresh, what was liked kept); your work in its own view; a narrower screen; a phone | 126 passed, 0 failed; 0 model routes called; 0 page errors; no host reached but Openverse |
+| Earlier browser checks, their entry steps moved to the workspaces' own ways in (`env.mjs`: `websiteWorkspace`, `handBrief`, `beginWith`) | checklist 52/52 · acceptance 33/33 · ui-qa 85/85 · boards-qa 62/62 · dsi-qa 46/46 · logo-qa 23/23 · style-qa 35/35 · ceiling-qa 47/47 · workflow A and B run clean (workflow B's console lines are the critique sandbox refusing the fixture page's own stylesheet and request, as it should) |
+| graphics-qa | 58/58 on one run, 57/58 on the final one: check 6 (a carousel's slide count), one of the two checks recorded before this work as depending on the composition drawn for a random project |
+| `npx tsc --noEmit` | clean |
+| `npx next build` | passes |
+| `node test/run.mjs` (the whole repository) | all 392 suites passed |
+
+How the browser runs were made: `next start -p 3100` on the production build, with placeholder sign-in keys (a
+production-style key, so no development handshake redirect) and `VERCEL_ENV=preview` so the page is open;
+`UXV0_FORWARD=1 UXV0_BASE=http://127.0.0.1:3100 node test/browser/ux-v0/<check>.mjs`, with `NODE_USE_ENV_PROXY=1` and
+the machine's `HTTPS_PROXY` for the studio check's live Openverse run. `moodboard-live.mjs` (the website workspace's
+own model-led moodboard) was not run; its entry step was moved like the others.
+
+## Limits — said plainly
+
+- **No model in the conversation.** Intent, questions, research planning and ranking, previews and every start are
+  deterministic code; words that fit none of the readers are kept with the brief, and the person is told so.
+- **One library.** References come from Openverse only: openly licensed photographs, prints, posters and museum
+  pieces. It holds few live websites or brand identities, so a website's or a logo's references are often adjacent
+  work (signage, print, interiors) rather than screenshots of sites or marks. SocriaUX says what it found and never
+  pads the wall.
+- **Colours need the picture.** A reference's colours are read from its thumbnail in the browser; a picture the
+  library cannot serve gives none, and is left out rather than guessed.
+- **Influences are read from words.** A liked reference's influences come from its own title and tags; a reference
+  with no telling words still gives its colours and its temperament, not a named style.
+- **Revising after the work has begun** is done in the workspace (by hand, or in words through the rail); decisions
+  recorded in the conversation are not re-run into a work that exists.
+- **Files other than pictures are held in memory** until the import or critique begins; after a reload the
+  conversation asks for them again (it says why).
+- **The model-led website process** (its own questions, licensed references, a brief, directions, generation) is still
+  in the website workspace for a site begun there by hand, and still needs sign-in; the conversation's website path
+  is the deterministic website engine.
+
+## Appendix — the first studio
+
+The first studio put one conversation in front of six capabilities (graphic, website, logo, design system, board,
+critique) with intent recognition, adaptive questions, engine-drawn previews and the conversation carried into each
+workspace. Its audit, which this redesign builds on:
+
+### Phase A — audit (before the first studio)
 
 | Area | What exists | Evidence |
 | --- | --- | --- |
@@ -27,7 +198,7 @@ built, how it is verified, and what is not done.
 | Brand | The SocriaUX brand layer (`.sb`, "Brandbook Version 2": Cormorant Garamond, Geist, apricot, lake, cobalt, burgundy). The design system selected for this work is Socria's own (Instrument Serif 400, Inter, moss on paper, ink at four strengths, no other colour); both faces are already loaded app-wide (`--font-serif`, `--font-sans`) | `components/brand/socria-brand.css:1-80`, `app/layout.tsx:25-66` |
 | Tests that drive the home | graphics-qa, boards-qa, logo-qa, style-qa, ceiling-qa type into the textarea and press **Make a graphic** / **Make a board**; acceptance, checklist and moodboard-live press **Begin** | `test/browser/ux-v0/*.mjs` |
 
-**What the audit decided**
+**What that audit decided**
 
 1. No new generation path. The studio reads words into the engines' own inputs (graphic brief, logo words, board
    brief, website brief and system, import wizard source, critique file) and steers them only through parameters they
@@ -40,160 +211,3 @@ built, how it is verified, and what is not done.
    is read by the workspaces; the workspaces keep their single writer (the conversation panel is rendered inside each).
 5. The brand layer moves to the selected Socria design system at the token level, so home, conversation and every
    workspace stay one product.
-
-## What was built
-
-### The home — one question (`components/ux-v0/studio/StudioHome.tsx`)
-
-- **The question first.** "What do you want to *make*?" in Instrument Serif, a one-line standfirst, and one white
-  composer (16 px corners, one drawn in to 6 px): the field (still named "What do you want to make?"), files and
-  pictures (attach or drop), a link (a website or a Figma file), the **design system** it is made in, a live reading
-  of the words, and **Begin**.
-- **Six kinds of work, or Any.** Graphic, Website, Logo, Design system, Board, Critique — a radio group of pills
-  (arrow keys move between them). Each, chosen, says what it is, how it goes, and offers three ways to begin in the
-  person's voice (they fill the composer). Any leaves the routing to the words.
-- **Intent recognition, said live.** As the person types, `recognizeIntent` (lib/ux-v0/studio/intent.ts) reads the
-  words and files: "Reads as logo — names a logo", "Could be a logo or a website: you will be asked". On Begin, a
-  clear reading routes at once; a close call or no signal is never guessed — the six kinds are offered, the likeliest
-  first, and no project is made until the kind is known.
-- **Critique is a door.** Chosen, the composer becomes a place to drop or choose a design (HTML, PNG, JPG, SVG); the
-  file is the whole request, so the critique opens at once, with whatever was typed kept as what to look at.
-- **Pick up where you left off.** Up to four works, those still in conversation first, each with its miniature.
-- **Everything you have made.** The collection, moved unchanged in what it does to `studio/Collection.tsx`: live
-  miniatures in sealed frames, exhibits or index, search, kind (with *In conversation*), order, delete asked in
-  place with *Keep it* focused, works from other devices.
-
-### The conversation — one focused question at a time (`studio/Conversation.tsx`, `studio/ProjectConversation.tsx`)
-
-Every work begins as a project in conversation (`DesignProject.studio`, status `discovering`), at its own address.
-The questions are lib/ux-v0/studio/discovery.ts's: only those that matter for this work, the accessible ones first.
-
-- **What the words already say is not asked.** It is said — "From your words: Poster · “Field Lines” · Bold,
-  Playful" — and recorded as such, changeable like anything else.
-- **Every control the brief asked for.** Visual cards drawn by the engines (style, composition, logo form, picture treatment, website
-  look, format, purpose), multi-select chips with a limit (at the limit the earliest gives way), a ranking (up and
-  down, in order), palettes as real swatches plus three colour pickers and colours taken from the person's own
-  picture, type pairings set in their own faces, sliders (only those moved are said; "Leave it" hands one back),
-  fields for the person's exact words, counts for a board's materials, and file drops.
-- **Always the person's own way.** Every question with options has "Something else? Describe your own"; every
-  optional one can be skipped or left to SocriaUX ("You decide"); "Surprise me" leaves every remaining choice to
-  SocriaUX and begins — except the person's own words, which SocriaUX never invents.
-- **Adaptive.** A typographic logo is asked about its lettering, a symbol what it should call to mind; a board with a
-  website is asked what the website must do; a design system's files are asked for by the source chosen; colours
-  and type are not asked inside a design system.
-- **Progressive.** When the accessible questions are done SocriaUX says it has enough, and what starting will do;
-  *Keep refining · N more* opens the deeper ones (colour, type, composition; then balance, what to avoid, pictures),
-  never imposed. *Start with this* is on every question once the required ones are answered.
-- **Back and change.** *Back* takes the last answer back and offers it again as the starting point; every answered
-  topic on the path, every decision on the side and every answer in the transcript can be opened again. Words typed
-  into the conversation answer the question being asked, run a command (start, back, skip, more, surprise me), change
-  the kind of work ("actually, a website instead"), or change earlier decisions (`reviseFromWords`: a quoted headline,
-  temperament words, a style named, three colours, something to avoid), which the conversation then says.
-- **Design context.** The side keeps every decision with where it came from — *From your words*, *Yours*,
-  *SocriaUX decides* — what was brought in, and the design system; on a phone it is a sheet.
-- **Persistent.** The record is saved like the rest of the project (this browser first, then the account), so a reload
-  or another device lands in the same conversation, everything said kept.
-
-### Previews — inspiration drawn by the engines (`studio/previews.tsx`)
-
-Not templates: each card is made from the person's own words by the engine that will make the work, and the choice
-reaches that engine as a parameter. A style card is the headline composed in that style (`styledDirection` over the
-words' own language, `composeGraphic`); a composition card is the person's design (in what they chose so far)
-organised under one generative constraint (`org`); a logo card is a concept `explore` constructs for the name in that
-form; a website card is a working page `startWebsite` makes from the conversation in that proposed system, shown in a
-sealed frame with no scripts; a treatment card is the person's own picture under the graphics engine's own effect
-stack (mono, duotone in their colours, halftone, risograph, posterize, grain), drawn by the same renderer. Each is
-made only when its card nears the screen, one at a time in idle moments, and kept for the visit.
-
-### Starting — the same project becomes the work (`studio/begin.ts`)
-
-| Kind | What Start does | Where it continues |
-| --- | --- | --- |
-| Graphic | The brief from the conversation (`graphicBriefOf`), pictures as assets; the workspace proposes three directions at once, held to the palette, faces and composition chosen (`directionsWithPrefs`), with the Creative DNA, the avoid list and the person's words for the look given to the direction engine; the person's pictures are composed treated as they chose (`withTreatment`: the engine's effects on their own images only, changeable in the editor) | Graphics workspace |
-| Logo | The logo brief (`logoBriefOf`); concepts constructed at once | Graphics workspace, logo concepts |
-| Board | The board brief and materials (`boardBriefOf`), pictures as board assets, a website's identity if one was chosen; three systems proposed at once (`systemsWithPrefs`) | Board |
-| Website | A whole, working page made from the answers in the direction chosen (`startWebsite` → `websiteConcept`), with its working parts (a booking that books, forms that send), same project id | Website workspace |
-| Design system | The import, opened with the source, the files or address and the parts already chosen (it reads at once when the parts are known); the conversation, having handed over, is not kept as a project | Design System Manager |
-| Critique | The design imported into the same project, the conversation kept on it | Critique workspace |
-
-A design system chosen for the work is linked when it starts (`applySystem`). *Write the brief yourself* (graphic,
-logo, board) and *Plan it in the workspace* (website: the model-led questions, references, brief and directions)
-open each workspace's own way in, with the words — so every earlier flow stays reachable.
-
-### The conversation in the workspace (`studio/StudioRail.tsx`)
-
-A work begun in the studio keeps its conversation beside it, docked on wide screens (the workspace moves aside) and
-a sheet on narrow ones; it can be put away and brought back (the choice is kept). What is said there goes to the
-workspace's own way of taking words — a graphic's changes in words (`GraphicEditor` reads it as if typed in its bar,
-previewed before it is applied), a board's, a page's refinement, a critique's question — and what the workspace
-answers is kept in the same transcript. Before a direction is chosen it understands "the second one" and "more". It
-starts put away where the person chose to work directly (the brief written by hand, or a critique, whose own cards
-are its conversation).
-
-### The design system, everywhere (`studio/SystemPicker.tsx`)
-
-One picker on the home's composer, in the conversation's header (and its phone sheet) — none (SocriaUX proposes an
-identity), or any published system kept here or with the account; the workspace's default is chosen to begin with.
-Inside a system, its colours and type are not asked about, website looks are three expressions of it
-(`brandBoardOptions`), and the work is linked to it when it starts.
-
-### The look
-
-The studio is in the selected Socria design system: Instrument Serif 400 for what is said (emphasis italic and moss),
-Inter for what is operated, moss on paper, ink at its strengths, borders `#e7e2d3`/`#ded8c6`; every action a 999 px
-pill; cards 18 px; the person's words in moss-50 bubbles, Socria's unboxed; hand-drawn 24-unit glyphs in
-`currentColor` with round ends (`studio/glyphs.tsx`, no icon library, no emoji). Motion eases out
-(`cubic-bezier(.16,1,.3,1)`), lifts by two pixels, fades up; nothing bounces or spins; all of it stops under
-`prefers-reduced-motion`. The home's composer becomes the conversation's reply bar through a view transition. The
-earlier brand layer was moved to the system at the token level (`components/brand/socria-brand.css`), so every
-workspace speaks the same.
-
-## Data
-
-`DesignProject.studio` (`lib/ux-v0/studio/schema.ts`), optional and normalised on read like the rest of the project,
-so no migration: the kind of work and whether it was chosen or recognised; the opening words exactly; every answer
-with its values, the person's own text, numbers (sliders, counts) and fields, whether it was skipped or left to
-SocriaUX, and where it came from (*words*, *person*, *socria*); the transcript (bounded at 200 messages); what was
-brought in (pictures as references kept in this browser; other files held in memory only until the import or the
-critique begins); the design system; the depth reached; *discovering* or *started*; and whether the work began from
-the conversation or by hand. It is saved and synced with the project (this browser first, then the account), and
-goes with it in the account's export and deletion. A conversation is listed with the rest of the work, as one.
-
-## Verification
-
-All without a model and without the network (every preview and every start is the engines' own code in the browser).
-
-| Check | Result |
-| --- | --- |
-| `test/studio.test.mjs` (intent, facts, the record, every kind's questions, adaptivity, depth, skip, back, you decide, surprise me, reopen, free text, revising decisions in words, picture treatments, every engine reached) | 113 passed, 0 failed |
-| `test/browser/ux-v0/studio-qa.mjs` against the production build (home, intent routing and the question instead of a guess, examples, the design system selector, the six conversations end to end with every control, previews drawn by the engines, back, skip, reopen from the side, a change in words, a reload, start into each workspace, the rail and words sent from it, recents and history with delete, a docked rail on a wide screen, a phone) | 105 passed, 0 failed; 0 model routes called; 0 page errors |
-| Earlier browser checks, their home steps moved to the studio (the kind chosen, then *Write the brief yourself* / *Plan it in the workspace*, or the Critique door) | checklist 52/52 · acceptance 33/33 · ui-qa 85/85 · boards-qa 62/62 · dsi-qa 46/46 · logo-qa 23/23 · style-qa 35/35 · workflow A and B run clean (no failed check; workflow B's console lines are the critique sandbox refusing the fixture page's own stylesheet and request, as it should) |
-| graphics-qa | 57/58 and 56/58 on two runs: check 22 (and once check 6), the two recorded in the previous phase as failing on the earlier build too (they depend on the composition drawn for a random project) |
-| ceiling-qa | 47/47 on one run; 46/47 and 45/47 on others — the "mixed styles" and "dense pattern" checks depend on the composition drawn for a random project id and pass or fail with it, on the same build |
-| `npx tsc --noEmit` | clean |
-| `npx next build` | passes |
-| `node test/run.mjs` (the whole repository) | all 392 suites passed |
-
-`moodboard-live.mjs` (real Openverse searches) was not run: it needs the live network. Its home step was moved like
-the others.
-
-How the browser runs were made: `next start -p 3100` on the production build, with placeholder sign-in keys present
-at runtime (a production-style key, so no development handshake redirect) and `VERCEL_ENV=preview` so the page is
-open; `UXV0_FORWARD=1 UXV0_BASE=http://127.0.0.1:3100 node test/browser/ux-v0/<check>.mjs`.
-
-## Limits — said plainly
-
-- **No model in the studio.** Intent recognition, the questions, the previews and every start are deterministic code.
-  Words that fit none of the readers are kept with the brief rather than understood; the person is told so.
-- **Files other than pictures are held in memory** until the import or critique begins; after a reload the
-  conversation asks for them again (it says why). Pictures are kept like any reference.
-- **Revising after the work has begun** is done in the workspace (by hand, or in words through the rail, which the
-  workspace's own engines read); the decisions recorded in the conversation are not re-run into an existing work.
-- **The rail docks** (the workspace moves aside) only from 1600 px wide; below, it opens over the right side when
-  asked, so the workspaces keep their full layout.
-- **The website path from the studio** is the deterministic website engine (`websiteConcept`): a designed, working
-  first page with its functional parts, sample times and labels marked as the person's to change. The model-led
-  website process (questions, licensed references, a brief, directions, generation) is still one step away and still
-  needs sign-in.
-- **Design systems** must be published to be chosen; a system whose identity cannot load leaves its work waiting at
-  the workspace rather than proposing without it.

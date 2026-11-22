@@ -5,7 +5,7 @@
 // from the project as the browser keeps it (IndexedDB). No model route is called.
 //
 //   UXV0_FORWARD=1 UXV0_BASE=http://127.0.0.1:3100 node test/browser/ux-v0/logo-qa.mjs
-import { chromium, S, BASE } from './env.mjs';
+import { chromium, S, BASE, handBrief } from './env.mjs';
 
 let pass = 0;
 let fail = 0;
@@ -49,14 +49,8 @@ const shot = (name) => page.screenshot({ path: `${S}logo-${name}.png` });
 
 console.log('=== SocriaUX logos, in the built app ===');
 await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
-await page.fill(
-  'textarea[aria-label="What do you want to make?"]',
-  'Design a logo for “Tidewell”, a water-quality monitoring service for coastal towns. Calm, trustworthy, precise. Values: clarity, care, community. Used on an app icon, signage and vans.',
-);
-await page.getByRole('radio', { name: 'Logo', exact: true }).click();
-await page.getByRole('button', { name: 'Begin' }).click();
-await page.getByRole('button', { name: 'Write the brief yourself' }).click();
-await page.waitForSelector('.gx-brief', { timeout: 15000 });
+// the brief written by hand in the workspace (its own form)
+await handBrief(page, 'graphic', 'Design a logo for “Tidewell”, a water-quality monitoring service for coastal towns. Calm, trustworthy, precise. Values: clarity, care, community. Used on an app icon, signage and vans.');
 await page.waitForTimeout(500);
 ok('a logo brief is read as a logo (the kind chosen from the words)', (await page.locator('#gx-kind').inputValue()) === 'logo', await page.locator('#gx-kind').inputValue());
 ok('…named exactly as written', (await page.locator('#gx-headline').inputValue()) === 'Tidewell', await page.locator('#gx-headline').inputValue());

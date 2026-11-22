@@ -70,23 +70,44 @@ ok('the summary says it was begun in the studio', S.summarize(back).studio?.mode
 ok('a project without one is unchanged', S.normalizeProject(JSON.parse(J(S.makeProject('create', 'x', NOW)))).studio === undefined);
 
 // ── adaptive discovery: a graphic ──
-sec('a graphic: what the words said is not asked; depth; enough to begin');
+sec('a graphic: what the words said is not asked; references, not presets; depth; enough to begin');
+// references as the research returns them (the shape lib/ux-v0/studio/research.ts gives an Openverse result)
+const ref = (id, title, tags, swatches, extra = {}) => ({ id: `openverse:${id}`, provider: 'openverse', title, creator: 'A. Maker', sourceUrl: `https://www.flickr.com/photos/maker/${id}`, origin: 'flickr', thumb: `https://api.openverse.org/v1/images/${id}/thumb/`, width: 1200, height: 800, license: 'CC BY 2.0', licenseUrl: 'https://creativecommons.org/licenses/by/2.0/', tags, query: 'creative coding poster', state: 'proposed', swatches, at: NOW, ...extra });
+const FOUND = [
+  ref('a1', 'Swiss style poster, Zurich 1961', ['poster', 'typography', 'swiss'], ['#f2efe6', '#141414', '#e2361b']),
+  ref('b2', 'Bauhaus exhibition poster', ['bauhaus', 'poster', 'print'], ['#efe9dc', '#1d1d1d', '#2d5fa8', '#e8b523']),
+  ref('c3', 'Neon sign at night', ['neon', 'sign'], ['#0b0b12', '#ff2bd6', '#28f0ff']),
+];
 let g = start('graphic', 'A bold, experimental poster for “Field Lines”, a creative coding night');
 ok('the kind, the words and the feel are taken from the sentence, said once', g.answers['g.kind']?.source === 'words' && g.answers['g.words']?.fields?.headline === 'Field Lines' && g.answers['g.personality']?.values.includes('bold') && /From your words/.test(g.transcript[0]?.text ?? ''), J(g.answers));
 let cur = S.currentStage(g);
-ok('the first question asked is the look (form, words and feel were said)', cur?.id === 'g.style', cur?.id);
-ok('the look offers styles chosen for these words, plus one made from them, with previews', cur.options.length >= 5 && cur.options.some((o) => o.id === 'generated') && cur.options.filter((o) => o.preview?.kind === 'style').length >= 4 && cur.select === 'multi' && cur.max === 2, J(cur.options.map((o) => o.label)));
+ok('the first question asked is the references found for these words (form, words and feel were said)', cur?.id === 'g.refs' && cur.control === 'references' && cur.select === 'multi', cur?.id);
+ok('before anything is found, nothing is offered in its place (no invented references)', cur.options.length === 0);
+const allStages = S.pathOf({ ...g, depth: 3 }).map((x) => x.id);
+ok('no preset style or direction list anywhere on the path', !allStages.some((id) => /style|direction/.test(id)), J(allStages));
 let r = S.readiness(g);
 ok('it can start already (the required kind and headline are there), but more is asked first', r.canStart && !r.enough, J(r));
-g = S.answerStage(g, 'g.style', { values: [cur.options[0].id] }, {}, NOW + 1);
+g = { ...g, references: S.mergeReferences(g.references ?? [], FOUND), research: { at: NOW, searches: [{ query: 'creative coding poster', provider: 'openverse', found: 3 }] } };
+cur = S.currentStage(g);
+ok('what was found becomes the choice, exactly as found (its title, its creator)', cur.options.length === 3 && cur.options[0].label === FOUND[0].title && cur.options[0].hint === 'A. Maker', J(cur.options));
+g = { ...g, references: g.references.map((x) => (x.id === 'openverse:a1' || x.id === 'openverse:b2' ? { ...x, state: 'liked' } : x.id === 'openverse:c3' ? { ...x, state: 'rejected' } : x)) };
+ok('a reference turned down is no longer offered', S.currentStage(g).options.length === 2 && !S.currentStage(g).options.some((o) => o.id === 'openverse:c3'));
+g = S.answerStage(g, 'g.refs', { values: ['openverse:a1', 'openverse:b2'] }, {}, NOW + 1);
 r = S.readiness(g);
-ok('after the look: enough to begin, with deeper choices on offer', r.canStart && r.enough && r.more >= 3 && S.currentStage(g) === null, J(r));
+ok('after the references: enough to begin, with deeper choices on offer', r.canStart && r.enough && r.more >= 3 && S.currentStage(g) === null, J(r));
+ok('the answer is said in the transcript, naming what was liked', g.transcript.some((m) => m.from === 'person' && /2 liked/.test(m.text) && /Swiss style poster/.test(m.text)), J(g.transcript.map((m) => m.text)));
+const gp0 = S.prefsOf(g);
+ok('the influences the liked references name in their own words reach the preferences (Swiss, Bauhaus)', gp0.styles.length >= 1, J(gp0.styles));
+ok('their colours become the palette: the lightest the ground, the darkest the ink, the most saturated the accent', gp0.palette?.ground === '#f2efe6' && gp0.palette?.ink === '#141414' && ['#e2361b', '#2d5fa8', '#e8b523'].includes(gp0.palette?.accent), J(gp0.palette));
+ok('a turned-down reference speaks for nothing (its neon is nowhere)', !Object.values(gp0.palette ?? {}).some((c) => ['#ff2bd6', '#28f0ff', '#0b0b12'].includes(c)));
+const onlyType = { ...g, references: g.references.map((x) => (x.state === 'liked' ? { ...x, take: ['type'] } : x)) };
+ok('references liked only for their type give no colour; one liked for its colour speaks for colour alone', S.prefsOf(onlyType).palette === null && S.prefsOf({ ...g, references: g.references.map((x) => (x.id === 'openverse:b2' ? { ...x, take: ['colour'] } : x)) }).palette?.accent !== '#e2361b', J(S.prefsOf(onlyType).palette));
 g = S.deeper(g);
 cur = S.currentStage(g);
-ok('deeper: the palette next, from the chosen style and from the words', cur?.id === 'g.palette' && cur.options.length >= 3 && cur.options.every((o) => o.swatches?.length >= 3), J(cur?.options));
+ok('deeper: colour, proposed from the references liked, each of them, and the words (never a stock palette)', cur?.id === 'g.palette' && cur.options[0].label === 'From the references you liked' && cur.options.some((o) => /^From “/.test(o.label)) && cur.options.some((o) => /your words/.test(o.label)) && cur.options.every((o) => o.swatches?.length >= 3), J(cur?.options.map((o) => o.label)));
 g = S.answerStage(g, 'g.palette', { values: [cur.options[0].id] }, {}, NOW + 2);
 cur = S.currentStage(g);
-ok('then type pairings, each with real faces', cur?.id === 'g.type' && cur.options.length >= 3 && cur.options.every((o) => o.faces?.display && o.faces?.body), J(cur?.options));
+ok('then type, generated: faces the references’ influences carry, then voices found for the words, each real', cur?.id === 'g.type' && cur.options.length >= 3 && cur.options.every((o) => o.faces?.display && o.faces?.body) && cur.options.some((o) => o.hint === 'From your references'), J(cur?.options));
 g = S.skipStage(g, 'g.type', {}, NOW + 3);
 cur = S.currentStage(g);
 ok('skipped is skipped; then composition, with previews of each spatial idea', cur?.id === 'g.composition' && cur.options.every((o) => o.preview?.kind === 'org'));
@@ -95,13 +116,13 @@ ok('"you decide" is recorded as SocriaUX’s', g.answers['g.composition']?.deleg
 ok('the transcript holds each question and answer in the person’s words', g.transcript.filter((m) => m.kind === 'question').length >= 2 && g.transcript.some((m) => m.from === 'person' && /You decide/.test(m.text)));
 const backed = S.stepBack(g);
 ok('back takes the last answer back to be given again', !backed.answers['g.composition'] && S.currentStage(backed)?.id === 'g.composition');
-const reopened = S.reopen(g, 'g.style');
-ok('any decision can be reopened (the style again)', !reopened.answers['g.style'] && S.currentStage(reopened)?.id === 'g.style');
+const reopened = S.reopen(g, 'g.refs');
+ok('any decision can be reopened (the references again, still liked)', !reopened.answers['g.refs'] && S.currentStage(reopened)?.id === 'g.refs' && S.likedOf(reopened).length === 2);
 ok('from-the-words decisions stay when stepping back', S.stepBack(S.stepBack(S.stepBack(S.stepBack(g)))).answers['g.words']?.source === 'words');
 let g2 = start('graphic', 'something for our open day');
 ok('without words to set, the words are asked for and required', S.currentStage(g2)?.id === 'g.kind' || S.currentStage(g2)?.id === 'g.words');
 g2 = S.surprise(g2, {}, NOW + 5);
-ok('"surprise me" leaves every choice to SocriaUX but still asks for the person’s words', !S.readiness(g2).canStart && S.readiness(g2).missing.length > 0 && ['g.kind', 'g.words'].includes(S.currentStage(g2)?.id) && g2.answers['g.style']?.delegated, J(S.readiness(g2)));
+ok('"surprise me" leaves every choice to SocriaUX but still asks for the person’s words', !S.readiness(g2).canStart && S.readiness(g2).missing.length > 0 && ['g.kind', 'g.words'].includes(S.currentStage(g2)?.id) && g2.answers['g.refs']?.delegated, J(S.readiness(g2)));
 g2 = S.answerStage(g2, 'g.kind', { values: ['carousel'] }, {}, NOW + 6);
 const wordsStage = S.currentStage(g2);
 ok('a carousel is asked for one point per slide (the question adapts to the form)', wordsStage?.id === 'g.words' && wordsStage.fields.some((f) => f.id === 'items'), J(wordsStage?.fields));
@@ -114,9 +135,11 @@ let l = start('logo', 'A logo for “Halden”, a small coffee roastery, warm an
 ok('name, subject and personality from the words', l.answers['l.name']?.fields?.name === 'Halden' && l.answers['l.about']?.values.length > 0 && l.answers['l.personality']?.values.length >= 2, J(l.answers));
 cur = S.currentStage(l);
 ok('asked first: typographic, symbolic or both — each drawn by the logo engine for the name', cur?.id === 'l.form' && cur.options.every((o) => o.preview?.kind === 'logo'), cur?.id);
-const typo = S.deeper(S.answerStage(l, 'l.form', { values: ['wordmark'] }, {}, NOW + 1));
+const formed = S.answerStage(l, 'l.form', { values: ['wordmark'] }, {}, NOW + 1);
+ok('once the form is known, the references found for it are asked about', S.currentStage(formed)?.id === 'l.refs', S.currentStage(formed)?.id);
+const typo = S.deeper(S.skipStage(formed, 'l.refs', {}, NOW + 1));
 ok('a typographic logo is asked about its lettering, not about a symbol', S.currentStage(typo)?.id === 'l.lettering' && !S.pathOf(typo).some((s) => s.id === 'l.idea'));
-const sym = S.deeper(S.answerStage(l, 'l.form', { values: ['abstract'] }, {}, NOW + 1));
+const sym = S.deeper(S.skipStage(S.answerStage(l, 'l.form', { values: ['abstract'] }, {}, NOW + 1), 'l.refs', {}, NOW + 1));
 ok('an abstract mark is asked what it should call to mind, from the subject’s own ideas', S.pathOf(sym).some((s) => s.id === 'l.idea') && !S.pathOf(sym).some((s) => s.id === 'l.lettering') && S.stageById(sym, 'l.idea').options.length > 0, J(S.stageById(sym, 'l.idea')?.options));
 const lw = S.logoWordsOf(S.answerStage(S.answerStage(typo, 'l.lettering', { values: ['serif'] }, {}, NOW + 2), 'l.avoid', { values: ['leaf'] }, {}, NOW + 3));
 ok('the logo brief carries the name, the form, the lettering and what to avoid, in words the logo engine reads', /“Halden”/.test(lw.words) && /wordmark/.test(lw.words) && /serif/.test(lw.words) && /Avoid leaf/.test(lw.words), lw.words);
@@ -137,7 +160,12 @@ ok('then what it must do, for bookings: a booking calendar first', cur?.id === '
 w = S.answerStage(w, 'w.functions', { values: ['booking', 'contact'] }, {}, NOW + 2);
 const systems = S.websiteSystems(w);
 ok('three systems proposed by the board engine for these words', systems.length === 3 && systems.every((s) => s.art), J(systems.map((s) => s.direction.name)));
+const wl = { ...w, references: FOUND.slice(0, 2).map((x) => ({ ...x, state: 'liked' })) };
+ok('references liked reach the website looks: each proposed in their colours', S.websiteSystems(wl).length === 3 && S.websiteSystems(wl).every((x) => x.tokens.colors.background === '#f2efe6'), J(S.websiteSystems(wl).map((x) => x.tokens.colors.background)));
 const env = { websiteSystems: systems };
+cur = S.currentStage(w, env);
+ok('then the references found for the site, before its look is chosen (what is liked shapes the looks)', cur?.id === 'w.refs', cur?.id);
+w = S.skipStage(w, 'w.refs', env, NOW + 3);
 cur = S.currentStage(w, env);
 ok('then the look: each a working page', cur?.id === 'w.aesthetic' && cur.options.length === 3 && cur.options.every((o) => o.preview?.kind === 'website'));
 w = S.answerStage(w, 'w.aesthetic', { values: ['sys-1'] }, env, NOW + 3);
@@ -159,7 +187,8 @@ ok('the objective read (a launch)', b.answers['b.objective']?.values[0] === 'lau
 ok('a board with a website is asked what the website must do (at depth 2)', S.pathOf(S.deeper(b)).some((s) => s.id === 'b.website'));
 ok('a board without one is not', !S.pathOf(S.deeper(start('board', 'A campaign for “Harbour Week”: four posters'))).some((s) => s.id === 'b.website'));
 ok('the identity question only when there is a system or a website to share', !S.pathOf(b).some((s) => s.id === 'b.identity') && S.pathOf(b, { systems: [{ id: 'dsys_x1234', name: 'Halden' }] }).some((s) => s.id === 'b.identity'));
-b = S.answerStage(b, 'b.direction', { values: [S.currentStage(b).options[0].id] }, {}, NOW + 1);
+ok('a board asks for references too, before anything is chosen for it', S.currentStage(b)?.id === 'b.refs', S.currentStage(b)?.id);
+b = S.skipStage(b, 'b.refs', {}, NOW + 1);
 const p0 = S.makeProject('create', 'Untitled board', NOW);
 const bs = S.startProject({ ...p0, medium: 'board' }, b, { now: NOW });
 ok('a board project ready to propose: brief, materials, the request', bs.ok && bs.project.board.brief.materials.length === 3 && bs.project.board.brief.content.headline === 'Night Market Lisbon' && bs.project.board.request.length > 0, J(bs.ok && bs.project.board.brief));
@@ -167,14 +196,16 @@ ok('a board project ready to propose: brief, materials, the request', bs.ok && b
 // ── the engines read the decisions ──
 sec('decisions reach the engines: briefs, directions, DNA');
 let gg = start('graphic', 'A poster for “Field Lines”, warm and quiet');
-gg = S.answerStage(gg, 'g.style', { values: [S.currentStage(gg).options[0].id] }, {}, NOW + 1);
+gg = { ...gg, references: FOUND.slice(0, 2).map((x) => ({ ...x, state: 'liked' })) };
+gg = S.answerStage(gg, 'g.refs', { values: ['openverse:a1', 'openverse:b2'] }, {}, NOW + 1);
 gg = S.answerStage(gg, 'g.palette', { values: [], fields: { ground: '#f4f1e8', ink: '#20201b', accent: '#5e7633' } }, {}, NOW + 2);
 gg = S.answerStage(gg, 'g.type', { values: ['Fraunces|Inter'] }, {}, NOW + 3);
 gg = S.answerStage(gg, 'g.composition', { values: ['grid'] }, {}, NOW + 4);
 gg = S.answerStage(gg, 'g.feel', { values: [], numbers: { restraint: 20, density: 30 } }, {}, NOW + 5);
 gg = S.answerStage(gg, 'g.avoid', { values: ['gradients'] }, {}, NOW + 6);
 const brief = S.graphicBriefOf(gg);
-ok('the graphic brief: the words exactly, the form, the feel, the style and the avoid list in its words', brief.content.headline === 'Field Lines' && brief.kind === 'poster' && brief.mood.includes('warm') && /style of/.test(brief.purpose) && /Avoid gradients/.test(brief.purpose), J(brief));
+ok('the graphic brief: the words exactly, the form, the feel, the influences of the references liked and the avoid list in its words', brief.content.headline === 'Field Lines' && brief.kind === 'poster' && brief.mood.includes('warm') && /style of/.test(brief.purpose) && /Avoid gradients/.test(brief.purpose), J(brief));
+ok('the person’s own palette outranks the references’ colours', S.prefsOf(gg).palette?.accent === '#5e7633');
 const prefs = S.prefsOf(gg);
 ok('preferences: palette, faces, composition, DNA', prefs.palette?.accent === '#5e7633' && prefs.faces?.display === 'Fraunces' && prefs.org === 'grid' && prefs.dna.restraint === 20, J(prefs));
 const dirs = [S.languageDirection('Field Lines', ['warm'], 'a'), S.languageDirection('Field Lines', ['quiet'], 'b'), S.languageDirection('Field Lines', ['bold'], 'c')];
@@ -204,7 +235,7 @@ const settled = S.surprise(start('graphic', 'A poster for “Field Lines”, a c
 const rev = S.reviseFromWords(settled, 'Actually call it “Signal Lines”, and make it bold and playful, swiss style', NOW + 1);
 ok('a quoted headline said later replaces the words, and says so', S.answerOf(rev.st, 'g.words')?.fields?.headline === 'Signal Lines' && rev.changed.includes('the words'), J(rev.changed));
 ok('temperament words said later change the feel (kept to four)', ['bold', 'playful'].every((m) => S.answerOf(rev.st, 'g.personality')?.values.includes(m)) && S.answerOf(rev.st, 'g.personality').values.length <= 4, J(S.answerOf(rev.st, 'g.personality')));
-ok('a style named later changes the look', (S.answerOf(rev.st, 'g.style')?.values ?? []).length > 0, J(S.answerOf(rev.st, 'g.style')));
+ok('a style named later changes the look, in the person’s words', /swiss/i.test(S.answerOf(rev.st, 'g.refs')?.text ?? '') && S.prefsOf(rev.st).styles.length > 0, J(S.answerOf(rev.st, 'g.refs')));
 ok('…and the change is said in the transcript, with the person’s words before it', rev.st.transcript.at(-1).kind === 'change' && /Changed/.test(rev.st.transcript.at(-1).text) && rev.st.transcript.at(-2).from === 'person');
 const calmer = S.reviseFromWords(rev.st, 'make it calm', NOW + 4);
 ok('“make it calm” replaces the feel', J(S.answerOf(calmer.st, 'g.personality')?.values) === J(['calm']), J(S.answerOf(calmer.st, 'g.personality')));
@@ -216,6 +247,65 @@ ok('…and the palette reaches the directions as the person’s own colours', S.
 const kept = S.reviseFromWords(start('logo', 'A logo for “Halden”'), 'it is for people who roast at home', NOW + 3);
 ok('words that change nothing named are kept with the opening words, and say so', kept.changed.length === 0 && kept.st.prompt.includes('roast at home') && /Kept with everything/.test(kept.st.transcript.at(-1).text));
 ok('…the name is never changed by words without quotes', S.answerOf(kept.st, 'l.name')?.fields?.name === 'Halden');
+
+// ── research: real references, looked for on the internet ──
+sec('research: what is searched for, what is found, said as it happened, never invented');
+const ov = (id, title, tags, extra = {}) => ({ id, title, creator: 'A. Maker', creator_url: '', url: `https://live.staticflickr.com/x/${id}.jpg`, thumbnail: `https://api.openverse.org/v1/images/${id}/thumb/`, width: 1200, height: 900, foreign_landing_url: `https://www.flickr.com/photos/maker/${id}`, license: 'by', license_version: '2.0', license_url: 'https://creativecommons.org/licenses/by/2.0/', source: 'flickr', tags: tags.map((name) => ({ name })), ...extra });
+const answering = (by) => {
+  const asked = [];
+  const f = async (url) => {
+    const q = new URL(url).searchParams.get('q');
+    asked.push(q);
+    const out = by(q, url);
+    return typeof out === 'number' ? { ok: false, status: out, json: async () => ({}) } : { ok: true, status: 200, json: async () => ({ results: out }) };
+  };
+  f.asked = asked;
+  return f;
+};
+const plan = S.researchPlan(start('graphic', 'A bold poster for “Field Lines”, a creative coding night'));
+ok('a brief asks for two to four short searches: its subject and its kind, its feel, typography', plan.length >= 2 && plan.length <= 4 && plan[0].q === 'creative coding poster' && plan.some((q) => q.q === 'bold poster') && plan.every((q) => q.q.split(' ').length <= 4), J(plan));
+ok('the subject is what it is about, never its temperament or its quoted words', S.subjectOf('A logo for “Halden”, a small coffee roastery, warm and crafted') === 'coffee roastery', S.subjectOf('A logo for “Halden”, a small coffee roastery, warm and crafted'));
+ok('each kind of work searches for its own kind of reference', S.researchPlan(start('logo', 'A logo for “Halden”, a coffee roastery'))[0].q === 'coffee roastery logo' && S.researchPlan(start('website', 'A website for a yoga studio'))[0].q === 'yoga studio website' && S.researchPlan(start('board', 'A launch campaign for a night market: two posters'))[0].q.endsWith('poster'));
+ok('a design system or a critique searches for nothing', S.researchPlan(start('critique', 'Critique this page')).length === 0 && S.researchPlan(start('system', 'Import our tokens')).length === 0);
+
+S.clearResearchCache();
+const fOv = answering((q) => (q === 'creative coding poster' ? [ov('p1', 'Generative poster series', ['poster', 'generative']), ov('p2', 'Plotter drawing', ['plotter']), ov('p1', 'Generative poster series', ['poster'])] : q === 'bold poster' ? [ov('p3', 'Bold type poster', ['typography', 'poster'])] : []));
+const run1 = await S.runResearch(plan, { fetcher: fOv, now: NOW });
+ok('every search of the plan is asked, one after another, any licence', fOv.asked.length >= plan.length && fOv.asked[0] === 'creative coding poster', J(fOv.asked));
+ok('what comes back is exactly what the library returned: its titles, creators, licences, sources and pictures', run1.refs.length === 3 && run1.refs.every((x) => x.provider === 'openverse' && x.thumb.startsWith('https://api.openverse.org/') && x.sourceUrl.startsWith('https://www.flickr.com/') && x.license === 'CC BY 2.0' && x.creator === 'A. Maker' && x.origin === 'flickr' && x.state === 'proposed'), J(run1.refs));
+ok('the same work found twice is shown once', new Set(run1.refs.map((x) => x.id)).size === run1.refs.length);
+ok('ranked for a designer: a poster before a plotter drawing', run1.refs[0].title === 'Generative poster series');
+ok('the log says what was searched and what came of it', run1.log.searches[0].query === 'creative coding poster' && run1.log.searches[0].found === 2 && run1.log.searches.some((x) => x.found === 0 && !x.error), J(run1.log));
+const said1 = S.researchSaid(run1.log, run1.refs.length);
+ok('said honestly: where it searched, for what, how many, and that references are never copied', /Openverse/.test(said1) && /“creative coding poster”/.test(said1) && /found 3/.test(said1) && /never copied/.test(said1), said1);
+
+S.clearResearchCache();
+const f429 = answering(() => 429);
+const busy = await S.runResearch(plan.slice(0, 2), { fetcher: f429, now: NOW });
+ok('a library that is busy is said to be busy, and nothing is put in its place', busy.refs.length === 0 && busy.log.searches.every((x) => /busy/.test(x.error ?? '')), J(busy.log));
+ok('…and the conversation says it could not search, rather than claiming it did', /tried to look/.test(S.researchSaid(busy.log, 0)) && !/found/.test(S.researchSaid(busy.log, 0)), S.researchSaid(busy.log, 0));
+S.clearResearchCache();
+const down = await S.runResearch([{ q: 'coffee roastery logo', why: '' }], { fetcher: async () => { throw new TypeError('Failed to fetch'); }, now: NOW });
+ok('a library that cannot be reached is said to be unreachable', down.refs.length === 0 && /could not be reached/.test(down.log.searches[0].error ?? ''), J(down.log));
+S.clearResearchCache();
+const f5 = answering((q) => (q === 'quiet harbour photography' ? 504 : q === 'quiet harbour' ? [ov('h1', 'Harbour at dawn', ['harbour'])] : []));
+const shorter = await S.runResearch([{ q: 'quiet harbour photography', why: '' }], { fetcher: f5, now: NOW });
+ok('a search that fails is tried again in a shorter form, and the log says which words found it', shorter.refs.length === 1 && shorter.log.searches[0].query === 'quiet harbour' && !shorter.log.searches[0].error, J({ asked: f5.asked, log: shorter.log }));
+const st0 = S.researchStatus({ references: [], research: busy.log }, false);
+ok('the status line says when searching failed', st0.failed && /could not be searched/.test(st0.text), J(st0));
+const st1 = S.researchStatus({ references: run1.refs, research: run1.log }, false);
+ok('…and what was found, for which words', !st1.failed && /^3 found on Openverse for “creative coding poster”/.test(st1.text), st1.text);
+ok('…and that it is searching while it is', /Searching Openverse/.test(S.researchStatus({}, true).text));
+ok('the status never claims a search that did not happen', /Nothing has been searched/.test(S.researchStatus({ references: [] }, false).text));
+
+const liked = run1.refs.map((x, i) => (i === 0 ? { ...x, state: 'liked' } : i === 1 ? { ...x, state: 'rejected' } : x));
+const merged = S.mergeReferences(liked, [...run1.refs, ...Array.from({ length: 70 }, (_, i) => ({ ...run1.refs[2], id: `openverse:n${i}` }))], 60);
+ok('more found are added without repeats, capped; what was liked or turned down always stays', merged.length === 60 && merged.some((x) => x.id === run1.refs[0].id && x.state === 'liked') && merged.some((x) => x.id === run1.refs[1].id && x.state === 'rejected') && new Set(merged.map((x) => x.id)).size === 60);
+ok('a credit line names title, creator, licence and the library', S.creditOf(run1.refs[0]) === '“Generative poster series” by A. Maker, CC BY 2.0, via Openverse', S.creditOf(run1.refs[0]));
+const unsafe = S.normalizeStudio({ ...start('graphic', 'A poster for “X”'), references: [{ ...run1.refs[0], thumb: 'javascript:alert(1)' }, { ...run1.refs[1], sourceUrl: 'https://user:pw@evil.example/x', thumb: 'http://insecure.example/x.jpg' }, { ...run1.refs[2], tags: Array.from({ length: 40 }, (_, i) => `t${i}`), swatches: ['#fff', '#123456', 'red'] }] });
+ok('references are held to their shape: only https pictures, no credentials, bounded tags and colours', unsafe.references.length === 1 && unsafe.references[0].tags.length <= 12 && J(unsafe.references[0].swatches) === J(['#123456']), J(unsafe.references));
+const moved = S.normalizeStudio(JSON.parse(J({ ...start('graphic', 'A poster for “X”'), references: liked, research: run1.log })));
+ok('kept on the project through storage, with the log', moved.references.length === 3 && moved.research?.searches.length === run1.log.searches.length);
 
 // ── pictures: how the person's own are treated ──
 sec('pictures: a treatment, asked only when there are pictures, drawn with the engine’s own effects');

@@ -20,6 +20,9 @@ import { emptyDNA, setDim, type CreativeDNA, type DnaKey, type DnaVector } from 
 import { contrastRatio } from '../../ux/audit';
 import { ensureContrast } from '../spec';
 import { mix } from '../color';
+import { influencesOf, likedOf, paletteOutOf, referenceColours } from './research';
+import { graphicFont, knownFont } from '../fonts';
+import { styleById } from '../graphics/styles/registry';
 
 // ── reading answers ──
 
@@ -105,19 +108,24 @@ export function facesOf(a: StudioAnswer | null): { display: string; body: string
 
 export function prefsOf(st: StudioState): StudioPrefs {
   const p = prefix(st);
-  const styleStage = st.mode === 'board' ? 'b.direction' : `${p}.style`;
   const avoidIds = values(st, `${p}.avoid`);
   const dna: DnaVector = {};
   const feel = answerOf(st, `${p}.feel`);
   for (const [k, v] of Object.entries(feel?.numbers ?? {})) dna[k as DnaKey] = v;
+  // the look is never picked from a list: it comes from the references liked (the influences their own words name,
+  // the colours they hold) and from what the person says about it in their own words
+  const liked = likedOf(st);
+  const inf = influencesOf(liked);
+  const ownWords = text(st, `${p}.refs`);
+  const fromRefs = paletteOutOf(referenceColours(liked));
   return {
-    styles: values(st, styleStage).filter((x) => x !== 'generated'),
-    styleWords: text(st, styleStage),
-    palette: paletteOf(answerOf(st, `${p}.palette`)),
+    styles: [...new Set([...inf.styles, ...readFacts(st.prompt).styles, ...readFacts(ownWords).styles])].slice(0, 3),
+    styleWords: ownWords,
+    palette: paletteOf(answerOf(st, `${p}.palette`)) ?? (fromRefs ? { ground: fromRefs.ground, ink: fromRefs.ink, accent: fromRefs.accent, ...(fromRefs.accent2 ? { accent2: fromRefs.accent2 } : {}) } : null),
     faces: facesOf(answerOf(st, `${p}.type`)),
     org: (COMPOSITIONS.find((c) => c.id === values(st, `${p}.composition`)[0])?.org ?? null) as Org | null,
     dna,
-    personality: personalityOf(st),
+    personality: [...new Set([...personalityOf(st), ...inf.mood])].slice(0, 8),
     avoid: [...labelsOf(avoidIds, AVOID_GRAPHIC).map((x) => x.toLowerCase()), ...(text(st, `${p}.avoid`) ? [text(st, `${p}.avoid`)] : []), ...readFacts(st.prompt).avoid],
     treatment: IMAGE_TREATMENTS.some((t) => t.id === values(st, `${p}.treatment`)[0]) ? values(st, `${p}.treatment`)[0] : null,
   };
@@ -259,7 +267,9 @@ export function logoWordsOf(st: StudioState): { name: string; words: string } {
   const tagline = field(st, 'l.name', 'tagline');
   const about = [...values(st, 'l.about'), text(st, 'l.about')].filter(Boolean).join(', ');
   const form = LOGO_FORMS.find((x) => x.id === values(st, 'l.form')[0]);
-  const lettering = LETTERING.find((x) => x.id === values(st, 'l.lettering')[0]);
+  const letterFace = (values(st, 'l.lettering')[0] ?? '').split('|')[0];
+  const letterEntry = letterFace ? graphicFont(letterFace) ?? knownFont(letterFace) : null;
+  const lettering = LETTERING.find((x) => x.id === values(st, 'l.lettering')[0]) ?? (letterEntry ? { words: `${letterEntry.note} lettering, like ${letterEntry.name}` } : null);
   const idea = [...values(st, 'l.idea'), text(st, 'l.idea')].filter(Boolean);
   const avoid = [...values(st, 'l.avoid'), ...(text(st, 'l.avoid') ? [text(st, 'l.avoid')] : [])];
   const uses = values(st, 'l.uses');
@@ -338,7 +348,7 @@ export function websiteAskOf(st: StudioState): WebsiteAsk | null {
   const functions = values(st, 'w.functions');
   const prefs = prefsOf(st);
   const board: BoardBrief = {
-    purpose: [st.prompt.trim(), purpose ? `${purpose.label}.` : '', audience ? `For ${audience}.` : '', prefs.styleWords].filter(Boolean).join(' ').slice(0, 600),
+    purpose: [st.prompt.trim(), purpose ? `${purpose.label}.` : '', audience ? `For ${audience}.` : '', prefs.styles.length ? `In the spirit of ${prefs.styles.map((id) => styleById(id)?.name ?? id.replace(/-/g, ' ')).join(' and ')}.` : '', prefs.styleWords].filter(Boolean).join(' ').slice(0, 600),
     name: (name || headline).slice(0, 80),
     content: {
       headline,

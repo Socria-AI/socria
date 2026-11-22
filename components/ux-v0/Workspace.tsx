@@ -240,6 +240,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const [view, setView] = useState<View>(() =>
     initial.mode === 'critique' ? (initial.artifact ? 'design' : 'import') : currentSpec(initial) ? 'design' : initial.direction.options.length && initial.brief.approved ? 'direction' : initial.brief.doc ? 'brief' : initial.intent ? 'discovery' : 'intent'
   );
+  const [railOpen, setRailOpen] = useState(false);
   const [rail, setRail] = useState<Rail>(() => (initial.mode === 'create' && !currentSpec(initial) ? (initial.brief.doc ? 'questions' : 'brief') : 'reasoning'));
   const [selection, setSelection] = useState<SelectionContext | null>(null);
   // the section being changed directly: it stays open through each change (a change redraws the page and
@@ -1542,11 +1543,14 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
           : composeMode === 'change' && spec && !imported
             ? 'Say what to change — “make the headline shorter”, “warmer accent”'
             : 'Ask about it — “why does this feel cluttered?”';
-  const showComposer = view === 'discovery' || view === 'brief' || (view === 'design' && (!!doc || !!fileUrl));
+  // a site begun in conversation is changed in that conversation while it is open beside it: one place to type
+  const studioBorn = !!project.studio && project.studio.via !== 'hand' && project.mode === 'create';
+  const showComposer = (view === 'discovery' || view === 'brief' || (view === 'design' && (!!doc || !!fileUrl))) && !(studioBorn && railOpen && view === 'design');
 
   // ── layout ──────────────────────────────────────────────────────────
   const steps: { id: View; label: string; ok: boolean }[] =
-    project.mode === 'create'
+    // a site begun in conversation was discovered, briefed and directed there: the work is what is left to show
+    project.mode === 'create' && !studioBorn
       ? [
           { id: 'discovery', label: 'Discovery', ok: !!project.intent },
           { id: 'brief', label: 'Brief', ok: !!project.brief.doc },
@@ -1557,12 +1561,13 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
       : [];
   // before there is a design, the rail is the brief as it forms, and the conversation behind it;
   // on the brief itself, only the conversation (the brief is the page)
-  const railShown: Rail = rail === 'brief' && (view === 'brief' || !!spec || project.mode !== 'create') ? 'questions' : rail;
+  const railShown: Rail = rail === 'brief' && (view === 'brief' || !!spec || project.mode !== 'create') ? (studioBorn && spec ? 'reasoning' : 'questions') : studioBorn && spec && rail === 'questions' ? 'reasoning' : rail;
   const railTabs: { id: Rail; label: string }[] =
     project.mode === 'create'
       ? [
           ...(!spec && view !== 'brief' ? [{ id: 'brief' as Rail, label: 'Brief so far' }] : []),
-          { id: 'questions', label: 'Questions' },
+          // its questions were asked in the conversation
+          ...(studioBorn && spec ? [] : [{ id: 'questions' as Rail, label: 'Questions' }]),
           ...(spec ? [{ id: 'reasoning' as Rail, label: `Cards${project.cards.length ? ` ${project.cards.filter((c) => c.state !== 'dismissed').length}` : ''}` }] : []),
           ...(spec ? [{ id: 'selection' as Rail, label: 'Selection' }] : []),
           ...(spec ? [{ id: 'checks' as Rail, label: checks?.running ? 'Checking…' : 'Checks' }] : []),
@@ -1597,7 +1602,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
 
   return (
     <>
-    {project.studio && <StudioRail studio={project.studio} onStudio={(fn) => update((p) => (p.studio ? { ...p, studio: fn(p.studio) } : p))} onAsk={railAsk} placeholder={project.mode === 'critique' ? 'Ask about the part you selected' : spec ? 'Say what to change: “make the headline shorter”, “warmer accent”…' : 'Say what to change'} systemName={linked?.rec.name ?? null} />}
+    {project.studio && <StudioRail studio={project.studio} onStudio={(fn) => update((p) => (p.studio ? { ...p, studio: fn(p.studio) } : p))} onAsk={railAsk} placeholder={project.mode === 'critique' ? 'Ask about the part you selected' : spec ? 'Say what to change: “make the headline shorter”, “warmer accent”…' : 'Say what to change'} systemName={linked?.rec.name ?? null} onOpenChange={setRailOpen} />}
     <div className="v0 sb">
       <header className="v0-head">
         <div className="v0-head-l">

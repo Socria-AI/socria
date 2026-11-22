@@ -23,13 +23,11 @@ import { DNA_META, type DnaKey } from '../dna';
 import { CLICHES } from '../graphics/logo/brief';
 import type { Org } from '../graphics/generative/principles';
 
-export type Control = 'cards' | 'chips' | 'rank' | 'palette' | 'type' | 'sliders' | 'fields' | 'counts' | 'upload';
+export type Control = 'cards' | 'chips' | 'rank' | 'palette' | 'type' | 'sliders' | 'fields' | 'counts' | 'upload' | 'references';
 
 /** What a card shows: drawn by the engines in the browser (components/ux-v0/studio/previews.tsx). */
 export type Preview =
   | { kind: 'format'; format: string }
-  | { kind: 'style'; style: string }
-  | { kind: 'generated' }
   | { kind: 'org'; org: Org }
   | { kind: 'logo'; category: string }
   | { kind: 'website'; index: number }
@@ -161,11 +159,10 @@ const DEFS: readonly Def[] = [
     build: (st) => ({ ...base, topic: 'Feel', question: 'How should it feel?', why: 'Pick up to four. The words steer colour, type and composition.', control: 'chips', select: 'multi', max: 4, options: O.personalityOptions(st), textLabel: 'In your own words' }),
   },
   {
-    id: 'g.style',
+    id: 'g.refs',
     mode: 'graphic',
     depth: 1,
-    fromWords: (_st, f) => (f.styles.length ? { values: f.styles.slice(0, 2) } : null),
-    build: (st) => ({ ...base, topic: 'Look', question: 'Which of these is closest?', why: 'Your words, composed in each. Pick one, or two to blend — a starting point, never a template.', control: 'cards', select: 'multi', max: 2, options: O.styleOptions(st).map((o) => ({ ...o, preview: o.id === 'generated' ? { kind: 'generated' } : { kind: 'style', style: o.id } })), textLabel: 'Describe the look you have in mind' }),
+    build: (st) => ({ ...base, topic: 'References', question: 'Which of these feel right?', why: 'Real work found for your words. Like what speaks to you, turn down what does not; what you like guides the direction and is never copied.', control: 'references', select: 'multi', options: (st.references ?? []).filter((r) => r.state !== 'rejected').map((r) => ({ id: r.id, label: r.title || 'Untitled', hint: r.creator })), textLabel: 'Describe what you are after instead', allowDelegate: true }),
   },
   {
     id: 'g.palette',
@@ -204,7 +201,7 @@ const DEFS: readonly Def[] = [
     id: 'g.references',
     mode: 'graphic',
     depth: 3,
-    build: () => ({ ...base, topic: 'References', question: 'Any pictures to use, or to learn from?', why: 'A picture you add can be placed in the design, or only read for its colour and mood.', control: 'upload', select: 'multi', options: [], accept: 'image/png,image/jpeg,image/webp,image/gif', allowText: false, allowDelegate: false }),
+    build: () => ({ ...base, topic: 'Your pictures', question: 'Any pictures of your own to use, or to learn from?', why: 'A picture you add can be placed in the design, or only read for its colour and mood.', control: 'upload', select: 'multi', options: [], accept: 'image/png,image/jpeg,image/webp,image/gif', allowText: false, allowDelegate: false }),
   },
   {
     id: 'g.treatment',
@@ -255,11 +252,17 @@ const DEFS: readonly Def[] = [
     build: () => ({ ...base, topic: 'Form', question: 'Typographic, symbolic, or both?', why: 'Each drawn for your name by the logo engine. Pick the one that feels closest.', control: 'cards', select: 'single', options: C.LOGO_FORMS.map((x) => ({ id: x.id, label: x.label, hint: x.hint, preview: { kind: 'logo', category: x.category } })) }),
   },
   {
+    id: 'l.refs',
+    mode: 'logo',
+    depth: 1,
+    build: (st) => ({ ...base, topic: 'References', question: 'Which of these feel right?', why: 'Real marks found for your words. Like what speaks to you, turn down what does not; they guide, they are never copied.', control: 'references', select: 'multi', options: (st.references ?? []).filter((r) => r.state !== 'rejected').map((r) => ({ id: r.id, label: r.title || 'Untitled', hint: r.creator })), textLabel: 'Describe what you are after instead', allowDelegate: true }),
+  },
+  {
     id: 'l.lettering',
     mode: 'logo',
     depth: 2,
     when: (st) => ['wordmark', 'monogram', 'combination'].includes(valuesOf(st, 'l.form')[0] ?? ''),
-    build: () => ({ ...base, topic: 'Lettering', question: 'How should the name be lettered?', why: 'Your name, set in each voice. The engine draws its own lettering from the one you choose.', control: 'type', select: 'single', options: O.letteringOptions() }),
+    build: (st) => ({ ...base, topic: 'Lettering', question: 'How should the name be lettered?', why: 'Your name, set in each voice. The engine draws its own lettering from the one you choose.', control: 'type', select: 'single', options: O.letteringOptions(st) }),
   },
   {
     id: 'l.idea',
@@ -330,6 +333,12 @@ const DEFS: readonly Def[] = [
       const list = C.SITE_FUNCTIONS.filter((x) => x.for.includes(purpose));
       return { ...base, topic: 'Function', question: 'What must it do?', why: 'Each becomes a working part of the page — a booking that books, a form that sends.', control: 'chips', select: 'multi', options: list.map((x, i) => ({ id: x.id, label: x.label, hint: x.hint, recommended: i < 2 })), textLabel: 'Something else it must do' };
     },
+  },
+  {
+    id: 'w.refs',
+    mode: 'website',
+    depth: 1,
+    build: (st) => ({ ...base, topic: 'References', question: 'Which of these feel right?', why: 'Real work found for your words. Like what speaks to you, turn down what does not; it guides the look and is never copied.', control: 'references', select: 'multi', options: (st.references ?? []).filter((r) => r.state !== 'rejected').map((r) => ({ id: r.id, label: r.title || 'Untitled', hint: r.creator })), textLabel: 'Describe what you are after instead', allowDelegate: true }),
   },
   {
     id: 'w.aesthetic',
@@ -403,6 +412,12 @@ const DEFS: readonly Def[] = [
     build: () => ({ ...base, topic: 'Materials', question: 'What should the board hold?', why: 'Each material is its own composition in one shared identity.', control: 'counts', select: 'multi', options: [], counts: C.BOARD_MATERIALS.map((m) => ({ id: m.id, label: m.label, max: m.id === 'website' ? 1 : 12 })), allowText: false, allowDelegate: false }),
   },
   {
+    id: 'b.refs',
+    mode: 'board',
+    depth: 1,
+    build: (st) => ({ ...base, topic: 'References', question: 'Which of these feel right?', why: 'Real work found for your campaign. Like what speaks to you, turn down what does not; it guides the identity and is never copied.', control: 'references', select: 'multi', options: (st.references ?? []).filter((r) => r.state !== 'rejected').map((r) => ({ id: r.id, label: r.title || 'Untitled', hint: r.creator })), textLabel: 'Describe what you are after instead', allowDelegate: true }),
+  },
+  {
     id: 'b.identity',
     mode: 'board',
     depth: 1,
@@ -417,13 +432,6 @@ const DEFS: readonly Def[] = [
       options: [{ id: 'propose', label: 'Let SocriaUX propose', hint: 'Three systems, drawn from your words' }, ...(env.systems ?? []).map((s) => ({ id: `system:${s.id}`, label: s.name, hint: 'Your design system' })), ...(env.websites ?? []).map((w) => ({ id: `website:${w.id}`, label: w.name, hint: 'The direction of your website' }))],
       allowText: false,
     }),
-  },
-  {
-    id: 'b.direction',
-    mode: 'board',
-    depth: 1,
-    fromWords: (_st, f) => (f.styles.length ? { values: f.styles.slice(0, 2) } : null),
-    build: (st, _f, env) => ({ ...base, topic: 'Look', question: env.hasSystem ? 'How should your system speak here?' : 'Which of these is closest?', why: 'Your line, composed in each. Pick one, or two to blend.', control: 'cards', select: 'multi', max: 2, options: O.styleOptions(st).map((o) => ({ ...o, preview: o.id === 'generated' ? { kind: 'generated' } : { kind: 'style', style: o.id } })), textLabel: 'Describe the look you have in mind' }),
   },
   {
     id: 'b.personality',
@@ -518,7 +526,8 @@ const DEFS: readonly Def[] = [
   {
     id: 'c.focus',
     mode: 'critique',
-    depth: 1,
+    // the design itself is enough to begin; what to look at first is offered, not asked
+    depth: 2,
     build: () => ({ ...base, topic: 'Focus', question: 'What should we look at first?', why: 'Up to three. Everything else is still open to question.', control: 'chips', select: 'multi', max: 3, options: opts(C.CRITIQUE_FOCUS), textLabel: 'Something specific' }),
   },
   {
@@ -627,10 +636,13 @@ export function summaryOf(st: StudioState, id: string, env: DiscoveryEnv = {}): 
       if (n > 0) parts.push(c.id === 'website' ? c.label : `${n} ${c.label.toLowerCase()}`);
     }
   if (body.control === 'sliders') for (const s of body.sliders ?? []) if (a.numbers?.[s.id] !== undefined) parts.push(`${s.label}: ${dnaWordOf(s.id, a.numbers[s.id])}`);
-  if (body.control === 'rank') parts.push(a.values.map((v, i) => `${i + 1}. ${label(v)}`).join(' '));
+  if (body.control === 'references') {
+    const liked = (st.references ?? []).filter((r) => r.state === 'liked');
+    parts.push(liked.length ? `${liked.length} liked: ${liked.slice(0, 3).map((r) => `“${(r.title || 'Untitled').slice(0, 40)}”`).join(', ')}${liked.length > 3 ? '…' : ''}` : 'None liked');
+  } else if (body.control === 'rank') parts.push(a.values.map((v, i) => `${i + 1}. ${label(v)}`).join(' '));
   else if (body.control === 'upload') parts.push(`${a.values.length} file${a.values.length === 1 ? '' : 's'}`);
   else if (body.control === 'palette') parts.push(a.fields?.accent ? `${a.fields.ground} · ${a.fields.ink} · ${a.fields.accent}` : body.options.find((o) => o.id === a.values[0])?.label ?? (a.values[0] ? a.values[0].split('|').slice(0, 3).join(' · ') : ''));
-  else if (!['fields', 'counts', 'sliders'].includes(body.control)) parts.push(...a.values.map(label));
+  else if (!['fields', 'counts', 'sliders', 'references'].includes(body.control)) parts.push(...a.values.map(label));
   if (a.text) parts.push(`“${a.text}”`);
   return parts.filter(Boolean).join(', ');
 }
@@ -783,8 +795,11 @@ export function reviseFromWords(st: StudioState, text: string, now = Date.now())
     if (ids.length) put(personality, { values: [...new Set([...ids, ...(adding ? answerOf(st, personality)?.values ?? [] : [])])].slice(0, 4) }, 'the feel');
   }
   // a style named outright
-  const style = st.mode === 'board' ? 'b.direction' : `${p}.style`;
-  if (f.styles.length && has(style)) put(style, { values: f.styles.slice(0, 2) }, 'the look');
+  const look = `${p}.refs`;
+  if (f.styles.length && has(look)) {
+    const before = answerOf(st, look);
+    put(look, { values: before?.values ?? [], text: [before?.text, t].filter(Boolean).join(' — ').slice(0, 400) }, 'the look');
+  }
   // three colours or more: a palette (the lightest the ground, the darkest the ink, the most saturated the accent)
   const palette = `${p}.palette`;
   if (f.colours.length >= 3 && has(palette)) {

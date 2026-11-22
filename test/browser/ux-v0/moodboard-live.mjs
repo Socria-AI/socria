@@ -2,7 +2,7 @@
 // check are scripted; every image is a real search. The discovery turn proposes long queries of the kind that once
 // found nothing, so this checks the two-word fallback, whole pages, More images, More like these, the board's own
 // search and Replace — and that every image shown carries its credit and licence.
-import { chromium, S, BASE } from './env.mjs';
+import { chromium, S, BASE, websiteWorkspace } from './env.mjs';
 
 const out = (m) => console.log(m);
 const b = await chromium.launch(process.env.HTTPS_PROXY ? { proxy: { server: process.env.HTTPS_PROXY, bypass: 'localhost,127.0.0.1' } } : {});
@@ -27,12 +27,8 @@ await ctx.route('**/api/ux-v0/discover', (r) => r.fulfill({ json: {
 
 const settle = async () => { await page.waitForTimeout(300); await page.waitForFunction(() => !document.querySelector('.v0-board-head [role=status]'), null, { timeout: 45000 }); await page.waitForTimeout(600); };
 await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
-await page.locator('.v0-intent-line textarea').fill('A website for my independent coffee house');
-await page.getByRole('button', { name: 'Begin' }).click();
-// the studio's conversation comes first; the model-led website workspace is its own way in from it
-await page.waitForSelector('.sd-conv', { timeout: 15000 });
-if (!(await page.getByRole('button', { name: 'Plan it in the workspace' }).isVisible())) await page.getByRole('button', { name: /Decisions/ }).click();
-await page.getByRole('button', { name: 'Plan it in the workspace' }).click();
+// the model-led website workspace's own way in (its questions, references, brief and directions)
+await websiteWorkspace(page, 'A website for my independent coffee house');
 await page.waitForSelector('.v0-tile img', { timeout: 60000 });
 await settle();
 const tiles = () => page.locator('.v0-tile').count();

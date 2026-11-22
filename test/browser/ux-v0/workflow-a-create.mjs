@@ -1,7 +1,7 @@
 // Workflow A (Create), end to end, with the model and the image libraries scripted:
 // intent → question → moodboard (keep, remove, replace) → answer → brief → art direction (three, asked again, one
 // changed and taken) → generate → checks → change → undo → critique → versions.
-import { chromium, S, FX, ROOT, BASE, underTest } from './env.mjs';
+import { chromium, S, FX, ROOT, BASE, underTest, websiteWorkspace } from './env.mjs';
 import { readFileSync } from 'node:fs';
 const V = await underTest();
 const out = (m) => console.log(m);
@@ -89,12 +89,8 @@ await ctx.route('**/api/ux-v0/**', async (r) => {
 });
 
 await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
-await page.locator('.v0-intent-line textarea').fill('A website for my independent coffee house');
-await page.getByRole('button', { name: 'Begin' }).click();
-// the studio's conversation comes first; the model-led website workspace is its own way in from it
-await page.waitForSelector('.sd-conv', { timeout: 15000 });
-if (!(await page.getByRole('button', { name: 'Plan it in the workspace' }).isVisible())) await page.getByRole('button', { name: /Decisions/ }).click();
-await page.getByRole('button', { name: 'Plan it in the workspace' }).click();
+// the model-led website workspace's own way in (its questions, references, brief and directions)
+await websiteWorkspace(page, 'A website for my independent coffee house');
 await page.waitForSelector('.v0-question .v0-q-text', { timeout: 15000 });
 await page.waitForSelector('.v0-tile img', { timeout: 15000 });
 await page.waitForTimeout(1200);

@@ -8,7 +8,7 @@
 //
 //   UXV0_FORWARD=1 UXV0_BASE=http://127.0.0.1:3100 node test/browser/ux-v0/ceiling-qa.mjs   (against `next start`)
 import { readFileSync } from 'node:fs';
-import { chromium, S, BASE, underTest } from './env.mjs';
+import { chromium, S, BASE, underTest, handBrief } from './env.mjs';
 
 const V = await underTest();
 const D = V.gfxDoc;
@@ -77,11 +77,8 @@ const exportItem = async (name) => {
 
 console.log('=== SocriaUX Graphics: the creative-ceiling expansion, by hand, in the built app ===');
 await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
-await page.fill('textarea[aria-label="What do you want to make?"]', 'A poster for “Field Lines”, a creative coding meetup, “Code that draws”, generative, procedural');
-await page.getByRole('radio', { name: 'Graphic', exact: true }).click();
-await page.getByRole('button', { name: 'Begin' }).click();
-await page.getByRole('button', { name: 'Write the brief yourself' }).click();
-await page.waitForSelector('.gx-brief', { timeout: 15000 });
+// the brief written by hand in the workspace (its own form)
+await handBrief(page, 'graphic', 'A poster for “Field Lines”, a creative coding meetup, “Code that draws”, generative, procedural');
 await page.getByRole('button', { name: /See three directions/ }).click();
 await page.waitForSelector('.gx-dir', { timeout: 15000 });
 await page.locator('.gx-dir').first().getByRole('button', { name: /Make it in this direction/ }).click();

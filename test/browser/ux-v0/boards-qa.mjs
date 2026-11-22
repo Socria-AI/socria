@@ -9,7 +9,7 @@
 //   UXV0_FORWARD=1 UXV0_BASE=http://127.0.0.1:3100 node test/browser/ux-v0/boards-qa.mjs   (against `next start`)
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { chromium, S, BASE, ROOT, underTest } from './env.mjs';
+import { chromium, S, BASE, ROOT, underTest, handBrief } from './env.mjs';
 
 const V = await underTest();
 const JSZip = createRequire(ROOT + 'package.json')('jszip');
@@ -142,11 +142,8 @@ await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
 
 // ── 1. a board, begun from the home ──
 const REQUEST = 'Create a launch campaign for “Night Market Lisbon”, “Food, music and makers after dark”, every Friday in July: two posters, two Instagram graphics, a website and a product mockup. Annotate the important design decisions.';
-await page.fill('textarea[aria-label="What do you want to make?"]', REQUEST);
-await page.getByRole('radio', { name: 'Board', exact: true }).click();
-await page.getByRole('button', { name: 'Begin' }).click();
-await page.getByRole('button', { name: 'Write the brief yourself' }).click();
-await page.waitForSelector('.bd-brief', { timeout: 15000 });
+// the brief written by hand in the workspace (its own form)
+await handBrief(page, 'board', REQUEST);
 await page.waitForTimeout(600);
 let proj = await projectOf(pid());
 ok('1. a board is a project type of its own: begun from the home, kept in this browser as a board', proj?.medium === 'board' && !!proj.board && /Night Market/.test(proj.intent), J({ medium: proj?.medium }));
@@ -471,18 +468,16 @@ await focusMaterial('Website');
 await page.locator('.bd-right').getByRole('button', { name: /Open in the website editor/ }).click();
 await page.waitForTimeout(2500);
 ok('20. the website opens in the website editor (the existing workspace, its own project)', new URL(page.url()).searchParams.get('p') === siteId && (await page.locator('.v0-head').count()) === 1 && !(await page.locator('.bd-canvas').count()));
-await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
+// everything made is in its own view (the home is one composer)
+await page.goto(BASE + '/ux-v0?work=1', { waitUntil: 'networkidle' });
 await page.waitForTimeout(1200);
 const plates = await page.locator('main').innerText();
 const count = (await projectOf(boardId)).board.materials.length;
-ok('…the home lists the board as a board (its materials counted) and the website as a website', new RegExp(`Board · ${count} materials`).test(plates) && /Website/.test(plates), plates.slice(0, 400));
+ok('…your work lists the board as a board (its materials counted) and the website as a website', new RegExp(`Board · ${count} materials`).test(plates) && /Website/.test(plates), plates.slice(0, 400));
 
 // ── dozens of materials stay light: virtualization and level of detail ──
-await page.fill('textarea[aria-label="What do you want to make?"]', 'For “Harbour Week”, “Ten days on the water”: twelve posters, twelve Instagram graphics and twelve stories');
-await page.getByRole('radio', { name: 'Board', exact: true }).click();
-await page.getByRole('button', { name: 'Begin' }).click();
-await page.getByRole('button', { name: 'Write the brief yourself' }).click();
-await page.waitForSelector('.bd-brief', { timeout: 15000 });
+// the brief written by hand in the workspace (its own form)
+await handBrief(page, 'board', 'For “Harbour Week”, “Ten days on the water”: twelve posters, twelve Instagram graphics and twelve stories');
 await page.getByRole('button', { name: /Propose design systems/ }).click();
 await page.waitForSelector('.bd-sys', { timeout: 15000 });
 const tBig = Date.now();

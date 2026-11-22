@@ -328,6 +328,19 @@
   grid-template-columns: var(--gx-left) minmax(0, 1fr) var(--gx-right);
   min-height: 0;
 }
+/* the work alone, with the conversation beside it: the panels put away, the properties back while something is selected */
+.gx-ws.is-focus {
+  grid-template-columns: minmax(0, 1fr) var(--gx-right);
+}
+.gx-ws.is-focus.no-right {
+  grid-template-columns: minmax(0, 1fr);
+}
+.gx-ws > [hidden] {
+  display: none !important;
+}
+.gx-askbar.is-quiet {
+  padding: 8px 14px 10px;
+}
 .gx-left,
 .gx-right {
   min-height: 0;

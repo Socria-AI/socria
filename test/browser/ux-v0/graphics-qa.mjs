@@ -8,7 +8,7 @@
 //   UXV0_FORWARD=1 UXV0_BASE=http://127.0.0.1:3100 node test/browser/ux-v0/graphics-qa.mjs   (against `next start`)
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { chromium, S, BASE, ROOT, FX, underTest } from './env.mjs';
+import { chromium, S, BASE, ROOT, FX, underTest, handBrief } from './env.mjs';
 
 const V = await underTest();
 const { getDocumentProxy } = await import(createRequire(ROOT + 'package.json').resolve('unpdf'));
@@ -111,11 +111,8 @@ const home = async () => {
 };
 /** A new graphic from the home: the words typed, the kind chosen, the brief written by hand (the studio's own way in). */
 const begin = async (words) => {
-  await page.fill('textarea[aria-label="What do you want to make?"]', words);
-  await page.getByRole('radio', { name: 'Graphic', exact: true }).click();
-  await page.getByRole('button', { name: 'Begin' }).click();
-  await page.getByRole('button', { name: 'Write the brief yourself' }).click();
-  await page.waitForSelector('.gx-brief', { timeout: 15000 });
+  // the brief written by hand in the workspace (its own form)
+  await handBrief(page, 'graphic', words);
   await page.waitForTimeout(500);
 };
 /** From the brief to the editor: three directions, the first (or the one given) chosen. */
@@ -582,11 +579,14 @@ const api = await page.evaluate(async () => {
 });
 const carousel = await projectOf(carouselId);
 ok('26. isolation: the account copy of projects refuses anyone not signed in (list, read, write, delete: 401); another project carries none of this one’s pictures', J(api) === '[401,401,401,401]' && !carousel.graphic.doc.assets.some((a) => a.src === `upload:${lettersUpload}`), J(api));
+// everything made is in its own view (the home is one composer)
+await page.goto(BASE + '/ux-v0?work=1', { waitUntil: 'networkidle' });
+await page.waitForSelector('.sd-work', { timeout: 15000 });
 const card = page.locator('.mu-exhibit').filter({ hasText: 'Letters in Motion' }).first();
 await card.scrollIntoViewIfNeeded();
 await page.waitForTimeout(1500);
 const cardText = await card.innerText().catch(() => '');
-ok('…the home labels a graphic as one (its kind and direction), with its own thumbnail drawn by the same renderer', /Poster ·/.test(cardText) && (await card.locator('.mu-plate-svg svg').count()) === 1 && (await card.locator('.mu-plate-svg svg text').count()) > 0, cardText);
+ok('…your work labels a graphic as one (its kind and direction), with its own thumbnail drawn by the same renderer', /Poster ·/.test(cardText) && (await card.locator('.mu-plate-svg svg').count()) === 1 && (await card.locator('.mu-plate-svg svg text').count()) > 0, cardText);
 const artBefore = await artifactIds();
 await card.getByRole('button', { name: 'Delete' }).click();
 await page.getByRole('button', { name: 'Delete it' }).click();

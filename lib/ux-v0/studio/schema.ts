@@ -27,6 +27,62 @@ export interface StudioAttachment {
   swatches?: string[];
 }
 
+export const REF_TAKES = ['colour', 'type', 'composition', 'mood', 'imagery'] as const;
+export type RefTake = (typeof REF_TAKES)[number];
+
+/** A reference found on the internet, as kept with the conversation: enough to show it, credit it and learn from it. */
+export interface StudioReference {
+  /** provider:id */
+  id: string;
+  provider: string;
+  title: string;
+  creator: string;
+  /** the page it came from */
+  sourceUrl: string;
+  /** where the provider found it (Flickr, Wikimedia Commons, a museum) */
+  origin?: string;
+  /** a small picture of it, as the provider serves it */
+  thumb: string;
+  width: number;
+  height: number;
+  license: string;
+  licenseUrl: string;
+  /** the provider's own words for it */
+  tags: string[];
+  /** what was searched for to find it */
+  query: string;
+  state: 'proposed' | 'liked' | 'rejected';
+  /** what the person likes about it (none: the whole of it) */
+  take?: RefTake[];
+  /** its colours, read in the browser */
+  swatches?: string[];
+  at: number;
+}
+
+export interface ResearchSearch {
+  query: string;
+  provider: string;
+  found: number;
+  error?: string;
+}
+
+/** What was really searched, where, and what came of it: said as it was, never more. */
+export interface ResearchLog {
+  at: number;
+  searches: ResearchSearch[];
+}
+
+/** Only addresses a browser may safely load or open: https, no credentials, bounded. */
+export function safeUrl(u: unknown): string {
+  if (typeof u !== 'string' || u.length > 600) return '';
+  try {
+    const x = new URL(u);
+    return x.protocol === 'https:' && !x.username && !x.password ? x.toString() : '';
+  } catch {
+    return '';
+  }
+}
+
 export type AnswerSource = 'words' | 'person' | 'socria';
 
 export interface StudioAnswer {
@@ -79,6 +135,10 @@ export interface StudioState {
   startedAt?: number;
   /** how the work began: from the conversation (the default), or with the brief written by hand in the workspace */
   via?: 'hand';
+  /** references found on the internet for this work, and what the person made of each */
+  references?: StudioReference[];
+  /** what was really searched for them, where, and what came of it */
+  research?: ResearchLog;
   createdAt: number;
 }
 
@@ -223,8 +283,69 @@ export function normalizeStudio(v: unknown): StudioState | undefined {
     status: r.status === 'started' ? 'started' : 'discovering',
     ...(n(r.startedAt, 0, 8.64e15) ? { startedAt: n(r.startedAt, 0, 8.64e15)! } : {}),
     ...(r.via === 'hand' ? { via: 'hand' as const } : {}),
+    ...((refs) => (refs.length ? { references: refs } : {}))(
+      a(r.references)
+        .map(normalizeReference)
+        .filter((x): x is StudioReference => !!x)
+        .slice(0, MAX_REFERENCES),
+    ),
+    ...((log) => (log ? { research: log } : {}))(normalizeResearch(r.research)),
     createdAt: n(r.createdAt, 0, 8.64e15) ?? 0,
   };
+}
+
+const MAX_REFERENCES = 60;
+const HEX6 = /^#[0-9a-f]{6}$/i;
+
+/** A reference as stored: every address checked, every field bounded, nothing else kept. */
+function normalizeReference(v: unknown): StudioReference | null {
+  const r = o(v);
+  const id = s(r.id, 140);
+  const thumb = safeUrl(r.thumb);
+  if (!id || !thumb) return null;
+  const take = a(r.take).filter((x): x is RefTake => typeof x === 'string' && (REF_TAKES as readonly string[]).includes(x));
+  const swatches = a(r.swatches)
+    .filter((x): x is string => typeof x === 'string' && HEX6.test(x))
+    .map((x) => x.toLowerCase())
+    .slice(0, 6);
+  return {
+    id,
+    provider: s(r.provider, 40) || 'openverse',
+    title: s(r.title, 200),
+    creator: s(r.creator, 120),
+    sourceUrl: safeUrl(r.sourceUrl),
+    ...(s(r.origin, 40) ? { origin: s(r.origin, 40) } : {}),
+    thumb,
+    width: n(r.width, 0, 100000) ?? 0,
+    height: n(r.height, 0, 100000) ?? 0,
+    license: s(r.license, 60),
+    licenseUrl: safeUrl(r.licenseUrl),
+    tags: a(r.tags)
+      .map((x) => s(x, 40))
+      .filter(Boolean)
+      .slice(0, 12),
+    query: s(r.query, 100),
+    state: r.state === 'liked' || r.state === 'rejected' ? r.state : 'proposed',
+    ...(take.length ? { take: [...new Set(take)] } : {}),
+    ...(swatches.length ? { swatches } : {}),
+    at: n(r.at, 0, 8.64e15) ?? 0,
+  };
+}
+
+function normalizeResearch(v: unknown): ResearchLog | null {
+  const r = o(v);
+  const searches = a(r.searches)
+    .map((x) => {
+      const q = o(x);
+      const query = s(q.query, 100);
+      if (!query) return null;
+      const error = s(q.error, 200);
+      return { query, provider: s(q.provider, 40) || 'openverse', found: n(q.found, 0, 10000) ?? 0, ...(error ? { error } : {}) };
+    })
+    .filter((x): x is ResearchSearch => !!x)
+    .slice(-20);
+  const at = n(r.at, 0, 8.64e15);
+  return searches.length && at ? { at, searches } : null;
 }
 
 /** A message added to the conversation (bounded: the oldest go first). */

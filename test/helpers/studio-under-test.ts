@@ -9,6 +9,7 @@ export * from '@/lib/ux-v0/studio/options';
 export * from '@/lib/ux-v0/studio/apply';
 export * from '@/lib/ux-v0/studio/discovery';
 export * from '@/lib/ux-v0/studio/start';
+export * from '@/lib/ux-v0/studio/research';
 // the engines it reaches, for the end-to-end checks
 export { makeProject, normalizeProject, summarize } from '@/lib/ux-v0/types';
 export { composeGraphic, readGraphicBrief } from '@/lib/ux-v0/graphics/compose';

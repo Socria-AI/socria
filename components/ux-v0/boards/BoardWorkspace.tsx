@@ -77,6 +77,10 @@ const systemFacesOf = (sys: MasterDesignSystem): Face[] => systemFaces(sys);
 export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenProject }: { initial: DesignProject; signedIn: boolean; onExit: () => void; startIntent?: string; onOpenProject: (id: string) => void }) {
   const { project, update, save, current } = useV0Project(initial, signedIn);
   const { library: styleLibrary } = useStyleLibrary();
+  // while the conversation is open beside the board it is the one place to type
+  const [railOpen, setRailOpen] = useState(false);
+  const [matInbox, setMatInbox] = useState<{ id: number; words: string } | null>(null);
+  const [matSaid, setMatSaid] = useState<{ text: string } | null>(null);
   const b: BoardState = project.board ?? emptyBoard();
   const setBoard = useCallback((fn: (x: BoardState) => BoardState) => update((p) => ({ ...p, board: fn(p.board ?? emptyBoard()) })), [update]);
   const boardNow = useCallback(() => current.current.board ?? emptyBoard(), [current]);
@@ -757,7 +761,8 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
 
   const shown = pending?.kind === 'ops' ? pending.preview : b;
   const steps: { id: View; label: string; ok: boolean }[] = [
-    { id: 'brief', label: 'Brief', ok: true },
+    // a board begun in conversation has its brief there, not in a form
+    ...(project.studio && project.studio.via !== 'hand' ? [] : [{ id: 'brief' as View, label: 'Brief', ok: true }]),
     { id: 'system', label: 'System', ok: !!b.brief && b.options.length > 0 },
     { id: 'board', label: 'Board', ok: !!b.system },
   ];
@@ -776,8 +781,25 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
   // ── the conversation beside the board: words go to the board's own changes in words ──
   const heard = useMemo(() => (pending ? { text: pending.kind === 'ops' ? `Previewing: ${pending.label}. Apply or Discard it under the board.` : pending.kind === 'confirm' ? pending.text : `Previewing the system change: ${pending.label}.` } : note ? { text: note.text } : null), [pending, note]);
   const waitReply = useRailReply(heard, (h) => h.text);
+  const waitMaterial = useRailReply(matSaid, (h) => h.text);
   const railAsk = async (said: string): Promise<string | null> => {
     const low = said.toLowerCase();
+    // a material open in the graphics editor takes the words, as if typed there
+    if (editingMaterial?.doc) {
+      const wait = waitMaterial();
+      setMatInbox((i) => ({ id: (i?.id ?? 0) + 1, words: said }));
+      return wait;
+    }
+    // a preview waiting: “apply” or “discard” said in words settles it
+    if (pending && /^\s*(apply( it)?|yes|keep( it)?|do it|ok(ay)?|looks good|perfect)\b/i.test(said)) {
+      applyPending();
+      return 'Applied. Undo takes it back.';
+    }
+    if (pending && /^\s*(discard( it)?|no\b|cancel|not that|never ?mind)/i.test(said)) {
+      setPending(null);
+      setNote({ tone: 'ok', text: 'Discarded: the board is as it was.' });
+      return 'Discarded: the board is as it was.';
+    }
     if (view === 'board' && b.system) {
       const wait = waitReply();
       ask(said);
@@ -800,7 +822,7 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
 
   return (
     <>
-    {project.studio && <StudioRail studio={project.studio} onStudio={(fn) => update((p) => (p.studio ? { ...p, studio: fn(p.studio) } : p))} onAsk={railAsk} placeholder={view === 'board' ? 'Ask the board: “arrange these into two rows”, “change the accent to green”…' : view === 'system' ? '“The first one”, or “more”' : 'Say what to change'} systemName={linked?.rec.name ?? null} />}
+    {project.studio && <StudioRail studio={project.studio} onStudio={(fn) => update((p) => (p.studio ? { ...p, studio: fn(p.studio) } : p))} onAsk={railAsk} placeholder={view === 'board' ? 'Ask the board: “arrange these into two rows”, “change the accent to green”…' : view === 'system' ? '“The first one”, or “more”' : 'Say what to change'} systemName={linked?.rec.name ?? null} onOpenChange={setRailOpen} />}
     <div className="v0 sb gx bd">
       <header className="v0-head">
         <div className="v0-head-l">
@@ -1138,6 +1160,7 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
               />
               {pending?.kind === 'ops' && <span className="gx-preview-tag">Preview</span>}
             </div>
+            {(!(railOpen && project.studio) || pending || note) && (
             <div className="gx-askbar bd-askbar">
               {pending ? (
                 <div className="gx-pending bd-pending" role="status">
@@ -1156,6 +1179,7 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
                   </button>
                 </div>
               ) : (
+                railOpen && project.studio ? null : (
                 <form
                   className="gx-ask"
                   onSubmit={(e) => {
@@ -1171,6 +1195,7 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
                     Preview
                   </button>
                 </form>
+                )
               )}
               {note && (
                 <p className={`gx-note is-${note.tone}`} role={note.tone === 'warn' ? 'alert' : 'status'}>
@@ -1178,6 +1203,7 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
                 </p>
               )}
             </div>
+            )}
           </main>
 
           <aside className="gx-right bd-right" aria-label="Inspector">
@@ -1224,6 +1250,9 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
                     ← Back to the board
                   </button>
                 }
+                inbox={matInbox}
+                onAsked={(t) => setMatSaid({ text: t })}
+                hideAsk={!!project.studio && railOpen}
               />
             </div>
           )}
