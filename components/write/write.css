@@ -41,6 +41,7 @@
   top: 46px;
   align-self: flex-start;
   max-height: calc(100vh - 170px - var(--omni, 0px));
+  max-height: calc(100svh - 170px - var(--omni, 0px));
   border-left: 1px solid var(--lg-line);
 }
 .logos-root .l5 .l5s-art.is-bare { padding: 0; gap: 0; width: min(1180px, 100%); }

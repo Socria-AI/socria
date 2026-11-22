@@ -271,13 +271,28 @@ export function outlineOf(map: Pick<ThinkingMap, 'nodes' | 'edges' | 'title'>): 
 // ── where things are, in each way of working ─────────────────────────
 
 export type Placed = Map<string, { x: number; y: number; manual: boolean }>;
-const CARD_W = 180, CARD_H = 64, GAP_X = 56, GAP_Y = 48;
+/**
+ * A card's width, and the least height it has (components/logos6/ThinkingCanvas.tsx draws them; one place for both).
+ * Its real height is its content's — a long label wraps — so the layouts below take the height of each card as drawn
+ * (`heightOf`), and step every row or layer by the tallest card in it. Laid out by the least height instead, a card
+ * with a long label ran over the card under it.
+ */
+export const CARD_W = 180;
+export const CARD_H = 64;
+const GAP_X = 56, GAP_Y = 48;
+/** The space between rows of cards (Ideas) and between layers (Logic), beyond the tallest card in the row above. */
+const ROW_GAP = GAP_Y + 12;
+const LAYER_GAP = GAP_Y + 30;
+/** How tall a card is, as drawn; the least height when it has not been measured (a test, the first render). */
+export type HeightOf = (id: string) => number;
+const leastHeight: HeightOf = () => CARD_H;
 
 /**
  * IDEAS: where the person put each card; the rest laid out in a calm grid by group (cards of a group together),
  * then by connection (a card near the ones it connects to), so a new map is never a pile.
  */
-export function ideasPlaces(map: Pick<ThinkingMap, 'nodes' | 'edges'>): Placed {
+export function ideasPlaces(map: Pick<ThinkingMap, 'nodes' | 'edges'>, heightOf: HeightOf = leastHeight): Placed {
+  const h = (id: string) => Math.max(CARD_H, heightOf(id) || CARD_H);
   const out: Placed = new Map();
   for (const n of map.nodes) if (n.mind?.pos?.i) out.set(n.id, { x: n.mind.pos.i[0], y: n.mind.pos.i[1], manual: true });
   const loose = map.nodes.filter((n) => !out.has(n.id));
@@ -290,9 +305,15 @@ export function ideasPlaces(map: Pick<ThinkingMap, 'nodes' | 'edges'>): Placed {
   });
   const order = [...loose].sort((a, b) => (a.group ?? '~').localeCompare(b.group ?? '~') || (touch.get(a.id) ?? 1e9) - (touch.get(b.id) ?? 1e9));
   const cols = Math.max(2, Math.min(5, Math.ceil(Math.sqrt(order.length * 1.6))));
-  // below the cards already placed by hand
-  const floor = out.size ? Math.max(...[...out.values()].map((p) => p.y)) + CARD_H + GAP_Y * 1.5 : 0;
-  order.forEach((n, i) => out.set(n.id, { x: (i % cols) * (CARD_W + GAP_X), y: floor + Math.floor(i / cols) * (CARD_H + GAP_Y + 12), manual: false }));
+  // below the cards already placed by hand (below the bottom of the lowest, as drawn)
+  const floor = out.size ? Math.max(...[...out.entries()].map(([id, p]) => p.y + h(id))) + GAP_Y * 1.5 : 0;
+  // each row as tall as its tallest card, so no card reaches the row under it
+  let y = floor;
+  for (let r = 0; r * cols < order.length; r++) {
+    const row = order.slice(r * cols, r * cols + cols);
+    row.forEach((n, i) => out.set(n.id, { x: i * (CARD_W + GAP_X), y, manual: false }));
+    y += Math.max(...row.map((n) => h(n.id))) + ROW_GAP;
+  }
   return out;
 }
 
@@ -320,7 +341,8 @@ function upper(e: LogosEdge): [string, string] | null {
  * supports, is needed for or follows from it — ordered within a layer to keep lines short. Loops are broken, never
  * drawn as layers that climb back.
  */
-export function logicPlaces(map: Pick<ThinkingMap, 'nodes' | 'edges'>): Placed {
+export function logicPlaces(map: Pick<ThinkingMap, 'nodes' | 'edges'>, heightOf: HeightOf = leastHeight): Placed {
+  const h = (id: string) => Math.max(CARD_H, heightOf(id) || CARD_H);
   const out: Placed = new Map();
   const ids = map.nodes.map((n) => n.id);
   const below = new Map<string, string[]>(ids.map((id) => [id, []]));
@@ -367,12 +389,45 @@ export function logicPlaces(map: Pick<ThinkingMap, 'nodes' | 'edges'>): Placed {
       xOf.set(r.id, x);
     });
   }
+  // each layer starts below the tallest card of the layer above it (as drawn), so a long label never reaches down
+  const topOf = new Map<number, number>();
+  let y = 0;
+  for (const l of sorted) {
+    topOf.set(l, y);
+    y += Math.max(...rows.get(l)!.map(h)) + LAYER_GAP;
+  }
   for (const n of map.nodes) {
     const manual = n.mind?.pos?.l;
     if (manual) out.set(n.id, { x: manual[0], y: manual[1], manual: true });
-    else out.set(n.id, { x: xOf.get(n.id) ?? 0, y: (layer.get(n.id) ?? 0) * (CARD_H + GAP_Y + 30), manual: false });
+    else out.set(n.id, { x: xOf.get(n.id) ?? 0, y: topOf.get(Math.min(layer.get(n.id) ?? 0, 12)) ?? 0, manual: false });
   }
   return out;
+}
+
+/** A card as drawn: its top-left corner and its size. */
+export interface CardBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+/**
+ * A LINE BETWEEN TWO CARDS, where it is seen. It runs on the line through the cards' centres, from the centre of the
+ * one it starts at (under that card) to just short of the edge of the card it points at, so an arrowhead lands on the
+ * edge. What the line says is written at the middle of the part seen BETWEEN the cards. The middle of the centres
+ * lay inside the taller card whenever the two differed in height — a label under a card with a long title.
+ */
+export function edgeEnds(a: CardBox, b: CardBox): { x1: number; y1: number; x2: number; y2: number; lx: number; ly: number } {
+  const ax = a.x + a.w / 2, ay = a.y + a.h / 2, bx = b.x + b.w / 2, by = b.y + b.h / 2;
+  const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;
+  // how far a line through a card's centre, in this direction, runs before it leaves the card
+  const inside = (w: number, h: number) => Math.min(Math.abs(ux) > 1e-6 ? w / 2 / Math.abs(ux) : Infinity, Math.abs(uy) > 1e-6 ? h / 2 / Math.abs(uy) : Infinity);
+  const ia = inside(a.w, a.h), ib = inside(b.w, b.h);
+  const cut = Math.min(len / 2 - 4, ib + 4);
+  // cards that touch or overlap have no part between them to write on: the middle of the centres, as before
+  const between = len - ia - ib > 1 ? (ia + len - ib) / 2 : len / 2;
+  return { x1: ax, y1: ay, x2: bx - ux * cut, y2: by - uy * cut, lx: ax + ux * between, ly: ay + uy * between };
 }
 
 /** STRUCTURE: the tree laid out left to right, a row per visible card, indented by depth. */

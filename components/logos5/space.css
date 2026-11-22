@@ -141,6 +141,11 @@
 /* ── the chatbox: a box at the foot of the space ── */
 .logos-root .ls-chat { position: absolute; left: 50%; bottom: 18px; z-index: 5; transform: translateX(-50%); width: min(760px, calc(100% - 48px)); display: flex; flex-direction: column; gap: 8px; }
 .logos-root .ls::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; height: 150px; background: linear-gradient(to bottom, rgba(var(--c-paper-rgb, 245, 243, 235), 0), var(--c-paper) 46%); pointer-events: none; }
+/* the chat box's own ground over the board: what sits over the box (the objective, a note, the Enter hint) is read on
+   the paper, never across a card scrolled beneath it — the fade above is a fixed height, and the box is not. The
+   ground is the box's own size, so it grows with whatever is over it, and soft at its edges, so the board fades into
+   it rather than stops. (A phone's box is a bar with a ground of its own.) */
+.logos-root .ls:not(.is-phone) .ls-chat::before { content: ''; position: absolute; inset: 0 0 -18px; z-index: -1; border-radius: 18px; background: var(--c-paper); box-shadow: 0 0 22px 14px var(--c-paper); pointer-events: none; }
 .logos-root .ls-answering { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px; border: 1px solid rgba(var(--c-moss-rgb), 0.3); border-radius: 6px; background: #eef1e6; font-size: 12.5px; color: var(--c-moss); max-width: 100%; }
 .logos-root .ls-answering b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 420px; }
 .logos-root .ls-answering-x { width: 20px; height: 20px; padding: 0; border: 0; background: none; color: var(--c-ink-45); font-size: 14px; line-height: 1; cursor: pointer; }
@@ -401,4 +406,8 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 /* the Mind Map stops where the chat box begins: the box's measured height (--ls-foot, L5Space), and its gap */
 .logos-root .ls-mind { position: relative; flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding-bottom: calc(var(--ls-foot, 94px) + 24px); }
 .logos-root .ls-mind > .tc { flex: 1; min-height: 0; }
+/* the space gives the map a frame of its own height: the map's body gives way inside it rather than run on under the
+   chat box on a short screen, at every width (its floors in thinking-canvas.css, 360px and a phone's 160px, are for a
+   panel that grows with what is in it) */
+.logos-root .ls-mind .tc .tc-body { min-height: 0; }
 .logos-root .ls-mind.is-phone { padding-bottom: calc(var(--ls-foot, 128px) + 8px); }

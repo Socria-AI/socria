@@ -3955,6 +3955,7 @@ html[data-theme="night"] .logos-root .l5 .l5b.is-settled[data-moving] .l5b-dot.c
   left: 12px;
   width: auto;
   max-height: calc(100vh - 120px);
+  max-height: calc(100dvh - 120px); /* a phone's visible height, with its browser bar shown */
 }
 /* the way back after a jump: one pill, low in the middle of the map */
 .logos-root .l5 .l5h-backwrap {

@@ -3,7 +3,9 @@
 .logos-root .l5-intent { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin: 0 0 6px; padding: 0 2px; font-size: 12px; color: var(--c-ink-60, rgba(35, 36, 31, 0.66)); }
 .logos-root .l5-intent-k { font-size: 12px; line-height: 1; color: var(--c-moss, #354620); opacity: 0.8; }
 .logos-root .l5-intent-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
-.logos-root .l5-intent-t { flex: 1 1 auto; min-width: 0; }
+/* the words start beside the ↵ and wrap there (from nothing, up to the room left): sized by their whole sentence they
+   took a line of their own on a phone, the ↵ alone above them and "Ask Socria instead" alone below */
+.logos-root .l5-intent-t { flex: 1 1 0; min-width: min(12em, 100%); }
 .logos-root .l5-intent-x { font-size: 12px; }
 .logos-root .l6-pick .lg-drift-acts { flex-wrap: wrap; }
 .logos-root .l6-pick .lg-drift-stay { max-width: 28ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

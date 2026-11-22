@@ -358,7 +358,7 @@
 .dsp-plot-axis .dsp-plot-zero { stroke: var(--dsp-60); stroke-width: 1.2; }
 .dsp-plot-ticks text { font-size: 11px; fill: var(--dsp-40); font-variant-numeric: tabular-nums; }
 .dsp-plot-titles text { font-size: 11.5px; fill: var(--dsp-60); font-style: italic; font-family: var(--serif, Georgia, serif); }
-.dsp.is-full .dsp-plot { max-height: calc(100vh - 220px); }
+.dsp.is-full .dsp-plot { max-height: calc(100vh - 220px); max-height: calc(100svh - 220px); }
 
 /* a table beside a picture, for the numbers a screen reader (or a careful eye) wants */
 .dsp-table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }

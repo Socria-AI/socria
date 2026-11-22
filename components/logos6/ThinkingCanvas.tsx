@@ -19,17 +19,15 @@
 // The canvas is addressable (lib/logos6/canvas-visual.ts): Socria can point at a card while it explains, a person
 // can ask to see one, and a pressed card is "this" in their next message.
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { MIND_TONES, NODE_TYPES, type LogosEdge, type LogosNode, type LogosRelation, type MindTone, type NodeMind, type ThinkingMap } from '@/lib/logos';
 import type { MapEdit } from '@/lib/map-edit';
-import { CANVAS_MODES, CHOOSABLE, FAMILY_LABEL, FAMILY_OF, MODE_LABEL, MODE_SAID, RELATION_SAID, STATUS_SAID, connectionsOf, edgeIdOf, ideasPlaces, lineStatus, logicFocus, logicPlaces, outlineOf, structureRows, wouldCycle, type CanvasMode, type LogicFilter, type StructureMove, type TreeRow } from '@/lib/logos6/graph';
+import { CANVAS_MODES, CARD_H, CARD_W, CHOOSABLE, FAMILY_LABEL, FAMILY_OF, MODE_LABEL, MODE_SAID, RELATION_SAID, STATUS_SAID, connectionsOf, edgeEnds, edgeIdOf, ideasPlaces, lineStatus, logicFocus, logicPlaces, outlineOf, structureRows, wouldCycle, type CanvasMode, type LogicFilter, type StructureMove, type TreeRow } from '@/lib/logos6/graph';
 import { workLabelFor, type WorkItem } from '@/lib/logos6/work';
 import { canvasArtifact, edgeVid, nodeVid } from '@/lib/logos6/canvas-visual';
 import { act, emphClass, reducedMotion, select as visSelect, touch, useRegister, useVisual } from '@/components/inline/visual-bus';
 import './thinking-canvas.css';
 
-const CARD_W = 180;
-const CARD_H = 64;
 const PAD = 48;
 
 /** The kinds a card can be given here: the everyday ones of the map's own list. */
@@ -153,7 +151,37 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
 
   const byId = useMemo(() => new Map(map.nodes.map((n) => [n.id, n])), [map]);
   const rows = useMemo(() => structureRows(map), [map]);
-  const placesRaw = useMemo(() => (mode === 'logic' ? logicPlaces(map) : ideasPlaces(map)), [map, mode]);
+  // EVERY CARD AS TALL AS IT IS DRAWN. A card's height is its content's (a long label wraps, a subtitle or marks add a
+  // line), so it is measured before the page is painted and the layout steps each row by its tallest card; the lines
+  // meet each card at its real edge. Laid out by one assumed height, a long card ran over the one beneath it.
+  const [heights, setHeights] = useState<Record<string, number>>({});
+  const heightOf = (id: string) => heights[id] ?? CARD_H;
+  const measureRef = useRef<() => void>(() => {});
+  measureRef.current = () => {
+    const host = hostRef.current;
+    if (!host) return;
+    const next: Record<string, number> = {};
+    for (const el of host.querySelectorAll<HTMLElement>('.tc-card[data-nid]')) {
+      const h = el.offsetHeight; // the card's own height, whatever the zoom (offsetHeight ignores the layer's scale)
+      if (h) next[el.dataset.nid!] = h;
+    }
+    setHeights((was) => {
+      const ids = Object.keys(next);
+      const same = ids.length === Object.keys(was).length && ids.every((id) => Math.abs((was[id] ?? 0) - next[id]) <= 1);
+      return same ? was : next;
+    });
+  };
+  // what a card holds changes only with the map, and how it is drawn with the way of working: measured then, before
+  // paint — and once more when the faces have loaded, since a late font rewraps a label (never per frame of a drag)
+  useLayoutEffect(() => measureRef.current(), [map, mode]);
+  useEffect(() => {
+    let live = true;
+    void document.fonts?.ready?.then(() => live && measureRef.current());
+    return () => {
+      live = false;
+    };
+  }, []);
+  const placesRaw = useMemo(() => (mode === 'logic' ? logicPlaces(map, heightOf) : ideasPlaces(map, heightOf)), [map, mode, heights]);
   // where each card is drawn: as placed, or where the hand is moving it now
   const places = useMemo(() => {
     const out = new Map<string, { x: number; y: number }>();
@@ -163,9 +191,9 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
   const bounds = useMemo(() => {
     const xs = [...places.values()].map((v) => v.x), ys = [...places.values()].map((v) => v.y);
     const minX = xs.length ? Math.min(...xs) : 0, minY = ys.length ? Math.min(...ys) : 0;
-    const maxX = xs.length ? Math.max(...xs) + CARD_W : 400, maxY = ys.length ? Math.max(...ys) + CARD_H : 240;
+    const maxX = xs.length ? Math.max(...xs) + CARD_W : 400, maxY = ys.length ? Math.max(...[...places.entries()].map(([id, v]) => v.y + heightOf(id))) : 240;
     return { minX: minX - PAD, minY: minY - PAD, w: maxX - minX + PAD * 2, h: maxY - minY + PAD * 2 };
-  }, [places]);
+  }, [places, heights]);
   const focusSet = useMemo(() => (mode === 'logic' ? logicFocus(map, filter) : null), [map, mode, filter]);
 
   // what was selected and has gone (removed, or the pass reorganised) is let go
@@ -188,7 +216,10 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
     const x = bounds.w * k <= W ? (W - bounds.w * k) / 2 - bounds.minX * k : -bounds.minX * k;
     const y = bounds.h * k <= H ? (H - bounds.h * k) / 2 - bounds.minY * k : -bounds.minY * k;
     setView({ k, x, y });
+    return { k, x, y };
   };
+  // the view the last automatic fit made: while the view is still that one, the person has not moved it
+  const fitted = useRef<{ k: number; x: number; y: number } | null>(null);
   // each way of working keeps its own view: back in Ideas, the space is where it was left (fitted only the first time,
   // or when the number of cards changes)
   const views = useRef<Partial<Record<CanvasMode, { x: number; y: number; k: number; n: number }>>>({});
@@ -197,12 +228,21 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
     if (shown.current && shown.current !== mode) views.current[shown.current] = { ...viewRef.current, n: map.nodes.length };
     shown.current = mode;
     const kept = views.current[mode];
-    if (kept && kept.n === map.nodes.length) setView({ x: kept.x, y: kept.y, k: kept.k });
-    else {
-      fit();
+    if (kept && kept.n === map.nodes.length) {
+      setView({ x: kept.x, y: kept.y, k: kept.k });
+      fitted.current = null;
+    } else {
+      fitted.current = fit() ?? null;
       views.current[mode] = undefined;
     }
   }, [mode, map.nodes.length]);
+  // the cards are measured after that first fit (and again once the faces load), and their real heights make the map
+  // taller than the fit allowed for — its last row out of view. Fitted again then, but only while the view is still the
+  // one the fit made: never once the person has moved or zoomed it.
+  useEffect(() => {
+    const f = fitted.current, v = viewRef.current;
+    if (f && Math.abs(v.k - f.k) < 1e-6 && Math.abs(v.x - f.x) < 0.5 && Math.abs(v.y - f.y) < 0.5) fitted.current = fit() ?? null;
+  }, [heights]);
 
   /** Select a card or a line: opened in the inspector, and "this" for the person's next message. */
   function choose(next: Sel) {
@@ -348,16 +388,21 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
       const at = places.get(n.id);
       if (!at) continue;
       const g = by.get(n.group) ?? { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
-      by.set(n.group, { x0: Math.min(g.x0, at.x), y0: Math.min(g.y0, at.y), x1: Math.max(g.x1, at.x + CARD_W), y1: Math.max(g.y1, at.y + CARD_H) });
+      by.set(n.group, { x0: Math.min(g.x0, at.x), y0: Math.min(g.y0, at.y), x1: Math.max(g.x1, at.x + CARD_W), y1: Math.max(g.y1, at.y + heightOf(n.id)) });
     }
     return [...by.entries()];
-  }, [map, places, mode]);
+  }, [map, places, mode, heights]);
 
   const drawnLines = mode === 'structure' ? [] : map.edges.filter((e) => places.has(e.from) && places.has(e.to) && (mode === 'logic' || e.kind !== 'structure'));
   const centre = (id: string) => {
     const at = places.get(id)!;
-    return { x: at.x + CARD_W / 2, y: at.y + CARD_H / 2 };
+    return { x: at.x + CARD_W / 2, y: at.y + heightOf(id) / 2 };
   };
+  const boxOf = (id: string) => {
+    const at = places.get(id)!;
+    return { x: at.x, y: at.y, w: CARD_W, h: heightOf(id) };
+  };
+  const lineOf = (e: { from: string; to: string }) => edgeEnds(boxOf(e.from), boxOf(e.to));
   const linkFrom = linking ? centre(linking.from) : null;
 
   const modeTabs = (
@@ -575,13 +620,11 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
                   const on = sel?.kind === 'edge' && sel.id === id;
                   const away = focusSet ? !focusSet.edges.has(id) : selNode ? e.from !== selNode.id && e.to !== selNode.id : false;
                   const directed = fam !== 'association' && fam !== 'tension';
-                  // stop short of the card it points at, so the arrow is seen
-                  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
-                  const cut = Math.min(len / 2 - 4, Math.abs(dx) / len > 0.6 ? CARD_W / 2 + 4 : CARD_H / 2 + 4);
-                  const bx = b.x - (dx / len) * cut, by = b.y - (dy / len) * cut;
+                  // stop short of the card it points at — where the line meets that card's edge, as drawn — so the arrow is seen
+                  const g = lineOf(e);
                   return (
                     <g key={id} className={`tc-edge is-${fam} is-${st}${on ? ' is-on' : ''}${away ? ' is-away' : ''}${emphClass(vis, edgeVid(e))}`}>
-                      <line x1={a.x} y1={a.y} x2={bx} y2={by} markerEnd={directed ? 'url(#tc-arrow)' : undefined} />
+                      <line x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2} markerEnd={directed ? 'url(#tc-arrow)' : undefined} />
                       <line className="tc-edge-hit" x1={a.x} y1={a.y} x2={b.x} y2={b.y} onPointerDown={(ev) => ev.stopPropagation()} onClick={() => choose({ kind: 'edge', id })} />
                     </g>
                   );
@@ -592,11 +635,12 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
               {drawnLines.map((e) => {
                 const said = mode === 'logic' ? e.label || (e.kind === 'structure' ? 'sits inside' : RELATION_SAID[e.relation]) : e.label;
                 if (!said) return null;
-                const a = centre(e.from), b = centre(e.to);
+                // written between the cards, on the part of the line that is seen (lib/logos6/graph.ts edgeEnds)
+                const g = lineOf(e);
                 const id = edgeIdOf(e);
                 const away = focusSet ? !focusSet.edges.has(id) : selNode ? e.from !== selNode.id && e.to !== selNode.id : false;
                 return (
-                  <button key={`l${id}`} type="button" className={`tc-label is-${lineStatus(e)}${away ? ' is-away' : ''}`} style={{ left: (a.x + b.x) / 2, top: (a.y + b.y) / 2 }} onClick={() => choose({ kind: 'edge', id })} title={`${STATUS_SAID[lineStatus(e)]} — press to see why`}>
+                  <button key={`l${id}`} type="button" className={`tc-label is-${lineStatus(e)}${away ? ' is-away' : ''}`} style={{ left: g.lx, top: g.ly }} onClick={() => choose({ kind: 'edge', id })} title={`${STATUS_SAID[lineStatus(e)]} — press to see why`}>
                     {said}
                     {e.why ? <span className="tc-why-mark" aria-label="explained">·</span> : null}
                   </button>

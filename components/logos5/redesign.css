@@ -587,6 +587,7 @@
   flex: 0 0 auto;
   /* the view's height less the bar, the strip, the card's own head and the composer floating below */
   height: clamp(360px, calc(100vh - 390px), 680px);
+  height: clamp(360px, calc(100svh - 390px), 680px); /* the height a phone keeps with its browser bar shown: steady as it scrolls */
   overflow: hidden;
   border-radius: 10px;
 }
@@ -642,6 +643,7 @@
 .logos-root .l5 .l5m-side {
   position: relative;
   height: clamp(360px, calc(100vh - 430px), 640px);
+  height: clamp(360px, calc(100svh - 430px), 640px);
   overflow: hidden;
   border-radius: 10px;
 }

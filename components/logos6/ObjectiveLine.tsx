@@ -7,7 +7,7 @@
 // from is said on the goal, as its title, not as more words on the line. All of it is read from the chat itself, so it
 // is there with no model at all. An empty chat shows nothing here: the new chat and the box already ask what it is for.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { KIND_SAID, SOURCE_SAID, workCounts, type Objective, type ObjectiveWork } from '@/lib/logos6/objective';
 import './objective.css';
 
@@ -60,6 +60,23 @@ export function ObjectiveLine(p: {
       window.removeEventListener('keydown', esc);
     };
   }, [open, editing]);
+
+  // THE PANEL'S ROOM: it opens upwards from the line, so it is no taller than the room between the line and the top of
+  // the view it is in (the space, or the conversation page), and never runs up under the bar above it. Measured when it
+  // opens and when the window changes size: the box under the line grows with a draft, a note or a hint.
+  const [room, setRoom] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    if (!open) return;
+    const measure = () => {
+      const el = box.current;
+      if (!el) return;
+      const ceiling = Math.max(0, el.closest('.ls, .lp')?.getBoundingClientRect().top ?? 0);
+      setRoom(Math.max(140, Math.floor(el.getBoundingClientRect().top - ceiling - 16)));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [open]);
 
   if (!o) return null;
   const counts = w ? workCounts(w) : '';
@@ -124,7 +141,7 @@ export function ObjectiveLine(p: {
         </p>
       )}
       {open && w && (
-        <div className="l6o-panel" role="group" aria-label="What this chat holds for its objective">
+        <div className="l6o-panel" role="group" aria-label="What this chat holds for its objective" style={room ? ({ '--l6o-room': `${room}px` } as CSSProperties) : undefined}>
           {o.outcome && <p className="l6o-outcome">Outcome: {o.outcome}</p>}
           {/* the canvas and the conversation themselves, always a way in */}
           <section className="l6o-sec">

@@ -18,7 +18,7 @@
 .logos-root .l6o-edit input { width: 100%; padding: 6px 10px; border: 1px solid var(--c-rule, rgba(53, 70, 32, 0.14)); border-radius: 6px; background: var(--c-paper, #f5f3eb); font: inherit; font-size: 14px; color: var(--c-ink, #23241f); }
 .logos-root .l6o-acts { display: inline-flex; gap: 12px; padding-bottom: 6px; }
 
-.logos-root .l6o-panel { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 30; width: min(440px, 100%); max-height: min(60vh, 520px); overflow-y: auto; padding: 14px 16px; border: 1px solid var(--c-rule, rgba(53, 70, 32, 0.14)); border-radius: 10px; background: var(--c-paper, #f5f3eb); box-shadow: 0 16px 40px -18px rgba(0, 0, 0, 0.28); }
+.logos-root .l6o-panel { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 30; width: min(440px, 100%); max-height: min(520px, var(--l6o-room, 60vh)); overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px; border: 1px solid var(--c-rule, rgba(53, 70, 32, 0.14)); border-radius: 10px; background: var(--c-paper, #f5f3eb); box-shadow: 0 16px 40px -18px rgba(0, 0, 0, 0.28); }
 .logos-root .l6o-outcome { margin: 0 0 10px; font-size: 13px; color: var(--c-ink, #23241f); }
 .logos-root .l6o-sec { padding: 8px 0; border-top: 1px solid var(--c-rule, rgba(53, 70, 32, 0.14)); }
 .logos-root .l6o-sec:first-child { border-top: 0; padding-top: 0; }
@@ -28,9 +28,11 @@
 .logos-root .l6o-sec li + li { margin-top: 2px; }
 .logos-root .l6o-x { margin-left: 8px; font-size: 11.5px; }
 
-/* a phone: the goal keeps the room it can, the counts their own; the panel the width */
+/* a phone: the goal keeps the room it can, the counts their own; the panel the line's width, still opening up from the
+   line. (It was fixed to the screen 140px from the foot, a guess at the box's height: over a taller box — a draft, a
+   hint — it covered the very line that opened it, and the top of the box.) */
 .logos-root .l6o.is-narrow .l6o-row > .l6o-k { display: none; }
-.logos-root .l6o.is-narrow .l6o-panel { position: fixed; left: 12px; right: 12px; bottom: 140px; width: auto; }
+.logos-root .l6o.is-narrow .l6o-panel { left: 0; right: 0; width: auto; }
 
 @media (forced-colors: active) {
   .logos-root .l6o-panel { border-color: CanvasText; }
