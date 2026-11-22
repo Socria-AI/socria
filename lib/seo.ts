@@ -35,11 +35,12 @@ export const HOME_TITLE = 'Socria — Think for Yourself. AI That Sharpens Your 
 
 /**
  * What Socria does, in the words a search result shows. Every clause is true
- * of the product as it ships: the map shows assumptions, open questions and
- * what a view rests on, and a first line of thinking needs no account.
+ * of the product as it ships: it asks before it answers (and still answers),
+ * the map shows assumptions, open questions and what a view rests on, and a
+ * first line of thinking needs no account.
  */
 export const DEFAULT_DESCRIPTION =
-  'Talk it through and see your reasoning take shape: what you’re assuming, what’s missing, what it rests on. Think clearer, decide better. Free, no sign-up.';
+  'Socria is a Human-First AI that asks before it answers. Talk it through and see what you’re assuming, what’s missing and what it rests on. Free, no sign-up.';
 
 /** The address a page is known by, absolute. */
 export function absoluteUrl(path: string): string {
@@ -117,12 +118,34 @@ export function pageMetadata(o: PageMetaInput): Metadata {
 export const NOINDEX: Metadata = { robots: { index: false, follow: false } };
 
 /**
+ * The first segment of every address that is behind sign-in or is somebody's own — next.config.js sends
+ * X-Robots-Tag: noindex on all of them (test/seo.test.mjs keeps the two lists in step). robots.txt closes only the ones
+ * no crawler has any business fetching; the rest stay readable so their noindex is seen.
+ */
+export const PRIVATE_PREFIXES = ['chat', 'account', 'memory', 'onboarding', 'sso-callback', 'studio', 's', 'r', 'dev', 'logos-5-internal', 'logos2-test', 'mind-ar', 'model', 'api'] as const;
+
+/**
+ * The search engines' proof that the site is ours, when it is given: GOOGLE_SITE_VERIFICATION (Search Console's HTML
+ * tag method) and BING_SITE_VERIFICATION (Bing Webmaster Tools, msvalidate.01). Nothing is invented: with neither set,
+ * nothing is written, and verifying by DNS instead needs no code at all (docs/SEO.md).
+ */
+export function verificationMetadata(env: Record<string, string | undefined> = process.env): Metadata['verification'] | undefined {
+  const google = (env.GOOGLE_SITE_VERIFICATION ?? '').trim();
+  const bing = (env.BING_SITE_VERIFICATION ?? '').trim();
+  const ok = (v: string) => /^[A-Za-z0-9_\-]{8,128}$/.test(v);
+  if (!ok(google) && !ok(bing)) return undefined;
+  return { ...(ok(google) ? { google } : {}), ...(ok(bing) ? { other: { 'msvalidate.01': bing } } : {}) };
+}
+
+/**
  * The root layout's metadata: the base every page builds on. No canonical
  * here, ever — see the header.
  */
-export function rootMetadata(production: boolean): Metadata {
+export function rootMetadata(production: boolean, env: Record<string, string | undefined> = process.env): Metadata {
+  const verification = production ? verificationMetadata(env) : undefined;
   return {
     metadataBase: new URL(SITE_URL),
+    ...(verification ? { verification } : {}),
     // A preview build carries its own noindex, so it stays out of search
     // even if something links to it. robots.txt asks; this tells.
     ...(production ? {} : { robots: { index: false, follow: false, nocache: true } }),
@@ -178,6 +201,20 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
     changeFrequency: 'monthly',
   },
   {
+    path: '/socratic-ai',
+    name: 'Socratic AI',
+    summary: 'How Socria uses Socratic questioning: it asks before it answers, maps the reasoning, and still answers when you need it.',
+    priority: 0.8,
+    changeFrequency: 'monthly',
+  },
+  {
+    path: '/for-students',
+    name: 'Socria for students',
+    summary: 'Studying with an AI that makes you do the thinking: problem sets, essays, reading and practice from your own material.',
+    priority: 0.8,
+    changeFrequency: 'monthly',
+  },
+  {
     path: '/one',
     name: 'Socria One',
     summary: `${onePlanSentence()} — ${priceWithPeriod()}. Every account starts free.`,
@@ -217,13 +254,6 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
     name: 'Working surfaces',
     summary: 'Physics you can move: a Kerr black hole with integrated geodesics, the thermal history of the universe, and gravity as an N-body integration.',
     priority: 0.5,
-    changeFrequency: 'monthly',
-  },
-  {
-    path: '/logos2',
-    name: 'Logos 2',
-    summary: 'A workspace you arrange: a Thinking Map, a transcript and a working surface.',
-    priority: 0.4,
     changeFrequency: 'monthly',
   },
   {
@@ -296,6 +326,22 @@ export function sitemapEntries(opts: { now: number; posts?: readonly PostRef[] }
 // when one does, what it reads is true and current, because it is built from
 // the same lists as the sitemap and the docs sidebar.
 
+/** The pages llms.txt lists first, after the way in: what Socria is for, and what it costs. */
+const LLMS_START: readonly string[] = ['/explore', '/socratic-ai', '/for-students', '/one', '/charter'];
+
+/**
+ * The names someone (or an answer engine) meets, and what each one is — so Logos 5 and the earlier versions are never
+ * confused with one another. Every line is checked against the docs' history. The models archived on 24 October 2026
+ * are not named: no copy names them (test/no-core.test.mjs), and Logos 5 is the one Socria offered.
+ */
+export const NAMES: readonly (readonly [string, string])[] = [
+  ['Socria', 'an AI thinking environment that strengthens your reasoning instead of doing it for you; the company and the product.'],
+  ['Logos 5', 'Socria as it is today: a conversation that asks as well as answers, the Logic Map beside it, models it can compute and documents it reads. Every conversation runs on it.'],
+  ['Logic Map', 'the map of your reasoning Socria draws as you talk — claims, assumptions, open questions, evidence and how they connect — which you can move, connect and correct.'],
+  ['Socria One', 'the subscription: Socria without a daily limit.'],
+  ['Logos, Logos 2, Logos 3, Logos 3.5 and Logos 4', 'earlier versions of the reasoning environment, each superseded by the next; their history is in the docs.'],
+];
+
 export function llmsTxt(opts: { now: number }): string {
   const lines: string[] = [];
   lines.push(`# ${SITE_NAME}`, '');
@@ -304,18 +350,20 @@ export function llmsTxt(opts: { now: number }): string {
     ''
   );
   lines.push(
-    `Socria is Logos 5: a conversation that asks as well as answers, with a live map of your reasoning beside it, models it can compute and documents it reads with every citation checked. Without an account you get a short preview: one line of thinking and its map, up to ${GUEST_TURNS} messages. An account starts with ${freePlanSentence()}, and the line you began comes with you; everything made stays open. Socria One (${priceWithPeriod()}) is ${onePlanSentence().replace(/^U/, 'u')}.`,
+    `Socria is Logos 5: a conversation that asks as well as answers, with a live map of your reasoning beside it, models it can compute and documents it reads, citing only the passages they hold and the sources it read. Without an account you get a short preview: one line of thinking and its map, up to ${GUEST_TURNS} messages. An account starts with ${freePlanSentence()}, and the line you began comes with you; everything made stays open. Socria One (${priceWithPeriod()}) is ${onePlanSentence().replace(/^U/, 'u')}.`,
     ''
   );
   const link = (name: string, path: string, summary: string) => `- [${name}](${absoluteUrl(path)}): ${summary}`;
   lines.push('## Start', '');
   lines.push(link('Try Socria', '/chat', 'Start a conversation — no account needed.'));
-  for (const p of PUBLIC_PAGES.slice(0, 4)) if (p.path !== '/') lines.push(link(p.name, p.path, p.summary));
+  for (const p of PUBLIC_PAGES) if (LLMS_START.includes(p.path)) lines.push(link(p.name, p.path, p.summary));
   if (studentPageOpen(opts.now)) lines.push(link(STUDENT_PAGE.name, STUDENT_PAGE.path, STUDENT_PAGE.summary));
+  lines.push('', '## What the names mean', '');
+  for (const [name, meaning] of NAMES) lines.push(`- ${name}: ${meaning}`);
   lines.push('', '## Docs', '');
   for (const d of DOC_PAGES) lines.push(link(d.title, docPath(d.slug), d.blurb));
   lines.push('', '## More', '');
-  for (const p of PUBLIC_PAGES.slice(4)) if (p.path !== '/docs') lines.push(link(p.name, p.path, p.summary));
+  for (const p of PUBLIC_PAGES) if (p.path !== '/' && p.path !== '/docs' && !LLMS_START.includes(p.path)) lines.push(link(p.name, p.path, p.summary));
   lines.push('');
   return lines.join('\n');
 }

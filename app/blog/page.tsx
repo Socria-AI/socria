@@ -160,7 +160,7 @@ export default async function BlogIndex() {
           <section className="posts">
             <div className="inner">
               <div className="grid-head reveal">
-                <h3>Latest essays</h3>
+                <h2>Latest essays</h2>
                 <span className="nt">Fresh thinking, slowly</span>
               </div>
               {gridPosts.length === 0 ? (
@@ -288,7 +288,7 @@ function PostCard({
             <span className="rt">{post.readingMinutes} min</span>
           )}
         </div>
-        <h4>{post.title}</h4>
+        <h3>{post.title}</h3>
         <p className="ex">{post.excerpt}</p>
         <p className="by">
           <span className="nb">{post.authorName}</span> ·{' '}

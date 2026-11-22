@@ -60,6 +60,8 @@ export function SiteA({ l, current }: { l: SiteLink; current?: 'page' | 'true' }
 export const ONE: SiteLink = { href: '/one', label: 'Socria One' };
 export const CHARTER: SiteLink = { href: '/charter', label: 'The Charter' };
 export const EXPLORE: SiteLink = { href: '/explore', label: 'Explore' };
+export const SOCRATIC: SiteLink = { href: '/socratic-ai', label: 'Socratic AI' };
+export const FOR_STUDENTS: SiteLink = { href: '/for-students', label: 'For students' };
 export const BLOG: SiteLink = { href: '/blog', label: 'Blog' };
 export const DOCS: SiteLink = { href: '/docs', label: 'Docs' };
 export const SUPPORT: SiteLink = { href: '/support', label: 'Support' };
@@ -93,7 +95,7 @@ export const ELSEWHERE: readonly SiteLink[] = [
 ];
 
 /** The foot's links: every page there is, the policies, and where else Socria is. */
-export const FOOT: readonly SiteLink[] = [ONE, CHARTER, EXPLORE, BLOG, DOCS, SUPPORT, ...POLICIES, ...ELSEWHERE];
+export const FOOT: readonly SiteLink[] = [ONE, CHARTER, EXPLORE, SOCRATIC, FOR_STUDENTS, BLOG, DOCS, SUPPORT, ...POLICIES, ...ELSEWHERE];
 
 /** The masthead's links less the page you are on: a link to where you already are is a dead control. */
 export function navWithout(href: string): readonly SiteLink[] {

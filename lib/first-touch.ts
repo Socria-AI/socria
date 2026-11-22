@@ -41,6 +41,8 @@ const LANDINGS: [RegExp, string][] = [
   [/^\/docs(\/|$)/, 'docs'],
   [/^\/blog(\/|$)/, 'blog'],
   [/^\/explore(\/|$)/, 'explore'],
+  [/^\/socratic-ai(\/|$)/, 'socratic-ai'],
+  [/^\/for-students(\/|$)/, 'for-students'],
   [/^\/one(\/|$)/, 'one'],
   [/^\/(logos|logos2|surfaces)(\/|$)/, 'logos'],
   [/^\/students(\/|$)/, 'students'],

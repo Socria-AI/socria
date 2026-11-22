@@ -109,7 +109,15 @@ console.log('\n=== every public page names itself ===');
     ok(`${f} is noindex`, /export const metadata: Metadata = NOINDEX;/.test(readFileSync(join(root, f), 'utf8')));
   }
   const robots = readFileSync(join(root, 'app/robots.ts'), 'utf8');
-  ok('robots still closes the private paths', ["'/api/'", "'/chat'", "'/account'", "'/studio'"].every((x) => robots.includes(x)));
+  ok('robots still closes what no crawler should fetch', ["'/api/'", "'/account'", "'/studio'"].every((x) => robots.includes(x)));
+  // /chat is where every call to action leads: blocked, it could still be listed from those links with no way to read
+  // its noindex; crawlable, the noindex in its layout and on its response is what keeps it out
+  ok('…but lets /chat be read, so its noindex is seen', !/disallow: \[[^\]]*'\/chat'/.test(robots));
+  for (const f of ['app/chat/layout.tsx', 'app/account/layout.tsx']) {
+    ok(`${f} is noindex`, /export const metadata: Metadata = \{ title: (\{ absolute: '[^']+' \}|'[^']+'), \.\.\.NOINDEX \};/.test(readFileSync(join(root, f), 'utf8')));
+  }
+  ok('the Studio is noindex', /robots: \{ index: false, follow: false \}/.test(readFileSync(join(root, 'app/studio/layout.tsx'), 'utf8')));
+  ok('the archived Logos 2 prototype stays out of search', /noindex: true/.test(readFileSync(join(root, 'app/logos2/page.tsx'), 'utf8')) && !SEO.PUBLIC_PAGES.some((p) => p.path === '/logos2'));
   ok('robots points at the sitemap', robots.includes('/sitemap.xml'));
 }
 
@@ -168,6 +176,8 @@ console.log('\n=== llms.txt ===');
   const own = t.slice(0, t.indexOf('## Docs')) + t.slice(t.indexOf('## More'));
   ok('promises no free tier and no monthly allowance in its own words', !/free (account|tier|plan)|free to start|a month\b|by the month/i.test(own), own.match(/.{0,60}(free (account|tier|plan)|free to start|a month\b|by the month).{0,60}/i)?.[0]);
   ok('names no Core in its own words', !/\bCore\b/.test(own), own.match(/.{0,60}\bCore\b.{0,60}/)?.[0]);
+  ok('says what the names mean: Logos 5 today, the earlier Logos, the Logic Map, Socria One', /## What the names mean/.test(t) && /- Logos 5: Socria as it is today/.test(t) && /- Logos, Logos 2, Logos 3, Logos 3\.5 and Logos 4: earlier versions/.test(t) && /- Logic Map: /.test(t) && /- Socria One: the subscription/.test(t));
+  ok('lists the two guides with the start', ['/socratic-ai', '/for-students'].every((p) => t.includes(`(${SEO.absoluteUrl(p)})`)) && t.indexOf('/socratic-ai') < t.indexOf('## Docs'));
   ok('the retired student page is not listed', !t.includes('/students'));
   ok('…nor after the old close', !SEO.llmsTxt({ now: AFTER }).includes('/students'));
   const paths = [...t.matchAll(/\]\((https?:[^)]+)\)/g)].map((m) => new URL(m[1]).pathname);
@@ -224,7 +234,9 @@ console.log('\n=== structured data ===');
 {
   const org = LD.organizationLd();
   ok('organization', org['@type'] === 'Organization' && org.name === 'Socria' && org.slogan === 'Think for Yourself');
-  ok('…with the profiles the site links to', org.sameAs.length === 2 && org.sameAs.every((u) => u.startsWith('https://')));
+  // exactly the profiles the footer links to (components/site/chrome.tsx ELSEWHERE), no more and no fewer
+  const elsewhere = [...(readFileSync(join(root, 'components/site/chrome.tsx'), 'utf8').match(/export const ELSEWHERE[^;]*;/)?.[0] ?? '').matchAll(/href: '([^']+)'/g)].map((m) => m[1]);
+  ok('…with the profiles the site links to', elsewhere.length >= 2 && org.sameAs.length === elsewhere.length && elsewhere.every((u) => org.sameAs.includes(u)), `${org.sameAs.join(' ')} vs ${elsewhere.join(' ')}`);
   const site = LD.websiteLd();
   ok('website, published by the organization', site['@type'] === 'WebSite' && site.publisher['@id'] === org['@id']);
   const app = LD.softwareApplicationLd();
@@ -299,6 +311,34 @@ console.log('\n=== how somebody arrived ===');
   ok('not where the country is unknown', attributionAllowed(null) === false && attributionAllowed('XX') === false);
 }
 
+console.log('\n=== the SEO pass of November 2026 ===');
+{
+  // search engines' ownership tags: only what is given, only in production, never invented
+  ok('no verification tag unless one is given', SEO.verificationMetadata({}) === undefined && !('verification' in SEO.rootMetadata(true, {})));
+  const v = SEO.verificationMetadata({ GOOGLE_SITE_VERIFICATION: 'abcDEF123_-xyz789', BING_SITE_VERIFICATION: '0123456789ABCDEF0123456789ABCDEF' });
+  ok('Search Console and Bing, as given', v?.google === 'abcDEF123_-xyz789' && v?.other?.['msvalidate.01'] === '0123456789ABCDEF0123456789ABCDEF', JSON.stringify(v));
+  ok('…in production only', SEO.rootMetadata(true, { GOOGLE_SITE_VERIFICATION: 'abcDEF123_-xyz789' }).verification?.google === 'abcDEF123_-xyz789' && !('verification' in SEO.rootMetadata(false, { GOOGLE_SITE_VERIFICATION: 'abcDEF123_-xyz789' })));
+  ok('…and nothing that is not a token', SEO.verificationMetadata({ GOOGLE_SITE_VERIFICATION: '<meta name="x">' }) === undefined);
+  // every private prefix carries X-Robots-Tag: noindex on its responses, kept in step with the list in lib/seo.ts
+  const cfg = createRequire(import.meta.url)(join(root, 'next.config.js'));
+  const rules = await cfg.headers();
+  const tagged = (src) => rules.some((r) => r.source === src && r.headers.some((x) => x.key === 'X-Robots-Tag' && /noindex/.test(x.value)));
+  ok('every private prefix answers noindex, itself and below', SEO.PRIVATE_PREFIXES.every((p) => tagged(`/${p}`) && tagged(`/${p}/:path*`)), SEO.PRIVATE_PREFIXES.filter((p) => !tagged(`/${p}`) || !tagged(`/${p}/:path*`)).join(' '));
+  ok('…the events’ tickets, check-in and admin too', tagged('/events/admin/:path*') && tagged('/events/:id/ticket') && tagged('/events/:id/checkin'));
+  ok('…and no public page does', !SEO.PUBLIC_PAGES.some((p) => SEO.PRIVATE_PREFIXES.some((x) => p.path === `/${x}` || p.path.startsWith(`/${x}/`))));
+  // the guides are public pages, in the sitemap
+  const urls = SEO.sitemapEntries({ now: BEFORE }).map((e) => e.url);
+  ok('the two guides are in the sitemap', urls.includes(`${SITE}/socratic-ai`) && urls.includes(`${SITE}/for-students`));
+  // the homepage's description and title fit a result and say what Socria is
+  ok('the description says what Socria is: Human-First, and it asks', /Human-First AI that asks before it answers/.test(SEO.DEFAULT_DESCRIPTION));
+  // every docs page's description fits a result whole
+  const long = DOC_PAGES.filter((d) => (d.description ?? d.blurb).length > 165 || (d.description ?? d.blurb).length < 60);
+  ok('every docs page’s description fits a result (60–165)', long.length === 0, long.map((d) => `${d.slug}:${(d.description ?? d.blurb).length}`).join(' '));
+  // structured data: the profiles the site links to, and the features the page shows
+  ok('sameAs is exactly the profiles the site links to', LD.organizationLd().sameAs.join(' ') === LD.SAME_AS.join(' ') && LD.SAME_AS.includes('https://www.tiktok.com/@socriaai'));
+  ok('the application names its features', Array.isArray(LD.softwareApplicationLd().featureList) && LD.softwareApplicationLd().featureList.length === LD.FEATURES.length);
+}
+
 // ── rendered: the public site and the student page ────────────────────
 
 const OUT = join(here, '.tmp', 'e2e-seo');
@@ -340,6 +380,11 @@ console.log('\n=== the homepage ===');
   const html = renderToStaticMarkup(h(UI.Landing, {}));
   ok('exactly one h1', h1Count(html) === 1, String(h1Count(html)));
   ok('it says the line', /Come out sharper\./.test(h1Of(html)), h1Of(html));
+  ok('…and, first, what Socria is', /^Socria · The Human-First AI that helps you think for yourself Come out sharper\.$/.test(h1Of(html).replace(/\s+/g, ' ').trim()), h1Of(html));
+  ok('What it does: six things, each a link to where it is explained, as many as the structured data names', (html.match(/<div class="s-does-item">/g) ?? []).length === UI.CAPABILITIES_COUNT && UI.CAPABILITIES_COUNT === LD.FEATURES.length && ['/socratic-ai', '/docs/thinking-map', '/docs/mathematics', '/docs/logos-5', '/docs/drafts-grounding', '/for-students'].every((x) => hrefs(html).includes(x)));
+  ok('…a heading for each section, the plans included', /<h2[^>]*>A thinking environment, <em>not an answer machine\.<\/em><\/h2>/.test(html) && /<h2 class="sr-only">Plans<\/h2>/.test(html));
+  ok('…and a way to the five uses', hrefs(html).includes('/explore'));
+  ok('the foot reaches the guides', hrefs(html).includes('/socratic-ai') && hrefs(html).includes('/for-students'));
   ok('every "Start a conversation" opens Logos', (html.match(/Start a conversation/g) ?? []).length === 3 && hrefs(html).filter((x) => x === '/logos').length === 4);
   // The masthead is the one every public page wears (components/site/chrome.tsx NAV).
   ok('the masthead reaches One, the Charter, the blog and the docs', ['/one', '/charter', '/blog', '/docs'].every((x) => hrefs(html).includes(x)));
@@ -401,6 +446,25 @@ console.log('\n=== the student page ===');
   // The one call to action every public page makes: "Start a conversation", into Logos.
   ok('…with a way in and the plan page', ended.includes('href="/logos"') && ended.includes('Start a conversation') && ended.includes('href="/one"'));
   ok('one h1', (ended.match(/<h1[\s>]/g) ?? []).length === 1);
+}
+
+console.log('\n=== the guides ===');
+for (const [name, Page, meta, path, word] of [
+  ['Socratic AI', UI.SocraticAiPage, UI.socraticAiMeta, '/socratic-ai', /Socratic AI/],
+  ['For students', UI.ForStudentsPage, UI.forStudentsMeta, '/for-students', /Study with an AI/],
+]) {
+  const html = renderToStaticMarkup(h(Page, {}));
+  ok(`${name}: one h1, saying what the page is about`, h1Count(html) === 1 && word.test(h1Of(html)), h1Of(html));
+  ok(`${name}: sections under it, and its questions under those`, (html.match(/<h2[\s>]/g) ?? []).length >= 5 && (html.match(/<h3[\s>]/g) ?? []).length >= 3 && !/<h[4-6][\s>]/.test(html));
+  const ld = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].flatMap((m) => JSON.parse(m[1]));
+  const faq = ld.find((x) => x['@type'] === 'FAQPage');
+  ok(`${name}: breadcrumbs and questions in its structured data`, ld.some((x) => x['@type'] === 'BreadcrumbList' && x.itemListElement.at(-1).item === `${SITE}${path}`) && !!faq);
+  const text = html.replace(/<[^>]+>/g, '').replace(/&#x27;|&rsquo;/g, '’').replace(/&amp;/g, '&');
+  ok(`${name}: every question and answer it carries is on the page, word for word`, faq.mainEntity.every((q) => text.includes(q.name) && q.acceptedAnswer.text.split(/(?<=\.)\s+/).every((part) => text.includes(part.replace(/'/g, '’')) || text.includes(part))), faq.mainEntity.map((q) => q.name).join(' | '));
+  ok(`${name}: its own canonical and card`, meta.alternates?.canonical === path && meta.openGraph?.images?.[0]?.url === `/og${path}` && ogCardFor([path.slice(1)], { now: BEFORE }).title !== DEFAULT_CARD.title);
+  ok(`${name}: a description that fits a result`, meta.description.length >= 70 && meta.description.length <= 165, String(meta.description.length));
+  ok(`${name}: the way in opens Logos`, hrefs(html).includes('/logos'));
+  ok(`${name}: no "trial", no seven days, no free tier, no outcome promised`, !/\btrial\b|seven days|seven-day|7-day|140,000|free tier|free to start|free month|better grades|proven|guarantee/i.test(html), html.match(/.{0,40}(\btrial\b|seven days|free tier|better grades|proven|guarantee).{0,40}/i)?.[0]);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

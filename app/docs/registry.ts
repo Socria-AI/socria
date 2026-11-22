@@ -32,6 +32,11 @@ export interface DocPage {
   title: string;
   /** short line under the title, and the description on the index cards */
   blurb: string;
+  /**
+   * What a search result shows, when the blurb will not do: it runs past what a result shows whole (about 160
+   * characters) or is too short to say what the page is. The blurb stays what the docs themselves show.
+   */
+  description?: string;
   group: string;
   /** set on every page in 'Earlier Socria' that describes a model no longer offered */
   archived?: Archived;
@@ -95,12 +100,14 @@ export const DOC_PAGES: DocPage[] = [
     slug: 'logos-3-engineering',
     title: 'Engineering',
     blurb: 'Engines, mechanisms, circuits, structures, flows, flight, reactions and control — what to ask for, what the engine builds, and the numbers it computes, each checked — and CAD-style designs drawn in 3D.',
+    description: 'Engines, mechanisms, circuits, structures, flows and control in Socria: what to ask for, what the engine builds, and the numbers it computes and checks.',
     group: 'The reasoning environment',
   },
   {
     slug: 'logos-3-dynamics',
     title: 'Dynamics and chaos',
     blurb: 'Maps and flows: the road to chaos and Feigenbaum’s δ, a strange attractor, the Lorenz butterfly cut by a Poincaré section, and predator–prey cycles — each built live, each number computed.',
+    description: 'Chaos you can build live in Socria: the road to chaos and Feigenbaum’s δ, the Lorenz attractor and a Poincaré section, and predator–prey cycles.',
     group: 'The reasoning environment',
   },
   {
@@ -125,6 +132,7 @@ export const DOC_PAGES: DocPage[] = [
     slug: 'accounts-data',
     title: 'Accounts & your data',
     blurb: 'Signed out vs signed in, what is stored where, sync, and deletion.',
+    description: 'Using Socria signed out or signed in: what is stored where, how your conversations sync, and how to export or delete your data.',
     group: 'Plans & accounts',
   },
   {
@@ -158,6 +166,7 @@ export const DOC_PAGES: DocPage[] = [
     slug: 'logos-3-5',
     title: 'What was new in Logos 3.5',
     blurb: 'Charts, plans, calendars, comparisons, diagrams, number lines and decisions made from your own words beside the map — plus the experiences, a memory that tracks how your thinking changes, and what it would not do.',
+    description: 'Logos 3.5, an earlier Socria: charts, plans, calendars, comparisons and diagrams drawn from your words beside the map, and a memory of how your thinking changed.',
     group: 'Earlier Socria',
     archived: { what: 'Logos 3.5', on: 'on 19 October 2026, when it became Logos 4', replacedBy: 'Logos 4, then Logos 5' },
   },
