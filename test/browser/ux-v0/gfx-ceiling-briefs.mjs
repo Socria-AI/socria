@@ -1,7 +1,12 @@
 // test/browser/ux-v0/gfx-ceiling-briefs.mjs — the thirty briefs of the Graphics creative-ceiling benchmark
 // (its section 16), each as a designer would write it. Shared by the benchmark and the probes.
 import { readFileSync } from 'node:fs';
-import { FX } from './env.mjs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// The pictures beside this file, found here rather than taken from ./env.mjs, which loads Playwright as it is imported:
+// the unit suite (test/graphics-ceiling.test.mjs) imports this module, and CI installs no browser.
+const FX = join(dirname(fileURLToPath(import.meta.url)), 'fx') + '/';
 
 export const pic = (f, w, h) => ({ id: `p${f.replace(/\W/g, '')}`, kind: 'image', src: `data:image/jpeg;base64,${readFileSync(FX + f).toString('base64')}`, width: w, height: h, name: f.replace(/\.jpg$/, ''), credit: 'SocriaUX test fixture', source: 'upload' });
 
