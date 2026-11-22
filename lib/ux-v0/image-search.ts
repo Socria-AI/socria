@@ -69,8 +69,10 @@ const CC: Record<string, string> = { by: 'CC BY', 'by-sa': 'CC BY-SA', 'by-nd': 
  * One page of a search: only licences that allow commercial use and change. No kind filter: Openverse's
  * "photograph" category leaves out most of what it holds ("magazine spread": 240 results, 13 as photographs).
  */
-export function openverseUrl(query: string, page: number): string {
-  return `https://api.openverse.org/v1/images/?q=${encodeURIComponent(query)}&page=${page}&page_size=${PAGE_SIZE}&license_type=commercial,modification&mature=false`;
+export function openverseUrl(query: string, page: number, opts: { anyLicense?: boolean; size?: number } = {}): string {
+  // a reference that only inspires is never reproduced, so any open licence will do; a picture placed in a design
+  // must allow commercial use and change
+  return `https://api.openverse.org/v1/images/?q=${encodeURIComponent(query)}&page=${page}&page_size=${opts.size ?? PAGE_SIZE}${opts.anyLicense ? '' : '&license_type=commercial,modification'}&mature=false`;
 }
 
 /** Openverse's results in the shape every library is read into: its own URLs, creator, source and licence. */
@@ -93,6 +95,8 @@ export function mapOpenverse(json: unknown): Record<string, unknown>[] {
       license,
       licenseUrl: p?.license_url || '',
       attribution: `“${p?.title || 'Image'}”${p?.creator ? ` by ${p.creator}` : ''}${license ? `, ${license}` : ''}`,
+      // where Openverse found it (Flickr, Wikimedia Commons, a museum…), for the credit line
+      origin: String(p?.source ?? '').slice(0, 40),
       tags: (Array.isArray(p?.tags) ? p.tags : []).map((t: any) => String(t?.name ?? '').toLowerCase()).filter(Boolean).slice(0, 30),
     };
   });

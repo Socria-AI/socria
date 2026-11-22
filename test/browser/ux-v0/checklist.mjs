@@ -1,6 +1,6 @@
 // The checklist items the two workflows do not reach: refusals, SVG and JPG, zoom keys, stepping through the page,
 // the home list, answer and brief editing, versions, drops, storage full, a failed call.
-import { chromium, S, FX, ROOT, BASE, underTest } from './env.mjs';
+import { chromium, S, FX, ROOT, BASE, underTest, websiteWorkspace, beginWith } from './env.mjs';
 import { readFileSync } from 'node:fs';
 const out = (m) => console.log(m);
 const b = await chromium.launch();
@@ -114,7 +114,6 @@ const comment = async (text) => {
 // 1 — the home refuses what it cannot import, before any project exists (2.1)
 await part('home refusals', async () => {
   await page.goto(HOME, { waitUntil: 'networkidle' });
-  await page.getByRole('radio', { name: 'Critique', exact: true }).click();
   const tries = [
     ['notes.txt', 'text/plain', Buffer.from('hello'), /imports HTML, PNG, JPG and SVG/],
     ['empty.png', 'image/png', Buffer.alloc(0), /empty/],
@@ -126,17 +125,22 @@ await part('home refusals', async () => {
   ];
   for (const [name, mimeType, buffer, want] of tries) {
     await page.locator('input[type=file]').setInputFiles({ name, mimeType, buffer });
+    await beginWith(page);
     await page.waitForSelector('.v0-error-line', { timeout: 5000 });
     const msg = await page.locator('.v0-error-line').innerText();
     check(`refuses ${name}`, want.test(msg) && !/is 2 MB; the limit/.test(msg), msg);
   }
+  // everything made is in its own view now
+  await page.goto(HOME + '?work=1', { waitUntil: 'networkidle' });
   check('no project is left behind by a refused file', (await page.locator('.v0-list-row').count()) === 0);
+  await page.goto(HOME, { waitUntil: 'networkidle' });
 });
 
 // 2 — SVG: drawn as an image from a blob URL, its script never runs; an area is rasterised for the crop (2.5, 3.5)
 await part('svg import', async () => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500"><script>document.title='svg ran';try{parent.document.title='svg ran'}catch(e){}</script><rect width="800" height="500" fill="#f4efe6"/><rect x="60" y="60" width="300" height="80" fill="#5b3a24"/><text x="80" y="112" font-size="32" fill="#ffffff" font-family="sans-serif">Book now</text></svg>`;
   await page.locator('input[type=file]').setInputFiles({ name: 'poster.svg', mimeType: 'image/svg+xml', buffer: Buffer.from(svg) });
+  await beginWith(page);
   await page.waitForSelector('img.v0-image', { timeout: 15000 });
   await page.waitForTimeout(600);
   const src = await page.locator('img.v0-image').getAttribute('src');
@@ -151,8 +155,8 @@ await part('svg import', async () => {
 // 3 — JPG: drawn, area-selected, cropped (2.5, 3.3, 3.5); zoom keys (1.6)
 await part('jpg import and zoom keys', async () => {
   await page.goto(HOME, { waitUntil: 'networkidle' });
-  await page.getByRole('radio', { name: 'Critique', exact: true }).click();
   await page.locator('input[type=file]').setInputFiles(FX + 'cafe-bar.jpg');
+  await beginWith(page);
   await page.waitForSelector('img.v0-image', { timeout: 15000 });
   await page.waitForTimeout(600);
   const nat = await page.locator('img.v0-image').evaluate((i) => [i.naturalWidth, i.naturalHeight, i.width, i.height]);
@@ -188,8 +192,8 @@ await part('jpg import and zoom keys', async () => {
 // 4 — HTML: step up to the parent, clear with Esc, tablet viewport (3.1, 2.4)
 await part('html parent, clear, tablet', async () => {
   await page.goto(HOME, { waitUntil: 'networkidle' });
-  await page.getByRole('radio', { name: 'Critique', exact: true }).click();
   await page.locator('input[type=file]').setInputFiles(FX + 'existing-design.html');
+  await beginWith(page);
   await page.waitForSelector('iframe.v0-frame', { timeout: 20000 });
   await page.waitForTimeout(1500);
   const missingLine = await page.waitForFunction(() => document.querySelector('.v0-notice')?.textContent?.includes('could not load'), null, { timeout: 6000 }).then(() => true).catch(() => false);
@@ -245,10 +249,11 @@ await part('workspace widths', async () => {
 
 // 6 — the home lists, opens and deletes (1.4)
 await part('home list', async () => {
-  await page.goto(HOME, { waitUntil: 'networkidle' });
+  // everything made is in its own view (the home is one composer)
+  await page.goto(HOME + '?work=1', { waitUntil: 'networkidle' });
   await page.waitForTimeout(500);
   const n0 = await page.locator('.v0-list-row').count();
-  check('the home lists the designs in this browser', n0 === 3, `${n0} listed`);
+  check('your work lists the designs in this browser', n0 === 3, `${n0} listed`);
   let dialogs = 0;
   page.on('dialog', (d) => (dialogs++, d.dismiss()));
   await page.locator('.v0-list-row').first().getByRole('button', { name: 'Delete' }).click();
@@ -275,12 +280,8 @@ await part('home list', async () => {
 await part('create details', async () => {
   await page.goto(HOME, { waitUntil: 'networkidle' });
   calls.discover.length = 0; calls.brief.length = 0; calls.images.length = 0;
-  await page.locator('.v0-intent-line textarea').fill('A website for my independent coffee house');
-  await page.getByRole('button', { name: 'Begin' }).click();
-  // the studio's conversation comes first; the model-led website workspace is its own way in from it
-  await page.waitForSelector('.sd-conv', { timeout: 15000 });
-  if (!(await page.getByRole('button', { name: 'Plan it in the workspace' }).isVisible())) await page.getByRole('button', { name: /Decisions/ }).click();
-  await page.getByRole('button', { name: 'Plan it in the workspace' }).click();
+  // the model-led website workspace's own way in (its questions, references, brief and directions)
+  await websiteWorkspace(page, 'A website for my independent coffee house');
   await page.waitForSelector('.v0-tile img', { timeout: 15000 });
   await page.waitForTimeout(600);
   const nd = calls.discover.length;
@@ -340,11 +341,11 @@ await part('create details', async () => {
 // 8 — a file dropped on the home's Critique way opens (2.1)
 await part('home drop', async () => {
   await page.goto(HOME, { waitUntil: 'networkidle' });
-  await page.getByRole('radio', { name: 'Critique', exact: true }).click();
   const dt = await page.evaluateHandle(() => { const d = new DataTransfer(); d.items.add(new File(['<!doctype html><title>Dropped</title><main><h1>Dropped page</h1><a href="#" class="btn">Go</a></main>'], 'dropped.html', { type: 'text/html' })); return d; });
-  await page.dispatchEvent('.v0-way-drop', 'dragover', { dataTransfer: dt });
-  check('a file held over Critique marks it', await page.locator('.v0-way-drop.is-over').count() === 1);
-  await page.dispatchEvent('.v0-way-drop', 'drop', { dataTransfer: dt });
+  await page.dispatchEvent('.v0-intent-line', 'dragover', { dataTransfer: dt });
+  check('a file held over Critique marks it', await page.locator('.v0-intent-line.is-over').count() === 1);
+  await page.dispatchEvent('.v0-intent-line', 'drop', { dataTransfer: dt });
+  await beginWith(page);
   await page.waitForSelector('iframe.v0-frame', { timeout: 15000 });
   await page.waitForTimeout(800);
   check('a dropped file opens in the workspace', (await page.frameLocator('iframe.v0-frame').locator('h1').innerText()) === 'Dropped page');
@@ -360,9 +361,9 @@ await part('home drop', async () => {
 // 9 — a file that passes its checks but cannot be read explains why; the import view takes a drop (2.6, 2.1)
 await part('unreadable image, then a drop', async () => {
   await page.goto(HOME, { waitUntil: 'networkidle' });
-  await page.getByRole('radio', { name: 'Critique', exact: true }).click();
   const broken = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from('this is not the rest of a PNG')]);
   await page.locator('input[type=file]').setInputFiles({ name: 'cut-off.png', mimeType: 'image/png', buffer: broken });
+  await beginWith(page);
   await page.waitForSelector('.v0-import', { timeout: 10000 });
   const err = await page.waitForFunction(() => document.querySelector('.v0-notice')?.textContent?.includes('could not be read'), null, { timeout: 6000 }).then(() => true).catch(() => false);
   check('an image that cannot be read says so, and nothing is drawn', err && (await page.locator('img.v0-image').count()) === 0, (await page.locator('.v0-notice').innerText().catch(() => '')).slice(0, 100));
@@ -376,9 +377,9 @@ await part('unreadable image, then a drop', async () => {
 // 10 — when the browser's storage is full, the design still opens and the person is told (1.3)
 await part('storage full', async () => {
   await page.goto(HOME, { waitUntil: 'networkidle' });
-  await page.getByRole('radio', { name: 'Critique', exact: true }).click();
   await page.evaluate(() => { window.__quota = true; });
   await page.locator('input[type=file]').setInputFiles(FX + 'marble.jpg');
+  await beginWith(page);
   await page.waitForSelector('img.v0-image', { timeout: 15000 });
   const said = await page.waitForFunction(() => document.querySelector('.v0-notice')?.textContent?.includes('storage is full'), null, { timeout: 6000 }).then(() => true).catch(() => false);
   check('storage full: the design opens anyway, and the person is told it will not be kept', said, (await page.locator('.v0-notice').innerText().catch(() => '')).slice(0, 120));
@@ -388,8 +389,8 @@ await part('storage full', async () => {
 // 11 — a model failure keeps the comment and offers to try again (6.6)
 await part('model failure', async () => {
   await page.goto(HOME, { waitUntil: 'networkidle' });
-  await page.getByRole('radio', { name: 'Critique', exact: true }).click();
   await page.locator('input[type=file]').setInputFiles(FX + 'existing-design.html');
+  await beginWith(page);
   await page.waitForSelector('iframe.v0-frame', { timeout: 20000 });
   await page.waitForTimeout(1500);
   await page.frameLocator('iframe.v0-frame').locator('a.btn').first().click();

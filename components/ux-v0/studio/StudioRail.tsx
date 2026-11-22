@@ -4,8 +4,9 @@
 // A work begun in the studio keeps its conversation beside it: everything said and decided, and a place to keep
 // talking. What is said here goes to the workspace's own way of taking words (a change to a graphic or a board in
 // words, a refinement of a page, a question on a critique), and what the workspace answers is kept in the same
-// transcript, so the conversation reads as one from the first sentence to the latest change. Docked on wide screens
-// (the workspace moves aside for it), a sheet on narrow ones; it can be put away and brought back.
+// transcript, so the conversation reads as one from the first sentence to the latest change. On the left, where the
+// conversation began; docked on wide screens (the workspace moves aside for it), over the work on narrow ones; it can
+// be put away and brought back. While it is open it is the one place to type: the workspace's own ask bars step back.
 
 import { useEffect, useRef, useState } from 'react';
 import type { StudioState } from '@/lib/ux-v0/studio/schema';
@@ -19,8 +20,8 @@ const KEY = 'socriaux.studio.rail';
 /** Open by default on a wide screen when the work came out of the conversation; put away when the person chose to
  * work directly (the brief written by hand, or a critique, whose own cards are its conversation). The person's own
  * choice, once made, is kept. */
-/** Wide enough for the workspace to keep its full layout beside the rail (below it, the rail opens over the right side). */
-export const DOCK_WIDTH = 1600;
+/** Wide enough for the work to keep its room beside the rail (below it, the rail opens over the left side). */
+export const DOCK_WIDTH = 1280;
 const readOpen = (byDefault: boolean) => {
   const wide = typeof window !== 'undefined' && window.innerWidth >= DOCK_WIDTH;
   try {
@@ -57,7 +58,7 @@ export function useRailReply<T>(signal: T | null, textOf: (s: T) => string | nul
     });
 }
 
-export function StudioRail({ studio, onStudio, onAsk, placeholder, env = {}, systemName }: { studio: StudioState; onStudio: (fn: (s: StudioState) => StudioState) => void; onAsk: (words: string) => Promise<string | null>; placeholder: string; env?: DiscoveryEnv; systemName?: string | null }) {
+export function StudioRail({ studio, onStudio, onAsk, placeholder, env = {}, systemName, onOpenChange }: { studio: StudioState; onStudio: (fn: (s: StudioState) => StudioState) => void; onAsk: (words: string) => Promise<string | null>; placeholder: string; env?: DiscoveryEnv; systemName?: string | null; /** told whether the rail is open (the workspace's own ask bar steps back while it is) */ onOpenChange?: (open: boolean) => void }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<'talk' | 'decisions'>('talk');
   const [words, setWords] = useState('');
@@ -69,8 +70,9 @@ export function StudioRail({ studio, onStudio, onAsk, placeholder, env = {}, sys
   // the workspace moves aside while the rail is docked
   useEffect(() => {
     document.body.classList.toggle('sd-railed', open);
+    onOpenChange?.(open);
     return () => document.body.classList.remove('sd-railed');
-  }, [open]);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!open || tab !== 'talk') return;
     end.current?.scrollIntoView({ block: 'end' });

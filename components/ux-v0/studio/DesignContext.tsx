@@ -7,6 +7,7 @@ import type { StudioState } from '@/lib/ux-v0/studio/schema';
 import { decisionsOf, type DiscoveryEnv } from '@/lib/ux-v0/studio/discovery';
 import { modeInfo } from '@/lib/ux-v0/studio/modes';
 import { FileMark, ModeGlyph } from './glyphs';
+import { creditOf, likedOf } from '@/lib/ux-v0/studio/research';
 
 const SOURCE: Record<string, string> = { words: 'From your words', person: 'Yours', socria: 'SocriaUX decides' };
 
@@ -16,6 +17,7 @@ export function DesignContext({ st, env, onChange, systemName, title = 'What we 
   const shown = all.filter((d) => d.source !== 'open' || d.depth <= depth);
   const open = all.length - shown.length;
   const m = modeInfo(st.mode);
+  const liked = likedOf(st);
   return (
     <div className="sd-ctx">
       <p className="sd-ctx-k">{title}</p>
@@ -46,6 +48,30 @@ export function DesignContext({ st, env, onChange, systemName, title = 'What we 
         <p className="sd-ctx-more">
           {open} finer choice{open === 1 ? '' : 's'} still on offer
         </p>
+      )}
+      {liked.length > 0 && (
+        <>
+          <p className="sd-ctx-k is-sub">References that guide it</p>
+          <ul className="sd-ctx-refs">
+            {liked.map((r) => (
+              <li key={r.id}>
+                <img src={r.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" />
+                <span>
+                  {creditOf(r)}
+                  {r.sourceUrl && (
+                    <>
+                      {' · '}
+                      <a href={r.sourceUrl} target="_blank" rel="noopener noreferrer nofollow">
+                        Source<span className="v0-sr"> (opens the page it comes from)</span>
+                      </a>
+                    </>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="sd-ctx-more">Inspiration only: their qualities guide the work; nothing of them is copied into it.</p>
+        </>
       )}
       {st.attachments.length > 0 && (
         <>

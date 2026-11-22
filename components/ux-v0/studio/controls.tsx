@@ -5,9 +5,11 @@
 // Continue. Every option is a button that says whether it is chosen; nothing here depends on colour alone.
 
 import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import type { StudioAnswer, StudioAttachment, StudioState } from '@/lib/ux-v0/studio/schema';
+import type { StudioAnswer, StudioAttachment, StudioReference, StudioState } from '@/lib/ux-v0/studio/schema';
+import { REF_TAKES, type RefTake } from '@/lib/ux-v0/studio/schema';
 import type { Stage, StageOption } from '@/lib/ux-v0/studio/discovery';
 import { previewWords } from '@/lib/ux-v0/studio/options';
+import { likedOf, researchStatus } from '@/lib/ux-v0/studio/research';
 import { DNA_META, type DnaKey } from '@/lib/ux-v0/dna';
 import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
 import { PreviewOf, useFacesFor } from './previews';
@@ -33,6 +35,17 @@ export interface ControlProps {
   attachments: readonly StudioAttachment[];
   onFiles: (files: File[], stage: Stage) => Promise<{ ids: string[]; error?: string }>;
   onRemoveFile: (id: string) => void;
+  /** the references found on the internet: searching, and what the person makes of each */
+  research?: ResearchControls;
+}
+
+export interface ResearchControls {
+  busy: boolean;
+  onReference: (id: string, patch: Partial<Pick<StudioReference, 'state' | 'take'>>) => void;
+  /** search for these words */
+  onSearch: (query: string) => void;
+  /** search again for what the brief asks (after a search that could not be completed) */
+  onRetry: () => void;
 }
 
 /** Whether a draft can be given as the answer. */
@@ -57,6 +70,8 @@ export function draftReady(stage: Stage, d: Draft): boolean {
 /** A draft from an answer already given (or one just taken back to be given again), or the question's starting point. */
 export function draftOf(stage: Stage, st: StudioState, prior?: StudioAnswer | null): Draft {
   const a = st.answers[stage.id] ?? prior ?? undefined;
+  // what the person liked is held on the references themselves, wherever it was liked
+  if (stage.control === 'references') return { values: likedOf(st).map((r) => r.id), ...(a?.text && !a.skipped && !a.delegated ? { text: a.text } : {}) };
   if (a && !a.skipped && !a.delegated) return { values: [...a.values], ...(a.text ? { text: a.text } : {}), ...(a.numbers ? { numbers: { ...a.numbers } } : {}), ...(a.fields ? { fields: { ...a.fields } } : {}) };
   if (stage.control === 'rank') return { values: stage.options.map((o) => o.id) };
   return { values: [] };
@@ -554,9 +569,170 @@ function Upload({ stage, draft, setDraft, commit, attachments, onFiles, onRemove
   );
 }
 
+// ── references found on the internet ──
+
+const ORIGIN: Record<string, string> = { flickr: 'Flickr', wikimedia: 'Wikimedia Commons', met: 'The Met', smithsonian: 'Smithsonian', clevelandmuseum: 'Cleveland Museum of Art', brooklynmuseum: 'Brooklyn Museum', rawpixel: 'rawpixel', stocksnap: 'StockSnap', geographorguk: 'Geograph', nappy: 'nappy', sciencemuseum: 'Science Museum' };
+const originOf = (o?: string) => (o ? ORIGIN[o] ?? o.replace(/_/g, ' ') : '');
+const TAKE_LABEL: Record<RefTake, string> = { colour: 'Colour', type: 'Type', composition: 'Composition', mood: 'Mood', imagery: 'Imagery' };
+
+function RefCard({ r, i, research, onToggle, onReject }: { r: StudioReference; i: number; research: ResearchControls; onToggle: (liked: boolean) => void; onReject: () => void }) {
+  const liked = r.state === 'liked';
+  const [gone, setGone] = useState(false);
+  // a picture the library can no longer serve is not shown (nothing stands in for it)
+  if (gone) return null;
+  const ratio = r.width && r.height ? Math.max(0.62, Math.min(1.7, r.width / r.height)) : 1.25;
+  const like = (r.tags.length ? r.tags.slice(0, 2).join(' ') : r.title.split(/\s+/).slice(0, 3).join(' ')).trim();
+  return (
+    <li className={`sd-ref${liked ? ' is-liked' : ''}`} style={{ ['--i' as string]: i % 12 }} data-ref={r.id}>
+      <button type="button" className="sd-ref-img" style={{ aspectRatio: String(ratio) }} aria-pressed={liked} onClick={() => onToggle(!liked)} aria-label={`${liked ? 'Liked' : 'Like'}: ${r.title || 'this reference'}${r.creator ? `, by ${r.creator}` : ''}`}>
+        <img src={r.thumb} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setGone(true)} />
+        <span className="sd-ref-tick" aria-hidden="true">
+          <Check size={13} />
+        </span>
+      </button>
+      <span className="sd-ref-cap">
+        <span className="sd-ref-t">{r.title || 'Untitled'}</span>
+        <span className="sd-ref-c">
+          {[r.creator, originOf(r.origin), r.license].filter(Boolean).join(' · ')}
+          {r.sourceUrl && (
+            <>
+              {' · '}
+              <a href={r.sourceUrl} target="_blank" rel="noopener noreferrer nofollow">
+                Source<span className="v0-sr"> (opens the page it comes from)</span>
+              </a>
+            </>
+          )}
+        </span>
+      </span>
+      <span className="sd-ref-acts">
+        <button type="button" className={`sd-chip is-tiny${liked ? ' is-on' : ''}`} aria-pressed={liked} onClick={() => onToggle(!liked)}>
+          {liked ? <Check size={12} /> : <Plus size={12} />}
+          {liked ? 'Liked' : 'Like'}
+        </button>
+        <button type="button" className="sd-chip is-tiny is-ghost" onClick={onReject} aria-label={`Not this: ${r.title || 'this reference'}`}>
+          Not this
+        </button>
+        {liked && like && (
+          <button type="button" className="sd-textlink is-small" disabled={research.busy} onClick={() => research.onSearch(like)} title={`Search Openverse for “${like}”`}>
+            More like this
+          </button>
+        )}
+      </span>
+      {liked && (
+        <span className="sd-ref-take" role="group" aria-label={`What you like about “${r.title || 'it'}”`}>
+          <span className="sd-ref-take-k">For its</span>
+          {REF_TAKES.map((t) => {
+            const on = (r.take ?? []).includes(t);
+            return (
+              <button key={t} type="button" className={`sd-chip is-tiny${on ? ' is-on' : ''}`} aria-pressed={on} onClick={() => research.onReference(r.id, { take: on ? (r.take ?? []).filter((x) => x !== t) : [...(r.take ?? []), t] })}>
+                {TAKE_LABEL[t]}
+              </button>
+            );
+          })}
+        </span>
+      )}
+    </li>
+  );
+}
+
+function References({ st, draft, setDraft, research }: ControlProps) {
+  const [query, setQuery] = useState('');
+  const [showTurned, setShowTurned] = useState(false);
+  if (!research) return null;
+  const refs = st.references ?? [];
+  const shown = refs.filter((r) => r.state !== 'rejected');
+  const turned = refs.filter((r) => r.state === 'rejected');
+  const status = researchStatus(st, research.busy);
+  const setLiked = (id: string, liked: boolean) => {
+    const ids = new Set(draft.values);
+    if (liked) ids.add(id);
+    else ids.delete(id);
+    setDraft({ ...draft, values: [...ids] });
+  };
+  return (
+    <div className="sd-refs">
+      <p className={`sd-refs-status${research.busy ? ' is-busy' : ''}${status.failed ? ' is-failed' : ''}`} role="status" aria-live="polite">
+        {research.busy && <span className="sd-refs-dot" aria-hidden="true" />}
+        <span>{status.text}</span>
+        {status.failed && !research.busy && (
+          <button type="button" className="sd-textlink is-small" onClick={research.onRetry}>
+            Try again
+          </button>
+        )}
+      </p>
+      {research.busy && !shown.length ? (
+        <ul className="sd-refs-grid is-waiting" aria-hidden="true">
+          {Array.from({ length: 8 }, (_, i) => (
+            <li key={i} className="sd-ref is-wait" style={{ ['--i' as string]: i }} />
+          ))}
+        </ul>
+      ) : shown.length ? (
+        <ul className="sd-refs-grid" aria-label="References">
+          {shown.map((r, i) => (
+            <RefCard
+              key={r.id}
+              r={r}
+              i={i}
+              research={research}
+              onToggle={(v) => {
+                research.onReference(r.id, { state: v ? 'liked' : 'proposed' });
+                setLiked(r.id, v);
+              }}
+              onReject={() => {
+                research.onReference(r.id, { state: 'rejected' });
+                setLiked(r.id, false);
+              }}
+            />
+          ))}
+        </ul>
+      ) : null}
+      {turned.length > 0 && (
+        <button type="button" className="sd-textlink is-small" onClick={() => setShowTurned((v) => !v)} aria-expanded={showTurned}>
+          {showTurned ? 'Hide' : 'Show'} the {turned.length} turned down
+        </button>
+      )}
+      {showTurned && (
+        <ul className="sd-refs-turned" aria-label="Turned down">
+          {turned.map((r) => (
+            <li key={r.id}>
+              <img src={r.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" />
+              <span>{r.title || 'Untitled'}</span>
+              <button type="button" className="sd-textlink is-small" onClick={() => research.onReference(r.id, { state: 'proposed' })}>
+                Bring back
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form
+        className="sd-refs-search"
+        role="search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const q = query.trim();
+          if (!q || research.busy) return;
+          research.onSearch(q);
+          setQuery('');
+        }}
+      >
+        <label htmlFor="sd-refs-q" className="v0-sr">
+          Search Openverse for other references
+        </label>
+        <input id="sd-refs-q" value={query} onChange={(e) => setQuery(e.target.value.slice(0, 80))} placeholder="Search for something else: “art deco poster”, “hand-painted sign”…" autoComplete="off" enterKeyHint="search" />
+        <button type="submit" className="sd-pill is-quiet is-sm" disabled={!query.trim() || research.busy}>
+          Search
+        </button>
+      </form>
+      <p className="sd-refs-note">Openly licensed works found through Openverse, each credited with its creator, licence and source. They are inspiration only: SocriaUX learns from what you like — colour, type, composition, mood — and never copies a reference into your work.</p>
+    </div>
+  );
+}
+
 /** The control a question asks with. */
 export function StageControl(p: ControlProps) {
   switch (p.stage.control) {
+    case 'references':
+      return <References {...p} />;
     case 'cards':
       return <Cards {...p} />;
     case 'chips':

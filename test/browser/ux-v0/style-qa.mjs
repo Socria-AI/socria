@@ -8,7 +8,7 @@
 //
 //   UXV0_FORWARD=1 UXV0_BASE=http://127.0.0.1:3100 node test/browser/ux-v0/style-qa.mjs   (against `next start`)
 import { readFileSync, mkdirSync } from 'node:fs';
-import { chromium, S, BASE, FX, underTest } from './env.mjs';
+import { chromium, S, BASE, FX, underTest, handBrief } from './env.mjs';
 
 const V = await underTest();
 const D = V.gfxDoc;
@@ -74,11 +74,8 @@ const library = () => page.evaluate(() => JSON.parse(localStorage.getItem('socri
 
 console.log('=== SocriaUX Style Intelligence, by hand, in the built app ===');
 await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
-await page.fill('textarea[aria-label="What do you want to make?"]', 'A poster for “Signal & Form”, a creative technology exhibition, “Where code becomes craft”, 12–28 March 2027, Lisbon Design Centre');
-await page.getByRole('radio', { name: 'Graphic', exact: true }).click();
-await page.getByRole('button', { name: 'Begin' }).click();
-await page.getByRole('button', { name: 'Write the brief yourself' }).click();
-await page.waitForSelector('.gx-brief', { timeout: 15000 });
+// the brief written by hand in the workspace (its own form)
+await handBrief(page, 'graphic', 'A poster for “Signal & Form”, a creative technology exhibition, “Where code becomes craft”, 12–28 March 2027, Lisbon Design Centre');
 await page.getByRole('button', { name: /See three directions/ }).click();
 await page.waitForSelector('.gx-dir', { timeout: 15000 });
 await page.waitForTimeout(800);
@@ -333,11 +330,8 @@ ok('10. after a reload the design still speaks its style, and one’s own styles
 
 // ── a board's design language ──
 await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
-await page.fill('textarea[aria-label="What do you want to make?"]', 'Create a campaign for “Signal & Form”, “Where code becomes craft”, 12–28 March 2027: two posters and two Instagram graphics.');
-await page.getByRole('radio', { name: 'Board', exact: true }).click();
-await page.getByRole('button', { name: 'Begin' }).click();
-await page.getByRole('button', { name: 'Write the brief yourself' }).click();
-await page.waitForSelector('.bd-brief', { timeout: 15000 });
+// the brief written by hand in the workspace (its own form)
+await handBrief(page, 'board', 'Create a campaign for “Signal & Form”, “Where code becomes craft”, 12–28 March 2027: two posters and two Instagram graphics.');
 await page.getByRole('button', { name: /Propose design systems/ }).click();
 await page.waitForSelector('.bd-sys', { timeout: 15000 });
 const boardReady = async (pred, ms = 20000) => {

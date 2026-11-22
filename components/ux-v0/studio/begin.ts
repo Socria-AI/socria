@@ -101,7 +101,10 @@ export function switchMode(st: StudioState, mode: StudioMode, now = Date.now()):
     }
   }
   if (mode === 'critique' || mode === 'system') delete answers[`${to}.personality`];
-  let next: StudioState = { ...st, mode, modeBy: 'person', answers, depth: 1, ...(mode === 'critique' || mode === 'system' ? { systemId: undefined } : {}) };
+  // references liked or turned down stay (a choice stays a choice); the rest were found for the other kind of work,
+  // so they go, and the new kind is searched for afresh
+  const references = (st.references ?? []).filter((r) => r.state !== 'proposed');
+  let next: StudioState = { ...st, mode, modeBy: 'person', answers, depth: 1, references, research: undefined, ...(mode === 'critique' || mode === 'system' ? { systemId: undefined } : {}) };
   next = said(next, { from: 'socria', kind: 'change', text: openingLine(mode, 'person'), at: now });
   return seedFromWords(next, now);
 }

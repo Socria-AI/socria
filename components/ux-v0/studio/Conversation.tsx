@@ -4,8 +4,9 @@
 // The questions come from lib/ux-v0/studio/discovery.ts: only those that matter for this work, the accessible ones
 // first, deeper ones offered once there is enough to begin. Each is answered with the control that suits it (visual
 // cards drawn by the engines, chips, a ranking, colours, type in its own faces, sliders, fields, counts, files), in the
-// person's own words, skipped, or left to SocriaUX. What is decided stays on the side, each decision with where it
-// came from, and any of it can be opened again or changed in words. Nothing here calls a model: the conversation,
+// person's own words, skipped, or left to SocriaUX. The conversation is on the left, the question on the right with
+// what is taking shape under it; the decisions, each with where it came from, are in a drawer, and any of them can be
+// opened again or changed in words. Nothing here calls a model: the conversation,
 // the previews and the start are the engines' own, in this browser.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -16,9 +17,10 @@ import { answerStage, currentStage, deeper, delegateStage, pathOf, readiness, re
 import { logoWordsOf, materialsOf, websiteAskOf, wordsOf } from '@/lib/ux-v0/studio/apply';
 import type { SystemRecord } from '@/lib/ux-v0/dsi/registry';
 import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
-import { StageControl, draftOf, draftReady, type Draft } from './controls';
-import { SystemPicker, usableSystems } from './SystemPicker';
+import { StageControl, draftOf, draftReady, type Draft, type ResearchControls } from './controls';
+import { SystemPicker } from './SystemPicker';
 import { DesignContext } from './DesignContext';
+import { Vision } from './Vision';
 import { ArrowUp, Back, Check, Close, Down, Leave, ModeGlyph, Panel } from './glyphs';
 
 export interface ConversationProps {
@@ -36,21 +38,26 @@ export interface ConversationProps {
   /** what is happening while the work begins ('' when nothing is) */
   starting: string;
   error: string;
-  /** the workspace's own way in, without the questions */
-  onWriteBrief?: () => void;
   onExit: () => void;
   onSwitchMode: (mode: StudioMode) => void;
   onFiles: (files: File[], stage: Stage) => Promise<{ ids: string[]; error?: string }>;
   onRemoveFile: (id: string) => void;
+  /** references looked for on the internet, and what the person makes of them */
+  research?: ResearchControls;
 }
 
 const START_LABEL: Record<StudioMode, string> = { graphic: 'Start creating', logo: 'Start creating', website: 'Start creating', board: 'Start creating', system: 'Bring it in', critique: 'Begin the critique' };
-const BRIEF_LABEL: Partial<Record<StudioMode, string>> = { graphic: 'Write the brief yourself', logo: 'Write the brief yourself', board: 'Write the brief yourself', website: 'Plan it in the workspace', system: 'Open the import' };
 
 const list = (xs: readonly string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0] ?? '');
 const given = (st: StudioState, id: string) => {
   const a = st.answers[id];
   return !!a && !a.skipped && !a.delegated && (a.values.length > 0 || !!a.text);
+};
+
+/** The references liked, as a clause of the plan. */
+const liked = (st: StudioState) => {
+  const n = (st.references ?? []).filter((r) => r.state === 'liked').length;
+  return n ? `, guided by the ${n === 1 ? 'reference' : `${n} references`} you liked` : '';
 };
 
 /** What starting will do, said before it is done. */
@@ -59,11 +66,11 @@ function planLine(st: StudioState, env: DiscoveryEnv): string {
   switch (st.mode) {
     case 'graphic': {
       const w = wordsOf(st, 'g.words');
-      return `I’ll compose “${w.headline}” three ways${given(st, 'g.style') ? `, starting from ${sum('g.style')}` : ''}${given(st, 'g.composition') ? `, ${sum('g.composition').toLowerCase()}` : ''}. You choose the one to develop, then change anything by hand or in words.`;
+      return `I’ll compose “${w.headline}” three ways${liked(st)}${given(st, 'g.composition') ? `, ${sum('g.composition').toLowerCase()}` : ''}. You choose the one to develop, then change anything by hand or in words.`;
     }
     case 'logo': {
       const { name } = logoWordsOf(st);
-      return `I’ll construct concepts for “${name}”${given(st, 'l.form') ? ` — ${sum('l.form').toLowerCase()}` : ''}, each built from what it stands for, never taken from a library of marks.`;
+      return `I’ll construct concepts for “${name}”${given(st, 'l.form') ? ` — ${sum('l.form').toLowerCase()}` : ''}${liked(st)}, each built from what it stands for, never taken from a library of marks.`;
     }
     case 'website': {
       const a = websiteAskOf(st);
@@ -73,7 +80,7 @@ function planLine(st: StudioState, env: DiscoveryEnv): string {
     case 'board': {
       const n = materialsOf(st).reduce((t, m) => t + m.count, 0);
       const w = wordsOf(st, 'b.words');
-      return `I’ll plan ${n} material${n === 1 ? '' : 's'} around “${w.headline}” and propose the identity they share. Each is its own composition.`;
+      return `I’ll plan ${n} material${n === 1 ? '' : 's'} around “${w.headline}” and propose the identity they share${liked(st)}. Each is its own composition.`;
     }
     case 'system':
       return `I’ll read ${sum('s.source').toLowerCase() || 'your files'} and show you what came across — references, modes and rules — before anything is kept.`;
@@ -110,7 +117,7 @@ function StageCard({ stage, st, env, p, prior, onAnswer, onSkip, onDelegate, onB
       </h2>
       <p className="sd-why">{stage.why}</p>
       <div className="sd-control">
-        <StageControl stage={stage} st={st} draft={draft} setDraft={setDraft} commit={onAnswer} nonce={p.nonce} websiteSystems={p.websiteSystems} attachments={st.attachments} onFiles={p.onFiles} onRemoveFile={p.onRemoveFile} />
+        <StageControl stage={stage} st={st} draft={draft} setDraft={setDraft} commit={onAnswer} nonce={p.nonce} websiteSystems={p.websiteSystems} attachments={st.attachments} onFiles={p.onFiles} onRemoveFile={p.onRemoveFile} research={p.research} />
       </div>
       {stage.allowText &&
         (own ? (
@@ -189,19 +196,34 @@ export function Conversation(p: ConversationProps) {
     if (id && a && !a.skipped && !a.delegated) setPriors((x) => ({ ...x, [id]: a }));
   };
   const scroller = useRef<HTMLDivElement>(null);
+  const stagePane = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const modeBox = useRef<HTMLDivElement>(null);
   const info = modeInfo(st.mode);
   const answeredByPerson = Object.values(st.answers).some((a) => a.source !== 'words');
   const systemName = env.hasSystem ? env.systemName ?? null : null;
 
-  // the newest turn in view, gently (at once for those who asked for less motion)
+  // the newest turn in view, gently (at once for those who asked for less motion), within the conversation's own column
   useEffect(() => {
-    const el = endRef.current;
-    if (!el) return;
+    const box = scroller.current;
+    if (!box) return;
     const calm = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    el.scrollIntoView({ block: 'end', behavior: calm ? 'auto' : 'smooth' });
-  }, [st.transcript.length, stage?.id, epoch]);
+    box.scrollTo({ top: box.scrollHeight, behavior: calm ? 'auto' : 'smooth' });
+  }, [st.transcript.length]);
+  // each new question is read from its top (on a narrow screen, where everything is one column, it is brought into view)
+  useEffect(() => {
+    const el = stagePane.current;
+    if (!el) return;
+    if (typeof window !== 'undefined' && window.matchMedia?.('(max-width: 960px)').matches) el.scrollIntoView({ block: 'start' });
+    else el.scrollTo({ top: 0 });
+  }, [stage?.id, epoch, p.starting]);
+
+  useEffect(() => {
+    if (!ctxOpen) return;
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setCtxOpen(false);
+    document.addEventListener('keydown', esc);
+    return () => document.removeEventListener('keydown', esc);
+  }, [ctxOpen]);
 
   useEffect(() => {
     if (!modeOpen) return;
@@ -341,7 +363,7 @@ export function Conversation(p: ConversationProps) {
               {p.saveWords}
             </span>
           )}
-          <button type="button" className="sd-pill is-ghost sd-ctx-toggle" aria-expanded={ctxOpen} onClick={() => setCtxOpen((o) => !o)}>
+          <button type="button" className="sd-pill is-ghost sd-ctx-toggle" aria-expanded={ctxOpen} aria-controls="sd-decisions" onClick={() => setCtxOpen((o) => !o)}>
             <Panel size={15} /> Decisions
           </button>
           <button type="button" className="sd-icon" onClick={p.onExit} aria-label="Leave the conversation (it is kept)">
@@ -351,38 +373,41 @@ export function Conversation(p: ConversationProps) {
       </header>
 
       <div className="sd-body">
-        <div className="sd-main" ref={scroller}>
-          <div className="sd-column">
-            <ol className="sd-transcript" aria-label="The conversation">
-              {st.transcript.map((m) => {
-                const reopenable = m.from === 'person' && m.kind === 'answer' && m.stage && st.answers[m.stage] && path.some((s) => s.id === m.stage);
-                return (
-                  <li key={m.id} className={`sd-msg is-${m.from} k-${m.kind}`}>
-                    {m.from === 'person' ? (
-                      <div className="sd-bubble">
-                        <p>{m.text}</p>
-                        {m.attachments?.length ? (
-                          <p className="sd-bubble-files">
-                            {m.attachments
-                              .map((id) => st.attachments.find((a) => a.id === id)?.name)
-                              .filter(Boolean)
-                              .join(' · ')}
-                          </p>
-                        ) : null}
-                        {reopenable && (
-                          <button type="button" className="sd-textlink is-small" onClick={() => reopenIt(m.stage!)}>
-                            Change
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <p className={m.kind === 'question' ? 'sd-said-q' : 'sd-said'}>{m.text}</p>
+        <div className="sd-talk" ref={scroller}>
+        <ol className="sd-transcript" aria-label="The conversation">
+          {st.transcript.map((m) => {
+            const reopenable = m.from === 'person' && m.kind === 'answer' && m.stage && st.answers[m.stage] && path.some((s) => s.id === m.stage);
+            return (
+              <li key={m.id} className={`sd-msg is-${m.from} k-${m.kind}`}>
+                {m.from === 'person' ? (
+                  <div className="sd-bubble">
+                    <p>{m.text}</p>
+                    {m.attachments?.length ? (
+                      <p className="sd-bubble-files">
+                        {m.attachments
+                          .map((id) => st.attachments.find((a) => a.id === id)?.name)
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </p>
+                    ) : null}
+                    {reopenable && (
+                      <button type="button" className="sd-textlink is-small" onClick={() => reopenIt(m.stage!)}>
+                        Change
+                      </button>
                     )}
-                  </li>
-                );
-              })}
-            </ol>
+                  </div>
+                ) : (
+                  <p className={m.kind === 'question' ? 'sd-said-q' : 'sd-said'}>{m.text}</p>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+          <div ref={endRef} className="sd-end" />
+        </div>
 
+        <div className="sd-stagepane" ref={stagePane}>
+          <div className="sd-stage-col">
             {p.starting ? (
               <section className="sd-starting" role="status" aria-live="polite">
                 <span className="sd-starting-bar" aria-hidden="true" />
@@ -448,11 +473,47 @@ export function Conversation(p: ConversationProps) {
                 {p.error}
               </p>
             )}
-            <div ref={endRef} className="sd-end" />
           </div>
         </div>
 
-        <aside className={`sd-side${ctxOpen ? ' is-open' : ''}`} aria-label="Design context">
+        <Vision st={st} />
+
+        <form
+          className="sd-reply"
+          onSubmit={(e) => {
+            e.preventDefault();
+            send();
+          }}
+        >
+          <div className="sd-reply-in">
+            <label htmlFor="sd-reply" className="v0-sr">
+              Reply in your own words
+            </label>
+            <textarea
+              id="sd-reply"
+              rows={1}
+              value={reply}
+              placeholder={stage ? (stage.allowText || stage.control === 'fields' ? 'Answer in your own words, or say what to change' : 'Say what to change, “back”, or “surprise me”') : 'Say what to change, or “start”'}
+              onChange={(e) => setReply(e.target.value.slice(0, 1200))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+            />
+            <button type="submit" className="sd-send" disabled={!reply.trim()} aria-label="Send">
+              <ArrowUp size={17} />
+            </button>
+          </div>
+          <p className="sd-reply-hint">
+            {systemName && st.mode !== 'critique' && st.mode !== 'system' ? `Made in ${systemName}. ` : ''}
+            Nothing here calls a model.
+          </p>
+        </form>
+
+        {ctxOpen && <button type="button" className="sd-scrim" aria-label="Close the decisions" onClick={() => setCtxOpen(false)} />}
+        <aside id="sd-decisions" className={`sd-side${ctxOpen ? ' is-open' : ''}`} aria-label="Design context" aria-hidden={!ctxOpen}>
           <div className="sd-side-head">
             <button type="button" className="sd-icon sd-side-close" onClick={() => setCtxOpen(false)} aria-label="Close the decisions">
               <Close size={16} />
@@ -465,11 +526,6 @@ export function Conversation(p: ConversationProps) {
                 <SystemPicker systems={p.systems} value={st.systemId ?? null} onChange={p.onSystem} onManage={p.onManageSystems} />
               </div>
             )}
-            {BRIEF_LABEL[st.mode] && p.onWriteBrief && (
-              <button type="button" className="sd-textlink" onClick={p.onWriteBrief}>
-                {BRIEF_LABEL[st.mode]}
-              </button>
-            )}
             {stage && ready.canStart && (
               <button type="button" className="sd-pill is-primary is-block" onClick={() => begin(st)}>
                 {START_LABEL[st.mode]}
@@ -478,40 +534,6 @@ export function Conversation(p: ConversationProps) {
           </div>
         </aside>
       </div>
-
-      <form
-        className="sd-reply"
-        onSubmit={(e) => {
-          e.preventDefault();
-          send();
-        }}
-      >
-        <div className="sd-reply-in">
-          <label htmlFor="sd-reply" className="v0-sr">
-            Reply in your own words
-          </label>
-          <textarea
-            id="sd-reply"
-            rows={1}
-            value={reply}
-            placeholder={stage ? (stage.allowText || stage.control === 'fields' ? 'Answer in your own words, or say what to change' : 'Say what to change, “back”, or “surprise me”') : 'Say what to change, or “start”'}
-            onChange={(e) => setReply(e.target.value.slice(0, 1200))}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-          />
-          <button type="submit" className="sd-send" disabled={!reply.trim()} aria-label="Send">
-            <ArrowUp size={17} />
-          </button>
-        </div>
-        <p className="sd-reply-hint">
-          {usableSystems(p.systems).length > 0 && st.mode !== 'critique' && st.mode !== 'system' ? (systemName ? `Made in ${systemName}. ` : 'No design system: SocriaUX proposes one. ') : ''}
-          Nothing here calls a model.
-        </p>
-      </form>
     </div>
   );
 }

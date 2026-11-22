@@ -177,49 +177,6 @@ function Frame({ ratio, html, label, children }: { ratio: number; html: string |
   );
 }
 
-/** The person's words composed in one style. */
-export function StyleShot({ st, style }: { st: StudioState; style: string }) {
-  const [ref, near] = useNear<HTMLSpanElement>();
-  const s = sampleOf(st);
-  const key = `style|${style}|${hash(s.salt)}`;
-  const html = usePreview(
-    key,
-    () => {
-      const base = languageDirection(st.prompt || s.brief.content.headline, s.brief.mood, `${s.salt}|${style}`);
-      const dir = styledDirection(base, { primary: style, strength: 60 }, { seed: s.salt });
-      const { doc } = composeGraphic(s.brief, dir, { seed: 7 });
-      return drawn(doc, `sd${hash(key)}-`);
-    },
-    near,
-  );
-  return (
-    <span ref={ref} className="sd-shot-wrap">
-      <Frame ratio={s.ratio} html={html} />
-    </span>
-  );
-}
-
-/** The person's words in a language generated from what they said, with no style behind it. */
-export function GeneratedShot({ st }: { st: StudioState }) {
-  const [ref, near] = useNear<HTMLSpanElement>();
-  const s = sampleOf(st);
-  const key = `gen|${hash(s.salt)}`;
-  const html = usePreview(
-    key,
-    () => {
-      const dir = languageDirection(st.prompt || s.brief.content.headline, s.brief.mood, `${s.salt}|generated`);
-      const { doc } = composeGraphic(s.brief, dir, { seed: 11 });
-      return drawn(doc, `sd${hash(key)}-`);
-    },
-    near,
-  );
-  return (
-    <span ref={ref} className="sd-shot-wrap">
-      <Frame ratio={s.ratio} html={html} />
-    </span>
-  );
-}
-
 /** The person's design organised under one composition constraint (the generative engine's own organisation). */
 export function OrgShot({ st, org }: { st: StudioState; org: Org }) {
   const [ref, near] = useNear<HTMLSpanElement>();
@@ -471,10 +428,6 @@ export function PreviewOf({ preview, st, nonce, systems }: { preview: Preview; s
   switch (preview.kind) {
     case 'format':
       return <FormatSketch format={preview.format} />;
-    case 'style':
-      return <StyleShot st={st} style={preview.style} />;
-    case 'generated':
-      return <GeneratedShot st={st} />;
     case 'org':
       return <OrgShot st={st} org={preview.org} />;
     case 'logo':

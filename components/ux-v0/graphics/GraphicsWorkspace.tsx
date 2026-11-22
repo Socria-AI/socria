@@ -51,6 +51,9 @@ const DEFAULT_NAMES = new Set(['Untitled design', 'Untitled graphic', '']);
 
 export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOpenProject }: { initial: DesignProject; signedIn: boolean; onExit: () => void; startIntent?: string; onOpenProject?: (id: string) => void }) {
   const { project, update, save, current } = useV0Project(initial, signedIn);
+  // a work made in conversation opens on the work alone, the conversation beside it; the panels come out by hand
+  const [railOpen, setRailOpen] = useState(false);
+  const [byHand, setByHand] = useState(() => !initial.studio || initial.studio.via === 'hand');
   const g: GraphicState = project.graphic ?? emptyGraphicState();
   const setG = useCallback((fn: (x: GraphicState) => GraphicState) => update((p) => ({ ...p, graphic: fn(p.graphic ?? emptyGraphicState()) })), [update]);
 
@@ -302,14 +305,15 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
 
   const isLogo = g.brief?.kind === 'logo' && !!g.doc?.artboards.some((b) => b.logo);
   const steps: { id: View; label: string; ok: boolean }[] = [
-    { id: 'brief', label: 'Brief', ok: true },
+    // a work begun in conversation has its brief there, not in a form
+    ...(project.studio && project.studio.via !== 'hand' ? [] : [{ id: 'brief' as View, label: 'Brief', ok: true }]),
     isLogo ? { id: 'directions', label: 'Concepts', ok: true } : { id: 'directions', label: 'Directions', ok: !!g.brief && g.options.length > 0 },
     { id: 'edit', label: 'Design', ok: !!g.doc },
   ];
 
   return (
     <>
-    {project.studio && <StudioRail studio={project.studio} onStudio={(fn) => update((p) => (p.studio ? { ...p, studio: fn(p.studio) } : p))} onAsk={railAsk} placeholder={view === 'edit' ? 'Say what to change: “make the headline bigger”, “warmer colours”…' : view === 'directions' ? '“The second one”, or “more”' : 'Say what to change'} systemName={linked?.rec.name ?? null} />}
+    {project.studio && <StudioRail studio={project.studio} onStudio={(fn) => update((p) => (p.studio ? { ...p, studio: fn(p.studio) } : p))} onAsk={railAsk} placeholder={view === 'edit' ? 'Say what to change: “make the headline bigger”, “warmer colours”…' : view === 'directions' ? '“The second one”, or “more”' : 'Say what to change'} systemName={linked?.rec.name ?? null} onOpenChange={setRailOpen} />}
     <div className="v0 sb gx">
       <header className="v0-head">
         <div className="v0-head-l">
@@ -413,6 +417,9 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
           onMakeBoard={(sys) => void makeBoard(sys)}
           inbox={inbox}
           onAsked={(t) => setAsked({ text: t })}
+          focus={!!project.studio && !byHand}
+          onFocus={project.studio ? (f) => setByHand(!f) : undefined}
+          hideAsk={!!project.studio && railOpen}
         />
       )}
     </div>
