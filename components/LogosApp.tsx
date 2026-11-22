@@ -2909,7 +2909,9 @@ export function LogosApp({
     const i = readOmnibox(text, omniContext(false));
     if (i.kind === 'thought') {
       const already = (mapRef.current?.nodes ?? []).find((n) => mapKeyOf(n.label) === mapKeyOf(i.label));
-      if (!already && !editMap([{ op: 'add', node: { label: i.label, type: i.type, hand: true } }])) return null;
+      // the chatbox is where an idea is made: its words, its kind, and the card it sits inside ("…inside Monopoly")
+      if (!already && !editMap([{ op: 'add', node: { label: i.label, type: i.type, hand: true }, ...(i.inside ? { parent: i.inside.id } : {}) }])) return null;
+      if (already && i.inside && i.inside.id !== already.id) editMap([{ op: 'parent', id: already.id, parent: i.inside.id }]);
       setThoughtKept({ sid, text });
       l6track('idea_added', {});
       return { said: '', thought: true };
@@ -6470,6 +6472,14 @@ export function LogosApp({
   }, [activeId]);
 
   function recentIdea(): Touched | null {
+    // the card pressed on the Mind Map is "this", "that" and "it" in their next words (the visual bus) — "add an idea
+    // called … inside this", "rename that to …"
+    const sid = activeIdRef.current;
+    const picked = visSelection();
+    if (sid && picked?.key === `map:${sid}`) {
+      const n = mapRef.current.nodes.find((x) => nodeVid(x.id) === picked.id);
+      if (n) return { id: n.id, label: n.label };
+    }
     const f = focusRef.current;
     if (f?.kind === 'node') {
       const n = mapRef.current.nodes.find((x) => x.id === f.id);
@@ -10065,7 +10075,10 @@ export function LogosApp({
     if (asksForQuiz(t)) return { said: 'A quiz from this chat’s material — it opens in the workspace' };
     const i = readOmnibox(t, omniContext(false));
     const said = omniHint(i);
-    return said ? { said, ...(i.kind === 'thought' || i.kind === 'connect' || i.kind === 'organize' ? { onInstead: () => setOmniOff(true) } : {}) } : null;
+    if (said) return { said, ...(i.kind === 'thought' || i.kind === 'connect' || i.kind === 'organize' ? { onInstead: () => setOmniOff(true) } : {}) };
+    // an idea added in so many words ("add an idea called … inside …", lib/map-edit.ts readMapAdd): said before Enter too
+    const add = readMapAdd(t, mapRef.current, recentIdea());
+    return add && 'edits' in add ? { said: add.said.replace(/^Added /, 'Add ').replace(/\.$/, '') } : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [input, omniOff, l5, activeId, map, messages, togetherReadOnly, guessFor]);
   const l5Dock = (

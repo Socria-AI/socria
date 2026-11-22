@@ -3,12 +3,13 @@
 //
 // Ideas, the Logic Map and Structure used to be separate places. Here they are three ways of working on the same
 // cards and lines (lib/logos6/graph.ts):
-//   • Ideas — put cards anywhere, add one in a keystroke, drag from a card's edge to connect it, group them;
+//   • Ideas — put cards anywhere, drag from a card's edge to connect it, group them;
 //   • Logic — the lines made explicit: what supports, conflicts with, depends on, causes what; each line can be
 //     opened to say why it holds and what bears it out, and confirmed (or taken off) when Socria read it;
-//   • Structure — what sits inside what, as an outline: indent, outdent, reorder, fold, add a part.
+//   • Structure — what sits inside what, as an outline: indent, outdent, reorder, fold.
 // Switching keeps everything: a card's data is the card's, where it was put is kept per way of working, and the
-// structure is laid out from the tree.
+// structure is laid out from the tree. Cards are never made here: an idea is made in the chatbox, which says its words,
+// its kind and the card it sits inside ("Idea: … inside …").
 //
 // Pressing a card opens what it means, why it matters, its notes, tags, sources, assumptions, fields, what it
 // connects to and why — what the person wrote kept apart from what Socria read, and said as such. Pressing a line
@@ -100,12 +101,6 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
   };
   const [sel, setSel] = useState<Sel>(null);
   const [filter, setFilter] = useState<LogicFilter>('all');
-  const [draft, setDraft] = useState('');
-  // a phone keeps the add field folded behind "+ Add" (the chatbox takes ideas too); open while it is in use
-  const [adding, setAdding] = useState(false);
-  const addOpen = !narrow || adding || !!draft;
-  const [pendingLabel, setPendingLabel] = useState<string | null>(null);
-  const [dropAt, setDropAt] = useState<[number, number] | null>(null);
   const [moved, setMoved] = useState<Record<string, [number, number]>>({});
   const [linking, setLinking] = useState<{ from: string; x: number; y: number } | null>(null);
   const [view, setView] = useState({ x: 0, y: 0, k: 1 });
@@ -113,7 +108,6 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
   viewRef.current = view;
   const [note, setNote] = useState<string | null>(null);
   const hostRef = useRef<HTMLDivElement>(null);
-  const addRef = useRef<HTMLInputElement>(null);
   // "More" puts itself away on a press elsewhere or Escape, like every other menu here
   const moreRef = useRef<HTMLDetailsElement>(null);
   const trayRef = useRef<HTMLDivElement>(null);
@@ -174,15 +168,6 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
   }, [places]);
   const focusSet = useMemo(() => (mode === 'logic' ? logicFocus(map, filter) : null), [map, mode, filter]);
 
-  // a card just added is selected as soon as it is on the map
-  useEffect(() => {
-    if (!pendingLabel) return;
-    const n = map.nodes.find((x) => x.label.toLowerCase() === pendingLabel.toLowerCase());
-    if (n) {
-      choose({ kind: 'node', id: n.id });
-      setPendingLabel(null);
-    }
-  }, [map, pendingLabel]);
   // what was selected and has gone (removed, or the pass reorganised) is let go
   useEffect(() => {
     if (sel?.kind === 'node' && !byId.has(sel.id)) setSel(null);
@@ -261,26 +246,10 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
     if (at && el) setView((v) => ({ ...v, x: el.clientWidth / 2 - (at.x + CARD_W / 2) * v.k, y: el.clientHeight / 2 - (at.y + CARD_H / 2) * v.k }));
   }, [vis.emph?.n]);
 
-  // ── adding ──
-  const add = () => {
-    const label = draft.replace(/\s+/g, ' ').trim();
-    if (!label || readOnly) return;
-    const now = Date.now();
-    const parent = mode === 'structure' && sel?.kind === 'node' ? sel.id : undefined;
-    const pos = mode !== 'structure' ? dropAt ?? centreOfView() : null;
-    const mind: NodeMind = { made: now, ...(pos ? { pos: mode === 'logic' ? { l: pos } : { i: pos } } : {}) };
-    onEdits([{ op: 'add', node: { label, type: 'idea', hand: true, mind }, ...(parent ? { parent } : {}) }]);
-    setPendingLabel(label);
-    setDraft('');
-    setDropAt(null);
-    setNote(parent ? `Added inside “${byId.get(parent)?.label}”.` : null);
-  };
-  const centreOfView = (): [number, number] => {
-    const el = hostRef.current;
-    const W = el?.clientWidth ?? 800, H = el?.clientHeight ?? 520;
-    const jitter = (map.nodes.length % 5) * 18;
-    return [Math.round((W / 2 - view.x) / view.k - CARD_W / 2 + jitter), Math.round((H / 2 - view.y) / view.k - CARD_H / 2 + jitter)];
-  };
+  // ── adding: never here ──
+  // An idea is made in the chatbox — its words, its kind, the card it sits inside ("Idea: … inside …", "add an idea
+  // called … inside …"; lib/logos6/omnibox.ts, lib/map-edit.ts readMapAdd). The canvas moves, connects, structures and
+  // opens what is there.
 
   // ── moving and connecting, by pointer ──
   const toCanvas = (cx: number, cy: number) => {
@@ -407,48 +376,6 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
       <header className="tc-bar">
         {modeTabs}
         <span className="tc-sp" />
-        {!readOnly && !addOpen && (
-          <button
-            type="button"
-            className="tc-add-open"
-            aria-label={mode === 'structure' && selNode ? `Add a card inside ${selNode.label}` : 'Add a card'}
-            onClick={() => {
-              setAdding(true);
-              requestAnimationFrame(() => addRef.current?.focus());
-            }}
-          >
-            + Add
-          </button>
-        )}
-        {!readOnly && addOpen && (
-          <form
-            className="tc-add"
-            onSubmit={(e) => {
-              e.preventDefault();
-              add();
-            }}
-          >
-            <input
-              ref={addRef}
-              value={draft}
-              onBlur={() => !draft.trim() && setAdding(false)}
-              onKeyDown={(e) => {
-                // a phone: Escape folds the field away again (a wider screen keeps it, and what was typed, as before)
-                if (e.key === 'Escape' && narrow) {
-                  setDraft('');
-                  setAdding(false);
-                }
-              }}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={mode === 'structure' && selNode ? `Add inside “${selNode.label.slice(0, 24)}”…` : 'Add an idea…'}
-              aria-label={mode === 'structure' && selNode ? `Add a card inside ${selNode.label}` : 'Add a card'}
-              maxLength={140}
-            />
-            <button type="submit" className="tc-btn is-go" disabled={!draft.trim()}>
-              Add
-            </button>
-          </form>
-        )}
       </header>
       {/* One quiet row, only what this way of working needs: a filter in Logic, the zoom, and the rest under More.
           The help says itself once — while the map is still small — and stays for screen readers after that. */}
@@ -466,7 +393,7 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
           </label>
         )}
         {mode === 'structure' && <span className="tc-sr">Tab moves a card inside the one above; Shift+Tab moves it out; Alt+↑↓ reorders.</span>}
-        {mode === 'ideas' && !readOnly && (map.nodes.length <= 3 ? <span className="tc-hint">Drag a card to move it. Drag from its ◦ to another card to connect them. Double-click the space to add there.</span> : <span className="tc-sr">Drag a card to move it. Drag from its ◦ to another card to connect them. Double-click the space to add there.</span>)}
+        {mode === 'ideas' && !readOnly && (map.nodes.length <= 3 ? <span className="tc-hint">Drag a card to move it, or from its ◦ to another card to connect them. New ideas come from the chat box.</span> : <span className="tc-sr">Drag a card to move it, or from its ◦ to another card to connect them. New ideas come from the chat box.</span>)}
         <span className="tc-sp" />
         {p.busy && <span className="tc-busy">Reading…</span>}
         {work.length > 0 && (
@@ -510,8 +437,7 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
                               const el = hostRef.current;
                               const v = viewRef.current;
                               const W = el?.clientWidth || 800, H = el?.clientHeight || 500;
-                              const at: [number, number] = dropAt ?? [Math.round((W / 2 - v.x) / v.k - CARD_W / 2), Math.round((H / 2 - v.y) / v.k - 30)];
-                              setDropAt(null);
+                              const at: [number, number] = [Math.round((W / 2 - v.x) / v.k - CARD_W / 2), Math.round((H / 2 - v.y) / v.k - 30)];
                               p.onPlaceWork!(w, at);
                             }}
                           >
@@ -612,7 +538,7 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
         {!map.nodes.length ? (
           <div className="tc-empty">
             <p>Nothing on the map yet.</p>
-            <p className="tc-empty-s">Add an idea above, or keep talking: the ideas you put into words land here, ready to connect and organise.</p>
+            <p className="tc-empty-s">Ideas are made in the chat box: write “Idea: …” or “I think …”, or just keep talking — what you put into words lands here, ready to connect and organise.</p>
           </div>
         ) : mode === 'structure' ? (
           <Outline map={map} rows={rows} byId={byId} sel={sel} vis={vis} readOnly={readOnly} onSelect={(id) => choose({ kind: 'node', id })} onEdits={onEdits} onNote={setNote} />
@@ -627,14 +553,6 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
               if (!e.ctrlKey && !e.metaKey) return;
               e.preventDefault();
               zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1);
-            }}
-            onDoubleClick={(e) => {
-              if (readOnly || (e.target as HTMLElement).closest('[data-nid]')) return;
-              const [x, y] = toCanvas(e.clientX, e.clientY);
-              setDropAt([Math.round(x - CARD_W / 2), Math.round(y - CARD_H / 2)]);
-              setAdding(true);
-              requestAnimationFrame(() => addRef.current?.focus());
-              setNote('Type the idea, and it goes where you double-clicked.');
             }}
           >
             <div className="tc-layer" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.k})` }}>

@@ -43,7 +43,7 @@ export interface OmniContext {
 }
 
 export type OmniIntent =
-  | { kind: 'thought'; label: string; type: 'claim' | 'idea' | 'assumption' }
+  | { kind: 'thought'; label: string; type: 'claim' | 'idea' | 'assumption'; /** the card it is to sit inside ("…inside Monopoly") */ inside?: { id: string; label: string } }
   | { kind: 'note'; text: string; target: { id: string; label: string } }
   | { kind: 'connect'; from: OmniNode | null; to: OmniNode | null; candidates: OmniNode[]; relation: LogosRelation; why: string }
   | { kind: 'organize' }
@@ -69,15 +69,43 @@ const ASKS = /\?|\b(?:can|could|would|will) you\b|\bplease\b|\bhelp me\b|\btell 
 const ABOUT_US = /^(?:i|i'm|i am|i've|i'll|i'd|me|my|you|you're|your|we|we're|us|that|that's|this|this is|it|it's|so|yes|no|ok|okay|so far|now)\b/i;
 const QUESTION_START = /^(?:why|how|what|when|where|who|whom|whose|which|is|are|was|were|do|does|did|can|could|should|would|will|shall|may|might|have|has|had)\b/i;
 
+// "Idea: price discrimination inside Monopoly": the card it sits inside — read only in the marked form ("Idea: …"),
+// where they are saying what the card is, and only when the words after "inside" or "within" name one card plainly
+// (its whole name, or every word of them in its name), or "this" (the card selected). Otherwise they are the idea's own
+// words: "Idea: thinking inside the box" is that idea, and "I think learning happens inside the classroom" is a claim,
+// whatever is on the map.
+const INSIDE = /^(.{2,}?)\s*,?\s+(?:inside(?:\s+of)?|within)\s+(?:the\s+)?(?:card\s+|idea\s+)?["“']?(.+?)["”']?[.!]?$/i;
+
+/** The card "inside …" names, or null when it names none plainly (or more than one). */
+export function insideCard(phrase: string, ctx: OmniContext): { id: string; label: string } | null {
+  const p = phrase.trim();
+  if (THIS.test(p)) return ctx.selected;
+  const exact = ctx.nodes.filter((n) => n.label.trim().toLowerCase() === p.toLowerCase());
+  if (exact.length === 1) return { id: exact[0].id, label: exact[0].label };
+  const want = wordsOf(p);
+  if (!want.length || exact.length) return null;
+  const all = ctx.nodes.filter((n) => {
+    const have = new Set(wordsOf(n.label));
+    return want.every((w) => have.has(w));
+  });
+  return all.length === 1 ? { id: all[0].id, label: all[0].label } : null;
+}
+
 /** "I think AI makes students too dependent on answers." → their claim, in their words (without the opener). */
-export function readThought(text: string, ctx: OmniContext): { label: string; type: 'claim' | 'idea' | 'assumption' } | null {
+export function readThought(text: string, ctx: OmniContext): { label: string; type: 'claim' | 'idea' | 'assumption'; inside?: { id: string; label: string } } | null {
   const t = clip(String(text ?? ''), 400);
   if (!t || t.length > 280 || ctx.asked || ctx.awaiting || ctx.attaching) return null;
   if (ASKS.test(t) || QUESTION_START.test(t)) return null;
   // two sentences at most: a paragraph is something to talk about
   if (t.split(/(?<=[.!])\s+/).filter(Boolean).length > 2) return null;
+  // the words, and the card they are to sit inside when they name one
+  const placed = (raw: string, type: 'claim' | 'idea' | 'assumption') => {
+    const ins = INSIDE.exec(raw.trim());
+    const card = ins ? insideCard(ins[2], ctx) : null;
+    return ins && card ? { label: tidy(ins[1]), type, inside: card } : { label: tidy(raw), type };
+  };
   const marked = t.match(MARKED);
-  if (marked) return { label: tidy(marked[1]), type: 'idea' };
+  if (marked) return placed(marked[1], 'idea');
   for (const [re, type] of OPENERS) {
     const m = t.match(re);
     if (!m) continue;
@@ -224,8 +252,10 @@ export function readOmnibox(text: string, ctx: OmniContext): OmniIntent {
 /** What pressing Enter will do, said under the box while it is typed; null when it goes to Socria as always. */
 export function omniHint(i: OmniIntent): string | null {
   switch (i.kind) {
-    case 'thought':
-      return 'A thought — kept on your Mind Map as yours, with no reply';
+    case 'thought': {
+      const what = i.type === 'idea' ? 'An idea' : i.type === 'assumption' ? 'An assumption' : 'A thought';
+      return `${what}${i.inside ? `, inside “${i.inside.label}”` : ''} — kept on your Mind Map as yours, with no reply`;
+    }
     case 'note':
       return `A note on “${i.target.label}”`;
     case 'connect':

@@ -25,6 +25,7 @@ The Omnibox adds only the few things that were never a model's to do. It runs af
 |---|---|---|
 | "I think AI makes students too dependent on answers." | **Kept as their thought:** a card of theirs on the Mind Map ("AI makes students too dependent on answers"), their turn in the conversation marked *Your thought · on the Mind Map*, and **no reply**. A note offers **Ask Socria about it**. | none |
 | "Idea: …", "Note: …", "Maybe …", "I assume …" | kept the same way, as an idea, a note or an assumption | none |
+| "Idea: price discrimination inside Monopoly", "add an idea called elasticity inside Microeconomics" | **an idea made inside the card named**, a line of structure as Structure draws it ("inside this": the card selected on the canvas). It is read only in the marked form ("Idea: …") or the add command, and only when the words after "inside" or "within" name one card plainly; otherwise they are the idea's own ("Idea: thinking inside the box"), and "I think … inside …" is a claim, whole. | none |
 | "Note: …" with a card selected | added to that card's notes | none |
 | "Connect this to my earlier argument" | "this" is the selected card, or else their newest. Their earlier argument is found among their own claims and ideas. A **suggested line** is drawn dashed and opened in the line inspector to confirm, change or dismiss. When more than one card fits, they are asked which (buttons, or "the second"). | none |
 | "Link the survey to students outsourcing thinking as support" | the same, with the kind read from the words (support, tension, cause, dependency, example, part) | none |
@@ -45,7 +46,9 @@ The Omnibox adds only the few things that were never a model's to do. It runs af
 
 A bare statement with no opener still goes to Socria.
 
-**Nothing silent.** While they type, one quiet line over the box says what Enter will do, for example *"↵ A thought — kept on your Mind Map as yours, with no reply"* (a screen reader hears "On Enter:" first), with **Ask Socria instead**. It shows for a thought, a note, a connection, a structure, a milestone or a quiz, and says nothing for an ordinary message. Consequential changes are only ever proposals: a suggested line, a proposed structure.
+**Ideas are made here, and only here.** The Mind Map has no add field and no double-click to add. A new card's words, kind, what it hangs from and the card it sits inside are all said in the chat box: "Idea: …", "I think …", "I assume …", "add a question called …", "add a branch called cost to Budget", "… inside Microeconomics", "… inside this" (the card pressed on the canvas, which is "this", "that" and "it" in the chat box's commands). "Add as idea" (Alt+Enter) keeps whatever is typed as an idea, where it is switched on.
+
+**Nothing silent.** While they type, one quiet line over the box says what Enter will do, for example *"↵ A thought — kept on your Mind Map as yours, with no reply"* or *"↵ Add “Elasticity” inside “Microeconomics”"* (a screen reader hears "On Enter:" first), with **Ask Socria instead**. It shows for a thought, an idea added in words, a note, a connection, a structure, a milestone or a quiz, and says nothing for an ordinary message. Consequential changes are only ever proposals: a suggested line, a proposed structure.
 
 **One note at a time.** Over the box stands at most one note: a card to choose first ("Connect … to which?"), then an offer about the message just sent (a separate objective), then the word that a thought was kept. The kept note has one action, **Ask Socria about it**; "the Mind Map" in its words is the way to see the card. It goes as soon as they type again.
 
@@ -114,13 +117,14 @@ Older chats, maps, quizzes, artifacts and attachments read exactly as before. Th
 
 ## 6. Validation
 
-- `test/omnibox.test.mjs`, 80 checks:
+- `test/omnibox.test.mjs`, 96 checks:
   - thought capture, and the many things not captured: questions, requests, answers to Socria, files, words about the conversation, bare statements;
   - notes; connections, including clarification and picking an answer; organisation proposed and applied without copies; milestones;
   - work items, placement and reference survival through the map pass;
   - the Core focus for a card and a line, cleaning, and recent changes;
   - the wiring in the app, route and storage;
-  - the simplification and the layout fixes of section 7.
+  - the simplification and the layout fixes of section 7;
+  - ideas made only in the chat box, inside a card when one is named.
 - `test/objective.test.mjs` (62), `test/mind-map.test.mjs` (76) and `test/onboarding-tips.test.mjs` (46) pass.
 - **The twelve workflows in the real app** (Playwright, Clerk stubbed, a store that saves what is sent; a real quiz made the way the quiz suite makes one):
   1. a thought is kept on the map and marked in the conversation, with **no request to a model**;
@@ -147,10 +151,11 @@ The chat stays in the middle and works like any chatbot. Everything else is ther
 | Over the chatbox | an OBJECTIVE label, the goal, "read from how this chat began" and "What this chat holds" with every count, over two rows; on an empty chat, a hint line | one row that never wraps: *Working towards* the goal, and at most three counts, which open the work. Where the goal came from is its tooltip. Nothing over an empty chat: the new chat and the box already ask |
 | Notes over the box | a kept-thought note, an offer and a card choice could stand together; the thought note had two buttons | one note at a time, the thought note with one action (section 1) |
 | What Enter will do | an uppercase ON ENTER label | a quiet ↵ and the sentence |
-| The Mind Map's bar | the mode described in words; five filter chips in Logic; Copy the outline and the keyboard help in Structure; the drag help in Ideas; Also drawn as | the ways of working and the add field; then only the **Show** choice in Logic, the chat's work, the zoom and **More** (other drawings, Copy the outline). Descriptions are tooltips. Help shows while the map is small, and stays for screen readers |
+| The Mind Map's bar | the mode described in words; five filter chips in Logic; Copy the outline and the keyboard help in Structure; the drag help in Ideas; Also drawn as | the ways of working; then only the **Show** choice in Logic, the chat's work, the zoom and **More** (other drawings, Copy the outline). Descriptions are tooltips. Help shows while the map is small, and stays for screen readers |
+| Making a card | an add field on the canvas (and double-click to add there) as well as the chat box | the chat box only, which says everything about it, including the card it sits inside |
 | A card's inspector | all fifteen of its fields at once | title, meaning, why it matters, explanation, connections, notes; **More details** for the rest, naming what is filled in |
 | The chat's work | a pill floating at the canvas's foot | a button in the tools row, its list under it |
-| A phone | the canvas ran under the chatbox, so the lower half of a card's sheet (notes, Ask, Take off) was hidden behind it and anything at the canvas's foot sat on the box; the guide's *Another hint* sat on "+ Add a file…" | the Mind Map stops where the box begins (the box's measured height, `--ls-foot`); the add field folds behind **+ Add**; a card's sheet takes the room it needs; the box's foot wraps |
+| A phone | the canvas ran under the chatbox, so the lower half of a card's sheet (notes, Ask, Take off) was hidden behind it and anything at the canvas's foot sat on the box; the guide's *Another hint* sat on "+ Add a file…" | the Mind Map stops where the box begins (the box's measured height, `--ls-foot`); a card's sheet takes the room it needs; the box's foot wraps |
 | Laptop widths, 1000–1280px | in the page view, the controls at the end of the bar spilled over the view switch from 1240px down, and the chat's name shrank to nothing by 1024px | the end keeps its room, the bar tightens (the switch's spacing, the wordmark, the key beside Search; the mark and Search stay), and the name keeps at least about 100px |
 | Tips | the + menu's tips could sit on the box's notes | they sit above the whole box, like the Make tip |
 

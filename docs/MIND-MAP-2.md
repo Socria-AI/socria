@@ -107,7 +107,7 @@ Lines are coloured by **family**, not by relation: support, tension, dependency,
 |---|---|---|---|
 | Layout | `ideasPlaces`: groups as soft hulls; cards where the person put them (`pos.i`) | `logicPlaces`: layered by what rests on what, ordered to reduce crossings; cards where the person put them (`pos.l`) | `structureRows`: a tree with an outline beside it |
 | Moving a card | drag: the `place` edit, `mode: 'ideas'` | drag: `place`, `mode: 'logic'` | Tab, Shift+Tab, Alt+↑↓, the row buttons, or "Sits inside" |
-| Adding | quick add; double-click marks where the card lands | quick add | quick add, inside the selected card |
+| Adding | never on the canvas: in the chat box ("Idea: …", "I think …", "add an idea called …") | the same | the same, with "inside …": "Idea: elasticity inside Microeconomics", or "… inside this" for the card selected |
 | Connecting | drag from a card's handle to another card. This makes a confirmed `relates` line and opens it to be named. | as Ideas | through the tree |
 | Focus | | one **Show** choice: all lines, tensions, support, assumptions, suggested (`logicFocus`) | fold and unfold |
 
@@ -116,7 +116,8 @@ What is kept:
 - The mode itself is remembered per conversation in local storage (`socria.mindmap.mode.<conversation>`).
 - On a phone or in a narrow pane (under 560px), the first fit keeps cards legible, at 70% or more. A map that does not fit at that size starts from its top left, ready to be moved about. **Fit** shows the whole map, however small.
 - Other drawings of the map (flow, timeline, cycle, tree, parts, concept, matrix) are still offered under **Also drawn as**, inside **More** at the end of the tools row with **Copy the outline**. They open beside the canvas, with a way back.
-- The bar stays quiet. The three ways of working and the add field are on the first row; the second holds only what the mode needs (the **Show** choice in Logic), the chat's work, the zoom and **More**. A mode's description is its tab's tooltip. The drag help shows while the map has three cards or fewer, and stays for screen readers after that, as do Structure's keys. On a phone the add field folds behind **+ Add** (the chatbox takes ideas too).
+- The bar stays quiet. The three ways of working are on the first row; the second holds only what the mode needs (the **Show** choice in Logic), the chat's work, the zoom and **More**. A mode's description is its tab's tooltip. The drag help shows while the map has three cards or fewer, and stays for screen readers after that, as do Structure's keys.
+- **Cards are made only in the chat box**, never on the canvas: no add field, no double-click to add. The chat box says everything about a new card: its words, its kind ("Idea: …", "I think …", "I assume …", "add a question called …"), what it hangs from ("add a branch called cost to Budget") and the card it sits inside ("Idea: elasticity inside Microeconomics", "add an idea called … inside this"). The canvas moves, connects, structures and opens what is there. An empty map says so: *"Ideas are made in the chat box"*.
 
 ## 6. Inspecting a card, inspecting a line
 

@@ -2,7 +2,7 @@
 // and the canvas's work — one bundle, for test/omnibox.test.mjs.
 export * from '@/lib/logos6/omnibox';
 export { structureProposal, structureRows } from '@/lib/logos6/graph';
-export { applyMapEdits } from '@/lib/map-edit';
+export { applyMapEdits, readMapAdd, insideOf } from '@/lib/map-edit';
 export { sanitizeMap, EMPTY_MAP } from '@/lib/logos';
 export { keepPlaced } from '@/lib/logos6/protect';
 export { workItemsOf, cardFor, workLabelFor } from '@/lib/logos6/work';

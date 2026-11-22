@@ -203,12 +203,45 @@ console.log('\n=== simple by default: one note, one quiet line, the rest a step 
   ok('…and what is filled in under it is named on the way in', /More details\{filled\.length \? <span className="tc-moredet-n"> · \{filled\.join\(', '\)\}<\/span> : null\}/.test(canvas));
   const tcCss = read('components/logos6/thinking-canvas.css');
   ok('the chat’s work sits in the tools row, a button and the list under it — never floating where the chat box lives', /\.logos-root \.tc-tray \{ position: relative; \}/.test(tcCss) && /\.tc-tray-list \{ position: absolute; right: 0; top: calc\(100% \+ 4px\);/.test(tcCss) && canvas.indexOf('className={`tc-tray${trayOpen') > canvas.indexOf('<div className="tc-tools">') && canvas.indexOf('className={`tc-tray${trayOpen') < canvas.indexOf('className="tc-body"'));
-  ok('…and on a phone the add field folds behind “+ Add”, and the card sheet takes the room it needs', /const addOpen = !narrow \|\| adding \|\| !!draft;/.test(canvas) && /className="tc-add-open"/.test(canvas) && /\.tc-inspect\.is-sheet \{[^}]*max-height: min\(100%, max\(72%, 320px\)\);/.test(tcCss) && /\.tc\.is-narrow \.tc-body \{ min-height: 160px; \}/.test(tcCss));
+  ok('…and on a phone the card sheet takes the room it needs', /\.tc-inspect\.is-sheet \{[^}]*max-height: min\(100%, max\(72%, 320px\)\);/.test(tcCss) && /\.tc\.is-narrow \.tc-body \{ min-height: 160px; \}/.test(tcCss));
   const spaceCss = read('components/logos5/space.css'), r2 = read('components/logos5/revision2.css');
   ok('the Mind Map stops where the chat box begins (its measured height), on a phone and beside the space', /\.ls-mind \{[^}]*padding-bottom: calc\(var\(--ls-foot, 94px\) \+ 24px\);/.test(spaceCss) && /\.ls-mind\.is-phone \{ padding-bottom: calc\(var\(--ls-foot, 128px\) \+ 8px\); \}/.test(spaceCss) && /root\.style\.setProperty\('--ls-foot'/.test(read('components/logos5/L5Space.tsx')));
   ok('the box’s foot wraps on a phone: the guide’s ways out never sit on “+ Add…”', /\.l5-ctools\.l5-compose-foot \{\s*display: flex;\s*flex-wrap: wrap;/.test(r2) && /\.l5-compose-foot \{ display: flex; flex-wrap: wrap;/.test(read('components/logos5/l5-controls.css')));
   ok('the page view’s bar at laptop widths: the end keeps its room (never spilling over the switch), the bar tightens, the name keeps some', /\.l5v-top\.is-sw-top:not\(\.is-narrow\) \{ grid-template-columns: minmax\(0, 1fr\) auto minmax\(max-content, 1fr\); \}/.test(r2) && /@media \(max-width: 1279px\) \{[^}]*\.l5-switch \{ gap: 18px; \}[\s\S]*?\.l5v-home-w \{ display: none; \}[\s\S]*?\.l5v-search \.l5-kbd \{ display: none; \}/.test(r2));
   ok('a tip on the box’s + menu sits above the whole box, never over its notes', (read('lib/logos5/tips.ts').match(/anchor: '\.l5-menuhost',\n\s*\/\/[^\n]*\n\s*avoid: '\.l5-dock',/g) || []).length === 2);
+}
+
+console.log('\n=== an idea is made in the chat box, and only there ===');
+{
+  const quiet = (f) => { const e = console.error; console.error = () => {}; try { return f(); } finally { console.error = e; } };
+  const mono = { id: 'mono', label: 'Monopoly', type: 'concept' };
+  const pd = X.readOmnibox('Idea: price discrimination inside Monopoly', ctx({ nodes: [...nodes, mono] }));
+  ok('“Idea: price discrimination inside Monopoly” → an idea, inside the card named', pd.kind === 'thought' && pd.label === 'Price discrimination' && pd.inside?.id === 'mono', J(pd));
+  ok('…said before Enter, by its kind', X.omniHint(pd) === 'An idea, inside “Monopoly” — kept on your Mind Map as yours, with no reply' && /^A thought — /.test(X.omniHint({ kind: 'thought', label: 'x', type: 'claim' })) && /^An assumption — /.test(X.omniHint({ kind: 'thought', label: 'x', type: 'assumption' })), X.omniHint(pd));
+  ok('…and “add an idea called … inside …” says what Enter will do as well', /const add = readMapAdd\(t, mapRef\.current, recentIdea\(\)\);\s*return add && 'edits' in add \? \{ said: add\.said\.replace\(\/\^Added \/, 'Add '\)/.test(read('components/LogosApp.tsx')));
+  const claim = X.readOmnibox('I think learning happens inside Monopoly firms', ctx({ nodes: [...nodes, mono, { id: 'mf', label: 'Monopoly firms', type: 'concept' }] }));
+  ok('…only when they say what the card is (“Idea: …”): “I think … inside …” is a claim, whole', claim.kind === 'thought' && claim.type === 'claim' && !claim.inside && /inside Monopoly firms$/.test(claim.label), J(claim));
+  const box = X.readOmnibox('Idea: thinking inside the box', ctx({ nodes: [...nodes, mono] }));
+  ok('…but “Idea: thinking inside the box” is that idea, whole: “the box” names no card', box.kind === 'thought' && box.label === 'Thinking inside the box' && !box.inside, J(box));
+  const sel = X.readOmnibox('Idea: elasticity inside this', ctx({ nodes: [...nodes, mono], selected: { id: 'mono', label: 'Monopoly' } }));
+  ok('…“inside this”: the card selected on the canvas', sel.inside?.id === 'mono' && sel.label === 'Elasticity', J(sel));
+  const two = X.readOmnibox('Idea: pricing power inside students', ctx({ nodes: [...nodes, mono] }));
+  ok('…a name that fits two cards places it nowhere (and the hint says so before Enter)', two.kind === 'thought' && !two.inside && !/inside “/.test(X.omniHint(two)), J(two));
+  const map = X.sanitizeMap({ nodes: [{ id: 'mono', type: 'concept', label: 'Monopoly' }, { id: 'b', type: 'idea', label: 'Budget' }, { id: 'm2', type: 'idea', label: 'Monopoly power' }], edges: [] });
+  const add = X.readMapAdd('add an idea called price discrimination inside Monopoly', map);
+  ok('“add an idea called price discrimination inside Monopoly” → added inside it (a line of structure)', add?.edits?.[0]?.parent === 'mono' && add.edits[0].node.label === 'price discrimination' && !add.edits[0].near && add.said === 'Added “price discrimination” inside “Monopoly”.', J(add));
+  const after = X.applyMapEdits(map, add.edits).map;
+  ok('…and on the map it sits inside Monopoly, as Structure draws it', after.edges.some((e) => e.kind === 'structure' && e.to === 'mono' && after.nodes.find((n) => n.id === e.from)?.label === 'price discrimination'), J(after.edges));
+  ok('…“inside this”: the card last touched or pressed', X.readMapAdd('add a card called elasticity inside this', map, { id: 'b', label: 'Budget' })?.edits?.[0]?.parent === 'b');
+  ok('…“thinking inside the box” stays whole when no card is called that', (() => { const r = X.readMapAdd('add an idea called thinking inside the box', map); return r?.edits?.[0]?.node.label === 'thinking inside the box' && !r.edits[0].parent; })());
+  ok('…a name two cards hold is asked about, never guessed', /could mean more than one card/.test(X.readMapAdd('add an idea called rent inside monopoly power budget', X.sanitizeMap({ nodes: [{ id: 'x', type: 'idea', label: 'Monopoly power budget' }, { id: 'y', type: 'idea', label: 'Monopoly power budget' }], edges: [] }))?.refused ?? ''));
+  ok('…“under” still connects, as it did (a branch from the card named)', X.readMapAdd('put an idea about cost under Budget', map)?.edits?.[0]?.near === 'b');
+  const canvas = read('components/logos6/ThinkingCanvas.tsx'), app = read('components/LogosApp.tsx');
+  ok('the canvas makes no cards: no add field, no “+ Add”, no double-click to add, no add edit', !/className="tc-add/.test(canvas) && !/onDoubleClick=/.test(canvas) && !/op: 'add'/.test(canvas) && !/placeholder=\{[^}]*Add an idea/.test(canvas));
+  const empty = quiet(() => renderToStaticMarkup(h(X.ThinkingCanvas, { map: X.sanitizeMap({ nodes: [], edges: [] }), onEdits: () => {} })));
+  ok('…an empty map, and the help, point to the chat box', /Ideas are made in the chat box/.test(empty) && /New ideas come from the chat box/.test(canvas));
+  ok('the chat box makes the card with what was said: its words, its kind, the card it sits inside', /node: \{ label: i\.label, type: i\.type, hand: true \}, \.\.\.\(i\.inside \? \{ parent: i\.inside\.id \} : \{\}\)/.test(app));
+  ok('…and the card pressed on the canvas is “this” in the chat box’s commands', /function recentIdea\(\): Touched \| null \{\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*const sid = activeIdRef\.current;\s*const picked = visSelection\(\);\s*if \(sid && picked\?\.key === `map:\$\{sid\}`\)/.test(app));
 }
 
 console.log(`\nomnibox: ${pass} passed, ${fail} failed`);

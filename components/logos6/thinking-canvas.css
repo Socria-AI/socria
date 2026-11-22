@@ -26,9 +26,6 @@
 .logos-root .tc-mode.is-on { background: var(--tc-card); color: var(--tc-ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
 .logos-root .tc-mode:focus-visible, .logos-root .tc-chip:focus-visible, .logos-root .tc-btn:focus-visible, .logos-root .tc-card:focus-visible, .logos-root .tc-label:focus-visible, .logos-root .tc-row-t:focus-visible, .logos-root .tc-conn:focus-visible { outline: 2px solid var(--tc-moss); outline-offset: 2px; }
 .logos-root .tc-sp { flex: 1; }
-.logos-root .tc-add { display: inline-flex; gap: 6px; }
-.logos-root .tc-add input { width: 220px; max-width: 46vw; padding: 7px 11px; border: 1px solid var(--tc-rule); border-radius: 10px; background: var(--tc-card); font: inherit; font-size: 13.5px; color: var(--tc-ink); }
-.logos-root .tc-add input:focus { outline: 2px solid rgba(var(--tc-moss-rgb), 0.45); outline-offset: 0; }
 .logos-root .tc-btn { padding: 7px 12px; border: 1px solid var(--tc-rule); border-radius: 10px; background: var(--tc-card); font: inherit; font-size: 13px; font-weight: 500; color: var(--tc-ink); cursor: pointer; }
 .logos-root .tc-btn.is-go { background: var(--tc-moss); border-color: var(--tc-moss); color: var(--tc-paper); }
 .logos-root .tc-btn.is-go:disabled { opacity: 0.45; cursor: default; }
@@ -176,7 +173,6 @@
 .logos-root .tc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 .logos-root .tc.is-narrow .tc-hint { display: none; }
-.logos-root .tc.is-narrow .tc-add input { width: 150px; }
 
 @media (prefers-reduced-motion: reduce) {
   .logos-root .tc-card, .logos-root .tc-edge line, .logos-root .tc-label, .logos-root .tc-row, .logos-root .tc-mode { transition: none !important; animation: none !important; }
@@ -250,6 +246,3 @@
 @media (prefers-reduced-motion: reduce) {
   .logos-root .tc-moredet > summary::before { transition: none; }
 }
-/* a phone: "+ Add" beside the ways of working, the field only while it is used */
-.logos-root .tc-add-open { height: 32px; padding: 0 12px; border: 1px solid var(--tc-rule); border-radius: 999px; background: var(--tc-card); font: inherit; font-size: 13px; color: var(--tc-ink); cursor: pointer; }
-.logos-root .tc-add-open:focus-visible { outline: 2px solid var(--tc-moss); outline-offset: 2px; }

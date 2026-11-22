@@ -590,7 +590,34 @@ function hubOf(map: ThinkingMap): LogosNode | null {
   return [...map.nodes].sort((a, b) => (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0))[0];
 }
 
-/** An idea to add, in words: what it says, what kind, and what it hangs from. */
+// "…inside Monopoly", "…within this": the card the new one sits inside (a line of structure, as Structure draws it).
+// Read only when what follows names one card plainly (the whole of its name, or every word of what is said in it), or
+// "this", "it", "that" — the idea last touched or selected. Otherwise the words are the idea's own: "add an idea called
+// thinking inside the box" is that idea, whatever is on the map.
+const INSIDE = /^(.+?)\s+(?:inside(?:\s+of)?|within)\s+(?:the\s+)?(?:(?:node|idea|branch|card)\s+)?["“']?(.+?)["”']?$/i;
+const THIS_ONE = /^(?:this|that|it|this one|that one|(?:this|that) (?:node|idea|branch|card))$/i;
+
+/** The card "inside …" names: exactly, else the one card holding every word said; null when it names none plainly. */
+export function insideOf(map: ThinkingMap, phrase: string, recent?: Touched | null): Found {
+  const p = phrase.trim();
+  if (THIS_ONE.test(p)) {
+    const n = recent ? map.nodes.find((x) => x.id === recent.id) : null;
+    return n ? { node: n } : null;
+  }
+  const key = keyOf(p);
+  if (!key) return null;
+  const exact = map.nodes.filter((n) => keyOf(n.label) === key);
+  if (exact.length) return exact.length === 1 ? { node: exact[0] } : { ambiguous: exact };
+  const want = tokens(p);
+  if (!want.length) return null;
+  const all = map.nodes.filter((n) => {
+    const have = new Set(tokens(n.label));
+    return want.every((t) => have.has(t));
+  });
+  return all.length === 1 ? { node: all[0] } : all.length > 1 ? { ambiguous: all } : null;
+}
+
+/** An idea to add, in words: what it says, what kind, and what it hangs from (or sits inside). */
 export function readMapAdd(text: string, map: ThinkingMap, recent?: Touched | null): Command | Refusal | null {
   const t = text.replace(/\s+/g, ' ').trim();
   if (!t || t.length > 220) return null;
@@ -606,22 +633,36 @@ export function readMapAdd(text: string, map: ThinkingMap, recent?: Touched | nu
       refused: `What should the new ${word === 'question' ? 'question' : word === 'branch' ? 'branch' : 'idea'} say?`,
       fill: `add ${another ? 'another' : 'a'} ${word} called {}${m[3] ? ` to ${m[3]}` : ''}`,
     };
+  // "…inside Monopoly": a card inside another, as Structure draws it — when it names one plainly
+  let inside: LogosNode | null = null;
+  let words = label;
+  const ins = m[3] ? null : INSIDE.exec(label);
+  if (ins) {
+    const f = insideOf(map, ins[2], recent);
+    if (f && 'ambiguous' in f) return { refused: `${quote(ins[2])} could mean more than one card: ${f.ambiguous.map((n) => quote(n.label)).join(', ')}. Which one?` };
+    if (f) {
+      inside = f.node;
+      words = ins[1].trim();
+    }
+  }
+  // what it hangs from: the card named after "to …", else (a branch, another) the idea last touched — never as well as
+  // the card it sits inside
   let near: LogosNode | null = null;
-  if (m[3]) {
+  if (!inside && m[3]) {
     const f = findNode(map, m[3]);
     if (f && 'ambiguous' in f) return { refused: `${quote(m[3])} could mean more than one thing on the map: ${f.ambiguous.map((n) => quote(n.label)).join(', ')}. Which one?` };
     if (!f) return { refused: `Nothing on the map is called ${quote(m[3])}.` };
     near = f.node;
-  } else if (word === 'branch' || word === 'subidea' || word === 'child' || another) {
+  } else if (!inside && (word === 'branch' || word === 'subidea' || word === 'child' || another)) {
     const anchor = another ? (recent?.near ?? recent?.id) : recent?.id;
     near = (anchor ? map.nodes.find((n) => n.id === anchor) : null) ?? hubOf(map);
   }
-  const type: LogosNode['type'] = word === 'question' || /\?\s*$/.test(label) ? 'question' : word === 'claim' ? 'claim' : 'idea';
-  const clean = label.replace(/\?\s*$/, type === 'question' ? '?' : '');
+  const type: LogosNode['type'] = word === 'question' || /\?\s*$/.test(words) ? 'question' : word === 'claim' ? 'claim' : 'idea';
+  const clean = words.replace(/\?\s*$/, type === 'question' ? '?' : '');
   return {
     // the person's own idea: no origin is theirs (a Socria suggestion carries 'socria')
-    edits: [{ op: 'add', node: { label: clean, type, hand: true }, ...(near ? { near: near.id } : {}) }],
-    said: `Added ${quote(clean)} to the map${near ? `, from ${quote(near.label)}` : ''}.`,
+    edits: [{ op: 'add', node: { label: clean, type, hand: true }, ...(inside ? { parent: inside.id } : near ? { near: near.id } : {}) }],
+    said: inside ? `Added ${quote(clean)} inside ${quote(inside.label)}.` : `Added ${quote(clean)} to the map${near ? `, from ${quote(near.label)}` : ''}.`,
   };
 }
 
