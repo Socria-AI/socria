@@ -10067,8 +10067,12 @@ export function LogosApp({
     </p>
   ) : null;
   // WHAT ENTER WILL DO, said while it is typed (the Omnibox): a thought kept with no reply, a connection or a structure
-  // proposed, a quiz made — and "Ask Socria instead" wherever the box would act on its own
-  const omniPreview = useMemo(() => {
+  // proposed, a quiz made — and "Ask Socria instead" wherever the box would act on its own.
+  // Worked out as plain code on each render, NOT a hook: this is below `if (!hasAccess) return …`, and a hook here is
+  // skipped while access is still being settled, then called once it is — React's "rendered more hooks than during the
+  // previous render", which took the whole page down to "This page stopped working" on a first load
+  // (test/hooks-order.test.mjs). It read the input on every keystroke as a memo too, so nothing is lost.
+  const omniPreview = ((): { said: string; onInstead?: () => void } | null => {
     if (!l5 || !activeId || omniOff || togetherReadOnly) return null;
     const t = input.trim();
     if (t.length < 4) return null;
@@ -10079,8 +10083,7 @@ export function LogosApp({
     // an idea added in so many words ("add an idea called … inside …", lib/map-edit.ts readMapAdd): said before Enter too
     const add = readMapAdd(t, mapRef.current, recentIdea());
     return add && 'edits' in add ? { said: add.said.replace(/^Added /, 'Add ').replace(/\.$/, '') } : null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input, omniOff, l5, activeId, map, messages, togetherReadOnly, guessFor]);
+  })();
   const l5Dock = (
       <div className="l5-dock" ref={pinRef}>
       {/* WHAT THIS CHAT IS FOR (components/logos6/ObjectiveLine.tsx): the objective, and what the chat holds for it */}
