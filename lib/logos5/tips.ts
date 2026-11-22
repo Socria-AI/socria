@@ -123,6 +123,8 @@ export const TIPS: readonly Tip[] = [
     title: 'What Socria does',
     body: 'Short tutorials for everything here, one at a time, each with something to try.',
     anchor: '.l5-menuhost',
+    // over the box's own notes (a thought kept, the objective) never: above the whole box instead
+    avoid: '.l5-dock',
     action: 'guide',
     when: (c) => c.lines >= 1,
   },
@@ -132,6 +134,8 @@ export const TIPS: readonly Tip[] = [
     title: 'Keep a thought for later',
     body: 'Quick capture holds a thought without starting a conversation. Find it again when you are ready.',
     anchor: '.l5-menuhost',
+    // over the box's own notes (a thought kept, the objective) never: above the whole box instead
+    avoid: '.l5-dock',
     action: 'capture',
     when: (c) => c.can.capture && c.lines >= 1,
   },

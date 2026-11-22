@@ -53,6 +53,9 @@ function keepPlacedCards(prev: Pick<ThinkingMap, 'nodes' | 'edges' | 'removed'> 
     }
     if (was.evidence?.length && !n.evidence?.length) add.evidence = was.evidence;
     if (was.mind && !n.mind) add.mind = was.mind;
+    // a card the person placed for an artifact or a source keeps what it stands for (the Omnibox and the canvas's work)
+    if (was.hand && was.obj && !n.obj) add.obj = was.obj;
+    if (was.hand && was.origin === 'source' && !n.origin) add.origin = 'source';
     if (!Object.keys(add).length) return n;
     changed = true;
     return { ...n, ...add };

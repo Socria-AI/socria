@@ -41,6 +41,7 @@ import { canPreview, targetOf } from './preview/types';
 import './logos-thread.css';
 import './photos.css';
 import './logos4.css';
+import './logos6/omnibox.css';
 
 export interface Draft extends Attachment {
   id: string;
@@ -436,6 +437,7 @@ export function LogosComposer({
   onSearchFiles,
   lead,
   guide,
+  intent,
 }: {
   /**
    * Reads a file — a PDF, Word, a spreadsheet, slides, Markdown, CSV… — into
@@ -524,6 +526,11 @@ export function LogosComposer({
    * start, Another hint and Show solution at its end — the same line as "Asking about", never a bar of its own.
    */
   guide?: { onHint: () => void; onReveal: () => void; busy?: boolean } | null;
+  /**
+   * THE OMNIBOX (lib/logos6/omnibox.ts): what Enter will do with what is typed, when it is not an ordinary message to
+   * Socria — "A thought — kept on your Mind Map as yours, with no reply" — and the way to send it to Socria instead.
+   */
+  intent?: { said: string; onInstead?: () => void } | null;
   /**
    * Others are here: a message goes to everyone, and Socria answers when it
    * is mentioned (@socria) or replied to. Talking to the others never waits
@@ -864,6 +871,20 @@ export function LogosComposer({
           </div>
         )}
 
+        {intent && (
+          <div className="l5-intent" role="status" aria-live="polite">
+            <span className="l5-intent-k" aria-hidden="true">↵</span>
+            <span className="l5-intent-t">
+              <span className="l5-intent-sr">On Enter: </span>
+              {intent.said}
+            </span>
+            {intent.onInstead && (
+              <button type="button" className="l5-link is-meta l5-intent-x" onClick={intent.onInstead}>
+                Ask Socria instead
+              </button>
+            )}
+          </div>
+        )}
         {(about || guide) && (
           // Logos 5: what the composer is asking about, said in one line above it — a label, the topic or card, the one clear;
           // and, while Socria is guiding rather than solving, that said at its start and the two ways out at its end

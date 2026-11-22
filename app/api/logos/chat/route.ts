@@ -159,6 +159,7 @@ import { NO_LOOKUP_FACT, renderNoResearch, renderResearch, type Research } from 
 import { LIST_ASK } from '@/lib/runtime/asks';
 import { SPOKEN_TURN } from '@/lib/voice/speech';
 import { objectiveBlock, recallBlock, recallEarlier, sanitizeObjectiveTurn } from '@/lib/logos6/objective';
+import { canvasFocusBlock, sanitizeCanvasFocus } from '@/lib/logos6/focus-context';
 
 /** The turn asked for code, JSON, a schema or a config: a fenced json block in the reply is then theirs (lib/inline-ui.ts InlineContext.code). */
 const CODE_ASKED = /\b(?:json|yaml|toml|schema|config(?:uration)?\s+file|payload|api\s+response|code|snippet|script|regex|sql|function|class|endpoint)\b/i;
@@ -363,7 +364,14 @@ export const POST = withMeter(async function POST(req: NextRequest) {
         typeof m.content === 'string'
     );
     const clipped = filtered.map((m: any, i: number) =>
-      i === filtered.length - 1 ? m : { ...m, content: m.content.slice(0, m.role === 'user' ? MAX_INPUT_LEN : MAX_HISTORY_REPLY_LEN) }
+      i === filtered.length - 1
+        ? m
+        : {
+            ...m,
+            // a thought they kept on their map with no reply (the Omnibox, lib/logos6/omnibox.ts): context, read as such —
+            // not a question left unanswered
+            content: (m.role === 'user' && m.via === 'thought' ? '(A thought of theirs, kept on their map; no reply was asked for.) ' : '') + m.content.slice(0, m.role === 'user' ? MAX_INPUT_LEN : MAX_HISTORY_REPLY_LEN),
+          }
     );
     let budget = MAX_HISTORY_TOTAL;
     let from = clipped.length;
@@ -1445,6 +1453,8 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       (twoPeople ? collabBlock(collabPeople) : '') +
       // …and when one of them asked Socria directly, it answers that person.
       (addressed ? addressedBlock(addressed) : '') +
+      // the card or line selected on their Mind Map, as it is held (lib/logos6/focus-context.ts)
+      canvasFocusBlock(sanitizeCanvasFocus(body?.canvasFocus)) +
       // what this chat is for, what it holds, and the earlier turns that bear on this message
       objectiveBlock(objectiveTurn) +
       recallBlock(earlier) +

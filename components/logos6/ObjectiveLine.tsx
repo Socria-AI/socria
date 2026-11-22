@@ -1,11 +1,11 @@
 'use client';
 // components/logos6/ObjectiveLine.tsx — WHAT THIS CHAT IS FOR, over the chatbox (Logos 6, lib/logos6/objective.ts).
 //
-// One quiet line: the objective, where it came from, and what the chat holds for it in counts. Pressed, the goal is
-// edited in place (their words from then on); "What this chat holds" opens the work — decisions, open questions,
-// sources, what was made, quizzes, the subjects within it — each a way into the view that has it. All of it is read
-// from the chat itself, so it is there with no model at all. Never a form before the first message: an empty chat
-// only says how it works.
+// One quiet line: what the chat is working towards, and what it holds for it in a few counts. Pressed, the goal is
+// edited in place (their words from then on); the counts open the work — decisions, open questions, sources, what was
+// made, quizzes, milestones, the subjects within it — each a way into the view that has it. Where the objective came
+// from is said on the goal, as its title, not as more words on the line. All of it is read from the chat itself, so it
+// is there with no model at all. An empty chat shows nothing here: the new chat and the box already ask what it is for.
 
 import { useEffect, useRef, useState } from 'react';
 import { KIND_SAID, SOURCE_SAID, workCounts, type Objective, type ObjectiveWork } from '@/lib/logos6/objective';
@@ -16,12 +16,13 @@ export type ObjectiveView = 'logic_map' | 'content' | 'artifacts';
 export function ObjectiveLine(p: {
   objective: Objective | null;
   work: ObjectiveWork | null;
-  /** the chat has no messages yet */
-  empty: boolean;
   readOnly?: boolean;
   narrow?: boolean;
   onSet: (goal: string, outcome: string) => void;
   onForgetNote?: (text: string) => void;
+  /** a milestone ticked off or back on (only ever by them), and one added */
+  onMilestone?: (text: string, done: boolean) => void;
+  onAddMilestone?: (text: string) => void;
   onOpen?: (v: ObjectiveView) => void;
 }) {
   const { objective: o, work: w } = p;
@@ -29,6 +30,7 @@ export function ObjectiveLine(p: {
   const [open, setOpen] = useState(false);
   const [goal, setGoal] = useState(o?.goal ?? '');
   const [outcome, setOutcome] = useState(o?.outcome ?? '');
+  const [step, setStep] = useState('');
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!editing) {
@@ -59,15 +61,12 @@ export function ObjectiveLine(p: {
     };
   }, [open, editing]);
 
-  if (!o) {
-    if (!p.empty) return null;
-    return (
-      <p className="l6o-hint" role="note">
-        <span className="l6o-k">One chat, one objective</span> Say what you want to work towards — Socria keeps it in view as the work builds up here.
-      </p>
-    );
-  }
+  if (!o) return null;
   const counts = w ? workCounts(w) : '';
+  // the line keeps to a few counts; the rest are a press away
+  const parts = counts ? counts.split(' · ') : [];
+  const shown = parts.length > 3 ? `${parts.slice(0, 3).join(' · ')} · more` : counts;
+  const from = `${o.kind ? `${KIND_SAID[o.kind]} · ` : ''}${SOURCE_SAID[o.source]}`;
   /** into the view that has it; the panel goes away */
   const go = (v: ObjectiveView) => {
     setOpen(false);
@@ -107,20 +106,19 @@ export function ObjectiveLine(p: {
         </form>
       ) : (
         <p className="l6o-row">
-          <span className="l6o-k">Objective</span>
+          <span className="l6o-k">Working towards</span>
           {p.readOnly ? (
-            <span className="l6o-goal">{o.goal}</span>
+            <span className="l6o-goal" title={from}>
+              {o.goal}
+            </span>
           ) : (
-            <button type="button" className="l6o-goal" title="Change this chat’s objective" aria-label={`Objective: ${o.goal}. Press to change it.`} onClick={() => setEditing(true)}>
+            <button type="button" className="l6o-goal" title={`${from}. Press to change it.`} aria-label={`Objective: ${o.goal}. Press to change it.`} onClick={() => setEditing(true)}>
               {o.goal}
             </button>
           )}
-          <span className="l6o-src" title={o.kind ? KIND_SAID[o.kind] : undefined}>
-            {SOURCE_SAID[o.source]}
-          </span>
           {counts && (
-            <button type="button" className="l5-link is-meta l6o-holds" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-              What this chat holds <span className="l6o-n">{counts}</span>
+            <button type="button" className="l5-link is-meta l6o-holds" aria-expanded={open} aria-label={`What this chat holds: ${counts}`} onClick={() => setOpen((v) => !v)}>
+              {shown}
             </button>
           )}
         </p>
@@ -157,6 +155,35 @@ export function ObjectiveLine(p: {
             go={p.onOpen ? () => go('artifacts') : undefined}
             goSaid="In Artifacts"
           />
+          {(o.milestones?.length || (p.onAddMilestone && !p.readOnly)) ? (
+            <section className="l6o-sec">
+              <span className="l6o-k">Milestones — yours to tick off</span>
+              {o.milestones?.length ? (
+                <ul className="l6o-steps">
+                  {o.milestones.map((m) => (
+                    <li key={m.t}>
+                      <label>
+                        <input type="checkbox" checked={!!m.done} disabled={p.readOnly || !p.onMilestone} onChange={(e) => p.onMilestone?.(m.t, e.target.checked)} />
+                        <span className={m.done ? 'is-done' : undefined}>{m.t}</span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {p.onAddMilestone && !p.readOnly && (
+                <form
+                  className="l6o-addstep"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (step.trim().length >= 2) p.onAddMilestone!(step.trim());
+                    setStep('');
+                  }}
+                >
+                  <input value={step} maxLength={120} onChange={(e) => setStep(e.target.value)} placeholder="Add a milestone" aria-label="Add a milestone" />
+                </form>
+              )}
+            </section>
+          ) : null}
           {o.notes?.length ? (
             <section className="l6o-sec">
               <span className="l6o-k">Keep in mind</span>

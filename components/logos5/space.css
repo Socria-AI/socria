@@ -398,6 +398,7 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 
 /* ── THE MIND MAP, in place (Logos 6): the same cards, in Ideas, Logic or Structure ── */
 .logos-root .ls.has-mind .ls-canvas, .logos-root .ls.has-mind .ls-feed { display: none; }
-.logos-root .ls-mind { position: relative; flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding-bottom: 112px; }
-.logos-root .ls-mind > .tc { flex: 1; }
-.logos-root .ls-mind.is-phone { padding-bottom: 140px; }
+/* the Mind Map stops where the chat box begins: the box's measured height (--ls-foot, L5Space), and its gap */
+.logos-root .ls-mind { position: relative; flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding-bottom: calc(var(--ls-foot, 94px) + 24px); }
+.logos-root .ls-mind > .tc { flex: 1; min-height: 0; }
+.logos-root .ls-mind.is-phone { padding-bottom: calc(var(--ls-foot, 128px) + 8px); }

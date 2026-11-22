@@ -1062,10 +1062,11 @@ export function L5Space({
         </article>
       )}
       {/* SOCRIA'S BUBBLE: the reply in words, its own bubble pointing at the idea — the one place it is a conversation */}
-      <div className={`ls-bub${open ? ' has-tail' : ''}${openHero ? ' has-hero' : ''}${earlier > 0 ? ' has-earlier' : ''}`} aria-label="Socria’s reply">
+      <div className={`ls-bub${open ? ' has-tail' : ''}${openHero ? ' has-hero' : ''}${earlier > 0 ? ' has-earlier' : ''}${t?.thought ? ' is-thought' : ''}`} aria-label={t?.thought ? 'Your thought' : 'Socria’s reply'}>
         <span className="ls-bub-who">
-          <span className="ls-bub-name">Socria</span>
-          {openTurn !== null && <span className="ls-tn">{t?.pending ? 'thinking…' : openTurn === turns.length - 1 ? 'just now' : `turn ${roman(openTurn + 1)}`}</span>}
+          {/* a thought kept as theirs (the Omnibox): theirs, on the Mind Map, with no reply waiting */}
+          <span className="ls-bub-name">{t?.thought ? 'Your thought' : 'Socria'}</span>
+          {openTurn !== null && <span className="ls-tn">{t?.thought ? 'on the Mind Map · no reply' : t?.pending ? 'thinking…' : openTurn === turns.length - 1 ? 'just now' : `turn ${roman(openTurn + 1)}`}</span>}
           {earlier > 0 && (
             // the replies before this one, stacked under it: pressed, every reply opens as a thread
             <button type="button" className="ls-earlier" aria-expanded={threadOn} onClick={() => setThreadOn((v) => !v)}>
@@ -1074,7 +1075,7 @@ export function L5Space({
             </button>
           )}
         </span>
-        <div className="ls-body">{openBody}</div>
+        <div className="ls-body">{t?.thought ? <p className="ls-tsay">{t.asked}</p> : openBody}</div>
       </div>
       {words(openKey)}
     </div>
@@ -1142,10 +1143,10 @@ export function L5Space({
                   onBlur={() => setHoverTurn((h) => (h === r.index ? null : h))}
                 >
                   <span className="ls-bub-who">
-                    <span className="ls-bub-name">Socria</span>
-                    <span className="ls-tn">{turn.pending ? 'thinking…' : r.index === turns.length - 1 ? 'just now' : roman(r.index + 1)}</span>
+                    <span className="ls-bub-name">{turn.thought ? 'Your thought' : 'Socria'}</span>
+                    <span className="ls-tn">{turn.thought ? 'on the Mind Map' : turn.pending ? 'thinking…' : r.index === turns.length - 1 ? 'just now' : roman(r.index + 1)}</span>
                   </span>
-                  {turn.pending ? <p className="ls-tsay">Replying…</p> : said && <p className="ls-tsay"><MathText>{said}</MathText></p>}
+                  {turn.thought ? <p className="ls-tsay">{turn.asked}</p> : turn.pending ? <p className="ls-tsay">Replying…</p> : said && <p className="ls-tsay"><MathText>{said}</MathText></p>}
                   {asks && !turn.pending && <p className="ls-task"><MathText>{asks}</MathText></p>}
                   {(r.made.length > 0 || madeHere.length > 0) && (
                     <span className="ls-tchips">

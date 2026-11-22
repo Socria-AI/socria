@@ -33,7 +33,7 @@ So the objective needed **no schema change and no migration**. A map without one
 ## 2. How a chat gets its objective
 
 There is no form and nothing is asked first.
-- **An empty chat** shows one quiet line above the chatbox: *"One chat, one objective. Say what you want to work towards — Socria keeps it in view as the work builds up here."*
+- **An empty chat** shows nothing over the chatbox. The new chat already says *"A new line of thinking — pick an idea, or say your own below"*, and the box asks *"What are you actually trying to work out?"*. A third line saying the same was taken out in the simplification pass ([OMNIBOX.md](OMNIBOX.md), section 7).
 - **The first message establishes it** (`inferObjective`):
   - A goal they stated becomes the objective. "Help me prepare for the board presentation on Thursday" gives *Prepare for the board presentation*, and "My goal is to ship the SocriaUX beta" gives *Ship the SocriaUX beta*. The time, the "please" and the reasons are cut.
   - A question with no stated goal is read as understanding what it is about.
@@ -58,7 +58,10 @@ There is no form and nothing is asked first.
 
 None of it is copied, so it can't go out of date, and it is there with no model at all.
 
-**The line over the chatbox** (`ObjectiveLine`) shows the objective, where it came from, and the work in counts ("6 ideas · 1 decision · 2 open questions · 3 sources · 1 quiz"). **What this chat holds** opens the lists. Each list links to the view that has it (the Mind Map, Files or Artifacts), and the panel closes as it goes. It sits in the dock, so it is the same in every view. In a chat they can only read, it is read-only.
+**The line over the chatbox** (`ObjectiveLine`) is one row that never wraps: *Working towards* the objective, then the work in at most three counts ("6 ideas · 1 decision · 2 open questions · more").
+- Where the objective came from ("read from how this chat began", "set by you") is the goal's tooltip, not more words on the line.
+- Pressing the goal edits it in place. Pressing the counts (named *What this chat holds* for screen readers) opens the lists. Each list links to the view that has it (the Mind Map, Files or Artifacts), and the panel closes as it goes.
+- It sits in the dock, so it is the same in every view. On a phone the *Working towards* label is dropped to leave room for the goal. In a chat they can only read, it is read-only.
 
 **The conversation list** names each chat's objective in the row's tooltip and in what a screen reader says.
 
@@ -105,14 +108,14 @@ Nothing is migrated in bulk and nothing is lost:
 
 ## 8. Validation
 
-- `test/objective.test.mjs`, 60 checks against the ten acceptance criteria:
+- `test/objective.test.mjs`, 62 checks against the ten acceptance criteria:
   - inference on six phrasings, a question and empty input;
   - storage, cleaning of hostile input, and survival through map passes;
   - the Core block and its wiring in the route;
   - recall of a turn fifty messages back, and silence when nothing bears on the message;
   - the work read from canvas, sources, artifacts and a quiz;
   - five same-objective messages not flagged; two different objectives offered; "Keep it here";
-  - restating in words; keep-in-mind; legacy chats; the empty-chat hint; the line and its read-only form; the rail.
+  - restating in words; keep-in-mind; legacy chats; nothing over an empty chat; the one-row line, its three counts and its read-only form; the rail.
 - **In the real app** (the Playwright harness with Clerk stubbed and a conversations store that saves what is sent, so a reload reads it back):
   1. a chat from before objectives shows its objective read from its first message, with nothing stored;
   2. *What this chat holds* opens, and opens the Mind Map beside the board;
@@ -122,7 +125,7 @@ Nothing is migrated in bulk and nothing is lost:
   6. "Keep in mind that the exam is open-book" keeps a note;
   7. "Unrelated, but help me plan a weekend trip to Lisbon" brings the offer, and Core is told; *Keep it here* keeps it as a subject;
   8. a reload reads it all back, with every message kept;
-  9. a new chat shows the hint and no fields, and its first message establishes *Prepare for the board presentation*;
+  9. a new chat shows no line and no fields, and its first message establishes *Prepare for the board presentation*;
   10. the older chat is untouched by the new one.
 
   There were no page errors.

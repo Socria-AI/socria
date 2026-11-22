@@ -19,6 +19,7 @@
 import { topicTitle } from '../logos5/title';
 import { wordsOf } from '../logos5/linking';
 import { domainsOf } from '../topic-drift';
+import type { MapHistory } from '../map-history';
 
 export const OBJECTIVE_KINDS = ['learn', 'understand', 'build', 'write', 'research', 'prepare', 'decide', 'solve', 'explore'] as const;
 export type ObjectiveKind = (typeof OBJECTIVE_KINDS)[number];
@@ -43,6 +44,13 @@ export interface ObjectiveNote {
   at: number;
 }
 
+/** A step on the way to the objective: added and ticked off by the person, never by Socria. */
+export interface Milestone {
+  t: string;
+  done?: true;
+  at: number;
+}
+
 export type ObjectiveSource = 'stated' | 'inferred' | 'title';
 export const SOURCE_SAID: Record<ObjectiveSource, string> = {
   stated: 'set by you',
@@ -62,11 +70,13 @@ export interface Objective {
   threads?: string[];
   /** what they asked to keep in mind for it */
   notes?: ObjectiveNote[];
+  /** steps on the way, theirs to add and to tick off (the Omnibox: "Milestone: finish chapter 5") */
+  milestones?: Milestone[];
   set: number;
   edited?: number;
 }
 
-export const OBJECTIVE_LIMITS = { goal: 100, outcome: 220, threads: 12, thread: 60, notes: 20, note: 220 } as const;
+export const OBJECTIVE_LIMITS = { goal: 100, outcome: 220, threads: 12, thread: 60, notes: 20, note: 220, milestones: 12, milestone: 120 } as const;
 
 const clean = (v: unknown, n: number) =>
   typeof v === 'string'
@@ -102,6 +112,16 @@ export function sanitizeObjective(raw: unknown): Objective | null {
         .filter((n): n is ObjectiveNote => !!n)
         .slice(-OBJECTIVE_LIMITS.notes)
     : [];
+  const milestones = Array.isArray(r.milestones)
+    ? r.milestones
+        .map((m) => {
+          const o = m && typeof m === 'object' ? (m as Record<string, unknown>) : {};
+          const t = clean(o.t, OBJECTIVE_LIMITS.milestone);
+          return t ? { t, ...(o.done === true ? { done: true as const } : {}), at: when(o.at) } : null;
+        })
+        .filter((m): m is Milestone => !!m)
+        .slice(0, OBJECTIVE_LIMITS.milestones)
+    : [];
   const set = when(r.set);
   const edited = when(r.edited);
   return {
@@ -111,6 +131,7 @@ export function sanitizeObjective(raw: unknown): Objective | null {
     source,
     ...(threads.length ? { threads } : {}),
     ...(notes.length ? { notes } : {}),
+    ...(milestones.length ? { milestones } : {}),
     set,
     ...(edited ? { edited } : {}),
   };
@@ -249,6 +270,31 @@ export function keepThread(o: Objective, thread: string): Objective {
   return { ...o, threads: [...new Set([...(o.threads ?? []), t])].slice(-OBJECTIVE_LIMITS.threads) };
 }
 
+/** A milestone added by the person (once, however it is cased); null when there is no room. */
+export function addMilestone(o: Objective, t: string, now: number): Objective | null {
+  const text = clean(t, OBJECTIVE_LIMITS.milestone);
+  if (!text) return null;
+  const list = o.milestones ?? [];
+  if (list.some((m) => m.t.toLowerCase() === text.toLowerCase())) return o;
+  if (list.length >= OBJECTIVE_LIMITS.milestones) return null;
+  return { ...o, milestones: [...list, { t: text, at: now }] };
+}
+
+/** A milestone ticked off (or back on) by the person: the one whose words fit best; null when none does. */
+export function tickMilestone(o: Objective, t: string, now: number, done = true): Objective | null {
+  const list = o.milestones ?? [];
+  const want = new Set(wordsOf(t));
+  let best = -1,
+    score = 0;
+  list.forEach((m, i) => {
+    const words = wordsOf(m.t);
+    const s = m.t.toLowerCase() === t.trim().toLowerCase() ? 99 : words.filter((w) => want.has(w)).length / Math.max(1, words.length);
+    if (s > score) (score = s), (best = i);
+  });
+  if (best < 0 || score < 0.5) return null;
+  return { ...o, milestones: list.map((m, i) => (i === best ? (done ? { t: m.t, done: true as const, at: now } : { t: m.t, at: now }) : m)) };
+}
+
 /** Something to keep in mind for the objective, said by the person. */
 export function addNote(o: Objective, k: NoteKind, t: string, now: number): Objective {
   const text = clean(t, OBJECTIVE_LIMITS.note);
@@ -317,6 +363,8 @@ export interface ObjectiveWork {
   artifacts: string[];
   quizzes: QuizDone[];
   threads: string[];
+  /** the map's own record of what changed lately, newest first, in words (recentChanges) */
+  recent: string[];
   ideas: number;
   turns: number;
 }
@@ -324,7 +372,7 @@ export interface ObjectiveWork {
 const uniq = (xs: string[], n: number) => [...new Set(xs.map((x) => clean(x, 90)).filter(Boolean))].slice(0, n);
 
 /** A quiz's standing, read from its state without the quiz engine: graded attempts only. */
-function quizOf(o: ObjLike): QuizDone | null {
+export function quizOf(o: ObjLike): QuizDone | null {
   const s = (o.states?.[Math.min(o.at ?? 0, (o.states?.length ?? 1) - 1)] ?? null) as {
     title?: string;
     asked?: string[];
@@ -350,7 +398,7 @@ function quizOf(o: ObjLike): QuizDone | null {
   return { title: clean(s.title ?? o.name, 80) || 'Quiz', right, total, missed: uniq(missed, 5), finished: s.phase === 'review' };
 }
 
-const KIND_NOUN: Record<string, string> = { quiz: 'Quiz', study: 'Study', matrix: 'Matrix', fn: 'Function', diagram: 'Diagram', chart: 'Chart', table: 'Table', doc: 'Document', model: 'Model' };
+export const KIND_NOUN: Record<string, string> = { quiz: 'Quiz', study: 'Study', matrix: 'Matrix', fn: 'Function', diagram: 'Diagram', chart: 'Chart', table: 'Table', doc: 'Document', model: 'Model' };
 
 /**
  * What a chat holds: the canvas's decisions, assumptions, open and settled questions and its subjects; the sources
@@ -359,7 +407,7 @@ const KIND_NOUN: Record<string, string> = { quiz: 'Quiz', study: 'Study', matrix
  */
 export function workOf(s: {
   messages: readonly MsgLike[];
-  map?: { nodes?: readonly NodeLike[]; objects?: { objs?: readonly ObjLike[] } | null; objective?: unknown } | null;
+  map?: { nodes?: readonly NodeLike[]; objects?: { objs?: readonly ObjLike[] } | null; objective?: unknown; history?: MapHistory | null } | null;
 }): ObjectiveWork {
   const nodes = s.map?.nodes ?? [];
   const open = (n: NodeLike) => (n.status ?? 'open') === 'open';
@@ -380,6 +428,7 @@ export function workOf(s: {
     artifacts: uniq(objs.filter((o) => o.kind !== 'quiz').map((o) => `${KIND_NOUN[o.kind] ?? cap(o.kind)}: ${o.name}`), 8),
     quizzes: quizzes.slice(-4),
     threads: uniq([...(held?.threads ?? []), ...nodes.map((n) => n.group ?? '').filter(Boolean)], 10),
+    recent: recentChanges(s.map?.history ?? null),
     ideas: nodes.length,
     turns: s.messages.filter((m) => m.role === 'user').length,
   };
@@ -398,6 +447,23 @@ export function workCounts(w: ObjectiveWork): string {
   ]
     .filter(Boolean)
     .join(' · ');
+}
+
+/** The map's own record of what changed lately, newest first, in words: "added “X”, “Y” (by them)". */
+export function recentChanges(history: MapHistory | null | undefined, max = 4): string[] {
+  const changes = history?.changes ?? [];
+  return changes
+    .slice(-max)
+    .reverse()
+    .map((c) => {
+      const bits = [
+        c.added.length ? `added ${c.added.slice(0, 4).map((x) => q(x.label)).join(', ')}${c.added.length > 4 ? ` and ${c.added.length - 4} more` : ''}` : '',
+        c.removed.length ? `took off ${c.removed.slice(0, 3).map((x) => q(x.label)).join(', ')}` : '',
+        c.renamed.length ? `renamed ${c.renamed.slice(0, 2).map((r) => `${q(r.from)} to ${q(r.to)}`).join(', ')}` : '',
+      ].filter(Boolean);
+      return bits.length ? `${bits.join('; ')} (${c.cause === 'edit' ? 'by them' : 'from a turn'})` : '';
+    })
+    .filter(Boolean);
 }
 
 // ── what Core is told ───────────────────────────────────────────────
@@ -438,6 +504,7 @@ export function sanitizeObjectiveTurn(raw: unknown): ObjectiveTurn | null {
       artifacts: list(w.artifacts, 8),
       quizzes,
       threads: list(w.threads, 10),
+      recent: list(w.recent, 4),
       ideas: num(w.ideas),
       turns: num(w.turns),
     },
@@ -465,7 +532,12 @@ export function objectiveBlock(t: ObjectiveTurn | null): string {
   if (w.artifacts.length) held.push(`made here — ${w.artifacts.join(', ')}`);
   for (const z of w.quizzes) if (z.total) held.push(`quiz ${q(z.title)}: ${z.right}/${z.total}${z.missed.length ? `, missed on ${z.missed.join(', ')}` : ''}${z.finished ? '' : ' (in progress)'}`);
   if (held.length) lines.push(`What this chat holds for it so far: ${held.join('. ')}.`);
+  if (w.recent.length) lines.push(`Recent changes on their map, newest first (from its record — "what changed?" is answered from this): ${w.recent.join('; ')}.`);
   if (o.notes?.length) lines.push(`They asked to keep in mind: ${o.notes.map((n) => q(n.t)).join('; ')}.`);
+  if (o.milestones?.length) {
+    const done = o.milestones.filter((m) => m.done), left = o.milestones.filter((m) => !m.done);
+    lines.push(`Their milestones: ${[...done.map((m) => `${q(m.t)} (done)`), ...left.map((m) => `${q(m.t)} (not yet)`)].join('; ')}. Only they tick one off — never say one is reached.`);
+  }
   lines.push(
     'Treat this turn as part of that objective: connect it to the earlier work in this chat when that genuinely helps (a mistake from a quiz, a source they gave, a decision made, a question left open), and never ask again for anything stated here or earlier in the conversation. Several subjects can serve one objective. Do not steer them back to it, police the topic, or refuse what lies outside it.'
   );

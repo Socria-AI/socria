@@ -109,26 +109,28 @@ Lines are coloured by **family**, not by relation: support, tension, dependency,
 | Moving a card | drag: the `place` edit, `mode: 'ideas'` | drag: `place`, `mode: 'logic'` | Tab, Shift+Tab, Alt+↑↓, the row buttons, or "Sits inside" |
 | Adding | quick add; double-click marks where the card lands | quick add | quick add, inside the selected card |
 | Connecting | drag from a card's handle to another card. This makes a confirmed `relates` line and opens it to be named. | as Ideas | through the tree |
-| Focus | | filters: all, tensions, evidence, assumptions, suggested (`logicFocus`) | fold and unfold |
+| Focus | | one **Show** choice: all lines, tensions, support, assumptions, suggested (`logicFocus`) | fold and unfold |
 
 What is kept:
 - Each mode keeps its own pan and zoom. The view is fitted only the first time, or when the number of cards changes. So a card you moved is where you left it, on the map and on screen, after switching away and back.
 - The mode itself is remembered per conversation in local storage (`socria.mindmap.mode.<conversation>`).
 - On a phone or in a narrow pane (under 560px), the first fit keeps cards legible, at 70% or more. A map that does not fit at that size starts from its top left, ready to be moved about. **Fit** shows the whole map, however small.
-- Other drawings of the map (flow, timeline, cycle, tree, parts, concept, matrix) are still offered under **Also drawn as**. They open beside the canvas, with a way back.
+- Other drawings of the map (flow, timeline, cycle, tree, parts, concept, matrix) are still offered under **Also drawn as**, inside **More** at the end of the tools row with **Copy the outline**. They open beside the canvas, with a way back.
+- The bar stays quiet. The three ways of working and the add field are on the first row; the second holds only what the mode needs (the **Show** choice in Logic), the chat's work, the zoom and **More**. A mode's description is its tab's tooltip. The drag help shows while the map has three cards or fewer, and stays for screen readers after that, as do Structure's keys. On a phone the add field folds behind **+ Add** (the chatbox takes ideas too).
 
 ## 6. Inspecting a card, inspecting a line
 
-**A card.** Click it, or select it from the outline. The inspector shows:
-- title, subtitle, kind and group;
+**A card.** Click it, or select it from the outline. The inspector leads with what most people need:
+- the title;
 - what it means and why it matters;
-- the detailed explanation, labelled as above;
+- the detailed explanation, labelled as above, when there is one;
 - Socria's interpretation, when there is one;
 - **connections**: every line in or out, phrased from this card's side ("is supported by", "contains"), each with its why;
-- where it sits in the structure;
-- notes, tags, assumptions, sources, your fields, evidence from documents, tone and shape;
+- their notes, and evidence from documents when there is some;
 - **Ask Socria about this**;
 - **Take off the map**. This asks for confirmation inline, not in a browser dialog.
+
+**More details**, one step away, holds the rest: subtitle, kind and group, an explanation when there is none yet, where it sits in the structure, tags, assumptions, sources, your fields, tone and shape. What is filled in among them is named on the way in ("More details · tags, sources"). On a phone the inspector is a sheet that takes the room it needs above the chatbox.
 
 Every field can be edited in place. Each change is one edit, so it can be undone.
 

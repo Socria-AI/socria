@@ -54,6 +54,8 @@ export type MapEdit =
         evidence?: LogosNode['evidence'];
         /** Mind Map 2.0: what it carries beyond its label (meaning, notes, where it was put…) */
         mind?: NodeMind;
+        /** Logos 6: the artifact, quiz or document it stands for on the canvas (an object in the map's workspace) */
+        obj?: string;
       };
       near?: string;
       /** Mind Map 2.0: the card it sits inside (a line of structure) */
@@ -226,7 +228,7 @@ export function applyMapEdits(map: ThinkingMap, edits: readonly MapEdit[]): Edit
       const finding = edit.node.finding && edit.node.origin === 'socria' ? sanitizeNodeFinding(edit.node.finding) : undefined;
       const evidence = sanitizeNodeEvidence(edit.node.evidence);
       const mind = sanitizeNodeMind(edit.node.mind);
-      nodes = [...nodes, { id, type: edit.node.type, label, status: 'open', ...(edit.node.role ? { role: edit.node.role } : {}), ...(edit.node.origin ? { origin: edit.node.origin } : {}), ...extra, ...(finding ? { finding } : {}), ...(edit.node.hand ? { hand: true as const } : {}), ...(evidence ? { evidence } : {}), ...(mind ? { mind } : {}) }];
+      nodes = [...nodes, { id, type: edit.node.type, label, status: 'open', ...(edit.node.role ? { role: edit.node.role } : {}), ...(edit.node.origin ? { origin: edit.node.origin } : {}), ...extra, ...(finding ? { finding } : {}), ...(edit.node.hand ? { hand: true as const } : {}), ...(evidence ? { evidence } : {}), ...(mind ? { mind } : {}), ...(typeof edit.node.obj === 'string' && /^[A-Za-z0-9_]{1,16}$/.test(edit.node.obj) ? { obj: edit.node.obj } : {}) }];
       if (edit.parent && byId(edit.parent)) edges = [...edges, { from: id, to: edit.parent, relation: 'part_of', strength: 'normal', kind: 'structure' }];
       // A removal of the same wording is forgotten: they asked for it back.
       removed = removed.filter((r) => r !== keyOf(label));

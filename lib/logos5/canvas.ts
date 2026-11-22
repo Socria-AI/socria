@@ -18,6 +18,8 @@ export interface CanvasMsg {
   content?: unknown;
   synthesis?: unknown;
   ui?: Record<string, { artifact?: string } | undefined>;
+  /** 'thought': kept as theirs with no reply (the Omnibox, lib/logos6/omnibox.ts) */
+  via?: string;
 }
 
 /** One exchange: what they asked, and the gist of what Socria said back. */
@@ -41,6 +43,8 @@ export interface CanvasTurn {
   pending?: boolean;
   /** a synthesis — where the thinking stands — rather than a reply */
   synthesis?: boolean;
+  /** a thought they kept on the map, with no reply asked for (the Omnibox): nothing waits on it */
+  thought?: boolean;
 }
 
 /** What the canvas can be narrowed to: everything, the ideas, what was made (practice with it), or just the chat. */
@@ -242,6 +246,12 @@ export function canvasTurns(messages: readonly CanvasMsg[], opts: { pending?: bo
       return;
     }
     if (m.role === 'user') {
+      // a thought kept as theirs is a turn of its own that waits for nothing: no reply attaches to it
+      if (m.via === 'thought') {
+        start({ asked: excerpt(m.content, 140), said: '', askedId: m.id, askedAt: at, thought: true });
+        open = null;
+        return;
+      }
       open = start({ asked: excerpt(m.content, 140), said: '', askedId: m.id, askedAt: at });
       return;
     }

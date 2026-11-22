@@ -1,0 +1,16 @@
+/* components/logos6/omnibox.css — what Enter will do (the Omnibox, lib/logos6/omnibox.ts), said in one quiet line over
+   the chatbox while it is typed; and the notes it leaves in the dock: a thought kept, a card to choose. */
+.logos-root .l5-intent { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin: 0 0 6px; padding: 0 2px; font-size: 12px; color: var(--c-ink-60, rgba(35, 36, 31, 0.66)); }
+.logos-root .l5-intent-k { font-size: 12px; line-height: 1; color: var(--c-moss, #354620); opacity: 0.8; }
+.logos-root .l5-intent-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+.logos-root .l5-intent-t { flex: 1 1 auto; min-width: 0; }
+.logos-root .l5-intent-x { font-size: 12px; }
+.logos-root .l6-pick .lg-drift-acts { flex-wrap: wrap; }
+.logos-root .l6-pick .lg-drift-stay { max-width: 28ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* a thought kept as theirs, in the conversation: quieter than a message waiting for a reply */
+.logos-root .l5-thought { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 11.5px; color: var(--c-ink-45, rgba(35, 36, 31, 0.5)); }
+.logos-root .l5-thought::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--c-moss, #354620); opacity: 0.7; }
+/* "the Mind Map", in the kept note's words: the way to see the thought, without a second button */
+.logos-root .l6-kept-map { padding: 0; border: 0; background: none; font: inherit; color: inherit; text-decoration: underline; text-decoration-color: var(--c-ink-25, rgba(35, 36, 31, 0.3)); text-underline-offset: 3px; cursor: pointer; }
+.logos-root .l6-kept-map:hover { text-decoration-color: currentColor; }
+.logos-root .l6-kept-map:focus-visible { outline: 2px solid var(--c-moss, #354620); outline-offset: 2px; border-radius: 2px; }

@@ -83,7 +83,8 @@ function sanitizeMessages(raw: unknown): Msg[] {
       // Point & Ask: what the turn was about, as selected when it was sent
       const about = m.role === 'user' ? cleanAboutRef(m.about) : undefined;
       // said rather than typed (Socria Voice): the conversation marks it with a microphone
-      const via = m.role === 'user' && (m.via === 'voice' || m.via === 'quiz') ? m.via : undefined;
+      // …or kept as a thought of theirs, with no reply (the Omnibox, lib/logos6/omnibox.ts)
+      const via = m.role === 'user' && (m.via === 'voice' || m.via === 'quiz' || m.via === 'thought') ? m.via : undefined;
       // what they had done with a reply's elements when they wrote it (lib/inline-ui.ts) — shown over their words
       const did = m.role === 'user' ? sanitizeDid(m.did) : undefined;
       // what was on screen when they wrote it (lib/visual/context.ts): shaped and clipped, context only

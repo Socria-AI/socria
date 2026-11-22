@@ -242,6 +242,26 @@ export function structureRows(map: Pick<ThinkingMap, 'nodes' | 'edges'>): TreeRo
 }
 
 /** The structure as an indented outline (for copying, and for Socria). Folded branches are included. */
+/** One move of a proposed structure: this card under that one. */
+export interface StructureMove {
+  id: string;
+  parent: string;
+  label: string;
+  parentLabel: string;
+}
+
+/**
+ * "ORGANIZE THESE IDEAS" (the Omnibox, lib/logos6/omnibox.ts): the structure the map's own lines already imply — each
+ * place Structure infers from a line of meaning (part of, is a, applies to, supports, depends on) — as moves for the
+ * person to apply or not. Nothing is moved, copied or removed by proposing; applying writes their structure.
+ */
+export function structureProposal(map: Pick<ThinkingMap, 'nodes' | 'edges'>): StructureMove[] {
+  const byId = new Map(map.nodes.map((n) => [n.id, n]));
+  return structureRows(map)
+    .filter((r) => r.inferred && r.parent && byId.has(r.parent))
+    .map((r) => ({ id: r.id, parent: r.parent!, label: byId.get(r.id)!.label, parentLabel: byId.get(r.parent!)!.label }));
+}
+
 export function outlineOf(map: Pick<ThinkingMap, 'nodes' | 'edges' | 'title'>): string {
   const byId = new Map(map.nodes.map((n) => [n.id, n]));
   const lines = structureRows(map).map((r) => `${'  '.repeat(r.depth)}- ${byId.get(r.id)!.label}${byId.get(r.id)!.mind?.subtitle ? ` — ${byId.get(r.id)!.mind!.subtitle}` : ''}`);

@@ -21,7 +21,8 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { MIND_TONES, NODE_TYPES, type LogosEdge, type LogosNode, type LogosRelation, type MindTone, type NodeMind, type ThinkingMap } from '@/lib/logos';
 import type { MapEdit } from '@/lib/map-edit';
-import { CANVAS_MODES, CHOOSABLE, FAMILY_LABEL, FAMILY_OF, MODE_LABEL, MODE_SAID, RELATION_SAID, STATUS_SAID, connectionsOf, edgeIdOf, ideasPlaces, lineStatus, logicFocus, logicPlaces, outlineOf, structureRows, wouldCycle, type CanvasMode, type LogicFilter, type TreeRow } from '@/lib/logos6/graph';
+import { CANVAS_MODES, CHOOSABLE, FAMILY_LABEL, FAMILY_OF, MODE_LABEL, MODE_SAID, RELATION_SAID, STATUS_SAID, connectionsOf, edgeIdOf, ideasPlaces, lineStatus, logicFocus, logicPlaces, outlineOf, structureRows, wouldCycle, type CanvasMode, type LogicFilter, type StructureMove, type TreeRow } from '@/lib/logos6/graph';
+import { workLabelFor, type WorkItem } from '@/lib/logos6/work';
 import { canvasArtifact, edgeVid, nodeVid } from '@/lib/logos6/canvas-visual';
 import { act, emphClass, reducedMotion, select as visSelect, touch, useRegister, useVisual } from '@/components/inline/visual-bus';
 import './thinking-canvas.css';
@@ -62,6 +63,15 @@ export interface ThinkingCanvasProps {
   initialMode?: CanvasMode;
   /** other drawings of the same map (flow, timeline, cycle…), offered beside the three ways of working */
   drawings?: ReactNode;
+  /** from outside (the Omnibox): a way of working to switch to, and a card or line to open — `n` is new for each ask */
+  ask?: { mode?: CanvasMode; node?: string; edge?: string; n: number } | null;
+  /** a structure proposed for them to apply or not ("Organize these ideas", lib/logos6/graph.ts structureProposal) */
+  proposal?: { moves: readonly StructureMove[] } | null;
+  onProposal?: (apply: boolean) => void;
+  /** THE CHAT'S WORK (lib/logos6/work.ts): its artifacts, quizzes and sources — opened in focus, or placed as cards */
+  work?: readonly WorkItem[];
+  onOpenWork?: (w: WorkItem) => void;
+  onPlaceWork?: (w: WorkItem, at: [number, number]) => void;
 }
 
 const modeKey = (k?: string) => `socria.mindmap.mode.${k ?? 'any'}`;
@@ -91,6 +101,9 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
   const [sel, setSel] = useState<Sel>(null);
   const [filter, setFilter] = useState<LogicFilter>('all');
   const [draft, setDraft] = useState('');
+  // a phone keeps the add field folded behind "+ Add" (the chatbox takes ideas too); open while it is in use
+  const [adding, setAdding] = useState(false);
+  const addOpen = !narrow || adding || !!draft;
   const [pendingLabel, setPendingLabel] = useState<string | null>(null);
   const [dropAt, setDropAt] = useState<[number, number] | null>(null);
   const [moved, setMoved] = useState<Record<string, [number, number]>>({});
@@ -101,11 +114,48 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
   const [note, setNote] = useState<string | null>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const addRef = useRef<HTMLInputElement>(null);
+  // "More" puts itself away on a press elsewhere or Escape, like every other menu here
+  const moreRef = useRef<HTMLDetailsElement>(null);
+  const trayRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const away = (e: PointerEvent) => {
+      const d = moreRef.current;
+      if (d?.open && !d.contains(e.target as Node)) d.open = false;
+      if (trayRef.current && !trayRef.current.contains(e.target as Node)) setTrayOpen(false);
+    };
+    const esc = (e: globalThis.KeyboardEvent) => {
+      const d = moreRef.current;
+      if (e.key === 'Escape' && d?.open) {
+        d.open = false;
+        d.querySelector('summary')?.focus();
+      }
+      if (e.key === 'Escape') setTrayOpen(false);
+    };
+    window.addEventListener('pointerdown', away);
+    window.addEventListener('keydown', esc);
+    return () => {
+      window.removeEventListener('pointerdown', away);
+      window.removeEventListener('keydown', esc);
+    };
+  }, []);
   const vkey = p.mapKey ? `map:${p.mapKey}` : undefined;
   const vis = useVisual(vkey);
   const mapRef = useRef(map);
   mapRef.current = map;
   useRegister(vkey, () => canvasArtifact(vkey!, mapRef.current), () => ({}));
+
+  // an ask from outside (the Omnibox): switch the way of working, open the card or the line it names
+  const askN = p.ask?.n;
+  useEffect(() => {
+    if (!p.ask) return;
+    if (p.ask.mode) setMode(p.ask.mode);
+    // chosen as a press would choose it: opened here, and "this" for their next message (the bus is told)
+    if (p.ask.node) choose({ kind: 'node', id: p.ask.node });
+    else if (p.ask.edge) choose({ kind: 'edge', id: p.ask.edge });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askN]);
+  const work = p.work ?? [];
+  const [trayOpen, setTrayOpen] = useState(false);
 
   const byId = useMemo(() => new Map(map.nodes.map((n) => [n.id, n])), [map]);
   const rows = useMemo(() => structureRows(map), [map]);
@@ -356,9 +406,21 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
     <section className={`tc is-${mode}${narrow ? ' is-narrow' : ''}${vis.emph ? ' has-vlit' : ''}`} aria-label="Mind Map">
       <header className="tc-bar">
         {modeTabs}
-        <p className="tc-said">{MODE_SAID[mode]}</p>
         <span className="tc-sp" />
-        {!readOnly && (
+        {!readOnly && !addOpen && (
+          <button
+            type="button"
+            className="tc-add-open"
+            aria-label={mode === 'structure' && selNode ? `Add a card inside ${selNode.label}` : 'Add a card'}
+            onClick={() => {
+              setAdding(true);
+              requestAnimationFrame(() => addRef.current?.focus());
+            }}
+          >
+            + Add
+          </button>
+        )}
+        {!readOnly && addOpen && (
           <form
             className="tc-add"
             onSubmit={(e) => {
@@ -369,6 +431,14 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
             <input
               ref={addRef}
               value={draft}
+              onBlur={() => !draft.trim() && setAdding(false)}
+              onKeyDown={(e) => {
+                // a phone: Escape folds the field away again (a wider screen keeps it, and what was typed, as before)
+                if (e.key === 'Escape' && narrow) {
+                  setDraft('');
+                  setAdding(false);
+                }
+              }}
               onChange={(e) => setDraft(e.target.value)}
               placeholder={mode === 'structure' && selNode ? `Add inside “${selNode.label.slice(0, 24)}”…` : 'Add an idea…'}
               aria-label={mode === 'structure' && selNode ? `Add a card inside ${selNode.label}` : 'Add a card'}
@@ -380,26 +450,82 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
           </form>
         )}
       </header>
+      {/* One quiet row, only what this way of working needs: a filter in Logic, the zoom, and the rest under More.
+          The help says itself once — while the map is still small — and stays for screen readers after that. */}
       <div className="tc-tools">
         {mode === 'logic' && (
-          <div className="tc-filters" role="group" aria-label="Bring forward">
-            {FILTERS.map((f) => (
-              <button key={f.id} type="button" className={`tc-chip${filter === f.id ? ' is-on' : ''}`} aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
-                {f.label}
-              </button>
-            ))}
-          </div>
+          <label className="tc-filter">
+            <span className="tc-filter-k">Show</span>
+            <select value={filter} onChange={(e) => setFilter(e.target.value as LogicFilter)} aria-label="Bring forward">
+              {FILTERS.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.id === 'all' ? 'All lines' : f.label}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
-        {mode === 'structure' && (
-          <div className="tc-filters">
-            <button type="button" className="tc-chip" onClick={() => void navigator.clipboard?.writeText(outlineOf(map)).then(() => setNote('The outline is copied.'), () => setNote('The outline could not be copied here.'))}>
-              Copy the outline
-            </button>
-            <span className="tc-hint">Tab moves a card inside the one above; Shift+Tab moves it out; Alt+↑↓ reorders.</span>
-          </div>
-        )}
-        {mode === 'ideas' && <span className="tc-hint">Drag a card to move it. Drag from its ◦ to another card to connect them. Double-click the space to add there.</span>}
+        {mode === 'structure' && <span className="tc-sr">Tab moves a card inside the one above; Shift+Tab moves it out; Alt+↑↓ reorders.</span>}
+        {mode === 'ideas' && !readOnly && (map.nodes.length <= 3 ? <span className="tc-hint">Drag a card to move it. Drag from its ◦ to another card to connect them. Double-click the space to add there.</span> : <span className="tc-sr">Drag a card to move it. Drag from its ◦ to another card to connect them. Double-click the space to add there.</span>)}
         <span className="tc-sp" />
+        {p.busy && <span className="tc-busy">Reading…</span>}
+        {work.length > 0 && (
+          <div className={`tc-tray${trayOpen ? ' is-open' : ''}`} ref={trayRef}>
+            <button type="button" className="tc-tray-b" aria-expanded={trayOpen} onClick={() => setTrayOpen((v) => !v)}>
+              {narrow ? 'Work' : 'This chat’s work'} <span className="tc-tray-n">{work.length}</span>
+              <span className="tc-sr">{narrow ? ': this chat’s artifacts, quizzes and sources' : ''}</span>
+            </button>
+            {trayOpen && (
+              <ul className="tc-tray-list" aria-label="This chat’s artifacts, quizzes and sources">
+                {work.map((w) => (
+                  <li key={w.key} className={`tc-work is-${w.kind}`}>
+                    <span className="tc-work-k">{w.kind === 'quiz' ? 'Quiz' : w.kind === 'source' ? 'Source' : 'Artifact'}</span>
+                    <span className="tc-work-t">{w.title}</span>
+                    {w.sub && <span className="tc-work-s">{w.sub}</span>}
+                    <span className="tc-work-acts">
+                      {p.onOpenWork && (
+                        <button type="button" className="tc-link" onClick={() => {
+                            setTrayOpen(false);
+                            p.onOpenWork!(w);
+                          }} aria-label={`Open ${w.title}`}>
+                          Open
+                        </button>
+                      )}
+                      {w.placed ? (
+                        <button type="button" className="tc-link" onClick={() => {
+                            setTrayOpen(false);
+                            choose({ kind: 'node', id: w.placed! });
+                          }} aria-label={`Show the card for ${w.title}`}>
+                          Show card
+                        </button>
+                      ) : (
+                        !readOnly &&
+                        p.onPlaceWork &&
+                        (w.obj || w.doc) && (
+                          <button
+                            type="button"
+                            className="tc-link"
+                            aria-label={`Place ${w.title} on the canvas`}
+                            onClick={() => {
+                              const el = hostRef.current;
+                              const v = viewRef.current;
+                              const W = el?.clientWidth || 800, H = el?.clientHeight || 500;
+                              const at: [number, number] = dropAt ?? [Math.round((W / 2 - v.x) / v.k - CARD_W / 2), Math.round((H / 2 - v.y) / v.k - 30)];
+                              setDropAt(null);
+                              p.onPlaceWork!(w, at);
+                            }}
+                          >
+                            Place on canvas
+                          </button>
+                        )
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         {mode !== 'structure' && (
           <span className="tc-zoom" role="group" aria-label="Zoom">
             <button type="button" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.2)}>
@@ -413,8 +539,26 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
             </button>
           </span>
         )}
-        {p.drawings}
-        {p.busy && <span className="tc-busy">Reading…</span>}
+        {(p.drawings || map.nodes.length > 0) && (
+          <details className="tc-more" ref={moreRef}>
+            <summary aria-label="More ways to see and keep the map">More</summary>
+            <div className="tc-more-b">
+              {p.drawings}
+              {map.nodes.length > 0 && (
+                <button
+                  type="button"
+                  className="tc-btn"
+                  onClick={() => {
+                    if (moreRef.current) moreRef.current.open = false;
+                    void navigator.clipboard?.writeText(outlineOf(map)).then(() => setNote('The outline is copied.'), () => setNote('The outline could not be copied here.'));
+                  }}
+                >
+                  Copy the outline
+                </button>
+              )}
+            </div>
+          </details>
+        )}
       </div>
       {note && (
         <p className="tc-note" role="status">
@@ -423,6 +567,46 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
             ×
           </button>
         </p>
+      )}
+      {p.proposal && (
+        <div className="tc-proposal" role="group" aria-label="A proposed structure">
+          {p.proposal.moves.length ? (
+            <>
+              <p className="tc-proposal-h">
+                <span className="tc-inspect-k">Proposed structure</span> from the lines already on your map — nothing moves until you apply it.
+              </p>
+              <ul>
+                {p.proposal.moves.slice(0, 8).map((m) => (
+                  <li key={m.id}>
+                    <b>{m.label}</b> inside <b>{m.parentLabel}</b>
+                  </li>
+                ))}
+                {p.proposal.moves.length > 8 && <li>…and {p.proposal.moves.length - 8} more</li>}
+              </ul>
+              <span className="tc-acts">
+                {!readOnly && (
+                  <button type="button" className="tc-btn is-go" onClick={() => p.onProposal?.(true)}>
+                    Apply this structure
+                  </button>
+                )}
+                <button type="button" className="tc-btn is-quiet" onClick={() => p.onProposal?.(false)}>
+                  Not now
+                </button>
+              </span>
+            </>
+          ) : (
+            <>
+              <p className="tc-proposal-h">
+                <span className="tc-inspect-k">Nothing to propose yet</span> No line on the map says what sits inside what. Move cards with Tab and Shift+Tab here, or connect them first.
+              </p>
+              <span className="tc-acts">
+                <button type="button" className="tc-btn is-quiet" onClick={() => p.onProposal?.(false)}>
+                  Close
+                </button>
+              </span>
+            </>
+          )}
+        </div>
       )}
       <div className="tc-body">
         {!map.nodes.length ? (
@@ -448,7 +632,8 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
               if (readOnly || (e.target as HTMLElement).closest('[data-nid]')) return;
               const [x, y] = toCanvas(e.clientX, e.clientY);
               setDropAt([Math.round(x - CARD_W / 2), Math.round(y - CARD_H / 2)]);
-              addRef.current?.focus();
+              setAdding(true);
+              requestAnimationFrame(() => addRef.current?.focus());
               setNote('Type the idea, and it goes where you double-clicked.');
             }}
           >
@@ -507,6 +692,7 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
                   <Card
                     key={n.id}
                     n={n}
+                    work={workLabelFor(n.obj, work)}
                     x={at.x}
                     y={at.y}
                     on={sel?.kind === 'node' && sel.id === n.id}
@@ -530,7 +716,7 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
             </div>
           </div>
         )}
-        {selNode && <NodeInspector key={selNode.id} n={selNode} map={map} readOnly={readOnly} onEdits={onEdits} onClose={() => choose(null)} onSelectEdge={(id) => choose({ kind: 'edge', id })} onSelectNode={(id) => choose({ kind: 'node', id })} onAsk={p.onAsk} narrow={narrow} />}
+        {selNode && <NodeInspector key={selNode.id} n={selNode} map={map} readOnly={readOnly} onEdits={onEdits} onClose={() => choose(null)} onSelectEdge={(id) => choose({ kind: 'edge', id })} onSelectNode={(id) => choose({ kind: 'node', id })} onAsk={p.onAsk} narrow={narrow} work={workLabelFor(selNode.obj, work)} onOpenWork={p.onOpenWork} />}
         {selEdge && <EdgeInspector key={edgeIdOf(selEdge)} e={selEdge} map={map} readOnly={readOnly} onEdits={onEdits} onClose={() => choose(null)} onSelectNode={(id) => choose({ kind: 'node', id })} onAskLine={p.onAskLine} narrow={narrow} />}
       </div>
       <p className="tc-sr" aria-live="polite">
@@ -542,26 +728,26 @@ export function ThinkingCanvas(p: ThinkingCanvasProps) {
 
 // ── a card ───────────────────────────────────────────────────────────
 
-function Card(p: { n: LogosNode; x: number; y: number; on: boolean; away: boolean; lit: boolean; vcls: string; readOnly: boolean; onDown: (e: React.PointerEvent) => void; onMove: (e: React.PointerEvent) => void; onUp: (e: React.PointerEvent) => void; onLinkDown: (e: React.PointerEvent) => void; onKey: (e: ReactKeyboardEvent) => void }) {
+function Card(p: { n: LogosNode; work?: ReturnType<typeof workLabelFor>; x: number; y: number; on: boolean; away: boolean; lit: boolean; vcls: string; readOnly: boolean; onDown: (e: React.PointerEvent) => void; onMove: (e: React.PointerEvent) => void; onUp: (e: React.PointerEvent) => void; onLinkDown: (e: React.PointerEvent) => void; onKey: (e: ReactKeyboardEvent) => void }) {
   const { n } = p;
   const m = n.mind;
   const marks = [m?.notes ? 'notes' : '', m?.sources?.length || n.evidence?.length ? 'sources' : '', m?.assumptions?.length ? 'assumptions' : ''].filter(Boolean);
   const theirs = n.origin === 'socria' ? 'Socria’s suggestion' : '';
   return (
     <div
-      className={`tc-card is-${n.type}${m?.tone ? ` tone-${m.tone}` : ''}${m?.shape ? ` shape-${m.shape}` : ''}${p.on ? ' is-on' : ''}${p.away ? ' is-away' : ''}${p.lit ? ' is-lit' : ''}${n.origin === 'socria' ? ' is-socria' : ''}${p.vcls}`}
+      className={`tc-card is-${n.type}${p.work ? ` is-work is-${p.work.kind}` : ''}${m?.tone ? ` tone-${m.tone}` : ''}${m?.shape ? ` shape-${m.shape}` : ''}${p.on ? ' is-on' : ''}${p.away ? ' is-away' : ''}${p.lit ? ' is-lit' : ''}${n.origin === 'socria' ? ' is-socria' : ''}${p.vcls}`}
       style={{ left: p.x, top: p.y, width: CARD_W }}
       data-nid={n.id}
       role="button"
       tabIndex={0}
       aria-pressed={p.on}
-      aria-label={`${n.label}${m?.subtitle ? `, ${m.subtitle}` : ''}${theirs ? `, ${theirs}` : ''}. Press to open.`}
+      aria-label={`${p.work ? `${p.work.said}: ` : ''}${n.label}${m?.subtitle ? `, ${m.subtitle}` : ''}${theirs ? `, ${theirs}` : ''}. Press to open.`}
       onPointerDown={p.onDown}
       onPointerMove={p.onMove}
       onPointerUp={p.onUp}
       onKeyDown={p.onKey}
     >
-      <span className="tc-card-k">{n.type}</span>
+      <span className="tc-card-k">{p.work ? p.work.said : n.type}</span>
       <span className="tc-card-t">{n.label}</span>
       {m?.subtitle && <span className="tc-card-s">{m.subtitle}</span>}
       {(m?.tags?.length || marks.length) ? (
@@ -718,7 +904,7 @@ function Field(p: { label: string; value: string; onSave: (v: string) => void; m
 
 const lines = (s: string) => s.split('\n').map((x) => x.trim()).filter(Boolean);
 
-function NodeInspector(p: { n: LogosNode; map: ThinkingMap; readOnly: boolean; onEdits: (e: MapEdit[]) => void; onClose: () => void; onSelectEdge: (id: string) => void; onSelectNode: (id: string) => void; onAsk?: (n: { id: string; label: string }) => void; narrow: boolean }) {
+function NodeInspector(p: { n: LogosNode; map: ThinkingMap; readOnly: boolean; onEdits: (e: MapEdit[]) => void; onClose: () => void; onSelectEdge: (id: string) => void; onSelectNode: (id: string) => void; onAsk?: (n: { id: string; label: string }) => void; narrow: boolean; work?: ReturnType<typeof workLabelFor>; onOpenWork?: (w: WorkItem) => void }) {
   const { n, map, readOnly } = p;
   const m = n.mind ?? {};
   const conns = useMemo(() => connectionsOf(map, n.id), [map, n.id]);
@@ -731,45 +917,50 @@ function NodeInspector(p: { n: LogosNode; map: ThinkingMap; readOnly: boolean; o
   const socriaRead = !!n.detail && !m.detailYours;
   // taking a card off is asked once, here, never in a box of the browser's own
   const [sure, setSure] = useState(false);
+  const filled = [
+    m.subtitle ? 'subtitle' : '',
+    n.group ? 'group' : '',
+    row?.parent && !row.inferred ? 'placed inside' : '',
+    m.tags?.length ? 'tags' : '',
+    m.assumptions?.length ? 'assumptions' : '',
+    m.sources?.length ? 'sources' : '',
+    m.props?.length ? 'fields' : '',
+    m.tone || (m.shape && m.shape !== 'card') ? 'look' : '',
+  ].filter(Boolean);
   return (
     <aside className={`tc-inspect${p.narrow ? ' is-sheet' : ''}`} aria-label={`About ${n.label}`}>
       <header className="tc-inspect-h">
-        <span className="tc-inspect-k">{n.origin === 'socria' ? 'Card · Socria’s suggestion' : n.hand ? 'Card · added by you' : 'Card · from the conversation'}</span>
+        <span className="tc-inspect-k">{p.work ? `${p.work.said} · on your canvas` : n.origin === 'socria' ? 'Card · Socria’s suggestion' : n.hand ? 'Card · added by you' : 'Card · from the conversation'}</span>
         <button type="button" className="tc-x" aria-label="Close" onClick={p.onClose}>
           ×
         </button>
       </header>
+      {p.work && p.onOpenWork && (
+        <p className="tc-work-open">
+          <button type="button" className="tc-btn is-go" onClick={() => p.onOpenWork!(p.work!.item)}>
+            Open {p.work.kind === 'quiz' ? 'the quiz' : p.work.kind === 'source' ? 'the source' : 'it'}
+          </button>
+          <span className="tc-quiet">In focus beside the canvas; it is the same {p.work.kind === 'quiz' ? 'quiz' : p.work.kind === 'source' ? 'source' : 'artifact'}, so nothing is lost coming back.</span>
+        </p>
+      )}
       <Field label="Title" value={n.label} readOnly={readOnly} max={140} onSave={(v) => v && p.onEdits([{ op: 'rename', id: n.id, label: v }])} />
-      <Field label="Subtitle" value={m.subtitle ?? ''} readOnly={readOnly} max={90} placeholder="A line under the title" onSave={(v) => setMind({ subtitle: v })} />
-      <div className="tc-row2">
-        <label className="tc-field">
-          <span className="tc-field-k">Kind</span>
-          <select value={n.type} disabled={readOnly} onChange={(e) => p.onEdits([{ op: 'retype', id: n.id, type: e.target.value as LogosNode['type'] }])}>
-            {[...new Set([n.type, ...TYPES_OFFERED])].map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-        </label>
-        <Field label="Group" value={n.group ?? ''} readOnly={readOnly} max={40} placeholder="None" onSave={(v) => p.onEdits([{ op: 'group', id: n.id, group: v }])} />
-      </div>
-
       <h4 className="tc-sec">What it means</h4>
       <Field label="Meaning" value={m.meaning ?? ''} multiline readOnly={readOnly} max={400} placeholder="What it is, in your words" onSave={(v) => setMind({ meaning: v })} />
       <Field label="Why it matters" value={m.why ?? ''} multiline readOnly={readOnly} max={400} placeholder="What it explains, or changes" onSave={(v) => setMind({ why: v })} />
-      <div className="tc-prov">
-        <Field
-          label={socriaRead ? 'Explanation · Socria’s reading of the conversation' : 'Detailed explanation'}
-          value={n.detail ?? ''}
-          multiline
-          readOnly={readOnly}
-          max={300}
-          placeholder="The fuller explanation behind the title"
-          hint={socriaRead ? 'Written by Socria from what was said. Edit it, and it becomes yours.' : undefined}
-          onSave={(v) => p.onEdits([{ op: 'detail', id: n.id, detail: v }, { op: 'mind', id: n.id, set: { detailYours: true, edited: Date.now() } }])}
-        />
-      </div>
+      {n.detail ? (
+        <div className="tc-prov">
+          <Field
+            label={socriaRead ? 'Explanation · Socria’s reading of the conversation' : 'Detailed explanation'}
+            value={n.detail ?? ''}
+            multiline
+            readOnly={readOnly}
+            max={300}
+            placeholder="The fuller explanation behind the title"
+            hint={socriaRead ? 'Written by Socria from what was said. Edit it, and it becomes yours.' : undefined}
+            onSave={(v) => p.onEdits([{ op: 'detail', id: n.id, detail: v }, { op: 'mind', id: n.id, set: { detailYours: true, edited: Date.now() } }])}
+          />
+        </div>
+      ) : null}
       {m.ai && (m.ai.meaning || m.ai.why) && (
         <div className="tc-ai" aria-label="Socria’s interpretation">
           <p className="tc-ai-k">Socria’s interpretation — not yours until you keep it</p>
@@ -800,55 +991,8 @@ function NodeInspector(p: { n: LogosNode; map: ThinkingMap; readOnly: boolean; o
         <p className="tc-quiet">Not connected yet. In Ideas or Logic, drag from its ◦ to another card.</p>
       )}
 
-      <h4 className="tc-sec">Structure</h4>
-      <label className="tc-field">
-        <span className="tc-field-k">Sits inside</span>
-        <select
-          value={row?.parent && !row.inferred ? row.parent : row?.inferred ? `~${row.parent}` : ''}
-          disabled={readOnly}
-          onChange={(e) => {
-            const v = e.target.value;
-            if (v.startsWith('~')) return;
-            p.onEdits([{ op: 'parent', id: n.id, parent: v || null }]);
-          }}
-        >
-          <option value="">The top level</option>
-          {row?.inferred && parentNow && <option value={`~${parentNow.id}`}>{parentNow.label} (from its connections)</option>}
-          {parentOptions.map((x) => (
-            <option key={x.id} value={x.id}>
-              {x.label}
-            </option>
-          ))}
-        </select>
-        {row?.inferred && parentNow && <span className="tc-field-h">Placed under “{parentNow.label}” from how they connect. Choose it here to make it yours.</span>}
-      </label>
-
       <h4 className="tc-sec">Your notes</h4>
       <Field label="Notes" value={m.notes ?? ''} multiline readOnly={readOnly} max={2000} placeholder="Anything to remember about it" onSave={(v) => setMind({ notes: v })} />
-      <Field label="Tags" value={(m.tags ?? []).join(', ')} readOnly={readOnly} placeholder="core, chapter-2" onSave={(v) => setMind({ tags: v.split(/[,\n]/).map((t) => t.trim()).filter(Boolean) })} />
-      <Field label="Assumptions" value={(m.assumptions ?? []).join('\n')} multiline readOnly={readOnly} placeholder="One per line: what it takes for granted" onSave={(v) => setMind({ assumptions: lines(v) })} />
-      <Field
-        label="Sources"
-        value={(m.sources ?? []).map((s) => (s.url ? `${s.title} | ${s.url}` : s.title)).join('\n')}
-        multiline
-        readOnly={readOnly}
-        placeholder="One per line: Title | https://…"
-        onSave={(v) => setMind({ sources: lines(v).map((l) => {
-          const [title, url] = l.split('|').map((x) => x.trim());
-          return { title, ...(url ? { url } : {}) };
-        }) })}
-      />
-      <Field
-        label="Your fields"
-        value={(m.props ?? []).map((x) => `${x.k}: ${x.v}`).join('\n')}
-        multiline
-        readOnly={readOnly}
-        placeholder="One per line: Chapter: 2"
-        onSave={(v) => setMind({ props: lines(v).map((l) => {
-          const i = l.indexOf(':');
-          return i > 0 ? { k: l.slice(0, i).trim(), v: l.slice(i + 1).trim() } : { k: l, v: '' };
-        }).filter((x) => x.v) })}
-      />
       {!!n.evidence?.length && (
         <>
           <h4 className="tc-sec">In your documents</h4>
@@ -863,17 +1007,97 @@ function NodeInspector(p: { n: LogosNode; map: ThinkingMap; readOnly: boolean; o
         </>
       )}
 
-      <h4 className="tc-sec">Look</h4>
-      <div className="tc-tones" role="group" aria-label="Tone">
-        {MIND_TONES.map((t) => (
-          <button key={t} type="button" className={`tc-tone tone-${t}${m.tone === t ? ' is-on' : ''}`} aria-pressed={m.tone === t} aria-label={TONE_SAID[t]} title={TONE_SAID[t]} disabled={readOnly} onClick={() => setMind({ tone: m.tone === t ? ('' as unknown as MindTone) : t })} />
-        ))}
-        <select aria-label="Shape" value={m.shape ?? 'card'} disabled={readOnly} onChange={(e) => setMind({ shape: e.target.value === 'card' ? ('' as unknown as 'card') : (e.target.value as 'pill' | 'note') })}>
-          <option value="card">Card</option>
-          <option value="pill">Pill</option>
-          <option value="note">Note</option>
-        </select>
-      </div>
+      {/* the rest of what a card can carry, a step away: what is filled in is named on the way in */}
+      <details className="tc-moredet">
+        <summary>
+          More details{filled.length ? <span className="tc-moredet-n"> · {filled.join(', ')}</span> : null}
+        </summary>
+        <Field label="Subtitle" value={m.subtitle ?? ''} readOnly={readOnly} max={90} placeholder="A line under the title" onSave={(v) => setMind({ subtitle: v })} />
+        <div className="tc-row2">
+          <label className="tc-field">
+            <span className="tc-field-k">Kind</span>
+            <select value={n.type} disabled={readOnly} onChange={(e) => p.onEdits([{ op: 'retype', id: n.id, type: e.target.value as LogosNode['type'] }])}>
+              {[...new Set([n.type, ...TYPES_OFFERED])].map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Field label="Group" value={n.group ?? ''} readOnly={readOnly} max={40} placeholder="None" onSave={(v) => p.onEdits([{ op: 'group', id: n.id, group: v }])} />
+        </div>
+
+        {!n.detail && (
+          <Field
+            label="Detailed explanation"
+            value=""
+            multiline
+            readOnly={readOnly}
+            max={300}
+            placeholder="The fuller explanation behind the title"
+            onSave={(v) => p.onEdits([{ op: 'detail', id: n.id, detail: v }, { op: 'mind', id: n.id, set: { detailYours: true, edited: Date.now() } }])}
+          />
+        )}
+        <h4 className="tc-sec">Structure</h4>
+        <label className="tc-field">
+          <span className="tc-field-k">Sits inside</span>
+          <select
+            value={row?.parent && !row.inferred ? row.parent : row?.inferred ? `~${row.parent}` : ''}
+            disabled={readOnly}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v.startsWith('~')) return;
+              p.onEdits([{ op: 'parent', id: n.id, parent: v || null }]);
+            }}
+          >
+            <option value="">The top level</option>
+            {row?.inferred && parentNow && <option value={`~${parentNow.id}`}>{parentNow.label} (from its connections)</option>}
+            {parentOptions.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.label}
+              </option>
+            ))}
+          </select>
+          {row?.inferred && parentNow && <span className="tc-field-h">Placed under “{parentNow.label}” from how they connect. Choose it here to make it yours.</span>}
+        </label>
+
+        <h4 className="tc-sec">Labels and sources</h4>
+        <Field label="Tags" value={(m.tags ?? []).join(', ')} readOnly={readOnly} placeholder="core, chapter-2" onSave={(v) => setMind({ tags: v.split(/[,\n]/).map((t) => t.trim()).filter(Boolean) })} />
+        <Field label="Assumptions" value={(m.assumptions ?? []).join('\n')} multiline readOnly={readOnly} placeholder="One per line: what it takes for granted" onSave={(v) => setMind({ assumptions: lines(v) })} />
+        <Field
+          label="Sources"
+          value={(m.sources ?? []).map((s) => (s.url ? `${s.title} | ${s.url}` : s.title)).join('\n')}
+          multiline
+          readOnly={readOnly}
+          placeholder="One per line: Title | https://…"
+          onSave={(v) => setMind({ sources: lines(v).map((l) => {
+            const [title, url] = l.split('|').map((x) => x.trim());
+            return { title, ...(url ? { url } : {}) };
+          }) })}
+        />
+        <Field
+          label="Your fields"
+          value={(m.props ?? []).map((x) => `${x.k}: ${x.v}`).join('\n')}
+          multiline
+          readOnly={readOnly}
+          placeholder="One per line: Chapter: 2"
+          onSave={(v) => setMind({ props: lines(v).map((l) => {
+            const i = l.indexOf(':');
+            return i > 0 ? { k: l.slice(0, i).trim(), v: l.slice(i + 1).trim() } : { k: l, v: '' };
+          }).filter((x) => x.v) })}
+        />
+        <h4 className="tc-sec">Look</h4>
+        <div className="tc-tones" role="group" aria-label="Tone">
+          {MIND_TONES.map((t) => (
+            <button key={t} type="button" className={`tc-tone tone-${t}${m.tone === t ? ' is-on' : ''}`} aria-pressed={m.tone === t} aria-label={TONE_SAID[t]} title={TONE_SAID[t]} disabled={readOnly} onClick={() => setMind({ tone: m.tone === t ? ('' as unknown as MindTone) : t })} />
+          ))}
+          <select aria-label="Shape" value={m.shape ?? 'card'} disabled={readOnly} onChange={(e) => setMind({ shape: e.target.value === 'card' ? ('' as unknown as 'card') : (e.target.value as 'pill' | 'note') })}>
+            <option value="card">Card</option>
+            <option value="pill">Pill</option>
+            <option value="note">Note</option>
+          </select>
+        </div>
+      </details>
 
       <footer className="tc-inspect-f">
         {p.onAsk && (

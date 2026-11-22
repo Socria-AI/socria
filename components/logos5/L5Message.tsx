@@ -359,6 +359,12 @@ export function L5Message(p: L5MessageProps) {
         </span>
       )}
 
+      {m.role === 'user' && m.via === 'thought' && (
+        <span className="l5-thought" title="Kept as your thought on the Mind Map — Socria answers only if you ask">
+          Your thought · on the Mind Map
+        </span>
+      )}
+
       {m.role === 'user' && m.via === 'voice' && (
         <span className="l5-spoken" title="Said with Socria Voice">
           <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

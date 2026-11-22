@@ -329,8 +329,12 @@ const DOCK_KEY = 'socria.logos3.dock.v1';
 /** the chats bar and header, hidden from the top-right control — per browser */
 const CHROME_KEY = 'socria.logos.chrome.v1';
 import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
-import { addNote, driftOf, keepThread, keptHere, objectiveOf, readKeepInMind, readRestate, refineGoal, restate, sanitizeObjective, workOf, type Objective } from '@/lib/logos6/objective';
+import { addMilestone, addNote, driftOf, keepThread, keptHere, objectiveOf, tickMilestone, readKeepInMind, readRestate, refineGoal, restate, sanitizeObjective, workOf, type Objective } from '@/lib/logos6/objective';
 import { ObjectiveLine } from './logos6/ObjectiveLine';
+import { omniHint, pickCandidate, readOmnibox, replyAsked, type OmniContext, type OmniIntent, type OmniNode } from '@/lib/logos6/omnibox';
+import { edgeIdOf, structureProposal, type CanvasMode, type StructureMove } from '@/lib/logos6/graph';
+import { cardFor, workItemsOf, type WorkItem } from '@/lib/logos6/work';
+import { focusOf } from '@/lib/logos6/focus-context';
 import {
   MATH_FADE_MS,
   readMathSignal,
@@ -909,6 +913,8 @@ export function LogosApp({
   // before objectives, read from how it began — and what it holds for it, from the chat itself
   const activeObjective = useMemo(() => (active ? objectiveOf(active, active.updatedAt || 1) : null), [active]);
   const activeWork = useMemo(() => (active ? workOf(active) : null), [active]);
+  // THE CHAT'S WORK ON THE CANVAS (lib/logos6/work.ts): its artifacts, quizzes and sources, where they already live
+  const workItems = useMemo(() => (active ? workItemsOf(active) : []), [active]);
 
   // ── DOCUMENTS (lib/docs) ──────────────────────────────────────────
   // Every document this line of thinking was given, as it was read. The
@@ -1096,6 +1102,19 @@ export function LogosApp({
   // Held rather than acted on: the message is sent and answered either way,
   // and the note is an offer beside it, never a gate in front of it.
   const [drift, setDrift] = useState<(DriftVerdict & { text: string; goal?: string }) | null>(null);
+  // ── THE OMNIBOX (lib/logos6/omnibox.ts) ──────────────────────────
+  // What the chatbox does on its own, never a model's: a thought kept as theirs, a note on a card, a connection or a
+  // structure proposed for them to confirm, a milestone. What the canvas is asked to show for it, what is proposed,
+  // which card they are being asked to choose, and "Ask Socria instead" for the message being typed.
+  const [canvasAsk, setCanvasAsk] = useState<{ mode?: CanvasMode; node?: string; edge?: string; n: number } | null>(null);
+  const [proposal, setProposal] = useState<{ moves: StructureMove[] } | null>(null);
+  const [omniPick, setOmniPick] = useState<{ sid: string; from: OmniNode; candidates: OmniNode[]; relation: Extract<OmniIntent, { kind: 'connect' }>['relation'] } | null>(null);
+  const [omniOff, setOmniOff] = useState(false);
+  const [thoughtKept, setThoughtKept] = useState<{ sid: string; text: string } | null>(null);
+  // the word that a thought was kept goes as soon as they write again: it has been seen
+  useEffect(() => {
+    if (input.trim()) setThoughtKept((k) => (k ? null : k));
+  }, [input]);
   const [driftDismissals, setDriftDismissals] = useState(0);
   useEffect(() => {
     try {
@@ -2839,6 +2858,131 @@ export function LogosApp({
     };
     if (sid === activeIdRef.current) mapRef.current = put(mapRef.current);
     patchSession(sid, (x) => ({ ...x, map: put(x.map ?? EMPTY_MAP) }), save);
+  }
+
+  /** What the Omnibox reads a message against: was it asked for, is something waiting, what is selected, what is there. */
+  function omniContext(attaching: boolean): OmniContext {
+    const sid = activeIdRef.current;
+    const here = sid ? sessionsRef.current.find((x) => x.id === sid) : null;
+    const reply = [...(here?.messages ?? [])].reverse().find((m) => m.role === 'assistant');
+    const nodes = (mapRef.current?.nodes ?? []).map((n) => ({ id: n.id, label: n.label, type: n.type, ...(n.hand ? { hand: true } : {}), ...(n.origin ? { origin: n.origin } : {}) }));
+    const picked = visSelection();
+    const selNode = sid && picked?.key === `map:${sid}` ? nodes.find((n) => nodeVid(n.id) === picked.id) ?? null : null;
+    return {
+      asked: replyAsked(typeof reply?.content === 'string' ? reply.content : '', reply?.explain?.q ?? null),
+      awaiting: !!guessFor || !!(quizAskRef.current && quizAskRef.current.sid === sid),
+      attaching,
+      selected: selNode ? { id: selNode.id, label: selNode.label } : null,
+      nodes,
+    };
+  }
+
+  /** The canvas, shown on the Mind Map, in a way of working, on a card or a line. */
+  function showOnCanvas(ask: { mode?: CanvasMode; node?: string; edge?: string }) {
+    setCanvasAsk((a) => ({ ...ask, n: (a?.n ?? 0) + 1 }));
+    openFull('logic_map');
+  }
+
+  /** A connection proposed: a suggested line, drawn dashed, opened for them to confirm, change or dismiss. */
+  function proposeLine(from: OmniNode, to: OmniNode, relation: Extract<OmniIntent, { kind: 'connect' }>['relation']): string {
+    const done = editMap([{ op: 'link', from: from.id, to: to.id, relation, status: 'suggested', why: 'You asked to connect these; confirm it, change its kind, or dismiss it.' }]);
+    if (!done) return `“${from.label}” and “${to.label}” are already connected — open the line on the Mind Map to see it.`;
+    showOnCanvas({ edge: edgeIdOf({ from: from.id, to: to.id, relation }) });
+    return `Proposed a connection: “${from.label}” ${relation === 'relates' ? 'relates to' : relation.replace(/_/g, ' ')} “${to.label}”. It is open on the Mind Map, dashed until you confirm it — change its kind or dismiss it there.`;
+  }
+
+  /**
+   * THE OMNIBOX'S OWN WORK (lib/logos6/omnibox.ts): what this message is, of the things done here rather than by a
+   * model — a thought kept as theirs (no reply), a note on the selected card, a connection or a structure proposed for
+   * them to confirm, a milestone. Null for everything else, which goes the way it always went.
+   */
+  function omniCommand(text: string): { said: string; thought?: boolean } | null {
+    const sid = activeIdRef.current;
+    if (!sid || togetherReadOnly) return null;
+    // the card they were asked to choose, chosen
+    const pending = omniPick && omniPick.sid === sid ? omniPick : null;
+    if (pending) {
+      setOmniPick(null);
+      const to = pickCandidate(text, pending.candidates);
+      if (to) return { said: proposeLine(pending.from, to, pending.relation) };
+    }
+    const i = readOmnibox(text, omniContext(false));
+    if (i.kind === 'thought') {
+      const already = (mapRef.current?.nodes ?? []).find((n) => mapKeyOf(n.label) === mapKeyOf(i.label));
+      if (!already && !editMap([{ op: 'add', node: { label: i.label, type: i.type, hand: true } }])) return null;
+      setThoughtKept({ sid, text });
+      l6track('idea_added', {});
+      return { said: '', thought: true };
+    }
+    if (i.kind === 'note') {
+      const n = (mapRef.current?.nodes ?? []).find((x) => x.id === i.target.id);
+      if (!n) return null;
+      const notes = [n.mind?.notes, i.text].filter(Boolean).join('\n');
+      if (!editMap([{ op: 'mind', id: n.id, set: { notes, edited: Date.now() } }])) return null;
+      return { said: `Added to the notes on “${n.label}”.` };
+    }
+    if (i.kind === 'connect') {
+      if (!i.from) return { said: 'Which card do you mean by that? Select it on the Mind Map (or name it in its own words), then say it again.' };
+      if (i.to) return { said: proposeLine(i.from, i.to, i.relation) };
+      if (!i.candidates.length) return { said: `Nothing on the map fits that yet. Name the card in its own words, or add it first.` };
+      setOmniPick({ sid, from: i.from, candidates: i.candidates, relation: i.relation });
+      return { said: `Connect “${i.from.label}” to which? ${i.candidates.map((c, k) => `${k + 1}. “${c.label}”`).join('  ')} — choose below, or say which.` };
+    }
+    if (i.kind === 'organize') {
+      const moves = structureProposal(mapRef.current);
+      setProposal({ moves });
+      showOnCanvas({ mode: 'structure' });
+      return {
+        said: moves.length
+          ? `Proposed a structure from the lines already on your map: ${moves.length === 1 ? 'one card' : `${moves.length} cards`} placed inside others. It is on the Mind Map, in Structure — nothing moves until you apply it.`
+          : 'Nothing on the map says yet what sits inside what. In Structure you can move cards in with Tab and out with Shift+Tab, or connect them first and ask again.',
+      };
+    }
+    if (i.kind === 'milestone') {
+      const here = sessionsRef.current.find((x) => x.id === sid);
+      const o = here ? objectiveOf(here, Date.now()) : null;
+      if (!o) return { said: 'Say what this chat is working towards first; milestones belong to its objective.' };
+      const next = i.done ? tickMilestone(o, i.text, Date.now()) : addMilestone(o, i.text, Date.now());
+      if (!next) return { said: `No milestone here matches “${i.text}”.` };
+      setObjectiveOf(sid, next);
+      return { said: i.done ? `Ticked off: “${i.text}”.` : `Milestone added to “${o.goal}”: “${i.text}”. Tick it off when you have done it.` };
+    }
+    return null;
+  }
+
+  /** A structure proposed, applied (their structure from now on) or put away. */
+  function onProposal(apply: boolean) {
+    const p = proposal;
+    setProposal(null);
+    if (apply && p?.moves.length) {
+      const done = editMap(p.moves.map((m) => ({ op: 'parent' as const, id: m.id, parent: m.parent })));
+      if (done) noteL6(`Applied: ${p.moves.length === 1 ? 'one card' : `${p.moves.length} cards`} placed in the structure — yours to change.`);
+    }
+  }
+
+  /** One of the chat's works, in focus: the artifact or quiz in Artifacts, the document as it was read, a picture in Files. */
+  function openWork(w: WorkItem) {
+    // opened from the canvas: closing it comes back to the canvas, where it was left
+    returnToMapRef.current = true;
+    if (w.obj) {
+      const o = objOf(spaceOf(mapRef.current), w.obj);
+      return showArtifact(o?.kind === 'scene' ? `s:${w.obj}` : `d:${w.obj}`);
+    }
+    if (w.doc) {
+      const id = documentDisplay(w.doc);
+      if (id) return showArtifact(`d:${id}`);
+    }
+    openFull('content');
+  }
+
+  /** One of the chat's works, placed on the canvas: a card that stands for it — one thing, never a copy. */
+  function placeWork(w: WorkItem, at: [number, number]) {
+    const obj = w.obj ?? (w.doc ? documentDisplay(w.doc) : null);
+    if (!obj) return;
+    if (!editMap([{ op: 'add', node: cardFor(w, obj, at) }])) return;
+    const n = (sessionsRef.current.find((x) => x.id === activeIdRef.current)?.map?.nodes ?? []).find((x) => x.obj === obj);
+    // shown where it was put: in Ideas, opened
+    if (n) setCanvasAsk((a) => ({ mode: 'ideas', node: n.id, n: (a?.n ?? 0) + 1 }));
   }
 
   /** "Keep it here": the subject a message was about is part of this chat's objective, and is not offered as separate again. */
@@ -5188,7 +5332,22 @@ export function LogosApp({
         if (done.fill) slotRef.current = { fill: done.fill, at: Date.now() };
         return done.said;
       }
+      // THE OMNIBOX (lib/logos6/omnibox.ts): a thought kept as theirs with no reply; a note, a connection, a structure,
+      // a milestone done here and said back. "Ask Socria instead" (omniOff) sends it to Socria as it is.
+      const own = omniOff || via === 'voice' ? null : omniCommand(content);
+      setOmniOff(false);
+      if (own) {
+        setError(null);
+        clearBox();
+        setReplyTo(null);
+        if (own.thought) {
+          const sent = postTurn({ id: newMsgId(), at: Date.now(), role: 'user', content: said0, via: 'thought' }, true);
+          chronRef.current = [...chronRef.current, sent];
+        } else postPair(...pairOf(own.said));
+        return own.said;
+      }
     }
+    setThoughtKept(null);
 
     const objTurn = takeObjects(content, atts);
 
@@ -5623,6 +5782,12 @@ export function LogosApp({
           ...(() => {
             const dg = digestOf(mapRef.current);
             return dg ? { mapDigest: dg } : {};
+          })(),
+          // the card or line selected on the Mind Map, as the map holds it (lib/logos6/focus-context.ts)
+          ...(() => {
+            const picked = visSelection();
+            const f = picked && picked.key === `map:${sid}` ? focusOf(mapRef.current, picked.id, workItemsOf({ messages: next, map: mapRef.current })) : null;
+            return f ? { canvasFocus: f } : {};
           })(),
           // what this chat is for, and what it holds for it (lib/logos6/objective.ts) — re-sanitised on the server
           ...(objHere && workHere ? { objective: { objective: objHere, work: workHere, ...(objDrift ? { drift: objDrift } : {}) } } : {}),
@@ -7693,6 +7858,19 @@ export function LogosApp({
   // which is the chatbox. The turn being read is open in full above the chatbox: the newest, unless another was pressed;
   // folded, every turn is on the board.
   const [boardBeside, setBoardBeside] = useState<'content' | 'artifacts' | 'logic_map' | null>(null);
+  // WORK OPENED FROM THE CANVAS (the Omnibox's workspace, lib/logos6/work.ts): in focus beside the board, and when it is
+  // closed the canvas comes back as it was — the same quiz or artifact, so nothing is lost either way
+  const returnToMapRef = useRef(false);
+  const besideWasRef = useRef<typeof boardBeside>(null);
+  useEffect(() => {
+    const was = besideWasRef.current;
+    besideWasRef.current = boardBeside;
+    if (!returnToMapRef.current) return;
+    if ((was === 'artifacts' || was === 'content') && boardBeside === null) {
+      returnToMapRef.current = false;
+      setBoardBeside('logic_map');
+    } else if (boardBeside === 'logic_map') returnToMapRef.current = false;
+  }, [boardBeside]);
   /** the one view (the space or the board) is what is drawn: read by the handlers that open things, set each render */
   const oneViewRef = useRef(false);
   const boardBesideRef = useRef(boardBeside);
@@ -8900,6 +9078,11 @@ export function LogosApp({
 
   // The notes under the conversation — the Answer Guard, One, the style note, the map's limit, the
   // drift offer, a read-only share — shared by Logos 4's dock and Logos 5's column.
+  // one note over the box at a time (UX): a choice waiting on them, then an offer about the message just sent, then
+  // the word that a thought was kept
+  const showPick = !!omniPick && omniPick.sid === activeId;
+  const showDrift = !!drift && !showPick;
+  const showKept = !!thoughtKept && thoughtKept.sid === activeId && !showPick && !drift;
   const convoNotes = (
     <>
           {/* Answer Guard: while learning math, Logos gives hints, not
@@ -9013,9 +9196,66 @@ export function LogosApp({
             </div>
           )}
 
+          {/* THE OMNIBOX (lib/logos6/omnibox.ts): a thought kept as theirs, with no reply — said once, quietly, with the
+              one way to a reply. Only one note stands over the box at a time: a choice to make first, then an offer
+              about the message just sent, then this; and it goes as soon as they type again. */}
+          {showKept && thoughtKept && (
+            <div className="lg-drift l6-kept" role="status">
+              <span className="lg-drift-text">
+                Kept as your thought, on{' '}
+                <button type="button" className="l6-kept-map" onClick={() => showOnCanvas({})} title="See it on the Mind Map">
+                  the Mind Map
+                </button>
+                . No reply unless you ask.
+              </span>
+              <span className="lg-drift-acts">
+                <button
+                  type="button"
+                  className="lg-drift-stay"
+                  onClick={() => {
+                    const k = thoughtKept;
+                    setThoughtKept(null);
+                    setOmniOff(true);
+                    void send(`What do you make of this thought of mine: “${k.text.replace(/\s+/g, ' ').trim()}”`);
+                  }}
+                >
+                  Ask Socria about it
+                </button>
+              </span>
+              <button type="button" className="lg-drift-x" onClick={() => setThoughtKept(null)} aria-label="Dismiss">
+                ×
+              </button>
+            </div>
+          )}
+          {showPick && omniPick && (
+            <div className="lg-drift l6-pick" role="group" aria-label={`Connect “${omniPick.from.label}” to which card?`}>
+              <span className="lg-drift-text">Connect “{omniPick.from.label}” to which?</span>
+              <span className="lg-drift-acts">
+                {omniPick.candidates.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="lg-drift-stay"
+                    onClick={() => {
+                      const pk = omniPick;
+                      setOmniPick(null);
+                      const said = proposeLine(pk.from, c, pk.relation);
+                      noteL6(said);
+                    }}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </span>
+              <button type="button" className="lg-drift-x" onClick={() => setOmniPick(null)} aria-label="Dismiss">
+                ×
+              </button>
+            </div>
+          )}
+
           {/* An offer, after the fact. The message was sent and answered;
               this only asks whether it landed where it was meant to. */}
-          {drift && (
+          {showDrift && drift && (
             <div className="lg-drift" role="note">
               <span className="lg-drift-text">
                 {drift.goal ? (
@@ -9073,6 +9313,13 @@ export function LogosApp({
       readOnly={togetherReadOnly}
       narrow={narrow}
       lit={mapLit}
+      // the Omnibox's asks and proposals, and the chat's work on the canvas (lib/logos6/omnibox.ts, work.ts)
+      ask={canvasAsk}
+      proposal={proposal}
+      onProposal={onProposal}
+      work={workItems}
+      onOpenWork={openWork}
+      onPlaceWork={togetherReadOnly ? undefined : placeWork}
       onAsk={togetherReadOnly ? undefined : (n) => askAboutNode({ id: n.id })}
       onAskLine={
         togetherReadOnly
@@ -9809,6 +10056,18 @@ export function LogosApp({
       </button>
     </p>
   ) : null;
+  // WHAT ENTER WILL DO, said while it is typed (the Omnibox): a thought kept with no reply, a connection or a structure
+  // proposed, a quiz made — and "Ask Socria instead" wherever the box would act on its own
+  const omniPreview = useMemo(() => {
+    if (!l5 || !activeId || omniOff || togetherReadOnly) return null;
+    const t = input.trim();
+    if (t.length < 4) return null;
+    if (asksForQuiz(t)) return { said: 'A quiz from this chat’s material — it opens in the workspace' };
+    const i = readOmnibox(t, omniContext(false));
+    const said = omniHint(i);
+    return said ? { said, ...(i.kind === 'thought' || i.kind === 'connect' || i.kind === 'organize' ? { onInstead: () => setOmniOff(true) } : {}) } : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [input, omniOff, l5, activeId, map, messages, togetherReadOnly, guessFor]);
   const l5Dock = (
       <div className="l5-dock" ref={pinRef}>
       {/* WHAT THIS CHAT IS FOR (components/logos6/ObjectiveLine.tsx): the objective, and what the chat holds for it */}
@@ -9816,7 +10075,6 @@ export function LogosApp({
         <ObjectiveLine
           objective={activeObjective}
           work={activeWork}
-          empty={!messages.some((m) => m.role === 'user')}
           readOnly={togetherReadOnly}
           narrow={narrow}
           onSet={(goal, outcome) => {
@@ -9824,6 +10082,14 @@ export function LogosApp({
             if (next) setObjectiveOf(activeIdRef.current, next);
           }}
           onForgetNote={(t) => activeObjective && setObjectiveOf(activeIdRef.current, { ...activeObjective, notes: (activeObjective.notes ?? []).filter((n) => n.t !== t) })}
+          onMilestone={(t, done) => {
+            const next = activeObjective ? tickMilestone(activeObjective, t, Date.now(), done) : null;
+            if (next) setObjectiveOf(activeIdRef.current, next);
+          }}
+          onAddMilestone={(t) => {
+            const next = activeObjective ? addMilestone(activeObjective, t, Date.now()) : null;
+            if (next) setObjectiveOf(activeIdRef.current, next);
+          }}
           onOpen={(v) => openFull(v)}
         />
       )}
@@ -9855,6 +10121,7 @@ export function LogosApp({
         value={input}
         onChange={setInput}
         {...(L6.addIdea && activeId && !togetherReadOnly ? { onAddIdea: addIdea } : {})}
+        intent={omniPreview}
         focusSignal={composerFocus}
         mathAvailable={mathAvailable}
         mathTopic={mathTopic}

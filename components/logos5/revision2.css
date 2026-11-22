@@ -67,6 +67,21 @@
 /* the tabs fill the bar: the chosen one underlined at its foot */
 .logos-root .l5 .l5v-top:not(.is-narrow) .l5v-top-c .l5-switch { height: 56px; gap: 28px; }
 .logos-root .l5 .l5v-top:not(.is-narrow) .l5v-top-c .l5-switch-i { height: 56px; }
+/* a laptop-wide bar (about 1000–1280px) with the switch in the middle: the controls at the end keep the room they
+   need (they used to spill left over the switch), the name gives way first, and the bar tightens — the switch's
+   spacing, the wordmark (the mark stays), the key beside Search (Search stays) — so the name keeps some of its room */
+.logos-root .l5 .l5v-top.is-sw-top:not(.is-narrow) { grid-template-columns: minmax(0, 1fr) auto minmax(max-content, 1fr); }
+@media (max-width: 1279px) {
+  .logos-root .l5 .l5v-top.is-sw-top:not(.is-narrow) .l5v-top-c .l5-switch { gap: 18px; }
+  .logos-root .l5 .l5v-top.is-sw-top:not(.is-narrow) .l5v-top-c .l5-tospace { margin-right: 14px; padding-right: 14px; }
+  .logos-root .l5 .l5v-top.is-sw-top:not(.is-narrow) .l5v-home-w { display: none; }
+  .logos-root .l5 .l5v-top.is-sw-top:not(.is-narrow) .l5v-search .l5-kbd { display: none; }
+}
+@media (max-width: 1139px) {
+  .logos-root .l5 .l5v-top.is-sw-top:not(.is-narrow) { column-gap: 14px; padding: 0 14px; }
+  .logos-root .l5 .l5v-top.is-sw-top:not(.is-narrow) .l5v-top-r { gap: 14px; }
+  .logos-root .l5 .l5v-top.is-sw-top:not(.is-narrow) .l5v-top-c .l5-switch { gap: 14px; }
+}
 /* the words at the end: Search (and its key, .l5-kbd), Sessions on the map, the way back from Memory — one word each,
    13.5 in ink 70, ink when pointed at or open */
 .logos-root .l5 :is(.l5v-search, .l5-head-end .l5-unibtn) { gap: 8px; color: var(--c-ink-70); }
@@ -165,9 +180,10 @@
 /* the foot */
 .logos-root .l5 .lg-composer.is-ruled .l5-ctools.l5-compose-foot {
   display: flex;
+  flex-wrap: wrap; /* a phone: the guide's ways out take their own line rather than sit on "+ Add…" */
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 2px 16px;
   min-height: 28px;
   margin: 0;
   font-size: 12.5px;
