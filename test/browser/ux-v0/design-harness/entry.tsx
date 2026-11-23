@@ -13,3 +13,11 @@ const base = makeProject('create', cfg.name ?? 'Harness design');
 const project: DesignProject = cfg.project ?? { ...base, medium: 'design', design: emptyState(cfg.kind ?? 'poster', cfg.format ?? 'a3', cfg.brief ?? '') };
 (window as any).__PROJECT_ID__ = project.id;
 createRoot(document.getElementById('root')!).render(<DesignWorkspace initial={project} signedIn={cfg.signedIn !== false} onExit={() => ((window as any).__EXITED__ = true)} startIntent={cfg.startIntent} />);
+
+// for the checks: an artboard as the export draws it (a data address), from the page's own code
+import { artboardPicture, toDataUrl } from '@/lib/ux-v0/design/export';
+import { assetData } from '@/components/ux-v0/design/runtime';
+(window as any).__picture = async (a: any, tokens: string, assets: any[] = [], maxSide = 1400) => {
+  const p = await artboardPicture(a, tokens, await assetData(assets), { type: 'image/png', maxSide });
+  return toDataUrl(p.blob);
+};

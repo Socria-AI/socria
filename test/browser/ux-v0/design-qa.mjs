@@ -71,6 +71,12 @@ function scripted(body) {
     const v = (n, bg, ink, layout) => `<artboard id="v${n}" name="Direction ${n}" format="a3" group="dirs" beside="${a.id}"><style>.sx-root{background:${bg};color:${ink}}h1{position:absolute;${layout};margin:0;font:400 150px/0.9 'Instrument Serif',serif}</style><h1>Rooms for Living</h1><p style="position:absolute;left:64px;bottom:80px;font:24px 'Instrument Sans',sans-serif;margin:0">Six evenings on the future of housing · Thursdays, 2 October – 6 November · Northlight Studio, 14 Dock Street · Reserve a seat · Northlight</p></artboard>`;
     return `<say>Three other ways in: the title as the building, the title at the foot, the plan from above.</say>${v(1, '#1c1a17', '#efe9dc', 'left:64px;top:64px;width:900px')}${v(2, '#c4512c', '#1c1a17', 'left:64px;bottom:200px;width:980px')}${v(3, '#efe9dc', '#1c1a17', 'right:64px;top:300px;width:700px;text-align:right')}`;
   }
+  if (/^Adapt /.test(w)) return `<say>Recomposed for each shape.</say><artboard id="f1" name="Story" format="story" group="fmt" beside="${a.id}"><style>h1{position:absolute;left:64px;top:200px;font:400 150px/.9 'Instrument Serif',serif;margin:0}</style><h1>Rooms for Living</h1></artboard><artboard id="f2" name="LinkedIn" format="linkedin" group="fmt"><h1 style="margin:64px;font:400 120px/.9 'Instrument Serif',serif">Rooms for Living</h1></artboard>`;
+  if (/use my picture/i.test(w)) {
+    const img = (body.assets ?? [])[0];
+    return `<say>Your picture, set behind the title.</say><edit artboard="${a.id}"><find><h1 </find><replace><img src="asset:${img?.id}" alt="" style="position:absolute;left:0;top:0;width:100%;height:540px;object-fit:cover"><h1 </replace></edit>`;
+  }
+  if (/act on this note/i.test(w)) return `<say>Done.</say><ok/>`;
   if (/missing artboard edit/i.test(w)) return `<say>Changed.</say><edit artboard="${a.id}"><find>this text is not there</find><replace>x</replace></edit>`;
   return '<say>I need to know one thing first.</say><question>Should it lean warm or cool?<option>Warm</option><option>Cool</option></question>';
 }
@@ -252,6 +258,53 @@ const [htmlFile] = await Promise.all([page.waitForEvent('download'), page.locato
 const htmlText = readFileSync(await htmlFile.path(), 'utf8');
 ok('HTML export: a standalone page with its faces linked and no ids', /fonts\.googleapis\.com/.test(htmlText) && !/data-sx/.test(htmlText) && /Rooms for/.test(htmlText));
 
+console.log('\n=== pictures of their own ===');
+await page.locator('.dx-label-name').first().click();
+await settle(300);
+await page.locator('.dx-compose input[type=file]').setInputFiles(join(ROOT, 'test/browser/ux-v0/fx/dusk.jpg'));
+await page.waitForFunction(() => /Added a picture/.test(document.querySelector('.dx-input')?.value ?? ''), null, { timeout: 15000 });
+await settle(900);
+st = await stateOf();
+ok('an added picture is kept with the design, as an upload', st.assets.length === 1 && /^upload:/.test(st.assets[0].src));
+await page.locator('.dx-input').fill('use my picture behind the title');
+await page.locator('.dx-input').press('Enter');
+await page.waitForFunction(() => !document.querySelector('.dx-phase'), null, { timeout: 30000 });
+await settle(1200);
+ok('the designer is told of it (asset id, size) and the request carries no picture data', requests.at(-1).assets?.[0]?.id === st.assets[0].id && !/data:image/.test(JSON.stringify(requests.at(-1).assets)));
+ok('the artboard draws it, from this browser, as data', await frame().locator('img').first().evaluate((el) => el.src.startsWith('data:image/') && el.naturalWidth > 0));
+
+console.log('\n=== notes on an element ===');
+await frame().locator('p.sub').click();
+await settle(400);
+await page.locator('.dx-note-in').fill('Too close to the drawing');
+await page.locator('.dx-note-in').press('Enter');
+await settle(500);
+st = await stateOf();
+ok('a note is kept on the element it was left on', st.comments.length === 1 && /^e\d+$/.test(st.comments[0].element) && !st.comments[0].resolved);
+ok('the artboard says it has a note', (await page.locator('.dx-label-note').first().textContent())?.includes('1 note'));
+await page.locator('.dx-label-name').first().click();
+await settle(400);
+await page.locator('.dx-notes button:text-is("Ask the designer")').click();
+await page.waitForFunction(() => !document.querySelector('.dx-phase'), null, { timeout: 30000 });
+ok('the designer can be asked to act on it, and is told the open notes', /Act on this note/.test(requests.at(-1).words) && requests.at(-1).comments?.length === 1);
+await page.locator('.dx-notes button:text-is("Resolve")').click();
+await settle(900);
+st = await stateOf();
+ok('a note can be resolved', st.comments[0].resolved === true);
+
+console.log('\n=== other formats ===');
+await page.locator('.dx-label-name').first().click();
+await settle(300);
+await page.locator('.dx-quick button:text-is("Other formats")').click();
+await page.locator('.dx-check:has-text("Story (vertical)") input').check();
+await page.locator('.dx-check:has-text("LinkedIn post") input').check();
+await page.locator('.dx-modal button.dx-primary').click();
+await page.waitForFunction(() => !document.querySelector('.dx-phase'), null, { timeout: 60000 });
+await settle(1200);
+st = await stateOf();
+const fmts = st.doc.artboards.filter((a) => a.group && st.doc.artboards.filter((b) => b.group === a.group).length === 2);
+ok('the formats asked for are made, each at its own size, in one group', /format="story"/.test(requests.findLast((r) => r.mode === 'write').words) && fmts.some((a) => a.format === 'story' && a.width === 1080 && a.height === 1920) && fmts.some((a) => a.format === 'linkedin'));
+
 console.log('\n=== presenting ===');
 await page.locator('.dx-head button:text-is("Present")').click();
 await settle(800);
@@ -259,7 +312,7 @@ ok('present shows one artboard full screen', (await page.locator('.dx-present-bo
 await page.screenshot({ path: `${OUT}3-present.png` });
 await page.keyboard.press('ArrowRight');
 await settle(300);
-ok('arrow keys move between artboards', (await page.locator('.dx-present-bar span').textContent())?.includes('2 / 4'));
+ok('arrow keys move between artboards', /2 \/ \d/.test(await page.locator('.dx-present-bar span').textContent()));
 await page.keyboard.press('Escape');
 
 // the export picture, kept to look at
