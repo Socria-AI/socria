@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { CORE_3_MODEL, CORE_3_FALLBACK_MODEL, CORE_4_MODEL } from '@/lib/socria-prompt';
 import { deployedCommit, probeModels, probeSearch, probeStore, summarise } from '@/lib/upstream-health';
@@ -16,6 +17,7 @@ import { runSearch, searchConfigured } from '@/lib/logos-explore';
 import { storeHealth } from '@/lib/core4/store';
 import { mrStoreHealth } from '@/lib/mr/store';
 import { usageStoreHealth } from '@/lib/quota';
+import { socriauxProviders } from '@/lib/ux-v0/model';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -53,6 +55,13 @@ export async function GET(req: NextRequest) {
     usageStoreHealth(),
   ]);
 
+  // SocriaUX: which model each stage runs on, whether its provider's key is set, and — for Claude — whether the
+  // key is accepted and the model reachable (the models endpoint: no tokens, nothing billed)
+  const ux = socriauxProviders(process.env);
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const claudeProbes = anthropicKey && ux.claudeModels.length ? await probeModels(new Anthropic({ apiKey: anthropicKey, maxRetries: 0 }), ux.claudeModels) : [];
+  const socriaux = { hasAnthropicKey: !!anthropicKey, missing: ux.missing, stages: ux.stages, probes: claudeProbes, ready: ux.missing.length === 0 && claudeProbes.every((p) => p.ok) };
+
   if (!apiKey) {
     return NextResponse.json({
       ...base,
@@ -61,6 +70,7 @@ export async function GET(req: NextRequest) {
       store,
       mrStore,
       usage,
+      socriaux,
       verdict: summarise({ ...base, probes: [], search, store }),
     });
   }
@@ -70,5 +80,5 @@ export async function GET(req: NextRequest) {
   // three at once is what makes that readable.
   const models = [...new Set([CORE_4_MODEL, CORE_3_MODEL, CORE_3_FALLBACK_MODEL])];
   const probes = await probeModels(new OpenAI({ apiKey, maxRetries: 0 }), models);
-  return NextResponse.json({ ...base, probes, search, store, mrStore, usage, verdict: summarise({ ...base, probes, search, store }) });
+  return NextResponse.json({ ...base, probes, search, store, mrStore, usage, socriaux, verdict: summarise({ ...base, probes, search, store }) });
 }

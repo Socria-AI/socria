@@ -44,6 +44,14 @@ export const ENV_SPEC: Spec[] = [
     looksLike: /^sk-/,
   },
   {
+    name: 'ANTHROPIC_API_KEY',
+    scope: 'server',
+    needed: 'SocriaUX on Claude Sonnet 5.5 — the brief, art direction, generation, changes and critique (lib/ux-v0/model.ts); without it those steps answer "not configured"',
+    required: 'optional',
+    looksLike: /^sk-ant-/,
+    hint: 'an Anthropic Console key starts with sk-ant-',
+  },
+  {
     name: 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
     scope: 'public',
     needed: 'sign-in',

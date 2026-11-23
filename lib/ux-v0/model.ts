@@ -196,6 +196,20 @@ export function routeFor(stage: CallKind, want: { tier?: Tier } = {}, env: Env =
   return { stage, tier, model, api, effort, ladder: ladderFor(model), source: own ? 'stage' : mode === 'single' ? 'single' : 'tier' };
 }
 
+/**
+ * What SocriaUX needs from this deployment, for the health check: each text stage's model and provider, and
+ * whether that provider's key is set. Names only: never a key, never part of one.
+ */
+export function socriauxProviders(env: Env = process.env): { stages: { stage: CallKind; model: string; provider: 'anthropic' | 'openai'; keyed: boolean }[]; missing: ('anthropic' | 'openai')[]; claudeModels: string[] } {
+  const keyed = (p: 'anthropic' | 'openai') => !!(p === 'anthropic' ? env.ANTHROPIC_API_KEY : env.OPENAI_API_KEY);
+  const stages = routingTable(env).map((r) => ({ stage: r.stage, model: r.model, provider: providerOf(r.model), keyed: keyed(providerOf(r.model)) }));
+  return {
+    stages,
+    missing: [...new Set(stages.filter((s) => !s.keyed).map((s) => s.provider))],
+    claudeModels: [...new Set(stages.filter((s) => s.provider === 'anthropic').map((s) => s.model))],
+  };
+}
+
 /** The stage on the economy model: where a premium call goes when a budget would not hold it, or it is too slow. */
 export function economyRoute(stage: CallKind, env: Env = process.env): Route {
   return routeFor(stage, { tier: 'economy' }, { ...env, [`SOCRIAUX_TIER_${stageKey(stage)}`]: 'economy' });
