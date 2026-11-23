@@ -988,17 +988,117 @@ console.log('\n=== what is being made: intent, the booking, the behaviour runtim
   ok('generation is told what it must do, by id, and what was ruled out', (() => { const b2 = { ...brief, intent: { ...brief.intent, prohibitions: ['stock photos'] } }; const t = V.generateSystem(b2); return t.includes('WHAT IT MUST DO') && t.includes('req-book') && t.includes('stock photos') && t.includes('NOT a page about it'); })());
 }
 
+console.log('\n=== Claude: the Messages API, through a fake client (no real call) ===');
+{
+  const quietWarn = console.warn;
+  const warned = [];
+  const { format: fmt } = await import('node:util');
+  console.warn = (...a) => warned.push(fmt(...a));
+  const calls = [];
+  let script = [];
+  const fake = {
+    messages: {
+      async create(body, options) {
+        calls.push({ body, options });
+        const next = script.shift();
+        if (typeof next === 'function') return next(body, options);
+        if (next instanceof Error) throw next;
+        return next;
+      },
+    },
+  };
+  V.setClaudeClient(fake);
+  const msg = (text, stop = 'end_turn', usage = { input_tokens: 1200, cache_read_input_tokens: 3000, cache_creation_input_tokens: 0, output_tokens: 900, output_tokens_details: { thinking_tokens: 400 } }) => ({ type: 'message', role: 'assistant', content: [{ type: 'thinking', thinking: 'weighing it' }, { type: 'text', text }], stop_reason: stop, usage });
+  const answer = { directions: [{ candidate: 1, language: 'broadsheet', name: 'Morning ledger' }] };
+  const route = V.routeFor('art-direction', {}, {});
+  const ask = (o = {}, r = route) => V.askJson(null, r.ladder, { system: 'You are the art director.', user: 'Three directions for the coffee house.', maxTokens: 1800, temperature: 0.8, label: 'art-direction', reasoningRoom: 4096, ...o }, r);
+
+  script = [msg(JSON.stringify(answer))];
+  const a1 = await ask({ format: V.formatFor('art-direction') });
+  const b1 = calls[0].body;
+  ok('one Messages call: the model, the system prompt as one cached block, the words as the message', calls.length === 1 && b1.model === 'claude-sonnet-5-5' && b1.system[0].text === 'You are the art director.' && b1.system[0].cache_control?.type === 'ephemeral' && b1.messages[0].role === 'user' && b1.messages[0].content.at(-1).text === 'Three directions for the coffee house.', J(b1));
+  ok('  the effort and the answer\'s schema in output_config; the thinking\'s room on top of the answer\'s cap', b1.output_config.effort === 'medium' && b1.output_config.format.type === 'json_schema' && J(b1.output_config.format.schema) === J(V.formatFor('art-direction').schema) && b1.max_tokens === 1800 + 4096);
+  ok('  no sampling setting, no thinking switch and no prefill are sent (the model refuses each)', !('temperature' in b1) && !('top_p' in b1) && !('thinking' in b1) && b1.messages.length === 1);
+  ok('  the answer is read from its text, the thinking left out', J(a1.json) === J(answer) && a1.api === 'anthropic' && a1.effort === 'medium' && a1.incomplete === null && a1.model === 'claude-sonnet-5-5' && a1.tier === 'premium');
+  ok('  priced from its usage: cache reads at the cached rate, thinking billed as output', a1.usage.input === 4200 && a1.usage.cached === 3000 && a1.usage.output === 900 && a1.usage.reasoning === 400 && Math.abs(a1.usage.cost - (1200 * 2 + 3000 * 0.1 + 900 * 10) / 1e6) < 1e-12, J(a1.usage));
+  const w = V.usageOfClaude('claude-sonnet-5-5', { input_tokens: 100, cache_creation_input_tokens: 4000, output_tokens: 50 });
+  ok('  a cache write is priced a quarter above plain input', w.input === 4100 && w.cached === 0 && Math.abs(w.cost - (4100 * 2 + 4000 * 0.5 + 50 * 10) / 1e6) < 1e-12, J(w));
+
+  calls.length = 0;
+  script = [msg('{"brief":{}}')];
+  await ask({}, V.routeFor('brief', {}, {}));
+  ok('a call with no schema: plain JSON asked for in the words, at the economy tier\'s low effort', calls[0].body.output_config.effort === 'low' && !calls[0].body.output_config.format && /JSON object/.test(calls[0].body.messages[0].content.at(-1).text));
+
+  calls.length = 0;
+  script = [msg('', 'refusal')];
+  const a3 = await ask({ format: V.formatFor('art-direction') });
+  ok('a refusal is said as a refusal, never read as an answer', a3.incomplete === 'refusal' && a3.json === null);
+  script = [msg('{"directions": [', 'max_tokens')];
+  const a4 = await ask({ format: V.formatFor('art-direction') });
+  ok('an answer cut at its cap is said to be incomplete', a4.incomplete === 'max_output_tokens' && a4.json === null && warned.some((x) => /stopped early \(max_output_tokens\)/.test(x)));
+
+  calls.length = 0;
+  script = [Object.assign(new Error('output_config.format.schema: unsupported keyword'), { status: 400 }), msg(JSON.stringify(answer))];
+  const a5 = await ask({ format: V.formatFor('art-direction') });
+  ok('a schema the model will not take: asked once more in plain JSON, on the same model', calls.length === 2 && calls[1].body.model === 'claude-sonnet-5-5' && !calls[1].body.output_config.format && J(a5.json) === J(answer));
+  calls.length = 0;
+  script = [Object.assign(new Error('Rate limited'), { status: 429 })];
+  let threw = null;
+  try { await ask({ format: V.formatFor('art-direction') }); } catch (e) { threw = e; }
+  ok('a rate limit is thrown as itself, not answered by another provider', threw?.status === 429 && calls.length === 1);
+
+  calls.length = 0;
+  script = [msg(JSON.stringify(answer))];
+  await ask({ images: [{ url: 'data:image/png;base64,iVBORw0KGgo=', detail: 'high' }, { url: 'https://example.com/a.jpg', detail: 'low' }] });
+  const parts = calls[0].body.messages[0].content;
+  ok('images go first: a data URL as its media type and bytes, a link as a link', parts[0].type === 'image' && parts[0].source.type === 'base64' && parts[0].source.media_type === 'image/png' && parts[0].source.data === 'iVBORw0KGgo=' && parts[1].source.type === 'url' && parts[1].source.url === 'https://example.com/a.jpg' && parts[2].type === 'text', J(parts));
+
+  // streamed: the first output timed, progress told, usage gathered from the events
+  const events = (text, stop = 'end_turn') => (async function* () {
+    yield { type: 'message_start', message: { usage: { input_tokens: 800, cache_read_input_tokens: 0, cache_creation_input_tokens: 2000, output_tokens: 1 } } };
+    yield { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '' } };
+    yield { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'hmm' } };
+    for (const piece of [text.slice(0, 10), text.slice(10)]) yield { type: 'content_block_delta', index: 1, delta: { type: 'text_delta', text: piece } };
+    yield { type: 'message_delta', delta: { stop_reason: stop }, usage: { output_tokens: 640 } };
+    yield { type: 'message_stop' };
+  })();
+  calls.length = 0;
+  const progress = [];
+  script = [() => events(JSON.stringify(answer))];
+  const a6 = await ask({ stream: true, onProgress: (p) => progress.push(p.phase) });
+  ok('streamed: asked with stream on, the text gathered from its deltas, the usage from its events', calls[0].body.stream === true && J(a6.json) === J(answer) && a6.usage.input === 2800 && a6.usage.output === 640 && typeof a6.ttftMs === 'number' && progress[0] === 'asked' && progress.includes('writing'), J({ u: a6.usage, progress }));
+  script = [() => (async function* () { yield { type: 'message_start', message: { usage: { input_tokens: 10 } } }; yield { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: '{"dir' } }; })()];
+  let cut = null;
+  try { await ask({ stream: true }); } catch (e) { cut = e; }
+  ok('a stream that ends before its last event is an interrupted answer', cut?.name === 'SocriauxInterrupted');
+
+  // the premium call too slow: the economy route (the same model, at low effort) answers instead
+  calls.length = 0;
+  script = [
+    (body, options) => new Promise((_, reject) => options?.signal?.addEventListener('abort', () => reject(Object.assign(new Error('Request was aborted.'), { name: 'APIUserAbortError' })))),
+    msg(JSON.stringify(answer)),
+  ];
+  const slow = await V.askRouted(null, route, { system: 's', user: 'u', maxTokens: 1800, label: 'art-direction' }, V.economyRoute('art-direction', {}), { SOCRIAUX_PREMIUM_TIMEOUT_MS: '5000' });
+  ok('the premium call too slow: the economy route answers, at low effort, and the designer is told', calls.length === 2 && calls[0].body.output_config.effort === 'medium' && calls[1].body.output_config.effort === 'low' && J(slow.json) === J(answer) && /answered instead/.test(slow.fellBack ?? ''), J(calls.map((c) => c.body.output_config)));
+  V.setClaudeClient(null);
+  console.warn = quietWarn;
+}
+
 console.log('\n=== routing: the model for each stage; budgets ===');
 {
   const R = (stage, env = {}, want = {}) => V.routeFor(stage, want, env);
   const table = V.routingTable({});
-  ok('by default: questions, the brief, the moodboard, a creative change and the studio’s questions on the economy model; direction, generation, critique on the premium', J(table.map((r) => `${r.stage}:${r.tier}:${r.model}`)) === J(['discover:economy:gpt-6-luna', 'direction:economy:gpt-6-luna', 'brief:economy:gpt-6-luna', 'refine-brief:economy:gpt-6-luna', 'art-direction:premium:gpt-6.1-sol', 'generate:premium:gpt-6.1-sol', 'refine:economy:gpt-6-luna', 'critique:premium:gpt-6.1-sol', 'creative-edit:economy:gpt-6-luna', 'studio-questions:economy:gpt-6-luna']), J(table.map((r) => `${r.stage}:${r.tier}:${r.model}`)));
-  ok('the premium tier on Sol: the Responses API at medium effort; the economy tier on Luna: Chat Completions at its own', R('generate').api === 'responses' && R('generate').effort === 'medium' && R('discover').api === 'chat' && R('discover').effort === undefined);
+  ok('by default: the questions on Luna; every other stage on Claude Sonnet 5.5, in its tier', J(table.map((r) => `${r.stage}:${r.tier}:${r.model}`)) === J(['discover:economy:gpt-6-luna', 'direction:economy:claude-sonnet-5-5', 'brief:economy:claude-sonnet-5-5', 'refine-brief:economy:claude-sonnet-5-5', 'art-direction:premium:claude-sonnet-5-5', 'generate:premium:claude-sonnet-5-5', 'refine:economy:claude-sonnet-5-5', 'critique:premium:claude-sonnet-5-5', 'creative-edit:economy:claude-sonnet-5-5', 'studio-questions:economy:gpt-6-luna']), J(table.map((r) => `${r.stage}:${r.tier}:${r.model}`)));
+  ok('Claude through the Messages API: premium at medium effort, economy at low; the questions on Luna through Chat Completions at its own', R('generate').api === 'anthropic' && R('generate').effort === 'medium' && R('brief').api === 'anthropic' && R('brief').effort === 'low' && R('discover').api === 'chat' && R('discover').effort === undefined && R('studio-questions').model === 'gpt-6-luna');
+  ok('a Claude model is its own ladder (never another provider), and SOCRIAUX_API cannot send it elsewhere', J(R('generate').ladder) === J(['claude-sonnet-5-5']) && R('generate', { SOCRIAUX_API: 'chat' }).api === 'anthropic');
+  ok('the question model is set apart: SOCRIAUX_QUESTION_MODEL moves both question stages, and a stage\'s own model still wins', R('discover', { SOCRIAUX_QUESTION_MODEL: 'claude-sonnet-5-5' }).model === 'claude-sonnet-5-5' && R('studio-questions', { SOCRIAUX_QUESTION_MODEL: 'claude-sonnet-5-5' }).api === 'anthropic' && R('discover', { SOCRIAUX_MODEL_DISCOVER: 'gpt-4o-mini' }).model === 'gpt-4o-mini');
+  ok('the premium tier back on Sol when set: the Responses API at medium, as before', R('generate', { SOCRIAUX_PREMIUM_MODEL: 'gpt-6.1-sol' }).api === 'responses' && R('generate', { SOCRIAUX_PREMIUM_MODEL: 'gpt-6.1-sol' }).effort === 'medium' && J(R('generate', { SOCRIAUX_PREMIUM_MODEL: 'gpt-6.1-sol' }).ladder) !== J(['gpt-6.1-sol']));
+  ok('which provider answers a model', V.providerOf('claude-sonnet-5-5') === 'anthropic' && V.providerOf('gpt-6-luna') === 'openai');
   ok('a complex refinement asks for premium; a tier set for the stage overrides it', R('refine', {}, { tier: 'premium' }).tier === 'premium' && R('refine', { SOCRIAUX_TIER_REFINE: 'economy' }, { tier: 'premium' }).tier === 'economy');
-  ok('SOCRIAUX_ROUTING=single: everything on the economy model', V.routingTable({ SOCRIAUX_ROUTING: 'single' }).every((r) => r.model === 'gpt-6-luna' && r.source === 'single'));
+  ok('SOCRIAUX_ROUTING=single: everything on the economy model but the questions', V.routingTable({ SOCRIAUX_ROUTING: 'single' }).every((r) => r.model === (['discover', 'studio-questions'].includes(r.stage) ? 'gpt-6-luna' : 'claude-sonnet-5-5') && r.tier === 'economy' && r.source === 'single'));
   ok('legacy SOCRIAUX_MODEL: every stage on it, at medium unless SOCRIAUX_EFFORT says otherwise', V.routingTable({ SOCRIAUX_MODEL: 'gpt-6.1-sol' }).every((r) => r.model === 'gpt-6.1-sol' && r.effort === 'medium' && r.api === 'responses' && r.source === 'legacy') && V.routingTable({ SOCRIAUX_MODEL: 'gpt-6.1-sol', SOCRIAUX_EFFORT: 'high' }).every((r) => r.effort === 'high'));
-  ok('tiers, efforts and single stages are configured, never asked for by a request', R('art-direction', { SOCRIAUX_PREMIUM_MODEL: 'gpt-6.1-terra', SOCRIAUX_PREMIUM_EFFORT: 'low' }).model === 'gpt-6.1-terra' && R('art-direction', { SOCRIAUX_PREMIUM_EFFORT: 'high' }).effort === 'high' && R('critique', { SOCRIAUX_MODEL_CRITIQUE: 'gpt-4o-mini' }).model === 'gpt-4o-mini' && R('critique', { SOCRIAUX_MODEL_CRITIQUE: 'rm -rf /' }).model === 'gpt-6.1-sol');
-  ok('a stage on the economy tier for fallbacks and budgets', V.economyRoute('generate', {}).model === 'gpt-6-luna' && V.economyRoute('generate', {}).tier === 'economy');
+  ok('tiers, efforts and single stages are configured, never asked for by a request', R('art-direction', { SOCRIAUX_PREMIUM_MODEL: 'gpt-6.1-terra', SOCRIAUX_PREMIUM_EFFORT: 'low' }).model === 'gpt-6.1-terra' && R('art-direction', { SOCRIAUX_PREMIUM_EFFORT: 'high' }).effort === 'high' && R('critique', { SOCRIAUX_MODEL_CRITIQUE: 'gpt-4o-mini' }).model === 'gpt-4o-mini' && R('critique', { SOCRIAUX_MODEL_CRITIQUE: 'rm -rf /' }).model === 'claude-sonnet-5-5');
+  ok('a stage on the economy tier for fallbacks and budgets: the same Claude model at low effort', V.economyRoute('generate', {}).model === 'claude-sonnet-5-5' && V.economyRoute('generate', {}).effort === 'low' && V.economyRoute('generate', {}).tier === 'economy');
   // refinement complexity, in code
   const el = { element: { ux: { section: 'hero' } }, region: null };
   ok('a short change to a selected part is economy', V.refineTier('Make the headline say mornings', el).tier === 'economy' && V.refineTier('Make the button darker', el).tier === 'economy');
@@ -1006,16 +1106,18 @@ console.log('\n=== routing: the model for each stage; budgets ===');
   // estimates are labelled estimates; budgets hold
   const gen = R('generate');
   const worst = V.worstCost(gen, 20000);
-  ok('a premium generation\'s worst case is its prompt, its cap and its reasoning room at Sol\'s price', Math.abs(worst - ((5000 * 2 + (V.MAX_TOKENS.generate + 8192) * 10) / 1e6)) < 1e-9, worst);
+  ok('a premium generation\'s worst case is its prompt, its cap and the thinking room it is given, at Claude Sonnet 5.5\'s price', Math.abs(worst - ((5000 * 2 + (V.MAX_TOKENS.generate + 4096) * 10) / 1e6)) < 1e-9, worst);
+  const solWorst = V.worstCost(R('generate', { SOCRIAUX_PREMIUM_MODEL: 'gpt-6.1-sol' }), 20000);
+  ok('  on Sol: its cap and its reasoning room at medium, as before', Math.abs(solWorst - ((5000 * 2 + (V.MAX_TOKENS.generate + 8192) * 10) / 1e6)) < 1e-9, solWorst);
   ok('a model with no price has no estimate', V.worstCost({ model: 'no-such-model', effort: undefined, stage: 'generate' }, 1000) === null);
   const B = V.budgets({});
   ok('default budgets: US$2 a day, US$20 a month, US$5 a project, US$0.40 a call, warned at 80%, one retry', B.dailyUsd === 2 && B.monthlyUsd === 20 && B.projectUsd === 5 && B.operationUsd === 0.4 && B.warnAt === 0.8 && B.maxRetries === 1);
   ok('budgets are read from the environment, within bounds', V.budgets({ SOCRIAUX_DAILY_USD: '0.5', SOCRIAUX_WARN_AT: '7', SOCRIAUX_MAX_RETRIES: '9' }).dailyUsd === 0.5 && V.budgets({ SOCRIAUX_WARN_AT: '7' }).warnAt === 0.8 && V.budgets({ SOCRIAUX_MAX_RETRIES: '9' }).maxRetries === 2);
   const none = { day: 0, month: 0, project: 0 };
   const fine = V.decide(gen, 20000, none, B, {});
-  ok('within every budget: the premium model, no warning', fine.ok && fine.route.model === 'gpt-6.1-sol' && !fine.downgraded && !fine.warning);
+  ok('within every budget: the premium model, no warning', fine.ok && fine.route.model === 'claude-sonnet-5-5' && fine.route.effort === 'medium' && !fine.downgraded && !fine.warning);
   const tight = V.decide(gen, 20000, { day: 1.95, month: 1.95, project: 1.95 }, B, {});
-  ok('a premium call the budget would not hold: the economy model, said, and a warning', tight.ok && tight.route.model === 'gpt-6-luna' && /past its limit/.test(tight.downgraded) && /98% of a SocriaUX budget/.test(tight.warning), J(tight));
+  ok('a premium call the budget would not hold: the economy tier (the same model at low effort), said, and a warning', tight.ok && tight.route.model === 'claude-sonnet-5-5' && tight.route.effort === 'low' && /economy tier .* at low effort/.test(tight.downgraded) && /past its limit/.test(tight.downgraded) && /98% of a SocriaUX budget/.test(tight.warning), J(tight));
   ok('a budget spent: refused, plainly', !V.decide(gen, 100, { day: 0, month: 20, project: 0 }, B, {}).ok && /this month/i.test(V.decide(gen, 100, { day: 0, month: 20, project: 0 }, B, {}).error));
   ok('an economy call is never moved: it runs while any budget remains', V.decide(R('discover'), 100, { day: 1.999, month: 0, project: 0 }, B, {}).route.model === 'gpt-6-luna');
   ok('the automatic repair loop is code, bounded', V.MAX_REVISION_ROUNDS === 2);

@@ -178,9 +178,11 @@ All settings are server-side. No request can name a model, an API, a tier, an ef
 | Variable | Default | Meaning |
 |---|---|---|
 | `SOCRIAUX_ROUTING` | `tiered` | `single` runs every stage on the economy model |
-| `SOCRIAUX_ECONOMY_MODEL` | `gpt-6-luna` | the economy tier |
-| `SOCRIAUX_PREMIUM_MODEL` | `gpt-6.1-sol` | the premium tier. **Set it to `gpt-6-luna` to keep every stage on Luna** (no Sol cost) |
-| `SOCRIAUX_ECONOMY_EFFORT`, `SOCRIAUX_PREMIUM_EFFORT` | model's own; `medium` for Sol | reasoning effort per tier |
+| `SOCRIAUX_QUESTION_MODEL` | `gpt-6-luna` | the questions (`DISCOVER`, `STUDIO_QUESTIONS`), whatever the tiers |
+| `SOCRIAUX_ECONOMY_MODEL` | `claude-sonnet-5-5` | the economy tier (was `gpt-6-luna`) |
+| `SOCRIAUX_PREMIUM_MODEL` | `claude-sonnet-5-5` | the premium tier (was `gpt-6.1-sol`; set it back to run the premium tier on Sol) |
+| `SOCRIAUX_ECONOMY_EFFORT`, `SOCRIAUX_PREMIUM_EFFORT` | `low` / `medium` for Claude; `medium` for Sol; the model's own otherwise | reasoning effort per tier |
+| `ANTHROPIC_API_KEY` | — | the key for every Claude stage; a Claude stage without it answers "not configured" |
 | `SOCRIAUX_TIER_<STAGE>` | — | `economy` or `premium` for one stage (`DISCOVER`, `DIRECTION`, `BRIEF`, `REFINE_BRIEF`, `ART_DIRECTION`, `GENERATE`, `REFINE`, `CRITIQUE`) |
 | `SOCRIAUX_MODEL_<STAGE>` | — | one model for one stage |
 | `SOCRIAUX_MODEL` | — | **legacy**: every stage on one model, exactly as before routing |

@@ -20,6 +20,7 @@
     "check:env": "node scripts/check-env.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.12.0",
     "@clerk/nextjs": "^5.7.0",
     "@portabletext/react": "^3.1.0",
     "@react-three/drei": "^9.122.0",

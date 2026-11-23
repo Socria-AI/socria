@@ -9,17 +9,25 @@
 // to what it must do (lib/ux-v0/fit.ts), the rendered-page audit, the
 // behaviour runtime, and one-decision adjustments (lib/ux-v0/refine-local.ts).
 //
+// QUESTIONING. The questions themselves (the discovery conversation and the
+// studio's next creative question) are short, structured and asked often: they
+// run on their own model, GPT-6 Luna by default, whatever the tiers are set to.
+// Everything else runs on Claude Sonnet 5.5 (the Messages API, lib/ux-v0/ask.ts):
+// the economy tier at low effort, the premium tier at medium.
+//
 //   SOCRIAUX_ROUTING          tiered (default) | single: single runs every stage on the economy model
-//   SOCRIAUX_ECONOMY_MODEL    default gpt-6-luna
-//   SOCRIAUX_PREMIUM_MODEL    default gpt-6.1-sol (set it to gpt-6-luna to keep every stage on Luna)
-//   SOCRIAUX_ECONOMY_EFFORT   reasoning effort for the economy tier (default: the model's own)
-//   SOCRIAUX_PREMIUM_EFFORT   reasoning effort for the premium tier (default: medium for Sol, which the
-//                             evaluation found as good as high at about 80% of the cost and 60% of the time,
+//   SOCRIAUX_QUESTION_MODEL   the questioning stages (DISCOVER, STUDIO_QUESTIONS); default gpt-6-luna
+//   SOCRIAUX_ECONOMY_MODEL    default claude-sonnet-5-5
+//   SOCRIAUX_PREMIUM_MODEL    default claude-sonnet-5-5 (gpt-6.1-sol runs the premium tier on Sol, as before)
+//   SOCRIAUX_ECONOMY_EFFORT   reasoning effort for the economy tier (default: low for Claude, the model's own otherwise)
+//   SOCRIAUX_PREMIUM_EFFORT   reasoning effort for the premium tier (default: medium for Claude and for Sol, which
+//                             the evaluation found as good as high at about 80% of the cost and 60% of the time,
 //                             docs/SOCRIAUX-SOL.md; the model's own otherwise)
 //   SOCRIAUX_TIER_<STAGE>     economy | premium: move one stage between tiers. Stages: DISCOVER, DIRECTION,
 //                             BRIEF, REFINE_BRIEF, ART_DIRECTION, GENERATE, REFINE, CRITIQUE
 //   SOCRIAUX_MODEL_<STAGE>    one model for one stage, whatever its tier
-//   SOCRIAUX_API              chat | responses for every call (default: responses for Sol, chat otherwise)
+//   SOCRIAUX_API              chat | responses for every OpenAI call (default: responses for Sol, chat otherwise);
+//                             a Claude model always goes through the Messages API, with ANTHROPIC_API_KEY
 //
 // LEGACY. SOCRIAUX_MODEL, when set, runs EVERY stage on that one model exactly
 // as before routing existed, with SOCRIAUX_API and SOCRIAUX_EFFORT (default:
@@ -43,6 +51,14 @@ export const DEFAULT_MODEL = 'gpt-6-luna';
 /** The experimental model: GPT-6.1 Sol. */
 export const SOL = 'gpt-6.1-sol';
 const IS_SOL = /^gpt-6\.1-sol(?:[-:.]|$)/i;
+/** Claude Sonnet 5.5: every stage but the questions, unless the environment says otherwise. */
+export const SONNET = 'claude-sonnet-5-5';
+/** The questions: the discovery conversation and the studio's next creative question. */
+export const QUESTION_MODEL = 'gpt-6-luna';
+const IS_CLAUDE = /^claude-/i;
+export const isClaude = (model: string): boolean => IS_CLAUDE.test(model);
+/** Which provider answers a model: Anthropic for a Claude model, OpenAI for the rest. */
+export const providerOf = (model: string): 'anthropic' | 'openai' => (IS_CLAUDE.test(model) ? 'anthropic' : 'openai');
 
 type Env = Record<string, string | undefined>;
 
@@ -51,11 +67,12 @@ export function socriauxModel(env: Env = process.env): string {
   return /^[a-z0-9][a-z0-9.\-:]{1,60}$/i.test(m) ? m : DEFAULT_MODEL;
 }
 
-export type Api = 'chat' | 'responses';
+export type Api = 'chat' | 'responses' | 'anthropic';
 
-/** Which OpenAI API SocriaUX's calls go through. */
+/** Which API SocriaUX's calls go through. */
 export function socriauxApi(env: Env = process.env): Api {
   const v = (env.SOCRIAUX_API ?? '').trim().toLowerCase();
+  if (IS_CLAUDE.test(socriauxModel(env))) return 'anthropic';
   if (v === 'chat' || v === 'responses') return v;
   return IS_SOL.test(socriauxModel(env)) ? 'responses' : 'chat';
 }
@@ -89,13 +106,18 @@ export function socriauxLadder(env: Env = process.env): string[] {
   return ladderFor(socriauxModel(env));
 }
 
-const ladderFor = (m: string): string[] => [...(LADDERS[m] ?? [m, 'gpt-4o-mini'])];
+// a Claude model is its own ladder: a ladder never crosses providers (the call's client, its API and its key
+// are the provider's), so a refused Claude call is said as refused, never quietly answered by another model
+const ladderFor = (m: string): string[] => (IS_CLAUDE.test(m) ? [m] : [...(LADDERS[m] ?? [m, 'gpt-4o-mini'])]);
 
 // ── routing ──────────────────────────────────────────────────────────
 
 export type Tier = 'economy' | 'premium';
 export const TIERS: readonly Tier[] = ['economy', 'premium'];
-export const DEFAULT_PREMIUM_MODEL = SOL;
+export const DEFAULT_ECONOMY_MODEL = SONNET;
+export const DEFAULT_PREMIUM_MODEL = SONNET;
+/** The stages that ask the designer something: on the question model, whatever their tier. */
+export const QUESTION_STAGES: readonly CallKind[] = ['discover', 'studio-questions'];
 
 /** Where each stage runs unless it is told otherwise. Refinement is economy unless it is complex (refineTier). */
 export const STAGE_TIER: Record<CallKind, Tier> = {
@@ -145,7 +167,12 @@ export function routingMode(env: Env = process.env): 'legacy' | 'single' | 'tier
 }
 
 export function tierModel(tier: Tier, env: Env = process.env): string {
-  return tier === 'premium' ? modelEnv(env.SOCRIAUX_PREMIUM_MODEL) ?? DEFAULT_PREMIUM_MODEL : modelEnv(env.SOCRIAUX_ECONOMY_MODEL) ?? DEFAULT_MODEL;
+  return tier === 'premium' ? modelEnv(env.SOCRIAUX_PREMIUM_MODEL) ?? DEFAULT_PREMIUM_MODEL : modelEnv(env.SOCRIAUX_ECONOMY_MODEL) ?? DEFAULT_ECONOMY_MODEL;
+}
+
+/** The model the questions are asked on. */
+export function questionModel(env: Env = process.env): string {
+  return modelEnv(env.SOCRIAUX_QUESTION_MODEL) ?? QUESTION_MODEL;
 }
 
 /**
@@ -161,10 +188,11 @@ export function routeFor(stage: CallKind, want: { tier?: Tier } = {}, env: Env =
   const set = (env[`SOCRIAUX_TIER_${stageKey(stage)}`] ?? '').trim().toLowerCase();
   const tier: Tier = mode === 'single' ? 'economy' : (TIERS as readonly string[]).includes(set) ? (set as Tier) : want.tier ?? STAGE_TIER[stage];
   const own = modelEnv(env[`SOCRIAUX_MODEL_${stageKey(stage)}`]);
-  const model = own ?? tierModel(tier, env);
+  const model = own ?? (QUESTION_STAGES.includes(stage) ? questionModel(env) : tierModel(tier, env));
   const forced = (env.SOCRIAUX_API ?? '').trim().toLowerCase();
-  const api: Api = forced === 'chat' || forced === 'responses' ? forced : IS_SOL.test(model) ? 'responses' : 'chat';
-  const effort = effortEnv(tier === 'premium' ? env.SOCRIAUX_PREMIUM_EFFORT : env.SOCRIAUX_ECONOMY_EFFORT) ?? effortEnv(env.SOCRIAUX_EFFORT) ?? (IS_SOL.test(model) ? 'medium' : undefined);
+  const api: Api = IS_CLAUDE.test(model) ? 'anthropic' : forced === 'chat' || forced === 'responses' ? forced : IS_SOL.test(model) ? 'responses' : 'chat';
+  const fallbackEffort: Effort | undefined = IS_SOL.test(model) ? 'medium' : IS_CLAUDE.test(model) ? (tier === 'premium' ? 'medium' : 'low') : undefined;
+  const effort = effortEnv(tier === 'premium' ? env.SOCRIAUX_PREMIUM_EFFORT : env.SOCRIAUX_ECONOMY_EFFORT) ?? effortEnv(env.SOCRIAUX_EFFORT) ?? fallbackEffort;
   return { stage, tier, model, api, effort, ladder: ladderFor(model), source: own ? 'stage' : mode === 'single' ? 'single' : 'tier' };
 }
 

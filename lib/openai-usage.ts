@@ -82,6 +82,14 @@ export function onMetering(m: Metering | null): void {
   metering = m;
 }
 
+/**
+ * A call made through another provider's client (a Claude call, lib/ux-v0/ask.ts), held against the week's
+ * tokens like any other: null when nobody counts it; throws, before the provider is asked, when it cannot be held.
+ */
+export function holdCall(call: MeteredCall): Promise<MeterHold | null> {
+  return metering ? metering.begin(call) : Promise.resolve(null);
+}
+
 /** The least a shortened answer is left to write, before any reasoning room. */
 export const MIN_ANSWER_TOKENS = 300;
 /** What a call that names no cap is held at for its output. */

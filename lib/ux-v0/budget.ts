@@ -28,7 +28,7 @@
 
 import { REASONING_ROOM, traitsOf, effortFor } from '../model-params';
 import { costOf } from '../model-router';
-import { MAX_TOKENS, economyRoute, type Route } from './model';
+import { MAX_TOKENS, economyRoute, isClaude, reasoningRoomFor, type Route } from './model';
 
 type Env = Record<string, string | undefined>;
 
@@ -72,7 +72,8 @@ export const tokensFor = (chars: number, images = 0) => Math.ceil(Math.max(0, ch
  * whole reasoning room, at the model's price. Null for a model with no published price.
  */
 export function worstCost(route: Pick<Route, 'model' | 'effort' | 'stage'>, inputChars: number, images = 0): number | null {
-  const reasoning = traitsOf(route.model).family === 'reasoning' ? REASONING_ROOM[effortFor(route.model, route.effort)] : 0;
+  // a Claude call is given the reasoning room it is asked with (lib/ux-v0/model.ts reasoningRoomFor) on top of its cap
+  const reasoning = isClaude(route.model) ? reasoningRoomFor(route.model, route.effort) : traitsOf(route.model).family === 'reasoning' ? REASONING_ROOM[effortFor(route.model, route.effort)] : 0;
   return costOf(route.model, { input: tokensFor(inputChars, images), output: MAX_TOKENS[route.stage] + reasoning });
 }
 
@@ -118,10 +119,10 @@ export function decide(route: Route, inputChars: number, spent: Spent, b: Budget
     const why = estimate > b.operationUsd ? `it could cost up to ${money(estimate)}, more than one change may (${money(b.operationUsd)})` : estimate > room ? `it could take the budget past its limit (${money(room)} left)` : '';
     if (why) {
       const economy = economyRoute(route.stage, env);
-      if (economy.model !== route.model) {
+      if (economy.model !== route.model || economy.effort !== route.effort) {
         chosen = economy;
         estimate = worstCost(economy, inputChars, images);
-        downgraded = `Made on the economy model (${economy.model}): ${why}.`;
+        downgraded = economy.model === route.model ? `Made on the economy tier (${economy.model} at ${economy.effort ?? 'its own'} effort): ${why}.` : `Made on the economy model (${economy.model}): ${why}.`;
       }
     }
   }

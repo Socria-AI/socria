@@ -33,7 +33,7 @@ export * from '@/lib/ux-v0/knowledge';
 export * from '@/lib/ux-v0/refine-local';
 // the one model call every route makes (Chat Completions, or the Responses API for GPT-6.1 Sol), and the
 // structured formats it asks for
-export { askJson, readJson } from '@/lib/ux-v0/ask';
+export { askJson, askRouted, readJson, setClaudeClient, usageOfClaude } from '@/lib/ux-v0/ask';
 export * from '@/lib/ux-v0/schemas';
 // what is being made: the intent, fitting a design to it, the Direction studies, the behaviour runtime
 export * from '@/lib/ux-v0/intent';

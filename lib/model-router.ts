@@ -70,6 +70,8 @@ export const PRICES: Record<string, { input: number; cached: number | null; outp
   'gpt-5.6-luna': { input: 0.2, cached: null, output: 1.2 },
   'gpt-6.1-terra': { input: 1, cached: 0.05, output: 5 },
   'gpt-6.1-sol': { input: 2, cached: 0.1, output: 10 },
+  // Anthropic's published price; a cache write costs 1.25 times the input price, added where the usage says so
+  'claude-sonnet-5-5': { input: 2, cached: 0.1, output: 10 },
 };
 
 /** What a call costs, in US$, by its usage; null for a model with no published price. */

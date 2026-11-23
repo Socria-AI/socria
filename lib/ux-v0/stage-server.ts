@@ -49,7 +49,7 @@ import { enforceRateLimit } from '../rate-limit';
 import { meterFor, sleepAnswer, sleepGate } from '../sleep-server';
 import { aborted, askRouted, timedOut, type Asked, type AskProgress } from './ask';
 import { budgets } from './budget';
-import { economyRoute, reasoningRoomFor, type Tier } from './model';
+import { economyRoute, providerOf, reasoningRoomFor, type Tier } from './model';
 import type { JsonFormat } from './schemas';
 import { logLine, shortHash, usageFields, type OperationRecord, type Outcome } from './telemetry';
 import type { CallKind } from './types';
@@ -220,6 +220,8 @@ async function execute(req: NextRequest, ctx: StageContext, s: Stage, op: string
   }, Math.max(0, deadlineAt - Date.now()));
   let askedAt: number | null = null;
   let asked: Asked | null = null;
+  // the model last asked: its provider is the record's, even when no answer came back
+  let askedModel: string | null = null;
   let budget: BudgetView | undefined;
   // while the model reasons nothing streams back: the browser hears the time so far, after every 3 s of silence
   let lastEmit = Date.now();
@@ -237,7 +239,7 @@ async function execute(req: NextRequest, ctx: StageContext, s: Stage, op: string
     op,
     stage: s.stage,
     operation: s.operation,
-    provider: asked || askedAt ? 'openai' : 'none',
+    provider: asked ? providerOf(asked.model) : askedAt && askedModel ? providerOf(askedModel) : 'none',
     ...usageFields(asked?.usage),
     api: asked?.api ?? null,
     startedAt: t0,
@@ -267,7 +269,12 @@ async function execute(req: NextRequest, ctx: StageContext, s: Stage, op: string
     }
     if (sleep.meter) meterFor(sleep.meter);
     if (controller.signal.aborted) throw Object.assign(new Error('Request was aborted.'), { name: 'APIUserAbortError' });
-    const openai = tracked(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), s.label);
+    // each provider's key: a route whose provider has none is not configured; a fallback whose provider has none is not offered
+    const keyed = (model: string) => !!(providerOf(model) === 'anthropic' ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY);
+    if (!keyed(g.route.model)) return { answer: { status: 500, body: { error: `The model for this step (${g.route.model}) is not configured on this deployment.` } }, record: record('failed', 'provider key missing') };
+    const economy = economyRoute(s.stage);
+    // the OpenAI client is made only where it can be asked (its constructor refuses a missing key); a Claude call uses Anthropic's
+    const openai = tracked(new OpenAI({ apiKey: process.env.OPENAI_API_KEY || 'not-configured' }), s.label);
     let lastChars = 0;
     asked = await askRouted(
       openai,
@@ -288,6 +295,7 @@ async function execute(req: NextRequest, ctx: StageContext, s: Stage, op: string
         reasoningRoom: reasoningRoomFor(g.route.model, g.route.effort, env),
         onProgress: (x: AskProgress) => {
           if (x.phase === 'asked') {
+            askedModel = x.model;
             const fallback = askedAt != null;
             askedAt ??= Date.now();
             tell({ type: 'progress', phase: fallback ? 'fallback' : 'asked', model: x.model, tier: fallback ? 'economy' : g.route.tier, elapsedMs: Date.now() - t0 });
@@ -297,7 +305,7 @@ async function execute(req: NextRequest, ctx: StageContext, s: Stage, op: string
           }
         },
       },
-      economyRoute(s.stage)
+      keyed(economy.model) ? economy : null
     );
     tell({ type: 'progress', phase: 'finishing', elapsedMs: Date.now() - t0 });
     const answer = await s.finish(asked);
@@ -349,10 +357,10 @@ export function noteUse(userId: string, usd: number, now = Date.now(), env: Env 
 /** Write what the operation spent, and its record: within the request, after the answer is on its way. */
 async function settle(ctx: StageContext, s: Stage, rec: OperationRecord, answer: StageAnswer): Promise<void> {
   console.info(logLine(rec, ctx.userId, ctx.projectId));
-  if (rec.provider === 'openai') noteUse(ctx.userId, rec.cost ?? 0);
+  if (rec.provider !== 'none') noteUse(ctx.userId, rec.cost ?? 0);
   const usage = answer.body.usage as Asked['usage'] | undefined;
   const tasks: Promise<unknown>[] = [];
-  if (usage && rec.provider === 'openai' && rec.outcome !== 'coalesced') tasks.push(recordUsage(ctx.userId, ctx.projectId, s.stage, usage, Date.now(), { api: rec.api ?? 'chat', downgraded: rec.outcome === 'fallback' || !!answer.body.notice, telemetry: rec, orgId: ctx.orgId }));
+  if (usage && rec.provider !== 'none' && rec.outcome !== 'coalesced') tasks.push(recordUsage(ctx.userId, ctx.projectId, s.stage, usage, Date.now(), { api: rec.api ?? 'chat', downgraded: rec.outcome === 'fallback' || !!answer.body.notice, telemetry: rec, orgId: ctx.orgId }));
   if (s.after && (answer.status ?? 200) < 300) tasks.push(s.after(answer).catch(() => undefined));
   await Promise.all(tasks);
 }
@@ -489,6 +497,6 @@ export async function admit(req: NextRequest): Promise<{ ok: true; userId: strin
   if (!a.userId) return { ok: false, res: refuse(req, NextResponse.json({ error: 'Sign in to use SocriaUX’s reasoning. Your work stays in this browser either way.', signIn: true }, { status: 401 })) };
   const limited = await enforceRateLimit(req, a.userId, 'uxmodel');
   if (limited) return { ok: false, res: refuse(req, limited) };
-  if (!process.env.OPENAI_API_KEY) return { ok: false, res: refuse(req, NextResponse.json({ error: 'The model is not configured on this deployment.' }, { status: 500 })) };
+  if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) return { ok: false, res: refuse(req, NextResponse.json({ error: 'The model is not configured on this deployment.' }, { status: 500 })) };
   return { ok: true, userId: a.userId, orgId: typeof a.orgId === 'string' && /^[A-Za-z0-9_-]{1,96}$/.test(a.orgId) ? a.orgId : null };
 }

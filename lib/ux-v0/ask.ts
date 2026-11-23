@@ -29,11 +29,26 @@ import 'server-only';
 // next one would start with no time left). `cacheKey` keeps calls whose
 // prompts share a long stable prefix on the provider's same prompt cache, and
 // `reasoningRoom` bounds the reasoning's room above the answer's cap.
+//
+// CLAUDE (the Messages API, lib/ux-v0/model.ts). A Claude model is asked through
+// Anthropic's own client, with ANTHROPIC_API_KEY: the system prompt as a cached
+// block (the stable prefix is read from the prompt cache on the next call), the
+// user's words and any image as the message, the effort as `output_config.effort`,
+// and the answer's shape as a JSON schema where the call has one. No sampling
+// settings are sent (the model refuses them) and no answer is prefilled. Its
+// thinking is the model's own and is billed as output, so the reasoning room is
+// added to the answer's cap. A refusal, or an answer cut at its cap, is said as
+// incomplete, never read as an answer. The call is held against the week's tokens
+// like an OpenAI one (lib/openai-usage.ts holdCall), and its usage priced with
+// the cache writes at their own price.
 
+import Anthropic from '@anthropic-ai/sdk';
 import type OpenAI from 'openai';
-import { firstAccepted } from '../model-router';
 import { cannotSee, type Effort } from '../model-params';
-import { responseText, usageFromResponses } from '../openai-usage';
+import { costOf, firstAccepted, PRICES } from '../model-router';
+import { holdCall, responseText, usageFromResponses } from '../openai-usage';
+import { countedTokens } from '../sleep';
+import { estimateTokens } from '../token-allowance';
 import { socriauxApi, socriauxEffort, usageOf, type Api, type Route, type Tier } from './model';
 import type { JsonFormat } from './schemas';
 import type { Usage } from './types';
@@ -112,6 +127,87 @@ export function readJson(raw: string): unknown {
     }
   }
 }
+
+// ── Claude ───────────────────────────────────────────────────────────
+
+/** The part of Anthropic's client SocriaUX uses: one message, streamed or whole. */
+export interface ClaudeClient {
+  messages: { create(body: any, options?: any): Promise<any> };
+}
+let claude: ClaudeClient | null = null;
+/** The Anthropic client, made once on first use; `setClaudeClient` puts a fake in its place for the tests. */
+export function claudeClient(): ClaudeClient {
+  claude ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 0 }) as unknown as ClaudeClient;
+  return claude;
+}
+export function setClaudeClient(c: ClaudeClient | null): void {
+  claude = c;
+}
+
+/** The efforts Claude takes: SocriaUX's none and minimal are its low. */
+const claudeEffort = (e: Effort | undefined): 'low' | 'medium' | 'high' | 'xhigh' | 'max' | undefined =>
+  !e ? undefined : e === 'none' || e === 'minimal' ? 'low' : (e as 'low' | 'medium' | 'high' | 'xhigh' | 'max');
+
+/** An image for Claude: a link as a link, a data URL as its media type and bytes. */
+function claudeImage(url: string): any {
+  const m = /^data:(image\/(?:png|jpeg|gif|webp));base64,(.+)$/i.exec(url);
+  return m ? { type: 'image', source: { type: 'base64', media_type: m[1].toLowerCase(), data: m[2] } } : { type: 'image', source: { type: 'url', url } };
+}
+
+interface ClaudeUsage {
+  input_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+  cache_creation_input_tokens?: number | null;
+  output_tokens?: number | null;
+  output_tokens_details?: { thinking_tokens?: number | null } | null;
+}
+
+/**
+ * A Claude answer's usage, in the house shape and priced. Anthropic counts the input apart from what the cache
+ * served and what it wrote; here `input` is all three (as OpenAI reports it) and `cached` what the cache served.
+ * A cache write costs a quarter more than plain input, and is priced so.
+ */
+export function usageOfClaude(model: string, u: ClaudeUsage | null | undefined): Usage {
+  const n = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) && x > 0 ? Math.floor(x) : 0);
+  const read = n(u?.cache_read_input_tokens);
+  const wrote = n(u?.cache_creation_input_tokens);
+  const input = n(u?.input_tokens) + read + wrote;
+  const output = n(u?.output_tokens);
+  const reasoning = Math.min(output, n(u?.output_tokens_details?.thinking_tokens));
+  const base = costOf(model, { input, cached: read, output });
+  const cost = base == null ? null : base + (wrote * (PRICES[model]?.input ?? 0) * 0.25) / 1_000_000;
+  return { model, input, cached: read, output, ...(reasoning ? { reasoning } : {}), cost };
+}
+
+/** A Claude answer, read whole: a message as it is, or a stream of events read to its end (the first output timed). */
+async function readClaude(res: any, first: () => void, writing: (chars: number) => void): Promise<{ text: string; stop: string | null; usage: ClaudeUsage | null }> {
+  if (!iterable(res)) {
+    const text = (res?.content ?? []).filter((b: any) => b?.type === 'text').map((b: any) => String(b.text ?? '')).join('');
+    return { text, stop: res?.stop_reason ?? null, usage: res?.usage ?? null };
+  }
+  let text = '';
+  let stop: string | null = null;
+  let usage: any = null;
+  let ended = false;
+  for await (const ev of res) {
+    const t = ev?.type;
+    if (t === 'message_start') usage = { ...(ev.message?.usage ?? {}) };
+    else if (t === 'content_block_delta' && ev.delta?.type === 'text_delta' && typeof ev.delta.text === 'string') {
+      if (!text) first();
+      text += ev.delta.text;
+      writing(text.length);
+    } else if (t === 'message_delta') {
+      if (ev.delta?.stop_reason) stop = ev.delta.stop_reason;
+      for (const [k, v] of Object.entries(ev.usage ?? {})) if (v != null) usage = { ...(usage ?? {}), [k]: v };
+    } else if (t === 'message_stop') ended = true;
+    else if (t === 'error') throw Object.assign(new Error(String(ev.error?.message ?? 'The stream failed.')), { status: ev.error?.type === 'overloaded_error' ? 529 : /rate/.test(String(ev.error?.type ?? '')) ? 429 : 500 });
+  }
+  if (!ended && !stop) throw Object.assign(new Error('The answer stopped before it was complete (the stream was interrupted).'), { name: 'SocriauxInterrupted', status: 502 });
+  return { text, stop, usage };
+}
+
+/** Claude refused the answer's schema (a 400 naming it): asked again without it, in plain JSON. */
+const schemaRefused = (e: unknown): boolean => (e as { status?: number })?.status === 400 && /schema|output_config|format/i.test(String((e as { message?: string })?.message ?? ''));
 
 const isRoute = (v: Env | Route): v is Route => typeof (v as Route).stage === 'string' && typeof (v as Route).tier === 'string';
 
@@ -264,6 +360,55 @@ export async function askJson(openai: OpenAI, ladder: string[], o: AskOptions, h
     }
     return done({ json: readJson(raw), raw, usage: tag(usage), model, api, effort: effort ?? 'default', incomplete, retried, ...(route ? { tier: route.tier } : {}) });
   }
+  if (api === 'anthropic') {
+    const client = claudeClient();
+    const level = claudeEffort(effort);
+    // the answer's cap, and the thinking's room on top of it (thinking is billed as output and counts against it)
+    const cap = o.maxTokens + Math.max(0, o.reasoningRoom ?? 4096);
+    const make = (format: JsonFormat | undefined) => async (model: string) => {
+      beforeDeadline();
+      const body: any = {
+        model,
+        max_tokens: cap,
+        // the stable instructions as one cached block: the next call with the same prefix reads it from the cache
+        system: [{ type: 'text', text: o.system, cache_control: { type: 'ephemeral' } }],
+        messages: [
+          {
+            role: 'user',
+            content: [...(o.images ?? []).map((im) => claudeImage(im.url)), { type: 'text', text: format ? o.user : `${o.user}\n\nAnswer with the one JSON object described, and nothing else.` }],
+          },
+        ],
+        ...(level || format ? { output_config: { ...(level ? { effort: level } : {}), ...(format ? { format: { type: 'json_schema', schema: format.schema } } : {}) } } : {}),
+        ...(o.stream ? { stream: true } : {}),
+      };
+      const input = estimateTokens(o.system) + estimateTokens(o.user) + (o.images?.length ?? 0) * 1600;
+      const hold = await holdCall({ route: o.label, input, output: cap, cappable: false, floor: cap });
+      attempts++;
+      o.onProgress?.({ phase: 'asked', model });
+      try {
+        const res = await limit(client.messages.create(body, requestOptions()));
+        const read = await limit(readClaude(res, markFirst, told(model)));
+        const u = usageOfClaude(model, read.usage);
+        hold?.end(read.usage ? countedTokens({ prompt_tokens: u.input, prompt_tokens_details: { cached_tokens: u.cached }, completion_tokens: u.output }) : input + estimateTokens(read.text));
+        return { ...read, priced: u };
+      } catch (e) {
+        hold?.end(0);
+        throw e;
+      }
+    };
+    let first: { result: Awaited<ReturnType<ReturnType<typeof make>>>; model: string };
+    try {
+      first = await firstAccepted(ladder, make(o.format), warn, also);
+    } catch (e) {
+      if (!o.format || !schemaRefused(e)) throw e;
+      console.warn('ux-v0 %s: %s refused the answer\'s schema; asking again in plain JSON', o.label, ladder[0]);
+      first = await firstAccepted(ladder, make(undefined), warn, also);
+    }
+    const { model, result } = first;
+    const incomplete = result.stop === 'refusal' ? 'refusal' : result.stop === 'max_tokens' ? 'max_output_tokens' : result.stop === 'model_context_window_exceeded' ? 'context_window' : null;
+    if (incomplete) console.warn('ux-v0 %s: %s stopped early (%s)', o.label, model, incomplete);
+    return done({ json: incomplete === 'refusal' ? null : readJson(result.text), raw: result.text, usage: tag(result.priced), model, api, effort: effort ?? 'default', incomplete, retried: null, ...(route ? { tier: route.tier } : {}) });
+  }
   const userContent: any = o.images?.length
     ? [{ type: 'text', text: o.user }, ...o.images.map((im) => ({ type: 'image_url', image_url: { url: im.url, detail: im.detail } }))]
     : o.user;
@@ -317,7 +462,7 @@ export const ECONOMY_RESERVE_MS: Record<string, number> = { generate: 15_000, 'a
  * invented. The designer's own cancel, or the operation's deadline, ends both: neither is a reason to fall back.
  */
 export async function askRouted(openai: OpenAI, route: Route, o: AskOptions, economy: Route | null, env: Env = process.env): Promise<Asked> {
-  if (route.tier !== 'premium' || !economy || economy.model === route.model) return askJson(openai, route.ladder, o, route);
+  if (route.tier !== 'premium' || !economy || (economy.model === route.model && economy.effort === route.effort)) return askJson(openai, route.ladder, o, route);
   const n = parseInt(env.SOCRIAUX_PREMIUM_TIMEOUT_MS ?? '', 10);
   let timeoutMs = Number.isFinite(n) && n >= 5000 ? Math.min(n, 55_000) : PREMIUM_TIMEOUT_MS;
   if (o.deadlineAt) timeoutMs = Math.max(5000, Math.min(timeoutMs, o.deadlineAt - Date.now() - (ECONOMY_RESERVE_MS[route.stage] ?? 8000)));

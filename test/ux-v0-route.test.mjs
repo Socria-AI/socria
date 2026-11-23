@@ -29,6 +29,7 @@ const swap = {
     });
     b.onResolve({ filter: /^@clerk\/nextjs\/server$/ }, () => ({ path: pathToFileURL(join(here, 'helpers', 'fake-clerk.mjs')).href, external: true }));
     b.onResolve({ filter: /^openai$/ }, () => ({ path: pathToFileURL(join(here, 'helpers', 'fake-openai-logos.mjs')).href, external: true }));
+    b.onResolve({ filter: /^@anthropic-ai\/sdk$/ }, () => ({ path: pathToFileURL(join(here, 'helpers', 'fake-anthropic.mjs')).href, external: true }));
     b.onResolve({ filter: /^server-only$/ }, () => ({ path: join(here, 'helpers', 'server-only-shim.mjs') }));
     b.onResolve({ filter: /^next\/(server|headers)$/ }, (a) => ({ path: `${a.path}.js`, external: true }));
   },
@@ -53,6 +54,10 @@ process.env.SOCRIAUX_DAILY_GENERATIONS = '2';
 // the sections before "routing" test every route on one model (GPT-6 Luna, Chat Completions), as SocriaUX ran
 // before routing; SOCRIAUX_ROUTING=single keeps that. The routing section takes it away.
 process.env.SOCRIAUX_ROUTING = 'single';
+// the OpenAI paths, tested as they were: Luna for the economy tier, Sol for the premium. The Claude section
+// at the end takes these away and tests the default (Claude Sonnet 5.5, the questions on Luna).
+process.env.SOCRIAUX_ECONOMY_MODEL = 'gpt-6-luna';
+process.env.SOCRIAUX_PREMIUM_MODEL = 'gpt-6.1-sol';
 delete process.env.UNSPLASH_ACCESS_KEY;
 delete process.env.PEXELS_API_KEY;
 
@@ -455,7 +460,7 @@ console.log('\n=== routing: the economy model for questions and the brief, the p
   process.env.SOCRIAUX_PREMIUM_MODEL = 'gpt-6-luna';
   const all = await post('direct', { projectId: P, brief, notes: '', avoid: '' }, U, [{ directions: [] }]);
   ok('SOCRIAUX_PREMIUM_MODEL=gpt-6-luna keeps every stage on Luna', all.status === 200 && onLuna(all));
-  delete process.env.SOCRIAUX_PREMIUM_MODEL;
+  process.env.SOCRIAUX_PREMIUM_MODEL = 'gpt-6.1-sol';
   process.env.SOCRIAUX_TIER_CRITIQUE = 'economy';
   const ce = await post('critique', { projectId: P, selection: elementSel, comment: 'Is this CTA prominent enough?', kind: 'generated', name: 'Halcyon' }, U, [REASONING]);
   ok('SOCRIAUX_TIER_CRITIQUE=economy moves one stage', ce.status === 200 && onLuna(ce));
@@ -993,6 +998,33 @@ console.log('\n=== the studio’s next creative question: written by the model f
   else process.env.SOCRIAUX_ROUTING = was.routing;
   if (was.model === undefined) delete process.env.SOCRIAUX_MODEL;
   else process.env.SOCRIAUX_MODEL = was.model;
+}
+
+console.log('\n=== Claude Sonnet 5.5 by default; the questions on GPT-6 Luna ===');
+{
+  delete process.env.SOCRIAUX_ROUTING;
+  delete process.env.SOCRIAUX_MODEL;
+  delete process.env.SOCRIAUX_ECONOMY_MODEL;
+  delete process.env.SOCRIAUX_PREMIUM_MODEL;
+  process.env.ANTHROPIC_API_KEY = 'test-anthropic';
+  const U = 'user_v0_claude';
+  const P = 'uxv0_claude';
+  const brief = { objective: 'Fill weekday mornings at a coffee bar.', audience: 'Commuters', personality: ['warm', 'honest'], visualDirection: 'Handmade, morning light', palette: [{ hex: '#f6f1e9', role: 'background' }, { hex: '#2a2420', role: 'text' }, { hex: '#6b3e1f', role: 'accent' }], typography: { display: 'Fraunces', body: 'Inter' }, references: [], requirements: [], constraints: [], openQuestions: [] };
+  const spec = { title: 'Halcyon', pageType: 'website', sections: [{ id: 'nav', kind: 'nav', content: { brand: 'Halcyon', links: ['Menu'] } }, { id: 'hero', kind: 'hero', content: { title: 'Coffee, slowly', primary: 'Book' } }, { id: 'f', kind: 'footer', content: { brand: 'Halcyon' } }] };
+  const onClaude = (out, effort) => out.calls[0]?.provider === 'anthropic' && out.calls[0]?.model === 'claude-sonnet-5-5' && out.calls[0]?.output_config?.effort === effort && !('temperature' in out.calls[0]);
+  const q = await post('discover', { projectId: P, action: 'turn', intent: 'A coffee shop website', questions: [], understanding: {}, moodboard: {} }, U, [{ understanding: { summary: 's', known: {}, gaps: [] }, questions: [], ready: true }]);
+  ok('the questions: GPT-6 Luna, Chat Completions', q.status === 200 && q.calls[0]?.model === 'gpt-6-luna' && Array.isArray(q.calls[0]?.messages), J(q.calls[0]?.model));
+  const d = await post('direct', { projectId: P, brief, notes: '', avoid: '' }, U, [{ directions: [] }]);
+  ok('art direction: Claude Sonnet 5.5 at medium effort, through Anthropic\'s client with its own key', d.status === 200 && onClaude(d, 'medium') && globalThis.__claudeKey === 'test-anthropic', J(d.calls[0]));
+  const g = await post('generate', { projectId: P, brief, moodboard: {}, version: 1 }, U, [spec]);
+  ok('generation: Claude at medium, its usage priced and said with its stage and tier', g.status === 200 && onClaude(g, 'medium') && g.json.usage?.model === 'claude-sonnet-5-5' && g.json.usage.tier === 'premium' && typeof g.json.usage.cost === 'number', J(g.json?.usage ?? g.json));
+  const logged = db.rows('ux_v0_calls').filter((r) => r.user_id === U);
+  ok('each call is in the call log with its provider\'s model and a measured cost', logged.length === 3 && J(logged.map((r) => r.model)) === J(['gpt-6-luna', 'claude-sonnet-5-5', 'claude-sonnet-5-5']) && logged.every((r) => typeof r.cost_usd === 'number'), J(logged.map((r) => [r.stage, r.model, r.cost_usd])));
+  delete process.env.ANTHROPIC_API_KEY;
+  const none = await post('direct', { projectId: P, brief, notes: '', avoid: '' }, U, [{ directions: [] }]);
+  ok('no Anthropic key: a Claude step says it is not configured, and no model is asked', none.status === 500 && /not configured/.test(none.json?.error ?? '') && none.calls.length === 0, J(none));
+  const stillQ = await post('discover', { projectId: P, action: 'turn', intent: 'A coffee shop website', questions: [], understanding: {}, moodboard: {} }, U, [{ understanding: { summary: 's', known: {}, gaps: [] }, questions: [], ready: true }]);
+  ok('…while the questions, on Luna, still work', stillQ.status === 200 && stillQ.calls[0]?.model === 'gpt-6-luna');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

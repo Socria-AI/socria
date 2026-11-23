@@ -28,9 +28,9 @@ export interface OperationRecord {
   stage: CallKind;
   /** what the operation was, in a word: turn, direction, synthesize, revise, propose, generate, patch, critique */
   operation: string;
-  provider: 'openai' | 'none';
+  provider: 'openai' | 'anthropic' | 'none';
   model: string | null;
-  api: 'chat' | 'responses' | null;
+  api: 'chat' | 'responses' | 'anthropic' | null;
   tier: 'economy' | 'premium' | null;
   effort: string | null;
   input: number;
@@ -65,9 +65,9 @@ export function normalizeRecord(v: unknown): OperationRecord | null {
     op: word(r.op, 96) ?? 'unknown',
     stage: r.stage as CallKind,
     operation: word(r.operation) ?? r.stage,
-    provider: r.provider === 'openai' ? 'openai' : 'none',
+    provider: r.provider === 'openai' || r.provider === 'anthropic' ? r.provider : 'none',
     model: word(r.model, 60),
-    api: r.api === 'chat' || r.api === 'responses' ? r.api : null,
+    api: r.api === 'chat' || r.api === 'responses' || r.api === 'anthropic' ? r.api : null,
     tier: r.tier === 'economy' || r.tier === 'premium' ? r.tier : null,
     effort: word(r.effort, 12),
     input: num(r.input),
