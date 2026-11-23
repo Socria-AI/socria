@@ -545,6 +545,9 @@ export interface DesignProject {
   board?: BoardState;
   /** a design written as HTML artboards: its artboards, versions, conversation and memory (lib/ux-v0/design/doc.ts) */
   design?: DesignState;
+  /** a graphic or board made with the earlier editor, as it was stored, kept when it was carried into the design
+   * workspace (lib/ux-v0/design/legacy.ts) */
+  legacy?: { medium: 'graphic' | 'board'; data: unknown; at: number };
   /** the registry design system it is built in (lib/ux-v0/dsi): which version, pinned or following, and its overrides */
   systemLink?: SystemLink;
   /** the studio conversation it was begun in (lib/ux-v0/studio): what was asked for, every decision since, the
@@ -1144,6 +1147,7 @@ export function normalizeProject(v: unknown, opts: { forSync?: boolean } = {}): 
     ...((ds) => (ds && r.medium === 'design' ? { design: ds } : {}))(r.medium === 'design' ? normalizeDesignState(r.design) : null),
     ...((g) => (g && r.medium === 'graphic' ? { graphic: g } : {}))(normalizeGraphicState(r.graphic)),
     ...((bd) => (bd ? { board: bd } : {}))(r.medium === 'board' ? normalizeBoard(r.board) : null),
+    ...((l) => (r.medium === 'design' && (l.medium === 'graphic' || l.medium === 'board') && l.data && typeof l.data === 'object' ? { legacy: { medium: l.medium as 'graphic' | 'board', data: l.data, at: Number.isFinite(l.at) ? Number(l.at) : 0 } } : {}))(obj(r.legacy)),
     ...((ln) => (ln ? { systemLink: ln } : {}))(normalizeSystemLink(r.systemLink)),
     ...((st) => (st ? { studio: st } : {}))(normalizeStudio(r.studio)),
     artifact: normalizeArtifact(r.artifact),

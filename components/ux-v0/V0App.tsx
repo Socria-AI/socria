@@ -26,9 +26,8 @@ import { readyToMake } from '@/lib/ux-v0/studio/director';
 import { usableSystems } from './studio/SystemPicker';
 import type { WizardStart } from './systems/ImportWizard';
 import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
-import { GraphicsWorkspace } from './graphics/GraphicsWorkspace';
-import { BoardWorkspace } from './boards/BoardWorkspace';
 import { DesignWorkspace } from './design/DesignWorkspace';
+import { openLegacy } from './design/legacy-open';
 import { SystemsApp } from './systems/SystemsApp';
 import type { SystemRecord } from '@/lib/ux-v0/dsi/registry';
 import { listSystems } from '@/lib/ux-v0/dsi/store';
@@ -261,6 +260,9 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
       const states = [p.board, ...p.board.versions.map((v) => v.state)];
       gfx.push(...states.flatMap((st) => [...st.assets, ...st.materials.flatMap((m) => (m.type === 'graphic' && m.doc ? m.doc.assets : []))]).map((a) => a.src).filter((src) => src.startsWith('upload:')).map((src) => src.slice('upload:'.length)));
     }
+    // a design's own pictures, and those of the earlier record it was carried over from
+    gfx.push(...(p?.design?.assets ?? []).map((a) => a.src).filter((src) => src.startsWith('upload:')).map((src) => src.slice('upload:'.length)));
+    if (p?.legacy) gfx.push(...[...JSON.stringify(p.legacy.data).matchAll(/"upload:([\w-]{1,80})"/g)].map((m) => m[1]));
     // a conversation's own pictures (those not yet placed in a work)
     gfx.push(...(p?.studio?.attachments ?? []).map((a) => a.upload ?? '').filter(Boolean));
     await deleteArtifacts([...new Set([...(p?.moodboard.refs.filter((r) => r.provider === 'upload').map((r) => r.providerId) ?? []), ...gfx])]);
@@ -325,31 +327,13 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
     );
   }
 
-  if (open && open.p.medium === 'board') {
+  // a graphic or a board made with the earlier editor: carried into the design workspace as it was drawn
+  if (open && (open.p.medium === 'graphic' || open.p.medium === 'board')) {
     return (
-      <BoardWorkspace
+      <LegacyOpen
         key={open.p.id}
-        initial={open.p}
-        signedIn={signedIn}
-        startIntent={open.intent}
-        onOpenProject={(id) => openById(id)}
-        onExit={() => {
-          passage(() => setOpen(null));
-          refresh();
-          window.history.pushState(null, '', '/ux-v0');
-        }}
-      />
-    );
-  }
-
-  if (open && open.p.medium === 'graphic') {
-    return (
-      <GraphicsWorkspace
-        onOpenProject={(id) => openById(id)}
-        key={open.p.id}
-        initial={open.p}
-        signedIn={signedIn}
-        startIntent={open.intent}
+        p={open.p}
+        onReady={(p) => setOpen({ p })}
         onExit={() => {
           passage(() => setOpen(null));
           refresh();
@@ -394,5 +378,34 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
       onWork={toWork}
       onOpen={(id) => openById(id)}
     />
+  );
+}
+
+/** An old graphic or board, carried over once (lib/ux-v0/design/legacy.ts), kept, then opened as a design. */
+function LegacyOpen({ p, onReady, onExit }: { p: DesignProject; onReady: (p: DesignProject) => void; onExit: () => void }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    openLegacy(p)
+      .then(async (r) => {
+        if (!live) return;
+        if (!r) return setFailed(true);
+        await putProject(r.project);
+        if (live) onReady(r.project);
+      })
+      .catch(() => live && setFailed(true));
+    return () => {
+      live = false;
+    };
+  }, [p]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <main className="sx-legacy" aria-busy={!failed}>
+      <p>{failed ? 'This design could not be carried over from the earlier editor.' : 'Carrying this design over from the earlier editor…'}</p>
+      {failed && (
+        <button type="button" onClick={onExit}>
+          Back to your work
+        </button>
+      )}
+    </main>
   );
 }

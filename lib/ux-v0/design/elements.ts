@@ -200,6 +200,13 @@ export function facesNamed(...css: string[]): string[] {
         if (name && !/^(serif|sans-serif|monospace|cursive|fantasy|system-ui|inherit|initial|unset|var\()/i.test(name)) out.add(name);
       }
     }
+    // an SVG attribute (font-family="…"), as a carried-over drawing writes it (lib/ux-v0/design/legacy.ts)
+    for (const m of s.matchAll(/font-family\s*=\s*(?:"([^"]*)"|'([^']*)')/gi)) {
+      for (const part of (m[1] ?? m[2] ?? '').replace(/&quot;|&#39;|&apos;/g, '"').split(',')) {
+        const name = part.trim().replace(/^['"]|['"]$/g, '').trim();
+        if (name && !/^(serif|sans-serif|monospace|cursive|fantasy|system-ui|inherit|initial|unset|var\()/i.test(name)) out.add(name);
+      }
+    }
     for (const m of s.matchAll(/font\s*:[^;}]*?(?:\d+(?:px|pt|em|rem|%)\S*)\s+([^;}]+)/gi)) {
       for (const part of m[1].split(',')) {
         const name = part.trim().replace(/^['"]|['"]$/g, '').trim();

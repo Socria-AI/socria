@@ -642,3 +642,23 @@
 .dx-present-bar button:disabled {
   opacity: 0.3;
 }
+
+/* an old graphic or board, being carried over (V0App LegacyOpen) */
+.sx-legacy {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  gap: 16px;
+  justify-items: center;
+  background: var(--sb-paper, #f4f1ea);
+  color: var(--sb-ink, #1c1b19);
+  font: 400 15px/1.5 var(--sb-sans, system-ui, sans-serif);
+}
+.sx-legacy button {
+  font: inherit;
+  padding: 8px 14px;
+  border: 1px solid currentColor;
+  background: transparent;
+  border-radius: 2px;
+  cursor: pointer;
+}

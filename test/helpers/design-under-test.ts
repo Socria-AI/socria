@@ -15,3 +15,4 @@ export { emptyStudio } from '@/lib/ux-v0/studio/schema';
 export { opening } from '@/lib/ux-v0/studio/director';
 export { startFrom } from '@/components/ux-v0/studio/begin';
 export * as request from '@/lib/ux-v0/design/request';
+export * as legacy from '@/lib/ux-v0/design/legacy';

@@ -9,6 +9,8 @@ import { renderDesign } from '@/lib/ux-v0/render';
 import { renderArtboard } from '@/lib/ux-v0/graphics/render';
 import { boardOverviewSvg, websiteSchematicSvg } from '@/lib/ux-v0/boards/export';
 import { mockupSvg } from '@/lib/ux-v0/boards/mockup';
+import { frameDoc } from '@/lib/ux-v0/design/frame';
+import { assetData } from '../design/runtime';
 import { fontStylesheet } from '@/lib/ux-v0/fonts';
 import { buildSandboxDoc } from '@/lib/ux-v0/sandbox';
 import { getArtifact, getProject } from '@/lib/ux-v0/store';
@@ -98,7 +100,7 @@ const keep = (key: string, v: string) => {
 
 // ── the plate: what a work looks like, drawn small ────────────────────
 
-type Shown = { kind: 'page'; html: string } | { kind: 'image'; url: string } | { kind: 'svg'; svg: string } | null;
+type Shown = { kind: 'page'; html: string } | { kind: 'image'; url: string } | { kind: 'svg'; svg: string } | { kind: 'artboard'; html: string; w: number; h: number } | null;
 
 /**
  * A work's plate. A generated design is drawn by the renderer at 1280 px and
@@ -193,6 +195,15 @@ export function Plate({ s, ratio, nonce }: { s: ProjectSummary; ratio: number; n
         const svg = renderArtboard(gdoc, gdoc.artboards[0], { href: (id, src) => map.get(id) ?? (src.startsWith('upload:') ? '' : src), idPrefix: `pl-${s.id}-` }).replace(/^<svg([^>]*?) width="[^"]+" height="[^"]+"/, '<svg$1 width="100%" height="100%"');
         return setShown({ kind: 'svg', svg });
       }
+      // a design: its first artboard, framed as the canvas frames it (no scripts here), scaled to fit the plate
+      const ds = p.medium === 'design' ? p.design : null;
+      const first = ds?.doc.artboards[0];
+      if (ds && first) {
+        const assets = await assetData(ds.assets);
+        if (!live) return;
+        const html = frameDoc(first, ds.doc.tokens, { parse: (h) => new DOMParser().parseFromString(h, 'text/html'), nonce, assets, interactive: false });
+        return setShown({ kind: 'artboard', html, w: first.width, h: first.height });
+      }
       // the same sealed document the workspace frames: no scripts, the nonce policy
       const seal = (html: string) => buildSandboxDoc(html, { parse: (h) => new DOMParser().parseFromString(h, 'text/html'), runScripts: false, nonce, inspector: '' }).doc;
       const spec = currentSpec(p);
@@ -228,6 +239,9 @@ export function Plate({ s, ratio, nonce }: { s: ProjectSummary; ratio: number; n
         <iframe className="mu-plate-frame" title="" sandbox="" srcDoc={shown.html} tabIndex={-1} style={{ width: 1280, height: Math.ceil(size.h / scale), transform: `scale(${scale})` }} />
       )}
       {shown?.kind === 'image' && <img className="mu-plate-img" src={shown.url} alt="" />}
+      {shown?.kind === 'artboard' && size.w > 0 && ((k) => (
+        <iframe className="mu-plate-frame" title="" sandbox="" srcDoc={shown.html} tabIndex={-1} style={{ width: shown.w, height: shown.h, left: (size.w - shown.w * k) / 2, top: (size.h - shown.h * k) / 2, transform: `scale(${k})` }} />
+      ))(Math.min(size.w / shown.w, size.h / shown.h) * 0.9)}
       {shown?.kind === 'svg' && <div className="mu-plate-svg" dangerouslySetInnerHTML={{ __html: shown.svg }} />}
       {!shown && s.studies.length > 0 && (
         <span className={`mu-studies n-${s.studies.length}`}>

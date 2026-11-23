@@ -208,5 +208,62 @@ sec('a conversation becomes a design project');
   ok('the first request is said per kind', /logo sheet/.test(ST.firstRequest('logo')) && /campaign/.test(ST.firstRequest('campaign')) && /first design/.test(ST.firstRequest('poster')));
 }
 
+sec('a graphic or a board from the earlier editor, carried over');
+{
+  const L = T.legacy;
+  const gdoc = {
+    schema: 1, id: 'gd1', name: 'Rooms', tokens: { colors: { background: '#f2efe8', text: '#15181b', accent: '#f0b02e' }, fonts: { display: 'Instrument Serif', body: 'DM Mono' } },
+    artboards: [
+      { id: 'ab1', name: 'Poster A3', width: 842, height: 1191, unit: 'pt', dpi: 300, format: 'a3', background: '#f2efe8', bleed: 9, safe: 28, children: [
+        { type: 'text', id: 't1', name: 'Headline', x: 40, y: 60, w: 700, h: 200, text: 'Rooms for Living', font: 'Instrument Serif', size: 90, weight: 400, color: '#15181b' },
+        { type: 'image', id: 'i1', name: 'Photo', x: 40, y: 400, w: 400, h: 300, asset: 'img1' },
+      ] },
+      { id: 'ab2', name: 'Square', width: 1080, height: 1080, unit: 'px', format: 'instagram-square', background: '#15181b', children: [] },
+    ],
+    assets: [{ id: 'img1', kind: 'image', src: 'upload:pic-1', width: 1200, height: 900, name: 'dusk.jpg', source: 'upload' }, { id: 'img2', kind: 'image', src: 'https://example.com/x.jpg', width: 10, height: 10, name: 'web.jpg', source: 'library' }],
+  };
+  const old = { ...T.makeProject('create', 'Rooms for Living', NOW), medium: 'graphic', intent: 'A lecture poster', graphic: { brief: { purpose: 'A lecture series', kind: 'poster', formats: ['a3'], content: { headline: 'Rooms for Living' }, mood: [], images: [] }, options: [], direction: null, doc: gdoc, versions: [] } };
+  const r = L.designFromLegacy(old, { now: NOW });
+  const d = r.project.design;
+  const [a1, a2] = d.doc.artboards;
+  ok('a graphic becomes a design project, both artboards drawn as they were (SVG, filling the artboard)', r.project.medium === 'design' && r.artboards === 2 && /<svg[^>]*class="legacy"[^>]*width="100%"/.test(a1.html) && a1.html.includes('Rooms') && a2.html.includes('<svg'), a1?.html?.slice(0, 300));
+  ok('a print artboard in points is sized in CSS pixels at 96 to the inch, and keeps its format', a1.width === Math.round(842 * 96 / 72) && a1.height === Math.round(1191 * 96 / 72) && a1.format === 'a3' && a1.medium === 'print' && a2.format === 'instagram-square', [a1.width, a1.height, a1.format, a2.format]);
+  ok('its own picture comes over as an asset the artboard names; one linked from the web is said, not drawn', d.assets.length === 1 && d.assets[0].src === 'upload:pic-1' && a1.html.includes('asset:img1') && /linked from the web/.test(d.turns[0].text), d.turns[0]?.text);
+  ok('one version, the first turn says what happened, the old record kept untouched', d.versions.length === 1 && d.turns.length === 1 && /earlier editor/.test(d.turns[0].text) && r.project.legacy.medium === 'graphic' && r.project.legacy.data.doc.id === 'gd1' && !('graphic' in r.project));
+  const kept = T.normalizeProject(JSON.parse(JSON.stringify(r.project)));
+  ok('stored and read back: still a design, the legacy record still there', kept.medium === 'design' && kept.design.doc.artboards.length === 2 && kept.legacy?.medium === 'graphic', kept.legacy);
+  ok('the frame draws the carried-over artboard with its faces found', FR.facesFor(a1, '').faces.includes('Instrument Serif'), FR.facesFor(a1, ''));
+  const els = E.prepareFragment(a1.html, parse);
+  ok('its SVG text is selectable like any element (ids given)', /<text[^>]*data-sx="e\d+"/.test(els), els.slice(0, 400));
+
+  const board = { ...T.makeProject('create', 'Campaign', NOW), medium: 'board', board: { request: 'A campaign', brief: null, materials: [
+    { id: 'm1', type: 'graphic', name: 'Poster', doc: gdoc },
+    { id: 'm2', type: 'mockup', name: 'On a wall' },
+    { id: 'm3', type: 'website', name: 'Site' },
+  ] } };
+  const rb = L.designFromLegacy(board, { now: NOW });
+  ok('a board brings its graphic materials as grouped artboards, and names the mockup and site it did not redraw', rb.project.medium === 'design' && rb.artboards === 2 && rb.project.design.doc.artboards.every((x) => x.group === 'legacy-Poster') && /1 mockup/.test(rb.project.design.turns[0].text) && /website schematic/.test(rb.project.design.turns[0].text) && rb.project.design.kind === 'campaign', rb.project.design.turns[0]?.text);
+  const empty = L.designFromLegacy({ ...T.makeProject('create', 'Nothing', NOW), medium: 'graphic' }, { now: NOW });
+  ok('an old graphic with no document opens empty, ready for a first request', empty.artboards === 0 && empty.project.design.versions.length === 0 && /no artboards yet/.test(empty.project.design.turns[0].text));
+  ok('a website is not touched', L.designFromLegacy({ ...T.makeProject('create', 'Site', NOW) }, { now: NOW }) === null);
+  ok('the faces to load before measuring are those it is set in', L.legacyFaces(old).includes('Instrument Serif') && L.legacyFaces(old).includes('DM Mono'));
+}
+
+sec('a broad change made by edits is looked at; an exact one is not');
+{
+  const s0 = D.emptyState('poster', 'a3', 'A poster');
+  const made = await FL.runRequest(s0, { words: 'Make a poster', noLook: true }, { send: async () => ({ ok: true, text: `<artboard id="new-1" format="a3">${POSTER}</artboard>`, usage: null }) }, { picture: async () => 'data:image/jpeg;base64,AAAA', measure: async () => [] }, { parse, now: NOW });
+  const id = made.state.doc.artboards[0].id;
+  const modes = [];
+  const t = (edit) => ({ send: async (b) => { modes.push(b.mode); return { ok: true, text: b.mode === 'look' ? '<say>Fine.</say><ok/>' : `<say>Done.</say><edit artboard="${id}"><find>font-size:160px</find><replace>${edit}</replace></edit>`, usage: null }; } });
+  const bench = { picture: async () => 'data:image/jpeg;base64,AAAA', measure: async () => [] };
+  modes.length = 0;
+  await FL.runRequest(made.state, { words: 'Make it feel more cinematic' }, t('font-size:150px'), bench, { parse, now: NOW + 1 });
+  ok('a change of feel carried out as edits: looked at once', modes.join() === 'write,look', modes);
+  modes.length = 0;
+  await FL.runRequest(made.state, { words: 'Make the headline slightly smaller' }, t('font-size:140px'), bench, { parse, now: NOW + 2 });
+  ok('an exact change to something named: not looked at', modes.join() === 'write', modes);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

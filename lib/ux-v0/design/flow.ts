@@ -17,6 +17,7 @@ import { applyAnswer, changedSentence, type Applied } from './apply';
 import { artboardOf, commit, newId, type DesignDoc, type DesignState, type DesignTurn } from './doc';
 import type { Parse } from './elements';
 import { parseAnswer, type Answer } from './protocol';
+import { requestTier } from './request';
 
 export interface WriteBody {
   mode: 'write' | 'look';
@@ -147,9 +148,12 @@ export async function runRequest(
 
   let doc = applied.doc;
   let looked: Looked | null = null;
-  // one look, at the artboards made or rewritten whole (an edit is small: it is not looked at)
+  // one look, at the artboards made or rewritten whole — and at those edited for a change of feel or of the whole
+  // (premium work: is the change there to see?). An exact edit to something named is not looked at.
   const rewritten = answer.blocks.filter((x) => x.kind === 'artboard').map((x) => applied.ids[(x as { id: string }).id] ?? (x as { id: string }).id);
-  const lookAt = [...new Set(rewritten)].filter((id) => doc.artboards.some((a) => a.id === id)).slice(0, 3);
+  const broad = requestTier(r.words, s0.doc.artboards.length > 0).tier === 'premium';
+  const edited = broad ? applied.touched.filter((id) => s0.doc.artboards.some((a) => a.id === id)) : [];
+  const lookAt = [...new Set([...rewritten, ...edited])].filter((id) => doc.artboards.some((a) => a.id === id)).slice(0, 3);
   if (lookAt.length && !r.noLook && !o.signal?.aborted) {
     o.onPhase?.('looking');
     const l = await lookOnce(doc, lookAt, r.words, changedSentence(applied, doc), { ...s0, memory }, t, b, o);
