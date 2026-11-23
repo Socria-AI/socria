@@ -127,17 +127,20 @@ ok('v2 published after review', rec?.versions.length === 2);
 // ── 5, 7, 9: a graphic in the system ──
 await tab('Usage');
 await page.getByRole('button', { name: 'New graphic in it' }).click();
-await page.waitForSelector('.gx-brief', { timeout: 15000 });
-ok('a new graphic opens linked to the system (its badge says so)', /Halden v2/.test(await page.locator('.ds-sysbadge').innerText()));
-await page.fill('#gx-headline', 'Slow coffee, early mornings');
-await page.getByRole('button', { name: /See three directions/ }).click();
-await page.waitForSelector('.gx-dir', { timeout: 15000 });
-await page.waitForTimeout(800);
-const dirNames = await page.locator('.gx-dir h2').allInnerTexts();
-ok('three directions, each the engine’s own, each in the system’s identity', dirNames.length === 3 && dirNames.every((n) => /Halden/.test(n)) && new Set(dirNames).size === 3, dirNames.join(' | '));
-await shot('directions');
-await page.locator('.gx-dir').first().getByRole('button', { name: /Make it in this direction/ }).click();
+// a conversation like any other, the system already chosen: only what the work cannot be made without is asked (never
+// its colours, lettering or mood — the system decides those), then it is composed at once in the system's identity
+const say = async (words) => {
+  await page.waitForSelector('#sd-reply', { timeout: 15000 });
+  await page.fill('#sd-reply', words);
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(700);
+};
+await page.waitForSelector('.sd-chat', { timeout: 15000 });
+if (/What will it be/.test(await page.locator('.sd-msg.is-socria .sd-said').last().innerText())) await say('A poster');
+await say('Slow coffee, early mornings');
 await page.waitForSelector('.gx-canvas .gx-board svg', { timeout: 30000 });
+ok('a new graphic is made linked to the system, with no visual question asked (its badge says so)', /Halden v2/.test(await page.locator('.ds-sysbadge').innerText()) && !(await idb('socria-ux-v0', 'projects', new URL(page.url()).searchParams.get('p')))?.studio?.discovery?.asked?.some((d) => ['vibe', 'colour', 'type'].includes(d)));
+await shot('composed-in-system');
 await page.waitForTimeout(1200);
 const gpid = new URL(page.url()).searchParams.get('p');
 let gproj = await idb('socria-ux-v0', 'projects', gpid);
@@ -271,16 +274,11 @@ await page.goto(`${BASE}/ux-v0?ds=${rec.id}`, { waitUntil: 'networkidle' });
 await page.waitForSelector('.ds-sys-name');
 await tab('Usage');
 await page.getByRole('button', { name: 'New board in it' }).click();
-await page.waitForSelector('.bd-brief', { timeout: 15000 });
-ok('a new board opens linked to the system (its badge says so)', /Halden v4/.test(await page.locator('.ds-sysbadge').innerText()));
-await page.fill('.bd-words', 'A launch for “Slow coffee, early mornings”, “Roasted in Halden”: one poster and one Instagram post.');
-await page.getByRole('button', { name: 'Read it' }).click();
-await page.getByRole('button', { name: /Propose design systems/ }).click();
-await page.waitForSelector('.bd-sys', { timeout: 15000 });
-await page.waitForTimeout(800);
-ok('three expressions of the one identity are offered for the board', (await page.locator('.bd-sys').count()) === 3);
-await page.locator('.bd-sys').first().getByRole('button', { name: /Use this system/ }).click();
-await page.waitForSelector('.bd-canvas', { timeout: 15000 });
+await page.waitForSelector('.sd-chat', { timeout: 15000 });
+await say('one poster and one Instagram post');
+await say('“Slow coffee, early mornings”, “Roasted in Halden”');
+await page.waitForSelector('.bd-canvas', { timeout: 30000 });
+ok('a new board is made linked to the system (its badge says so), at once in an expression of its identity (no systems to choose from)', /Halden v4/.test(await page.locator('.ds-sysbadge').innerText()) && (await page.locator('.bd-sys').count()) === 0);
 const bpid = new URL(page.url()).searchParams.get('p');
 const board = await until(async () => {
   const p = await idb('socria-ux-v0', 'projects', bpid);

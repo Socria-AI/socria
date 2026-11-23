@@ -23,6 +23,8 @@ import { mix } from '../color';
 import { likedRefs, paletteOutOf, referenceFaces, referencePalette, referenceWords } from './references';
 import { graphicFont, knownFont } from '../fonts';
 import { styleById } from '../graphics/styles/registry';
+import { TYPE_CHARACTERS, type TypeCharacter } from '../graphics/creative/lexicon';
+import { readableSet } from './discovery';
 
 // ── reading answers ──
 
@@ -85,6 +87,8 @@ export interface StudioPrefs {
   avoid: string[];
   /** how the person's own pictures are treated (IMAGE_TREATMENTS), when they chose */
   treatment: string | null;
+  /** the mood chosen in the conversation (studio/discovery.ts): the engine's qualities (and a theme) to realise */
+  vibe?: { qualities: string[]; theme?: string; name?: string } | null;
 }
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -102,6 +106,9 @@ export function paletteOf(a: StudioAnswer | null): StudioPalette | null {
 
 export function facesOf(a: StudioAnswer | null): { display: string; body: string } | null {
   if (!a) return null;
+  // a pairing chosen or named in the conversation keeps its faces as fields
+  const f = a.fields ?? {};
+  if (f.display && f.body) return { display: f.display.slice(0, 60), body: f.body.slice(0, 60) };
   const [display, body] = (a.values[0] ?? '').split('|');
   return display && body ? { display: display.slice(0, 60), body: body.slice(0, 60) } : null;
 }
@@ -121,16 +128,22 @@ export function prefsOf(st: StudioState): StudioPrefs {
   const ownPalette = paletteOf(answerOf(st, `${p}.palette`));
   const borrowed = fromRefs ?? fromPictures;
   const refFaces = referenceFaces(refs).filter((f) => graphicFont(f) ?? knownFont(f));
+  // a mood chosen brings its colours and its type, where nothing more particular was chosen
+  const vibeAns = answerOf(st, `${p}.vibe`);
+  const vibe = vibeAns && !vibeAns.skipped && vibeAns.values.length ? vibeAns : null;
+  const vibePalette = vibe ? paletteOf({ ...vibe, values: [] }) : null;
+  const vibeSet = vibe?.fields?.character && (TYPE_CHARACTERS as readonly string[]).includes(vibe.fields.character) ? readableSet(vibe.fields.character as TypeCharacter, 0) : null;
   return {
     styles: [...new Set([...readFacts(st.prompt).styles, ...readFacts(ownWords).styles])].slice(0, 3),
     styleWords: [ownWords, referenceWords(refs)].filter(Boolean).join('; ').slice(0, 600),
-    palette: ownPalette ?? (borrowed ? { ground: borrowed.ground, ink: borrowed.ink, accent: borrowed.accent, ...(borrowed.accent2 ? { accent2: borrowed.accent2 } : {}) } : null),
-    faces: facesOf(answerOf(st, `${p}.type`)) ?? (refFaces.length ? { display: refFaces[0], body: refFaces[1] ?? refFaces[0] } : null),
+    palette: ownPalette ?? (borrowed ? { ground: borrowed.ground, ink: borrowed.ink, accent: borrowed.accent, ...(borrowed.accent2 ? { accent2: borrowed.accent2 } : {}) } : null) ?? vibePalette,
+    faces: facesOf(answerOf(st, `${p}.type`)) ?? (refFaces.length ? { display: refFaces[0], body: refFaces[1] ?? refFaces[0] } : null) ?? (vibeSet ? { display: vibeSet.display, body: vibeSet.body } : null),
     org: (COMPOSITIONS.find((c) => c.id === values(st, `${p}.composition`)[0])?.org ?? null) as Org | null,
     dna,
     personality: personalityOf(st).slice(0, 8),
     avoid: [...labelsOf(avoidIds, AVOID_GRAPHIC).map((x) => x.toLowerCase()), ...(text(st, `${p}.avoid`) ? [text(st, `${p}.avoid`)] : []), ...readFacts(st.prompt).avoid],
     treatment: IMAGE_TREATMENTS.some((t) => t.id === values(st, `${p}.treatment`)[0]) ? values(st, `${p}.treatment`)[0] : null,
+    vibe: vibe ? { qualities: vibe.values.slice(0, 3), ...(vibe.fields?.theme ? { theme: vibe.fields.theme } : {}), ...(vibe.fields?.name ? { name: vibe.fields.name } : {}) } : null,
   };
 }
 

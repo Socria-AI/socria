@@ -33,7 +33,7 @@ const swap = {
     b.onResolve({ filter: /^next\/(server|headers)$/ }, (a) => ({ path: `${a.path}.js`, external: true }));
   },
 };
-const ROUTES = ['critique', 'discover', 'brief', 'direct', 'generate', 'refine', 'reference', 'projects', 'design-system', 'assets', 'graphic-edit'];
+const ROUTES = ['critique', 'discover', 'brief', 'direct', 'generate', 'refine', 'reference', 'projects', 'design-system', 'assets', 'graphic-edit', 'studio-questions'];
 await Promise.all(
   ROUTES.map((r) =>
     build({
@@ -922,6 +922,73 @@ console.log('\n=== a creative change in words: read by the model into a plan, he
   ok('a model failure is a calm error the browser falls back from — it never speaks of being “without a model”', broken.status >= 500 && !!broken.json?.error && !/without a model/i.test(broken.json.error), J(broken));
   const logged = db.rows('ux_v0_calls').filter((x) => x.user_id === G);
   ok('each reading is in the call log on its own stage, priced', logged.length >= 2 && logged.every((x) => x.stage === 'creative-edit' && typeof x.cost_usd === 'number'), J(logged.map((x) => [x.stage, x.cost_usd])));
+  if (was.routing === undefined) delete process.env.SOCRIAUX_ROUTING;
+  else process.env.SOCRIAUX_ROUTING = was.routing;
+  if (was.model === undefined) delete process.env.SOCRIAUX_MODEL;
+  else process.env.SOCRIAUX_MODEL = was.model;
+}
+
+console.log('\n=== the studio’s next creative question: written by the model for this brief, held to its shape ===');
+{
+  const Q = 'user_v0_studio';
+  const was = { routing: process.env.SOCRIAUX_ROUTING, model: process.env.SOCRIAUX_MODEL };
+  process.env.SOCRIAUX_ROUTING = 'single';
+  process.env.SOCRIAUX_MODEL = 'gpt-6.1-sol';
+  const context = {
+    mode: 'graphic',
+    kind: 'poster',
+    brief: 'A poster for “Blue Hour”, a late-night jazz evening',
+    subject: ['music'],
+    known: { palette: false, type: false, vibe: false, purpose: false, about: true, pictures: true },
+    decided: ['its words: “Blue Hour”'],
+    asked: [],
+    open: ['vibe', 'colour'],
+    remaining: 3,
+    visualAsked: 0,
+    visualLeft: 2,
+    pictures: 0,
+  };
+  const VIBES = {
+    ready: false,
+    question: {
+      kind: 'vibe',
+      decides: 'vibe',
+      text: 'How should the night feel when people see the poster?',
+      why: null,
+      palettes: null,
+      faces: null,
+      vibes: [
+        { name: 'Smoke and brass', note: 'a low-lit ground, a brass accent, condensed capitals', qualities: ['dramatic', 'retro', 'nonsense'], theme: null, character: 'condensed', palette: { ground: '#15130f', ink: '#16140f', accent: '#c8a24a' }, form: 'line' },
+        { name: 'Blue velvet', note: 'deep blue, soft forms', qualities: ['calm', 'dark'], theme: null, character: 'refined', palette: { ground: 'navy', ink: '#ffffff', accent: '#7aa2ff' }, form: 'orb' },
+        { name: 'Invented', note: '', qualities: ['made-up'], theme: null, character: null, palette: { ground: '#ffffff', ink: '#000000', accent: '#ff0000' }, form: null },
+      ],
+      options: null,
+    },
+  };
+  const signedOut = await post('studio-questions', { context }, null, [VIBES]);
+  ok('signed out: refused, told to sign in, nothing asked', signedOut.status === 401 && signedOut.calls.length === 0, J(signedOut));
+  ok('no conversation: no call', (await post('studio-questions', {}, Q, [VIBES])).status === 400 && (await post('studio-questions', { context: { ...context, mode: 'critique' } }, Q, [VIBES])).status === 400);
+  const spent = await post('studio-questions', { context: { ...context, remaining: 0 } }, Q, [VIBES]);
+  ok('nothing left to ask: “ready”, without a model call', spent.status === 200 && spent.json?.ready === true && spent.calls.length === 0, J(spent));
+
+  const r = await post('studio-questions', { projectId: 'uxv0_studio', context }, Q, [VIBES]);
+  const q = r.json?.question;
+  ok('a question comes back, written by the model', r.status === 200 && r.json.ready === false && q?.by === 'model' && q.kind === 'vibe', J(r.json));
+  ok('  moods keep only the engine’s qualities; one with none is dropped', q?.vibes?.length === 2 && J(q.vibes[0].qualities) === J(['dramatic', 'retro']), J(q?.vibes));
+  ok('  a mood’s own colours kept when they are colours (its ink made to read), else drawn from its qualities', q?.vibes?.[0]?.palette.ground === '#15130f' && q.vibes[0].palette.ink !== '#16140f' && /^#[0-9a-f]{6}$/.test(q.vibes[1].palette.ground), J(q?.vibes?.map((x) => x.palette)));
+  const sent = r.calls[0] ?? {};
+  ok('the model is asked for the question as a strict schema', sent.text?.format?.type === 'json_schema' && sent.text.format.name === 'socriaux_studio_questions' && sent.text.format.strict === true, J(sent.text));
+  ok('  told the rules, the vocabulary and the font library; given the brief, what is known and the budget', /DECIDE/.test(sent.instructions ?? '') && /FONT LIBRARY/.test(sent.instructions ?? '') && /Fraunces/.test(sent.instructions ?? '') && /Blue Hour/.test(J(sent.input)) && /visual questions still allowed: 2/.test(J(sent.input)), J(sent.input).slice(0, 300));
+  const repeat = await post('studio-questions', { projectId: 'uxv0_studio', context: { ...context, asked: [{ decides: 'vibe', text: '', answer: 'skipped — left to SocriaUX' }], remaining: 2, visualAsked: 1, visualLeft: 1 } }, Q, [VIBES]);
+  ok('a question about what was already asked is not passed on (the reader’s question stands)', repeat.status === 422 && repeat.json?.unreadable === true, J(repeat));
+  const ready = await post('studio-questions', { projectId: 'uxv0_studio', context }, Q, [{ ready: true, question: null }]);
+  ok('“ready”: the brief is enough, and the work is made', ready.status === 200 && ready.json.ready === true && ready.json.question === null, J(ready.json));
+  const prose = await post('studio-questions', { projectId: 'uxv0_studio', context }, Q, ['I would ask about the mood.']);
+  ok('an answer with no question in it: said, and nothing is made up', prose.status !== 200 && !prose.json?.question, J(prose));
+  const broken = await post('studio-questions', { projectId: 'uxv0_studio', context }, Q, [new Error('upstream down')]);
+  ok('a model failure is a calm error the browser falls back from', broken.status >= 500 && !!broken.json?.error && !/without a model/i.test(broken.json.error), J(broken));
+  const logged = db.rows('ux_v0_calls').filter((x) => x.user_id === Q);
+  ok('each question is in the call log on its own stage, priced', logged.length >= 3 && logged.every((x) => x.stage === 'studio-questions' && typeof x.cost_usd === 'number'), J(logged.map((x) => [x.stage, x.cost_usd])));
   if (was.routing === undefined) delete process.env.SOCRIAUX_ROUTING;
   else process.env.SOCRIAUX_ROUTING = was.routing;
   if (was.model === undefined) delete process.env.SOCRIAUX_MODEL;

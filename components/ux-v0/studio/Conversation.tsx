@@ -1,31 +1,31 @@
 'use client';
 // components/ux-v0/studio/Conversation.tsx — talking it through with a creative director, before the work is made.
 //
-// A conversation, not a questionnaire: SocriaUX says what it understood and asks one meaningful question when one is
-// needed (lib/ux-v0/studio/director.ts); the person answers in their own words — or taps one of at most three
-// suggestions, skips it, or says "make it now". Links to websites they like are read and shown as references (what
-// was read, the page drawn as it is, what to take from it); pictures can be dropped in at any point. A website's three
-// looks are offered when the brief is enough to draw them: choose one, combine two, ask for something different, or
-// let SocriaUX go with the first. Everything understood is in the brief drawer, each line with where it came from.
-// Nothing here calls a model.
+// A conversation, not a questionnaire: SocriaUX says what it understood and asks a question only when one would change
+// the work (lib/ux-v0/studio/director.ts) — at most a few, each written for this brief. Creative questions show their
+// answers (./DiscoveryOptions.tsx): palettes to see, lettering set in real faces, moods drawn by the engine; the person
+// taps one, answers in their own words, asks for others, skips it, or says "surprise me" — or "make it now" at any
+// point. Links to websites they like are read and shown as references (what was read, the page drawn as it is, what to
+// take from it); pictures can be dropped in at any point. Once the brief is enough the work is made: there is no
+// separate stage of choosing a direction. Everything understood is in the brief drawer, each line with where it came
+// from.
 
 import { useEffect, useRef, useState } from 'react';
 import type { RefTake, StudioMode, StudioReference, StudioState } from '@/lib/ux-v0/studio/schema';
 import { REF_TAKES } from '@/lib/ux-v0/studio/schema';
 import { MODES, modeInfo } from '@/lib/ux-v0/studio/modes';
-import { lookOnOffer, questionFor, understand, type DirectorEnv, type Topic } from '@/lib/ux-v0/studio/director';
+import { questionFor, subjectFor, understand, type DirectorEnv, type Topic } from '@/lib/ux-v0/studio/director';
 import { referenceSaid } from '@/lib/ux-v0/studio/references';
 import type { SystemRecord } from '@/lib/ux-v0/dsi/registry';
-import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
 import { SystemPicker, usableSystems } from './SystemPicker';
 import { Brief } from './Brief';
-import { SitePreview, WebsiteShot } from './previews';
+import { SitePreview } from './previews';
+import { DiscoveryOptions } from './DiscoveryOptions';
 import { ArrowUp, Attach, Check, Close, Down, FileMark, ModeGlyph, Panel } from './glyphs';
 
 export interface ConversationProps {
   studio: StudioState;
   env: DirectorEnv;
-  websiteSystems: readonly MasterDesignSystem[];
   nonce: string;
   saveWords?: string;
   systems: readonly SystemRecord[];
@@ -35,9 +35,10 @@ export interface ConversationProps {
   onSend: (text: string, files: File[]) => void;
   /** "Make it now": whatever is open is left to SocriaUX */
   onMake: () => void;
-  /** a website's look chosen, or two combined */
-  onChooseLook: (choice: number | [number, number]) => void;
-  onDifferent: () => void;
+  /** one of the options a creative question offered, tapped */
+  onChoose: (optionId: string) => void;
+  /** the creative question waiting is being written for this brief (its words and options are not shown yet) */
+  thinking?: boolean;
   /** what to take from a reference, or that it is not wanted */
   onReference: (id: string, patch: Partial<Pick<StudioReference, 'take' | 'state'>>) => void;
   /** pages read this visit, drawn as they are (by reference id) */
@@ -103,60 +104,6 @@ function ReferenceCard({ r, preview, onReference }: { r: StudioReference; previe
   );
 }
 
-function Looks({ st, systems, nonce, live, onChoose, onDifferent }: { st: StudioState; systems: readonly MasterDesignSystem[]; nonce: string; live: boolean; onChoose: ConversationProps['onChooseLook']; onDifferent: () => void }) {
-  const [picked, setPicked] = useState<number[]>([]);
-  if (!systems.length) return <p className="sd-said is-wait">Drawing the looks…</p>;
-  const toggle = (i: number) => setPicked((xs) => (xs.includes(i) ? xs.filter((x) => x !== i) : [...xs, i].slice(-2)));
-  const [a, b] = picked;
-  return (
-    <div className="sd-looks">
-      <ol className="sd-looks-list">
-        {systems.slice(0, 3).map((s, i) => (
-          <li key={`${s.direction.name}-${i}`} className={`sd-look${picked.includes(i) ? ' is-picked' : ''}`}>
-            <WebsiteShot st={st} system={s} nonce={nonce} />
-            <span className="sd-look-t">{s.direction.name}</span>
-            <span className="sd-look-h">{s.direction.concept?.split(/(?<=\.)\s/)[0]?.slice(0, 110) ?? s.personality.slice(0, 3).join(', ')}</span>
-            {live && (
-              <span className="sd-look-acts">
-                <button type="button" className="sd-pill is-sm is-primary" onClick={() => onChoose(i)}>
-                  Make it in this one
-                </button>
-                <label className="sd-look-pick">
-                  <input type="checkbox" checked={picked.includes(i)} onChange={() => toggle(i)} />
-                  Combine
-                </label>
-              </span>
-            )}
-          </li>
-        ))}
-      </ol>
-      {live && (
-        <div className="sd-looks-bar">
-          {picked.length === 2 ? (
-            <>
-              <button type="button" className="sd-pill is-sm is-quiet" onClick={() => onChoose([a, b])}>
-                {systems[a].direction.name}’s colours, {systems[b].direction.name}’s type and layout
-              </button>
-              <button type="button" className="sd-pill is-sm is-quiet" onClick={() => onChoose([b, a])}>
-                {systems[b].direction.name}’s colours, {systems[a].direction.name}’s type and layout
-              </button>
-            </>
-          ) : (
-            <span className="sd-looks-hint">Tick two to combine them.</span>
-          )}
-          <span className="sd-acts-gap" />
-          <button type="button" className="sd-pill is-sm is-ghost" onClick={onDifferent}>
-            Something different
-          </button>
-          <button type="button" className="sd-pill is-sm is-ghost" onClick={() => onChoose(0)}>
-            You choose
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function Conversation(p: ConversationProps) {
   const { studio: st, env } = p;
   const [words, setWords] = useState('');
@@ -169,12 +116,13 @@ export function Conversation(p: ConversationProps) {
   const fileInput = useRef<HTMLInputElement>(null);
   const modeBox = useRef<HTMLDivElement>(null);
   const info = modeInfo(st.mode);
-  const pending = st.pending as Topic | undefined;
+  const pending = st.pending && st.pending !== 'discover' ? (st.pending as Topic) : undefined;
   const question = pending ? questionFor(st, pending, env) : null;
+  const creative = st.pending === 'discover' ? st.discovery?.current : undefined;
   // Socria's last turn that moved things on (a site read after a question leaves the question, and its suggestions, open)
   const lastQuestion = [...st.transcript].reverse().find((m) => m.from === 'socria' && (m.kind === 'question' || m.kind === 'offer' || m.stage === 'making'));
-  const offerId = [...st.transcript].reverse().find((m) => m.kind === 'offer')?.id;
   const u = understand(st);
+  const sample = subjectFor(st, u).sample;
   // a logo cannot be made without its name, a critique without its design, an import without its source
   const blocked = st.modeBy === 'unsure' || (st.mode === 'logo' && !u.name) || u.required.includes('file') || u.required.includes('source');
 
@@ -184,7 +132,7 @@ export function Conversation(p: ConversationProps) {
     if (!box) return;
     const calm = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     box.scrollTo({ top: box.scrollHeight, behavior: calm ? 'auto' : 'smooth' });
-  }, [st.transcript.length, p.reading.length, p.starting]);
+  }, [st.transcript.length, p.reading.length, p.starting, p.thinking]);
   useEffect(() => field.current?.focus(), [st.transcript.length]);
   // the reply grows with what is said
   useEffect(() => {
@@ -300,12 +248,22 @@ export function Conversation(p: ConversationProps) {
                 );
               const r = m.kind === 'reference' && m.stage ? refs.get(m.stage) : undefined;
               const isLast = m.id === lastQuestion?.id;
+              const asking = isLast && m.kind === 'question' && m.stage === 'discover' && !!creative && st.status === 'discovering';
+              // the question being written for this brief: its words and options are shown once they are ready
+              if (asking && p.thinking)
+                return (
+                  <li key={m.id} className="sd-msg is-socria k-note">
+                    <p className="sd-said is-wait sd-thinking" role="status" aria-live="polite">
+                      Thinking about what would change this most…
+                    </p>
+                  </li>
+                );
               return (
-                <li key={m.id} className={`sd-msg is-socria k-${m.kind}`}>
+                <li key={m.id} className={`sd-msg is-socria k-${m.kind}${asking ? ' is-asking' : ''}`}>
                   <div className="sd-say">
                     <p className="sd-said">{r ? referenceSaid(r) : m.text}</p>
                     {r && <ReferenceCard r={r} preview={p.previews[r.id]} onReference={p.onReference} />}
-                    {m.kind === 'offer' && st.mode === 'website' && m.id === offerId && <Looks st={st} systems={p.websiteSystems} nonce={p.nonce} live={!busy && st.status === 'discovering' && lookOnOffer(st)} onChoose={p.onChooseLook} onDifferent={p.onDifferent} />}
+                    {asking && creative && !busy && <DiscoveryOptions key={creative.id} q={creative} sample={sample} onChoose={p.onChoose} onSend={(w) => p.onSend(w, [])} />}
                     {isLast && m.kind === 'question' && question && question.suggestions.length > 0 && !busy && (
                       <p className="sd-suggest" role="group" aria-label="Some ways to answer">
                         {question.suggestions.map((s) => (
@@ -362,7 +320,7 @@ export function Conversation(p: ConversationProps) {
           }}
         >
           <div className="sd-chat-acts">
-            {st.status === 'discovering' && !busy && !lookOnOffer(st) && (
+            {st.status === 'discovering' && !busy && (
               <button type="button" className="sd-pill is-sm is-quiet sd-make" onClick={p.onMake} disabled={blocked} title={blocked ? 'One thing is needed first' : 'Leave whatever is open to SocriaUX, and make it'}>
                 Make it now
               </button>
@@ -398,7 +356,7 @@ export function Conversation(p: ConversationProps) {
               ref={field}
               rows={1}
               value={words}
-              placeholder={question ? 'Answer in your own words — or tell me anything else' : 'Tell me anything else, paste a link to something you like, or say “make it”'}
+              placeholder={creative ? (creative.kind === 'colour' ? 'Choose a palette, or name your colours — hex codes or words' : creative.kind === 'type' ? 'Choose one, or name a typeface or describe the lettering you like' : creative.kind === 'vibe' ? 'Choose a mood, or describe the feel in your own words' : 'Answer in your own words') : question ? 'Answer in your own words — or tell me anything else' : 'Tell me anything else, paste a link to something you like, or say “make it”'}
               onChange={(e) => setWords(e.target.value.slice(0, 1200))}
               onPaste={(e) => {
                 const pics = [...e.clipboardData.files];
@@ -421,7 +379,7 @@ export function Conversation(p: ConversationProps) {
           </div>
           <p className="sd-reply-hint">
             {env.hasSystem && env.systemName ? `Made in ${env.systemName}. ` : ''}
-            Nothing here calls a model.
+            Once it is made, change anything in your own words.
           </p>
         </form>
 

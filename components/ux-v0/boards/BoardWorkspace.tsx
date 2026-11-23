@@ -2,11 +2,13 @@
 
 // components/ux-v0/boards/BoardWorkspace.tsx — a board: many materials, one design system, one canvas.
 //
-// Brief (the request read into materials and words, corrected in fields) → the Master Design System (three proposed
-// by the art-direction engine, or a website's approved one) → the board: its materials planned, placed and composed in
-// that one system, at most three at a time, each with its status (planned, generating, rendering, ready, failed); a
-// material that fails leaves the others as they are and is retried alone. Then the board is arranged and its notes are
-// written from the facts. Nothing here calls a model.
+// Brief (the request read into materials and words, in the studio's conversation or corrected in fields) → the board,
+// made at once: its Master Design System drawn by the art-direction engine from the words and what the conversation
+// decided (or a website's approved one, or a registry design system's identity) — there is no stage of choosing a
+// system first — and its materials planned, placed and composed in that one system, at most three at a time, each with
+// its status (planned, generating, rendering, ready, failed); a material that fails leaves the others as they are and
+// is retried alone. Then the board is arranged and its notes are written from the facts. The system's colours, type
+// and shapes are changed afterwards, in the System panel or in words, and the materials follow.
 //
 // Every change to the board (moving, arranging, notes, a change asked in words) is one validated operation list,
 // refused whole or applied whole, and one undo step. A change to the system is shown first (which materials it reaches,
@@ -36,7 +38,7 @@ import { planRestyle } from '@/lib/ux-v0/boards/style';
 import type { StyleSelection } from '@/lib/ux-v0/graphics/styles/blend';
 import { useStyleLibrary } from '../graphics/styleLibrary';
 import { syncWebsite, websiteConcept, websiteDrift } from '@/lib/ux-v0/boards/website';
-import { boardFile, openBoardFile, systemOverviewSvg } from '@/lib/ux-v0/boards/export';
+import { boardFile, openBoardFile } from '@/lib/ux-v0/boards/export';
 import { GraphicEditor, type EditorNote } from '../graphics/GraphicEditor';
 import { planChange } from '../graphics/creativePlanner';
 import { executePlan } from '@/lib/ux-v0/graphics/creative/execute';
@@ -52,7 +54,7 @@ import { BoardCanvas, type BoardCanvasApi } from './BoardCanvas';
 import { AddPanel, BoardInspector, ChecksPanel, MaterialsPanel, SystemPanel, VersionsPanel } from './BoardPanels';
 import { exportMaterialsZip, exportOverview, loadWebsites, websiteInfo } from './boardRender';
 
-type View = 'brief' | 'system' | 'board';
+type View = 'brief' | 'board';
 type Tab = 'materials' | 'system' | 'add' | 'checks' | 'versions';
 type Note = EditorNote;
 type Pending = { kind: 'ops'; label: string; ops: BoardOp[]; preview: BoardState } | { kind: 'sync'; label: string; plan: SyncPlan; next: MasterDesignSystem; reset: Record<string, 'all'> } | { kind: 'confirm'; label: string; text: string; run: () => void };
@@ -108,7 +110,7 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
   );
   const nonce = useMemo(() => makeNonce(), []);
 
-  const [view, setView] = useState<View>(b.system ? 'board' : b.options.length ? 'system' : 'brief');
+  const [view, setView] = useState<View>(b.system ? 'board' : 'brief');
   const [note, setNote] = useState<Note>(null);
   const [error, setError] = useState('');
 
@@ -315,7 +317,7 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
   // the palette and faces chosen in the studio's conversation, held by the systems proposed (never a design system's)
   const heldToStudio = (xs: MasterDesignSystem[]) => (project.studio ? systemsWithPrefs(xs, prefsOf(project.studio)) : xs);
 
-  // ── the brief → systems → the board ──
+  // ── the brief → the board, made at once in the system its words call for ──
   const readWords = () => {
     const r = readBoardRequest(words);
     setDraft({ ...r, images: draft?.images ?? [], annotate: draft?.annotate ?? r.annotate, ...(draft?.systemFrom ? { systemFrom: draft.systemFrom } : {}) });
@@ -326,37 +328,28 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
     setError('');
     const brief: BoardBrief = { ...draft, name: draft.name || draft.content.headline.slice(0, 80) };
     update((p) => ({ ...p, name: DEFAULT_NAMES.has(p.name) ? brief.name.slice(0, 80) : p.name, intent: p.intent || words.slice(0, 600) }));
+    const cur = boardNow();
     if (brief.systemFrom) {
       const site = await getProject(brief.systemFrom);
       const sys = site ? systemFromWebsite(site, brief.name) : null;
-      if (!sys) return setError('That website has no approved direction yet: approve one there, or let SocriaUX propose systems.');
-      setBoard((x) => ({ ...x, request: words, brief, options: [sys] }));
-      setView('system');
-      return;
+      if (!sys) return setError('That website has no approved direction yet: approve one there, or remove it from the brief and SocriaUX will draw a system from your words.');
+      return makeIn(sys, { brief, request: words, options: [sys], assets: cur.assets });
     }
     if (linked) {
-      // within a design system: the brand is named (its approved logo takes the place), three expressions of its identity
+      // within a design system: the brand is named (its approved logo takes the place), in an expression of its identity
       const named: BoardBrief = { ...brief, content: { ...brief.content, brand: brief.content.brand || linked.content.identity.name } };
-      const b = brandOptions(named);
-      setBoard((x) => ({ ...x, request: words, brief: named, options: b.options, assets: b.logo ? [...x.assets.filter((a) => a.id !== b.logo!.id), b.logo] : x.assets }));
-      setView('system');
-      return;
+      const bo = brandOptions(named);
+      if (!bo.options.length) return setError('This design system could not be expressed for the board.');
+      return makeIn(bo.options[0], { brief: named, request: words, options: bo.options, assets: bo.logo ? [...cur.assets.filter((a) => a.id !== bo.logo!.id), bo.logo] : cur.assets });
     }
     const options = heldToStudio(proposeSystems(brief, project.id));
-    setBoard((x) => ({ ...x, request: words, brief, options }));
-    setView('system');
+    if (!options.length) return setError('SocriaUX could not draw a system for this brief. Add a word about how it should feel, and continue.');
+    return makeIn(options[0], { brief, request: words, options, assets: cur.assets });
   };
-  const moreSystems = () => {
+  /** The board made in a system: its materials planned, then generated, at most three at a time. */
+  const makeIn = async (sys: MasterDesignSystem, from: { brief: BoardBrief; request: string; options: MasterDesignSystem[]; assets: Asset[] }) => {
     const cur = boardNow();
-    if (!cur.brief) return;
-    const seen = cur.options.map((o) => o.direction.language);
-    const round = Math.ceil(seen.length / 3);
-    setBoard((x) => ({ ...x, options: linked ? brandOptions(cur.brief!, round).options : heldToStudio(proposeSystems(cur.brief!, project.id, { round, seen })) }));
-  };
-  const chooseSystem = async (sys: MasterDesignSystem) => {
-    const cur = boardNow();
-    if (!cur.brief) return;
-    const start: BoardState = { ...startBoard(cur.brief, sys, { request: cur.request, assets: cur.assets, websiteProject: cur.brief.website }), options: cur.options, versions: cur.versions };
+    const start: BoardState = { ...startBoard(from.brief, sys, { request: from.request, assets: from.assets, websiteProject: from.brief.website }), options: from.options, versions: cur.versions };
     commitBoard(start);
     past.current = [];
     future.current = [];
@@ -822,18 +815,17 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
   const steps: { id: View; label: string; ok: boolean }[] = [
     // a board begun in conversation has its brief there, not in a form
     ...(project.studio && project.studio.via !== 'hand' ? [] : [{ id: 'brief' as View, label: 'Brief', ok: true }]),
-    { id: 'system', label: 'System', ok: !!b.brief && b.options.length > 0 },
     { id: 'board', label: 'Board', ok: !!b.system },
   ];
   const sourceName = b.system?.source?.name;
 
-  // ── a board begun in the studio: its brief came from the conversation, so its systems are proposed at once ──
+  // ── a board begun in the studio: its brief came from the conversation, so the board is made at once ──
   const autoStarted = useRef(false);
   useEffect(() => {
     if (autoStarted.current) return;
     if (project.systemLink && !linked) return;
     autoStarted.current = true;
-    if (project.studio?.status !== 'started' || !b.brief || b.options.length || b.system) return;
+    if (project.studio?.status !== 'started' || !b.brief || b.system) return;
     void continueFromBrief();
   }, [linked]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -865,24 +857,12 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
       void ask(said);
       return wait;
     }
-    if (view === 'system' && b.options.length) {
-      const ord = [/\b(first|1st|one|1)\b/, /\b(second|2nd|two|2)\b/, /\b(third|3rd|three|3)\b/].findIndex((re) => re.test(low));
-      if (/\b(more|others?|another|different|again)\b/.test(low)) {
-        moreSystems();
-        return 'More systems, kept apart from those you have seen.';
-      }
-      if (ord >= 0 && b.options[ord]) {
-        void chooseSystem(b.options[ord]);
-        return `Making the board in “${b.options[ord].direction.name}”: every material composed in it, at most three at a time.`;
-      }
-      return 'Choose the system the board is made in — say “the first one”, or “more” for others.';
-    }
-    return 'Finish the brief and continue: the systems follow from it.';
+    return generating ? 'One moment — the board is being made.' : 'Finish the brief and continue: the board is made from it.';
   };
 
   return (
     <>
-    {project.studio && <StudioRail studio={project.studio} onStudio={(fn) => update((p) => (p.studio ? { ...p, studio: fn(p.studio) } : p))} onAsk={railAsk} placeholder={view === 'board' ? 'Ask the board: “arrange these into two rows”, “change the accent to green”…' : view === 'system' ? '“The first one”, or “more”' : 'Say what to change'} systemName={linked?.rec.name ?? null} onOpenChange={setRailOpen} />}
+    {project.studio && <StudioRail studio={project.studio} onStudio={(fn) => update((p) => (p.studio ? { ...p, studio: fn(p.studio) } : p))} onAsk={railAsk} placeholder={view === 'board' ? 'Ask the board: “arrange these into two rows”, “change the accent to green”…' : 'Say what to change'} systemName={linked?.rec.name ?? null} onOpenChange={setRailOpen} />}
     <div className="v0 sb gx bd">
       <header className="v0-head">
         <div className="v0-head-l">
@@ -1031,44 +1011,10 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
                 </p>
               )}
               <button type="button" className="sb-btn is-primary" onClick={() => void continueFromBrief()}>
-                {draft.systemFrom ? 'Use the website’s system' : 'Propose design systems'} <span className="sb-ar">→</span>
+                {draft.systemFrom ? 'Make it in the website’s system' : 'Make the board'} <span className="sb-ar">→</span>
               </button>
             </section>
           )}
-        </main>
-      )}
-
-      {view === 'system' && b.brief && (
-        <main className="bd-systems">
-          <p className="sb-label">One design system for every material</p>
-          <h1 className="bd-h1">Choose the system the {b.brief.materials.reduce((s, m) => s + m.count, 0)} materials will share.</h1>
-          <p className="v0-quiet">Not separate directions for separate materials: every poster, post, page and mockup is composed in the one you choose, each its own composition. Its colours, type and shapes can be changed later, and the materials follow.</p>
-          <div className="bd-sys-grid">
-            {b.options.map((s, i) => (
-              <article key={`${s.id}-${i}`} className="bd-sys">
-                <div className="bd-sys-art" dangerouslySetInnerHTML={{ __html: systemOverviewSvg(s, 960, 640, `opt${i}`, measure).replace(/^<svg([^>]*?)\swidth="[^"]*"\sheight="[^"]*"/, '<svg$1 width="100%" height="100%"') }} />
-                <h2>{s.direction.name}</h2>
-                <p className="v0-quiet">
-                  {s.tokens.fonts.display} and {s.tokens.fonts.body} · accent {s.tokens.colors.accent}
-                  {s.source ? ` · from the website “${s.source.name}”` : ''}
-                </p>
-                {s.accentWhy && <p className="v0-quiet">Accent: {s.accentWhy}.</p>}
-                <button type="button" className="sb-btn is-sm is-primary" onClick={() => void chooseSystem(s)}>
-                  Use this system
-                </button>
-              </article>
-            ))}
-          </div>
-          <div className="bd-row">
-            {!b.brief.systemFrom && (
-              <button type="button" className="sb-btn is-sm" onClick={moreSystems}>
-                Show three others
-              </button>
-            )}
-            <button type="button" className="sb-link is-meta" onClick={() => setView('brief')}>
-              Back to the brief
-            </button>
-          </div>
         </main>
       )}
 

@@ -213,19 +213,19 @@ export function ConceptCompare(p: { doc: GraphicDoc; board: Artboard; measure: M
     });
   }, [p.doc, p.board, p.measure, p.href]);
   return (
-    <div className="gx-compare" role="dialog" aria-label="Concepts side by side">
-      <header className="gx-compare-h">
-        <p className="gx-compare-t">Concepts side by side</p>
+    <div className="gx-cmp" role="dialog" aria-label="Concepts side by side">
+      <header className="gx-cmp-h">
+        <p className="gx-cmp-t">Concepts side by side</p>
         <button type="button" className="sb-btn is-sm" onClick={p.onClose}>
           Close
         </button>
       </header>
-      <ol className="gx-compare-grid">
+      <ol className="gx-cmp-grid">
         {cards.map((c) => (
-          <li key={`${c.kind}-${c.id}`} className={`gx-compare-card is-${c.kind}`}>
-            <div className="gx-compare-art" style={{ aspectRatio: String(c.ratio) }} aria-hidden="true" dangerouslySetInnerHTML={{ __html: c.svg }} />
-            <p className="gx-compare-name">{c.name}</p>
-            <dl className="gx-compare-dl">
+          <li key={`${c.kind}-${c.id}`} className={`gx-cmp-card is-${c.kind}`}>
+            <div className="gx-cmp-art" style={{ aspectRatio: String(c.ratio) }} aria-hidden="true" dangerouslySetInnerHTML={{ __html: c.svg }} />
+            <p className="gx-cmp-name">{c.name}</p>
+            <dl className="gx-cmp-dl">
               <div>
                 <dt>Colour</dt>
                 <dd>
@@ -249,7 +249,7 @@ export function ConceptCompare(p: { doc: GraphicDoc; board: Artboard; measure: M
               </div>
             </dl>
             {c.kind !== 'now' && (
-              <p className="gx-compare-acts">
+              <p className="gx-cmp-acts">
                 {c.kind === 'kept' ? (
                   <button type="button" className="sb-link is-meta" onClick={() => p.onRevisit(c.id)}>
                     Go back to it

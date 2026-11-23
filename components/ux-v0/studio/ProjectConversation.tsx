@@ -1,27 +1,27 @@
 'use client';
 // components/ux-v0/studio/ProjectConversation.tsx — a project still in conversation: the one writer of its record
-// (useV0Project, like every workspace), every message read by the creative director (lib/ux-v0/studio/director.ts),
-// websites the person points to read for reference (/api/ux-v0/reference) before anything is made from them, files
-// attached as they come, a website's looks drawn when they are offered, and the hand-over when the work begins.
+// (useV0Project, like every workspace), every message and every option tapped read by the creative director
+// (lib/ux-v0/studio/director.ts), each creative question written for this brief by the model when it can be reached
+// (./questionPlanner.ts; the reader's question stands otherwise), websites the person points to read for reference
+// (/api/ux-v0/reference) before anything is made from them, files attached as they come, and the hand-over when the
+// work begins — as soon as the brief is enough, with no direction to choose first.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SAVE_WORDS, useV0Project } from '../useV0Project';
 import { putProject } from '@/lib/ux-v0/store';
 import type { DesignProject } from '@/lib/ux-v0/types';
 import { said, type StudioMode, type StudioState } from '@/lib/ux-v0/studio/schema';
-import { chooseLook, readyToMake, respond, seedFromWords, type DirectorEnv } from '@/lib/ux-v0/studio/director';
+import { chooseOption, enoughToMake, readyToMake, respond, rethinkQuestion, seedFromWords, type DirectorEnv } from '@/lib/ux-v0/studio/director';
 import { addReference, referenceOf, type SiteRead } from '@/lib/ux-v0/studio/references';
-import { websiteAskOf } from '@/lib/ux-v0/studio/apply';
-import { websiteSystems as proposeWebsiteSystems } from '@/lib/ux-v0/studio/options';
-import { brandBoardOptions } from '@/lib/ux-v0/dsi/generate';
-import { publishedContent, type SystemRecord } from '@/lib/ux-v0/dsi/registry';
+import type { SystemRecord } from '@/lib/ux-v0/dsi/registry';
 import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
 import { Conversation } from './Conversation';
+import { planQuestion, questionModelWorthAsking } from './questionPlanner';
 import { attachFiles, switchMode } from './begin';
 import { usableSystems } from './SystemPicker';
 
 const STARTING: Record<StudioMode, string> = {
-  graphic: 'Composing three directions from what you said…',
+  graphic: 'Composing it from what you said…',
   logo: 'Constructing logo concepts from the name and what it stands for…',
   website: 'Making the page: its structure, its working parts, your words…',
   board: 'Planning the board and the identity its pieces share…',
@@ -66,27 +66,16 @@ export function ProjectConversation(props: {
 
   const usable = usableSystems(props.systems);
   const rec = usable.find((r) => r.id === st.systemId) ?? null;
-  const content = useMemo(() => (rec ? publishedContent(rec, 'latest') : null), [rec]);
   const env: DirectorEnv = { hasSystem: !!rec, ...(rec ? { systemName: rec.name } : {}) };
-
-  // the looks a website could take: proposed for these words (in a design system, three expressions of it)
-  const wsKey = st.mode === 'website' ? JSON.stringify([st.prompt, st.answers['w.words']?.fields, st.answers['w.purpose']?.values, st.answers['w.functions']?.values, st.answers['w.palette'], st.answers['w.personality']?.values, st.answers['w.look']?.text, (st.references ?? []).filter((r) => r.state === 'liked').map((r) => [r.id, r.take]), st.round, st.systemId, st.createdAt]) : '';
-  const websiteSystems = useMemo<MasterDesignSystem[]>(() => {
-    if (st.mode !== 'website') return [];
-    const ask = websiteAskOf(st);
-    if (!ask) return [];
-    try {
-      return content ? brandBoardOptions(content, ask.board, `${st.createdAt}|${st.round ?? 0}`, { round: st.round ?? 0 }).slice(0, 3) : proposeWebsiteSystems(st);
-    } catch {
-      return [];
-    }
-  }, [wsKey, content]); // eslint-disable-line react-hooks/exhaustive-deps
+  const envRef = useRef(env);
+  envRef.current = env;
 
   const start = async (from: StudioState) => {
     setError('');
     setStarting(STARTING[from.mode]);
     await putProject({ ...current.current, studio: from });
-    const err = await props.onStart({ ...current.current, studio: from }, from, websiteSystems);
+    // a website is made in the first look its words call for (within its design system when it has one)
+    const err = await props.onStart({ ...current.current, studio: from }, from, []);
     if (err) {
       setStarting('');
       setError(err);
@@ -94,7 +83,46 @@ export function ProjectConversation(props: {
   };
   /** Made now if the conversation's last word was that it is being made (a switch of kind can say so, or ask). */
   const after = async () => {
-    if (readyToMake(latest.current, env)) await start(latest.current);
+    if (readyToMake(latest.current, envRef.current)) await start(latest.current);
+  };
+
+  // each creative question is written for this brief by the model when it can be reached: the reader's question is
+  // held back while it writes (a moment), then the model's takes its place — or the brief is judged enough and the
+  // work is made. Answered in the meantime, or not reachable: the reader's question stands, nothing is lost.
+  const [thinking, setThinking] = useState<string | null>(null);
+  const tried = useRef(new Set<string>());
+  const planning = useRef<AbortController | null>(null);
+  const waiting = st.status === 'discovering' && st.pending === 'discover' ? st.discovery?.current : undefined;
+  useEffect(() => {
+    const q = waiting;
+    if (!q || q.by !== 'reader' || tried.current.has(q.id) || !questionModelWorthAsking()) return;
+    tried.current.add(q.id);
+    setThinking(q.id);
+    const ctl = new AbortController();
+    planning.current = ctl;
+    void planQuestion(latest.current, { projectId: project.id, signal: ctl.signal })
+      .then(async (r) => {
+        if (r.by !== 'model' || ctl.signal.aborted) return;
+        const now = latest.current;
+        if (now.pending !== 'discover' || now.discovery?.current?.id !== q.id) return;
+        if (r.ready) {
+          const next = enoughToMake(now, q.id, envRef.current);
+          if (next !== now) {
+            commit(next);
+            await after();
+          }
+          return;
+        }
+        commit(rethinkQuestion(now, q.id, r.question));
+      })
+      .finally(() => setThinking((t) => (t === q.id ? null : t)));
+  }, [waiting?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => planning.current?.abort(), []);
+  /** Whatever the person does next answers the question as shown: a question still being written is let go. */
+  const settle = () => {
+    if (!thinking) return;
+    planning.current?.abort();
+    setThinking(null);
   };
 
   // a conversation that said it was making the work, opened before it could (a reload): it is made now
@@ -132,6 +160,7 @@ export function ProjectConversation(props: {
 
   const onSend = async (text: string, files: File[]) => {
     setError('');
+    settle();
     let ids: string[] = [];
     if (files.length) {
       const r = await attachFiles(files, { critique: latest.current.mode === 'critique', hold: latest.current.mode === 'system' });
@@ -155,16 +184,26 @@ export function ProjectConversation(props: {
   };
 
   const onMake = async () => {
+    settle();
     const turn = respond(latest.current, 'Make it now', env);
     commit(turn.st);
     if (turn.move.kind === 'create') await start(latest.current);
+  };
+
+  /** One of the options a creative question offered, tapped: the decision taken, then the next question or the work. */
+  const onChoose = async (optionId: string) => {
+    setError('');
+    settle();
+    const turn = chooseOption(latest.current, optionId, env);
+    commit(turn.st);
+    if (turn.research.length) await readSites(turn.research);
+    if (turn.move.kind === 'create') await after();
   };
 
   return (
     <Conversation
       studio={st}
       env={env}
-      websiteSystems={websiteSystems}
       nonce={props.nonce}
       saveWords={SAVE_WORDS[save]}
       systems={props.systems}
@@ -178,15 +217,8 @@ export function ProjectConversation(props: {
       }}
       onSend={(t, f) => void onSend(t, f)}
       onMake={() => void onMake()}
-      onChooseLook={(choice) => {
-        const next = chooseLook(latest.current, choice);
-        commit(next);
-        void start(next);
-      }}
-      onDifferent={() => {
-        const turn = respond(latest.current, 'Something different', env);
-        commit(turn.st);
-      }}
+      onChoose={(id) => void onChoose(id)}
+      thinking={!!thinking && thinking === waiting?.id}
       onReference={(id, patch) => change((s) => ({ ...s, references: (s.references ?? []).map((r) => (r.id === id ? { ...r, ...patch } : r)) }))}
       previews={previews}
       reading={reading}

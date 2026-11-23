@@ -231,8 +231,10 @@ export function regrade(stops: readonly string[], was: { ground: string; partner
 
 const fontOk = (name: string) => FONTS.some((f) => f.name === name);
 const weightFor = (name: string, want: number) => {
-  const f = FONTS.find((x) => x.name === name);
-  const list = (f as { weights?: number[] } | undefined)?.weights ?? [400, 700];
+  const f = FONTS.find((x) => x.name === name) as { weights?: readonly number[]; variable?: boolean } | undefined;
+  const list = f?.weights ?? [400, 700];
+  // a variable family takes any weight in its range; a static one the nearest it has
+  if (f?.variable && list.length === 2) return Math.max(list[0], Math.min(list[1], want));
   return list.reduce((a, b) => (Math.abs(b - want) < Math.abs(a - want) ? b : a), list[0]);
 };
 

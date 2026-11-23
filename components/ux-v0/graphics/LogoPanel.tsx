@@ -1,8 +1,7 @@
 'use client';
 
-// components/ux-v0/graphics/LogoPanel.tsx — logos in the Graphics workspace: the concepts stage (every concept shown
-// with its idea, rationale, construction, typography, geometry, scalability, weaknesses and measured quality; develop,
-// set aside, compare, combine, explore further) and the editor's Logo tab (the concept on the artboard, its twelve
+// components/ux-v0/graphics/LogoPanel.tsx — logos in the Graphics workspace: the editor's Logo tab (the concept on the
+// artboard — the first constructed opens at once, with no stage of choosing first — its twelve
 // quality criteria, the sizes from 16 to 512 px, the colour tests, the contexts, the lockups and versions, the nine
 // commands and the explorations, lettering and symbol adjustments, approval, and the identity built from it). Nothing
 // here calls a model: the logo engine runs in this browser (lib/ux-v0/graphics/logo).
@@ -90,7 +89,9 @@ function ConceptCard({ c, e, svg, on, actions }: { c: LogoConcept; e?: LogoEvalu
   );
 }
 
-/** The concepts stage of a logo project (see the head of this file). */
+/** Every concept side by side (its idea, rationale, construction, typography, geometry, scalability, weaknesses and
+ * measured quality; develop, set aside, compare, combine, explore further): opened from the Logo tab when wanted, never a
+ * step before the editor. */
 export function LogoConceptsStage({ doc, measure, onDoc, onDevelop, onBack }: { doc: GraphicDoc; measure: Measure; onDoc: (next: GraphicDoc, label: string) => void; onDevelop: () => void; onBack: () => void }) {
   const board = doc.artboards.find((b) => b.logo) ?? null;
   const rec = board?.logo ?? null;
@@ -213,7 +214,7 @@ export function LogoConceptsStage({ doc, measure, onDoc, onDevelop, onBack }: { 
       </ol>
       <p>
         <button type="button" className="sb-link" onClick={onBack}>
-          Back to the brief
+          Back to the design
         </button>
       </p>
     </div>
@@ -221,7 +222,7 @@ export function LogoConceptsStage({ doc, measure, onDoc, onDevelop, onBack }: { 
 }
 
 /** The editor's Logo tab for a logo artboard (see the head of this file). */
-export function LogoTab({ doc, board, measure, onDoc, onMakeBoard }: { doc: GraphicDoc; board: Artboard; measure: Measure; onDoc: (next: GraphicDoc, label: string) => void; onMakeBoard?: (sys: MasterDesignSystem) => void }) {
+export function LogoTab({ doc, board, measure, onDoc, onMakeBoard, onConcepts }: { doc: GraphicDoc; board: Artboard; measure: Measure; onDoc: (next: GraphicDoc, label: string) => void; onMakeBoard?: (sys: MasterDesignSystem) => void; onConcepts?: () => void }) {
   const rec = board.logo!;
   const concepts = useMemo(() => conceptsOf(rec), [rec]);
   const c = useMemo(() => selectedConcept(rec), [rec]);
@@ -485,6 +486,13 @@ export function LogoTab({ doc, board, measure, onDoc, onMakeBoard }: { doc: Grap
       <p className="v0-quiet">The identity (palette, type, motif, pattern, icon style, imagery, guidelines and the variants) is built from the approved logo only.</p>
 
       <p className="gx-panel-sub">Concepts ({concepts.length})</p>
+      {onConcepts && (
+        <p>
+          <button type="button" className="sb-link is-meta is-strong" onClick={onConcepts}>
+            See every concept side by side
+          </button>
+        </p>
+      )}
       <ul className="gx-logo-thumbs">
         {concepts.map((x) => (
           <li key={x.id} className={`${x.id === c.id ? 'is-on' : ''}${x.status === 'rejected' ? ' is-aside' : ''}`}>

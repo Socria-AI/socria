@@ -1,9 +1,10 @@
 // lib/ux-v0/studio/options.ts — the looks a website could take, proposed by the engines from the person's words.
 //
-// Nothing here is a stock palette, a stock pairing or a style picked from a list: a website's three looks are systems
-// the board engine proposes for this conversation's words (lib/ux-v0/boards/pipeline.ts), held to the colours and faces
-// the person chose or their references gave; asking for something different proposes three others; two can be
-// combined (one's colours with the other's type and structure).
+// Nothing here is a stock palette, a stock pairing or a style picked from a list: a website's looks are systems the
+// board engine proposes for this conversation's words (lib/ux-v0/boards/pipeline.ts), held to the colours and faces the
+// person chose — in the conversation's creative questions, or from their references. The page is made in the first
+// (there is no line-up to choose from: studio/begin.ts startFrom); two can still be combined (one's colours with the
+// other's type and structure).
 
 import type { StudioState } from './schema';
 import { readFacts } from './facts';

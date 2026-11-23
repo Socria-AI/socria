@@ -238,9 +238,12 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
 
   /** A new project built in a registry design system: linked (identity from the system), then opened. */
   const startInSystem = async (kind: 'graphic' | 'board' | 'website', rec: SystemRecord) => {
-    // a conversation like any other, the system already chosen: it asks only what the work needs
+    // a conversation like any other, the system already chosen: it asks only what the work needs (never its colours,
+    // lettering or mood: the system decides those)
     const p = conversationProject(kind, '', { modeBy: 'person', attachments: [], systemId: rec.id, systemName: rec.name });
     await putProject(p);
+    // the systems as they are now (one made or published in the manager a moment ago is the one the work is made in)
+    await refreshSystems();
     setSystems(null);
     passage(() => setOpen({ p }));
     window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(p.id)}`);
@@ -282,6 +285,7 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
         }}
         onOpenProject={(id) => {
           setSystems(null);
+          void refreshSystems();
           openById(id);
         }}
         onNewProject={(kind, rec) => void startInSystem(kind, rec)}

@@ -76,34 +76,16 @@ console.log('=== SocriaUX Style Intelligence, by hand, in the built app ===');
 await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
 // the brief written by hand in the workspace (its own form)
 await handBrief(page, 'graphic', 'A poster for “Signal & Form”, a creative technology exhibition, “Where code becomes craft”, 12–28 March 2027, Lisbon Design Centre');
-await page.getByRole('button', { name: /See three directions/ }).click();
-await page.waitForSelector('.gx-dir', { timeout: 15000 });
-await page.waitForTimeout(800);
-
-// ── directions in design languages ──
-const dirNames = await page
-  .locator('.gx-dir h2, .gx-dir .gx-dir-name')
-  .allInnerTexts()
-  .catch(() => []);
-const dirLangs = await page.locator('.gx-dir .gx-dir-lang').allInnerTexts();
-let proj = await projectOf(pid());
-const optStyles = (proj?.graphic?.options ?? []).map((o) => o.style?.primary);
-// Engine 2.0: directions are not only style selection: two design languages chosen from the brief, and one language
-// generated from the brief itself (no style profile, no house default)
-const optOrigins = (proj?.graphic?.options ?? []).map((o) => o.origin ?? null);
-ok('1. three directions: two design languages chosen from the brief, one language generated from the brief itself (no house default)', optStyles.length === 3 && optStyles.filter(Boolean).length === 2 && new Set(optStyles.filter(Boolean)).size === 2 && optOrigins.filter((x) => x === 'generated').length === 1, J({ optStyles, optOrigins }));
-ok('…each card says its language: a style’s period and kind, or that it was generated from the brief', dirLangs.length === 3 && dirLangs.every((l) => /·/.test(l)) && dirLangs.some((l) => /Generated from the brief/i.test(l)), J(dirLangs));
-await shot('01-directions');
-await page
-  .locator('.gx-dir')
-  .first()
-  .getByRole('button', { name: /Make it in this direction/ })
-  .click();
+// the design is composed at once from the brief (no directions to choose first), in a design language chosen from it
+await page.getByRole('button', { name: /^Make it$/ }).click();
 await page.waitForSelector('.gx-canvas .gx-board svg', { timeout: 30000 });
 await page.waitForTimeout(1200);
+let proj = await projectOf(pid());
 let d = await docWhere((x) => nodes(x).length > 0);
 const first = d?.style?.primary;
-ok('…the design is built in it, and keeps the brief’s words exactly', first === optStyles[0] && texts(d).includes('Signal & Form') && texts(d).some((t) => t.includes('Where code becomes craft')), J({ style: d?.style, texts: texts(d) }));
+ok('1. the design is composed at once, in a design language chosen from the brief (no house default, no directions to choose first)', !!first && (await page.locator('.gx-dir').count()) === 0, J({ style: d?.style }));
+ok('…and keeps the brief’s words exactly', texts(d).includes('Signal & Form') && texts(d).some((t) => t.includes('Where code becomes craft')), J({ texts: texts(d) }));
+await shot('01-composed');
 
 // ── the Styles panel ──
 await tab('Styles');
@@ -332,8 +314,8 @@ ok('10. after a reload the design still speaks its style, and one’s own styles
 await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
 // the brief written by hand in the workspace (its own form)
 await handBrief(page, 'board', 'Create a campaign for “Signal & Form”, “Where code becomes craft”, 12–28 March 2027: two posters and two Instagram graphics.');
-await page.getByRole('button', { name: /Propose design systems/ }).click();
-await page.waitForSelector('.bd-sys', { timeout: 15000 });
+await page.getByRole('button', { name: /Make the board/ }).click();
+await page.waitForSelector('.bd-canvas', { timeout: 15000 });
 const boardReady = async (pred, ms = 20000) => {
   const start = Date.now();
   let bd = null;
@@ -344,15 +326,9 @@ const boardReady = async (pred, ms = 20000) => {
   }
   return bd;
 };
-// the project is saved a moment after the systems are shown
+// the systems the engine drew for the words are kept with the board (it is made in the first), each its own language
 const sysStyles = ((await boardReady((x) => x.options.length >= 3))?.options ?? []).map((s) => s.style?.primary);
-ok('11. a board’s three design systems each speak a different language', sysStyles.length === 3 && sysStyles.every(Boolean) && new Set(sysStyles).size === 3, J(sysStyles));
-await page
-  .locator('.bd-sys')
-  .first()
-  .getByRole('button', { name: /Use this system/ })
-  .click();
-await page.waitForSelector('.bd-canvas', { timeout: 15000 });
+ok('11. the board’s design systems, drawn from the words, each speak a different language (the board is made in the first)', sysStyles.length === 3 && sysStyles.every(Boolean) && new Set(sysStyles).size === 3, J(sysStyles));
 let bd = await boardReady((x) => x.materials.length && x.materials.every((m) => m.status === 'ready'));
 const mats = bd.materials.filter((m) => m.type === 'graphic');
 ok(

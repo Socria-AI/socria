@@ -1,29 +1,18 @@
 'use client';
 
-// components/ux-v0/graphics/GraphicBrief.tsx — the first two steps of a graphic: what it is and says (the brief), then
-// three directions to choose from, each shown as the design itself, composed, not described.
+// components/ux-v0/graphics/GraphicBrief.tsx — a graphic's brief written by hand: what it is and what it says. The design
+// is composed from it at once (GraphicsWorkspace.tsx), with no direction to choose first.
 //
 // The words of a graphic are the designer's, exactly: SocriaUX reads a first draft of the fields from their sentence
 // (readGraphicBrief: quoted words become the headline, the subtitle, the points) and they correct it. A headline is
 // required: nothing is composed around invented words. Numbers for a chart are theirs too, and the chart says where
 // they came from.
 
-import { useEffect, useMemo, useState, useRef } from 'react';
-import { FORMATS, formatOf, sizeLabel } from '@/lib/ux-v0/graphics/formats';
-import { composeGraphic, GRAPHIC_KINDS, readGraphicBrief, type GraphicBrief, type GraphicDirection, type GraphicKind } from '@/lib/ux-v0/graphics/compose';
+import { useRef } from 'react';
+import { FORMATS, sizeLabel } from '@/lib/ux-v0/graphics/formats';
+import { GRAPHIC_KINDS, readGraphicBrief, type GraphicBrief, type GraphicKind } from '@/lib/ux-v0/graphics/compose';
 import { normalizeGraphicBrief } from '@/lib/ux-v0/graphics/state';
-import { renderArtboard } from '@/lib/ux-v0/graphics/render';
-import { refineDoc } from '@/lib/ux-v0/graphics/check';
 import type { Asset } from '@/lib/ux-v0/graphics/doc';
-import type { Measure } from '@/lib/ux-v0/graphics/text';
-import { styleById } from '@/lib/ux-v0/graphics/styles/registry';
-import type { StyleDNA } from '@/lib/ux-v0/graphics/styles/schema';
-
-/** What a direction's design language is, in a line: its period and kind. */
-const styleLine = (id: string, customs?: readonly StyleDNA[]): string => {
-  const s = styleById(id, customs ?? []);
-  return s ? [s.era, s.category === 'custom' ? 'your style' : s.category].filter(Boolean).join(' · ') : id;
-};
 
 export const KIND_LABEL: Record<GraphicKind, string> = {
   poster: 'Poster or flyer',
@@ -353,136 +342,8 @@ export function BriefStage({
       )}
       <div className="gx-go">
         <button type="button" className="sb-btn is-primary" onClick={onContinue}>
-          {fields.kind === 'logo' ? 'See logo concepts' : source ? 'Compose it in that direction' : 'See three directions'}
+          {fields.kind === 'logo' ? 'Make the logo' : source ? 'Compose it in that direction' : 'Make it'}
         </button>
-      </div>
-    </div>
-  );
-}
-
-/** One direction's card: the design composed in it, at its first format. */
-export function DirectionsStage({
-  brief,
-  options,
-  assets,
-  measure,
-  href,
-  source,
-  onChoose,
-  onMore,
-  onBack,
-  onCombine,
-}: {
-  brief: GraphicBrief;
-  options: readonly GraphicDirection[];
-  assets: Asset[];
-  measure: Measure;
-  href: (id: string, src: string) => string;
-  source: { projectId: string; name: string } | null;
-  onChoose: (d: GraphicDirection) => void;
-  onMore: () => void;
-  /** back to the brief form (not offered for work begun in conversation: its brief is the conversation) */
-  onBack?: () => void;
-  /** two directions made one: the first's colours, the second's type and structure */
-  onCombine?: (colour: GraphicDirection, rest: GraphicDirection) => void;
-}) {
-  const [picked, setPicked] = useState<number[]>([]);
-  const toggle = (i: number) => setPicked((xs) => (xs.includes(i) ? xs.filter((x) => x !== i) : [...xs, i].slice(-2)));
-  // other directions drawn: what was ticked meant the ones before
-  useEffect(() => setPicked([]), [options]);
-  const previews = useMemo(
-    () =>
-      options.map((d, i) => {
-        // checked and repaired as the design will be when chosen: the preview is what the designer gets
-        const { doc: made, plans } = composeGraphic(brief, d, { measure, seed: 7 + i, assets });
-        const doc = refineDoc(made, measure).doc;
-        const b = doc.artboards[0];
-        const svg = renderArtboard(doc, b, { measure, href, idPrefix: `dp${i}-` }).replace(/^<svg([^>]*?) width="[^"]+" height="[^"]+"/, '<svg$1 width="100%" height="100%"');
-        return { svg, ratio: b.width / b.height, plan: plans[0], boards: doc.artboards.length };
-      }),
-    [options, brief, measure, assets, href],
-  );
-  const f = formatOf(brief.formats[0]);
-  return (
-    <div className="gx-dirs">
-      <header className="gx-brief-h">
-        <p className="gx-kicker">A graphic · 2 of 3</p>
-        <h1>Three directions for “{brief.content.headline}”</h1>
-        <p className="v0-quiet">
-          Each is the design itself{f ? `, at ${f.label} (${sizeLabel(f)})` : ''}, with your words exactly. Choose one to edit; nothing is final.
-        </p>
-      </header>
-      <ol className="gx-dir-list">
-        {options.map((d, i) => {
-          const p = previews[i];
-          return (
-            <li key={`${d.name}-${i}`} className="gx-dir">
-              <div className="gx-dir-art" style={{ aspectRatio: String(p.ratio) }} aria-hidden="true" dangerouslySetInnerHTML={{ __html: p.svg }} />
-              <h2>
-                {d.name}
-                {source && i === 0 ? <span className="gx-badge">From {source.name}</span> : null}
-              </h2>
-              <p className="gx-dir-lang">{d.style ? styleLine(d.style.primary, d.style.customs) : d.origin === 'generated' ? 'Generated from the brief · no style profile' : d.language.replace(/-/g, ' ')}</p>
-              {d.concept && <p className="gx-dir-concept">{d.concept}</p>}
-              <p className="gx-swatches" aria-label="Colours">
-                {(['background', 'text', 'accent', 'muted'] as const).map((k) => (
-                  <span key={k} style={{ background: d.tokens.colors[k] }} title={`${k} ${d.tokens.colors[k]}`} />
-                ))}
-              </p>
-              {p.plan?.generative ? <p className="gx-dir-idea">{p.plan.generative.concept.idea}</p> : null}
-              <p className="v0-quiet">
-                {d.tokens.fonts.display} and {d.tokens.fonts.body}
-                {p.plan ? (p.plan.generative ? ` · ${p.plan.generative.concept.emphasis === 'type' ? 'type-led' : p.plan.generative.concept.emphasis === 'image' ? 'image-led' : `${p.plan.generative.concept.emphasis}`} concept` : ` · ${p.plan.archetype.replace(/-/g, ' ')} composition`) : ''}
-                {p.boards > 1 ? ` · ${p.boards} artboards` : ''}
-              </p>
-              {p.plan?.said.length ? (
-                <details className="gx-why">
-                  <summary>Why it is composed this way</summary>
-                  <ul>
-                    {p.plan.said.slice(0, 5).map((s) => (
-                      <li key={s}>{s}</li>
-                    ))}
-                  </ul>
-                </details>
-              ) : null}
-              <span className="gx-dir-acts">
-                <button type="button" className="sb-btn is-primary is-sm" onClick={() => onChoose(d)}>
-                  Make it in this direction
-                </button>
-                {onCombine && (
-                  <label className="gx-dir-pick">
-                    <input type="checkbox" checked={picked.includes(i)} onChange={() => toggle(i)} />
-                    Combine
-                  </label>
-                )}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-      <div className="gx-go">
-        {onCombine && picked.length === 2 && (
-          <>
-            <button type="button" className="sb-btn" onClick={() => onCombine(options[picked[0]], options[picked[1]])}>
-              {options[picked[0]].name}’s colours, {options[picked[1]].name}’s type and structure
-            </button>
-            <button type="button" className="sb-btn" onClick={() => onCombine(options[picked[1]], options[picked[0]])}>
-              {options[picked[1]].name}’s colours, {options[picked[0]].name}’s type and structure
-            </button>
-          </>
-        )}
-        {onCombine && picked.length < 2 && <span className="v0-quiet">Tick two to combine them.</span>}
-        <button type="button" className="sb-btn" onClick={onMore}>
-          Something different
-        </button>
-        <button type="button" className="sb-link is-meta" onClick={() => options[0] && onChoose(options[0])}>
-          You choose
-        </button>
-        {onBack && (
-          <button type="button" className="sb-link is-meta" onClick={onBack}>
-            Back to the brief
-          </button>
-        )}
       </div>
     </div>
   );

@@ -2,14 +2,18 @@
 // creative director, from the first sentence to the finished work.
 //
 //   the home        one composer; words read live; a question instead of a guess when the words settle nothing
-//   how much        a detailed brief made at once (no conversation page, three directions waiting); a vague one asked
-//                   one meaningful question at a time, answered in the person's own words or at a tap
-//   choices         an optional question skipped, "make it now" with a gap left marked, a logo's name never skipped;
-//                   a website's three looks chosen, combined, refused for others; a graphic's directions combined
+//   how much        a detailed brief made at once (no conversation page, the design composed — no directions to choose);
+//                   a vague one asked what it cannot be made without, then a few creative questions drawn for it
+//   visual answers  moods drawn by the engine, palettes to see (and a colour of your own), lettering set in real faces
+//                   from the font library (loaded before they are shown); tapped, answered in words, skipped, "show me
+//                   others", "surprise me"; a reload keeps the question and its options
+//   the model       the questions route scripted: the model's question takes the reader's place, "ready" makes the work;
+//                   signed out (the real answer here), the reader's question stands and nothing waits
+//   choices         "make it now" with a gap left marked, a logo's name never skipped, a website made at once
 //   references      websites the person points to read through the server's guarded reader (recorded here), shown with
 //                   the page drawn inert, what was read, and what to take; one that cannot be read said so; set aside
-//   and             a reload mid-conversation, a phone's width, no model route called, no image library and no outside
-//                   host reached, no page errors
+//   and             a phone's width, no generation route called, no image library and no outside host reached, no
+//                   page errors
 // Every outcome is read back from the browser's own store (IndexedDB) as well as from the page.
 //
 //   UXV0_FORWARD=1 UXV0_BASE=http://127.0.0.1:3100 node test/browser/ux-v0/studio-qa.mjs
@@ -20,6 +24,7 @@ let fail = 0;
 const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok  ', n)) : (fail++, console.log('  FAIL', n, String(x).slice(0, 600))));
 const errors = [];
 const modelCalls = [];
+const questionCalls = [];
 const outside = new Set();
 const read = [];
 const b = await chromium.launch();
@@ -43,6 +48,32 @@ await ctx.route('**/api/ux-v0/reference', async (route) => {
   read.push(url);
   if (/larkfield/.test(url)) return route.fulfill({ json: LARKFIELD });
   return route.fulfill({ status: 422, json: { error: 'The site did not answer.' } });
+});
+
+// the questions route, scripted: signed out by default (as it really is here, with placeholder keys); a model's
+// question, or "ready", where a scenario asks for one
+let model = { mode: 'signed-out', answers: [] };
+const MODEL_VIBES = {
+  ready: false,
+  question: {
+    id: 'q-model',
+    kind: 'vibe',
+    decides: 'vibe',
+    text: 'Which morning should the post feel like?',
+    by: 'model',
+    vibes: [
+      { id: 'vibe-0', name: 'First light', note: 'pale flour tones, a soft crust-brown accent, a humanist serif', qualities: ['warm', 'calm'], character: 'humanist', palette: { ground: '#f6efe3', ink: '#2a1f16', accent: '#a65a2a', support: ['#e2c9a6'] }, form: 'organic' },
+      { id: 'vibe-1', name: 'Sugar rush', note: 'bright icing colours, rounded type, playful forms', qualities: ['playful', 'colourful'], character: 'friendly', palette: { ground: '#fff4f6', ink: '#2b1a24', accent: '#e0457b', support: ['#ffd166'] }, form: 'organic' },
+      { id: 'vibe-2', name: 'Old oven', note: 'faded print colours and a retro face, with grain', qualities: ['retro', 'warm'], character: 'retro', palette: { ground: '#efe4cf', ink: '#2c2218', accent: '#b4532a', support: ['#6b8f71'] }, form: 'orb' },
+    ],
+  },
+};
+await ctx.route('**/api/ux-v0/studio-questions', async (route) => {
+  const body = JSON.parse(route.request().postData() || '{}');
+  questionCalls.push(body.context ?? null);
+  if (model.mode === 'signed-out') return route.fulfill({ status: 401, json: { error: 'Sign in to use SocriaUX’s reasoning.', signIn: true } });
+  const next = model.answers.shift() ?? { ready: true, question: null };
+  return route.fulfill({ json: next });
 });
 
 const shot = (name) => page.screenshot({ path: `${S}studio-${name}.png` });
@@ -74,6 +105,11 @@ const until = async (fn, ms = 12000) => {
 };
 const pid = () => new URL(page.url()).searchParams.get('p');
 const project = async () => (pid() ? idb('socria-ux-v0', 'projects', pid()) : null);
+const started = () =>
+  until(async () => {
+    const x = await project();
+    return x?.studio?.status === 'started' ? x : null;
+  }, 30000);
 const COMPOSER = 'textarea[aria-label="What do you want to make?"]';
 const goHome = async () => {
   await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
@@ -84,17 +120,18 @@ const begin = async (words) => {
   await page.waitForTimeout(300);
   await page.getByRole('button', { name: 'Begin' }).click();
   await page.waitForSelector('.sd-chat, .gx, .bd, .v0-work', { timeout: 20000 });
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(500);
 };
 const reply = async (words) => {
   await page.fill('#sd-reply', words);
   await page.keyboard.press('Enter');
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(600);
 };
 const said = () => page.locator('.sd-msg.is-socria .sd-said').allInnerTexts();
 const lastSaid = async () => (await said()).at(-1) ?? '';
 const suggestions = () => page.locator('.sd-suggestion').allInnerTexts();
 const questionsAsked = async () => ((await project())?.studio?.transcript ?? []).filter((m) => m.from === 'socria' && m.kind === 'question').length;
+const designed = () => page.waitForSelector('.gx-stage svg, .gx-ws', { timeout: 30000 });
 
 console.log('=== the home ===');
 await goHome();
@@ -107,29 +144,19 @@ await shot('01-home');
 
 console.log('\n=== a detailed brief is made at once ===');
 await begin('A bold, experimental poster for “Field Lines”, “Code that draws”, 12–30 June 2027, Lisbon, in the style of a Swiss poster');
-await page.waitForSelector('.gx-dir', { timeout: 25000 });
-let p = await project();
-ok('no conversation page: the graphics workspace, three directions waiting', (await page.locator('.sd-chat').count()) === 0 && (await page.locator('.gx-dir').count()) === 3, await page.url());
-ok('…nothing was asked; what was understood is said once, as making', p?.studio && p.studio.transcript.filter((m) => m.from === 'socria' && m.kind === 'question').length === 0 && p.studio.transcript.some((m) => m.stage === 'making') && p.studio.status === 'started', JSON.stringify(p?.studio?.transcript?.map((m) => [m.kind, m.text.slice(0, 60)])));
-ok('…the words exactly as written, and the form, from the sentence', p.graphic?.brief?.content?.headline === 'Field Lines' && p.graphic.brief.kind === 'poster', JSON.stringify(p.graphic?.brief?.content));
-ok('the directions can be chosen, combined, refused for others, or left to SocriaUX', (await page.locator('.gx-dir-pick').count()) === 3 && (await page.getByRole('button', { name: 'Something different' }).count()) === 1 && (await page.getByRole('button', { name: 'You choose' }).count()) === 1 && (await page.getByRole('button', { name: 'Back to the brief' }).count()) === 0);
-const names = (await page.locator('.gx-dir h2').allInnerTexts()).map((t) => t.trim());
-await page.locator('.gx-dir-pick input').nth(0).check();
-await page.locator('.gx-dir-pick input').nth(2).check();
-await page.waitForTimeout(200);
-await shot('02-directions-combine');
-const combineBtn = page.locator('.gx-go .sb-btn').filter({ hasText: /’s colours, .*’s type and structure/ }).first();
-ok('two ticked: offered both ways round, in words', (await page.locator('.gx-go .sb-btn').filter({ hasText: /’s colours/ }).count()) === 2, await page.locator('.gx-go').innerText());
-await combineBtn.click();
-p = await until(async () => {
+await designed();
+let p = await until(async () => {
   const x = await project();
   return x?.graphic?.doc ? x : null;
-}, 20000);
-ok('combined: composed in one direction made of two (the first’s colours, the third’s type and structure)', p?.graphic?.direction?.name?.includes('×') && p.graphic.direction.name.startsWith(names[0].replace(/From .*$/, '').trim()), p?.graphic?.direction?.name);
-await page.waitForTimeout(600);
-await shot('03-combined-composed');
+}, 30000);
+ok('no conversation page and no directions to choose: the design itself, composed', (await page.locator('.sd-chat').count()) === 0 && (await page.locator('.gx-dir').count()) === 0 && !!p?.graphic?.doc, await page.url());
+ok('…nothing was asked; what was understood is said once, as making', p?.studio && p.studio.transcript.filter((m) => m.from === 'socria' && m.kind === 'question').length === 0 && p.studio.transcript.some((m) => m.stage === 'making') && p.studio.status === 'started', JSON.stringify(p?.studio?.transcript?.map((m) => [m.kind, m.text.slice(0, 60)])));
+ok('…the words exactly as written, and the form, from the sentence', p.graphic?.brief?.content?.headline === 'Field Lines' && p.graphic.brief.kind === 'poster' && p.graphic.doc.artboards[0].children.some((n) => n.type === 'text' && n.text === 'Field Lines'), JSON.stringify(p.graphic?.brief?.content));
+ok('…and the steps say so: the design, with no Directions step', (await page.locator('.v0-steps .sb-seg-item').filter({ hasText: 'Directions' }).count()) === 0);
+await page.waitForTimeout(800);
+await shot('02-detailed-made');
 
-console.log('\n=== a vague request: one meaningful question at a time ===');
+console.log('\n=== a vague request: what it is, its words, then a few questions drawn for it ===');
 await goHome();
 await begin('something for my bakery');
 ok('a conversation, opened on the one thing it cannot know: what it is', (await page.locator('.sd-chat').count()) === 1 && /What are you after/.test(await lastSaid()), await lastSaid());
@@ -139,63 +166,104 @@ ok('“Make it now” waits until it knows what it is making', await page.locato
 await page.locator('.sd-suggestion').filter({ hasText: 'A poster' }).first().click();
 await page.waitForTimeout(500);
 ok('a poster, then: the next question is the one a poster needs, its words', /What should the poster say/.test(await lastSaid()), await lastSaid());
-await shot('04-vague-words-question');
 await reply('Grand Opening — Saturday 4 May, 9am, 12 Mill Lane');
-await page.waitForSelector('.gx-dir', { timeout: 25000 });
-p = await project();
-ok('answered in the person’s own words: the work is made with them (two questions in all)', p.graphic?.brief?.content?.headline === 'Grand Opening' && (p.studio.transcript.filter((m) => m.from === 'socria' && m.kind === 'question').length === 2), JSON.stringify({ c: p.graphic?.brief?.content, q: p.studio?.transcript?.filter((m) => m.kind === 'question').length }));
+await page.waitForSelector('.sd-dq-card.is-vibe', { timeout: 15000 });
+await page.waitForTimeout(600);
+const tiles = page.locator('.sd-dq-card.is-vibe');
+ok('then how it should feel: moods drawn by the engine for it, each a small composition in the poster’s own words', (await tiles.count()) >= 3 && (await page.locator('.sd-dq-vibe svg').count()) >= 3 && (await page.locator('.sd-dq-vibe svg').first().innerHTML()).includes('Grand Opening'), await lastSaid());
+ok('…with “Show me others”, “Surprise me” and “Skip” beside them', (await page.locator('.sd-dq-acts .sd-chip').allInnerTexts()).join('|') === 'Show me others|Surprise me|Skip', (await page.locator('.sd-dq-acts .sd-chip').allInnerTexts()).join('|'));
+await shot('03-vibe-question');
+const moodNames0 = (await page.locator('.sd-dq-card.is-vibe .sd-dq-name').allInnerTexts()).join('|');
+await page.locator('.sd-dq-acts .sd-chip').filter({ hasText: 'Show me others' }).click();
+await page.waitForTimeout(800);
+const moodNames1 = (await page.locator('.sd-dq-card.is-vibe .sd-dq-name').allInnerTexts()).join('|');
+ok('“Show me others”: other moods for the same question', moodNames1 && moodNames1 !== moodNames0 && /some others/i.test(await lastSaid()), `${moodNames0} → ${moodNames1}`);
+const chosenMood = (await page.locator('.sd-dq-card.is-vibe .sd-dq-name').first().innerText()).trim();
+await page.locator('.sd-dq-card.is-vibe').first().click();
+await designed();
+p = await started();
+ok('a mood tapped: recorded as the person’s, and the poster is made in it (one creative question, asked once — “show me others” asked it again with other moods)', p?.studio?.answers['g.vibe']?.fields?.name === chosenMood && p.graphic?.brief?.content?.headline === 'Grand Opening' && JSON.stringify(p.studio.discovery?.asked) === '["vibe"]', JSON.stringify({ v: p?.studio?.answers['g.vibe'], asked: p?.studio?.discovery?.asked }));
+await until(async () => !!(await project())?.graphic?.doc, 20000);
+await page.waitForTimeout(800);
+await shot('04-made-in-the-mood');
 
-console.log('\n=== an optional question: skippable, asked once; a reload keeps the conversation ===');
+console.log('\n=== skipping, a colour of your own, a reload keeps the question ===');
 await goHome();
 await begin('A poster for “Open Day”');
-ok('a thin brief: how it should feel, with suggestions for this work, and “Skip this”', /How should it feel/.test(await lastSaid()) && (await suggestions()).length === 3 && (await page.getByRole('button', { name: 'Skip this' }).count()) === 1, await lastSaid());
+await page.waitForSelector('.sd-dq-card.is-vibe', { timeout: 15000 });
+ok('a thin brief: how it should feel, as moods to choose from', (await page.locator('.sd-dq-card.is-vibe').count()) >= 3 && /How should the poster feel/.test(await lastSaid()), await lastSaid());
+const before = (await page.locator('.sd-dq-card.is-vibe .sd-dq-name').allInnerTexts()).join('|');
 await page.reload({ waitUntil: 'networkidle' });
-await page.waitForSelector('.sd-chat');
-ok('a reload: the conversation is where it was, the question still open', /How should it feel/.test(await lastSaid()) && (await page.getByRole('button', { name: 'Skip this' }).count()) === 1);
-await page.getByRole('button', { name: 'Skip this' }).click();
-await page.waitForSelector('.gx-dir', { timeout: 25000 });
-p = await project();
-ok('skipped: “I’ll decide that”, and the directions are made', p.studio.answers['g.personality']?.skipped === true && p.studio.transcript.some((m) => /I’ll decide that/.test(m.text)), JSON.stringify(p.studio.answers['g.personality']));
+await page.waitForSelector('.sd-dq-card.is-vibe', { timeout: 15000 });
+ok('a reload: the conversation is where it was, the same moods offered', (await page.locator('.sd-dq-card.is-vibe .sd-dq-name').allInnerTexts()).join('|') === before, before);
+await page.locator('.sd-dq-acts .sd-chip').filter({ hasText: 'Skip' }).click();
+await page.waitForSelector('.sd-dq-card .sd-dq-pal', { timeout: 15000 });
+await page.waitForTimeout(500);
+ok('skipped: “I’ll decide that”, then its colours — palettes to see, each with its ink on its ground', /I’ll decide that/.test(await lastSaid()) && (await page.locator('.sd-dq-pal').count()) >= 3 && (await page.locator('.sd-dq-pal-aa').count()) >= 3, await lastSaid());
+ok('…and a colour of your own a tap away', (await page.locator('.sd-dq-own input[type="color"]').count()) === 1);
+await shot('05-colour-question');
+await reply('#c2410c');
+await designed();
+p = await started();
+ok('a hex code in the person’s own words: the accent, and the poster is made', p?.studio?.answers['g.palette']?.fields?.accent === '#c2410c' && p.studio.answers['g.vibe']?.skipped === true, JSON.stringify(p?.studio?.answers['g.palette']));
 
-console.log('\n=== “make it now”: gaps marked, never the name of a logo ===');
+console.log('\n=== a logo: its name, then its lettering in real faces ===');
 await goHome();
 await begin('A logo for a coffee roastery');
 ok('a logo without its name: the name is asked, and “Make it now” cannot do without it', /What is the name/.test(await lastSaid()) && (await page.locator('.sd-make').isDisabled()), await lastSaid());
 await reply('It’s called Halden');
-ok('the name read from a sentence and said back; then the one optional question this thin brief earns: how it should feel', /“Halden”\. How should it feel/.test(await lastSaid()) && (await page.getByRole('button', { name: 'Skip this' }).count()) === 1, await lastSaid());
-await reply('warm and crafted');
-await page.waitForSelector('.gx, .gx-logo, .lx', { timeout: 25000 });
-p = await until(async () => {
-  const x = await project();
-  return x?.studio?.status === 'started' ? x : null;
-}, 15000);
-ok('answered in a few words: the name set exactly, the feel kept, the concepts made', p?.studio?.answers['l.name']?.fields?.name === 'Halden' && p.studio.answers['l.personality']?.values?.includes('warm') && p.studio.status === 'started', JSON.stringify({ n: p?.studio?.answers['l.name'], f: p?.studio?.answers['l.personality'] }));
+await page.waitForSelector('.sd-dq-card.is-face', { timeout: 15000 });
+await page.waitForSelector('.sd-dq-list.is-faces.is-ready', { timeout: 15000 }).catch(() => null);
+await page.waitForTimeout(800);
+const specFaces = await page.locator('.sd-dq-spec').evaluateAll((els) => els.map((e) => getComputedStyle(e).fontFamily));
+const loaded = await page.evaluate((fams) => fams.map((f) => document.fonts.check(`40px ${f.split(',')[0]}`)), specFaces);
+ok('the name read from a sentence; then how its lettering should speak — “Halden” set in pairings of real faces, loaded before they are shown', /“Halden”/.test((await said()).join(' ')) && (await page.locator('.sd-dq-card.is-face').count()) >= 3 && (await page.locator('.sd-dq-spec').first().textContent()) === 'Halden' && loaded.filter(Boolean).length >= 2, JSON.stringify({ specFaces, loaded }));
+await shot('06-type-question');
+const faceName = (await page.locator('.sd-dq-card.is-face .sd-dq-name').first().innerText()).trim();
+await page.locator('.sd-dq-card.is-face').first().click();
+await page.waitForSelector('.sd-dq-pal', { timeout: 15000 });
+ok('a pairing tapped and said back; then its colours', (await said()).some((t) => t.toLowerCase().includes(faceName.toLowerCase())) && (await page.locator('.sd-dq-pal').count()) >= 3, await lastSaid());
+await page.locator('.sd-dq-acts .sd-chip').filter({ hasText: 'Surprise me' }).click();
+await page.waitForSelector('.gx-ws', { timeout: 30000 });
+p = await started();
+ok('“surprise me”: the logo is made, its concepts open in the editor (no concepts stage to choose from first)', p?.studio?.answers['l.name']?.fields?.name === 'Halden' && !!p.studio.answers['l.type']?.fields?.display && (await page.locator('.gx-ws').count()) === 1 && (await page.locator('.v0-steps .sb-seg-item').filter({ hasText: 'Concepts' }).count()) === 0, JSON.stringify({ n: p?.studio?.answers['l.name'], t: p?.studio?.answers['l.type'] }));
+await page.waitForTimeout(800);
+await shot('07-logo-made');
+
+console.log('\n=== the model writes the question when it can be reached ===');
+model = { mode: 'scripted', answers: [MODEL_VIBES, { ready: true, question: null }] };
+await goHome();
+await begin('An Instagram post for “Crumb & Co”, our bakery’s opening');
+await page.waitForSelector('.sd-dq-card.is-vibe', { timeout: 15000 });
+await until(async () => (await page.locator('.sd-dq-card.is-vibe .sd-dq-name').allInnerTexts()).includes('First light'), 10000);
+ok('the model’s question takes the reader’s place: its own words and moods, drawn by the engine', /Which morning should the post feel like/.test(await lastSaid()) && (await page.locator('.sd-dq-card.is-vibe .sd-dq-name').allInnerTexts()).join('|') === 'First light|Sugar rush|Old oven', await lastSaid());
+ok('…asked with the conversation as it stands (the brief, what is known, the budget), never more', questionCalls.at(-1)?.brief?.includes('Crumb & Co') && questionCalls.at(-1)?.open?.[0] === 'vibe' && questionCalls.at(-1)?.visualLeft === 2, JSON.stringify(questionCalls.at(-1)));
+await shot('08-model-question');
+await page.locator('.sd-dq-card.is-vibe').filter({ hasText: 'Old oven' }).click();
+await designed();
+p = await started();
+ok('a model mood tapped, then the model says the brief is enough: the post is made at once', p?.studio?.answers['g.vibe']?.fields?.name === 'Old oven' && p.studio.discovery?.done === true && p.studio.transcript.some((m) => m.stage === 'making'), JSON.stringify({ v: p?.studio?.answers['g.vibe'], d: p?.studio?.discovery }));
+model = { mode: 'signed-out', answers: [] };
+
+console.log('\n=== “make it now”: gaps marked; a website made at once ===');
 await goHome();
 await begin('a website for my pottery classes');
 ok('a website without its name: what it is called is asked', /What is it called/.test(await lastSaid()), await lastSaid());
 await page.locator('.sd-make').click();
-await page.waitForSelector('.v0-work, iframe.v0-frame, .v0', { timeout: 30000 });
-p = await until(async () => {
-  const x = await project();
-  return x?.studio?.status === 'started' ? x : null;
-}, 20000);
-ok('“make it now”: the page is made with its name left as a marked gap, the look chosen by SocriaUX', p && /^\[.+\]$/.test(p.studio.answers['w.words']?.fields?.brand ?? '') && !p.studio.answers['w.aesthetic'], JSON.stringify(p?.studio?.answers['w.words']));
-
-console.log('\n=== a website: looks to choose from, combine, refuse — and websites to learn from ===');
+p = await started();
+ok('“make it now”: the page is made with its name left as a marked gap', p && /^\[.+\]$/.test(p.studio.answers['w.words']?.fields?.brand ?? '') && p.specs?.length > 0, JSON.stringify(p?.studio?.answers['w.words']));
 await goHome();
 await begin('A website for “Stillwater Yoga” with bookings, calm and warm');
-await page.waitForSelector('.sd-look', { timeout: 20000 });
-ok('nothing asked: three looks offered, each a working page with the person’s words', (await page.locator('.sd-look').count()) === 3 && (await questionsAsked()) === 0 && /three directions/i.test(await lastSaid()), await lastSaid());
-await until(async () => (await page.locator('.sd-look iframe.sd-shot-frame').count()) === 3, 20000);
-ok('…drawn as pages (three sealed frames)', (await page.locator('.sd-look iframe.sd-shot-frame').count()) === 3);
-ok('…and “Make it now” is not offered beside them (choosing is: one, two combined, others, or “You choose”)', (await page.locator('.sd-make').count()) === 0 && (await page.getByRole('button', { name: 'You choose' }).count()) === 1 && (await page.getByRole('button', { name: 'Something different' }).count()) === 1);
-await shot('05-website-looks');
-const looks0 = (await page.locator('.sd-look-t').allInnerTexts()).join('|');
-await page.getByRole('button', { name: 'Something different' }).click();
-await page.waitForTimeout(900);
-const looks1 = (await page.locator('.sd-look-t').allInnerTexts()).join('|');
-ok('“Something different”: three others, kept apart from those seen', looks1 && looks1 !== looks0 && (await project()).studio.round === 1, `${looks0} → ${looks1}`);
-// a site to learn from, and one that cannot be read
+p = await started();
+ok('a website with its name, purpose and feel: made at once, no looks to choose from', p?.mode === 'create' && p.specs?.length > 0 && (await page.locator('.sd-look').count()) === 0 && p.studio.transcript.filter((m) => m.from === 'socria' && m.kind === 'question').length === 0, JSON.stringify(p?.studio?.transcript?.map((m) => m.text.slice(0, 60))));
+await page.waitForTimeout(1200);
+await shot('09-website-made');
+
+console.log('\n=== websites to learn from, while a question waits ===');
+await goHome();
+await begin('A website for “Mira Studio”');
+await page.waitForSelector('.sd-suggestion', { timeout: 15000 });
+ok('a website whose purpose is not said: what people should do on it, with a few suggested answers', /What should people be able to do on it/.test(await lastSaid()) && (await suggestions()).length >= 2, await lastSaid());
 await reply('something like larkfield.studio, or like nowhere.design');
 await page.waitForSelector('.sd-refcard', { timeout: 10000 });
 await page.waitForTimeout(500);
@@ -203,46 +271,40 @@ p = await project();
 ok('sites named in a sentence (“like larkfield.studio”) were asked of the server’s reader, nothing fetched from the browser', read.some((u) => /larkfield\.studio/.test(u)) && read.some((u) => /nowhere\.design/.test(u)) && ![...outside].some((h) => /larkfield|nowhere/.test(h)), JSON.stringify({ read, outside: [...outside] }));
 const rc = page.locator('.sd-refcard').first();
 ok('what was read is shown: the page drawn inert, its address, its colours, a designer’s notes', (await rc.locator('iframe[sandbox=""]').count()) === 1 && /larkfield\.studio/.test(await rc.innerText()) && (await rc.locator('.sd-refcard-sw span').count()) === 4 && /serif headings/.test(await rc.innerText()), await rc.innerText());
-ok('…kept with the conversation, liked until said otherwise', p.studio.references?.length === 1 && p.studio.references[0].state === 'liked' && p.studio.references[0].kind === 'site');
+ok('…kept with the conversation, liked until said otherwise; the question still waits', p.studio.references?.length === 1 && p.studio.references[0].state === 'liked' && p.studio.pending === 'discover' && p.studio.discovery?.current?.decides === 'purpose');
 ok('the site that could not be read is said plainly, with what to do instead', (await said()).some((t) => /I couldn’t read nowhere\.design: the site did not answer/.test(t) && /screenshot/.test(t)), JSON.stringify((await said()).slice(-3)));
 await rc.locator('.sd-chip').filter({ hasText: 'Colours' }).click();
 await page.waitForTimeout(400);
 p = await project();
 ok('what to take from it, at a tap: its colours only', JSON.stringify(p.studio.references[0].take) === '["colour"]', JSON.stringify(p.studio.references[0]));
-await shot('06-reference-card');
-ok('the looks still on offer after the reading, drawn again with it', (await page.locator('.sd-look .sd-look-pick input').count()) === 3);
+await shot('10-reference-card');
 await rc.getByRole('button', { name: 'Not this one' }).click();
 await page.waitForTimeout(400);
 ok('set aside: it speaks for nothing, and can be taken back', (await project()).studio.references[0].state === 'rejected' && (await page.getByRole('button', { name: 'Use it after all' }).count()) === 1);
 await page.getByRole('button', { name: 'Use it after all' }).click();
 await page.waitForTimeout(300);
-// two looks combined
-await page.locator('.sd-look-pick input').nth(0).check();
-await page.locator('.sd-look-pick input').nth(2).check();
-await page.waitForTimeout(200);
-ok('two ticked: both combinations offered, in words', (await page.locator('.sd-looks-bar .sd-pill').filter({ hasText: /’s colours/ }).count()) === 2);
-await page.locator('.sd-looks-bar .sd-pill').filter({ hasText: /’s colours/ }).first().click();
-p = await until(async () => {
-  const x = await project();
-  return x?.studio?.status === 'started' ? x : null;
-}, 30000);
-ok('combined and made: the first’s colours with the third’s type and structure, a working website', p?.studio?.answers['w.aesthetic']?.values?.[0] === 'mix-0-2' && p.mode === 'create' && p.specs?.length > 0, JSON.stringify(p?.studio?.answers['w.aesthetic']));
-await page.waitForTimeout(800);
-await shot('07-website-made');
+await page.locator('.sd-suggestion').first().click();
+await page.waitForTimeout(700);
+p = await project();
+ok('a suggested answer tapped: read as the person’s words, then the next question worth asking', !!p.studio.answers['w.purpose'] && p.studio.pending === 'discover' && p.studio.discovery?.current?.decides !== 'purpose', JSON.stringify({ p: p.studio.answers['w.purpose'], q: p.studio.discovery?.current?.decides }));
+await page.locator('.sd-make').click();
+p = await started();
+ok('“make it now”: a working website, its colours from the site taken for them', p?.mode === 'create' && p.specs?.length > 0, JSON.stringify(p?.studio?.answers));
 
 console.log('\n=== a phone ===');
 await page.setViewportSize({ width: 390, height: 844 });
 await goHome();
 await begin('A poster for “Spring Fair”');
-await page.waitForSelector('.sd-chat');
+await page.waitForSelector('.sd-dq-card.is-vibe', { timeout: 15000 });
+await page.waitForTimeout(500);
 const fit = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);
-ok('the conversation fits a phone, no sideways scrolling', fit[0] <= fit[1], JSON.stringify(fit));
+ok('the conversation and its moods fit a phone, no sideways scrolling', fit[0] <= fit[1], JSON.stringify(fit));
 const comp = await page.locator('.sd-chat-composer').boundingBox();
 ok('…the reply at the foot, within the screen', comp && comp.y + comp.height <= 844 + 1 && comp.x >= 0, JSON.stringify(comp));
-await shot('08-phone');
+await shot('11-phone');
 
 console.log('\n=== and ===');
-ok('no model route was called', modelCalls.length === 0, modelCalls.join(' '));
+ok('no generation route was called (the questions route was asked, refused while signed out, and the reader’s questions stood)', modelCalls.length === 0 && questionCalls.length >= 3, modelCalls.join(' '));
 // the app's own sign-in script (placeholder keys here) and the typefaces the engines set are the only hosts expected
 const hosts = [...outside].filter((h) => !/^fonts\.(googleapis|gstatic)\.com$/.test(h) && !/clerk/.test(h));
 ok('no image library and no other outside host reached from the browser (the sites read were read by the server)', !hosts.length && ![...outside].some((h) => /openverse|unsplash|pexels|flickr|wikimedia|larkfield|nowhere/.test(h)), [...outside].join(' '));

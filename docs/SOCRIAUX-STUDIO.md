@@ -8,6 +8,13 @@ This document records how the experience is built: the audit behind the creative
 what replaced it, the data it keeps, how it is verified, and what it does not do. The first studio and its redesign
 are kept at the end as their own audits.
 
+> **Superseded in part by the dynamic creative discovery redesign — docs/SOCRIAUX-DYNAMIC-DISCOVERY.md.** The fixed
+> "How should it feel?" question, a website's three looks, a graphic's three directions, the logo concepts stage and a
+> board's three systems are gone: after what the work cannot be made without, SocriaUX asks at most three creative
+> questions generated for the brief (moods drawn by the engine, palettes, lettering in real faces, or a written
+> question), the model writing them when it can be reached, then makes the work at once. What follows describes the
+> rework before that one.
+
 ## The creative discovery rework — audit and decisions
 
 The redesign before this one began every work in a conversation, but the conversation was still a questionnaire: a

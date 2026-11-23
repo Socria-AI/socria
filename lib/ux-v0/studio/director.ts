@@ -7,15 +7,16 @@
 //   · what the work cannot be made without, and nothing in the words gives (the words a poster says, a logo's name, a
 //     campaign's pieces, the design for a critique) — and even these can be left as marked gaps when the person asks
 //     to just make it, except where the work would mean nothing without them (a logo's name);
-//   · then, only when the brief is thin, one question that would change the work most for this project (what a logo's
-//     business does, what people should do on a site, whether a picture is to be placed or only learnt from, how it
-//     should feel) — asked once, never repeated, always skippable;
-//   · never typography, colour, spacing or composition as such: those are the engines' to propose, and the person's to
-//     change in words when they see the work.
-// A detailed brief is made at once; a vague one gets a question or two. Replies are read as the person writes them —
-// an answer, a change of mind, a link to learn from, "make it", "surprise me", "skip", "something different" — and
-// mapped onto the decisions the engines already read (./apply.ts), so making the work is unchanged.
-// Deterministic and free: no model decides what to ask.
+//   · then a few creative questions, only those that would change this work and that the brief leaves open
+//     (./discovery.ts): what a logo stands for, what a site is for, whether a picture is placed; and, as visual aids,
+//     how it should feel (moods drawn for the brief), its colours (palettes) or its lettering (real typefaces) — at
+//     most three in all, never all three visual ones, none when the brief is complete. Each is generated for this
+//     brief and the answers so far; the model writes them when it can be reached (the browser asks it:
+//     components/ux-v0/studio/questionPlanner.ts), the reader here otherwise.
+// A detailed brief is made at once; a vague one gets a question or two, then the work is made — there is no separate
+// stage of choosing a direction. Replies are read as the person writes them — an answer, a tap on an option, a
+// colour or a typeface named, a change of mind, a link to learn from, "make it", "surprise me", "skip", "show me
+// others" — and mapped onto the decisions the engines already read (./apply.ts), so making the work is unchanged.
 
 import type { StudioAnswer, StudioMode, StudioState } from './schema';
 import { said } from './schema';
@@ -25,6 +26,7 @@ import { answerOf, wordsOf } from './apply';
 import { recognizeIntent } from './intent';
 import { modeInfo } from './modes';
 import { likedRefs } from './references';
+import { answerDiscoveryWords, askDiscovery, chooseDiscovery, closeDiscovery, creativeNeeds, discoveryQuestion, onlyPointsElsewhere, skipDiscovery, type DiscoveryQuestion, type Subject } from './discovery';
 
 export type Topic = 'what' | 'kind' | 'words' | 'name' | 'about' | 'purpose' | 'materials' | 'feel' | 'pictures' | 'file' | 'source';
 
@@ -40,8 +42,8 @@ export interface Question {
 
 export type Move =
   | { kind: 'ask'; question: Question }
-  /** a website: three looks drawn as working pages, to choose from — or not */
-  | { kind: 'looks' }
+  /** a creative question (./discovery.ts), with options generated for this brief */
+  | { kind: 'discover'; question: DiscoveryQuestion }
   | { kind: 'create' };
 
 /** What the browser knows that the record does not. */
@@ -271,31 +273,13 @@ function materialNumbers(words: string): Record<string, number> {
 
 // ── how much to ask ──
 
-/** How much the brief says beyond what is required: its feel, its look, its details, references to learn from. */
-function richness(st: StudioState, u: Understanding): number {
-  return (u.mood.length ? 1 : 0) + (u.look.length ? 1 : 0) + (u.details.length ? 1 : 0) + (st.attachments.some((a) => a.kind === 'image') ? 1 : 0);
+/** What the work is called in a question, and the words its lettering is shown in (./discovery.ts Subject). */
+export function subjectFor(st: StudioState, u: Understanding = understand(st)): Subject {
+  const it = st.mode === 'graphic' ? (u.kindLabel === 'graphic' ? 'it' : `the ${u.kindLabel}`) : st.mode === 'logo' ? 'the logo' : st.mode === 'website' ? 'the site' : st.mode === 'board' ? 'the campaign' : 'it';
+  return { it, sample: (u.name || u.headline || title(subjectOf(st.prompt)) || modeInfo(st.mode).label).slice(0, 60) };
 }
 
-/** The one question that would change this work most, when the brief is thin (asked at most once per conversation). */
-function optionalTopic(st: StudioState, u: Understanding): Topic | null {
-  const rich = richness(st, u);
-  if (st.mode === 'graphic' || st.mode === 'board') {
-    if (u.pictures && !u.pictureUse) return 'pictures';
-    return rich === 0 ? 'feel' : null;
-  }
-  if (st.mode === 'logo') {
-    if (!u.about) return 'about';
-    return rich === 0 ? 'feel' : null;
-  }
-  if (st.mode === 'website') return u.purpose ? null : 'purpose';
-  return null;
-}
-
-const OPTIONAL: readonly Topic[] = ['about', 'purpose', 'feel', 'pictures'];
-const wasAsked = (st: StudioState, t: Topic) => (st.asked ?? []).includes(t);
-const askedAnOptional = (st: StudioState) => (st.asked ?? []).some((t) => (OPTIONAL as readonly string[]).includes(t));
-
-/** What to do next: ask one thing, show a website's looks, or make the work. */
+/** What to do next: ask what the work cannot be made without, ask a creative question worth asking, or make it. */
 export function nextMove(st: StudioState, env: DirectorEnv = {}): Move {
   if (st.modeBy === 'unsure' && !st.answers.what) return { kind: 'ask', question: questionFor(st, 'what', env) };
   const u = understand(st);
@@ -303,35 +287,21 @@ export function nextMove(st: StudioState, env: DirectorEnv = {}): Move {
   // what the work cannot be made without (when the person asked to just make it, only what cannot be left as a gap)
   const required = go ? u.required.filter((t) => !GAPPABLE[st.mode].includes(t)) : u.required;
   if (required.length) return { kind: 'ask', question: questionFor(st, required[0], env) };
-  if (!go) {
-    const opt = optionalTopic(st, u);
-    if (opt && !wasAsked(st, opt) && !askedAnOptional(st) && !resolved(st.answers[optKey(st, opt)])) return { kind: 'ask', question: questionFor(st, opt, env) };
+  // then the creative questions that would change this work, while the brief leaves them open
+  for (const d of go ? [] : creativeNeeds(st)) {
+    const q = discoveryQuestion(st, d, subjectFor(st, u));
+    if (q) return { kind: 'discover', question: q };
   }
-  // a website's looks are offered once the brief is enough: unless one is chosen, or the person left the choice to SocriaUX
-  return st.mode === 'website' && !go && !st.answers['w.aesthetic'] ? { kind: 'looks' } : { kind: 'create' };
+  return { kind: 'create' };
 }
 
 /** Topics that can be left as a marked gap when the person asks to just make it. */
 const GAPPABLE: Record<StudioMode, readonly Topic[]> = { graphic: ['kind', 'words'], website: ['name'], board: ['words'], logo: [], critique: [], system: [] };
 
+/** Where an answer to a topic is kept (the optional topics of conversations recorded before discovery). */
 const optKey = (st: StudioState, t: Topic) => (t === 'feel' ? key(st, 'personality') : t === 'about' ? 'l.about' : t === 'purpose' ? 'w.purpose' : key(st, t));
 
 // ── the questions, in Socria's voice, for this project ──
-
-const FEEL_PAIRS: Readonly<Record<string, readonly string[]>> = {
-  food: ['Warm and handmade', 'Bright and playful', 'Calm and refined'],
-  music: ['Loud and raw', 'Dark and cinematic', 'Playful and bright'],
-  art: ['Quiet and poetic', 'Bold and experimental', 'Precise and minimal'],
-  technology: ['Precise and modern', 'Bold and futuristic', 'Calm and friendly'],
-  wellbeing: ['Calm and natural', 'Warm and friendly', 'Quiet and refined'],
-  fashion: ['Refined and editorial', 'Bold and loud', 'Minimal and elegant'],
-  children: ['Playful and joyful', 'Warm and friendly', 'Bright and bold'],
-  celebration: ['Joyful and loud', 'Elegant and warm', 'Bold and playful'],
-};
-const feelSuggestions = (st: StudioState) => {
-  const d = readFacts(allWords(st)).domains.find((x) => FEEL_PAIRS[x]);
-  return [...(d ? FEEL_PAIRS[d] : ['Bold and playful', 'Calm and minimal', 'Warm and crafted'])];
-};
 
 const it = (st: StudioState) => {
   const u = understand(st);
@@ -372,12 +342,9 @@ export function questionFor(st: StudioState, topic: Topic, env: DirectorEnv = {}
       const one = st.attachments.filter((x) => x.kind === 'image').length === 1;
       return { topic, optional: true, text: `Should I place ${one ? 'your picture' : 'your pictures'} in the design, or just take ${one ? 'its' : 'their'} look — the colours and the mood?`, suggestions: ['Place it in the design', 'Just take its look'] };
     }
-    case 'feel': {
-      const after = st.mode === 'logo' ? 'Or I’ll start from the name.' : 'Or I’ll start from what you’ve said and show you three directions.';
-      return u.mood.length
-        ? { topic, optional: true, text: `Anything it should look like? Describe it, paste a link to something you like, or drop in a picture. ${after}`, suggestions: [] }
-        : { topic, optional: true, text: `How should it feel? A few words is plenty — or point me to something you like: paste a link, or drop in a picture. ${after}`, suggestions: feelSuggestions(st) };
-    }
+    case 'feel':
+      // asked only by conversations recorded before the creative questions (./discovery.ts asks about the feel now)
+      return { topic, optional: true, text: 'How should it feel? A few words is plenty — or point me to something you like: paste a link, or drop in a picture.', suggestions: [] };
     case 'file':
       return { topic, optional: false, text: 'Which design should I look at? Drop in the page (HTML) or a screenshot (PNG, JPG or SVG). It stays in this browser.', suggestions: [] };
     case 'source':
@@ -420,7 +387,8 @@ export function restate(st: StudioState): string {
     const subj = yourSubject(st.prompt);
     const what = subj && u.name && !subj.toLowerCase().includes(u.name.toLowerCase()) ? `, ${/^your /.test(subj) ? subj : `${a_(subj)} ${subj}`}` : '';
     const own = answerOf(st, 'l.about')?.text;
-    return `${title(art)} ${lead} for ${u.name ? `“${u.name}”` : subj || 'you'}${what}${own ? ` — ${own.replace(/[.!]+$/, '').slice(0, 80)}` : ''}`;
+    const forWhom = u.name ? `“${u.name}”` : subj ? (/^your /.test(subj) ? subj : `${a_(subj)} ${subj}`) : 'you';
+    return `${title(art)} ${lead} for ${forWhom}${what}${own ? ` — ${own.replace(/[.!]+$/, '').slice(0, 80)}` : ''}`;
   }
   if (st.mode === 'website') {
     const parts = C.SITE_FUNCTIONS.filter((x) => u.functions.includes(x.id)).map((x) => FUNCTION_SAID[x.id] ?? x.label.toLowerCase()).slice(0, 3);
@@ -445,19 +413,18 @@ export function restate(st: StudioState): string {
 export function makingLine(st: StudioState): string {
   const u = understand(st);
   const go = !!st.answers.go;
-  const open = go ? ' I’ll decide whatever you left open — change anything once you see it.' : '';
+  const open = go ? ' I’ll decide whatever you left open — change anything once you see it.' : ' Change anything in your own words once you see it.';
   switch (st.mode) {
     case 'graphic':
-      return `Composing three directions for ${u.headline ? `“${u.headline}”` : 'it'} — pick one, combine two, or ask for something different.${open}`;
+      return `Composing ${u.kindLabel === 'graphic' ? 'it' : `the ${u.kindLabel}`}${u.headline ? ` for “${u.headline}”` : ''} from what you’ve told me.${open}`;
     case 'logo':
-      return `Constructing concepts for “${u.name}” — built from what it stands for, never taken from a library of marks.${open}`;
+      return `Constructing “${u.name}” — lettering and a mark built from what it stands for, never taken from a library of marks.${open}`;
     case 'board': {
       const n = u.materials.reduce((t, m) => t + m.count, 0);
-      return `Planning ${n} piece${n === 1 ? '' : 's'}${u.headline ? ` around “${u.headline}”` : ''}, with three identities to choose from.${open}`;
+      return `Planning ${n} piece${n === 1 ? '' : 's'}${u.headline ? ` around “${u.headline}”` : ''}, sharing one identity drawn from what you’ve said.${open}`;
     }
     case 'website':
-      if (go || st.answers['w.aesthetic']) return `Making the page${u.name ? ` for “${u.name}”` : ''}: its structure, its working parts, your words.${go && !st.answers['w.aesthetic'] ? ' I’ll choose the look myself — change anything once you see it.' : ''}`;
-      return `Here are three directions for ${u.name ? `“${u.name}”` : 'it'}, each a working page with your words. Choose one, combine two, or ask for something different — or I’ll go with the first.`;
+      return `Making the page${u.name ? ` for “${u.name}”` : ''}: its structure, its working parts, your words, in a look drawn from what you’ve said.${open}`;
     case 'critique':
       return 'Opening your design. Select any part of it and we’ll reason it through.';
     case 'system':
@@ -481,12 +448,54 @@ function speak(st: StudioState, move: Move, lead: string, now: number): StudioSt
     const asked = [...new Set([...(st.asked ?? []), q.topic])];
     return said({ ...st, pending: q.topic, asked }, { from: 'socria', kind: 'question', stage: q.topic, text: [lead, q.text].filter(Boolean).join(' '), at: now });
   }
-  const { pending: _, ...rest } = st;
-  if (move.kind === 'looks' && st.transcript.some((m) => m.kind === 'offer')) {
-    return said(rest, { from: 'socria', kind: 'offer', stage: 'looks', text: `${lead ? `${lead} ` : ''}The three directions, drawn again with that — choose one, combine two, or ask for something different.`, at: now });
+  if (move.kind === 'discover') {
+    const q = move.question;
+    return said(askDiscovery(st, q), { from: 'socria', kind: 'question', stage: 'discover', text: [lead, q.text].filter(Boolean).join(' '), at: now });
   }
+  const { pending: _, ...rest } = st;
   const enough = lead ? `${lead} That’s enough to begin.` : 'That’s enough to begin.';
-  return said(rest, { from: 'socria', kind: move.kind === 'looks' ? 'offer' : 'note', stage: move.kind === 'looks' ? 'looks' : 'making', text: `${enough} ${makingLine(rest)}`, at: now });
+  return said(rest, { from: 'socria', kind: 'note', stage: 'making', text: `${enough} ${makingLine(rest)}`, at: now });
+}
+
+/** Socria's last question message about the creative question waiting, and the words that led into it. */
+function questionMessage(st: StudioState, q: DiscoveryQuestion): { index: number; lead: string } | null {
+  for (let i = st.transcript.length - 1; i >= 0; i--) {
+    const m = st.transcript[i];
+    if (m.from !== 'socria') continue;
+    if (m.kind !== 'question' || m.stage !== 'discover') return null;
+    return { index: i, lead: m.text.endsWith(q.text) ? m.text.slice(0, m.text.length - q.text.length).trim() : '' };
+  }
+  return null;
+}
+
+/**
+ * The model's question in place of the reader's (asked while it was being written, never seen): the same turn, the
+ * same lead, its own words and options. Nothing changes when the reader's question was answered in the meantime.
+ */
+export function rethinkQuestion(st: StudioState, readerId: string, q: DiscoveryQuestion | null): StudioState {
+  const cur = st.discovery?.current;
+  if (!q || st.pending !== 'discover' || !cur || cur.id !== readerId) return st;
+  const at = questionMessage(st, cur);
+  if (!at) return st;
+  const asked = [...new Set([...(st.discovery?.asked ?? []).filter((d) => d !== cur.decides), q.decides])];
+  const transcript = st.transcript.map((m, i) => (i === at.index ? { ...m, text: [at.lead, q.text].filter(Boolean).join(' ').slice(0, 2400) } : m));
+  return { ...st, transcript, discovery: { ...st.discovery, asked, current: q } };
+}
+
+/**
+ * The brief is enough (the model judged it so before the reader's question was seen): nothing more is asked, and the
+ * turn says the work is being made instead.
+ */
+export function enoughToMake(st: StudioState, readerId: string, env: DirectorEnv = {}): StudioState {
+  const cur = st.discovery?.current;
+  if (st.pending !== 'discover' || !cur || cur.id !== readerId) return st;
+  const at = questionMessage(st, cur);
+  const { pending: _, ...rest } = st;
+  const next: StudioState = { ...rest, discovery: { asked: (st.discovery?.asked ?? []).filter((d) => d !== cur.decides), done: true } };
+  if (nextMove(next, env).kind !== 'create') return st;
+  const enough = at?.lead ? `${at.lead} That’s enough to begin.` : 'That’s enough to begin.';
+  const text = `${enough} ${makingLine(next)}`;
+  return { ...next, transcript: next.transcript.map((m, i) => (at && i === at.index ? { ...m, kind: 'note' as const, stage: 'making', text } : m)) };
 }
 
 /** The directions named in words, in the order they are named ("the third and the first" → [2, 0]). */
@@ -651,7 +660,7 @@ function absorb(st: StudioState, text: string, now: number, skip: readonly strin
     const before = answers[`${p}.look`]?.text ?? '';
     put(`${p}.look`, { values: [], text: [before, f.styles.map((s) => s.replace(/-/g, ' ')).join(', ')].filter(Boolean).join(', ').slice(0, 400) }, 'the look');
   }
-  if (f.colours.length >= 3) {
+  if (f.colours.length >= 3 && !skip.includes('colours')) {
     const [ground, ink, accent] = paletteOrder(f.colours);
     put(`${p}.palette`, { values: [], fields: { ground, ink, accent } }, 'the colours');
   }
@@ -779,9 +788,10 @@ export function respond(st: StudioState, text: string, env: DirectorEnv = {}, op
   let next = said(st, { from: 'person', kind: 'reply', text: t || 'These', ...(opts.attachments?.length ? { attachments: opts.attachments } : {}), at: now });
   const heard = t ? hear(st, t) : ({ kind: 'words' } as Heard);
   const research = referenceUrls(t);
+  const waiting = st.pending === 'discover' ? st.discovery?.current : undefined;
   if (heard.kind === 'switch') return { st: next, move: nextMove(next, env), research, switchTo: heard.mode };
   if (heard.kind === 'make' || heard.kind === 'surprise') {
-    next = makeItNow(next, now);
+    next = makeItNow(waiting ? closeDiscovery(next) : next, now);
     const move = nextMove(next, env);
     if (move.kind === 'ask') return { st: speak(next, move, 'I need one thing before I can make it.', now), move, research };
     return { st: speak(next, move, heard.kind === 'surprise' ? 'Leaving the rest to me, then.' : '', now), move, research };
@@ -790,26 +800,22 @@ export function respond(st: StudioState, text: string, env: DirectorEnv = {}, op
     const lead = 'I can read any website you point me to and take what is useful from it — its colours, its type, how its pages feel. Paste a link to something you like, or drop in a picture.';
     return { st: said(next, { from: 'socria', kind: 'note', text: lead, at: now }), move: nextMove(next, env), research };
   }
-  if (heard.kind === 'different' || heard.kind === 'looks') {
-    if (st.mode === 'website' && (heard.kind === 'looks' || st.transcript.some((m) => m.kind === 'offer'))) {
-      next = { ...next, round: (next.round ?? 0) + (heard.kind === 'different' ? 1 : 0) };
-      const { pending: _, ...rest } = next;
-      return { st: said(rest, { from: 'socria', kind: 'offer', stage: 'looks', text: heard.kind === 'different' ? 'Three more directions, apart from those you have seen — a style your own words point to stays in the running.' : makingLine(rest), at: now }), move: { kind: 'looks' }, research };
+  // other options for the question waiting ("show me others", "none of these")
+  if (waiting && (heard.kind === 'different' || heard.kind === 'looks')) {
+    next = { ...next, round: (next.round ?? 0) + 1 };
+    const q = discoveryQuestion(next, waiting.decides, subjectFor(next));
+    if (q && q.kind !== 'text') {
+      const move: Move = { kind: 'discover', question: q };
+      return { st: speak(next, move, 'Here are some others.', now), move, research };
     }
   }
-  // a look named while the looks are on offer: "the second one", "the first’s colours with the third's type"
-  if (st.mode === 'website' && t && lookOnOffer(st)) {
-    const low = norm(t);
-    const ords = ordinalsIn(low).filter((i) => i < 3);
-    const mix = ords.length >= 2 && COMBINE_WORDS.test(low);
-    if (mix || (ords.length === 1 && !/\b(not|don'?t|no|never)\b/.test(low))) {
-      const value = mix ? `mix-${colourFirst(low, ords).join('-')}` : `sys-${ords[0]}`;
-      next = { ...next, answers: { ...next.answers, 'w.aesthetic': { values: [value], source: 'person', at: now } } };
-      return { st: makingIn(next, value, now), move: { kind: 'create' }, research };
-    }
+  const pending = st.pending as Topic | 'discover' | undefined;
+  if (heard.kind === 'skip' && pending === 'discover') {
+    next = skipDiscovery(next, now);
+    const move = nextMove(next, env);
+    return { st: speak(next, move, 'Fine — I’ll decide that.', now), move, research };
   }
-  const pending = st.pending as Topic | undefined;
-  if (heard.kind === 'skip' && pending) {
+  if (heard.kind === 'skip' && pending && pending !== 'discover') {
     const q = questionFor(st, pending, env);
     if (!q.optional && !GAPPABLE[st.mode].includes(pending)) {
       return { st: said(next, { from: 'socria', kind: 'question', stage: pending, text: `I can’t make it without that, I’m afraid. ${q.text}`, at: now }), move: { kind: 'ask', question: q }, research };
@@ -820,8 +826,15 @@ export function respond(st: StudioState, text: string, env: DirectorEnv = {}, op
   }
   // the answer to what was asked, then whatever else the words change
   let ack = '';
-  let readAs: Topic | null = null;
-  if (pending && t) {
+  let readAs: string | null = null;
+  if (waiting && t) {
+    const r = answerCreative(next, waiting, t, env, now);
+    if (r.read) {
+      next = r.st;
+      ack = r.ack;
+      readAs = waiting.decides;
+    }
+  } else if (pending && pending !== 'discover' && t) {
     const r = answerTopic(next, pending, t, env, now);
     if (r.read) {
       next = r.st;
@@ -837,27 +850,53 @@ export function respond(st: StudioState, text: string, env: DirectorEnv = {}, op
     return { st: speak(next, move, heardNow ? `${heardNow}.` : ack, now), move, research };
   }
   if (t) {
-    const ab = absorb(next, t, now, readAs ? [readAs === 'feel' ? 'feel' : readAs, ...(readAs === 'feel' ? ['look'] : [])] : []);
+    // what was answered is not read again from the same words (a colour answer is the palette, not a change of it)
+    const skip = readAs === 'feel' || readAs === 'vibe' ? ['feel', 'look'] : readAs === 'colour' ? ['colours', 'look'] : readAs === 'type' ? ['look'] : readAs ? [readAs] : [];
+    const ab = absorb(next, t, now, skip);
     next = ab.st;
     if (!readAs && ab.changed.length) ack = `Changed ${list(ab.changed)}.`;
     // words that settle something of what is still open are kept with everything said, for the engines to read
-    if (!readAs || readAs === 'feel' || readAs === 'about' || readAs === 'purpose') next = seedFromWords({ ...next, prompt: `${next.prompt} — ${t}`.slice(0, 2000) }, now);
+    // (words that only point to a site are not: the site's address is not a description of the work)
+    if (!onlyPointsElsewhere(t) && (!readAs || ['feel', 'about', 'purpose', 'vibe', 'type'].includes(readAs) || (waiting?.kind === 'text' && !['pictures'].includes(readAs)))) next = seedFromWords({ ...next, prompt: `${next.prompt} — ${t}`.slice(0, 2000) }, now);
   }
   if (research.length && !ack) ack = `I’ll take a look at ${list(research.map((u) => u.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')))}.`;
   if (!readAs && pending && t && !research.length && !ack) {
     // a reply that answers nothing that was asked, and changes nothing named: the question again, said another way
-    const q = questionFor(next, pending, env);
+    if (waiting) return { st: said(next, { from: 'socria', kind: 'question', stage: 'discover', text: `I didn’t quite catch that. ${waiting.text}`, at: now }), move: { kind: 'discover', question: waiting }, research };
+    const q = questionFor(next, pending as Topic, env);
     return { st: said(next, { from: 'socria', kind: 'question', stage: pending, text: `I didn’t quite catch that. ${q.text}`, at: now }), move: { kind: 'ask', question: q }, research };
   }
+  // the question waiting stays waiting when the reply only changed something else (a site to read, a colour named)
+  if (waiting && !readAs) return { st: next, move: { kind: 'discover', question: waiting }, research };
   const move = nextMove(next, env);
   return { st: speak(next, move, ack, now), move, research };
 }
 
-/** A website's look chosen (or two combined), and the work made from it. */
-export function chooseLook(st: StudioState, choice: number | [number, number], now = Date.now()): StudioState {
-  const value = Array.isArray(choice) ? `mix-${choice[0]}-${choice[1]}` : `sys-${choice}`;
-  const next = { ...st, answers: { ...st.answers, 'w.aesthetic': { values: [value], source: 'person' as const, at: now } } };
-  return makingIn(said(next, { from: 'person', kind: 'reply', text: Array.isArray(choice) ? `The ${ORD_WORD[choice[0]]}’s colours with the ${ORD_WORD[choice[1]]}’s type and structure` : `The ${ORD_WORD[choice]} one`, at: now }), value, now);
+/** The person's words read as the answer to the creative question waiting (./discovery.ts), when they answer it. */
+function answerCreative(st: StudioState, q: DiscoveryQuestion, text: string, env: DirectorEnv, now: number): { st: StudioState; ack: string; read: boolean } {
+  // words that only point to a site to learn from answer nothing: the site is read, and the question goes on waiting
+  if (onlyPointsElsewhere(text)) return { st, ack: '', read: false };
+  if (q.kind === 'colour' || q.kind === 'type' || q.kind === 'vibe') return answerDiscoveryWords(st, text, now);
+  // what a logo stands for, what a site is for, whether a picture is placed: read as those topics always were
+  if (q.decides === 'about' || q.decides === 'purpose' || q.decides === 'pictures') {
+    const r = answerTopic(st, q.decides, text, env, now);
+    return r.read ? { ...r, st: closeDiscovery(r.st) } : r;
+  }
+  // a question the model wrote about something else (who it is for, the occasion…): the words kept for the engines
+  const answers = { ...st.answers, [`d.${q.decides}`]: { values: [], text: text.slice(0, 300), source: 'person' as const, at: now } };
+  return { st: closeDiscovery({ ...st, answers }), ack: 'Good — I’ll take that into it.', read: true };
+}
+
+/** A tap on one of the options a creative question offered: the decision taken, said back, and what comes next. */
+export function chooseOption(st: StudioState, optionId: string, env: DirectorEnv = {}, now = Date.now()): Turn {
+  const q = st.pending === 'discover' ? st.discovery?.current : undefined;
+  const r = q ? chooseDiscovery(st, optionId, now) : null;
+  if (!q || !r) return { st, move: nextMove(st, env), research: [] };
+  // a suggested answer to a written question is read as the person's own words
+  if (!r.ack) return respond(st, r.words, env, { now });
+  const next = said(r.st, { from: 'person', kind: 'reply', text: r.words, at: now });
+  const move = nextMove(next, env);
+  return { st: speak(next, move, r.ack, now), move, research: [] };
 }
 
 /**
@@ -868,23 +907,6 @@ export function chooseLook(st: StudioState, choice: number | [number, number], n
 export function readyToMake(st: StudioState, env: DirectorEnv = {}): boolean {
   const last = [...st.transcript].reverse().find((m) => m.from === 'socria' && (m.kind === 'question' || m.kind === 'offer' || m.stage === 'making'));
   return last?.stage === 'making' && nextMove(st, env).kind === 'create';
-}
-
-/** Whether a website's looks are on offer now: offered, and not yet chosen. */
-export function lookOnOffer(st: StudioState): boolean {
-  if (st.answers['w.aesthetic']) return false;
-  // Socria's last turn that moved the conversation on (a site read, or a note about one, does not take the looks away)
-  const last = [...st.transcript].reverse().find((m) => m.from === 'socria' && (m.kind === 'question' || m.kind === 'offer' || m.stage === 'making'));
-  return last?.kind === 'offer' && last.stage === 'looks';
-}
-
-/** Socria says which look the page is made in (marked as making, so a reload picks it up). */
-function makingIn(st: StudioState, value: string, now: number): StudioState {
-  const mix = value.match(/^mix-(\d)-(\d)$/);
-  const one = value.match(/^sys-(\d)$/);
-  const which = mix ? `the colours of the ${ORD_WORD[Number(mix[1])]} direction with the type and structure of the ${ORD_WORD[Number(mix[2])]}` : `the ${ORD_WORD[one ? Number(one[1]) : 0]} direction`;
-  const { pending: _, ...rest } = st;
-  return said(rest, { from: 'socria', kind: 'note', stage: 'making', text: `Making it in ${which}. ${makingLine(rest)}`, at: now });
 }
 
 // ── the brief, as understood ──
@@ -927,7 +949,7 @@ export function briefLines(st: StudioState, env: DirectorEnv = {}): BriefLine[] 
   if (open.length || st.answers.go) out.push({ label: 'Left to SocriaUX', value: open.length ? list([...new Set(open)]) : 'anything not said', source: 'socria' });
   return out;
 }
-const TOPIC_LABEL: Record<string, string> = { personality: 'the feel', look: 'the look', about: 'what it stands for', purpose: 'what it is for', pictures: 'the pictures', words: 'the words', kind: 'the format' };
+const TOPIC_LABEL: Record<string, string> = { personality: 'the feel', vibe: 'the feel', palette: 'the colours', type: 'the lettering', look: 'the look', about: 'what it stands for', purpose: 'what it is for', pictures: 'the pictures', words: 'the words', kind: 'the format' };
 
 // ── the kind of work, when the words do not settle it (the home asks nothing: the conversation does) ──
 

@@ -6,6 +6,8 @@
 // the person's own words in the opening sentence, a choice they made, or something left to SocriaUX. Normalised on
 // read like the rest of the project, so a stored record can never break the page.
 
+import { normalizeDiscovery, type DiscoveryState } from './discovery';
+
 export const STUDIO_MODES = ['graphic', 'website', 'logo', 'system', 'board', 'critique'] as const;
 export type StudioMode = (typeof STUDIO_MODES)[number];
 
@@ -142,6 +144,8 @@ export interface StudioState {
   via?: 'hand';
   /** websites the person pointed to, as read, and what to take from each */
   references?: StudioReference[];
+  /** the creative questions: the one waiting (with the options offered) and what has been asked (./discovery.ts) */
+  discovery?: DiscoveryState;
   createdAt: number;
 }
 
@@ -295,6 +299,7 @@ export function normalizeStudio(v: unknown): StudioState | undefined {
         .filter((x): x is StudioReference => !!x)
         .slice(0, MAX_REFERENCES),
     ),
+    ...((d) => (d ? { discovery: d } : {}))(normalizeDiscovery(r.discovery)),
     createdAt: n(r.createdAt, 0, 8.64e15) ?? 0,
   };
 }

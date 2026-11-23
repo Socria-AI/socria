@@ -24,6 +24,7 @@ import { LANGUAGES } from './direction';
 import { SIGNATURES } from './plan';
 import { MOOD_CATEGORIES, PALETTE_ROLES, VERDICTS, type CallKind } from './types';
 import { CREATIVE_PLAN_SCHEMA } from './graphics/creative/model';
+import { STUDIO_QUESTION_SCHEMA } from './studio/discovery-model';
 
 type Schema = Record<string, unknown>;
 
@@ -135,6 +136,8 @@ const SCHEMAS: Partial<Record<CallKind, Schema>> = {
   critique,
   // lib/ux-v0/graphics/creative/model.ts: a creative change read into a plan of decisions in the engine's vocabulary
   'creative-edit': CREATIVE_PLAN_SCHEMA,
+  // lib/ux-v0/studio/discovery-model.ts: the studio's next creative question, with options generated for the brief
+  'studio-questions': STUDIO_QUESTION_SCHEMA,
 };
 
 /** The structured format for a kind of call, or undefined when it answers in plain JSON (see above). */

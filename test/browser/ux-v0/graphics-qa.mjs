@@ -115,12 +115,9 @@ const begin = async (words) => {
   await handBrief(page, 'graphic', words);
   await page.waitForTimeout(500);
 };
-/** From the brief to the editor: three directions, the first (or the one given) chosen. */
-const toEditor = async (pick = 0) => {
-  await page.getByRole('button', { name: /See three directions/ }).click();
-  await page.waitForSelector('.gx-dir', { timeout: 15000 });
-  await page.waitForTimeout(800);
-  await page.locator('.gx-dir').nth(pick).getByRole('button', { name: /Make it in this direction/ }).click();
+/** From the brief to the editor: the design composed at once (no direction to choose first). */
+const toEditor = async () => {
+  await page.getByRole('button', { name: /^Make it$/ }).click();
   await page.waitForSelector('.gx-canvas .gx-board svg', { timeout: 30000 });
   await page.waitForTimeout(1200);
 };
@@ -161,22 +158,17 @@ await shot('01-brief');
 
 // a brief without a headline is refused: nothing is composed around invented words
 await page.fill('#gx-headline', '');
-await page.getByRole('button', { name: /See three directions/ }).click();
+await page.getByRole('button', { name: /^Make it$/ }).click();
 ok('…a brief without a headline is refused and said (no words are invented)', /Write the headline first/.test(await page.locator('.gx-brief .v0-error-line').innerText().catch(() => '')));
 await page.fill('#gx-headline', 'Letters in Motion');
 await page.fill('#gx-brand', 'The Print Room');
 
 // ── 2. an editable poster from the brief ──
-await page.getByRole('button', { name: /See three directions/ }).click();
-await page.waitForSelector('.gx-dir', { timeout: 15000 });
-await page.waitForTimeout(1500);
-const dirNames = await page.locator('.gx-dir h2').allInnerTexts();
-const dirArt = await page.locator('.gx-dir-art svg').evaluateAll((xs) => xs.map((s) => ({ texts: [...s.querySelectorAll('text')].map((t) => t.textContent).join(' '), bg: s.querySelector('rect')?.getAttribute('fill') })));
-await shot('02-directions');
-ok('2. three directions, each shown as the design itself with the exact headline, and not three copies of one', dirNames.length === 3 && new Set(dirNames).size === 3 && dirArt.every((a) => /Letters/i.test(a.texts) && /Motion/i.test(a.texts)), J({ dirNames, dirArt }));
-await page.locator('.gx-dir').first().getByRole('button', { name: /Make it in this direction/ }).click();
+await page.getByRole('button', { name: /^Make it$/ }).click();
 await page.waitForSelector('.gx-canvas .gx-board svg', { timeout: 30000 });
 await page.waitForTimeout(1500);
+ok('2. the design is composed at once from the brief: no directions to choose first, no Directions step', (await page.locator('.gx-dir').count()) === 0 && (await page.locator('.v0-steps .sb-seg-item').filter({ hasText: 'Directions' }).count()) === 0);
+await shot('02-composed');
 let doc = await docWhere((d) => d.artboards.length >= 1);
 const texts = nodes(doc).filter((n) => n.type === 'text');
 const canvasTexts = await page.locator('.gx-board svg text').allTextContents();
@@ -432,7 +424,8 @@ writeFileSync(`${S}gfx-letters.svg`, svgText);
 // the headline's words as shown (a style may set them in capitals), each kept as text (lines and runs are spans of their own)
 const headNode = nodes(doc).find((n) => n.type === 'text' && n.role === 'headline');
 const shownHead = headNode ? V.gfxText.shownText(headNode) : 'Letters';
-const svgWords = svgText.replace(/<[^>]+>/g, ' ');
+// spans within one line of text join without a space (a headline set letter by letter is still its words)
+const svgWords = svgText.replace(/<\/?tspan[^>]*>/g, '').replace(/<[^>]+>/g, ' ');
 ok('22. SVG exported: text kept as text with the exact words, its faces linked, no script, sized in points', /<text/.test(svgText) && shownHead.split(/\s+/).every((w) => svgWords.includes(w)) && /fonts\.googleapis\.com/.test(svgText) && !/<script/i.test(svgText) && /width="[\d.]+pt"/.test(svgText), J({ shownHead, start: svgText.slice(0, 160) }));
 const pdf = await exportItem(/^PDF$/);
 writeFileSync(`${S}gfx-letters.pdf`, pdf.bytes);
@@ -527,10 +520,8 @@ const carouselId = pid();
 await home();
 await begin('A brand identity board for “Kepler Lab”, a science studio, geometric');
 await page.fill('#gx-brand', 'Kepler Lab');
-await page.getByRole('button', { name: /See logo concepts/ }).click();
-await page.waitForSelector('.gx-logo-card', { timeout: 30000 });
-await page.waitForTimeout(800);
-await page.locator('.gx-logo-card').first().getByRole('button', { name: 'Develop this concept' }).click();
+await page.getByRole('button', { name: /^Make the logo$/ }).click();
+// the concepts are constructed and the first opens in the editor, the others in its Logo tab
 await page.waitForSelector('.gx-logo', { timeout: 30000 });
 await page.getByRole('button', { name: 'Approve this logo' }).click();
 await page.waitForTimeout(800);

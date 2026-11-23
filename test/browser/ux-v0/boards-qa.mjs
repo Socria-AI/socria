@@ -154,19 +154,14 @@ await page.getByLabel('Brand or name').fill('Night Market');
 await page.getByLabel('Call to action').fill('Find the market');
 await shot('01-brief');
 await page.getByLabel('Headline').fill('');
-await page.getByRole('button', { name: /Propose design systems/ }).click();
+await page.getByRole('button', { name: /Make the board/ }).click();
 ok('…a brief without a headline is refused and said (nothing is composed around invented words)', /Write the headline first/.test(await page.locator('.bd-brief .v0-error-line').innerText().catch(() => '')));
 await page.getByLabel('Headline').fill('Night Market Lisbon');
 
-// ── the Master Design System ──
-await page.getByRole('button', { name: /Propose design systems/ }).click();
-await page.waitForSelector('.bd-sys', { timeout: 15000 });
-await page.waitForTimeout(1500);
-const sysNames = await page.locator('.bd-sys h2').allInnerTexts();
-ok('three design systems are proposed, one to be shared by every material (not one direction per material)', sysNames.length === 3 && /one you choose/.test(await page.locator('.bd-systems').innerText()), J(sysNames));
-await shot('02-systems');
-await page.locator('.bd-sys').first().getByRole('button', { name: /Use this system/ }).click();
+// ── the Master Design System: drawn from the words, the board made in it at once (no system to choose first) ──
+await page.getByRole('button', { name: /Make the board/ }).click();
 await page.waitForSelector('.bd-canvas', { timeout: 15000 });
+ok('the board is made at once in one design system drawn from the words: no systems to choose from, no System step', (await page.locator('.bd-sys').count()) === 0 && (await page.locator('.v0-steps .sb-seg-item').filter({ hasText: 'System' }).count()) === 0);
 await settled();
 let bd = await boardWhere((x) => x.materials.every((m) => m.status === 'ready') && x.nodes.some((n) => n.type === 'note'));
 await page.waitForTimeout(2500);
@@ -480,10 +475,8 @@ ok('…your work lists the board as a board (its materials counted) and the webs
 // ── dozens of materials stay light: virtualization and level of detail ──
 // the brief written by hand in the workspace (its own form)
 await handBrief(page, 'board', 'For “Harbour Week”, “Ten days on the water”: twelve posters, twelve Instagram graphics and twelve stories');
-await page.getByRole('button', { name: /Propose design systems/ }).click();
-await page.waitForSelector('.bd-sys', { timeout: 15000 });
 const tBig = Date.now();
-await page.locator('.bd-sys').nth(1).getByRole('button', { name: /Use this system/ }).click();
+await page.getByRole('button', { name: /Make the board/ }).click();
 await page.waitForSelector('.bd-canvas', { timeout: 15000 });
 await settled();
 const bigMs = Date.now() - tBig;
@@ -497,7 +490,9 @@ const farOut = { drawn: await page.locator('.bd-node.is-material .bd-art').count
 await focusMaterial('Poster 7');
 await page.waitForTimeout(600);
 const zoomedIn = { drawn: await page.locator('.bd-node.is-material .bd-art').count() };
-ok('dozens of materials: 36 composed in one system, each its own composition', big?.materials.length === 36 && new Set(big.materials.filter((m) => m.brief.kind === 'poster').map((m) => `${m.plan.archetype}|${m.doc.artboards[0].background}`)).size >= 3, J({ n: big?.materials.length, ms: bigMs }));
+// each its own composition: its concept (the structure the generative engine built it on) and its ground
+const posterWays = new Set((big?.materials ?? []).filter((m) => m.brief.kind === 'poster').map((m) => `${JSON.stringify(m.doc.artboards[0].concept ?? m.plan.archetype)}|${m.doc.artboards[0].background}`));
+ok('dozens of materials: 36 composed in one system, each its own composition', big?.materials.length === 36 && posterWays.size >= 3, J({ n: big?.materials.length, ways: posterWays.size, ms: bigMs }));
 ok('…and the board stays light: what is too small on screen is drawn as a plain block, what is out of view is not drawn at all', atFit.nodes === 36 && farOut.blocks > 0 && farOut.drawn + farOut.blocks <= 36 && zoomedIn.drawn < 12, J({ atFit, farOut, zoomedIn, ms: bigMs }));
 console.log(`   (36 materials generated and arranged in ${bigMs} ms; at fit ${atFit.drawn} drawn in full; zoomed far out ${farOut.blocks} as plain blocks; zoomed in on one, ${zoomedIn.drawn} drawn, the rest not drawn)`);
 await shot('09-thirty-six');

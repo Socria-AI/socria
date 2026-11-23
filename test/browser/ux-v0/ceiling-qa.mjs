@@ -79,9 +79,7 @@ console.log('=== SocriaUX Graphics: the creative-ceiling expansion, by hand, in 
 await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
 // the brief written by hand in the workspace (its own form)
 await handBrief(page, 'graphic', 'A poster for “Field Lines”, a creative coding meetup, “Code that draws”, generative, procedural');
-await page.getByRole('button', { name: /See three directions/ }).click();
-await page.waitForSelector('.gx-dir', { timeout: 15000 });
-await page.locator('.gx-dir').first().getByRole('button', { name: /Make it in this direction/ }).click();
+await page.getByRole('button', { name: /^Make it$/ }).click();
 await page.waitForSelector('.gx-canvas .gx-board svg', { timeout: 30000 });
 await page.waitForTimeout(1200);
 let d = await docWhere((x) => nodes(x).length > 0);

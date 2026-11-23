@@ -262,7 +262,26 @@ const THING_HUES: Record<string, number[]> = {
   bloom: [338, 20],
   honey: [42, 36],
   citrus: [48, 34],
+  bakery: [32, 38, 26],
+  pastry: [36, 30],
+  chocolate: [20, 16],
+  ember: [14, 22],
+  smoke: [24, 210],
+  oak: [30, 36],
+  wood: [28, 34],
+  snow: [200, 210],
+  rose: [345, 350],
+  lavender: [262, 270],
+  desert: [30, 22],
+  jungle: [130, 150],
 };
+
+/** The things a brief names whose colours the language can lean toward ("bread", "the sea", "embers"). */
+export function thingsIn(words: string): string[] {
+  const w = (words ?? '').toLowerCase();
+  // "light" names a quality far more often than a thing
+  return Object.keys(THING_HUES).filter((k) => k !== 'light' && new RegExp(`\\b${k}(?:s|es)?\\b`).test(w));
+}
 
 /** A visual language for a temperament (see the head of this file). `things` are the brief's named things, whose
  * hues it leans toward. */

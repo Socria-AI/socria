@@ -109,6 +109,8 @@ export const STAGE_TIER: Record<CallKind, Tier> = {
   critique: 'premium',
   // a creative change in words read into a plan (graphics/creative/model.ts): short, structured, validated twice
   'creative-edit': 'economy',
+  // the studio's next creative question and its options (studio/discovery-model.ts): short, structured, validated twice
+  'studio-questions': 'economy',
   // not a text stage: a picture from an image model, routed by lib/ux-v0/image-gen-server.ts
   image: 'economy',
 };
@@ -295,6 +297,7 @@ export const MAX_TOKENS: Record<CallKind, number> = {
   refine: 2200,
   critique: 1400,
   'creative-edit': 1400,
+  'studio-questions': 1600,
   image: 0,
 };
 

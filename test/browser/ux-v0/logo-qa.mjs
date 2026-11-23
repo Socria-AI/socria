@@ -54,11 +54,17 @@ await handBrief(page, 'graphic', 'Design a logo for “Tidewell”, a water-qual
 await page.waitForTimeout(500);
 ok('a logo brief is read as a logo (the kind chosen from the words)', (await page.locator('#gx-kind').inputValue()) === 'logo', await page.locator('#gx-kind').inputValue());
 ok('…named exactly as written', (await page.locator('#gx-headline').inputValue()) === 'Tidewell', await page.locator('#gx-headline').inputValue());
-await page.getByRole('button', { name: /See logo concepts|See three directions/ }).click();
+await page.getByRole('button', { name: /^Make the logo$/ }).click();
+// the concepts are constructed and the first opens in the editor at once (no stage of choosing first)
+await page.waitForSelector('.gx-logo', { timeout: 30000 });
+await page.waitForTimeout(800);
+ok('the logo opens in the editor at once, on its Logo tab (no directions step, no concepts step, no templates)', (await page.locator('.gx-tab.is-on', { hasText: 'Logo' }).count()) === 1 && (await page.locator('.gx-dir').count()) === 0 && (await page.locator('.v0-steps .sb-seg-item').filter({ hasText: /Concepts|Directions/ }).count()) === 0);
+// every concept side by side, when wanted
+await page.getByRole('button', { name: 'See every concept side by side' }).click();
 await page.waitForSelector('.gx-logo-card', { timeout: 30000 });
 await page.waitForTimeout(1500);
 const cards0 = await page.locator('.gx-logo-card').count();
-ok('concepts are constructed and shown (no directions step, no templates)', cards0 >= 8 && (await page.locator('.gx-dir').count()) === 0, cards0);
+ok('…and every concept constructed is a tap away, side by side', cards0 >= 8, cards0);
 ok('each concept carries its idea and its argument', (await page.locator('.gx-logo-card .gx-logo-idea').count()) === cards0 && (await page.locator('.gx-logo-card details.gx-why').count()) === cards0);
 await page.waitForFunction(() => [...document.querySelectorAll('.gx-logo-score')].every((e) => /Quality/.test(e.textContent ?? '')), null, { timeout: 30000 }).catch(() => undefined);
 ok('every concept is measured (quality out of 100, criteria met of 12)', (await page.locator('.gx-logo-score', { hasText: /Quality \d+ \/ 100/ }).count()) === cards0);

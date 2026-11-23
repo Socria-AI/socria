@@ -1816,20 +1816,20 @@
 .gx-thinking span::after { content: ''; display: inline-block; width: 6px; height: 6px; margin-left: 8px; border-radius: 999px; background: var(--sb-moss); opacity: 0.5; animation: gx-breathe 1.6s cubic-bezier(0.16, 1, 0.3, 1) infinite alternate; }
 @keyframes gx-breathe { from { opacity: 0.2; } to { opacity: 0.8; } }
 
-.gx-compare { position: absolute; inset: 12px; z-index: 6; display: flex; flex-direction: column; border-radius: 18px; background: var(--sb-paper); box-shadow: 0 24px 48px -32px rgba(32, 32, 27, 0.5); border: 1px solid var(--sb-rule); overflow: hidden; }
-.gx-compare-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--sb-rule); }
-.gx-compare-t { margin: 0; font-family: var(--sb-voice); font-weight: var(--sb-voice-weight); font-size: 22px; line-height: 1.1; }
-.gx-compare-grid { list-style: none; margin: 0; padding: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; overflow: auto; }
-.gx-compare-card { display: grid; align-content: start; gap: 6px; padding: 10px; border-radius: 18px; background: var(--sb-surface); border: 1px solid var(--sb-rule); }
-.gx-compare-card.is-now { border-color: var(--sb-moss); }
-.gx-compare-art { width: 100%; max-height: 320px; border-radius: 10px; overflow: hidden; background: var(--sb-well); }
-.gx-compare-art svg { display: block; }
-.gx-compare-name { margin: 2px 0 0; font-family: var(--sb-voice); font-weight: var(--sb-voice-weight); font-size: 17px; line-height: 1.2; }
-.gx-compare-dl { display: grid; gap: 3px; margin: 0; font-size: 12px; }
-.gx-compare-dl div { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 6px; }
-.gx-compare-dl dt { color: var(--sb-ink-60); }
-.gx-compare-dl dd { margin: 0; }
-.gx-compare-acts { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 2px 0 0; }
+.gx-cmp { position: absolute; inset: 12px; z-index: 6; display: flex; flex-direction: column; border-radius: 18px; background: var(--sb-paper); box-shadow: 0 24px 48px -32px rgba(32, 32, 27, 0.5); border: 1px solid var(--sb-rule); overflow: hidden; }
+.gx-cmp-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--sb-rule); }
+.gx-cmp-t { margin: 0; font-family: var(--sb-voice); font-weight: var(--sb-voice-weight); font-size: 22px; line-height: 1.1; }
+.gx-cmp-grid { list-style: none; margin: 0; padding: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; overflow: auto; }
+.gx-cmp-card { display: grid; align-content: start; gap: 6px; padding: 10px; border-radius: 18px; background: var(--sb-surface); border: 1px solid var(--sb-rule); }
+.gx-cmp-card.is-now { border-color: var(--sb-moss); }
+.gx-cmp-art { width: 100%; max-height: 320px; border-radius: 10px; overflow: hidden; background: var(--sb-well); }
+.gx-cmp-art svg { display: block; }
+.gx-cmp-name { margin: 2px 0 0; font-family: var(--sb-voice); font-weight: var(--sb-voice-weight); font-size: 17px; line-height: 1.2; }
+.gx-cmp-dl { display: grid; gap: 3px; margin: 0; font-size: 12px; }
+.gx-cmp-dl div { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 6px; }
+.gx-cmp-dl dt { color: var(--sb-ink-60); }
+.gx-cmp-dl dd { margin: 0; }
+.gx-cmp-acts { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 2px 0 0; }
 @media (prefers-reduced-motion: reduce) {
   .gx-move { transition: none; }
   .gx-move:hover:not(:disabled) { transform: none; }

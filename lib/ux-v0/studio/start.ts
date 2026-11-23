@@ -1,10 +1,12 @@
 // lib/ux-v0/studio/start.ts — a conversation becoming a work: the project each engine starts from.
 //
-// A graphic or a logo starts with its brief written (the graphics workspace proposes directions, or explores logo
-// concepts, the moment it opens); a board starts with its brief and materials (the board proposes its systems at once);
-// a website starts already made — its brief, its approved direction and a first design composed by the website engine
-// from the person's words (lib/ux-v0/boards/website.ts websiteConcept), with the working parts it must have. Nothing is
-// composed here that the workspace would not compose itself.
+// A graphic or a logo starts with its brief written (the graphics workspace composes it the moment it opens, in the
+// direction the person's words and answers call for, or constructs the logo's concepts and opens the first); a board
+// starts with its brief and materials (the board makes its identity and its pieces at once); a website starts already
+// made — its brief, its direction and a first design composed by the website engine from the person's words
+// (lib/ux-v0/boards/website.ts websiteConcept), with the working parts it must have. There is no stage of choosing a
+// direction first: everything is changed afterwards, in words. Nothing is composed here that the workspace would not
+// compose itself.
 
 import type { StudioState } from './schema';
 import { said } from './schema';
@@ -39,10 +41,10 @@ export function startProject(p: DesignProject, st: StudioState, opts: { images?:
       intent: p.intent || st.prompt.slice(0, 600),
       graphic: { ...(p.graphic ?? emptyGraphicState()), brief, ...(opts.assets?.length ? { assets: [...(p.graphic?.assets ?? []), ...opts.assets] } : {}) },
       ...(dna ? { dna } : {}),
-      studio: said(started, { from: 'socria', kind: 'note', text: st.mode === 'logo' ? `Constructing logo concepts for “${brief.content.headline}”.` : `Composing “${brief.content.headline}” three ways.`, at: now }),
+      studio: said(started, { from: 'socria', kind: 'note', text: st.mode === 'logo' ? `Constructing “${brief.content.headline}”: lettering and a mark built from what it stands for.` : `Composing “${brief.content.headline}” from what you told me.`, at: now }),
       updatedAt: now,
     };
-    return { ok: true, project, said: st.mode === 'logo' ? 'logo concepts' : 'three directions' };
+    return { ok: true, project, said: st.mode === 'logo' ? 'the logo' : 'the design' };
   }
   if (st.mode === 'board') {
     const brief = boardBriefOf(st, opts.images ?? []);
@@ -79,7 +81,7 @@ export function startWebsite(st: StudioState, sys: MasterDesignSystem, opts: { n
     name: opts.name ?? ask.board.name,
     brief: { audience: ask.audience, functionalRequirements: functions, intent, ...(prefs.personality.length ? { experience: `It should feel ${prefs.personality.join(', ')}.` } : {}) },
     sections,
-    note: 'Made in the studio from your words, in the direction you chose',
+    note: 'Made in the studio from your words and answers',
   });
   if (!r.ok) return r;
   const dna = studioDNA(st);
@@ -87,7 +89,7 @@ export function startWebsite(st: StudioState, sys: MasterDesignSystem, opts: { n
   const project: DesignProject = {
     ...r.project,
     ...(dna ? { dna } : {}),
-    studio: said(started, { from: 'socria', kind: 'note', text: `Made “${ask.board.name}” in ${sys.direction.name}${functions.length ? `, with ${functions.join(', ').toLowerCase()}` : ''}. Functional labels and sample times are yours to change.`, at: now }),
+    studio: said(started, { from: 'socria', kind: 'note', text: `Made “${ask.board.name}” in ${sys.direction.name}${functions.length ? `, with ${functions.join(', ').toLowerCase()}` : ''}. Change anything in your own words; functional labels and sample times are yours to change too.`, at: now }),
   };
   return { ok: true, project, said: 'a first design' };
 }

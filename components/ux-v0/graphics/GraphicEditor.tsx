@@ -94,6 +94,8 @@ export interface GraphicEditorProps {
   inspectorExtra?: ReactNode;
   /** a Board made from an approved logo's identity (offered in the Logo tab when given) */
   onMakeBoard?: (sys: MasterDesignSystem) => void;
+  /** every logo concept side by side, to compare, combine or set aside (offered in the Logo tab when given) */
+  onLogoConcepts?: () => void;
   /** a change asked in words elsewhere (the studio's conversation beside the workspace), read as if typed here */
   inbox?: { id: number; words: string } | null;
   /** what came of a change asked in words, said back to where it was asked */
@@ -399,7 +401,10 @@ export function GraphicEditor(props: GraphicEditorProps) {
     // what one object should do, or a command of the editor's own (a format, a colour for the selection, a size): the
     // precise reader first, whenever the words hold no creative decision
     const creative = !!read && read.plan.changes.some((c) => c.decision !== 'object');
-    if (!creative && precise(words)) return;
+    // a design in a style: its own style speaks first for what only it does well — its gradients made flat everywhere,
+    // its layout re-balanced in another style's composition (styles/edit.ts)
+    const styleFirst = !!cur.style?.primary && /\b(remove|lose|drop|no|without|get rid of|kill)\b[^.]*\bgradients?\b|\bflat colou?rs?\b|\b(layout|composition|arrangement)\b[^.]*\b(a-?symmetric(al)?|symmetric(al)?|centred|centered|off-?cent(re|er))\b/i.test(words);
+    if ((!creative || styleFirst) && precise(words)) return;
     const ac = new AbortController();
     planning.current = ac;
     setThinking('Reading the change…');
@@ -643,7 +648,7 @@ export function GraphicEditor(props: GraphicEditorProps) {
           ))}
         </nav>
         <div className="gx-left-body" role="tabpanel">
-          {tab === 'logo' && board.logo && <LogoTab doc={doc} board={board} measure={measure} onDoc={(next, label) => commitDoc(next, label, { version: true })} onMakeBoard={props.onMakeBoard} />}
+          {tab === 'logo' && board.logo && <LogoTab doc={doc} board={board} measure={measure} onDoc={(next, label) => commitDoc(next, label, { version: true })} onMakeBoard={props.onMakeBoard} onConcepts={props.onLogoConcepts} />}
           {tab === 'logo' && !board.logo && <p className="v0-quiet">This artboard is not a logo. Pick the logo artboard in Artboards.</p>}
           {tab === 'layers' && <LayersPanel board={board} selection={selection} onSelect={setSelection} onOps={onOps} />}
           {tab === 'boards' && <ArtboardsPanel doc={doc} boardId={board.id} onPick={(id) => (setBoardId(id), setSelection([]))} onOps={onOps} onAdapt={adapt} />}

@@ -1,14 +1,16 @@
 'use client';
 
-// components/ux-v0/graphics/GraphicsWorkspace.tsx — a graphics project: its brief, three directions, and the editor.
+// components/ux-v0/graphics/GraphicsWorkspace.tsx — a graphics project: its brief, and the design made from it.
 //
-// Nothing here calls a model. The brief is read from the designer's words and corrected in fields (GraphicBrief.tsx);
-// the directions are SocriaUX's own art-direction engine (lib/ux-v0/direction.ts) given to graphics
-// (graphicDirectionOf), or an approved website's direction, so a brand carries across media; the composition is
-// planned and placed in code (compose.ts), checked and repaired at most twice (check.ts); a change asked in words is
-// read into validated operations (edit.ts) and shown as a preview before it is applied. The editor itself
-// (GraphicEditor.tsx) is shared with the graphic materials of a board. The project is saved like a website
-// (useV0Project).
+// The brief is read from the designer's words (in the studio's conversation, or in fields: GraphicBrief.tsx) and the
+// design is composed at once — there is no stage of choosing a direction first. Its direction comes from SocriaUX's own
+// art-direction engine (lib/ux-v0/direction.ts) given to graphics (graphicDirectionOf), held to what the conversation
+// decided (the palette, the faces, the feel), or an approved website's direction, so a brand carries across media; the
+// composition is planned and placed in code (compose.ts), the mood chosen carried into it by the creative executor
+// (lib/ux-v0/studio/realise.ts), checked and repaired at most twice (check.ts). Everything is changed afterwards: in
+// words (read into validated operations or a creative plan, previewed before it is applied), by hand, or by asking for
+// other concepts in the editor (GraphicEditor.tsx, shared with the graphic materials of a board). The project is saved
+// like a website (useV0Project).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SAVE_WORDS, useV0Project } from '../useV0Project';
@@ -32,7 +34,7 @@ import { startBoard } from '@/lib/ux-v0/boards/pipeline';
 import type { BoardBrief } from '@/lib/ux-v0/boards/model';
 import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
 import { directionFaces, facesUsed, loadFaces, useAssetUrls, useFaceMeasure } from './faces';
-import { BriefStage, DirectionsStage, briefOf, fieldsOf, KIND_LABEL, type BriefFields, type WebsiteSource } from './GraphicBrief';
+import { BriefStage, briefOf, fieldsOf, KIND_LABEL, type BriefFields, type WebsiteSource } from './GraphicBrief';
 import { brandDirections } from '@/lib/ux-v0/dsi/generate';
 import { guardedForBrand } from '@/lib/ux-v0/dsi/adapters';
 import { bindForBrand } from '@/lib/ux-v0/dsi/link';
@@ -40,10 +42,12 @@ import { fidelityOfDoc } from '@/lib/ux-v0/dsi/fidelity';
 import { useLinkedSystem } from '../systems/useLinkedSystem';
 import { SystemBadge } from '../systems/SystemBadge';
 import { StudioRail, useRailReply } from '../studio/StudioRail';
-import { combineDirections, directionsWithPrefs, prefsOf, withTreatment } from '@/lib/ux-v0/studio/apply';
-import { COMBINE_WORDS, colourFirst, ordinalsIn } from '@/lib/ux-v0/studio/director';
+import { directionsWithPrefs, prefsOf, withTreatment } from '@/lib/ux-v0/studio/apply';
+import { vibeRealisation } from '@/lib/ux-v0/studio/realise';
+import { executePlan } from '@/lib/ux-v0/graphics/creative/execute';
 
-type View = 'brief' | 'directions' | 'edit';
+// 'concepts': every logo concept side by side, opened from the editor's Logo tab when wanted (never a step before it)
+type View = 'brief' | 'edit' | 'concepts';
 type Note = EditorNote;
 
 const seedOf = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % 9973;
@@ -58,13 +62,11 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
   const g: GraphicState = project.graphic ?? emptyGraphicState();
   const setG = useCallback((fn: (x: GraphicState) => GraphicState) => update((p) => ({ ...p, graphic: fn(p.graphic ?? emptyGraphicState()) })), [update]);
 
-  const [view, setView] = useState<View>(g.doc ? 'edit' : g.options.length ? 'directions' : 'brief');
+  const [view, setView] = useState<View>(g.doc ? 'edit' : 'brief');
   const [fields, setFields] = useState<BriefFields>(() => fieldsOf(g.brief, g.brief ? '' : startIntent ?? project.intent ?? ''));
   const [error, setError] = useState('');
   const [note, setNote] = useState<Note>(null);
   const [busy, setBusy] = useState('');
-  const [round, setRound] = useState(0);
-  const [seen, setSeen] = useState<string[]>([]);
   const [siteDir, setSiteDir] = useState<GraphicDirection | null>(null);
   const [websites, setWebsites] = useState<WebsiteSource[]>([]);
   const [planNotes, setPlanNotes] = useState<string[]>([]);
@@ -73,8 +75,8 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
   const brandOpts = useMemo(() => ({ mode: project.systemLink?.mode, overrides: project.systemLink?.overrides }), [project.systemLink]);
   const fidelity = useMemo(() => (linked && g.doc ? fidelityOfDoc(g.doc, linked.content, brandOpts) : null), [linked, g.doc, brandOpts]);
 
-  // ── fonts and measuring: the faces of the design and of the directions on offer ──
-  const faces = useMemo(() => [...(g.doc ? facesUsed(g.doc) : []), ...g.options.flatMap(directionFaces)], [g.doc, g.options]);
+  // ── fonts and measuring: the faces of the design ──
+  const faces = useMemo(() => (g.doc ? facesUsed(g.doc) : []), [g.doc]);
   const { measure, refresh: refreshMeasure } = useFaceMeasure(faces);
 
   // ── pictures kept in this browser, shown by object address ──
@@ -163,8 +165,9 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
     [project.id, project.studio, project.dna, linked, brandOpts],
   );
 
-  /** The design composed in a direction, checked and repaired, as the current document and a version. */
-  const composeIn = async (dir: GraphicDirection, brief: GraphicBrief) => {
+  /** The design composed in a direction, checked and repaired, as the current document and a version (with the mood
+   * chosen in the conversation carried into it, when `realise`). */
+  const composeIn = async (dir: GraphicDirection, brief: GraphicBrief, opts: { realise?: boolean } = {}) => {
     setBusy(`Composing in “${dir.name}”…`);
     const changed = await loadFaces(directionFaces(dir));
     const m = canvasMeasure();
@@ -179,7 +182,22 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
     // judge the colours the design will really have (lib/ux-v0/dsi/adapters.ts guardedForBrand)
     const brand = linked ? guardedForBrand(doc, linked.content, brandOpts, m) : null;
     const refined = brand ?? refineDoc(doc, m);
-    const finalDoc = refined.doc;
+    let finalDoc = refined.doc;
+    // the mood chosen in the conversation: its forms, depth and ground carried into the work by the creative executor
+    // (its colours and faces are already the composition's); never over a design system's identity
+    const vibe = opts.realise && project.studio && !linked ? vibeRealisation(project.studio) : null;
+    let vibeLine = '';
+    if (vibe) {
+      const run = (mm: typeof m) => executePlan(finalDoc, vibe, { board: finalDoc.artboards[0]?.id, dir, kind: brief.kind, measure: mm, said: vibe.summary });
+      let r = run(m);
+      if (r && r.doc !== finalDoc) {
+        const known = new Set(facesUsed(finalDoc).map((f) => `${f.face}|${f.weight}`));
+        const fresh = facesUsed(r.doc).filter((f) => !known.has(`${f.face}|${f.weight}`));
+        if (fresh.length && (await loadFaces(fresh))) r = run(canvasMeasure()) ?? r;
+        finalDoc = refineDoc(r.doc, canvasMeasure()).doc;
+        vibeLine = vibe.summary;
+      }
+    }
     let bindings = g.bindings;
     let brandLine = '';
     if (linked && brand) {
@@ -195,6 +213,7 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
       tone: placeholders.length || remaining ? 'warn' : 'ok',
       text: [
         `Composed and checked in ${ms} ms, without a model.`,
+        vibeLine,
         brandLine,
         refined.fixed.length ? `Fixed before showing: ${refined.fixed.slice(0, 3).map((f) => f.replace(/\.$/, '')).join('; ')}.` : '',
         remaining ? `${remaining} thing${remaining === 1 ? '' : 's'} left to look at (Checks, with nothing selected).` : '',
@@ -217,9 +236,9 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
       const rec = doc.artboards.find((b) => b.logo)?.logo;
       const ms = Math.round(performance.now() - t0);
       setG((x) => ({ ...x, brief, options: [], direction: null, doc, versions: pushVersion(x.versions, doc, 'Logo concepts explored') }));
-      setNote({ tone: 'ok', text: `${rec?.concepts.length ?? 0} logo concepts constructed in ${ms} ms, without a model and without a library of logos.` });
+      setNote({ tone: 'ok', text: `${rec?.concepts.length ?? 0} logo concepts constructed in ${ms} ms, without a model and without a library of logos. The first is open; the others are in the Logo tab, and any change can be asked in words.` });
       setBusy('');
-      setView('directions');
+      setView('edit');
     }, 0);
   };
 
@@ -233,31 +252,26 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
     if (onOpenProject) onOpenProject(p.id);
   };
 
+  /** The design made at once, in the direction its words and answers call for: there is no direction to choose first
+   * (another interpretation is asked for in the editor, or in words, once it is made). */
+  const makeNow = (brief: GraphicBrief, opts: { realise?: boolean } = {}) => {
+    if (brief.kind === 'logo') return exploreLogo(brief);
+    if (siteDir && g.source) return void composeIn(siteDir, brief);
+    const options = proposeFor(brief, 0, []);
+    if (!options.length) return setError('SocriaUX could not find a direction for this brief. Add a word about how it should feel, and continue.');
+    setG((x) => ({ ...x, brief, options: [] }));
+    void composeIn(options[0], brief, opts);
+  };
+
   const continueFromBrief = () => {
     const brief = briefOf(fields, (g.assets ?? []).map((a) => a.id));
     if (!brief) return setError('Write the headline first: SocriaUX composes around your words and never invents them.');
     setError('');
     update((p) => ({ ...p, name: DEFAULT_NAMES.has(p.name) ? brief.content.headline.slice(0, 80) : p.name, intent: p.intent || fields.words.slice(0, 600), graphic: { ...(p.graphic ?? emptyGraphicState()), brief } }));
-    if (brief.kind === 'logo') return exploreLogo(brief);
-    if (siteDir && g.source) return void composeIn(siteDir, brief);
-    const options = proposeFor(brief, 0, []);
-    setRound(0);
-    setSeen(options.flatMap((o) => [o.language, ...(o.style ? [o.style.primary] : [])]));
-    setG((x) => ({ ...x, brief, options }));
-    setView('directions');
+    makeNow(brief);
   };
 
-  const moreDirections = () => {
-    if (!g.brief) return;
-    const r = round + 1;
-    const options = proposeFor(g.brief, r, seen);
-    setRound(r);
-    setSeen((s) => [...new Set([...s, ...options.flatMap((o) => [o.language, ...(o.style ? [o.style.primary] : [])])])]);
-    setG((x) => ({ ...x, options: siteDir && x.source ? [siteDir, ...options] : options }));
-  };
-
-  // ── a work begun in the studio: its brief came from the conversation, so the directions (or the logo concepts)
-  // follow at once, as they would from Continue ──
+  // ── a work begun in the studio: its brief came from the conversation, so the design (or the logo) is made at once ──
   const autoStarted = useRef(false);
   useEffect(() => {
     if (autoStarted.current) return;
@@ -265,16 +279,11 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
     if (project.systemLink && !linked) return;
     autoStarted.current = true;
     const b = g.brief;
-    if (project.studio?.status !== 'started' || !b || g.options.length || g.doc) return;
-    if (b.kind === 'logo') return exploreLogo(b);
-    const options = proposeFor(b, 0, []);
-    setSeen(options.flatMap((o) => [o.language, ...(o.style ? [o.style.primary] : [])]));
-    setG((x) => ({ ...x, options }));
-    setView('directions');
-    setNote({ tone: 'ok', text: 'Three directions from the conversation: your words, in what you chose. Choose one to develop.' });
+    if (project.studio?.status !== 'started' || !b || g.doc) return;
+    makeNow(b, { realise: true });
   }, [linked]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── the conversation beside the workspace: words go to the editor (or choose among the directions) ──
+  // ── the conversation beside the workspace: words go to the editor ──
   const [inbox, setInbox] = useState<{ id: number; words: string } | null>(null);
   const [asked, setAsked] = useState<{ text: string } | null>(null);
   const waitReply = useRailReply(asked, (a) => a.text);
@@ -285,48 +294,21 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
       setInbox((i) => ({ id: (i?.id ?? 0) + 1, words }));
       return wait;
     }
-    if (view === 'directions' && !isLogo && g.brief) {
-      const low = words.toLowerCase();
-      const ords = ordinalsIn(low).filter((i) => g.options[i]);
-      // two of them made one: the colours of the one named with "colours" (else the first named), the rest of the other
-      if (ords.length >= 2 && COMBINE_WORDS.test(low)) {
-        const [a, b] = colourFirst(low, ords);
-        const d = combineDirections(g.options[a], g.options[b]);
-        void composeIn(d, g.brief);
-        return `Composing “${d.name}”: the colours of ${g.options[a].name}, the type and structure of ${g.options[b].name}.`;
-      }
-      if (/\b(you choose|you pick|you decide|surprise me|up to you|your call|pick for me|choose for me|whatever you think)\b/.test(low)) {
-        void composeIn(g.options[0], g.brief);
-        return `I’d take “${g.options[0].name}”: composing in it now. Change anything by hand, or here in words.`;
-      }
-      if (/\b(more|others?|another|different|new ones?|again|none|neither|not these|nothing like)\b/.test(low)) {
-        moreDirections();
-        return 'Three others, kept apart from those you have seen. Say what you’d like instead, if you know, and I’ll lean that way.';
-      }
-      if (ords.length && g.options[ords[0]]) {
-        void composeIn(g.options[ords[0]], g.brief);
-        return `Composing in “${g.options[ords[0]].name}”. Then change anything by hand, or here in words.`;
-      }
-      return 'Say “the second one”, “the first’s colours with the third”, “something different”, or “you choose”.';
-    }
-    if (view === 'directions' && isLogo) return 'Choose a concept and develop it; then ask for any change here in words.';
-    return 'Finish the brief on the left and continue: the directions follow from it.';
+    return busy ? 'One moment — the design is being made.' : 'Finish the brief on the left and continue: the design is made from it.';
   };
 
   /** A document from the editor: the current one, and a version when it says so. */
   const onEditorChange = (next: GraphicDoc, meta: { label: string; version?: boolean }) => setG((x) => ({ ...x, doc: next, ...(meta.version ? { versions: pushVersion(x.versions, next, meta.label) } : {}) }));
 
-  const isLogo = g.brief?.kind === 'logo' && !!g.doc?.artboards.some((b) => b.logo);
   const steps: { id: View; label: string; ok: boolean }[] = [
     // a work begun in conversation has its brief there, not in a form
     ...(project.studio && project.studio.via !== 'hand' ? [] : [{ id: 'brief' as View, label: 'Brief', ok: true }]),
-    isLogo ? { id: 'directions', label: 'Concepts', ok: true } : { id: 'directions', label: 'Directions', ok: !!g.brief && g.options.length > 0 },
     { id: 'edit', label: 'Design', ok: !!g.doc },
   ];
 
   return (
     <>
-    {project.studio && <StudioRail studio={project.studio} onStudio={(fn) => update((p) => (p.studio ? { ...p, studio: fn(p.studio) } : p))} onAsk={railAsk} placeholder={view === 'edit' ? 'Say what to change: “make the headline bigger”, “warmer colours”…' : view === 'directions' ? '“The second one”, “the first’s colours with the third”, “something different”' : 'Say what to change'} systemName={linked?.rec.name ?? null} onOpenChange={setRailOpen} />}
+    {project.studio && <StudioRail studio={project.studio} onStudio={(fn) => update((p) => (p.studio ? { ...p, studio: fn(p.studio) } : p))} onAsk={railAsk} placeholder={view === 'edit' ? 'Say what to change: “make the headline bigger”, “warmer colours”…' : 'Say what to change'} systemName={linked?.rec.name ?? null} onOpenChange={setRailOpen} />}
     <div className="v0 sb gx">
       <header className="v0-head">
         <div className="v0-head-l">
@@ -399,12 +381,8 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
         />
       )}
 
-      {view === 'directions' && isLogo && g.doc && (
-        <LogoConceptsStage doc={g.doc} measure={measure} onDoc={(next, label) => setG((x) => ({ ...x, doc: next, versions: pushVersion(x.versions, next, label) }))} onDevelop={() => setView('edit')} onBack={() => setView('brief')} />
-      )}
-
-      {view === 'directions' && g.brief && !isLogo && (
-        <DirectionsStage brief={g.brief} options={g.options} assets={g.assets ?? []} measure={measure} href={href} source={g.source ?? null} onChoose={(d) => void composeIn(d, g.brief!)} onMore={moreDirections} onCombine={(a, b) => void composeIn(combineDirections(a, b), g.brief!)} onBack={!project.studio || project.studio.via === 'hand' ? () => setView('brief') : undefined} />
+      {view === 'concepts' && g.doc && g.doc.artboards.some((b) => b.logo) && (
+        <LogoConceptsStage doc={g.doc} measure={measure} onDoc={(next, label) => setG((x) => ({ ...x, doc: next, versions: pushVersion(x.versions, next, label) }))} onDevelop={() => setView('edit')} onBack={() => setView('edit')} />
       )}
 
       {view === 'edit' && g.doc && (
@@ -428,6 +406,7 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
           brand={{ title: g.direction?.name ?? g.doc.direction?.name ?? 'This design', note: g.source ? <p className="v0-quiet">The direction of the website “{g.source.name}”.</p> : undefined }}
           allowOpen
           onMakeBoard={(sys) => void makeBoard(sys)}
+          onLogoConcepts={() => setView('concepts')}
           inbox={inbox}
           onAsked={(t) => setAsked({ text: t })}
           focus={!!project.studio && !byHand}
