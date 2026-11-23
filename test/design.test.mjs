@@ -223,7 +223,7 @@ sec('a graphic or a board from the earlier editor, carried over');
     assets: [{ id: 'img1', kind: 'image', src: 'upload:pic-1', width: 1200, height: 900, name: 'dusk.jpg', source: 'upload' }, { id: 'img2', kind: 'image', src: 'https://example.com/x.jpg', width: 10, height: 10, name: 'web.jpg', source: 'library' }],
   };
   const old = { ...T.makeProject('create', 'Rooms for Living', NOW), medium: 'graphic', intent: 'A lecture poster', graphic: { brief: { purpose: 'A lecture series', kind: 'poster', formats: ['a3'], content: { headline: 'Rooms for Living' }, mood: [], images: [] }, options: [], direction: null, doc: gdoc, versions: [] } };
-  const r = L.designFromLegacy(old, { now: NOW });
+  const r = L.designFromLegacy(old, { now: NOW, parse });
   const d = r.project.design;
   const [a1, a2] = d.doc.artboards;
   ok('a graphic becomes a design project, both artboards drawn as they were (SVG, filling the artboard)', r.project.medium === 'design' && r.artboards === 2 && /<svg[^>]*class="legacy"[^>]*width="100%"/.test(a1.html) && a1.html.includes('Rooms') && a2.html.includes('<svg'), a1?.html?.slice(0, 300));
@@ -233,8 +233,7 @@ sec('a graphic or a board from the earlier editor, carried over');
   const kept = T.normalizeProject(JSON.parse(JSON.stringify(r.project)));
   ok('stored and read back: still a design, the legacy record still there', kept.medium === 'design' && kept.design.doc.artboards.length === 2 && kept.legacy?.medium === 'graphic', kept.legacy);
   ok('the frame draws the carried-over artboard with its faces found', FR.facesFor(a1, '').faces.includes('Instrument Serif'), FR.facesFor(a1, ''));
-  const els = E.prepareFragment(a1.html, parse);
-  ok('its SVG text is selectable like any element (ids given)', /<text[^>]*data-sx="e\d+"/.test(els), els.slice(0, 400));
+  ok('its SVG text is selectable like any element (ids given as it is carried over)', /<text[^>]*data-sx="e\d+"/.test(a1.html), a1.html.slice(0, 400));
 
   const board = { ...T.makeProject('create', 'Campaign', NOW), medium: 'board', board: { request: 'A campaign', brief: null, materials: [
     { id: 'm1', type: 'graphic', name: 'Poster', doc: gdoc },

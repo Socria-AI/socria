@@ -7,9 +7,9 @@
 // and website schematics were pictures of those, and are named in the first turn, not redrawn. The old record itself
 // is kept on the project (DesignProject.legacy), untouched, so nothing made before is lost.
 //
-// Pure: the browser passes a measure with the faces loaded (components/ux-v0/design/legacy-open.ts), the tests the
-// approximate one. Pictures held by upload stay uploads; a picture linked from the web cannot be drawn in the
-// sandboxed canvas (it has no network), so it is left out and said.
+// Pure: the browser passes a measure with the faces loaded and its own parser (components/ux-v0/design/legacy-open.ts),
+// the tests the approximate measure and a DOM of their own. Pictures held by upload stay uploads; a picture linked from
+// the web cannot be drawn in the sandboxed canvas (it has no network), so it is left out and said.
 
 import { normalizeDoc, type Artboard, type GraphicDoc } from '../graphics/doc';
 import { renderArtboard } from '../graphics/render';
@@ -17,6 +17,7 @@ import type { Measure } from '../graphics/text';
 import type { DesignProject } from '../types';
 import { commit, emptyState, type DesignArtboard, type DesignAsset, type DesignState } from './doc';
 import { DEFAULT_FORMAT, formatOf } from './formats';
+import { prepareFragment, type Parse } from './elements';
 
 const obj = (v: unknown): Record<string, any> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, any>) : {});
 const safeId = (v: string, i: number) => (String(v).replace(/[^\w-]/g, '').slice(0, 36) || `ab${i}`);
@@ -65,7 +66,7 @@ function legacyDocs(p: DesignProject): { doc: GraphicDoc; group: string | null }
 }
 
 /** One old artboard as a new one: its SVG, drawn by the renderer it was made with, filling the artboard. */
-export function artboardFromLegacy(doc: GraphicDoc, a: Artboard, i: number, measure?: Measure): Omit<DesignArtboard, 'x' | 'y'> {
+export function artboardFromLegacy(doc: GraphicDoc, a: Artboard, i: number, measure?: Measure, parse?: Parse): Omit<DesignArtboard, 'x' | 'y'> {
   const k = a.unit === 'pt' ? PX_PER_PT : 1;
   const width = Math.max(16, Math.round(a.width * k));
   const height = Math.max(16, Math.round(a.height * k));
@@ -80,12 +81,13 @@ export function artboardFromLegacy(doc: GraphicDoc, a: Artboard, i: number, meas
     width,
     height,
     medium: f?.medium ?? (a.unit === 'pt' ? 'print' : 'screen'),
-    html: `<style>.sx-root{background:${bg}}svg.legacy{position:absolute;inset:0;display:block}</style>${svg}`,
+    // cleaned and given element ids like any artboard the designer writes, so its words select and edit by hand
+    html: ((h) => (parse ? prepareFragment(h, parse) : h))(`<style>.sx-root{background:${bg}}svg.legacy{position:absolute;inset:0;display:block}</style>${svg}`),
   };
 }
 
 /** An old graphic or board project as a design project (see the head of this file); null for anything else. */
-export function designFromLegacy(p: DesignProject, o: { measure?: Measure; now: number }): LegacyOutcome | null {
+export function designFromLegacy(p: DesignProject, o: { measure?: Measure; parse?: Parse; now: number }): LegacyOutcome | null {
   if (p.medium !== 'graphic' && p.medium !== 'board') return null;
   const docs = legacyDocs(p);
   const left: string[] = [];
@@ -104,7 +106,7 @@ export function designFromLegacy(p: DesignProject, o: { measure?: Measure; now: 
     let x = 0;
     let rowH = 0;
     for (const a of doc.artboards.slice(0, 40)) {
-      const made = artboardFromLegacy(doc, a, artboards.length, o.measure);
+      const made = artboardFromLegacy(doc, a, artboards.length, o.measure, o.parse);
       let id = made.id;
       while (seen.has(id)) id = `${made.id}-${artboards.length}`;
       seen.add(id);

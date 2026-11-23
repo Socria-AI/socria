@@ -27,6 +27,11 @@ import { directionInBrand, logoBoardAsset, placeBrandLogo, productSlots, toGraph
 import { latestVersion, publishedContent, type SystemRecord } from './registry';
 import type { SystemLink } from './link-schema';
 import type { SystemContent, TokenValue } from './schema';
+import { exportCss } from './exporters';
+import { commit as commitDesign } from '../design/doc';
+
+/** A system's tokens as a design's shared styles (lib/ux-v0/design/brand.ts gives the same to the designer). */
+export const designCss = (content: SystemContent) => exportCss(content).text.replace(/\/\*[\s\S]*?\*\//g, '').trim();
 
 export type ProjectKind = 'website' | 'graphic' | 'board';
 export const kindOfProject = (p: DesignProject): ProjectKind => (p.medium === 'graphic' || p.medium === 'design' ? 'graphic' : p.medium === 'board' ? 'board' : 'website');
@@ -273,7 +278,10 @@ function logoPlaceable(p: DesignProject, c: SystemContent): boolean {
   return docs.some((d) => d?.artboards.some((b) => b.children.some((n) => n.link?.startsWith('brand:') || (n.type === 'text' && n.role === 'logo' && (n as { text: string }).text.trim().toLowerCase() === name))));
 }
 
-const slotsOf = (p: DesignProject) => (kindOfProject(p) === 'website' ? websiteSlots(p.specs[p.specIndex]) : kindOfProject(p) === 'graphic' ? graphicSlots(p.graphic) : boardSlots(p.board));
+// a design holds the system as shared styles, not as slots: what it holds is what was applied, unless the person
+// changed those styles (then every slot is theirs, and nothing would be written)
+const slotsOf = (p: DesignProject) => (p.medium === 'design' ? { ...(p.systemLink?.applied ?? {}) } : slotsOfMedium(p));
+const slotsOfMedium = (p: DesignProject) => (kindOfProject(p) === 'website' ? websiteSlots(p.specs[p.specIndex]) : kindOfProject(p) === 'graphic' ? graphicSlots(p.graphic) : boardSlots(p.board));
 
 /**
  * A project linked to a system and brought into it (see the head of this file). `pin` 'latest' follows each published
@@ -314,6 +322,22 @@ export function applySystem(p: DesignProject, rec: SystemRecord, opts: { pin?: n
     }
     const outcome = spec ? (write.length ? (first ? 'applied' : 'updated') : 'unchanged') : 'linked';
     return { project, report: { ...report, outcome, version, changed: write, kept, summary: summaryOf(outcome, label, write, kept, spec ? '' : p.brief.doc ? 'The brief is built within it; the design will be too.' : 'It applies as soon as there is a brief.') } };
+  }
+  // a design written as HTML artboards takes the system at request time (lib/ux-v0/design/brand.ts): its tokens as
+  // the shared styles of a design that has none, its rules in what the designer is told
+  // A new version reaches the design's shared styles when they are the system's as applied before (or empty); styles
+  // the person changed are theirs, kept and said.
+  if (p.medium === 'design' && p.design) {
+    const css = designCss(content);
+    const was = prev ? contentForLink(rec, prev.version) : null;
+    const tokens = p.design.doc.tokens.trim();
+    const ours = !tokens || (!!was && tokens === designCss(was.content));
+    const made = p.design.doc.artboards.length > 0;
+    if (!ours) return { project, report: { ...report, outcome: 'linked', version, kept: [{ what: 'shared styles', why: 'changed in the design' }] as ApplyReport['kept'], summary: `Linked to ${label}. The design's shared styles were changed here, so they are kept; ask to bring them into the system.` } };
+    if (tokens === css) return { project, report: { ...report, outcome: first ? 'linked' : 'unchanged', version, summary: first ? `Linked to ${label}: everything designed from now on is made within it.` : `Already on ${label}.` } };
+    const design = commitDesign(p.design, { ...p.design.doc, tokens: css }, `Applied ${label}`, 'model', now);
+    project = { ...project, design };
+    return { project, report: { ...report, outcome: first ? 'applied' : 'updated', version, before: `Before ${label}`, summary: `${first ? 'Linked to' : 'Updated to'} ${label}: its colours and type are the design's shared styles${made ? ', so every artboard that uses them follows' : ''}.` } };
   }
   if (kind === 'graphic') {
     if (!p.graphic?.doc) {
@@ -381,6 +405,14 @@ export function undoApply(p: DesignProject, report: Pick<ApplyReport, 'before'> 
     const i = p.specs.findIndex((s) => s.version === n);
     if (i < 0) return { project: p, ok: false, error: 'That version is no longer kept.' };
     return { project: { ...p, specIndex: i, ...(link ? { systemLink: link } : {}), updatedAt: Date.now() }, ok: true };
+  }
+  // a design: the version before the one the system was applied in, committed again (its history kept)
+  if (p.medium === 'design' && p.design) {
+    const said = `Applied ${label.replace(/^Before /, '')}`;
+    const i = p.design.versions.map((v) => v.said).lastIndexOf(said);
+    if (i < 0) return { project: p, ok: false, error: 'That version is no longer kept.' };
+    const doc = i > 0 ? p.design.versions[i - 1].doc : { ...p.design.versions[i].doc, tokens: '' };
+    return { project: { ...p, design: commitDesign(p.design, doc, `Undone: ${label.replace(/^Before /, '')}`, 'person'), ...(link ? { systemLink: link } : {}), updatedAt: Date.now() }, ok: true };
   }
   if (kindOfProject(p) === 'graphic' && p.graphic) {
     const v = [...p.graphic.versions].reverse().find((x) => x.label === label);

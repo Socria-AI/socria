@@ -5,8 +5,7 @@
 // system knows about the brand — its description, confirmed and approved guidance, locked tokens — becomes rules the
 // designer is told on every request. Hard rules are said as rules; preferences as preferences.
 
-import { exportCss } from '../dsi/exporters';
-import { contentForLink } from '../dsi/link';
+import { contentForLink, designCss } from '../dsi/link';
 import type { SystemRecord } from '../dsi/registry';
 import type { SystemLink } from '../dsi/link-schema';
 
@@ -21,7 +20,7 @@ export function brandForDesign(rec: SystemRecord, link: SystemLink | undefined):
   const c = contentForLink(rec, link?.pin ?? 'latest');
   if (!c) return null;
   const content = c.content;
-  const css = exportCss(content).text.replace(/\/\*[\s\S]*?\*\//g, '').trim();
+  const css = designCss(content);
   const rules: string[] = [];
   if (content.identity.description) rules.push(`About the brand: ${content.identity.description.slice(0, 400)}`);
   if (content.identity.audience) rules.push(`Its audience: ${content.identity.audience.slice(0, 200)}`);

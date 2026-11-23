@@ -27,6 +27,15 @@ page.on('pageerror', (e) => errors.push(String(e).slice(0, 300)));
 page.on('request', (r) => {
   if (/\/api\/ux-v0\/(generate|refine|brief|discover|direct|critique|images)/.test(r.url())) modelCalls.push(r.url());
 });
+// the designer's route, scripted (no model here): a first design set in the shared styles it is given, an "ok" to a look
+const designCalls = [];
+await page.context().route('**/api/ux-v0/design', async (route) => {
+  const body = JSON.parse(route.request().postData() || '{}');
+  designCalls.push(body);
+  const text = body.mode === 'look' ? '<say>It reads.</say><ok/>' : `<say>A first design, in the system.</say><artboard id="new-1" name="Poster" format="${body.format}"><style>.sx-root{background:var(--color-background,#fff)}h1{position:absolute;left:80px;top:120px;margin:0;font:700 120px/0.9 serif;color:var(--color-action-primary,#000)}</style><h1>Slow coffee</h1></artboard>`;
+  const lines = [{ type: 'accepted', op: 'x' }, { type: 'text', delta: text }, { type: 'result', status: 200, body: { text, model: 'scripted', usage: { input: 0, output: 0, cost: 0 } } }];
+  return route.fulfill({ status: 200, contentType: 'application/x-ndjson', body: lines.map((l) => JSON.stringify(l)).join('\n') + '\n' });
+});
 const shot = (name) => page.screenshot({ path: `${S}dsi-${name}.png` });
 const idb = (db, store, id) =>
   page.evaluate(
@@ -138,17 +147,14 @@ const say = async (words) => {
 await page.waitForSelector('.sd-chat', { timeout: 15000 });
 if (/What will it be/.test(await page.locator('.sd-msg.is-socria .sd-said').last().innerText())) await say('A poster');
 await say('Slow coffee, early mornings');
-await page.waitForSelector('.gx-canvas .gx-board svg', { timeout: 30000 });
+await page.waitForSelector('.dx', { timeout: 30000 });
 ok('a new graphic is made linked to the system, with no visual question asked (its badge says so)', /Halden v2/.test(await page.locator('.ds-sysbadge').innerText()) && !(await idb('socria-ux-v0', 'projects', new URL(page.url()).searchParams.get('p')))?.studio?.discovery?.asked?.some((d) => ['vibe', 'colour', 'type'].includes(d)));
 await shot('composed-in-system');
 await page.waitForTimeout(1200);
 const gpid = new URL(page.url()).searchParams.get('p');
 let gproj = await idb('socria-ux-v0', 'projects', gpid);
-const nodes = gproj?.graphic?.doc?.artboards.flatMap((a) => a.children) ?? [];
-ok('composed in the system: its tokens, its approved logo placed as a linked image', gproj?.graphic?.doc?.tokens.colors.accent === '#e4572e' && nodes.some((n) => n.type === 'image' && n.link?.startsWith('brand:')) && !!gproj.graphic.bindings, JSON.stringify(gproj?.graphic?.doc?.tokens));
-const fidText = (await page.locator('body').innerText()).match(/Brand fidelity to Halden: (\d+)/);
-ok('brand fidelity said after composing, and high (the palette held even in a styled direction)', fidText && Number(fidText[1]) >= 86, fidText?.[0]);
-ok('the badge carries the live fidelity', /fidelity \d+/.test(await page.locator('.ds-sysbadge').innerText()));
+gproj = await until(async () => { const x = await idb('socria-ux-v0', 'projects', gpid); return x?.design?.doc?.tokens ? x : null; }, 15000);
+ok('made in the system: a design whose shared styles are the system’s tokens (signed out here: nothing sent to the designer yet)', gproj?.medium === 'design' && gproj.systemLink?.version === 2 && /#e4572e/i.test(gproj.design.doc.tokens) && designCalls.length === 0, JSON.stringify({ link: gproj?.systemLink, tokens: gproj?.design?.doc?.tokens?.slice(0, 120) }));
 await shot('graphic');
 
 // ── 10–13: modify, preview impact, publish, update ──
@@ -173,18 +179,11 @@ await page.getByRole('button', { name: 'Preview the impact' }).click();
 const preview = await page.locator('.ds-report').first().innerText();
 ok('impact preview: what changes before anything is applied', /colors\.accent: #e4572e → #c8401c/.test(preview), preview);
 gproj = await idb('socria-ux-v0', 'projects', gpid);
-ok('…and nothing has changed yet', gproj.graphic.doc.tokens.colors.accent === '#e4572e');
+ok('…and nothing has changed yet', /#e4572e/i.test(gproj.design.doc.tokens) && !/#c8401c/i.test(gproj.design.doc.tokens));
 await page.getByRole('button', { name: 'Update to the latest' }).click();
 await page.waitForSelector('text=Updated to Halden v3', { timeout: 10000 });
 gproj = await idb('socria-ux-v0', 'projects', gpid);
-// every property recorded as bound to the accent (at any depth, in groups too) now carries the new accent; nothing else
-// is asked of the composition (whether it uses its accent at all is the engine's choice)
-const walkAll = (ns) => ns.flatMap((n) => [n, ...(n.children ? walkAll(n.children) : [])]);
-const allNodes = new Map(gproj.graphic.doc.artboards.flatMap((a) => walkAll(a.children)).map((n) => [n.id, n]));
-const propOf = (n, k) => (k === 'stroke' ? n.stroke?.color : n[k]);
-const accentBound = Object.entries(gproj.graphic.bindings?.nodes ?? {}).flatMap(([id, props]) => Object.entries(props).filter(([, t]) => t === 'accent').map(([k]) => ({ id, k }))).filter(({ id }) => allNodes.has(id));
-const followed = accentBound.filter(({ id, k }) => propOf(allNodes.get(id), k) === '#c8401c').length;
-ok(`updated: the linked graphic follows (its token, and all ${accentBound.length} propert${accentBound.length === 1 ? 'y' : 'ies'} bound to the accent), a version saved before`, gproj.graphic.doc.tokens.colors.accent === '#c8401c' && followed === accentBound.length && gproj.graphic.versions.some((v) => /Before Halden v3/.test(v.label)) && gproj.systemLink.version === 3, JSON.stringify({ accentBound: accentBound.length, followed, token: gproj.graphic.doc.tokens.colors.accent }));
+ok('updated: the design’s shared styles carry the new accent, a version saved before', /#c8401c/i.test(gproj.design.doc.tokens) && gproj.design.versions.some((v) => /Applied Halden v3/.test(v.said)) && gproj.systemLink.version === 3, JSON.stringify(gproj.design.versions.map((v) => v.said)));
 await shot('usage');
 
 // ── 14: roll back ──
@@ -277,19 +276,14 @@ await page.getByRole('button', { name: 'New board in it' }).click();
 await page.waitForSelector('.sd-chat', { timeout: 15000 });
 await say('one poster and one Instagram post');
 await say('“Slow coffee, early mornings”, “Roasted in Halden”');
-await page.waitForSelector('.bd-canvas', { timeout: 30000 });
-ok('a new board is made linked to the system (its badge says so), at once in an expression of its identity (no systems to choose from)', /Halden v4/.test(await page.locator('.ds-sysbadge').innerText()) && (await page.locator('.bd-sys').count()) === 0);
+await page.waitForSelector('.dx', { timeout: 30000 });
+ok('a new board is made linked to the system (its badge says so), at once in an expression of its identity (no systems to choose from)', /Halden v4/.test(await page.locator('.ds-sysbadge').innerText()));
 const bpid = new URL(page.url()).searchParams.get('p');
-const board = await until(async () => {
+const bproj = await until(async () => {
   const p = await idb('socria-ux-v0', 'projects', bpid);
-  const ms = p?.board?.materials ?? [];
-  return ms.length && ms.every((m) => m.status === 'ready') ? p.board : null;
-}, 60000);
-const bgfx = (board?.materials ?? []).filter((m) => m.type === 'graphic' && m.doc);
-const bfid = bgfx.map((m) => D.fidelityOfDoc(m.doc, v4).score);
-ok('the board’s system is the design system (linked, published version)', board?.system?.brand?.id === rec.id && board.system.brand.version === 4, JSON.stringify(board?.system?.brand));
-ok('every board material in the system’s identity, the approved logo placed unaltered as a linked image', bgfx.length >= 2 && bgfx.every((m) => m.doc.tokens.colors.accent === sysAccent && m.doc.artboards.some((a) => a.children.some((n) => n.type === 'image' && n.link?.startsWith('brand:')))), JSON.stringify(bgfx.map((m) => [m.name, m.doc.tokens.colors.accent])));
-ok('each material holds to the system (fidelity ≥ 86) while composed its own way', bfid.length >= 2 && bfid.every((x) => x >= 86) && new Set(bgfx.map((m) => JSON.stringify(m.doc.artboards[0].concept ?? m.plan))).size === bgfx.length, JSON.stringify(bfid));
+  return p?.design?.doc?.tokens ? p : null;
+}, 30000);
+ok('the board is a campaign in the design system (linked, published version), its shared styles the system’s', bproj?.medium === 'design' && bproj.design.kind === 'campaign' && bproj.systemLink?.id === rec.id && bproj.systemLink.version === 4 && bproj.design.doc.tokens.toLowerCase().includes(String(sysAccent).toLowerCase()), JSON.stringify({ link: bproj?.systemLink, kind: bproj?.design?.kind }));
 await page.waitForTimeout(1500);
 await shot('board');
 

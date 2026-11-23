@@ -17,6 +17,8 @@ import { applyHandEdit, labelOf, type HandEdit } from '@/lib/ux-v0/design/elemen
 import { runRequest } from '@/lib/ux-v0/design/flow';
 import { firstRequest } from '@/lib/ux-v0/design/start';
 import { brandForDesign, type BrandForDesign } from '@/lib/ux-v0/design/brand';
+import { SystemBadge } from '../systems/SystemBadge';
+import { useLinkedSystem } from '../systems/useLinkedSystem';
 import { FORMATS, formatOf, sizeLabel } from '@/lib/ux-v0/design/formats';
 import { frameDoc } from '@/lib/ux-v0/design/frame';
 import { artboardHtml, artboardPicture, artboardsPdf, artboardSvg, download, embeddedFonts, fileName } from '@/lib/ux-v0/design/export';
@@ -66,12 +68,23 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
   }, [assetsKey]);
   const assetsNow = useCallback(() => assetData(cur.current.design!.assets), []);
   const [brand, setBrand] = useState<BrandForDesign | null>(null);
+  // the first request waits for the system a project is built in, so the first design is made in it
+  const [brandReady, setBrandReady] = useState(!initial.systemLink);
+  const linked = useLinkedSystem(project.systemLink);
   useEffect(() => {
     const link = project.systemLink;
-    if (!link) return;
+    if (!link) {
+      setBrand(null);
+      setBrandReady(true);
+      return;
+    }
     let live = true;
-    void getSystem(link.id).then((rec) => {
-      if (!live || !rec) return;
+    void getSystem(link.id)
+      .catch(() => null)
+      .then((rec) => {
+      if (!live) return;
+      setBrandReady(true);
+      if (!rec) return;
       const b = brandForDesign(rec, link);
       setBrand(b);
       // the system's tokens become the shared styles of a design that has none yet
@@ -172,13 +185,13 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
   // the first design is asked for the moment a project begun in conversation opens
   const started = useRef(false);
   useEffect(() => {
-    if (started.current || !signedIn) return;
+    if (started.current || !signedIn || !brandReady) return;
     const st = cur.current.design!;
     if (st.doc.artboards.length || st.turns.length) return;
     started.current = true;
     if (startIntent?.trim()) void ask(startIntent.trim(), { selection: false });
     else if (st.memory.brief) void ask(firstRequest(st.kind), { selection: false });
-  }, [ask, signedIn, startIntent]);
+  }, [ask, signedIn, startIntent, brandReady]);
 
   // ── by hand ──
   const lastHand = useRef<{ key: string; at: number } | null>(null);
@@ -365,7 +378,15 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
         </button>
         <input className="dx-name" value={project.name} onChange={(e) => setProject((p) => ({ ...p, name: e.target.value.slice(0, 80), updatedAt: Date.now() }))} aria-label="Design name" />
         <div className="dx-head-r">
-          {brand && <span className="dx-badge" title="Designed in this design system">{brand.name}</span>}
+          <SystemBadge
+            project={project}
+            linked={linked}
+            onApply={(fn) => {
+              const r = fn(cur.current);
+              const turn = { id: newId('t'), role: 'designer' as const, text: r.say, at: Date.now() };
+              setProject({ ...r.project, design: { ...r.project.design!, turns: [...r.project.design!.turns, turn] } });
+            }}
+          />
           <button type="button" className="dx-btn dx-ghost" onClick={undo} disabled={!canUndo(s) || !!busy} title="Undo (⌘Z)">
             Undo
           </button>

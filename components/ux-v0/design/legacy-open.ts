@@ -29,5 +29,5 @@ async function loadFaces(faces: string[]): Promise<void> {
 export async function openLegacy(p: DesignProject): Promise<LegacyOutcome | null> {
   const faces = legacyFaces(p);
   if (faces.length) await loadFaces(faces).catch(() => undefined);
-  return designFromLegacy(p, { measure: canvasMeasure(), now: Date.now() });
+  return designFromLegacy(p, { measure: canvasMeasure(), parse: (h) => new DOMParser().parseFromString(h, 'text/html'), now: Date.now() });
 }

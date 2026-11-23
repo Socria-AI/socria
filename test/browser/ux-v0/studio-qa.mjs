@@ -76,6 +76,18 @@ await ctx.route('**/api/ux-v0/studio-questions', async (route) => {
   return route.fulfill({ json: next });
 });
 
+// the designer's route, scripted (no model here): a first design that sets the brief's quoted words, and an "ok" to a
+// look — streamed as the route streams it
+const designCalls = [];
+await ctx.route('**/api/ux-v0/design', async (route) => {
+  const body = JSON.parse(route.request().postData() || '{}');
+  designCalls.push(body);
+  const words = (String(body.memory?.brief ?? '').match(/[“"]([^”"]+)[”"]/) ?? [])[1] ?? 'Untitled';
+  const text = body.mode === 'look' ? '<say>It reads.</say><ok/>' : `<say>A first design.</say><artboard id="new-1" name="${body.kind === 'logo' ? 'Logo sheet' : 'Poster'}" format="${body.format}"><style>.sx-root{background:#f2efe8}h1{position:absolute;left:80px;top:120px;margin:0;font:700 140px/0.9 'Instrument Serif',serif;color:#15181b}</style><h1>${words}</h1></artboard>`;
+  const lines = [{ type: 'accepted', op: 'x' }, { type: 'text', delta: text }, { type: 'result', status: 200, body: { text, model: 'scripted', usage: { input: 0, output: 0, cost: 0 } } }];
+  return route.fulfill({ status: 200, contentType: 'application/x-ndjson', body: lines.map((l) => JSON.stringify(l)).join('\n') + '\n' });
+});
+
 const shot = (name) => page.screenshot({ path: `${S}studio-${name}.png` });
 const idb = (db, store, id) =>
   page.evaluate(
@@ -119,7 +131,7 @@ const begin = async (words) => {
   await page.fill(COMPOSER, words);
   await page.waitForTimeout(300);
   await page.getByRole('button', { name: 'Begin' }).click();
-  await page.waitForSelector('.sd-chat, .gx, .bd, .v0-work', { timeout: 20000 });
+  await page.waitForSelector('.sd-chat, .dx, .v0-work', { timeout: 20000 });
   await page.waitForTimeout(500);
 };
 const reply = async (words) => {
@@ -131,7 +143,9 @@ const said = () => page.locator('.sd-msg.is-socria .sd-said').allInnerTexts();
 const lastSaid = async () => (await said()).at(-1) ?? '';
 const suggestions = () => page.locator('.sd-suggestion').allInnerTexts();
 const questionsAsked = async () => ((await project())?.studio?.transcript ?? []).filter((m) => m.from === 'socria' && m.kind === 'question').length;
-const designed = () => page.waitForSelector('.gx-stage svg, .gx-ws', { timeout: 30000 });
+// the design workspace (signed out here, as the app really is with placeholder keys: it opens with the brief and asks
+// to sign in before anything is sent to the designer)
+const designed = () => page.waitForSelector('.dx', { timeout: 30000 });
 
 console.log('=== the home ===');
 await goHome();
@@ -147,12 +161,11 @@ await begin('A bold, experimental poster for “Field Lines”, “Code that dra
 await designed();
 let p = await until(async () => {
   const x = await project();
-  return x?.graphic?.doc ? x : null;
+  return x?.medium === 'design' ? x : null;
 }, 30000);
-ok('no conversation page and no directions to choose: the design itself, composed', (await page.locator('.sd-chat').count()) === 0 && (await page.locator('.gx-dir').count()) === 0 && !!p?.graphic?.doc, await page.url());
+ok('no conversation page and no directions to choose: the design workspace, ready to design (signed out: asks to sign in, sends nothing)', (await page.locator('.sd-chat').count()) === 0 && (await page.locator('.dx').count()) === 1 && p?.medium === 'design' && designCalls.length === 0 && /Sign in/.test(await page.locator('.dx-chat textarea').getAttribute('placeholder')), await page.url());
 ok('…nothing was asked; what was understood is said once, as making', p?.studio && p.studio.transcript.filter((m) => m.from === 'socria' && m.kind === 'question').length === 0 && p.studio.transcript.some((m) => m.stage === 'making') && p.studio.status === 'started', JSON.stringify(p?.studio?.transcript?.map((m) => [m.kind, m.text.slice(0, 60)])));
-ok('…the words exactly as written, and the form, from the sentence', p.graphic?.brief?.content?.headline === 'Field Lines' && p.graphic.brief.kind === 'poster' && p.graphic.doc.artboards[0].children.some((n) => n.type === 'text' && n.text === 'Field Lines'), JSON.stringify(p.graphic?.brief?.content));
-ok('…and the steps say so: the design, with no Directions step', (await page.locator('.v0-steps .sb-seg-item').filter({ hasText: 'Directions' }).count()) === 0);
+ok('…the words exactly as written, and the form, from the sentence: the brief the designer will be given', /Field Lines/.test(p.design.memory.brief) && p.design.kind === 'poster' && !!p.design.format, JSON.stringify(p.design.memory));
 await page.waitForTimeout(800);
 await shot('02-detailed-made');
 
@@ -182,8 +195,8 @@ const chosenMood = (await page.locator('.sd-dq-card.is-vibe .sd-dq-name').first(
 await page.locator('.sd-dq-card.is-vibe').first().click();
 await designed();
 p = await started();
-ok('a mood tapped: recorded as the person’s, and the poster is made in it (one creative question, asked once — “show me others” asked it again with other moods)', p?.studio?.answers['g.vibe']?.fields?.name === chosenMood && p.graphic?.brief?.content?.headline === 'Grand Opening' && JSON.stringify(p.studio.discovery?.asked) === '["vibe"]', JSON.stringify({ v: p?.studio?.answers['g.vibe'], asked: p?.studio?.discovery?.asked }));
-await until(async () => !!(await project())?.graphic?.doc, 20000);
+ok('a mood tapped: recorded as the person’s, and the poster is made in it (one creative question, asked once — “show me others” asked it again with other moods)', p?.studio?.answers['g.vibe']?.fields?.name === chosenMood && p.medium === 'design' && /Grand Opening/.test(p.design.memory.brief) && p.design.memory.brief.includes(chosenMood) && JSON.stringify(p.studio.discovery?.asked) === '["vibe"]', JSON.stringify({ v: p?.studio?.answers['g.vibe'], asked: p?.studio?.discovery?.asked }));
+await until(async () => (await project())?.medium === 'design', 20000);
 await page.waitForTimeout(800);
 await shot('04-made-in-the-mood');
 
@@ -224,9 +237,9 @@ await page.locator('.sd-dq-card.is-face').first().click();
 await page.waitForSelector('.sd-dq-pal', { timeout: 15000 });
 ok('a pairing tapped and said back; then its colours', (await said()).some((t) => t.toLowerCase().includes(faceName.toLowerCase())) && (await page.locator('.sd-dq-pal').count()) >= 3, await lastSaid());
 await page.locator('.sd-dq-acts .sd-chip').filter({ hasText: 'Surprise me' }).click();
-await page.waitForSelector('.gx-ws', { timeout: 30000 });
+await page.waitForSelector('.dx', { timeout: 30000 });
 p = await started();
-ok('“surprise me”: the logo is made, its concepts open in the editor (no concepts stage to choose from first)', p?.studio?.answers['l.name']?.fields?.name === 'Halden' && !!p.studio.answers['l.type']?.fields?.display && (await page.locator('.gx-ws').count()) === 1 && (await page.locator('.v0-steps .sb-seg-item').filter({ hasText: 'Concepts' }).count()) === 0, JSON.stringify({ n: p?.studio?.answers['l.name'], t: p?.studio?.answers['l.type'] }));
+ok('“surprise me”: the logo is begun on a logo sheet in the design workspace, the name and the lettering chosen carried in its brief', p?.studio?.answers['l.name']?.fields?.name === 'Halden' && !!p.studio.answers['l.type']?.fields?.display && p.medium === 'design' && p.design.kind === 'logo' && p.design.format === 'logo-sheet' && /Halden/.test(p.design.memory.brief) && (await page.locator('.dx').count()) === 1, JSON.stringify({ n: p?.studio?.answers['l.name'], t: p?.studio?.answers['l.type'], d: p?.design && { kind: p.design.kind, format: p.design.format } }));
 await page.waitForTimeout(800);
 await shot('07-logo-made');
 

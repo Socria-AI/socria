@@ -485,5 +485,32 @@ ok('a graphic project gives its tokens and type habits (not its composition)', f
 const fromBoard = await D.extractFromProject(bprop.project);
 ok('a board gives its Master Design System identity', fromBoard.content.identity.name === bprop.project.board.system.name && fromBoard.content.tokens['font.family.display'].value === bprop.project.board.system.tokens.fonts.display);
 
+// ── a design written as HTML artboards, built in a system ──
+sec('a design in the system: its shared styles are the system’s, and follow new versions');
+{
+  let sysR = D.newRecord(D.analyzeBrand({ ...pc }), { now: 500 });
+  sysR = D.publish(sysR, { now: 501, confirm: true }).record;
+  const art = { id: 'a1', name: 'Poster', format: 'a3', width: 1123, height: 1587, medium: 'print', html: '<style>h1{color:var(--color-text)}</style><h1>Walk further</h1>', x: 0, y: 0 };
+  const ds0 = { v: 1, doc: { artboards: [art], tokens: '' }, versions: [], at: -1, turns: [], memory: { brief: '', decisions: [], rejected: [] }, comments: [], assets: [], kind: 'poster', format: 'a3' };
+  let dp = { ...D.makeProject('create', 'Walk poster', 1), medium: 'design', design: ds0 };
+  const a1 = D.applySystem(dp, sysR, { now: 502 });
+  dp = a1.project;
+  ok('linked: the system’s tokens become the design’s shared styles, a version saved', a1.report.outcome === 'applied' && dp.design.doc.tokens.includes('--color-') && dp.design.versions.length === 1 && dp.design.versions[0].said === `Applied ${sysR.name} v1` && !dp.graphic, J(a1.report));
+  sysR = D.updateDraft(sysR, D.setToken(sysR.draft, 'color.brand.peat', { value: '#101820' }).content, 'deeper peat');
+  sysR = D.publish(sysR, { now: 510, confirm: true }).record;
+  const imp = D.impactOn(dp, sysR, D.publishedContent(sysR), sysR.published);
+  ok('the impact preview for a design names only what the new version changes', imp.changed.length >= 1 && imp.changed.every((c) => c.from !== c.to) && imp.changed.length < 6 && imp.changed.some((c) => /#101820/i.test(String(c.to))), J(imp.changed));
+  const pr2 = D.propagateTo(dp, sysR, { now: 511 });
+  ok('a new version reaches the design: its shared styles are the new ones, every artboard that uses them follows', pr2.report.outcome === 'updated' && pr2.project.design.doc.tokens !== dp.design.doc.tokens && /#101820/i.test(pr2.project.design.doc.tokens) && pr2.project.systemLink.version === 2, J(pr2.report));
+  const back = D.undoApply(pr2.project, pr2.report);
+  ok('…and can be put back (the earlier styles, history kept)', back.ok && back.project.design.doc.tokens === dp.design.doc.tokens && back.project.design.versions.length === 3, back.error);
+  // shared styles the person changed are theirs: kept, and said
+  const mine = { ...pr2.project, design: { ...pr2.project.design, doc: { ...pr2.project.design.doc, tokens: ':root{--color-text:#ff0066}' } } };
+  sysR = D.updateDraft(sysR, D.setToken(sysR.draft, 'color.brand.peat', { value: '#202830' }).content, 'peat again');
+  sysR = D.publish(sysR, { now: 520, confirm: true }).record;
+  const pr3 = D.propagateTo(mine, sysR, { now: 521 });
+  ok('styles changed in the design are kept, and said', pr3.project.design.doc.tokens === ':root{--color-text:#ff0066}' && pr3.report.kept.length === 1 && /kept/.test(pr3.report.summary), J(pr3.report));
+}
+
 console.log(`\ndesign-system-intelligence: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
