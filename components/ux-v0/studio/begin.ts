@@ -14,7 +14,8 @@ import { systemChosen, websiteSystems } from '@/lib/ux-v0/studio/options';
 import { attachmentKindOf } from '@/lib/ux-v0/studio/intent';
 import { readFacts } from '@/lib/ux-v0/studio/facts';
 import { modeInfo } from '@/lib/ux-v0/studio/modes';
-import { startProject, startWebsite } from '@/lib/ux-v0/studio/start';
+import { startWebsite } from '@/lib/ux-v0/studio/start';
+import { designFromStudio } from '@/lib/ux-v0/design/start';
 import { importAskOf, websiteAskOf } from '@/lib/ux-v0/studio/apply';
 import { newId, type Asset } from '@/lib/ux-v0/graphics/doc';
 import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
@@ -116,18 +117,13 @@ export function startFrom(p: DesignProject, st: StudioState, opts: { systems: re
   const sysId = st.systemId ?? (st.mode === 'board' && identity.startsWith('system:') ? identity.slice('system:'.length) : undefined);
   const rec = sysId ? opts.systems.find((r) => r.id === sysId && r.status === 'active' && r.published > 0) ?? null : null;
   const linked = (x: DesignProject) => (rec ? applySystem(x, rec, { now }).project : x);
-  if (st.mode === 'graphic' || st.mode === 'logo') {
-    const assets = st.mode === 'graphic' ? picturesOf(st) : [];
-    const r = startProject(p, st, { images: assets.map((a) => a.id), assets, now });
+  // graphics, logos and boards are designed as HTML artboards (lib/ux-v0/design): the brief written down, the first
+  // design asked for the moment the workspace opens
+  if (st.mode === 'graphic' || st.mode === 'logo' || st.mode === 'board') {
+    const assets = st.mode === 'logo' ? [] : picturesOf(st);
+    const r = designFromStudio(p, st, { assets: assets.map((a) => ({ id: a.id, src: a.src, name: a.name, width: a.width, height: a.height })), now });
     if (!r.ok) return r;
     return { ok: true, kind: 'project', project: linked(r.project) };
-  }
-  if (st.mode === 'board') {
-    const assets = picturesOf(st);
-    const r = startProject(p, st, { images: assets.map((a) => a.id), now });
-    if (!r.ok) return r;
-    const b = r.project.board!;
-    return { ok: true, kind: 'project', project: linked({ ...r.project, board: { ...b, assets: [...b.assets, ...assets] } }) };
   }
   if (st.mode === 'website') {
     // the looks shown in the conversation; when none were drawn (made at once), drawn here the same way

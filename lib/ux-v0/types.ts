@@ -25,6 +25,7 @@ import { GRIDS, normalizeMotion, normalizeSpec, type DesignSpec, type Motion } f
 import { bodyFont, displayFont } from './fonts';
 import { normalizeGraphicState, type GraphicState } from './graphics/state';
 import { normalizeBoard, type BoardState } from './boards/model';
+import { normalizeDesignState, type DesignState } from './design/doc';
 
 // ── small helpers ────────────────────────────────────────────────────
 
@@ -462,8 +463,8 @@ export interface DesignBrief {
 
 // ── usage ────────────────────────────────────────────────────────────
 
-export type CallKind = 'discover' | 'direction' | 'brief' | 'refine-brief' | 'art-direction' | 'generate' | 'refine' | 'critique' | 'creative-edit' | 'graphic-design' | 'graphic-review' | 'studio-questions' | 'image';
-export const CALL_KINDS: readonly CallKind[] = ['discover', 'direction', 'brief', 'refine-brief', 'art-direction', 'generate', 'refine', 'critique', 'creative-edit', 'graphic-design', 'graphic-review', 'studio-questions', 'image'];
+export type CallKind = 'discover' | 'direction' | 'brief' | 'refine-brief' | 'art-direction' | 'generate' | 'refine' | 'critique' | 'creative-edit' | 'graphic-design' | 'graphic-review' | 'design-write' | 'design-look' | 'studio-questions' | 'image';
+export const CALL_KINDS: readonly CallKind[] = ['discover', 'direction', 'brief', 'refine-brief', 'art-direction', 'generate', 'refine', 'critique', 'creative-edit', 'graphic-design', 'graphic-review', 'design-write', 'design-look', 'studio-questions', 'image'];
 
 /** What each stage is, in words, for the cost panel, the settings and the report. */
 export const STAGE_LABEL: Record<CallKind, string> = {
@@ -477,6 +478,8 @@ export const STAGE_LABEL: Record<CallKind, string> = {
   critique: 'Critique',
   'creative-edit': 'Creative change',
   'graphic-design': 'Graphic design',
+  'design-write': 'Design',
+  'design-look': 'Design check',
   'graphic-review': 'Design review',
   'studio-questions': 'Creative questions',
   // a picture made by an image model (lib/ux-v0/image-gen-server.ts): priced and capped apart from the text stages
@@ -535,11 +538,13 @@ export interface DesignProject {
   keptVersions?: number[];
   /** what is being made: a website (the default), a graphic (lib/ux-v0/graphics), or a board of many materials in one
    * design system (lib/ux-v0/boards) */
-  medium?: 'website' | 'graphic' | 'board';
+  medium?: 'website' | 'graphic' | 'board' | 'design';
   /** a graphic's brief, directions, document and versions (lib/ux-v0/graphics/state.ts) */
   graphic?: GraphicState;
   /** a board: its request, its Master Design System, its materials, what is on its canvas (lib/ux-v0/boards/model.ts) */
   board?: BoardState;
+  /** a design written as HTML artboards: its artboards, versions, conversation and memory (lib/ux-v0/design/doc.ts) */
+  design?: DesignState;
   /** the registry design system it is built in (lib/ux-v0/dsi): which version, pinned or following, and its overrides */
   systemLink?: SystemLink;
   /** the studio conversation it was begun in (lib/ux-v0/studio): what was asked for, every decision since, the
@@ -1135,7 +1140,8 @@ export function normalizeProject(v: unknown, opts: { forSync?: boolean } = {}): 
         .filter((x): x is number => typeof x === 'number' && Number.isInteger(x) && x > 0 && specs.some((sp) => sp.version === x))
         .slice(0, 30),
     ),
-    ...(r.medium === 'graphic' ? { medium: 'graphic' as const } : r.medium === 'board' ? { medium: 'board' as const } : {}),
+    ...(r.medium === 'graphic' ? { medium: 'graphic' as const } : r.medium === 'board' ? { medium: 'board' as const } : r.medium === 'design' ? { medium: 'design' as const } : {}),
+    ...((ds) => (ds && r.medium === 'design' ? { design: ds } : {}))(r.medium === 'design' ? normalizeDesignState(r.design) : null),
     ...((g) => (g && r.medium === 'graphic' ? { graphic: g } : {}))(normalizeGraphicState(r.graphic)),
     ...((bd) => (bd ? { board: bd } : {}))(r.medium === 'board' ? normalizeBoard(r.board) : null),
     ...((ln) => (ln ? { systemLink: ln } : {}))(normalizeSystemLink(r.systemLink)),
@@ -1175,7 +1181,12 @@ export function summarize(p: DesignProject): ProjectSummary {
   const imported = p.artifact?.type === 'imported' ? p.artifact : null;
   const g = p.medium === 'graphic' ? p.graphic : undefined;
   const bd = p.medium === 'board' ? p.board : undefined;
-  const stage: ProjectSummary['stage'] = bd
+  const ds = p.medium === 'design' ? p.design : undefined;
+  const stage: ProjectSummary['stage'] = ds
+    ? ds.doc.artboards.length
+      ? 'design'
+      : 'begun'
+    : bd
     ? bd.materials.some((m) => m.status === 'ready')
       ? 'design'
       : bd.system
@@ -1206,15 +1217,15 @@ export function summarize(p: DesignProject): ProjectSummary {
     id: p.id,
     name: p.name,
     mode: p.mode,
-    ...(p.medium === 'graphic' ? { graphic: g?.brief?.kind ?? 'graphic' } : {}),
+    ...(p.medium === 'graphic' ? { graphic: g?.brief?.kind ?? 'graphic' } : ds ? { graphic: ds.kind } : {}),
     ...(bd ? { board: bd.materials.length } : {}),
     intent: p.intent.slice(0, 160),
     updatedAt: p.updatedAt,
     cards: p.cards.length,
-    hasDesign: !!p.artifact || p.specs.length > 0,
+    hasDesign: !!p.artifact || p.specs.length > 0 || !!ds?.doc.artboards.length,
     createdAt: p.createdAt,
     stage,
-    versions: bd ? bd.versions.length : g ? g.versions.length : p.specs.length,
+    versions: ds ? ds.versions.length : bd ? bd.versions.length : g ? g.versions.length : p.specs.length,
     pageType: p.brief.doc?.pageType ?? currentSpec(p)?.pageType ?? null,
     medium: imported ? imported.kind : null,
     direction: bd ? bd.system?.direction.name ?? '' : g ? g.direction?.name ?? '' : p.direction.chosen?.name ?? '',

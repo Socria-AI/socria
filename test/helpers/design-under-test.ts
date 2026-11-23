@@ -1,0 +1,16 @@
+// test/helpers/design-under-test.ts — the design core (lib/ux-v0/design), bundled for test/design.test.mjs.
+export * as protocol from '@/lib/ux-v0/design/protocol';
+export * as apply from '@/lib/ux-v0/design/apply';
+export * as elements from '@/lib/ux-v0/design/elements';
+export * as doc from '@/lib/ux-v0/design/doc';
+export * as formats from '@/lib/ux-v0/design/formats';
+export * as prompts from '@/lib/ux-v0/design/prompts';
+export * as frame from '@/lib/ux-v0/design/frame';
+export * as flow from '@/lib/ux-v0/design/flow';
+export * as start from '@/lib/ux-v0/design/start';
+export * as brand from '@/lib/ux-v0/design/brand';
+export { normalizeProject, summarize, makeProject } from '@/lib/ux-v0/types';
+export { askJson, setClaudeClient } from '@/lib/ux-v0/ask';
+export { emptyStudio } from '@/lib/ux-v0/studio/schema';
+export { opening } from '@/lib/ux-v0/studio/director';
+export { startFrom } from '@/components/ux-v0/studio/begin';

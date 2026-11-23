@@ -29,7 +29,7 @@ import type { SystemLink } from './link-schema';
 import type { SystemContent, TokenValue } from './schema';
 
 export type ProjectKind = 'website' | 'graphic' | 'board';
-export const kindOfProject = (p: DesignProject): ProjectKind => (p.medium === 'graphic' ? 'graphic' : p.medium === 'board' ? 'board' : 'website');
+export const kindOfProject = (p: DesignProject): ProjectKind => (p.medium === 'graphic' || p.medium === 'design' ? 'graphic' : p.medium === 'board' ? 'board' : 'website');
 
 export interface SlotChange {
   slot: string;

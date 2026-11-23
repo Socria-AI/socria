@@ -34,7 +34,7 @@ const swap = {
     b.onResolve({ filter: /^next\/(server|headers)$/ }, (a) => ({ path: `${a.path}.js`, external: true }));
   },
 };
-const ROUTES = ['critique', 'discover', 'brief', 'direct', 'generate', 'refine', 'reference', 'projects', 'design-system', 'assets', 'graphic-edit', 'graphic-design', 'studio-questions'];
+const ROUTES = ['critique', 'discover', 'brief', 'direct', 'generate', 'refine', 'reference', 'projects', 'design-system', 'assets', 'graphic-edit', 'graphic-design', 'studio-questions', 'design'];
 await Promise.all(
   ROUTES.map((r) =>
     build({
@@ -1060,6 +1060,45 @@ console.log('\n=== Claude Sonnet 5.5 by default; the questions on GPT-6 Luna ===
   ok('no Anthropic key: a Claude step says it is not configured, and no model is asked', none.status === 500 && /not configured/.test(none.json?.error ?? '') && none.calls.length === 0, J(none));
   const stillQ = await post('discover', { projectId: P, action: 'turn', intent: 'A coffee shop website', questions: [], understanding: {}, moodboard: {} }, U, [{ understanding: { summary: 's', known: {}, gaps: [] }, questions: [], ready: true }]);
   ok('…while the questions, on Luna, still work', stillQ.status === 200 && stillQ.calls[0]?.model === 'gpt-6-luna');
+}
+
+console.log('\n=== the designer: a design written as HTML, streamed ===');
+{
+  delete process.env.SOCRIAUX_ROUTING;
+  delete process.env.SOCRIAUX_MODEL;
+  delete process.env.SOCRIAUX_ECONOMY_MODEL;
+  delete process.env.SOCRIAUX_PREMIUM_MODEL;
+  process.env.ANTHROPIC_API_KEY = 'test-anthropic';
+  const U = 'user_v0_design';
+  const P = 'uxv0_design';
+  const ANSWER = '<say>A section cut open.</say><artboard id="new-1" name="Poster" format="a3"><style>h1{font-size:160px}</style><h1>Rooms for Living</h1></artboard>';
+  const doc = { artboards: [{ id: 'ab1', name: 'Poster', format: 'a3', width: 1123, height: 1587, medium: 'print', html: '<h1 data-sx="e1">Rooms for Living</h1>', x: 0, y: 0 }], tokens: ':root{--ink:#111}' };
+  ok('signed out: refused, nothing asked', (await post('design', { words: 'a poster' }, null, [ANSWER])).status === 401);
+  ok('no words: no call', (await post('design', { doc }, U, [ANSWER])).status === 400);
+  const w = await post('design', { projectId: P, words: 'Make the headline smaller', doc, kind: 'poster', format: 'a3', memory: { brief: 'A lecture poster for Northlight', decisions: ['keep the serif'], rejected: [] }, selection: { artboard: 'ab1', element: 'e1', label: 'h1' }, turns: [], comments: [] }, U, [ANSWER]);
+  const call = w.calls[0];
+  const sys = J(call?.system ?? '');
+  const user = J(call?.messages ?? '');
+  ok('the answer is the text as written (no JSON asked for, none read)', w.status === 200 && w.json.text === ANSWER && !/Answer with the one JSON object/.test(user), J(w.json).slice(0, 300));
+  ok('Claude, premium, with room for a whole design', call?.provider === 'anthropic' && call.model === 'claude-sonnet-5-5' && call.max_tokens >= 16000, J({ m: call?.model, t: call?.max_tokens }));
+  ok('the instructions: the tags, the formats, no house style (cached as one block)', /<artboard/.test(sys) && /a3: A3 poster/.test(sys) && /no house style/i.test(sys) && /ephemeral/.test(sys));
+  ok('the message: the words, the selection, the project, the artboard in full with its ids', /Make the headline smaller/.test(user) && /data-sx=\\"e1\\"/.test(user) && /Northlight/.test(user) && /keep the serif/.test(user), user.slice(0, 600));
+  const png = `data:image/jpeg;base64,${'A'.repeat(400)}`;
+  ok('a look needs the artboards and their pictures', (await post('design', { projectId: P, mode: 'look', words: 'x', doc, artboards: ['ab1'] }, U, ['<ok/>'])).status === 400);
+  const lk = await post('design', { projectId: P, mode: 'look', words: 'a poster', made: 'made one artboard', doc, artboards: ['ab1'], pictures: [png], measured: { ab1: ['words cut off in e1'] } }, U, ['<say>Fine.</say><ok/>']);
+  ok('a look: the economy tier, the picture attached, what was measured said', lk.status === 200 && lk.json.text.includes('<ok/>') && /"type":"image"/.test(J(lk.calls[0]?.messages)) && /words cut off in e1/.test(J(lk.calls[0]?.messages)) && lk.calls[0]?.output_config?.effort === 'low', J(lk.calls[0]?.output_config));
+  // streamed: the text reaches the browser as it is written
+  globalThis.__uid = U;
+  globalThis.__logosScript = [ANSWER];
+  globalThis.__logosCalls = [];
+  const res = await R.design.POST(new NextRequest('http://localhost/api/ux-v0/design', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/x-ndjson, application/json' }, body: J({ projectId: P, words: 'a poster', doc: { artboards: [], tokens: '' } }) }));
+  const lines = (await res.text()).trim().split('\n').map((l) => JSON.parse(l));
+  const text = lines.filter((l) => l.type === 'text').map((l) => l.delta).join('');
+  const result = lines.find((l) => l.type === 'result');
+  ok('streamed: the answer arrives as text events, then the whole answer', text === ANSWER && result?.status === 200 && result.body.text === ANSWER, J(lines.map((l) => l.type)));
+  const logged = db.rows('ux_v0_calls').filter((r) => r.user_id === U);
+  ok('each call is logged on its stage, priced', logged.some((r) => r.stage === 'design-write') && logged.some((r) => r.stage === 'design-look') && logged.every((r) => typeof r.cost_usd === 'number'), J(logged.map((r) => r.stage)));
+  delete process.env.ANTHROPIC_API_KEY;
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

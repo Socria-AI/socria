@@ -76,6 +76,8 @@ export interface StagePrompt {
   extraChars?: number;
   /** the part of the prompt that is the same for every project, for the provider's cache key */
   cacheScope?: string;
+  /** the answer is plain text, streamed to the browser as it is written ({ type: 'text', delta } events) */
+  plainText?: boolean;
 }
 
 export interface Stage {
@@ -89,6 +91,8 @@ export interface Stage {
   finish: (asked: Asked) => StageAnswer | Promise<StageAnswer>;
   /** after the answer is sent (still within the request): Unsplash's download ping, say */
   after?: (answer: StageAnswer) => Promise<void>;
+  /** this stage's own time limit (ms), within its route's maxDuration; the shared budget when unset */
+  budgetMs?: number;
 }
 
 export interface StageContext {
@@ -163,6 +167,8 @@ const STAGE_WORDS: Record<CallKind, string> = {
   critique: 'Reading the design',
   'creative-edit': 'Working out the change',
   'graphic-design': 'Designing',
+  'design-write': 'Designing',
+  'design-look': 'Looking at the result',
   'graphic-review': 'Looking at the result',
   'studio-questions': 'Thinking about what to ask',
   image: 'Making the picture',
@@ -204,7 +210,7 @@ export function failureAnswer(stage: CallKind, e: unknown, why: 'cancelled' | 't
 type Emit = (event: Record<string, unknown>) => void;
 
 async function execute(req: NextRequest, ctx: StageContext, s: Stage, op: string, t0: number, emit: Emit, env: Env, cancel: AbortSignal): Promise<{ answer: StageAnswer; record: OperationRecord }> {
-  const budgetMs = routeBudgetMs(env);
+  const budgetMs = s.budgetMs ?? routeBudgetMs(env);
   const deadlineAt = t0 + budgetMs;
   const controller = new AbortController();
   let why: 'cancelled' | 'timeout' | null = null;
@@ -278,6 +284,14 @@ async function execute(req: NextRequest, ctx: StageContext, s: Stage, op: string
     // the OpenAI client is made only where it can be asked (its constructor refuses a missing key); a Claude call uses Anthropic's
     const openai = tracked(new OpenAI({ apiKey: process.env.OPENAI_API_KEY || 'not-configured' }), s.label);
     let lastChars = 0;
+    // a plain-text answer goes to the browser as it is written, a few words at a time
+    let pending = '';
+    let flushAt = 0;
+    const flush = () => {
+      if (pending) tell({ type: 'text', delta: pending });
+      pending = '';
+      flushAt = Date.now();
+    };
     asked = await askRouted(
       openai,
       g.route,
@@ -295,10 +309,24 @@ async function execute(req: NextRequest, ctx: StageContext, s: Stage, op: string
         deadlineAt,
         cacheKey: cacheKey('ux-v0', `${s.stage}:${p.cacheScope ?? ''}`),
         reasoningRoom: reasoningRoomFor(g.route.model, g.route.effort, env),
+        ...(p.plainText
+          ? {
+              plainText: true,
+              onText: (d: string) => {
+                pending += d;
+                if (pending.length >= 160 || Date.now() - flushAt > 120) flush();
+              },
+            }
+          : {}),
         onProgress: (x: AskProgress) => {
           if (x.phase === 'asked') {
             askedModel = x.model;
             const fallback = askedAt != null;
+            // another model starts the answer over: what the browser has of the first is thrown away
+            if (fallback && p.plainText) {
+              pending = '';
+              tell({ type: 'text-reset' });
+            }
             askedAt ??= Date.now();
             tell({ type: 'progress', phase: fallback ? 'fallback' : 'asked', model: x.model, tier: fallback ? 'economy' : g.route.tier, elapsedMs: Date.now() - t0 });
           } else if ((x.chars ?? 0) - lastChars >= 400 || lastChars === 0) {
@@ -309,6 +337,7 @@ async function execute(req: NextRequest, ctx: StageContext, s: Stage, op: string
       },
       keyed(economy.model) ? economy : null
     );
+    flush();
     tell({ type: 'progress', phase: 'finishing', elapsedMs: Date.now() - t0 });
     const answer = await s.finish(asked);
     const ok = (answer.status ?? 200) < 300;

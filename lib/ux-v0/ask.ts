@@ -79,6 +79,10 @@ export interface AskOptions {
   cacheKey?: string;
   /** the most reasoning room (tokens) above the answer's cap; the model's own default room when unset */
   reasoningRoom?: number;
+  /** the answer is plain text (a design written as HTML), not one JSON object: nothing asks for JSON, nothing reads it */
+  plainText?: boolean;
+  /** each piece of the answer as it is written (streamed calls): the design route passes them on to the browser */
+  onText?: (delta: string) => void;
 }
 
 export interface AskProgress {
@@ -180,7 +184,7 @@ export function usageOfClaude(model: string, u: ClaudeUsage | null | undefined):
 }
 
 /** A Claude answer, read whole: a message as it is, or a stream of events read to its end (the first output timed). */
-async function readClaude(res: any, first: () => void, writing: (chars: number) => void): Promise<{ text: string; stop: string | null; usage: ClaudeUsage | null }> {
+async function readClaude(res: any, first: () => void, writing: (chars: number, delta: string) => void): Promise<{ text: string; stop: string | null; usage: ClaudeUsage | null }> {
   if (!iterable(res)) {
     const text = (res?.content ?? []).filter((b: any) => b?.type === 'text').map((b: any) => String(b.text ?? '')).join('');
     return { text, stop: res?.stop_reason ?? null, usage: res?.usage ?? null };
@@ -195,7 +199,7 @@ async function readClaude(res: any, first: () => void, writing: (chars: number) 
     else if (t === 'content_block_delta' && ev.delta?.type === 'text_delta' && typeof ev.delta.text === 'string') {
       if (!text) first();
       text += ev.delta.text;
-      writing(text.length);
+      writing(text.length, ev.delta.text);
     } else if (t === 'message_delta') {
       if (ev.delta?.stop_reason) stop = ev.delta.stop_reason;
       for (const [k, v] of Object.entries(ev.usage ?? {})) if (v != null) usage = { ...(usage ?? {}), [k]: v };
@@ -224,7 +228,7 @@ const iterable = (v: any): boolean => !!v && typeof v[Symbol.asyncIterator] === 
  * A Responses API answer, read whole: a buffered response as it is, or a stream read to its end (the first
  * output timed, progress told). A stream that ends before its final event is an interrupted answer.
  */
-async function readResponses(res: any, first: () => void, writing: (chars: number) => void): Promise<any> {
+async function readResponses(res: any, first: () => void, writing: (chars: number, delta: string) => void): Promise<any> {
   if (!iterable(res)) return res;
   let text = '';
   let final: any = null;
@@ -233,7 +237,7 @@ async function readResponses(res: any, first: () => void, writing: (chars: numbe
     if (t === 'response.output_text.delta' && typeof ev.delta === 'string') {
       if (!text) first();
       text += ev.delta;
-      writing(text.length);
+      writing(text.length, ev.delta);
     } else if (t === 'response.completed' || t === 'response.incomplete') final = ev.response;
     else if (t === 'response.failed') throw Object.assign(new Error(String(ev.response?.error?.message ?? 'The answer failed.')), { status: 500 });
     else if (t === 'error') throw Object.assign(new Error(String(ev.message ?? 'The stream failed.')), { status: /rate/.test(String(ev.code ?? '')) ? 429 : 500 });
@@ -244,7 +248,7 @@ async function readResponses(res: any, first: () => void, writing: (chars: numbe
 }
 
 /** A Chat Completions answer, read whole: buffered, or a stream (with its usage in the last chunk) read to its end. */
-async function readChat(res: any, first: () => void, writing: (chars: number) => void): Promise<any> {
+async function readChat(res: any, first: () => void, writing: (chars: number, delta: string) => void): Promise<any> {
   if (!iterable(res)) return res;
   let text = '';
   let finish: string | null = null;
@@ -254,7 +258,7 @@ async function readChat(res: any, first: () => void, writing: (chars: number) =>
     if (typeof d === 'string' && d) {
       if (!text) first();
       text += d;
-      writing(text.length);
+      writing(text.length, d);
     }
     if (chunk?.choices?.[0]?.finish_reason) finish = chunk.choices[0].finish_reason;
     if (chunk?.usage) usage = chunk.usage;
@@ -287,7 +291,10 @@ export async function askJson(openai: OpenAI, ladder: string[], o: AskOptions, h
   const markFirst = () => {
     firstAt ??= Date.now();
   };
-  const told = (model: string) => (chars: number) => o.onProgress?.({ phase: 'writing', model, chars });
+  const told = (model: string) => (chars: number, delta = '') => {
+    o.onProgress?.({ phase: 'writing', model, chars });
+    if (delta) o.onText?.(delta);
+  };
   const extra = { ...(o.stream ? { stream: true } : {}), ...(o.cacheKey ? { prompt_cache_key: o.cacheKey } : {}), ...(typeof o.reasoningRoom === 'number' ? { reasoning_room: o.reasoningRoom } : {}) };
   const done = (a: Omit<Asked, 'ttftMs' | 'modelMs' | 'attempts'>): Asked => ({ ...a, ttftMs: firstAt == null ? null : firstAt - started, modelMs: Date.now() - started, attempts });
   // a call past its time limit is not a model to step down from (the next rung would get the whole limit again,
@@ -318,14 +325,14 @@ export async function askJson(openai: OpenAI, ladder: string[], o: AskOptions, h
             role: 'user',
             // plain JSON mode on the Responses API needs the word in the INPUT, not only in the instructions
             // (a 400 otherwise, found by the first live run): said once, at the end, where a schema is not given
-            content: [{ type: 'input_text', text: format ? o.user : `${o.user}\n\nAnswer with the one JSON object described.` }, ...(o.images ?? []).map((im) => ({ type: 'input_image', image_url: im.url, detail: im.detail }))],
+            content: [{ type: 'input_text', text: format || o.plainText ? o.user : `${o.user}\n\nAnswer with the one JSON object described.` }, ...(o.images ?? []).map((im) => ({ type: 'input_image', image_url: im.url, detail: im.detail }))],
           },
         ],
         // the cap for the answer: the tracked client gives the reasoning its room on top
         max_output_tokens: o.maxTokens,
         temperature: o.temperature ?? 0.5,
         ...(effort ? { reasoning: { effort } } : {}),
-        text: { format: format ?? { type: 'json_object' } },
+        text: { format: o.plainText ? { type: 'text' } : format ?? { type: 'json_object' } },
         store: false,
         ...extra,
         },
@@ -358,7 +365,7 @@ export async function askJson(openai: OpenAI, ladder: string[], o: AskOptions, h
       model = again.model;
       if (incomplete) console.warn('ux-v0 %s: %s stopped early again (%s)', o.label, model, incomplete);
     }
-    return done({ json: readJson(raw), raw, usage: tag(usage), model, api, effort: effort ?? 'default', incomplete, retried, ...(route ? { tier: route.tier } : {}) });
+    return done({ json: o.plainText ? null : readJson(raw), raw, usage: tag(usage), model, api, effort: effort ?? 'default', incomplete, retried, ...(route ? { tier: route.tier } : {}) });
   }
   if (api === 'anthropic') {
     const client = claudeClient();
@@ -375,7 +382,7 @@ export async function askJson(openai: OpenAI, ladder: string[], o: AskOptions, h
         messages: [
           {
             role: 'user',
-            content: [...(o.images ?? []).map((im) => claudeImage(im.url)), { type: 'text', text: format ? o.user : `${o.user}\n\nAnswer with the one JSON object described, and nothing else.` }],
+            content: [...(o.images ?? []).map((im) => claudeImage(im.url)), { type: 'text', text: format || o.plainText ? o.user : `${o.user}\n\nAnswer with the one JSON object described, and nothing else.` }],
           },
         ],
         ...(level || format ? { output_config: { ...(level ? { effort: level } : {}), ...(format ? { format: { type: 'json_schema', schema: format.schema } } : {}) } } : {}),
@@ -407,7 +414,7 @@ export async function askJson(openai: OpenAI, ladder: string[], o: AskOptions, h
     const { model, result } = first;
     const incomplete = result.stop === 'refusal' ? 'refusal' : result.stop === 'max_tokens' ? 'max_output_tokens' : result.stop === 'model_context_window_exceeded' ? 'context_window' : null;
     if (incomplete) console.warn('ux-v0 %s: %s stopped early (%s)', o.label, model, incomplete);
-    return done({ json: incomplete === 'refusal' ? null : readJson(result.text), raw: result.text, usage: tag(result.priced), model, api, effort: effort ?? 'default', incomplete, retried: null, ...(route ? { tier: route.tier } : {}) });
+    return done({ json: incomplete === 'refusal' || o.plainText ? null : readJson(result.text), raw: result.text, usage: tag(result.priced), model, api, effort: effort ?? 'default', incomplete, retried: null, ...(route ? { tier: route.tier } : {}) });
   }
   const userContent: any = o.images?.length
     ? [{ type: 'text', text: o.user }, ...o.images.map((im) => ({ type: 'image_url', image_url: { url: im.url, detail: im.detail } }))]
@@ -422,7 +429,7 @@ export async function askJson(openai: OpenAI, ladder: string[], o: AskOptions, h
         temperature: o.temperature ?? 0.5,
         max_tokens: o.maxTokens,
         ...(effort ? { reasoning_effort: effort } : {}),
-        response_format: { type: 'json_object' },
+        ...(o.plainText ? {} : { response_format: { type: 'json_object' } }),
         messages: [
           { role: 'system', content: o.system },
           { role: 'user', content: userContent },
@@ -438,7 +445,7 @@ export async function askJson(openai: OpenAI, ladder: string[], o: AskOptions, h
   const raw = (result as any).choices?.[0]?.message?.content ?? '';
   const finish = (result as any).choices?.[0]?.finish_reason;
   const incomplete = finish === 'length' || finish === 'content_filter' ? String(finish) : null;
-  return done({ json: readJson(raw), raw, usage: tag(usageOf(model, (result as any).usage)), model, api, effort: effort ?? 'default', incomplete, retried: null, ...(route ? { tier: route.tier } : {}) });
+  return done({ json: o.plainText ? null : readJson(raw), raw, usage: tag(usageOf(model, (result as any).usage)), model, api, effort: effort ?? 'default', incomplete, retried: null, ...(route ? { tier: route.tier } : {}) });
 }
 
 /** A call that did not answer in time (the SDK's own timeout, or an abort). */
@@ -452,7 +459,7 @@ export const PREMIUM_TIMEOUT_MS = 40_000;
  * November 2026 for that stage (GPT-6 Luna: generation 10.0 s, art direction 8.5 s, the brief 7.6 s, a critique
  * 4.9 s, a question 4.0 s) with half again on top, and never less than 8 s.
  */
-export const ECONOMY_RESERVE_MS: Record<string, number> = { 'graphic-design': 22_000, 'creative-edit': 14_000, 'graphic-review': 10_000, generate: 15_000, 'art-direction': 13_000, brief: 12_000, 'refine-brief': 12_000, critique: 9_000, refine: 8_000, discover: 8_000, direction: 8_000 };
+export const ECONOMY_RESERVE_MS: Record<string, number> = { 'design-write': 60_000, 'design-look': 15_000, 'graphic-design': 22_000, 'creative-edit': 14_000, 'graphic-review': 10_000, generate: 15_000, 'art-direction': 13_000, brief: 12_000, 'refine-brief': 12_000, critique: 9_000, refine: 8_000, discover: 8_000, direction: 8_000 };
 
 /**
  * One routed call. A PREMIUM call gets a time limit (SOCRIAUX_PREMIUM_TIMEOUT_MS, default 40 s, and never so

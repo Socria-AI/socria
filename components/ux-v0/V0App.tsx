@@ -28,6 +28,7 @@ import type { WizardStart } from './systems/ImportWizard';
 import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
 import { GraphicsWorkspace } from './graphics/GraphicsWorkspace';
 import { BoardWorkspace } from './boards/BoardWorkspace';
+import { DesignWorkspace } from './design/DesignWorkspace';
 import { SystemsApp } from './systems/SystemsApp';
 import type { SystemRecord } from '@/lib/ux-v0/dsi/registry';
 import { listSystems } from '@/lib/ux-v0/dsi/store';
@@ -304,6 +305,22 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
         onStart={startConversation}
         onExit={home}
         onManageSystems={() => toSystems(null)}
+      />
+    );
+  }
+
+  if (open && open.p.medium === 'design') {
+    return (
+      <DesignWorkspace
+        key={open.p.id}
+        initial={open.p}
+        signedIn={signedIn}
+        startIntent={open.intent}
+        onExit={() => {
+          passage(() => setOpen(null));
+          refresh();
+          window.history.pushState(null, '', '/ux-v0');
+        }}
       />
     );
   }

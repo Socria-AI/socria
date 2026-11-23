@@ -407,6 +407,8 @@ const MODULES = [
   // SocriaUX studio (lib/ux-v0/studio): intent recognition, adaptive discovery, the creative context, engine mappings
   'test/helpers/studio-under-test.ts',
   'test/helpers/creative-under-test.ts',
+  // the design core: HTML artboards written by the designer (lib/ux-v0/design)
+  'test/helpers/design-under-test.ts',
   // SocriaUX 2.0: synthesis across artboards, alternatives, comments, controls, the visual review, research
   'test/helpers/platform-under-test.ts',
 ];

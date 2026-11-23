@@ -30,6 +30,8 @@ export interface Progress {
 export interface PostOptions {
   signal?: AbortSignal;
   onProgress?: (p: Progress) => void;
+  /** a plain-text answer, a piece at a time as it is written; `reset` when another model starts it over */
+  onText?: (delta: string, reset?: boolean) => void;
   operationId?: string;
   timeoutMs?: number;
 }
@@ -116,6 +118,8 @@ export async function post<T>(path: string, body: unknown, o: PostOptions = {}):
             status = Number(ev.status) || 200;
             j = ev.body ?? null;
           } else if (ev.type === 'accepted' || ev.type === 'progress') o.onProgress?.(ev as Progress);
+          else if (ev.type === 'text' && typeof ev.delta === 'string') o.onText?.(ev.delta);
+          else if (ev.type === 'text-reset') o.onText?.('', true);
         }
       }
       if (j === null) {

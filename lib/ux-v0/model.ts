@@ -134,6 +134,8 @@ export const STAGE_TIER: Record<CallKind, Tier> = {
   'creative-edit': 'economy',
   // a graphic designed from its brief by the creative director: the idea, the palette, the faces, the program
   'graphic-design': 'premium',
+  'design-write': 'premium',
+  'design-look': 'economy',
   // the director looking at the rendered result (a picture) and correcting what it sees: a few precise edits
   'graphic-review': 'economy',
   // the studio's next creative question and its options (studio/discovery-model.ts): short, structured, validated twice
@@ -347,6 +349,9 @@ export const MAX_TOKENS: Record<CallKind, number> = {
   critique: 1400,
   'creative-edit': 5000,
   'graphic-design': 7000,
+  // a design written as HTML and CSS: a poster is 2–6k tokens, three variations or a campaign more
+  'design-write': 16000,
+  'design-look': 4000,
   'graphic-review': 2600,
   'studio-questions': 1600,
   image: 0,
