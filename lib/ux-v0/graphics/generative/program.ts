@@ -218,7 +218,7 @@ export function normalizeProgram(raw: unknown, ctx: { images: number }): { progr
         const b = box(e.box);
         const fill = e.fill === null ? null : paintRef(e.fill);
         const st = stroke(e.stroke);
-        if (!b) return (problems.push(`${where}: a ${op} without a valid box`), null);
+        if (!b) return (problems.push(`${where}: ${/^[aeiou]/.test(op) ? 'an' : 'a'} ${op} without a valid box`), null);
         if (fill === null && !st && e.fill !== null) return (problems.push(`${where}: a ${op} with neither a valid fill nor a stroke`), null);
         if (op === 'prim') {
           if (typeof e.kind !== 'string' || !PRIMITIVE_BY_KIND.has(e.kind)) return (problems.push(`${where}: “${String(e.kind)}” is not a primitive SocriaUX draws`), null);

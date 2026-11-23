@@ -24,7 +24,7 @@ import { composeDirected, type Decided } from './design';
 import { measure as measureBoard, type Measured } from './evaluate';
 import { recordTurn } from './journal';
 import { protectionsIn, type Protection } from './protect';
-import type { DirectedDesign, DirectedEdit, DirectedReview } from './schema';
+import type { DirectedDesign, DirectedEdit, DirectedReview, EditOp } from './schema';
 import { memoryOfRecord, sheetOf, type ProjectMemory, type Sheet } from './sheet';
 import { editTier } from './tier';
 
@@ -52,12 +52,40 @@ export interface Reviewed {
   /** the corrections made something measurably worse and were not kept */
   reverted: boolean;
   failed: string[];
+  /** corrections that reached past what the change touched, and were not applied */
+  held?: string[];
+}
+
+/** What a look at the render may correct after a change that was not a redesign. */
+export interface ReviewScope {
+  /** objects the change addressed by id, and those it added: these may be restyled, moved, reordered or removed */
+  addressed: ReadonlySet<string>;
+  /** objects the change altered at all (a new palette repaints many): these may be restyled, nothing more */
+  changed: ReadonlySet<string>;
+  /** the change moved the ground */
+  ground: boolean;
+}
+
+/**
+ * Corrections held to what the change touched. A person who asked for one thing did not ask for the rest of their
+ * design to be tidied: a look at the render fixes what the change did, and what it reaches for beyond that is listed
+ * and left alone.
+ */
+export function withinScope(edits: readonly EditOp[], scope: ReviewScope): { edits: EditOp[]; held: string[] } {
+  const kept: EditOp[] = [];
+  const held: string[] = [];
+  for (const e of edits) {
+    const ok = e.do === 'set' ? scope.addressed.has(e.id) || scope.changed.has(e.id) : e.do === 'place' || e.do === 'remove' || e.do === 'order' || e.do === 'words' ? scope.addressed.has(e.id) : e.do === 'ground' ? scope.ground : false;
+    if (ok) kept.push(e);
+    else held.push(e.do === 'add' ? 'an addition that was not asked for' : e.do === 'ground' ? 'a change of ground that was not asked for' : e.do === 'restore' ? 'a restore that was not asked for' : `${e.do === 'set' ? 'a restyle of' : e.do === 'place' ? 'a move of' : e.do === 'remove' ? 'the removal of' : e.do === 'order' ? 'a reorder of' : 'new words for'} an object the change did not touch (${e.id})`);
+  }
+  return { edits: kept, held };
 }
 
 const boardOf = (doc: GraphicDoc, id: string): Artboard => doc.artboards.find((b) => b.id === id) ?? doc.artboards[0];
 
 /** One bounded look at the rendered result (never a loop; never kept when it makes the measurable state worse). */
-async function reviewOnce(t: Transport, b: Bench, doc: GraphicDoc, boardId: string, made: string, o: { memory: ProjectMemory; protection?: Protection; kind?: GraphicKind }): Promise<{ doc: GraphicDoc; review: Reviewed | null }> {
+async function reviewOnce(t: Transport, b: Bench, doc: GraphicDoc, boardId: string, made: string, o: { memory: ProjectMemory; protection?: Protection; kind?: GraphicKind; scope?: ReviewScope }): Promise<{ doc: GraphicDoc; review: Reviewed | null }> {
   const sheet = sheetOf(doc, boardId);
   const url = sheet ? await b.picture(doc, boardId).catch(() => null) : null;
   if (!sheet || !url) return { doc, review: null };
@@ -67,11 +95,14 @@ async function reviewOnce(t: Transport, b: Bench, doc: GraphicDoc, boardId: stri
   if (!a.ok) return { doc, review: null };
   const rv = a.value;
   if (rv.verdict === 'ship' || !rv.edits.length) return { doc, review: { verdict: rv.verdict, seen: rv.seen, applied: false, reverted: false, failed: [] } };
-  const edit: DirectedEdit = { understanding: { level: 'element', goal: 'corrections after looking at the rendered design', affects: [], preserves: [] }, summary: rv.seen.join('; '), edits: rv.edits, dropped: rv.dropped };
+  const scoped = o.scope ? withinScope(rv.edits, o.scope) : { edits: rv.edits, held: [] };
+  const held = scoped.held.length ? { held: scoped.held } : {};
+  if (!scoped.edits.length) return { doc, review: { verdict: rv.verdict, seen: rv.seen, applied: false, reverted: false, failed: [], ...held } };
+  const edit: DirectedEdit = { understanding: { level: 'element', goal: 'corrections after looking at the rendered design', affects: [], preserves: [] }, summary: rv.seen.join('; '), edits: scoped.edits, dropped: rv.dropped };
   const out = await b.settle((m) => applyEdit(doc, edit, { board: boardId, measure: m, kind: o.kind, given: '', protection: o.protection }));
   const after = measureBoard(out.doc, boardId, { measure: b.measure, content });
-  if (!out.changed || after.high > before.high) return { doc, review: { verdict: rv.verdict, seen: rv.seen, applied: false, reverted: out.changed, failed: out.failed } };
-  return { doc: out.doc, review: { verdict: rv.verdict, seen: rv.seen, applied: true, reverted: false, failed: out.failed } };
+  if (!out.changed || after.high > before.high) return { doc, review: { verdict: rv.verdict, seen: rv.seen, applied: false, reverted: out.changed, failed: out.failed, ...held } };
+  return { doc: out.doc, review: { verdict: rv.verdict, seen: rv.seen, applied: true, reverted: false, failed: out.failed, ...held } };
 }
 
 export type DesignResult =
@@ -138,7 +169,10 @@ export async function editFlow(
   let next = out.doc;
   let review: Reviewed | null = null;
   if (o.review !== false && REVIEWED.has(edit.understanding.level)) {
-    const r = await reviewOnce(t, b, next, board.id, edit.summary, { memory, protection, kind: o.kind });
+    // a redesign is looked at whole; anything less is corrected only where the change reached
+    const whole = edit.understanding.level === 'global' || edit.understanding.level === 'conceptual';
+    const scope: ReviewScope | undefined = whole ? undefined : { addressed: new Set([...edit.edits.flatMap((e) => ('id' in e ? [e.id] : [])), ...out.diff.added.map((x) => x.id)]), changed: new Set(out.diff.changed.map((c) => c.id)), ground: out.diff.ground };
+    const r = await reviewOnce(t, b, next, board.id, edit.summary, { memory, protection, kind: o.kind, scope });
     next = r.doc;
     review = r.review;
   }

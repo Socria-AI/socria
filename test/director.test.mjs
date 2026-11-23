@@ -93,6 +93,11 @@ console.log('\n=== a design: held to its shape, then built through the gate ==='
   const huge = DESIGN();
   huge.program.elements = [...huge.program.elements, ...Array.from({ length: 900 }, (_, i) => ({ op: 'ellipse', box: { x: i, y: i, w: 5, h: 5 }, fill: 'accent' }))];
   ok('a program is bounded (the words always kept)', all(make(huge).doc).length <= 420 && EV.missingWords(board(make(huge).doc), BRIEF.content).length === 0);
+  const over = DESIGN();
+  over.program.elements.push({ op: 'rect', box: { x: 60, y: 1150, w: 400, h: 90 }, fill: 'accent', name: 'Bar' });
+  const m4 = make(over);
+  const kids4 = board(m4.doc).children;
+  ok('an opaque form the program drew over words that must be read: the words are brought above it, and that is said', kids4.findIndex((n) => n.role === 'subhead') > kids4.findIndex((n) => n.name === 'Bar') && m4.problems.some((p) => /brought the words above/.test(p)) && EV.measure(m4.doc, board(m4.doc).id).high === 0, m4.problems);
   const held = DS.composeDirected(BRIEF, SC.normalizeDesign(DESIGN()), BASE, { decided: { palette: { ground: '#0b1d2a', accent: '#ffd166' }, fonts: { display: 'Fraunces', body: 'Inter' } } });
   ok('what the conversation decided (a palette, a pairing of faces) holds over the director’s own', held.doc.tokens.colors.background === '#0b1d2a' && held.doc.tokens.colors.accent === '#ffd166' && held.doc.tokens.fonts.display === 'Fraunces' && byRole(held.doc, 'headline').font === 'Fraunces');
   const two = DS.composeDirected({ ...BRIEF, formats: ['a3', 'instagram-square'] }, SC.normalizeDesign(DESIGN()), BASE, {});
@@ -169,6 +174,11 @@ console.log('\n=== edits: held to their shape, carried out by id, compared with 
   const kids = board(add.doc).children;
   ok('new drawn material is compiled like any program and placed beneath what it was asked to sit beneath', add.diff.added.length === 2 && kids.findIndex((n) => n.name === 'Horizon') < kids.findIndex((n) => n.id === head.id) && kids.findIndex((n) => n.name === 'Horizon') > 0, kids.map((n) => n.name));
   ok('a graded ground becomes the back-most object; the form asked to go is gone', kids[0].role === 'background' && typeof kids[0].fill === 'object' && !kids.some((n) => n.id === room.id));
+  const plain = apply(doc, { edits: [{ do: 'add', element: { op: 'rect', box: { x: 0, y: 700, w: 1000, h: 500 }, fill: 'accent', name: 'Field' } }] }, 'Add a field of colour');
+  const pk = board(plain.doc).children;
+  ok('new material with no place named sits above the forms and beneath every word (never over what must be read)', pk.findIndex((n) => n.name === 'Field') < pk.findIndex((n) => n.type === 'text') && pk.findIndex((n) => n.name === 'Field') > pk.findIndex((n) => n.name === 'Plan') && EV.measure(plain.doc, board(plain.doc).id).findings.every((f) => !/covered/.test(f)));
+  const arr = apply(doc, { edits: [{ do: 'add', element: { op: 'ellipse', box: [100, 200, 300, 300], fill: 'accent', name: 'Sun' } }, { do: 'place', id: head.id, box: [80, 700, 840, 380] }] }, 'Add a sun and move the headline up');
+  ok('a box written the way the sheet writes boxes ([x, y, w, h]) is read as a box, for new material and for a move', arr.failed.length === 0 && board(arr.doc).children.some((n) => n.name === 'Sun') && Math.round(byRole(arr.doc, 'headline').y) === Math.round(700 * FR.frameOf(board(doc)).k), arr.failed);
   const noWords = apply(doc, { edits: [{ do: 'add', element: { op: 'text', content: 'headline', box: { x: 0, y: 0, w: 500, h: 100 } } }] });
   ok('words are never added a second time', !noWords.changed && noWords.failed.some((f) => /not added again/.test(f)));
   const rm = apply(doc, { edits: [{ do: 'remove', id: byRole(doc, 'subhead').id }] }, 'Make it more minimal');
@@ -232,6 +242,14 @@ console.log('\n=== the journal: one continuous project ===');
   ok('“the earlier typography”: the faces and styles back, the colours and the composition kept', byRole(type.doc, 'headline').font === 'Archivo' && byRole(type.doc, 'headline').weight === 800 && !byRole(type.doc, 'headline').italic && type.doc.tokens.colors.background === '#2b1d14' && byRole(type.doc, 'headline').x === byRole(d3, 'headline').x);
   const everything = apply(d3, { edits: [{ do: 'restore', turn: 3, scope: 'everything' }] }, 'Undo the move to the right');
   ok('a turn put back whole: what it moved is where it was, what it added is gone', JR.diffBoards(board(d2), board(everything.doc), d2.tokens, everything.doc.tokens).none);
+  // a later turn that recoloured on purpose is not undone by putting the earlier palette back
+  const lit = board(d1).children.find((n) => n.name === 'Lit room');
+  const plan = board(d1).children.find((n) => n.name === 'Plan');
+  const m1 = apply(d1, { edits: [{ do: 'set', id: lit.id, fill: null }, { do: 'set', id: plan.id, fill: 'accent' }] }, 'Light the big room instead');
+  const dm = JR.recordTurn(d1, m1.doc, id, { said: 'Light the big room instead', did: 'the light moved to the big room', level: 'composition', at: 25 });
+  const mb = apply(dm, { edits: [{ do: 'restore', turn: 1, scope: 'colours' }] }, 'Go back to the original colours');
+  const same = (d, n) => board(d).children.find((x) => x.id === n.id);
+  ok('colours put back after a later turn moved the light: the light stays where it was moved, in the colour that role had before', !!lit && !!plan && m1.changed && same(mb.doc, lit).fill === null && same(mb.doc, plan).fill === '#e4572e' && J(mb.doc.tokens.colors) === J(d0.tokens.colors) && texts(d0).every((t) => all(mb.doc).find((n) => n.id === t.id).color === t.color), [same(mb.doc, lit)?.fill, same(mb.doc, plan)?.fill, mb.failed]);
   ok('a turn with nothing kept to go back to is said, not guessed', apply(d0, { edits: [{ do: 'restore', turn: 4, scope: 'colours' }] }, 'go back').failed.some((f) => /nothing kept to go back to/.test(f)));
   const rej = JR.recordTurn(d3, d3, id, { said: 'make it neon pink', did: 'a neon pink ground', status: 'rejected', at: 40 });
   ok('a change turned down is remembered as turned down (and never restorable)', board(rej).directed.journal.length === 4 && board(rej).directed.journal[3].status === 'rejected' && !board(rej).directed.journal[3].before && SH.memoryOfRecord(board(rej).directed).journal[3].status === 'rejected');
@@ -247,7 +265,25 @@ console.log('\n=== what is measured before anything is shown ===');
 {
   const clean = make().doc;
   const m = EV.measure(clean, board(clean).id, { content: BRIEF.content });
-  ok('a clean design: nothing missing, nothing cut or colliding, a real scale, no generic habit', m.high === 0 && m.missing.length === 0 && m.scale >= 3 && m.habits.said.length === 0, m);
+  ok('a sound design: nothing missing, nothing cut or colliding, a real scale; its one habit is its structure, and that is said', m.high === 0 && m.missing.length === 0 && m.scale >= 3 && m.habits.stockStructure && m.habits.said.length === 1 && /stock poster structure/.test(m.habits.said[0]), m);
+  const led = DESIGN();
+  led.program.elements = [
+    { op: 'text', content: 'headline', box: { x: 80, y: 80, w: 840, h: 380 }, weight: 800, tracking: -30, lineHeight: 0.9, color: 'ink' },
+    { op: 'rect', box: { x: 80, y: 520, w: 840, h: 560 }, fill: null, stroke: { color: 'ink', width: 3 }, name: 'Plan' },
+    { op: 'rect', box: { x: 360, y: 520, w: 280, h: 300 }, fill: 'accent', name: 'Lit room' },
+    ...DESIGN().program.elements.filter((e) => (e.op === 'text' && e.content !== 'headline') || e.op === 'details'),
+  ];
+  const ledDoc = make(led).doc;
+  ok('the same content led by its title from the top is another structure: no habit at all', !EV.habitsOf(board(ledDoc)).stockStructure && EV.habitsOf(board(ledDoc)).said.length === 0, EV.habitsOf(board(ledDoc)));
+  const side = DESIGN();
+  side.program.elements = [
+    { op: 'rect', box: { x: 80, y: 80, w: 840, h: 560 }, fill: null, stroke: { color: 'ink', width: 3 }, name: 'Plan' },
+    { op: 'text', content: 'headline', box: { x: 80, y: 700, w: 840, h: 380 }, weight: 800, tracking: -30, lineHeight: 0.9, color: 'ink' },
+    { op: 'text', content: 'subhead', box: { x: 80, y: 1120, w: 520, h: 60 }, size: 30, color: 'ink' },
+    { op: 'details', box: { x: 80, y: 1200, w: 520, h: 110 }, align: 'left', color: 'muted' },
+    { op: 'text', content: 'cta', box: { x: 80, y: 1320, w: 400, h: 50 }, size: 26, weight: 700, color: 'ink' },
+  ];
+  ok('  and the details gathered in one column are not the strip across the foot', !EV.habitsOf(board(make(side).doc)).stockStructure);
   const slop = DESIGN();
   slop.program.ground = { linear: { angle: 135, stops: ['#6a5cff', '#3aa0ff'] } };
   slop.program.elements = [
@@ -306,6 +342,37 @@ console.log('\n=== one request, start to finish ===');
   const e4 = await FL.editFlow(transport({}), bench, doc, id, 'Make it cloud themed');
   ok('the director unreachable: the caller is told (and falls back to the reader, saying so)', e4.kind === 'unreachable');
   ok('what is said to the person is the director’s sentence, with what was kept and what could not be done', /The headline is a step smaller\./.test(FL.saidOfEdit(e1)) && /Kept as you asked: the logo/.test(FL.saidOfEdit(e2)));
+
+  // a look at the render after a change corrects the change: it does not tidy what the person never mentioned
+  const cta = byRole(doc, 'cta');
+  const sub = byRole(doc, 'subhead');
+  const sc = FL.withinScope([{ do: 'set', id: sub.id, props: { weight: 600 } }, { do: 'set', id: cta.id, props: { weight: 600 } }, { do: 'remove', id: cta.id }, { do: 'place', id: sub.id, box: { x: 60, y: 900, w: 500, h: 80 } }, { do: 'add', element: { op: 'rect' } }, { do: 'ground', paint: 'ink' }], { addressed: new Set([sub.id]), changed: new Set([sub.id, cta.id]), ground: false });
+  ok('corrections after a change: what it addressed may be restyled and moved; what it only repainted may be restyled; nothing else', sc.edits.length === 3 && sc.edits.map((e) => e.do).join() === 'set,set,place' && sc.held.length === 3 && /removal of an object the change did not touch/.test(sc.held[0]) && /addition/.test(sc.held[1]) && /ground/.test(sc.held[2]), sc.held);
+  const feel = (level, review) => transport({ edit: (b) => ({ ok: true, value: SC.normalizeEdit({ understanding: { level, goal: 'quieter', affects: ['subhead'], preserves: [] }, summary: 'A quieter supporting line.', edits: [{ do: 'set', id: b.sheet.objects.find((o) => o.role === 'subhead').id, opacity: 0.7 }] }, { ids: new Set(b.sheet.objects.map((o) => o.id)), given: b.words }) }), review: (b) => ({ ok: true, value: SC.normalizeReview(review(b), { ids: new Set(b.sheet.objects.map((o) => o.id)) }) }) });
+  const swing = board(doc).children.find((n) => n.name === 'Door swing');
+  const has = (d, n) => board(d).children.some((x) => x.id === n.id);
+  const tidy = (b) => ({ verdict: 'revise', seen: ['the door swing is one mark too many'], edits: [{ do: 'remove', id: swing.id }, { do: 'set', id: b.sheet.objects.find((o) => o.role === 'subhead').id, opacity: 0.85 }] });
+  const e5 = await FL.editFlow(feel('aesthetic', tidy), bench, doc, id, 'Make it feel quieter');
+  ok('a review after a change of feel: its correction to the change is applied, its reach for an untouched object is held and listed', !!swing && e5.kind === 'done' && e5.review.applied && byRole(e5.doc, 'subhead').opacity === 0.85 && has(e5.doc, swing) && e5.review.held?.length === 1 && JR.diffBoards(board(doc), board(e5.doc)).changed.length === 1, e5.review);
+  const e6 = await FL.editFlow(feel('aesthetic', () => ({ verdict: 'revise', seen: ['x'], edits: [{ do: 'remove', id: swing.id }] })), bench, doc, id, 'Make it feel quieter');
+  ok('  and when that is all it asked for, nothing is applied and the design is exactly the change', e6.kind === 'done' && !e6.review.applied && !e6.review.reverted && e6.review.held?.length === 1 && has(e6.doc, swing) && byRole(e6.doc, 'subhead').opacity === 0.7);
+  const e7 = await FL.editFlow(feel('global', tidy), bench, doc, id, 'Redesign all of it, quieter');
+  ok('a redesign is looked at whole: the same correction is applied', e7.kind === 'done' && e7.review.applied && !has(e7.doc, swing) && !e7.review.held, e7.review);
+  const e8 = await FL.editFlow(feel('global', (b) => ({ verdict: 'revise', seen: ['x'], edits: [{ do: 'remove', id: b.sheet.objects.find((o) => o.role === 'cta').id }] })), bench, doc, id, 'Redesign all of it, quieter');
+  ok('  but even then a review never removes words that are read', e8.kind === 'done' && !!byRole(e8.doc, 'cta'));
+
+  // covered words are judged where the words sit, not by the whole box they are set in
+  const hb = board(doc);
+  const measure = C.approxMeasure;
+  const lay = C.layoutText(head, measure);
+  const short = lay.lines.reduce((a, l) => (l.width < a.width ? l : a), lay.lines[0]);
+  const row = lay.lines.indexOf(short);
+  const gapW = head.w - short.width;
+  const shape = (x, w) => ({ ...hb.children.find((n) => n.type === 'shape'), id: 'cover1', name: 'Cover', role: undefined, shape: 'rect', fill: '#123456', stroke: null, opacity: 1, blend: undefined, hidden: false, rotation: 0, x, y: head.y + row * lay.leading, w, h: head.size });
+  const withShape = (n) => ({ ...doc, artboards: [{ ...hb, children: [...hb.children, n] }] });
+  const empty = EV.measure(withShape(shape(head.x + short.width + gapW * 0.1, gapW * 0.8)), hb.id, { measure }).findings.filter((f) => /covered/.test(f));
+  const inked = EV.measure(withShape(shape(head.x, short.width * 0.6)), hb.id, { measure }).findings.filter((f) => /covered/.test(f));
+  ok('a form in the empty end of a short line covers nothing; the same form over the line’s words is reported', gapW > head.w * 0.15 ? empty.length === 0 && inked.length === 1 : inked.length === 1, { gapW, w: head.w, empty, inked });
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

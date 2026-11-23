@@ -355,6 +355,7 @@ for (const [id, words, expect] of EDITS) {
   report.tests[id] = {
     instruction: words,
     expect,
+    slop: slopOf(r.doc),
     path: r.path,
     said: r.said,
     question: r.question,
@@ -474,9 +475,19 @@ function slopOf(doc) {
   const glows = all.filter((n) => (n.effects ?? []).some((e) => /glow|blur|shadow/.test(e.kind))).length;
   const centred = texts.length ? texts.filter((t) => t.align === 'center').length / texts.length : 0;
   const faces = new Set(texts.map((t) => t.font));
-  return { gradientGround: gradGrounds.length > 0, purpleBlueGradient: purpleBlue.length > 0, roundedCards: roundedCards.length, smallFloatingShapes: smallFloating.length, glowsShadowsBlurs: glows, centredTextShare: +centred.toFixed(2), faces: faces.size, objects: all.length };
+  // (the product's own habit detector says the rest: the stock poster structure among them)
+  const own = CR.dirEvaluate.habitsOf(b);
+  return { gradientGround: gradGrounds.length > 0, purpleBlueGradient: purpleBlue.length > 0, roundedCards: roundedCards.length, smallFloatingShapes: smallFloating.length, glowsShadowsBlurs: glows, centredTextShare: +centred.toFixed(2), faces: faces.size, objects: all.length, stockStructure: own.stockStructure, said: own.said };
 }
-if (want('K') && !base.pending) report.tests.K = { base: slopOf(base.doc) };
+// every design this run made, and every design it changed: the habits each one shows
+if (want('K') && !base.pending) {
+  const rows = { base: slopOf(base.doc) };
+  if (report.tests.H?.slop) rows.H = report.tests.H.slop;
+  for (const d of report.tests.I?.designs ?? []) rows[`I/${d.name}`] = d.slop;
+  for (const [id] of EDITS) if (report.tests[id]?.slop) rows[`after ${id}`] = report.tests[id].slop;
+  const all = Object.values(rows);
+  report.tests.K = { designs: rows, totals: { designs: all.length, gradientGrounds: all.filter((x) => x.gradientGround).length, purpleBlueGradients: all.filter((x) => x.purpleBlueGradient).length, withRoundedCards: all.filter((x) => x.roundedCards > 0).length, withGlowsShadowsBlurs: all.filter((x) => x.glowsShadowsBlurs > 0).length, mostlyCentred: all.filter((x) => x.centredTextShare > 0.6).length, stockStructure: all.filter((x) => x.stockStructure).length } };
+}
 
 report.waiting = waiting;
 if (director?.pending?.length) {

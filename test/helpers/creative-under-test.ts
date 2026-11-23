@@ -36,4 +36,4 @@ export { askJson, askRouted, setClaudeClient } from '@/lib/ux-v0/ask';
 export { routeFor, economyRoute, editTier, MAX_TOKENS, reasoningRoomFor } from '@/lib/ux-v0/model';
 export * as dirFlow from '@/lib/ux-v0/graphics/director/flow';
 export * as dirTier from '@/lib/ux-v0/graphics/director/tier';
-export { approxMeasure } from '@/lib/ux-v0/graphics/text';
+export { approxMeasure, layoutText } from '@/lib/ux-v0/graphics/text';

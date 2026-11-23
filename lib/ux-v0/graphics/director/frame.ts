@@ -36,8 +36,11 @@ const PX_EFFECT_KEYS = new Set(['dx', 'dy', 'blur', 'spread', 'size', 'width', '
 /** Path data with every coordinate scaled (absolute commands only: every number is a coordinate). */
 export const scaleD = (d: string, k: number) => d.slice(0, 20000).replace(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi, (n) => String(Math.round(Number(n) * k * 100) / 100));
 
+/** A box as written: {x,y,w,h}, or the [x, y, w, h] the design sheet itself uses for every object. */
+export const boxAsObject = (v: unknown): unknown => (Array.isArray(v) && v.length === 4 && v.every(fin) ? { x: v[0], y: v[1], w: v[2], h: v[3] } : v);
+
 const scaleBox = (v: unknown, k: number): unknown => {
-  const b = obj(v);
+  const b = obj(boxAsObject(v));
   if (!b) return v;
   return { ...b, ...(fin(b.x) ? { x: b.x * k } : {}), ...(fin(b.y) ? { y: b.y * k } : {}), ...(fin(b.w) ? { w: b.w * k } : {}), ...(fin(b.h) ? { h: b.h * k } : {}) };
 };

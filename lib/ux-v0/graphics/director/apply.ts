@@ -334,7 +334,10 @@ export function applyEdit(doc0: GraphicDoc, edit0: DirectedEdit, ctx: ApplyConte
         if (!made.nodes.length) return void (made.problems.length || failed.push(`${where}: nothing could be drawn from that instruction`));
         const list = board().children;
         const floor = list.filter((n) => n.role === 'background' && n.w * n.h >= board().width * board().height * 0.9).length;
-        let at = e.under === 'bottom' ? floor : e.under ? list.findIndex((n) => n.id === e.under) : list.length;
+        // new material sits above the forms already there and beneath the words (never over what must be read),
+        // unless it was asked to sit beneath something in particular
+        const firstWords = list.findIndex((n) => n.type === 'text' && !n.decorative);
+        let at = e.under === 'bottom' ? floor : e.under ? list.findIndex((n) => n.id === e.under) : firstWords >= 0 ? firstWords : list.length;
         if (at < 0) at = list.length;
         for (const node of made.nodes) if (run({ op: 'add', artboard: boardId, node, index: at }, where)) at++;
         return;
@@ -360,12 +363,13 @@ export function applyEdit(doc0: GraphicDoc, edit0: DirectedEdit, ctx: ApplyConte
         if (colours && (snap.colors || snap.accent2 !== undefined)) {
           const before = rolesOf(doc.tokens, board());
           if (run({ op: 'tokens', set: { ...(snap.colors ? { colors: snap.colors } : {}), ...(typeof snap.accent2 === 'string' ? { accent2: snap.accent2 } : {}) } }, where)) {
-            // objects the snapshot does not hold (made since) follow the palette back, role for role
+            // every object follows the palette back, role for role: those made since, and those a later turn
+            // recoloured on purpose (the room it lit stays lit, in the colour that role had before)
             const after = rolesOf(doc.tokens, { ...board(), background: snap.ground ?? board().background });
             const map = new Map<string, string>();
             for (const role of ['ground', 'ink', 'accent', 'accent2', 'muted', 'paper', 'line'] as const) if (before[role] !== after[role] && !map.has(before[role])) map.set(before[role], after[role]);
             for (const l of walk(board())) {
-              if (snap.nodes?.[l.node.id] || !free(l.node.id)) continue;
+              if (!free(l.node.id)) continue;
               const set = repaintSet(l.node, map);
               if (Object.keys(set).length) run({ op: 'update', id: l.node.id, set }, where);
             }
@@ -373,11 +377,16 @@ export function applyEdit(doc0: GraphicDoc, edit0: DirectedEdit, ctx: ApplyConte
         }
         if (colours && snap.ground !== undefined) run({ op: 'artboard-update', id: boardId, set: { background: snap.ground } }, where);
         if (type && snap.fonts) run({ op: 'tokens', set: { fonts: snap.fonts } }, where);
+        // What later turns decided stands. Putting back one side of an earlier turn (its colours, its type, its
+        // layout) does not undo what was asked for after it: a property a later kept turn changed on purpose is left
+        // as that turn made it (its colour has already followed the palette back, above).
+        const later = (board().directed?.journal ?? []).slice(e.turn).filter((j) => j.status === 'applied');
+        const sinceChanged = (id: string, k: string) => e.scope !== 'everything' && later.some((j) => !!j.before?.nodes?.[id] && k in j.before.nodes[id]);
         for (const [id, was] of Object.entries(snap.nodes ?? {})) {
           const l = nodeOf(id);
           if (!l || !free(id)) continue;
           const keys = keysFor(e.scope, l.node.type);
-          const set = Object.fromEntries(Object.entries(was).filter(([k]) => !keys || keys.includes(k)).filter(([k]) => e.scope === 'everything' || !(e.scope === 'type' && (k === 'stroke' || k === 'fill') && l.node.type !== 'text')));
+          const set = Object.fromEntries(Object.entries(was).filter(([k]) => (!keys || keys.includes(k)) && !sinceChanged(id, k)).filter(([k]) => e.scope === 'everything' || !(e.scope === 'type' && (k === 'stroke' || k === 'fill') && l.node.type !== 'text')));
           if (!Object.keys(set).length) continue;
           if (run({ op: 'update', id, set }, where) && e.scope === 'type') {
             const t = nodeOf(id)?.node;

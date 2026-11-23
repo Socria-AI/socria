@@ -189,7 +189,8 @@ function setProps(r: Record<string, unknown>, where: string, dropped: string[]):
 }
 
 const box = (v: unknown): FrameBox | null => {
-  const b = o(v);
+  // (the sheet writes every object's box as [x, y, w, h]: an answer in the same notation is read as one)
+  const b = o(Array.isArray(v) && v.length === 4 ? { x: v[0], y: v[1], w: v[2], h: v[3] } : v);
   if (![b.x, b.y, b.w, b.h].every(fin)) return null;
   return { x: clamp(b.x as number, -4000, 8000), y: clamp(b.y as number, -4000, 12000), w: clamp(b.w as number, 1, 12000), h: clamp(b.h as number, 1, 16000) };
 };

@@ -1932,6 +1932,34 @@ function programContext(brief: GraphicBrief, dir: GraphicDirection, f: Format, m
   return contextFor(brief, { ...dir, tokens: { ...dir.tokens, colors: { ...c, background: hex, text: ensureContrast(text, hex, 4.5) } } }, f, PLAIN_PLAN(brief), measure, seed);
 }
 
+/**
+ * Words that must be read are never left beneath an opaque object drawn over them (a bar that lands on a line that
+ * wrapped, a block placed after the words it should sit behind): such words are brought above it. Decorative
+ * lettering, translucent washes, blended layers and line fields are left where the design put them.
+ */
+export function liftCoveredWords(nodes: Node[]): { nodes: Node[]; lifted: string[] } {
+  const out = [...nodes];
+  const lifted: string[] = [];
+  const covers = (n: Node) => (n.type === 'image' || (n.type === 'shape' && n.fill !== null && n.shape !== 'line')) && n.opacity >= 0.5 && (!n.blend || n.blend === 'normal') && !n.hidden;
+  for (const t of nodes) {
+    if (t.type !== 'text' || t.decorative || t.hidden || !t.role || !['headline', 'subhead', 'meta', 'cta', 'logo', 'body'].includes(t.role)) continue;
+    const i = out.indexOf(t);
+    let top = -1;
+    for (let j = i + 1; j < out.length; j++) {
+      const s = out[j];
+      if (!covers(s)) continue;
+      const ox = Math.max(0, Math.min(t.x + t.w, s.x + s.w) - Math.max(t.x, s.x));
+      const oy = Math.max(0, Math.min(t.y + t.h, s.y + s.h) - Math.max(t.y, s.y));
+      if (ox * oy > t.w * t.h * 0.05) top = j;
+    }
+    if (top < 0) continue;
+    out.splice(i, 1);
+    out.splice(top, 0, t);
+    lifted.push(t.role);
+  }
+  return { nodes: out, lifted };
+}
+
 /** One artboard composed from a program (see above). Null when the program is not one (no frame, nothing valid). */
 export function composeProgram(brief: GraphicBrief, dir: GraphicDirection, f: Format, raw: unknown, opts: { measure?: Measure; seed?: number } = {}): ProgramBoard | null {
   const measure = opts.measure ?? approxMeasure;
@@ -1946,7 +1974,9 @@ export function composeProgram(brief: GraphicBrief, dir: GraphicDirection, f: Fo
   const elements: Instruction[] = typeof g === 'string' ? program.elements : [{ op: 'rect', box: { x: 0, y: 0, w: x.W, h: x.H }, fill: g, role: 'background', name: 'Ground' }, ...program.elements];
   const compiled = compileProgram(cc, { ...program, elements }, readBriefCreative(brief, f, {}), { keepClear: false });
   const wordsBefore = new Set(compiled.nodes.filter((n): n is TextNode => n.type === 'text' && !n.decorative).map((n) => n.text));
-  const children = ensureWords(x, compiled.nodes, brief.kind);
+  const raised = liftCoveredWords(ensureWords(x, compiled.nodes, brief.kind));
+  const children = raised.nodes;
+  if (raised.lifted.length) problems.push(`the ${[...new Set(raised.lifted)].join(', ')} had a shape drawn over ${raised.lifted.length === 1 ? 'it' : 'them'}, so SocriaUX brought the words above it`);
   const placed = children.filter((n): n is TextNode => n.type === 'text' && !n.decorative && !wordsBefore.has(n.text)).map((n) => n.role ?? 'text');
   const stand = brief.images.filter((id) => /^[A-Za-z][\w-]{0,47}$/.test(id)).map((id) => ({ id, kind: 'image', src: `upload:${id.slice(0, 96)}`, width: 1000, height: 1000, name: id }));
   const tmp = normalizeDoc({ name: 'directed', tokens: dir.tokens, assets: stand, artboards: [{ id: 'dir', name: 'dir', width: x.W, height: x.H, unit: f.unit, dpi: f.dpi, safe: f.safe, bleed: f.bleed, format: f.id, background: x.ground, children }] });

@@ -1,0 +1,2331 @@
+{
+  "engine": "director",
+  "at": "2026-11-23T19:10:24.611Z",
+  "blocked": null,
+  "tests": {
+    "A": {
+      "instruction": "Make this cloud themed.",
+      "expect": "a coherent transformation of the relevant elements (not cloud icons on a blue gradient); words and logo intact",
+      "slop": {
+        "gradientGround": true,
+        "purpleBlueGradient": false,
+        "roundedCards": 0,
+        "smallFloatingShapes": 8,
+        "glowsShadowsBlurs": 2,
+        "centredTextShare": 0,
+        "faces": 2,
+        "objects": 27,
+        "stockStructure": false,
+        "said": [
+          "a graded ground",
+          "2 objects with glows, blurs or soft shadows",
+          "6 small shapes floating on their own"
+        ]
+      },
+      "path": "director (claude (agent)), aesthetic",
+      "said": "You now have a sky-toned poster: a pale-blue ground that lightens toward the ground rule, slate ink, a cloud-shadow blue for 'Living' and the lit room, a sunlit cream-gold for the last room, and flat white cloud masses drifting beside the headline and through the empty rooms, so the section drawing reads as a house open to the sky. (cta: the colour was adjusted so it reads on its ground)",
+      "question": null,
+      "plan": null,
+      "understanding": {
+        "level": "aesthetic",
+        "goal": "A poster that feels of the sky: air, softness, light and a cloud's tonal range, while still reading as an architect's section drawing.",
+        "affects": [
+          "palette",
+          "ground",
+          "drawn forms (new cloud masses drifting through the sky and the open rooms)"
+        ],
+        "preserves": [
+          "all words and their layout",
+          "the section drawing's rooms, stair, window, door and lamp",
+          "the headline's two-line setting with Living in the accent"
+        ]
+      },
+      "edits": 7,
+      "failedOperations": [],
+      "kept": [],
+      "notes": [
+        "cta: the colour was adjusted so it reads on its ground"
+      ],
+      "review": {
+        "verdict": "revise",
+        "seen": [
+          "The call to action shows two arrows: the arrow in 'Reserve a seat →' and a separate long arrow stranded at the right edge of the column, far from the words. The second one is redundant and reads as a stray mark.",
+          "Otherwise the poster holds together: the headline is large and clear, the section drawing is the focal point, and the information columns are legible and aligned."
+        ],
+        "applied": false,
+        "reverted": false,
+        "failed": [],
+        "held": [
+          "the removal of an object the change did not touch (sjxykywv28)"
+        ]
+      },
+      "ms": null,
+      "model": "claude (agent)",
+      "usage": {
+        "calls": 2,
+        "estimated": true,
+        "input": 25932,
+        "cached": 0,
+        "output": 847,
+        "reasoning": 0,
+        "cost": null,
+        "ms": null,
+        "byCall": [
+          "creative-edit claude (agent) in ~12769 out ~709",
+          "graphic-review claude (agent) in ~13163 out ~138"
+        ]
+      },
+      "changed": [
+        "logo: color",
+        "motif “Line”: stroke",
+        "headline: color, runs",
+        "motif “room top left”: stroke",
+        "motif “room top middle”: fill, stroke",
+        "motif “room top right”: stroke",
+        "motif “room bottom left”: fill, stroke",
+        "motif “room bottom middle”: stroke",
+        "motif “room bottom right”: fill, stroke",
+        "motif “window”: fill",
+        "motif “Line”: stroke",
+        "motif “Line”: stroke",
+        "motif “pendant”: fill",
+        "motif “door”: fill",
+        "motif “stair”: stroke",
+        "motif “Line”: stroke",
+        "subhead: color",
+        "meta: color",
+        "motif “Line”: stroke",
+        "cta: color",
+        "motif “Arrow line”: stroke"
+      ],
+      "added": [
+        "background “Ground”",
+        "motif “sky cloud large”",
+        "motif “sky cloud small”",
+        "motif “cloud room left”",
+        "motif “cloud room right”",
+        "motif “cloud room stair”"
+      ],
+      "removed": [],
+      "background": "#efe9dc → #c9dae7",
+      "untouched": 0,
+      "nothingChanged": false,
+      "wordsKept": true,
+      "headline": {
+        "size": [
+          185.2,
+          185.2
+        ],
+        "font": [
+          "Instrument Serif",
+          "Instrument Serif"
+        ],
+        "box": [
+          [
+            43,
+            88,
+            757,
+            361
+          ],
+          [
+            43,
+            88,
+            757,
+            361
+          ]
+        ]
+      },
+      "logoSame": false,
+      "typeSame": true
+    },
+    "B": {
+      "instruction": "Make this feel more sophisticated and atmospheric.",
+      "expect": "decisions across composition, hierarchy, type, imagery and space",
+      "slop": {
+        "gradientGround": false,
+        "purpleBlueGradient": false,
+        "roundedCards": 0,
+        "smallFloatingShapes": 4,
+        "glowsShadowsBlurs": 0,
+        "centredTextShare": 0,
+        "faces": 2,
+        "objects": 25,
+        "stockStructure": false,
+        "said": [
+          "3 small shapes floating on their own"
+        ]
+      },
+      "path": "director (claude (agent)), aesthetic",
+      "said": "I turned the section into an evening scene: a deep warm-black ground, hairline drawing lines, the lamp and window casting light into their rooms, a faint drafting grid and drifting dust for atmosphere, and an italic serif subhead with more open small type for a more refined voice. After looking at the result, SocriaUX corrected: The details block wraps badly: 'Thursdays, 2 October – 6' breaks before 'November', and the last line, 'Northlight Studio, 14 Dock Street', runs onto the hairline below it so it looks underlined and crowded against the call to action.; The details are small, widely tracked and muted on the near-black ground, so they read weakly next to the strong subhead..",
+      "question": null,
+      "plan": null,
+      "understanding": {
+        "level": "aesthetic",
+        "goal": "A quieter, more refined poster with mood: the section drawing becomes an evening scene, lit rooms glowing in the dark, since the lectures are six evenings.",
+        "affects": [
+          "palette and ground (warm paper to dusk)",
+          "drawing line weights and room fills",
+          "light spill from the lamp and window",
+          "drafting grid and faint dust in the air",
+          "subhead and small type refinement"
+        ],
+        "preserves": [
+          "all wording",
+          "headline size, position and terracotta 'Living'",
+          "section drawing layout and room proportions",
+          "two-column information block",
+          "Instrument Serif and Instrument Sans"
+        ]
+      },
+      "edits": 23,
+      "failedOperations": [],
+      "kept": [],
+      "notes": [],
+      "review": {
+        "verdict": "revise",
+        "seen": [
+          "The details block wraps badly: 'Thursdays, 2 October – 6' breaks before 'November', and the last line, 'Northlight Studio, 14 Dock Street', runs onto the hairline below it so it looks underlined and crowded against the call to action.",
+          "The details are small, widely tracked and muted on the near-black ground, so they read weakly next to the strong subhead."
+        ],
+        "applied": true,
+        "reverted": false,
+        "failed": []
+      },
+      "ms": null,
+      "model": "claude (agent)",
+      "usage": {
+        "calls": 2,
+        "estimated": true,
+        "input": 25802,
+        "cached": 0,
+        "output": 1074,
+        "reasoning": 0,
+        "cost": null,
+        "ms": null,
+        "byCall": [
+          "creative-edit claude (agent) in ~12777 out ~905",
+          "graphic-review claude (agent) in ~13025 out ~169"
+        ]
+      },
+      "changed": [
+        "logo: weight, size, tracking, color",
+        "motif “Line”: stroke",
+        "headline: tracking, color, runs",
+        "motif “room top left”: stroke",
+        "motif “room top middle”: fill, stroke",
+        "motif “room top right”: stroke",
+        "motif “room bottom left”: fill, stroke",
+        "motif “room bottom middle”: stroke",
+        "motif “room bottom right”: opacity, fill, stroke",
+        "motif “window”: fill",
+        "motif “Line”: stroke",
+        "motif “Line”: stroke",
+        "motif “pendant”: fill",
+        "motif “door”: fill",
+        "motif “stair”: stroke",
+        "motif “Line”: stroke",
+        "subhead: h, font, weight, size, lineHeight, tracking, color, italic",
+        "meta: x, h, opacity, size, tracking, color",
+        "motif “Line”: stroke",
+        "cta: color",
+        "motif “Arrow line”: stroke"
+      ],
+      "added": [
+        "motif “Pattern”",
+        "motif “Pattern”",
+        "motif “window light”",
+        "motif “lamp light”"
+      ],
+      "removed": [],
+      "background": "#efe9dc → #181614",
+      "untouched": 0,
+      "nothingChanged": false,
+      "wordsKept": true,
+      "headline": {
+        "size": [
+          185.2,
+          185.2
+        ],
+        "font": [
+          "Instrument Serif",
+          "Instrument Serif"
+        ],
+        "box": [
+          [
+            43,
+            88,
+            757,
+            361
+          ],
+          [
+            43,
+            88,
+            757,
+            361
+          ]
+        ]
+      },
+      "logoSame": false,
+      "typeSame": false
+    },
+    "C": {
+      "instruction": "Make this look like a premium architecture studio.",
+      "expect": "a subject-specific solution, not a generic layout",
+      "slop": {
+        "gradientGround": false,
+        "purpleBlueGradient": false,
+        "roundedCards": 0,
+        "smallFloatingShapes": 4,
+        "glowsShadowsBlurs": 0,
+        "centredTextShare": 0,
+        "faces": 2,
+        "objects": 27,
+        "stockStructure": false,
+        "said": [
+          "3 small shapes floating on their own"
+        ]
+      },
+      "path": "director (claude (agent)), aesthetic",
+      "said": "I pulled the poster toward an architect's drawing: a deeper terracotta, stone and brass instead of primary ochre and black, hairline walls with a section hatch and a dimension line, and lighter, more precise type, so the one lit room now carries the colour. (meta: the colour was adjusted so it reads on its ground)",
+      "question": null,
+      "plan": null,
+      "understanding": {
+        "level": "aesthetic",
+        "goal": "Shift the poster from a bold, colour-blocked graphic to the quiet, exact register of a premium architecture studio: drawing-weight lines, muted material colours, one lit room, finer type.",
+        "affects": [
+          "palette",
+          "headline scale and tracking",
+          "section drawing line weights and room fills",
+          "supporting type weights",
+          "added dimension line and section hatching"
+        ],
+        "preserves": [
+          "all wording",
+          "the section-cut idea and room layout",
+          "headline top-left on the shared left edge",
+          "two-column information block",
+          "terracotta on Living and the single lit room"
+        ]
+      },
+      "edits": 27,
+      "failedOperations": [],
+      "kept": [],
+      "notes": [
+        "meta: the colour was adjusted so it reads on its ground"
+      ],
+      "review": {
+        "verdict": "ship",
+        "seen": [
+          "Nothing that needs fixing: the headline reads first with 'Living' in terracotta, the lit room carries the single accent, the section drawing is clear and the details and call to action are legible and aligned to shared edges. The measured '"
+        ],
+        "applied": false,
+        "reverted": false,
+        "failed": []
+      },
+      "ms": null,
+      "model": "claude (agent)",
+      "usage": {
+        "calls": 2,
+        "estimated": true,
+        "input": 25926,
+        "cached": 0,
+        "output": 1124,
+        "reasoning": 0,
+        "cost": null,
+        "ms": null,
+        "byCall": [
+          "creative-edit claude (agent) in ~12777 out ~1008",
+          "graphic-review claude (agent) in ~13149 out ~116"
+        ]
+      },
+      "changed": [
+        "logo: weight, size, tracking, color",
+        "motif “Line”: stroke",
+        "headline: size, lineHeight, tracking, color, runs",
+        "motif “room top left”: stroke",
+        "motif “room top middle”: fill, stroke",
+        "motif “room top right”: stroke",
+        "motif “room bottom left”: fill, stroke",
+        "motif “room bottom middle”: stroke",
+        "motif “room bottom right”: fill, stroke",
+        "motif “window”: fill, stroke",
+        "motif “Line”: stroke",
+        "motif “Line”: stroke",
+        "motif “pendant”: fill",
+        "motif “door”: fill, stroke",
+        "motif “stair”: stroke",
+        "motif “Line”: stroke",
+        "subhead: weight, size, tracking, color",
+        "meta: size, tracking, color",
+        "motif “Line”: stroke",
+        "cta: weight, size, tracking, color",
+        "motif “Arrow line”: stroke"
+      ],
+      "added": [
+        "motif “dimension line”",
+        "motif “dimension tick”",
+        "motif “dimension tick”",
+        "motif “dimension tick”",
+        "motif “dimension tick”",
+        "motif “section hatch”"
+      ],
+      "removed": [],
+      "background": "#efe9dc → #ebe7de",
+      "untouched": 0,
+      "nothingChanged": false,
+      "wordsKept": true,
+      "headline": {
+        "size": [
+          185.2,
+          168.4
+        ],
+        "font": [
+          "Instrument Serif",
+          "Instrument Serif"
+        ],
+        "box": [
+          [
+            43,
+            88,
+            757,
+            361
+          ],
+          [
+            43,
+            88,
+            757,
+            361
+          ]
+        ]
+      },
+      "logoSame": false,
+      "typeSame": false
+    },
+    "D": {
+      "instruction": "Keep the logo and typography. Redesign everything else.",
+      "expect": "logo and type untouched; the rest transformed",
+      "slop": {
+        "gradientGround": false,
+        "purpleBlueGradient": false,
+        "roundedCards": 0,
+        "smallFloatingShapes": 14,
+        "glowsShadowsBlurs": 0,
+        "centredTextShare": 0,
+        "faces": 2,
+        "objects": 61,
+        "stockStructure": true,
+        "said": [
+          "the stock poster structure: a picture above, the title beneath it, the details in a strip across the foot",
+          "11 small shapes floating on their own"
+        ]
+      },
+      "path": "director (claude (agent)), global",
+      "said": "I swapped the cut-open section for a drafted floor plan of six unequal rooms with doors, windows, a stair and a dimension line, moved the headline beneath it, and changed the palette to cobalt and yellow on pale plaster, while the logo and all type stay as they were.",
+      "question": null,
+      "plan": null,
+      "understanding": {
+        "level": "global",
+        "goal": "Keep the Northlight logo and the Instrument Serif / Instrument Sans typography, and rebuild everything else: a new drawing, a new palette and a new layout.",
+        "affects": [
+          "building section drawing replaced by a floor plan",
+          "palette and ground",
+          "layout: plan on top, headline beneath, information below",
+          "rules and hairlines"
+        ],
+        "preserves": [
+          "Northlight logo, untouched",
+          "all words, faces, weights and styles",
+          "the six-rooms idea and the architecture-studio drawing language"
+        ]
+      },
+      "edits": 76,
+      "failedOperations": [],
+      "kept": [],
+      "notes": [],
+      "review": {
+        "verdict": "ship",
+        "seen": [
+          "The change reads as asked: a drafted plan of six unequal rooms with doors, windows, a stair and a dimension line sits on top, with the headline beneath it, in cobalt and yellow on pale plaster.",
+          "Reading order is clear: the plan first, then the huge 'Rooms for Living' with 'Living' in cobalt, then the details and call to action.",
+          "Nothing collides or runs off the frame. The 'g' descender comes close to the info rule but does not touch it.",
+          "The picture-above, title-beneath, details-below structure was asked for, and the plan's heavy walls and flat colour rooms give it a clear point of view."
+        ],
+        "applied": false,
+        "reverted": false,
+        "failed": []
+      },
+      "ms": null,
+      "model": "claude (agent)",
+      "usage": {
+        "calls": 2,
+        "estimated": true,
+        "input": 27362,
+        "cached": 0,
+        "output": 2751,
+        "reasoning": 0,
+        "cost": null,
+        "ms": null,
+        "byCall": [
+          "creative-edit claude (agent) in ~12812 out ~2559",
+          "graphic-review claude (agent) in ~14550 out ~192"
+        ]
+      },
+      "changed": [
+        "headline: y, w, h, color, runs",
+        "subhead: y, h, color",
+        "meta: x, y, h, color",
+        "motif “Line”: x, y, stroke",
+        "cta: y, color",
+        "motif “Arrow line”: y, stroke"
+      ],
+      "added": [
+        "motif “room F fill”",
+        "motif “room C fill”",
+        "motif “room D hatch”",
+        "motif “stair treads”",
+        "motif “stair outline”",
+        "motif “table”",
+        "motif “bed”",
+        "motif “pillow”",
+        "motif “sofa”",
+        "motif “wall x340”",
+        "motif “wall x620”",
+        "motif “wall x660”",
+        "motif “wall y360”",
+        "motif “wall y460”",
+        "motif “outer wall”",
+        "motif “gap A-B”",
+        "motif “gap D-E”",
+        "motif “gap B-C”",
+        "motif “gap E-F”",
+        "motif “gap B-E”",
+        "motif “gap C-F”",
+        "motif “gap A-D”",
+        "motif “entrance gap”",
+        "motif “window gap A”",
+        "motif “window gap C”",
+        "motif “window gap F”",
+        "motif “window A outer”",
+        "motif “window A inner”",
+        "motif “window C outer”",
+        "motif “window C inner”",
+        "motif “window F outer”",
+        "motif “window F inner”",
+        "motif “leaf A-B”",
+        "motif “swing A-B”",
+        "motif “leaf D-E”",
+        "motif “swing D-E”",
+        "motif “leaf B-C”",
+        "motif “swing B-C”",
+        "motif “leaf E-F”",
+        "motif “swing E-F”",
+        "motif “leaf B-E”",
+        "motif “swing B-E”",
+        "motif “leaf C-F”",
+        "motif “swing C-F”",
+        "motif “leaf A-D”",
+        "motif “swing A-D”",
+        "motif “leaf entrance”",
+        "motif “swing entrance”",
+        "motif “dimension line”",
+        "motif “tick 1”",
+        "motif “tick 2”",
+        "motif “tick 3”",
+        "motif “tick 4”",
+        "motif “info rule”"
+      ],
+      "removed": [
+        "motif “Line”",
+        "motif “room top left”",
+        "motif “room top middle”",
+        "motif “room top right”",
+        "motif “room bottom left”",
+        "motif “room bottom middle”",
+        "motif “room bottom right”",
+        "motif “window”",
+        "motif “Line”",
+        "motif “Line”",
+        "motif “pendant”",
+        "motif “door”",
+        "motif “stair”",
+        "motif “Line”"
+      ],
+      "background": "#efe9dc → #ece9e0",
+      "untouched": 1,
+      "nothingChanged": false,
+      "wordsKept": true,
+      "headline": {
+        "size": [
+          185.2,
+          185.2
+        ],
+        "font": [
+          "Instrument Serif",
+          "Instrument Serif"
+        ],
+        "box": [
+          [
+            43,
+            88,
+            757,
+            361
+          ],
+          [
+            43,
+            655,
+            757,
+            360
+          ]
+        ]
+      },
+      "logoSame": true,
+      "typeSame": true
+    },
+    "E": {
+      "instruction": "Make the headline slightly smaller.",
+      "expect": "only the headline changes",
+      "slop": {
+        "gradientGround": false,
+        "purpleBlueGradient": false,
+        "roundedCards": 0,
+        "smallFloatingShapes": 4,
+        "glowsShadowsBlurs": 0,
+        "centredTextShare": 0,
+        "faces": 2,
+        "objects": 21,
+        "stockStructure": false,
+        "said": [
+          "3 small shapes floating on their own"
+        ]
+      },
+      "path": "precise reader (in code, no model)",
+      "said": "headline slightly smaller",
+      "question": null,
+      "plan": null,
+      "understanding": null,
+      "edits": null,
+      "failedOperations": [],
+      "kept": [],
+      "notes": [],
+      "review": null,
+      "ms": 57,
+      "model": null,
+      "usage": null,
+      "changed": [
+        "headline: h, size"
+      ],
+      "added": [],
+      "removed": [],
+      "background": null,
+      "untouched": 20,
+      "nothingChanged": false,
+      "wordsKept": true,
+      "headline": {
+        "size": [
+          185.2,
+          171.5
+        ],
+        "font": [
+          "Instrument Serif",
+          "Instrument Serif"
+        ],
+        "box": [
+          [
+            43,
+            88,
+            757,
+            361
+          ],
+          [
+            43,
+            88,
+            757,
+            334
+          ]
+        ]
+      },
+      "logoSame": true,
+      "typeSame": true
+    },
+    "F": {
+      "instruction": "Make the design feel more cinematic. Adjust the imagery, lighting, background, and typography.",
+      "expect": "a coordinated change across related elements",
+      "slop": {
+        "gradientGround": true,
+        "purpleBlueGradient": false,
+        "roundedCards": 0,
+        "smallFloatingShapes": 5,
+        "glowsShadowsBlurs": 3,
+        "centredTextShare": 0,
+        "faces": 2,
+        "objects": 25,
+        "stockStructure": false,
+        "said": [
+          "a graded ground",
+          "3 objects with glows, blurs or soft shadows",
+          "3 small shapes floating on their own"
+        ]
+      },
+      "path": "director (claude (agent)), aesthetic",
+      "said": "I moved the poster from daylight paper to a night scene: a near-black ground, the terracotta room lit like a window in the dark with a warm bloom, a lamp glow and an anamorphic streak, edges falling off into shadow with fine grain, and calmer type with a wide-set brand line and an italic serif subtitle. After looking at the result, SocriaUX corrected: The details block (dates and address) is small, widely tracked and set in dim grey on near-black, so it is the weakest text on the sheet and hard to read at poster distance.; Everything else holds: the headline is large and clear, the lit terracotta room is a strong focal point, and the call to action reads..",
+      "question": null,
+      "plan": null,
+      "understanding": {
+        "level": "aesthetic",
+        "goal": "Turn the flat drafting-paper poster into a night-time, film-still feel: dark ground, one pool of warm light inside the section, grain and falloff at the edges, and quieter, more filmic type.",
+        "affects": [
+          "ground and palette",
+          "lighting (glow on the lit room, pendant and window, light bloom, vignette, grain",
+          "rooms and their strokes",
+          "typography of headline, subhead, brand and details"
+        ],
+        "preserves": [
+          "all wording",
+          "the section drawing and its six rooms, stair, door, window, pendant",
+          "layout and reading order",
+          "terracotta on Living and the lit room",
+          "Instrument Serif and Instrument Sans"
+        ]
+      },
+      "edits": 21,
+      "failedOperations": [],
+      "kept": [],
+      "notes": [],
+      "review": {
+        "verdict": "revise",
+        "seen": [
+          "The details block (dates and address) is small, widely tracked and set in dim grey on near-black, so it is the weakest text on the sheet and hard to read at poster distance.",
+          "Everything else holds: the headline is large and clear, the lit terracotta room is a strong focal point, and the call to action reads."
+        ],
+        "applied": true,
+        "reverted": false,
+        "failed": []
+      },
+      "ms": null,
+      "model": "claude (agent)",
+      "usage": {
+        "calls": 2,
+        "estimated": true,
+        "input": 25967,
+        "cached": 0,
+        "output": 1025,
+        "reasoning": 0,
+        "cost": null,
+        "ms": null,
+        "byCall": [
+          "creative-edit claude (agent) in ~12789 out ~904",
+          "graphic-review claude (agent) in ~13178 out ~121"
+        ]
+      },
+      "changed": [
+        "logo: weight, size, tracking, color",
+        "motif “Line”: stroke",
+        "headline: lineHeight, tracking, color, runs",
+        "motif “room top left”: stroke",
+        "motif “room top middle”: fill, stroke",
+        "motif “room top right”: stroke",
+        "motif “room bottom left”: fill, stroke",
+        "motif “room bottom middle”: stroke",
+        "motif “room bottom right”: fill, stroke",
+        "motif “window”: fill, effects",
+        "motif “Line”: stroke",
+        "motif “Line”: stroke",
+        "motif “pendant”: fill, effects",
+        "motif “door”: fill",
+        "motif “stair”: stroke",
+        "motif “Line”: stroke",
+        "subhead: h, font, weight, size, lineHeight, tracking, color, italic",
+        "meta: size, tracking, color",
+        "motif “Line”: stroke",
+        "cta: size, tracking, color",
+        "motif “Arrow line”: stroke"
+      ],
+      "added": [
+        "motif “light bloom”",
+        "motif “anamorphic streak”",
+        "motif “film grain”",
+        "motif “vignette”"
+      ],
+      "removed": [],
+      "background": "#efe9dc → #0e0d0c",
+      "untouched": 0,
+      "nothingChanged": false,
+      "wordsKept": true,
+      "headline": {
+        "size": [
+          185.2,
+          185.2
+        ],
+        "font": [
+          "Instrument Serif",
+          "Instrument Serif"
+        ],
+        "box": [
+          [
+            43,
+            88,
+            757,
+            361
+          ],
+          [
+            43,
+            88,
+            757,
+            361
+          ]
+        ]
+      },
+      "logoSame": false,
+      "typeSame": false
+    },
+    "G": {
+      "instruction": "Make it better.",
+      "expect": "improvements found from the artifact and its brief; a question only if necessary",
+      "slop": {
+        "gradientGround": false,
+        "purpleBlueGradient": false,
+        "roundedCards": 0,
+        "smallFloatingShapes": 4,
+        "glowsShadowsBlurs": 0,
+        "centredTextShare": 0,
+        "faces": 2,
+        "objects": 21,
+        "stockStructure": false,
+        "said": [
+          "3 small shapes floating on their own"
+        ]
+      },
+      "path": "director (claude (agent)), aesthetic",
+      "said": "I made the headline larger so 'Rooms for Living' spans most of the sheet width and gives the section drawing below a clearer, stronger lead-in, leaving everything else as it was.",
+      "question": null,
+      "plan": null,
+      "understanding": {
+        "level": "aesthetic",
+        "goal": "Make the poster stronger without changing its idea: the headline should own the sheet more confidently and the first read should be unmistakable.",
+        "affects": [
+          "headline scale and box"
+        ],
+        "preserves": [
+          "all wording",
+          "palette",
+          "type faces",
+          "section drawing",
+          "information block",
+          "brand and rules"
+        ]
+      },
+      "edits": 2,
+      "failedOperations": [],
+      "kept": [],
+      "notes": [],
+      "review": {
+        "verdict": "ship",
+        "seen": [],
+        "applied": false,
+        "reverted": false,
+        "failed": []
+      },
+      "ms": null,
+      "model": "claude (agent)",
+      "usage": {
+        "calls": 2,
+        "estimated": true,
+        "input": 25605,
+        "cached": 0,
+        "output": 229,
+        "reasoning": 0,
+        "cost": null,
+        "ms": null,
+        "byCall": [
+          "creative-edit claude (agent) in ~12767 out ~213",
+          "graphic-review claude (agent) in ~12838 out ~16"
+        ]
+      },
+      "changed": [
+        "headline: y, w, h, size, tracking"
+      ],
+      "added": [],
+      "removed": [],
+      "background": null,
+      "untouched": 20,
+      "nothingChanged": false,
+      "wordsKept": true,
+      "headline": {
+        "size": [
+          185.2,
+          212.2
+        ],
+        "font": [
+          "Instrument Serif",
+          "Instrument Serif"
+        ],
+        "box": [
+          [
+            43,
+            88,
+            757,
+            361
+          ],
+          [
+            43,
+            81,
+            758,
+            413
+          ]
+        ]
+      },
+      "logoSame": true,
+      "typeSame": true
+    },
+    "H": {
+      "instruction": "Create an experimental editorial poster for an independent architecture publication.",
+      "ms": null,
+      "model": "claude (agent)",
+      "usage": {
+        "calls": 2,
+        "estimated": true,
+        "input": 22462,
+        "cached": 0,
+        "output": 1130,
+        "reasoning": 0,
+        "cost": null,
+        "ms": null,
+        "byCall": [
+          "graphic-design claude (agent) in ~9947 out ~996",
+          "graphic-review claude (agent) in ~12515 out ~134"
+        ]
+      },
+      "said": [
+        "Idea: A plinth is the base that waits for something to stand on it, so the poster is a black plinth carrying the title, with the building above it drawn only as a dashed ghost whose roof has lifted off in solid vermilion: the unbuilt.",
+        "read first: the huge PLINTH slab at the bottom, then the vermilion roof plane floating above the ghost tower",
+        "type: heavy Archivo Black for the plinth-weight title, Space Grotesk small and exact for subhead and details, like drawing annotations",
+        "colour: concrete grey ground, near-black ink, one vermilion accent used only on the unbuilt part and the brand",
+        "composition: the lower third is a full-bleed black mass, the upper two thirds is mostly air with one tall ghost volume offset from centre and a measuring ruler at the left edge",
+        "forms: dashed construction outline, a faint hatch inside the ghost, dashed lift lines connecting the roof to its missing position, a tick ruler for scale"
+      ],
+      "direction": {
+        "name": "Unbuilt Plinth",
+        "palette": {
+          "ground": "#dcd8d0",
+          "ink": "#141414",
+          "accent": "#ff4b1f",
+          "muted": "#8a867e"
+        },
+        "display": "Archivo Black",
+        "body": "Space Grotesk"
+      },
+      "review": {
+        "verdict": "revise",
+        "seen": [
+          "The ghost tower is drawn in solid hairlines, so the idea of an unbuilt, dashed ghost is not visible; it reads as a finished building outline.",
+          "The subhead breaks awkwardly as 'Issue 07 — The / Unbuilt', orphaning the key word on a second line."
+        ],
+        "applied": true,
+        "reverted": false,
+        "failed": []
+      },
+      "problems": [],
+      "instructions": 13,
+      "objects": 13,
+      "palette": {
+        "background": "#dcd8d0",
+        "surface": "#d0ccc5",
+        "text": "#141414",
+        "muted": "#615e58",
+        "accent": "#ff4b1f",
+        "accentText": "#111111",
+        "line": "#b8b5ae"
+      },
+      "fonts": {
+        "display": "Archivo Black",
+        "body": "Space Grotesk"
+      },
+      "findings": [],
+      "slop": {
+        "gradientGround": false,
+        "purpleBlueGradient": false,
+        "roundedCards": 0,
+        "smallFloatingShapes": 0,
+        "glowsShadowsBlurs": 0,
+        "centredTextShare": 0,
+        "faces": 2,
+        "objects": 13,
+        "stockStructure": false,
+        "said": []
+      }
+    },
+    "I": {
+      "designs": [
+        {
+          "name": "fashion",
+          "ms": null,
+          "model": "claude (agent)",
+          "usage": {
+            "calls": 2,
+            "estimated": true,
+            "input": 22095,
+            "cached": 0,
+            "output": 680,
+            "reasoning": 0,
+            "cost": null,
+            "ms": null,
+            "byCall": [
+              "graphic-design claude (agent) in ~9930 out ~664",
+              "graphic-review claude (agent) in ~12165 out ~16"
+            ]
+          },
+          "palette": {
+            "background": "#1a1011",
+            "surface": "#271d1d",
+            "text": "#efe6d6",
+            "muted": "#9b8b7a",
+            "accent": "#b8893f",
+            "accentText": "#111111",
+            "line": "#403734"
+          },
+          "fonts": {
+            "display": "Bodoni Moda",
+            "body": "Instrument Sans"
+          },
+          "objects": 7,
+          "direction": {
+            "name": "Gilded Eclipse",
+            "palette": {
+              "ground": "#1a1011",
+              "ink": "#efe6d6",
+              "accent": "#b8893f",
+              "accent2": "#7a2e22",
+              "muted": "#9b8b7a"
+            },
+            "display": "Bodoni Moda",
+            "body": "Instrument Sans"
+          },
+          "review": {
+            "verdict": "ship",
+            "seen": [],
+            "applied": false,
+            "reverted": false,
+            "failed": []
+          },
+          "problems": [],
+          "said": [
+            "Idea: An eclipse of rust and gold, an aureole around a dark autumn sun, because Aurel means gold and the season is low light.",
+            "structure: weight sits at the foot in an oversized name, with the eclipse bleeding off the upper right so the dark ground stays as shape",
+            "read first: the eclipse, then the name overlapping its lower edge, then the season line",
+            "type: Bodoni Moda, a fashion Didone, set large and tight; Instrument Sans in small spaced capitals for everything else",
+            "colour: aubergine-black ground, ivory ink, one gold used only as a hairline ring, rust for the disc",
+            "forms: a solid rust disc and a thin offset gold ring, one hairline rule; nothing else"
+          ],
+          "findings": [],
+          "slop": {
+            "gradientGround": false,
+            "purpleBlueGradient": false,
+            "roundedCards": 0,
+            "smallFloatingShapes": 0,
+            "glowsShadowsBlurs": 0,
+            "centredTextShare": 0,
+            "faces": 2,
+            "objects": 7,
+            "stockStructure": false,
+            "said": []
+          }
+        },
+        {
+          "name": "tech",
+          "ms": null,
+          "model": "claude (agent)",
+          "usage": {
+            "calls": 2,
+            "estimated": true,
+            "input": 22396,
+            "cached": 0,
+            "output": 1123,
+            "reasoning": 0,
+            "cost": null,
+            "ms": null,
+            "byCall": [
+              "graphic-design claude (agent) in ~9934 out ~947",
+              "graphic-review claude (agent) in ~12462 out ~176"
+            ]
+          },
+          "palette": {
+            "background": "#ebeae3",
+            "surface": "#deddd6",
+            "text": "#121212",
+            "muted": "#65655f",
+            "accent": "#ff4a1c",
+            "accentText": "#111111",
+            "line": "#c4c3bd"
+          },
+          "fonts": {
+            "display": "Archivo",
+            "body": "Space Grotesk"
+          },
+          "objects": 12,
+          "direction": {
+            "name": "Through The Gap",
+            "palette": {
+              "ground": "#ebeae3",
+              "ink": "#121212",
+              "accent": "#ff4a1c",
+              "muted": "#a9a89f"
+            },
+            "display": "Archivo",
+            "body": "Space Grotesk"
+          },
+          "review": {
+            "verdict": "revise",
+            "seen": [
+              "The call to action wraps onto two lines: the arrow drops below 'GET TICKETS' and the first line rides up over the top edge of the orange block, so the button looks broken and off-centre",
+              "The year 2027 renders as a dull brick red rather than the signal orange, which weakens the one-accent idea, but the headline block is otherwise strong and the frame and signal-line motif reads clearly"
+            ],
+            "applied": true,
+            "reverted": false,
+            "failed": []
+          },
+          "problems": [
+            "tight at this size: headline breaks a word"
+          ],
+          "said": [
+            "Idea: Nested structural frames, each with a gap, are crossed by a single signal line: infrastructure is open when something can pass through every layer.",
+            "structure: the open frames sit in the upper right and the very large headline fills the lower two thirds as a block, so the sheet reads as a machine hall with a heavy base",
+            "read first: the headline Open Systems 2027, then the signal line leading out through the gaps, then the details and ticket button",
+            "type: Archivo at heavy weight, tightly tracked, for a plant-sign headline; Space Grotesk for the technical small text",
+            "colour: warm paper ground, near-black ink, one signal orange used only for the line, the core, the year and the button",
+            "forms: three nested open squares with aligned gaps and a through-line, set over a faint engineering grid; nothing decorative beyond that"
+          ],
+          "findings": [
+            "a generic habit: the stock poster structure: a picture above, the title beneath it, the details in a strip across the foot"
+          ],
+          "slop": {
+            "gradientGround": false,
+            "purpleBlueGradient": false,
+            "roundedCards": 0,
+            "smallFloatingShapes": 1,
+            "glowsShadowsBlurs": 0,
+            "centredTextShare": 0.2,
+            "faces": 2,
+            "objects": 12,
+            "stockStructure": true,
+            "said": [
+              "the stock poster structure: a picture above, the title beneath it, the details in a strip across the foot"
+            ]
+          }
+        },
+        {
+          "name": "architecture",
+          "ms": null,
+          "model": "claude (agent)",
+          "usage": {
+            "calls": 2,
+            "estimated": true,
+            "input": 22438,
+            "cached": 0,
+            "output": 1117,
+            "reasoning": 0,
+            "cost": null,
+            "ms": null,
+            "byCall": [
+              "graphic-design claude (agent) in ~9934 out ~961",
+              "graphic-review claude (agent) in ~12504 out ~156"
+            ]
+          },
+          "palette": {
+            "background": "#ebe7dd",
+            "surface": "#dedad1",
+            "text": "#151515",
+            "muted": "#625f58",
+            "accent": "#e2401c",
+            "accentText": "#111111",
+            "line": "#c4c1b9"
+          },
+          "fonts": {
+            "display": "Archivo",
+            "body": "IBM Plex Mono"
+          },
+          "objects": 13,
+          "direction": {
+            "name": "Open Door Plan",
+            "palette": {
+              "ground": "#ebe7dd",
+              "ink": "#151515",
+              "accent": "#e2401c",
+              "muted": "#8c887d"
+            },
+            "display": "Archivo",
+            "body": "IBM Plex Mono"
+          },
+          "review": {
+            "verdict": "revise",
+            "seen": [
+              "A thin black diagonal chord cuts across the vermilion swing from the hinge corner to the arc's end; it is an artefact of the closed arc path, not part of the plan-view door symbol, and it splits the one focal shape in two.",
+              "The subhead and the mono details sit close together, but they read clearly and the safe margin holds, so the rest of the layout is sound."
+            ],
+            "applied": true,
+            "reverted": false,
+            "failed": []
+          },
+          "problems": [
+            "tight at this size: headline breaks a word"
+          ],
+          "said": [
+            "Idea: The plan-view door swing, the architect's own symbol for an open door, drawn huge: a wall in poche with a gap and a vermilion quarter-circle of swept floor, so the poster literally shows 'open'.",
+            "structure: the weight sits in a diagonal from the heavy headline at top left down through the wall opening to the swing at lower right; the wall line is the horizon dividing words above from drawing below",
+            "read first: 'Open House' at enormous scale, then the vermilion door swing it opens onto, then the subhead and details in a narrow column beside the swing",
+            "type: Archivo at heavy weight, tightly tracked, for a blunt drafting-sheet headline; IBM Plex Mono for the small annotations, like labels on a drawing",
+            "colour: warm drafting-paper ground, near-black ink for walls and leaf, a single vermilion accent reserved for the swept area of the door",
+            "forms: only what a plan contains: two wall pieces, a door leaf, its swing arc and a faint construction grid"
+          ],
+          "findings": [],
+          "slop": {
+            "gradientGround": false,
+            "purpleBlueGradient": false,
+            "roundedCards": 0,
+            "smallFloatingShapes": 2,
+            "glowsShadowsBlurs": 0,
+            "centredTextShare": 0,
+            "faces": 2,
+            "objects": 13,
+            "stockStructure": false,
+            "said": []
+          }
+        },
+        {
+          "name": "music",
+          "ms": null,
+          "model": "claude (agent)",
+          "usage": {
+            "calls": 2,
+            "estimated": true,
+            "input": 22235,
+            "cached": 0,
+            "output": 990,
+            "reasoning": 0,
+            "cost": null,
+            "ms": null,
+            "byCall": [
+              "graphic-design claude (agent) in ~9937 out ~826",
+              "graphic-review claude (agent) in ~12298 out ~164"
+            ]
+          },
+          "palette": {
+            "background": "#ebe6d8",
+            "surface": "#dedace",
+            "text": "#13262a",
+            "muted": "#555c59",
+            "accent": "#d9532b",
+            "accentText": "#111111",
+            "line": "#c4c3b9"
+          },
+          "fonts": {
+            "display": "Instrument Serif",
+            "body": "Instrument Sans"
+          },
+          "objects": 9,
+          "direction": {
+            "name": "Stranded At Ebb",
+            "palette": {
+              "ground": "#ebe6d8",
+              "ink": "#13262a",
+              "accent": "#d9532b",
+              "muted": "#8d9a95"
+            },
+            "display": "Instrument Serif",
+            "body": "Instrument Sans"
+          },
+          "review": {
+            "verdict": "revise",
+            "seen": [
+              "The call to action breaks onto two lines and leaves the arrow stranded alone under 'TICKETS ON THE DOOR', which looks like an error at the foot of the sheet.",
+              "The small brand line floats alone in the middle of the sand at right, unconnected to the details or the call to action."
+            ],
+            "applied": true,
+            "reverted": false,
+            "failed": []
+          },
+          "problems": [],
+          "said": [
+            "Idea: The sheet is a tidal flat: a dark body of water has pulled back to a wavering shoreline, leaving the title stranded at the water's edge and the details on the exposed sand.",
+            "structure: weight sits in the lower half of the dark mass, with an empty dark sky above it; the shoreline is the hinge between title and details",
+            "read first: the huge 'Low Tide' standing on the waterline",
+            "type: Instrument Serif at a very large size for the title, tightly set; Instrument Sans for the small print so details stay crisp",
+            "colour: dark marsh green-black water, pale salt-bone sand, and one boiler-orange line along the shore and on the call to action",
+            "forms: one drawn shoreline, one band of wet sand with faint ripples; nothing else"
+          ],
+          "findings": [],
+          "slop": {
+            "gradientGround": false,
+            "purpleBlueGradient": false,
+            "roundedCards": 0,
+            "smallFloatingShapes": 0,
+            "glowsShadowsBlurs": 0,
+            "centredTextShare": 0,
+            "faces": 2,
+            "objects": 9,
+            "stockStructure": false,
+            "said": []
+          }
+        },
+        {
+          "name": "art",
+          "ms": null,
+          "model": "claude (agent)",
+          "usage": {
+            "calls": 2,
+            "estimated": true,
+            "input": 22232,
+            "cached": 0,
+            "output": 897,
+            "reasoning": 0,
+            "cost": null,
+            "ms": null,
+            "byCall": [
+              "graphic-design claude (agent) in ~9927 out ~756",
+              "graphic-review claude (agent) in ~12305 out ~141"
+            ]
+          },
+          "palette": {
+            "background": "#f1eee8",
+            "surface": "#e4e1db",
+            "text": "#16130f",
+            "muted": "#6d675e",
+            "accent": "#f0432f",
+            "accentText": "#111111",
+            "line": "#cac7c1"
+          },
+          "fonts": {
+            "display": "Instrument Serif",
+            "body": "Instrument Sans"
+          },
+          "objects": 8,
+          "direction": {
+            "name": "Retinal Ghost",
+            "palette": {
+              "ground": "#f1eee8",
+              "ink": "#16130f",
+              "accent": "#f0432f",
+              "accent2": "#1fb5a8",
+              "muted": "#6d675e"
+            },
+            "display": "Instrument Serif",
+            "body": "Instrument Sans"
+          },
+          "review": {
+            "verdict": "revise",
+            "seen": [
+              "The subhead starts exactly at the right edge of the teal rectangle (x=750), so 'Light, memory and the photographic trace' touches the block with no breathing room and looks jammed against it.",
+              "The subhead is not aligned with the short rule above it, which starts at x=790; the two should share a left edge."
+            ],
+            "applied": true,
+            "reverted": false,
+            "failed": []
+          },
+          "problems": [],
+          "said": [
+            "Idea: An afterimage drawn literally: a luminous red field and its complementary teal ghost, displaced and overlapping, the way the eye leaves a trace after looking at light.",
+            "structure: weight sits in the upper-left as one large doubled block; the title lies beneath it as a heavy horizontal, details stay small at the foot, so the eye drops from the image of light to its name",
+            "read first: the doubled block, then Afterimage, then the subhead in a narrow column beside the block",
+            "type: Instrument Serif for the title, tall and tightly tracked, with an outlined echo offset behind it like a trace; Instrument Sans for small text",
+            "colour: warm paper ground, near-black ink, a hot red and its complement teal; multiply makes the overlap a dark fused zone, as the eye mixes the two",
+            "forms: two identical rectangles, one offset, nothing else decorative"
+          ],
+          "findings": [],
+          "slop": {
+            "gradientGround": false,
+            "purpleBlueGradient": false,
+            "roundedCards": 0,
+            "smallFloatingShapes": 0,
+            "glowsShadowsBlurs": 0,
+            "centredTextShare": 0,
+            "faces": 2,
+            "objects": 8,
+            "stockStructure": false,
+            "said": []
+          }
+        }
+      ],
+      "structuralSimilarity": {
+        "pairs": [
+          {
+            "a": "fashion",
+            "b": "tech",
+            "similarity": 0.814
+          },
+          {
+            "a": "fashion",
+            "b": "architecture",
+            "similarity": 0.555
+          },
+          {
+            "a": "fashion",
+            "b": "music",
+            "similarity": 0.526
+          },
+          {
+            "a": "fashion",
+            "b": "art",
+            "similarity": 0.747
+          },
+          {
+            "a": "tech",
+            "b": "architecture",
+            "similarity": 0.597
+          },
+          {
+            "a": "tech",
+            "b": "music",
+            "similarity": 0.576
+          },
+          {
+            "a": "tech",
+            "b": "art",
+            "similarity": 0.651
+          },
+          {
+            "a": "architecture",
+            "b": "music",
+            "similarity": 0.685
+          },
+          {
+            "a": "architecture",
+            "b": "art",
+            "similarity": 0.554
+          },
+          {
+            "a": "music",
+            "b": "art",
+            "similarity": 0.466
+          }
+        ],
+        "mean": 0.617,
+        "max": 0.814,
+        "tooSimilar": 0
+      },
+      "distinctDisplayFaces": 3,
+      "distinctGrounds": 5
+    },
+    "J": {
+      "steps": [
+        {
+          "words": "Make the colours warm and earthy.",
+          "path": "director (claude (agent)), element",
+          "said": "I moved every colour role to warmer, earthier values: a sand-clay paper ground, deep umber instead of near-black ink, a richer rust-terracotta accent and a baked ochre, with a brown-grey for the quiet lines; layout and words are untouched. (cta: the colour was adjusted so it reads on its ground)",
+          "question": null,
+          "changed": 21,
+          "added": 0,
+          "removed": 0,
+          "palette": {
+            "background": "#e9d8bb",
+            "surface": "#decdb1",
+            "text": "#32231a",
+            "muted": "#76614b",
+            "accent": "#b4502a",
+            "accentText": "#ffffff",
+            "line": "#c8b79e"
+          },
+          "fonts": {
+            "display": "Instrument Serif",
+            "body": "Instrument Sans"
+          },
+          "ms": null,
+          "usage": {
+            "calls": 1,
+            "estimated": true,
+            "input": 12772,
+            "cached": 0,
+            "output": 246,
+            "reasoning": 0,
+            "cost": null,
+            "ms": null,
+            "byCall": [
+              "creative-edit claude (agent) in ~12772 out ~246"
+            ]
+          }
+        },
+        {
+          "words": "Make the typography more expressive.",
+          "path": "director (claude (agent)), aesthetic",
+          "said": "The headline is now set larger, tighter and in italic, with 'Living' still in terracotta, and the subhead moves into the same serif in italic, so the type has real contrast against the small drawing-annotation sans. After looking at the result, SocriaUX corrected: The headline box runs 4 units past the right safe margin (954 against 950). The words themselves stop near x=860, so nothing visible is clipped, but the box should sit inside the margin.; Otherwise the poster works. The headline is huge, with 'Living' in terracotta. The section drawing follows, then the details and call to action. Everything is legible and aligned to shared edges, and the pendant, window, stair and door each.",
+          "question": null,
+          "changed": 2,
+          "added": 0,
+          "removed": 0,
+          "palette": {
+            "background": "#e9d8bb",
+            "surface": "#decdb1",
+            "text": "#32231a",
+            "muted": "#76614b",
+            "accent": "#b4502a",
+            "accentText": "#ffffff",
+            "line": "#c8b79e"
+          },
+          "fonts": {
+            "display": "Instrument Serif",
+            "body": "Instrument Sans"
+          },
+          "ms": null,
+          "usage": {
+            "calls": 2,
+            "estimated": true,
+            "input": 25833,
+            "cached": 0,
+            "output": 484,
+            "reasoning": 0,
+            "cost": null,
+            "ms": null,
+            "byCall": [
+              "creative-edit claude (agent) in ~12875 out ~305",
+              "graphic-review claude (agent) in ~12958 out ~179"
+            ]
+          }
+        },
+        {
+          "words": "Move the focal point toward the right.",
+          "path": "director (claude (agent)), composition",
+          "said": "The headline now sits flush to the right edge, so the terracotta 'Living' lands over the right side, and the lit terracotta room with its pendant lamp has moved to the top-right room directly beneath it, pulling the eye to the right. After looking at the result, SocriaUX corrected: The right-aligned headline's italic overhang pushes the 'g' of 'Living' and the 'f' of 'for' past the 50-unit safe margin on the right (to about x 970), so the words crowd the edge of the sheet.; Everything else holds: the headline reads first, the terracotta 'Living' sits over the lit room, and the section drawing, details and call to action are clear..",
+          "question": null,
+          "changed": 5,
+          "added": 0,
+          "removed": 0,
+          "palette": {
+            "background": "#e9d8bb",
+            "surface": "#decdb1",
+            "text": "#32231a",
+            "muted": "#76614b",
+            "accent": "#b4502a",
+            "accentText": "#ffffff",
+            "line": "#c8b79e"
+          },
+          "fonts": {
+            "display": "Instrument Serif",
+            "body": "Instrument Sans"
+          },
+          "ms": null,
+          "usage": {
+            "calls": 2,
+            "estimated": true,
+            "input": 25996,
+            "cached": 0,
+            "output": 453,
+            "reasoning": 0,
+            "cost": null,
+            "ms": null,
+            "byCall": [
+              "creative-edit claude (agent) in ~12966 out ~310",
+              "graphic-review claude (agent) in ~13030 out ~143"
+            ]
+          }
+        },
+        {
+          "words": "Go back to the original colours.",
+          "path": "director (claude (agent)), element",
+          "said": "You now have the original colours back: the paper ground, ink, terracotta, ochre and muted tones from before the earthy recolour, while the expressive type and the right-leaning layout stay as they are.",
+          "question": null,
+          "changed": 21,
+          "added": 0,
+          "removed": 0,
+          "palette": {
+            "background": "#efe9dc",
+            "surface": "#e2ddd0",
+            "text": "#1d1c1a",
+            "muted": "#615d55",
+            "accent": "#c4512c",
+            "accentText": "#ffffff",
+            "line": "#c9c4b9"
+          },
+          "fonts": {
+            "display": "Instrument Serif",
+            "body": "Instrument Sans"
+          },
+          "ms": null,
+          "usage": {
+            "calls": 1,
+            "estimated": true,
+            "input": 13053,
+            "cached": 0,
+            "output": 229,
+            "reasoning": 0,
+            "cost": null,
+            "ms": null,
+            "byCall": [
+              "creative-edit claude (agent) in ~13053 out ~229"
+            ]
+          }
+        }
+      ],
+      "paletteRestored": true,
+      "typeKeptAfterRestore": true,
+      "paletteChangedAtStep1": true
+    },
+    "K": {
+      "designs": {
+        "base": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 4,
+          "glowsShadowsBlurs": 0,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 21,
+          "stockStructure": false,
+          "said": [
+            "3 small shapes floating on their own"
+          ]
+        },
+        "H": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 0,
+          "glowsShadowsBlurs": 0,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 13,
+          "stockStructure": false,
+          "said": []
+        },
+        "I/fashion": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 0,
+          "glowsShadowsBlurs": 0,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 7,
+          "stockStructure": false,
+          "said": []
+        },
+        "I/tech": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 1,
+          "glowsShadowsBlurs": 0,
+          "centredTextShare": 0.2,
+          "faces": 2,
+          "objects": 12,
+          "stockStructure": true,
+          "said": [
+            "the stock poster structure: a picture above, the title beneath it, the details in a strip across the foot"
+          ]
+        },
+        "I/architecture": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 2,
+          "glowsShadowsBlurs": 0,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 13,
+          "stockStructure": false,
+          "said": []
+        },
+        "I/music": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 0,
+          "glowsShadowsBlurs": 0,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 9,
+          "stockStructure": false,
+          "said": []
+        },
+        "I/art": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 0,
+          "glowsShadowsBlurs": 0,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 8,
+          "stockStructure": false,
+          "said": []
+        },
+        "after A": {
+          "gradientGround": true,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 8,
+          "glowsShadowsBlurs": 2,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 27,
+          "stockStructure": false,
+          "said": [
+            "a graded ground",
+            "2 objects with glows, blurs or soft shadows",
+            "6 small shapes floating on their own"
+          ]
+        },
+        "after B": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 4,
+          "glowsShadowsBlurs": 0,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 25,
+          "stockStructure": false,
+          "said": [
+            "3 small shapes floating on their own"
+          ]
+        },
+        "after C": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 4,
+          "glowsShadowsBlurs": 0,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 27,
+          "stockStructure": false,
+          "said": [
+            "3 small shapes floating on their own"
+          ]
+        },
+        "after D": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 14,
+          "glowsShadowsBlurs": 0,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 61,
+          "stockStructure": true,
+          "said": [
+            "the stock poster structure: a picture above, the title beneath it, the details in a strip across the foot",
+            "11 small shapes floating on their own"
+          ]
+        },
+        "after E": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 4,
+          "glowsShadowsBlurs": 0,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 21,
+          "stockStructure": false,
+          "said": [
+            "3 small shapes floating on their own"
+          ]
+        },
+        "after F": {
+          "gradientGround": true,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 5,
+          "glowsShadowsBlurs": 3,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 25,
+          "stockStructure": false,
+          "said": [
+            "a graded ground",
+            "3 objects with glows, blurs or soft shadows",
+            "3 small shapes floating on their own"
+          ]
+        },
+        "after G": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 4,
+          "glowsShadowsBlurs": 0,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 21,
+          "stockStructure": false,
+          "said": [
+            "3 small shapes floating on their own"
+          ]
+        }
+      },
+      "totals": {
+        "designs": 14,
+        "gradientGrounds": 2,
+        "purpleBlueGradients": 0,
+        "withRoundedCards": 0,
+        "withGlowsShadowsBlurs": 2,
+        "mostlyCentred": 0,
+        "stockStructure": 2
+      }
+    }
+  },
+  "base": {
+    "headline": "Rooms for Living",
+    "ms": null,
+    "model": "claude (agent)",
+    "usage": {
+      "calls": 2,
+      "estimated": true,
+      "input": 22771,
+      "cached": 0,
+      "output": 1384,
+      "reasoning": 0,
+      "cost": null,
+      "ms": null,
+      "byCall": [
+        "graphic-design claude (agent) in ~9947 out ~1212",
+        "graphic-review claude (agent) in ~12824 out ~172"
+      ]
+    },
+    "said": [
+      "Idea: The poster is a building section cut open: six rooms of unequal size for six evenings, so the architecture studio's own drawing language carries the title 'Rooms for Living'.",
+      "read first: the huge two-line headline, with 'Living' in terracotta; second the section drawing; third the details and call to action",
+      "type: Instrument Serif for the condensed, editorial headline; Instrument Sans for small precise text, like drawing annotations",
+      "colour: warm drafting-paper ground, near-black ink, terracotta as the single accent for 'Living' and one lit room, ochre as a quiet second",
+      "composition: headline top-left on a shared left edge, section drawing in the centre of the sheet standing on a ground rule, information in two columns beneath, split by hairlines",
+      "forms: six rooms in a staggered 3+3 grid, a stair, a door, a window and a pendant lamp mark them as rooms to live in, not abstract blocks"
+    ],
+    "direction": {
+      "name": "Section Drawing",
+      "palette": {
+        "ground": "#efe9dc",
+        "ink": "#1d1c1a",
+        "accent": "#c4512c",
+        "accent2": "#e1ac4a",
+        "muted": "#8b857a"
+      },
+      "display": "Instrument Serif",
+      "body": "Instrument Sans"
+    },
+    "review": {
+      "verdict": "revise",
+      "seen": [
+        "The door is lost: it is filled with the ground colour and sits inside the empty top-right room, so it vanishes into the paper and only a thin sliver shows on the floor line of that room. The ochre room beside it has no door, so the 'rooms t",
+        "The rest holds: the headline is large with a clear scale contrast, the terracotta 'Living' leads into the section drawing, and the information block is clean and aligned."
+      ],
+      "applied": true,
+      "reverted": false,
+      "failed": []
+    },
+    "problems": [],
+    "objects": 21,
+    "palette": {
+      "background": "#efe9dc",
+      "surface": "#e2ddd0",
+      "text": "#1d1c1a",
+      "muted": "#615d55",
+      "accent": "#c4512c",
+      "accentText": "#ffffff",
+      "line": "#c9c4b9"
+    },
+    "fonts": {
+      "display": "Instrument Serif",
+      "body": "Instrument Sans"
+    },
+    "findings": [
+      "a generic habit: 3 small shapes floating on their own"
+    ]
+  },
+  "waiting": [],
+  "mode": "agents",
+  "calls": [
+    {
+      "stage": "graphic-design",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 9947,
+      "cached": 0,
+      "output": 1212,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-review",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 12824,
+      "cached": 0,
+      "output": 172,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "creative-edit",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": "premium",
+      "ms": null,
+      "ttftMs": null,
+      "input": 12769,
+      "cached": 0,
+      "output": 709,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-review",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 13163,
+      "cached": 0,
+      "output": 138,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "creative-edit",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": "premium",
+      "ms": null,
+      "ttftMs": null,
+      "input": 12777,
+      "cached": 0,
+      "output": 905,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-review",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 13025,
+      "cached": 0,
+      "output": 169,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "creative-edit",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": "premium",
+      "ms": null,
+      "ttftMs": null,
+      "input": 12777,
+      "cached": 0,
+      "output": 1008,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-review",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 13149,
+      "cached": 0,
+      "output": 116,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "creative-edit",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": "premium",
+      "ms": null,
+      "ttftMs": null,
+      "input": 12812,
+      "cached": 0,
+      "output": 2559,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-review",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 14550,
+      "cached": 0,
+      "output": 192,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "creative-edit",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": "premium",
+      "ms": null,
+      "ttftMs": null,
+      "input": 12789,
+      "cached": 0,
+      "output": 904,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-review",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 13178,
+      "cached": 0,
+      "output": 121,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "creative-edit",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": "premium",
+      "ms": null,
+      "ttftMs": null,
+      "input": 12767,
+      "cached": 0,
+      "output": 213,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-review",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 12838,
+      "cached": 0,
+      "output": 16,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-design",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 9947,
+      "cached": 0,
+      "output": 996,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-review",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 12515,
+      "cached": 0,
+      "output": 134,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-design",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 9930,
+      "cached": 0,
+      "output": 664,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-review",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 12165,
+      "cached": 0,
+      "output": 16,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-design",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 9934,
+      "cached": 0,
+      "output": 947,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-review",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 12462,
+      "cached": 0,
+      "output": 176,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-design",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 9934,
+      "cached": 0,
+      "output": 961,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-review",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 12504,
+      "cached": 0,
+      "output": 156,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-design",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 9937,
+      "cached": 0,
+      "output": 826,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-review",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 12298,
+      "cached": 0,
+      "output": 164,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-design",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 9927,
+      "cached": 0,
+      "output": 756,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-review",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 12305,
+      "cached": 0,
+      "output": 141,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "creative-edit",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": "premium",
+      "ms": null,
+      "ttftMs": null,
+      "input": 12772,
+      "cached": 0,
+      "output": 246,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "creative-edit",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": "premium",
+      "ms": null,
+      "ttftMs": null,
+      "input": 12875,
+      "cached": 0,
+      "output": 305,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-review",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 12958,
+      "cached": 0,
+      "output": 179,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "creative-edit",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": "premium",
+      "ms": null,
+      "ttftMs": null,
+      "input": 12966,
+      "cached": 0,
+      "output": 310,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "graphic-review",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": null,
+      "ms": null,
+      "ttftMs": null,
+      "input": 13030,
+      "cached": 0,
+      "output": 143,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    },
+    {
+      "stage": "creative-edit",
+      "model": "claude (agent)",
+      "effort": "agent",
+      "tier": "premium",
+      "ms": null,
+      "ttftMs": null,
+      "input": 13053,
+      "cached": 0,
+      "output": 229,
+      "reasoning": 0,
+      "cost": null,
+      "incomplete": null,
+      "estimated": true
+    }
+  ],
+  "usage": {
+    "calls": 32,
+    "estimated": true,
+    "input": 390877,
+    "output": 15783,
+    "cached": 0,
+    "cost": null
+  },
+  "sheets": [
+    "sheet-edits.png",
+    "sheet-H.png",
+    "sheet-I.png",
+    "sheet-J.png"
+  ],
+  "ms": 24348
+}

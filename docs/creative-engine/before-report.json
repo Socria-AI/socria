@@ -1,11 +1,26 @@
 {
   "engine": "rules",
-  "at": "2026-11-23T18:09:39.217Z",
+  "at": "2026-11-23T19:01:30.283Z",
   "blocked": null,
   "tests": {
     "A": {
       "instruction": "Make this cloud themed.",
       "expect": "a coherent transformation of the relevant elements (not cloud icons on a blue gradient); words and logo intact",
+      "slop": {
+        "gradientGround": true,
+        "purpleBlueGradient": false,
+        "roundedCards": 0,
+        "smallFloatingShapes": 1,
+        "glowsShadowsBlurs": 3,
+        "centredTextShare": 0,
+        "faces": 2,
+        "objects": 13,
+        "stockStructure": false,
+        "said": [
+          "a graded ground",
+          "3 objects with glows, blurs or soft shadows"
+        ]
+      },
       "path": "reader plan (certain)",
       "said": "the clouds palette; a clouds ground, graded; clouds in place of the shapes there, literal; depth: the forms layered by distance, with shadows",
       "question": null,
@@ -28,7 +43,7 @@
         "Fixed before showing: “Subhead” reads at 1.0:1 against what is beneath it (3:1 needed)."
       ],
       "review": null,
-      "ms": 48,
+      "ms": 45,
       "model": null,
       "usage": null,
       "changed": [
@@ -99,6 +114,21 @@
     "B": {
       "instruction": "Make this feel more sophisticated and atmospheric.",
       "expect": "decisions across composition, hierarchy, type, imagery and space",
+      "slop": {
+        "gradientGround": false,
+        "purpleBlueGradient": false,
+        "roundedCards": 0,
+        "smallFloatingShapes": 3,
+        "glowsShadowsBlurs": 2,
+        "centredTextShare": 0,
+        "faces": 3,
+        "objects": 20,
+        "stockStructure": false,
+        "said": [
+          "2 objects with glows, blurs or soft shadows",
+          "3 typefaces"
+        ]
+      },
       "path": "reader plan (certain)",
       "said": "the colour muted, restrained; the type set in Bodoni Moda with Manrope (refined); 3 of the shapes taken out, the strongest kept; a little depth: soft shadows beneath the forms",
       "question": null,
@@ -123,7 +153,7 @@
         "Fixed before showing: “Logo” reads at 1.1:1 against what is beneath it (3:1 needed); “Subhead” reads at 2.9:1 against what is beneath it (3:1 needed)."
       ],
       "review": null,
-      "ms": 132,
+      "ms": 104,
       "model": null,
       "usage": null,
       "changed": [
@@ -187,6 +217,23 @@
     "C": {
       "instruction": "Make this look like a premium architecture studio.",
       "expect": "a subject-specific solution, not a generic layout",
+      "slop": {
+        "gradientGround": true,
+        "purpleBlueGradient": false,
+        "roundedCards": 0,
+        "smallFloatingShapes": 19,
+        "glowsShadowsBlurs": 11,
+        "centredTextShare": 0,
+        "faces": 3,
+        "objects": 26,
+        "stockStructure": false,
+        "said": [
+          "a graded ground",
+          "11 objects with glows, blurs or soft shadows",
+          "4 small shapes floating on their own",
+          "3 typefaces"
+        ]
+      },
       "path": "reader plan (uncertain)",
       "said": "the colour changed; the type set in Marcellus with Source Serif 4; a graded ground; fine lines in place of the shapes there, abstract; a little depth: soft shadows beneath the forms",
       "question": null,
@@ -238,7 +285,7 @@
         "Fixed before showing: “Subhead” reads at 1.0:1 against what is beneath it (3:1 needed)."
       ],
       "review": null,
-      "ms": 134,
+      "ms": 141,
       "model": null,
       "usage": null,
       "changed": [
@@ -322,6 +369,18 @@
     "D": {
       "instruction": "Keep the logo and typography. Redesign everything else.",
       "expect": "logo and type untouched; the rest transformed",
+      "slop": {
+        "gradientGround": false,
+        "purpleBlueGradient": false,
+        "roundedCards": 0,
+        "smallFloatingShapes": 1,
+        "glowsShadowsBlurs": 0,
+        "centredTextShare": 0,
+        "faces": 2,
+        "objects": 10,
+        "stockStructure": false,
+        "said": []
+      },
       "path": "reader plan (certain)",
       "said": "the composition rethought; the colour darker, cooler; a flat ground",
       "question": null,
@@ -357,7 +416,7 @@
         "Fixed before showing: “Headline” reads at 2.4:1 against what is beneath it (3:1 needed); “Subhead” reads at 1.0:1 against what is beneath it (3:1 needed); “Meta” reads at 1.0:1 against what is beneath it (3:1 needed)."
       ],
       "review": null,
-      "ms": 52,
+      "ms": 46,
       "model": null,
       "usage": null,
       "changed": [],
@@ -432,6 +491,20 @@
     "E": {
       "instruction": "Make the headline slightly smaller.",
       "expect": "only the headline changes",
+      "slop": {
+        "gradientGround": false,
+        "purpleBlueGradient": false,
+        "roundedCards": 0,
+        "smallFloatingShapes": 4,
+        "glowsShadowsBlurs": 3,
+        "centredTextShare": 0,
+        "faces": 2,
+        "objects": 23,
+        "stockStructure": false,
+        "said": [
+          "3 objects with glows, blurs or soft shadows"
+        ]
+      },
       "path": "precise reader",
       "said": "headline slightly smaller",
       "question": null,
@@ -442,7 +515,7 @@
       "kept": [],
       "notes": [],
       "review": null,
-      "ms": 32,
+      "ms": 31,
       "model": null,
       "usage": null,
       "changed": [
@@ -484,6 +557,22 @@
     "F": {
       "instruction": "Make the design feel more cinematic. Adjust the imagery, lighting, background, and typography.",
       "expect": "a coordinated change across related elements",
+      "slop": {
+        "gradientGround": true,
+        "purpleBlueGradient": false,
+        "roundedCards": 0,
+        "smallFloatingShapes": 3,
+        "glowsShadowsBlurs": 7,
+        "centredTextShare": 0,
+        "faces": 3,
+        "objects": 23,
+        "stockStructure": false,
+        "said": [
+          "a graded ground",
+          "7 objects with glows, blurs or soft shadows",
+          "3 typefaces"
+        ]
+      },
       "path": "reader plan (uncertain)",
       "said": "the colour darker, contrast, richer; the type set in Dela Gothic One with Archivo (expressive); a graded ground; the shapes larger; atmospheric depth: far forms softened, near ones shadowed",
       "question": null,
@@ -510,7 +599,7 @@
         "Fixed before showing: “Subhead” reads at 1.0:1 against what is beneath it (3:1 needed)."
       ],
       "review": null,
-      "ms": 118,
+      "ms": 112,
       "model": null,
       "usage": null,
       "changed": [
@@ -573,6 +662,20 @@
     "G": {
       "instruction": "Make it better.",
       "expect": "improvements found from the artifact and its brief; a question only if necessary",
+      "slop": {
+        "gradientGround": false,
+        "purpleBlueGradient": false,
+        "roundedCards": 0,
+        "smallFloatingShapes": 3,
+        "glowsShadowsBlurs": 3,
+        "centredTextShare": 0,
+        "faces": 2,
+        "objects": 32,
+        "stockStructure": false,
+        "said": [
+          "3 objects with glows, blurs or soft shadows"
+        ]
+      },
       "path": "reader plan (certain)",
       "said": "an asymmetric, moving composition; headline much larger",
       "question": null,
@@ -606,7 +709,7 @@
         "Fixed before showing: “Headline” reads at 1.0:1 against what is beneath it (3:1 needed). No one colour reads on everything beneath it: it is given a ground of its own."
       ],
       "review": null,
-      "ms": 51,
+      "ms": 50,
       "model": null,
       "usage": null,
       "changed": [],
@@ -702,7 +805,7 @@
     },
     "H": {
       "instruction": "Create an experimental editorial poster for an independent architecture publication.",
-      "ms": 155,
+      "ms": 176,
       "model": null,
       "usage": null,
       "said": [
@@ -740,14 +843,16 @@
         "glowsShadowsBlurs": 0,
         "centredTextShare": 0,
         "faces": 2,
-        "objects": 26
+        "objects": 26,
+        "stockStructure": false,
+        "said": []
       }
     },
     "I": {
       "designs": [
         {
           "name": "fashion",
-          "ms": 149,
+          "ms": 160,
           "model": null,
           "usage": null,
           "palette": {
@@ -784,12 +889,16 @@
             "glowsShadowsBlurs": 0,
             "centredTextShare": 1,
             "faces": 2,
-            "objects": 7
+            "objects": 7,
+            "stockStructure": false,
+            "said": [
+              "every line centred"
+            ]
           }
         },
         {
           "name": "tech",
-          "ms": 135,
+          "ms": 120,
           "model": null,
           "usage": null,
           "palette": {
@@ -826,12 +935,16 @@
             "glowsShadowsBlurs": 0,
             "centredTextShare": 0,
             "faces": 2,
-            "objects": 85
+            "objects": 85,
+            "stockStructure": false,
+            "said": [
+              "5 small shapes floating on their own"
+            ]
           }
         },
         {
           "name": "architecture",
-          "ms": 125,
+          "ms": 105,
           "model": null,
           "usage": null,
           "palette": {
@@ -868,12 +981,14 @@
             "glowsShadowsBlurs": 0,
             "centredTextShare": 0,
             "faces": 2,
-            "objects": 12
+            "objects": 12,
+            "stockStructure": false,
+            "said": []
           }
         },
         {
           "name": "music",
-          "ms": 125,
+          "ms": 135,
           "model": null,
           "usage": null,
           "palette": {
@@ -910,12 +1025,14 @@
             "glowsShadowsBlurs": 0,
             "centredTextShare": 0,
             "faces": 2,
-            "objects": 21
+            "objects": 21,
+            "stockStructure": false,
+            "said": []
           }
         },
         {
           "name": "art",
-          "ms": 118,
+          "ms": 110,
           "model": null,
           "usage": null,
           "palette": {
@@ -952,7 +1069,9 @@
             "glowsShadowsBlurs": 0,
             "centredTextShare": 0,
             "faces": 2,
-            "objects": 17
+            "objects": 17,
+            "stockStructure": false,
+            "said": []
           }
         }
       ],
@@ -1063,7 +1182,7 @@
             "display": "Bricolage Grotesque",
             "body": "Work Sans"
           },
-          "ms": 76,
+          "ms": 239,
           "usage": null
         },
         {
@@ -1120,21 +1239,215 @@
       "paletteChangedAtStep1": true
     },
     "K": {
-      "base": {
-        "gradientGround": false,
-        "purpleBlueGradient": false,
-        "roundedCards": 0,
-        "smallFloatingShapes": 4,
-        "glowsShadowsBlurs": 3,
-        "centredTextShare": 0,
-        "faces": 2,
-        "objects": 23
+      "designs": {
+        "base": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 4,
+          "glowsShadowsBlurs": 3,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 23,
+          "stockStructure": false,
+          "said": [
+            "3 objects with glows, blurs or soft shadows"
+          ]
+        },
+        "H": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 1,
+          "glowsShadowsBlurs": 0,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 26,
+          "stockStructure": false,
+          "said": []
+        },
+        "I/fashion": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 0,
+          "glowsShadowsBlurs": 0,
+          "centredTextShare": 1,
+          "faces": 2,
+          "objects": 7,
+          "stockStructure": false,
+          "said": [
+            "every line centred"
+          ]
+        },
+        "I/tech": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 15,
+          "glowsShadowsBlurs": 0,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 85,
+          "stockStructure": false,
+          "said": [
+            "5 small shapes floating on their own"
+          ]
+        },
+        "I/architecture": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 0,
+          "glowsShadowsBlurs": 0,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 12,
+          "stockStructure": false,
+          "said": []
+        },
+        "I/music": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 0,
+          "glowsShadowsBlurs": 0,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 21,
+          "stockStructure": false,
+          "said": []
+        },
+        "I/art": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 0,
+          "glowsShadowsBlurs": 0,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 17,
+          "stockStructure": false,
+          "said": []
+        },
+        "after A": {
+          "gradientGround": true,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 1,
+          "glowsShadowsBlurs": 3,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 13,
+          "stockStructure": false,
+          "said": [
+            "a graded ground",
+            "3 objects with glows, blurs or soft shadows"
+          ]
+        },
+        "after B": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 3,
+          "glowsShadowsBlurs": 2,
+          "centredTextShare": 0,
+          "faces": 3,
+          "objects": 20,
+          "stockStructure": false,
+          "said": [
+            "2 objects with glows, blurs or soft shadows",
+            "3 typefaces"
+          ]
+        },
+        "after C": {
+          "gradientGround": true,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 19,
+          "glowsShadowsBlurs": 11,
+          "centredTextShare": 0,
+          "faces": 3,
+          "objects": 26,
+          "stockStructure": false,
+          "said": [
+            "a graded ground",
+            "11 objects with glows, blurs or soft shadows",
+            "4 small shapes floating on their own",
+            "3 typefaces"
+          ]
+        },
+        "after D": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 1,
+          "glowsShadowsBlurs": 0,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 10,
+          "stockStructure": false,
+          "said": []
+        },
+        "after E": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 4,
+          "glowsShadowsBlurs": 3,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 23,
+          "stockStructure": false,
+          "said": [
+            "3 objects with glows, blurs or soft shadows"
+          ]
+        },
+        "after F": {
+          "gradientGround": true,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 3,
+          "glowsShadowsBlurs": 7,
+          "centredTextShare": 0,
+          "faces": 3,
+          "objects": 23,
+          "stockStructure": false,
+          "said": [
+            "a graded ground",
+            "7 objects with glows, blurs or soft shadows",
+            "3 typefaces"
+          ]
+        },
+        "after G": {
+          "gradientGround": false,
+          "purpleBlueGradient": false,
+          "roundedCards": 0,
+          "smallFloatingShapes": 3,
+          "glowsShadowsBlurs": 3,
+          "centredTextShare": 0,
+          "faces": 2,
+          "objects": 32,
+          "stockStructure": false,
+          "said": [
+            "3 objects with glows, blurs or soft shadows"
+          ]
+        }
+      },
+      "totals": {
+        "designs": 14,
+        "gradientGrounds": 3,
+        "purpleBlueGradients": 0,
+        "withRoundedCards": 0,
+        "withGlowsShadowsBlurs": 7,
+        "mostlyCentred": 1,
+        "stockStructure": 0
       }
     }
   },
   "base": {
     "headline": "Rooms for Living",
-    "ms": 826,
+    "ms": 822,
     "model": null,
     "usage": null,
     "said": [
@@ -1174,5 +1487,5 @@
     "sheet-I.png",
     "sheet-J.png"
   ],
-  "ms": 18032
+  "ms": 18312
 }
