@@ -26,7 +26,6 @@ export { normalizeBrief } from '@/lib/ux-v0/types';
 export * from '@/lib/ux-v0/studio/discovery-model';
 export * from '@/lib/ux-v0/studio/realise';
 export * from '@/lib/ux-v0/studio/vibe-preview';
-export { executePlan } from '@/lib/ux-v0/graphics/creative/execute';
 export { renderArtboard } from '@/lib/ux-v0/graphics/render';
 export { FONTS } from '@/lib/ux-v0/fonts';
 export { contrastRatio } from '@/lib/ux/audit';

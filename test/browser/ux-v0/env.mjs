@@ -114,20 +114,3 @@ export async function websiteWorkspace(page, words) {
   await page.locator('.v0-intent').getByRole('button', { name: 'Begin' }).click();
   return p.id;
 }
-
-/**
- * A graphic or a board whose brief is written by hand in its workspace (the workspaces' own forms, which the checks of
- * the engines drive): a project of that kind kept in this browser with the words as its intent, opened at its address.
- */
-export async function handBrief(page, medium, words) {
-  const { makeProject } = await underTest();
-  const base = makeProject('create', medium === 'board' ? 'Untitled board' : 'Untitled graphic');
-  const p =
-    medium === 'board'
-      ? { ...base, intent: words, medium: 'board', board: { schema: 1, request: '', brief: null, system: null, options: [], materials: [], nodes: [], connectors: [], assets: [], background: { color: '#ecebe6', pattern: 'dots' }, annotations: true, arrangement: 'editorial', versions: [] } }
-      : { ...base, intent: words, medium: 'graphic', graphic: { brief: null, options: [], direction: null, doc: null, versions: [] } };
-  await putProjectInBrowser(page, p);
-  await page.goto(`${BASE}/ux-v0?p=${encodeURIComponent(p.id)}`, { waitUntil: 'networkidle' });
-  await page.waitForSelector(medium === 'board' ? '.bd-brief' : '.gx-brief', { timeout: 15000 });
-  return p.id;
-}

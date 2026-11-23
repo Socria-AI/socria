@@ -325,8 +325,6 @@ export function critiqueTier(comment: string, selection: { type?: string; elemen
   return { tier: 'economy', why: 'a short question about the selected part' };
 }
 
-export { editTier } from './graphics/director/tier';
-
 const intEnv = (v: string | undefined, fallback: number) => {
   const n = parseInt(v ?? '', 10);
   return Number.isFinite(n) && n > 0 ? n : fallback;

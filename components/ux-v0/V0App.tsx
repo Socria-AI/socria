@@ -36,8 +36,6 @@ import './ux-v0.css';
 import './home.css';
 import './studio.css';
 import './dna.css';
-import './graphics/graphics.css';
-import './boards/boards.css';
 import './studio/studio-home.css';
 
 const idFromUrl = () => {

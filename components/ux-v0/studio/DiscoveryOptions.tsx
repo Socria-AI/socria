@@ -12,7 +12,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { DiscoveryQuestion, PaletteChoice, TypeChoice, VibeChoice } from '@/lib/ux-v0/studio/discovery';
 import { renderArtboard } from '@/lib/ux-v0/graphics/render';
 import { vibeFaces, vibePreviewDoc } from '@/lib/ux-v0/studio/vibe-preview';
-import { loadFaces, useFaceMeasure, type Face } from '../graphics/faces';
+import { loadFaces, useFaceMeasure, type Face } from './faces';
 
 export interface DiscoveryOptionsProps {
   q: DiscoveryQuestion;

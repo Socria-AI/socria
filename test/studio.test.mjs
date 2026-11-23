@@ -555,13 +555,7 @@ ok('its qualities are asked of the creative executor as a plan, keeping the pale
 let formed = S.respond(open('graphic', 'A poster for “Blue Hour”'), 'playful and dreamy', {}, { now: NOW + 3 }).st;
 formed = S.respond(formed, 'skip', {}, { now: NOW + 4 }).st;
 const fplan = S.vibeRealisation(formed);
-const fp = S.prefsOf(formed);
-const mb = S.graphicBriefOf(formed);
-const md = S.directionsWithPrefs([S.languageDirection('Blue Hour', mb.mood, 'm')], fp)[0];
-const mc = S.composeGraphic(mb, md, { seed: 5 }).doc;
-const realised = S.executePlan(mc, fplan, { board: mc.artboards[0].id, dir: md, kind: mb.kind, said: fplan.summary, now: NOW });
-ok('…carried out on the composed work: its forms and depth change, the words and the palette stay', fplan && realised && realised.doc !== mc && realised.changed.length > 0 && realised.doc.tokens.colors.accent === mc.tokens.colors.accent && realised.doc.artboards[0].children.some((n) => n.type === 'text' && n.text === 'Blue Hour'), J(realised && { done: realised.done, changed: realised.changed, notes: realised.notes }));
-ok('…and a mood that only colours and letters the work leaves nothing more to do once those are held', S.executePlan(mc, plan, { board: mc.artboards[0].id, dir: md, kind: mb.kind, said: plan.summary, now: NOW }) === null || plan.changes.every((c) => c.decision === 'mood'));
+ok('a mood that asks for forms and depth is a plan of its own', fplan && fplan.changes.some((c) => c.decision === 'mood'), J(fplan));
 ok('no mood chosen: nothing to carry', S.vibeRealisation(open('graphic', 'A poster for “Blue Hour”, warm and smoky')) === null);
 
 // ── voice ──

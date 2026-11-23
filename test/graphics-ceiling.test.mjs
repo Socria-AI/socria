@@ -8,7 +8,7 @@ let pass = 0;
 let fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, String(x).slice(0, 700))));
 const J = JSON.stringify;
-const { gfxDoc: D, gfxRender: R, gfxGeometry: G, gfxPaint: P, gfxEffects: E, gfxPatterns: PT, gfxVector: VO, gfxSvgImport: I, gfxVocab: VC, gfxCaps: CAP, gfxCompose: C, gfxEdit: ED, gfxText: T, gfxExport: X } = V;
+const { gfxDoc: D, gfxRender: R, gfxGeometry: G, gfxPaint: P, gfxEffects: E, gfxPatterns: PT, gfxVector: VO, gfxSvgImport: I, gfxVocab: VC, gfxCompose: C, gfxText: T, gfxExport: X } = V;
 
 const board = (children, extra = {}) => D.normalizeDoc({ schema: 1, name: 'T', artboards: [{ id: 'ab', width: 1000, height: 1000, background: '#f4f1ea', children }], ...extra });
 const svgOf = (doc) => R.renderArtboard(doc, doc.artboards[0]);
@@ -238,104 +238,6 @@ const nodesOf = (doc) => doc.artboards.flatMap((b) => D.walk(b).map((l) => l.nod
   const doc = board([{ id: 'a', type: 'shape', shape: 'rect', x: 0, y: 0, w: 10, h: 10, fill: '#000' }]);
   const r = D.applyOps(doc, [{ op: 'update', id: 'a', set: { effects: [E.effectDefaults('glow')] } }, { op: 'update', id: 'missing', set: {} }]);
   ok('16. several operations apply whole or not at all (a failure leaves the design as it was)', !r.ok && doc.artboards[0].children[0].effects === undefined);
-}
-
-// ── 17, 23. the AI's vocabulary and operations, validated ──
-{
-  const plan = CAP.validateVisualPlan({ style: 'organic', archetype: 'organic', motifs: [{ kind: 'blob', params: { seed: 9 } }, { kind: 'teleporter' }], pattern: { gen: 'waves', params: { amplitude: 3 }, inks: ['accent', 'laser'] }, type: 'wave-path', image: [{ kind: 'duotone' }], marks: [{ kind: 'nope' }], palette: 'full', complexity: 300 });
-  ok('17. a model’s visual plan is held to the registry: unknown shapes and effects dropped (said), numbers clamped', plan.vocabulary && plan.vocabulary.motifs.length === 1 && plan.vocabulary.pattern.gen === 'waves' && J(plan.vocabulary.pattern.inks) === J(['accent']) && plan.vocabulary.complexity === 100 && plan.notes.length === 2, J(plan));
-  const dir = C.graphicDirectionOf(V.proposeDirections({ brief: V.normalizeBrief({ pageType: 'website', objective: 'A garden', personality: [], visualDirection: 'A garden', palette: [], typography: { display: '', body: '' }, decisions: { colour: 'delegated', typography: 'delegated' } }, new Set()), salt: 'ai' })[0]);
-  const brief = C.readGraphicBrief('A poster for “Night Garden”, a night walk');
-  const made = C.composeGraphic(brief, dir, { over: { vocabulary: { ...plan.vocabulary, strength: 5 } } });
-  // the plan's vocabulary (its shapes, its pattern) is spoken; the arrangement is the engine's own concept
-  ok('…and composed with: the plan’s shapes and pattern appear in the design, in a composition the engine conceived', !!made.plans[0].generative && nodesOf(made.doc).some((n) => n.prim?.kind === 'blob') && nodesOf(made.doc).some((n) => n.type === 'pattern' && n.gen === 'waves'), J({ arch: made.plans[0].archetype, prims: nodesOf(made.doc).filter((n) => n.prim).map((n) => n.prim.kind), patterns: nodesOf(made.doc).filter((n) => n.type === 'pattern').map((n) => n.gen) }));
-  ok('…a plan with an unknown style is refused (null), said', CAP.validateVisualPlan({ style: 'vaporwave-9000' }).vocabulary === null);
-  const doc = board([{ id: 'a', type: 'shape', shape: 'rect', x: 0, y: 0, w: 10, h: 10, fill: '#000' }]);
-  const bad1 = CAP.validateOps(doc, [{ op: 'update', id: 'a', set: { opacity: 0.5 } }, { op: 'rm -rf' }]);
-  const bad2 = CAP.validateOps(doc, [{ op: 'update', id: 'a', set: { opacity: 0.5 } }, { op: 'remove', id: 'ghost' }]);
-  const bad3 = CAP.validateOps(doc, 'not a list');
-  const good = CAP.validateOps(doc, [{ op: 'update', id: 'a', set: { effects: [{ kind: 'grain' }] } }]);
-  ok('23. malformed AI operations change nothing: an unknown operation, one that fails, an answer that is not a list', !bad1.ok && !bad2.ok && !bad3.ok && good.ok && nodesOf(good.doc)[0].effects[0].kind === 'grain');
-  ok('…the capability registry holds every kind (primitives, patterns, effects, gradients, type, blends, masks, operations, compositions, styles)', Object.values(CAP.capabilityCounts()).every((n) => n > 0) && Object.keys(CAP.capabilityCounts()).length === 10 && CAP.capabilityMenu().split('\n').length > 120);
-}
-
-// ── 18, 19. edits in words: targeted, reversible, guarded by locks ──
-{
-  const pic = { id: 'p1', kind: 'image', src: 'https://images.example.org/a.jpg', width: 400, height: 300, name: 'p', source: 'upload' };
-  const doc = board([{ id: 'i', type: 'image', role: 'image', asset: 'p1', x: 0, y: 0, w: 400, h: 300 }, { id: 'h', type: 'text', role: 'headline', text: 'Headline', x: 0, y: 400, w: 600, h: 100, size: 60 }, { id: 'm', type: 'shape', shape: 'ellipse', role: 'motif', x: 600, y: 0, w: 200, h: 200, fill: '#e5322d' }], { assets: [pic] });
-  const e = ED.readGraphicEdit('Add a subtle halftone treatment to the image.', doc, { artboard: 'ab', selection: [] });
-  ok('18. “add a subtle halftone treatment to the image”: one effect on the picture only, gentle', e && e.ops.length === 1 && e.ops[0].id === 'i' && e.ops[0].set.effects[0].kind === 'halftone' && e.ops[0].set.effects[0].params.size < 8, J(e));
-  const r = ED.readGraphicEdit('Replace the circular motif with an irregular vector ribbon.', doc, { artboard: 'ab', selection: [] });
-  ok('…“replace the circular motif with an irregular vector ribbon”: that motif becomes the ribbon, its paint kept', r && r.ops[0].id === 'm' && r.ops[0].set.prim.kind === 'ribbon' && r.ops[0].set.fill === '#e5322d', J(r));
-  const p = ED.readGraphicEdit('Make the headline follow a curved path.', doc, { artboard: 'ab', selection: [] });
-  ok('…“make the headline follow a curved path”: an arc, the size fitted, the words untouched', p && p.ops[0].set.path.kind === 'arc' && !('text' in p.ops[0].set));
-  const g = ED.readGraphicEdit('Generate a repeating wave pattern that becomes denser toward the bottom.', doc, { artboard: 'ab', selection: [] });
-  ok('…“a repeating wave pattern that becomes denser toward the bottom”: the waves generator with a downward ramp', g && g.ops[0].node.gen === 'waves' && g.ops[0].node.params.ramp > 50 && g.ops[0].node.params.rampDir === 0);
-  const dr = ED.readGraphicEdit('Create a more dramatic composition using the same colors. Keep the typography unchanged.', doc, { artboard: 'ab', selection: [] });
-  const textTouched = dr.ops.some((o) => o.id === 'h' && o.set && ['size', 'weight', 'font'].some((k) => k in o.set));
-  ok('…“more dramatic… keep the typography unchanged”: drama without touching the type, and only the design’s own colours', dr && dr.ops.length > 0 && !textTouched && /typography kept/.test(dr.label), J(dr));
-  const locked = D.applyOp(doc, { op: 'update', id: 'i', set: { locked: true } }).doc;
-  const l = ED.readGraphicEdit('Add a subtle halftone treatment to the image.', locked, { artboard: 'ab', selection: [] });
-  ok('19. a locked picture is not changed: the edit says so instead', l && !l.ops.length && /locked/i.test(`${l.question ?? ''} ${l.label}`), J(l));
-  const lockedOp = D.applyOp(locked, { op: 'update', id: 'i', set: { effects: [E.effectDefaults('blur')] } });
-  ok('…and an operation on it is refused, naming it', !lockedOp.ok && lockedOp.locked?.length === 1);
-}
-
-// ── the rest of the brief's edits, and the vocabulary's own: each a targeted operation, nothing moved ──
-{
-  const tokens = { colors: { background: '#f4f1ea', surface: '#ffffff', text: '#111111', muted: '#555555', accent: '#e5322d', accentText: '#ffffff', line: '#dddddd' } };
-  const doc = board([
-    { id: 'h', type: 'text', role: 'headline', text: 'Field Lines', x: 60, y: 80, w: 700, h: 160, size: 120, color: '#111111' },
-    { id: 'o1', type: 'shape', shape: 'prim', prim: { kind: 'star', params: {} }, role: 'motif', x: 600, y: 600, w: 300, h: 300, fill: '#e5322d' },
-    { id: 'o2', type: 'shape', shape: 'ellipse', role: 'motif', x: 100, y: 700, w: 80, h: 80, fill: '#222222' },
-    { id: 'o3', type: 'shape', shape: 'rect', role: 'motif', x: 300, y: 760, w: 60, h: 60, fill: '#222222' },
-    { id: 'o4', type: 'shape', shape: 'prim', prim: { kind: 'burst', params: {} }, role: 'motif', x: 700, y: 300, w: 120, h: 120, fill: '#e5322d' },
-  ], { tokens });
-  const run = (words) => {
-    const e = ED.readGraphicEdit(words, doc, { artboard: 'ab', selection: [] });
-    const r = e ? D.applyOps(doc, e.ops) : { ok: false };
-    const after = r.ok ? r.doc.artboards[0].children : [];
-    const moved = doc.artboards[0].children.filter((n) => { const m = after.find((x) => x.id === n.id); return m && ['x', 'y', 'w', 'h', 'size', 'font', 'text'].some((k) => m[k] !== n[k]); });
-    return { e, ok: r.ok, after, moved, added: after.filter((n) => !doc.artboards[0].children.some((x) => x.id === n.id)) };
-  };
-  const bg = run('Use a more complex geometric background.');
-  ok('…“use a more complex geometric background”: a tessellation in several inks, at the very back, nothing moved', bg.ok && bg.added.length === 1 && bg.added[0].gen === 'tessellation' && bg.added[0].colors.length >= 2 && bg.after[0] === bg.added[0] && !bg.moved.length, J(bg.e));
-  const fewer = run('Reduce the number of decorative elements.');
-  ok('…“reduce the number of decorative elements”: the smaller half removed, the larger and the words kept (undo brings them back)', fewer.ok && fewer.e.ops.every((o) => o.op === 'remove') && J(fewer.after.map((n) => n.id)) === J(['h', 'o1', 'o4']), J(fewer.e));
-  const grain = run('Add a grain texture without changing the layout.');
-  ok('…“add a grain texture without changing the layout”: grain on a paper layer of the ground’s own colour, nothing moved', grain.ok && grain.added.length === 1 && grain.added[0].effects?.[0]?.kind === 'grain' && grain.added[0].fill === '#f4f1ea' && grain.after[0] === grain.added[0] && !grain.moved.length, J(grain.e));
-  const radial = run('Create a dense radial line pattern behind the headline.');
-  const hi = radial.after.findIndex((n) => n.id === 'h');
-  ok('…“a dense radial line pattern behind the headline”: the radial generator, dense, just beneath the headline', radial.ok && radial.added[0]?.gen === 'radial' && radial.added[0].params.count >= 150 && radial.after.indexOf(radial.added[0]) === hi - 1 && !radial.moved.length, J(radial.e));
-  const motif = run('Generate an irregular geometric motif using the campaign accent color.');
-  ok('…“an irregular geometric motif using the campaign accent color”: a seeded irregular polygon in the design’s accent', motif.ok && motif.added[0]?.prim?.kind === 'irregular-polygon' && Number.isFinite(motif.added[0].prim.params.seed) && motif.added[0].fill === '#e5322d' && !motif.moved.length, J(motif.e));
-  const fluid = run('Make the background feel more organic and fluid.');
-  ok('…“make the background feel more organic and fluid”: a flow field at the back', fluid.ok && fluid.added[0]?.gen === 'flow' && fluid.after[0] === fluid.added[0] && !fluid.moved.length, J(fluid.e));
-  const tech = run('Create a technical grid with subtle annotations.');
-  ok('…“a technical grid with subtle annotations”: the technical generator with its labels, faint', tech.ok && tech.added[0]?.gen === 'technical' && tech.added[0].params.labels === 1 && tech.added[0].opacity <= 0.5 && !tech.moved.length, J(tech.e));
-}
-
-// ── 20. Boards: one vocabulary, many executions; a board-wide edit without regeneration ──
-{
-  const { boardPlan: BP, boardPipeline: PL, boardModel: M, boardEdit: BE } = V;
-  const brief = BP.readBoardRequest('A campaign for “Tidewater”, a botanical garden night walk, organic and fluid: three posters and two Instagram graphics.');
-  const sys = PL.proposeSystems(brief, 'ceiling-board')[0];
-  let b = PL.startBoard(brief, sys, { request: brief.purpose });
-  const res = await PL.generate(b, { website: async () => 'x' }, (op) => {
-    const r = M.applyBoardOp(b, op);
-    if (r.ok) b = r.board;
-  });
-  const graphics = b.materials.filter((m) => m.type === 'graphic' && m.doc);
-  const kinds = graphics.map((m) => nodesOf(m.doc).filter((n) => n.prim).map((n) => n.prim.kind));
-  ok('20. a board’s system carries one vocabulary (organic), and its materials speak it', b.system.vocabulary?.style === 'organic' && graphics.length >= 4 && graphics.every((m) => m.doc.vocabulary?.motifs.length) && kinds.filter((k) => k.length).length >= 3, J({ style: b.system.vocabulary?.style, kinds, res: res?.failed }));
-  // each material's own composition: its own concept's structure (or, where a kind keeps a fixed layout, its archetype)
-  const archetypes = new Set(graphics.map((m) => (m.doc.artboards[0].concept ? `${m.doc.artboards[0].concept.org}/${m.doc.artboards[0].concept.type}` : m.plan?.archetype)));
-  ok('…each in its own composition (same identity, different execution)', archetypes.size >= 2, J([...archetypes]));
-  const before = J(graphics.map((m) => m.doc.artboards[0].children.length));
-  const e = BE.readBoardEdit('Add a grain texture to every material', b, { selection: [] });
-  ok('…a board-wide edit (“add a grain texture to every material”) changes each material’s own design, nothing regenerated', e && e.ops?.length === graphics.length && e.ops.every((o) => o.op === 'material-update' && o.set.doc) && e.ops.every((o) => nodesOf(o.set.doc).some((n) => n.effects?.some((x) => x.kind === 'grain'))), J({ label: e?.label, n: e?.ops?.length, before }));
-  const reopened = M.normalizeBoard(JSON.parse(J(b)));
-  ok('…the board’s vocabulary saved and reopened with it', reopened.system.vocabulary?.style === 'organic' && reopened.system.vocabulary.motifs.length > 0);
 }
 
 // ── 21. exports carry it all ──

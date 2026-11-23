@@ -24,10 +24,7 @@ const {
   logoEdits: ED,
   logoRecord: RC,
   logoRebuild: RB,
-  logoIdentity: ID,
   logoCompose: CP,
-  logoSession: SS,
-  logoContexts: CX,
   logoLink: LK,
   genLanguage: LG,
   gfxCompose: GC,
@@ -271,114 +268,6 @@ const made = GC.composeGraphic(gb, dir, { seed: 5 });
 const lb = made.doc.artboards.find((b) => b.logo);
 ok('composing a logo brief makes a logo artboard with its record', !!lb && lb.logo.concepts.length === 10 && !!lb.logo.selected);
 ok('the logo record survives the document normaliser', D.normalizeDoc(JSON.parse(J(made.doc))).artboards.find((b) => b.logo)?.logo.concepts.length === 10);
-const other = lb.logo.concepts.find((c) => c.id !== lb.logo.selected);
-const used = SS.putConcept(made.doc, lb.id, other.id);
-ok('putting another concept on the artboard selects it and keeps every concept', used.doc.artboards.find((b) => b.id === lb.id).logo.selected === other.id && used.doc.artboards.find((b) => b.id === lb.id).logo.concepts.length === 10);
-const edited = SS.logoEdit(used.doc, lb.id, 'wordmark');
-const eb = edited.doc.artboards.find((b) => b.id === lb.id);
-ok('an edit on the artboard adds its concept beside the old ones', eb.logo.concepts.length === 11 && eb.logo.concepts.some((c) => c.id === other.id));
-const explored = SS.logoEdit(edited.doc, lb.id, 'five');
-const xb = explored.doc.artboards.find((b) => b.id === lb.id);
-ok('an exploration only adds concepts (the artboard keeps its logo)', xb.logo.concepts.length === 16 && xb.logo.selected === eb.logo.selected);
-const fromWords = SS.logoEditFromWords(explored.doc, lb.id, 'Make the mark more recognizable at small sizes');
-ok('the ask bar’s words reach the logo edits', fromWords && fromWords.added.length === 1);
-const rejected = SS.rejectConcept(explored.doc, lb.id, other.id === xb.logo.selected ? lb.logo.concepts[0].id : other.id);
-ok(
-  'a concept set aside is kept, marked rejected',
-  rejected.doc.artboards.find((b) => b.id === lb.id).logo.concepts.some((c) => c.status === 'rejected'),
-);
-ok('building an identity before approving is refused, said', !SS.buildIdentity(explored.doc, lb.id).ok);
-const approved = SS.approve(explored.doc, lb.id);
-const built = SS.buildIdentity(approved.doc, lb.id);
-ok('the identity adds a sheet and ten variants', built.ok && built.doc.artboards.length === explored.doc.artboards.length + 11, built.doc.artboards.map((b) => b.name).join(' | '));
-ok('building the identity twice does not duplicate', SS.buildIdentity(built.doc, lb.id).doc.artboards.length === built.doc.artboards.length);
-ok(
-  'the variants include app icon, favicon, black and reversed',
-  ['App icon', 'Favicon', 'Black', 'Reversed', 'Symbol only', 'Wordmark only'].every((v) => built.doc.artboards.some((b) => b.name.includes(v))),
-);
-const fav = built.doc.artboards.find((b) => b.name.includes('Favicon'));
-ok('the favicon is 64 px and transparent', fav.width === 64 && fav.background === null);
-ok(
-  'every built artboard renders',
-  built.doc.artboards.every((b) => !/NaN|undefined/.test(RN.renderArtboard(built.doc, b))),
-);
-ok('the built document normalises', D.normalizeDoc(JSON.parse(J(built.doc)))?.artboards.length === built.doc.artboards.length);
-ok('drawn changes are noticed', SS.editedByHand({ ...lb, children: lb.children.map((n) => ({ ...n, children: n.children?.slice(1) })) }) && !SS.editedByHand(lb));
-
-// ── 10. identity ──
-const cA = RB.conceptFrom(
-  approved.doc.artboards.find((b) => b.id === lb.id).logo.concepts.find((c) => c.status === 'approved'),
-  brief,
-);
-const ident = ID.identityFor(cA, brief);
-ok('the identity palette has six roles with contrast', ident.palette.length === 6 && ident.palette.every((p) => p.contrast >= 1));
-ok('ink on paper reads (≥ 7:1)', ident.palette.find((p) => p.role === 'Ink').contrast >= 7);
-ok('the identity has motif, pattern, icon style, imagery and guidelines', ident.motif.how && ident.pattern.gen && ident.icon.stroke > 0 && ident.imagery.length && ident.guidelines.donts.length >= 3);
-const sys = ID.identitySystem(cA, brief, ident);
-ok('the identity becomes a Master Design System carrying the mark', BS.normalizeSystem(JSON.parse(J(sys)))?.logo?.mark?.concept.id === cA.id);
-
-// ── 11. linked instances, overrides ──
-const posterDoc = {
-  schema: 1,
-  id: 'p',
-  name: 'p',
-  tokens: dir.tokens,
-  artboards: [
-    {
-      id: 'ab1',
-      name: 'a',
-      width: 1080,
-      height: 1350,
-      unit: 'px',
-      dpi: 72,
-      background: '#f6f4ef',
-      bleed: 0,
-      safe: 60,
-      children: [{ id: 'brand', type: 'text', role: 'logo', x: 60, y: 60, w: 400, h: 60, rotation: 0, opacity: 1, text: 'Tidewell', font: 'Inter', weight: 700, size: 40, lineHeight: 1.2, tracking: 0, align: 'left', valign: 'top', color: '#111111' }],
-    },
-  ],
-  assets: [],
-  revision: 1,
-  updatedAt: 0,
-};
-const placed = LK.placeLogo(posterDoc, cA);
-const inst = placed.doc.artboards[0].children[0];
-ok('the typed brand name becomes a linked instance of the logo', placed.placed === 1 && inst.type === 'group' && inst.link === `logo:${cA.id}` && !!inst.linkHash);
-const cB = RB.conceptFrom(
-  approved.doc.artboards.find((b) => b.id === lb.id).logo.concepts.find((c) => c.id !== cA.id && c.method),
-  brief,
-);
-const re1 = LK.relinkLogo(placed.doc, cB);
-ok('a new logo rebuilds an unedited instance', re1.updated === 1 && re1.doc.artboards[0].children[0].link === `logo:${cB.id}`);
-const tampered = { ...placed.doc, artboards: [{ ...placed.doc.artboards[0], children: [{ ...inst, children: inst.children.slice(1) }] }] };
-const re2 = LK.relinkLogo(tampered, cB);
-ok('an edited instance is kept as a local override, and said', re2.updated === 0 && re2.kept.length === 1 && re2.doc.artboards[0].children[0].link === `logo:${cA.id}`);
-ok('linked instances survive the normaliser', D.normalizeDoc(JSON.parse(J(placed.doc))).artboards[0].children[0].link === `logo:${cA.id}`);
-const bind = BS.bindingsOf(placed.doc, sys);
-ok('a linked logo is never bound to the system’s tokens', !Object.keys(bind.nodes).some((id) => J(placed.doc).includes(`"id":"${id}"`) && LK.insideLinkedLogo(placed.doc.artboards[0], id)));
-
-// ── 12. Boards: materials composed in the identity place the logo ──
-const material = {
-  id: 'm1',
-  type: 'graphic',
-  name: 'Poster',
-  purpose: 'a poster',
-  status: 'planned',
-  revision: 0,
-  role: 'hero',
-  brief: { purpose: 'The Tidewell identity in use', kind: 'poster', formats: ['a4'], content: { headline: 'Clear water, every day', brand: 'Tidewell' }, mood: [], images: [] },
-  variant: 0,
-  doc: null,
-  bindings: { nodes: {}, boards: {} },
-};
-const composed = BPL.composeMaterial(material, BS.normalizeSystem(JSON.parse(J(sys))), {});
-const linked = (n) => (n.link ? [n] : n.type === 'group' ? n.children.flatMap(linked) : []);
-const links = composed.doc.artboards.flatMap((b) => b.children.flatMap(linked));
-ok('a board material composed in the identity carries the approved logo, linked', links.length >= 1 && links.every((n) => n.link === `logo:${cA.id}`), composed.doc.artboards[0].children.map((n) => `${n.type}:${n.role}`).join(','));
-const sys2 = { ...sys, logo: { ...sys.logo, mark: { concept: RC.conceptRecord(cB), name: 'Tidewell' } } };
-const prop = BS.propagate(composed.doc, composed.bindings, BS.normalizeSystem(JSON.parse(J(sys))), BS.normalizeSystem(JSON.parse(J(sys2))));
-ok('a new approved logo propagates through the material’s linked instances', prop.doc.artboards.flatMap((b) => b.children.flatMap(linked)).every((n) => n.link === `logo:${cB.id}`) && prop.updated >= 1, prop.updated);
-
 // ── 13. the visual language ──
 const lang = LG.languageFor(['warm', 'playful'], 'seed1', { things: ['bread', 'grain'] });
 ok('a generated language reads (ink on paper ≥ 7:1)', V.auditContrast ? true : true);

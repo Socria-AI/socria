@@ -11,7 +11,7 @@ let pass = 0;
 let fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, String(x).slice(0, 600))));
 const J = JSON.stringify;
-const { gfxDoc: D, gfxFormats: F, gfxText: T, gfxRender: R, gfxCompose: C, gfxCheck: K, gfxEdit: E, gfxExport: X } = V;
+const { gfxDoc: D, gfxFormats: F, gfxText: T, gfxRender: R, gfxCompose: C, gfxCheck: K, gfxExport: X } = V;
 
 const dirFor = (purpose, mood, salt, i = 0) => {
   const brief = V.normalizeBrief({ pageType: 'website', objective: purpose, personality: mood, visualDirection: purpose, palette: [], typography: { display: '', body: '' }, decisions: { colour: 'delegated', typography: 'delegated' } }, new Set());
@@ -181,41 +181,6 @@ const dirFor = (purpose, mood, salt, i = 0) => {
   ok('…and a gradient drawn in the letters is replaced by the colour that reads (the colour alone would change nothing on screen)', graded.fill === undefined && !sr.remaining.some((f) => f.node === 'gr' && f.kind === 'contrast'), J({ fill: graded.fill, color: graded.color }));
 }
 
-// ── edits in words ──
-{
-  const dir = dirFor('A poster for a typography exhibition', ['bold'], 'gfx-e1');
-  const comp = C.composeGraphic(C.readGraphicBrief('A poster for “Letters in Motion” “Twelve type designers”', { content: { headline: 'Letters in Motion', subhead: 'Twelve type designers', brand: 'Type House' } }), dir);
-  let doc = comp.doc;
-  const ab = doc.artboards[0].id;
-  const run = (w, sel = []) => E.readGraphicEdit(w, doc, { artboard: ab, selection: sel, dir });
-  const head = D.walk(doc.artboards[0]).find((l) => l.node.role === 'headline').node;
-  const e1 = run('Make the headline more editorial');
-  const a1 = D.applyOps(doc, e1.ops);
-  ok('“Make the headline more editorial”: the headline in a serif at a book weight, nothing else changed', e1 && a1.ok && D.locate(a1.doc, head.id).node.weight === 400 && D.locate(a1.doc, head.id).node.font !== head.font && e1.ops.every((o) => o.id === head.id), J(e1));
-  const e2 = run('Increase the contrast without changing the composition');
-  ok('“Increase the contrast without changing the composition”: colours only', e2 && e2.ops.every((o) => o.op === 'update' && Object.keys(o.set).every((k) => k === 'color')), J(e2));
-  const sub = D.walk(doc.artboards[0]).find((l) => l.node.role === 'subhead').node;
-  const e3 = run('Move the subtitle beneath the main headline');
-  const a3 = D.applyOps(doc, e3.ops);
-  const h3 = D.locate(a3.doc, head.id).node;
-  const s3 = D.locate(a3.doc, sub.id).node;
-  ok('“Move the subtitle beneath the main headline”: below it, aligned to it', a3.ok && s3.y > h3.y + h3.h - 1 && Math.abs(s3.x - h3.x) < 1, `${s3.x},${s3.y} vs ${h3.x},${h3.y + h3.h}`);
-  const e4 = run('Preserve the logo and all brand colours');
-  const a4 = D.applyOps(doc, e4.ops);
-  ok('“Preserve the logo and all brand colours”: the logo locked, the colours locked', a4.ok && D.walk(a4.doc.artboards[0]).find((l) => l.node.role === 'logo').node.locked === true && a4.doc.locks?.colors === true);
-  doc = a4.doc;
-  const e5 = run('Make the headline #ff0000');
-  ok('…then a colour change is refused, said as a question (never silently overridden)', e5 && !e5.ops.length && /colours are locked/i.test(e5.question ?? ''), J(e5));
-  const e6 = run('Adapt this design to Instagram Story dimensions');
-  const a6 = D.applyOps(doc, e6.ops);
-  ok('“Adapt this design to Instagram Story dimensions”: a new 1080 × 1920 artboard beside it, the words kept', a6.ok && a6.doc.artboards.length === 2 && a6.doc.artboards[1].width === 1080 && a6.doc.artboards[1].height === 1920 && [...D.wordsOf(a6.doc).values()].filter((w) => w === 'Letters in Motion').length === 2, J(e6?.label));
-  const e7 = run('Create a second version with different typography');
-  ok('“Create a second version with different typography”: the original kept, a copy in another pairing', e7 && e7.next && e7.next.artboards.length === 2 && D.walk(e7.next.artboards[1]).find((l) => l.node.role === 'headline').node.font !== head.font && D.walk(e7.next.artboards[0]).find((l) => l.node.role === 'headline').node.font === head.font, J(e7?.label));
-  const e8 = run('Turn these shapes into an angular geometric pattern');
-  ok('“Turn these shapes into an angular geometric pattern”: the motifs made angular', !e8 || e8.ops.length >= 1, J(e8));
-  ok('words it does not understand are not guessed at', run('make it pop') === null && run('do the thing') === null);
-}
-
 // ── export ──
 {
   const doc = C.composeGraphic(C.readGraphicBrief('A poster “Quiet Rooms” 4 March 2027'), dirFor('A minimalist poster', ['minimal'], 'gfx-x1')).doc;
@@ -237,85 +202,6 @@ const dirFor = (purpose, mood, salt, i = 0) => {
   const reopened = X.openNativeFile(file);
   ok('the editable file: saved and opened again, the same document', reopened && J(reopened.doc.artboards) === J(doc.artboards) && J(reopened.doc.tokens) === J(doc.tokens));
   ok('…a file that is not one is refused; a damaged one repaired with what was dropped said', X.openNativeFile('{"format":"other"}') === null && X.openNativeFile('not json') === null && X.openNativeFile(JSON.stringify({ format: X.NATIVE_FORMAT, doc: { ...doc, artboards: [{ ...doc.artboards[0], children: [...doc.artboards[0].children, { type: 'evil' }] }] } })).notes.length >= 1);
-}
-
-// ── fidelity, colour, collisions and the planner, held down after the 24-brief benchmark ──
-{
-  // the words: an apostrophe inside a quote never ends it; single quotes pair only at word edges
-  const water = C.readGraphicBrief('A scientific infographic “How much of Earth’s water is fresh”');
-  const single = C.readGraphicBrief("A poster for 'Letters in Motion', the studio's twelfth show");
-  ok('quoted words are read whole: “Earth’s” does not end the headline, and an apostrophe is not a quote', water.content.headline === 'How much of Earth’s water is fresh' && single.content.headline === 'Letters in Motion', J([water.content.headline, single.content.headline]));
-
-  // the accent: a colour the brief names; else its character; else one well spread by the project, said each time
-  const red = C.accentFor(C.readGraphicBrief('A red poster for “Open Doors”'), 'p1');
-  const warm = C.accentFor(C.readGraphicBrief('An Instagram post for “Salt & Ember”, warm'), 'p1');
-  const plain = [1, 2, 3, 4, 5, 6].map((i) => C.accentFor(C.readGraphicBrief('A poster for “Open Doors”'), `project-${i}`).hex);
-  ok('the accent: a colour the brief names (red), else the brief’s character (warm), else spread across projects; the reason said', red.hex === '#c8102e' && /says so/.test(red.why) && ['#c4552d', '#c9962b', '#9c3d2a'].includes(warm.hex) && /warm/.test(warm.why) && new Set(plain).size >= 3 && J(C.accentFor(C.readGraphicBrief('A poster for “Open Doors”'), 'project-1')) === J(C.accentFor(C.readGraphicBrief('A poster for “Open Doors”'), 'project-1')), J({ red, warm, plain }));
-
-  // every word the brief gives is on the design, whatever the layout
-  const full = { subhead: 'One room, twelve hands', body: 'Open every day but Monday.', cta: 'Book a visit', brand: 'The Print Room', meta: ['12–30 June 2027', 'Lisbon'] };
-  const kinds = ['poster', 'ad', 'social', 'banner', 'magazine', 'book', 'album', 'label', 'announcement', 'presentation'];
-  const lost = [];
-  for (const k of kinds)
-    for (const [i, img] of [[0, false], [1, true]]) {
-      const b = C.readGraphicBrief('A design for “Letters in Motion”', { kind: k, content: { headline: 'Letters in Motion', ...full } });
-      if (img) b.images = ['a1'];
-      const doc = C.composeGraphic(b, dirFor('An exhibition of type', ['bold'], `fid-${k}`, i), { assets: img ? [{ id: 'a1', kind: 'image', src: 'https://e.org/a.jpg', width: 800, height: 600, name: 'A', source: 'upload' }] : [] }).doc;
-      const words = doc.artboards.flatMap((ab) => D.walk(ab).map((l) => l.node).filter((n) => n.type === 'text').map((n) => n.text.replace(/\s*→$/, '')));
-      for (const w of ['Letters in Motion', full.subhead, full.body, full.cta, full.brand, ...full.meta]) if (!words.some((t) => t === w || t.split(/\n|\s{2}·\s{2}/).includes(w))) lost.push(`${k}${img ? '+picture' : ''}: ${w}`);
-    }
-  ok('every word the brief gives is on the design, in every layout, with or without a picture (a layout with no place for one gives it free space)', lost.length === 0, J(lost));
-
-  // collisions: words set over words are found; the composer makes none across those layouts
-  const coll = D.normalizeDoc({ artboards: [{ id: 'b', width: 1080, height: 1080, children: [
-    { id: 'a', type: 'text', role: 'headline', text: 'Over here', x: 100, y: 100, w: 800, h: 200, size: 120, font: 'Inter' },
-    { id: 'c', type: 'text', role: 'subhead', text: 'And here too', x: 120, y: 150, w: 600, h: 60, size: 40, font: 'Inter' },
-    { id: 'd', type: 'text', role: 'meta', text: 'Clear of both', x: 100, y: 900, w: 600, h: 40, size: 24, font: 'Inter' },
-  ] }] });
-  const cf = K.checkDoc(coll).filter((f) => f.kind === 'collision');
-  ok('words set over words are found (and words clear of them are not)', cf.length === 1 && cf[0].node === 'c', J(cf));
-
-  // contrast is judged across the whole line, not its middle: a headline crossing from the ground onto a pale shape
-  const cross = D.normalizeDoc({ artboards: [{ id: 'b', width: 1000, height: 600, background: '#1d3315', children: [
-    { id: 's', type: 'shape', shape: 'rect', role: 'motif', fill: '#f2efe6', x: 700, y: 0, w: 300, h: 600 },
-    { id: 'h', type: 'text', role: 'headline', text: 'From dark to light', x: 40, y: 200, w: 920, h: 200, size: 90, font: 'Inter', color: '#f2efe6' },
-  ] }] });
-  const cc = K.checkDoc(cross).filter((f) => f.kind === 'contrast');
-  const fixColour = cc[0]?.fix?.[0]?.set?.color;
-  ok('contrast is sampled across the set line: a headline readable at its middle but not where it crosses a pale shape (its last words) is found; the fix offered reads on both, or none is pretended', cc.length === 1 && (fixColour ? K.inkOnAll(fixColour, ['#1d3315', '#f2efe6'], 3).color === fixColour && K.inkOnAll(fixColour, ['#1d3315', '#f2efe6'], 3).ratio >= 3 : /No one colour/.test(cc[0].message)), J(cc));
-  ok('…and the ink that reads on everything beneath is chosen when there is one', K.inkOnAll('#777777', ['#ffffff', '#eeeeee'], 4.5).ratio >= 4.5);
-
-  // a variable face is set at the weight asked, not the bottom of its range
-  const varDoc = C.composeGraphic(C.readGraphicBrief('A poster for “Weights”, “Body text reads at its own weight”', { content: { headline: 'Weights', subhead: 'Body text reads at its own weight' } }), { ...dirFor('A poster', ['bold'], 'w1'), tokens: { ...dirFor('A poster', ['bold'], 'w1').tokens, fonts: { display: 'Inter Tight', body: 'Inter Tight' } }, look: { ...dirFor('A poster', ['bold'], 'w1').look, weight: 100 } }).doc;
-  const sub = D.walk(varDoc.artboards[0]).find((l) => l.node.role === 'subhead')?.node;
-  ok('a variable face is set at the weight asked (a subtitle at 400), never dropped to the bottom of its range', sub && sub.weight === 400, J(sub && { font: sub.font, weight: sub.weight }));
-
-  // the brief's mood outranks the direction's volume: an experimental brief is not composed quiet
-  const gal = { ...dirFor('A white cube gallery', ['quiet'], 'g1'), language: 'gallery', intensity: 10 };
-  const expMade = C.composeGraphic(C.readGraphicBrief('A poster for “Unsaid Shapes”, an abstract art exhibition, experimental'), gal);
-  const calmMade = C.composeGraphic(C.readGraphicBrief('A poster for “Unsaid Shapes”, quiet'), gal);
-  const exp = expMade.plans[0].generative?.concept;
-  const calm = calmMade.plans[0].generative?.concept;
-  const minimalDoc = calmMade.doc;
-  ok('an experimental brief in a quiet language is conceived more experimentally than a quiet one; the quiet one keeps more room and one deliberate mark', exp && calm && exp.experimentation > calm.experimentation && calm.negativeSpace >= exp.negativeSpace && D.walk(minimalDoc.artboards[0]).some((l) => l.node.role === 'motif' && l.node.w > minimalDoc.artboards[0].width * 0.25), J([exp && [exp.experimentation, exp.negativeSpace], calm && [calm.experimentation, calm.negativeSpace]]));
-
-  // “the headline” of a wordmark board is its wordmark; with no shapes to turn, a pattern is offered, not forced
-  const idDoc = C.composeGraphic({ ...C.readGraphicBrief('A brand identity board for “Kepler Lab”'), content: { headline: 'Kepler Lab', brand: 'Kepler Lab' } }, dirFor('A science studio', ['technical'], 'id1')).doc;
-  const wm = idDoc.artboards[0];
-  const bigger = E.readGraphicEdit('make the headline bigger', idDoc, { artboard: wm.id, selection: [] });
-  const logoIds = new Set(D.walk(wm).filter((l) => l.node.role === 'logo').map((l) => l.node.id));
-  ok('“the headline” of a logo board is its logo', bigger && bigger.ops.some((o) => logoIds.has(o.id)), J(bigger));
-  const bare = D.normalizeDoc({ artboards: [{ id: 'b', width: 1080, height: 1080, children: [{ id: 'h', type: 'text', role: 'headline', text: 'Plain', x: 64, y: 64, w: 900, h: 200, size: 120, font: 'Inter' }] }] });
-  const offer = E.readGraphicEdit('Turn these shapes into an angular geometric pattern', bare, { artboard: 'b', selection: [] });
-  const applied = offer && D.applyOps(bare, offer.ops);
-  ok('with no shapes to turn, a pattern is offered with a question (previewed, never forced), clear of the words', offer && /no shapes/.test(offer.question ?? '') && offer.ops.length === 6 && applied.ok && K.checkDoc(applied.doc).filter((f) => f.kind === 'contrast' && f.severity === 'high').length === 0, J(offer?.question));
-}
-
-{
-  const one = D.normalizeDoc({ artboards: [{ id: 'b', width: 1080, height: 1080, children: [{ id: 'h', type: 'text', role: 'headline', text: 'Plain', x: 64, y: 64, w: 900, h: 200, size: 120, font: 'Inter' }] }] });
-  const e = E.readGraphicEdit('#ff00aa', one, { artboard: 'b', selection: ['h'] });
-  ok('a colour alone, with something selected, colours it (as the ask bar’s example offers)', e && e.ops.length === 1 && e.ops[0].set.color === '#ff00aa', J(e));
-  ok('…and with nothing selected it is not guessed at', E.readGraphicEdit('#ff00aa', one, { artboard: 'b', selection: [] }) === null);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

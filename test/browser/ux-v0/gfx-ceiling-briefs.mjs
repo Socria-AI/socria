@@ -1,5 +1,5 @@
 // test/browser/ux-v0/gfx-ceiling-briefs.mjs — the thirty briefs of the Graphics creative-ceiling benchmark
-// (its section 16), each as a designer would write it. Shared by the benchmark and the probes.
+// (its section 16), each as a designer would write it. Read by test/graphics-ceiling.test.mjs.
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

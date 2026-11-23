@@ -1783,3 +1783,10 @@ body:has(.sd-rail-tab) .env-badge {
 .sd-found-body .sd-chip {
   justify-self: start;
 }
+
+/* a quiet note that something runs without a model (the systems manager's head) */
+.gx-free {
+  font-size: 12px;
+  color: var(--sb-ink-60);
+  white-space: nowrap;
+}
