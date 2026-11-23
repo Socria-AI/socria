@@ -1,310 +1,227 @@
 'use client';
-// components/ux-v0/studio/Conversation.tsx — the creative director's conversation, one focused question at a time.
+// components/ux-v0/studio/Conversation.tsx — talking it through with a creative director, before the work is made.
 //
-// The questions come from lib/ux-v0/studio/discovery.ts: only those that matter for this work, the accessible ones
-// first, deeper ones offered once there is enough to begin. Each is answered with the control that suits it (visual
-// cards drawn by the engines, chips, a ranking, colours, type in its own faces, sliders, fields, counts, files), in the
-// person's own words, skipped, or left to SocriaUX. The conversation is on the left, the question on the right with
-// what is taking shape under it; the decisions, each with where it came from, are in a drawer, and any of them can be
-// opened again or changed in words. Nothing here calls a model: the conversation,
-// the previews and the start are the engines' own, in this browser.
+// A conversation, not a questionnaire: SocriaUX says what it understood and asks one meaningful question when one is
+// needed (lib/ux-v0/studio/director.ts); the person answers in their own words — or taps one of at most three
+// suggestions, skips it, or says "make it now". Links to websites they like are read and shown as references (what
+// was read, the page drawn as it is, what to take from it); pictures can be dropped in at any point. A website's three
+// looks are offered when the brief is enough to draw them: choose one, combine two, ask for something different, or
+// let SocriaUX go with the first. Everything understood is in the brief drawer, each line with where it came from.
+// Nothing here calls a model.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { StudioAnswer, StudioMode, StudioState } from '@/lib/ux-v0/studio/schema';
-import { said } from '@/lib/ux-v0/studio/schema';
+import { useEffect, useRef, useState } from 'react';
+import type { RefTake, StudioMode, StudioReference, StudioState } from '@/lib/ux-v0/studio/schema';
+import { REF_TAKES } from '@/lib/ux-v0/studio/schema';
 import { MODES, modeInfo } from '@/lib/ux-v0/studio/modes';
-import { answerStage, currentStage, deeper, delegateStage, pathOf, readiness, readReply, reopen, reviseFromWords, skipStage, stepBack, summaryOf, surprise, type DiscoveryEnv, type Stage } from '@/lib/ux-v0/studio/discovery';
-import { logoWordsOf, materialsOf, websiteAskOf, wordsOf } from '@/lib/ux-v0/studio/apply';
+import { lookOnOffer, questionFor, understand, type DirectorEnv, type Topic } from '@/lib/ux-v0/studio/director';
+import { referenceSaid } from '@/lib/ux-v0/studio/references';
 import type { SystemRecord } from '@/lib/ux-v0/dsi/registry';
 import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
-import { StageControl, draftOf, draftReady, type Draft, type ResearchControls } from './controls';
-import { SystemPicker } from './SystemPicker';
-import { DesignContext } from './DesignContext';
-import { Vision } from './Vision';
-import { ArrowUp, Back, Check, Close, Down, Leave, ModeGlyph, Panel } from './glyphs';
+import { SystemPicker, usableSystems } from './SystemPicker';
+import { Brief } from './Brief';
+import { SitePreview, WebsiteShot } from './previews';
+import { ArrowUp, Attach, Check, Close, Down, FileMark, ModeGlyph, Panel } from './glyphs';
 
 export interface ConversationProps {
   studio: StudioState;
-  onStudio: (fn: (s: StudioState) => StudioState) => void;
-  env: DiscoveryEnv;
+  env: DirectorEnv;
   websiteSystems: readonly MasterDesignSystem[];
   nonce: string;
   saveWords?: string;
   systems: readonly SystemRecord[];
   onSystem: (id: string | null) => void;
   onManageSystems: () => void;
-  /** begin the work from this record (the latest, after any last change) */
-  onStart: (st: StudioState) => void;
+  /** the person's message, with any files they attached to it */
+  onSend: (text: string, files: File[]) => void;
+  /** "Make it now": whatever is open is left to SocriaUX */
+  onMake: () => void;
+  /** a website's look chosen, or two combined */
+  onChooseLook: (choice: number | [number, number]) => void;
+  onDifferent: () => void;
+  /** what to take from a reference, or that it is not wanted */
+  onReference: (id: string, patch: Partial<Pick<StudioReference, 'take' | 'state'>>) => void;
+  /** pages read this visit, drawn as they are (by reference id) */
+  previews: Record<string, string>;
+  /** sites being read right now */
+  reading: string[];
   /** what is happening while the work begins ('' when nothing is) */
   starting: string;
   error: string;
   onExit: () => void;
   onSwitchMode: (mode: StudioMode) => void;
-  onFiles: (files: File[], stage: Stage) => Promise<{ ids: string[]; error?: string }>;
-  onRemoveFile: (id: string) => void;
-  /** references looked for on the internet, and what the person makes of them */
-  research?: ResearchControls;
 }
 
-const START_LABEL: Record<StudioMode, string> = { graphic: 'Start creating', logo: 'Start creating', website: 'Start creating', board: 'Start creating', system: 'Bring it in', critique: 'Begin the critique' };
+const ATTACH = '.png,.jpg,.jpeg,.webp,.gif,.svg,.json,.css,.scss,.pdf,.ttf,.otf,.woff,.woff2,.html,.htm,image/*,application/json,text/css,application/pdf,text/html';
+const TAKE_LABEL: Record<RefTake, string> = { colour: 'Colours', type: 'Type', layout: 'Layout', mood: 'Mood' };
 
-const list = (xs: readonly string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0] ?? '');
-const given = (st: StudioState, id: string) => {
-  const a = st.answers[id];
-  return !!a && !a.skipped && !a.delegated && (a.values.length > 0 || !!a.text);
-};
-
-/** The references liked, as a clause of the plan. */
-const liked = (st: StudioState) => {
-  const n = (st.references ?? []).filter((r) => r.state === 'liked').length;
-  return n ? `, guided by the ${n === 1 ? 'reference' : `${n} references`} you liked` : '';
-};
-
-/** What starting will do, said before it is done. */
-function planLine(st: StudioState, env: DiscoveryEnv): string {
-  const sum = (id: string) => summaryOf(st, id, env);
-  switch (st.mode) {
-    case 'graphic': {
-      const w = wordsOf(st, 'g.words');
-      return `I’ll compose “${w.headline}” three ways${liked(st)}${given(st, 'g.composition') ? `, ${sum('g.composition').toLowerCase()}` : ''}. You choose the one to develop, then change anything by hand or in words.`;
-    }
-    case 'logo': {
-      const { name } = logoWordsOf(st);
-      return `I’ll construct concepts for “${name}”${given(st, 'l.form') ? ` — ${sum('l.form').toLowerCase()}` : ''}${liked(st)}, each built from what it stands for, never taken from a library of marks.`;
-    }
-    case 'website': {
-      const a = websiteAskOf(st);
-      const fns = st.answers['w.functions']?.values ?? [];
-      return `I’ll make “${a?.board.name ?? 'your site'}” as a working page${given(st, 'w.aesthetic') ? ` in ${sum('w.aesthetic')}` : ''}${fns.length ? `, with ${sum('w.functions').toLowerCase()}` : ''}. Then it is yours to shape, section by section.`;
-    }
-    case 'board': {
-      const n = materialsOf(st).reduce((t, m) => t + m.count, 0);
-      const w = wordsOf(st, 'b.words');
-      return `I’ll plan ${n} material${n === 1 ? '' : 's'} around “${w.headline}” and propose the identity they share${liked(st)}. Each is its own composition.`;
-    }
-    case 'system':
-      return `I’ll read ${sum('s.source').toLowerCase() || 'your files'} and show you what came across — references, modes and rules — before anything is kept.`;
-    case 'critique':
-      return `I’ll open your design to look at closely${given(st, 'c.focus') ? `, starting with ${sum('c.focus').toLowerCase()}` : ''}. Select any part and we reason it through; nothing is changed for you.`;
-  }
-}
-
-// ── the question being asked ──
-
-function StageCard({ stage, st, env, p, prior, onAnswer, onSkip, onDelegate, onBack, canBack, canStartNow, onStartNow, onSurprise }: { stage: Stage; st: StudioState; env: DiscoveryEnv; p: ConversationProps; prior?: StudioAnswer | null; onAnswer: (d: Draft) => void; onSkip: () => void; onDelegate: () => void; onBack: () => void; canBack: boolean; canStartNow: boolean; onStartNow: () => void; onSurprise: () => void }) {
-  const [draft, setDraft] = useState<Draft>(() => draftOf(stage, st, prior));
-  const [own, setOwn] = useState(() => !!draftOf(stage, st, prior).text);
-  const ready = draftReady(stage, draft);
-  const textRef = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    if (own) textRef.current?.focus();
-  }, [own]);
-  const path = pathOf(st, env);
-  const n = path.findIndex((s) => s.id === stage.id) + 1;
+function ReferenceCard({ r, preview, onReference }: { r: StudioReference; preview?: string; onReference: ConversationProps['onReference'] }) {
+  const rejected = r.state === 'rejected';
   return (
-    <section className="sd-stage" aria-labelledby={`sd-q-${stage.id}`} data-stage={stage.id}>
-      <p className="sd-stage-k">
-        <span>{stage.topic}</span>
-        {n > 0 && (
-          <span className="sd-stage-n">
-            {n} of {path.filter((s) => s.depth <= (st.depth ?? 1) || st.answers[s.id]).length || path.length}
+    <figure className={`sd-refcard${rejected ? ' is-rejected' : ''}`} data-ref={r.id}>
+      {preview && !rejected ? <SitePreview html={preview} label={`${r.host}, drawn without its scripts`} /> : null}
+      <figcaption className="sd-refcard-cap">
+        <span className="sd-refcard-t">
+          <a href={r.url} target="_blank" rel="noopener noreferrer nofollow">
+            {r.host}
+          </a>
+          {r.title && r.title.toLowerCase() !== r.host ? <span className="sd-refcard-title"> — {r.title}</span> : null}
+        </span>
+        {r.colours.length > 0 && (
+          <span className="sd-refcard-sw" role="img" aria-label={`Its colours: ${r.colours.slice(0, 6).join(', ')}`}>
+            {r.colours.slice(0, 6).map((c, i) => (
+              <span key={`${c}-${i}`} style={{ background: c }} />
+            ))}
           </span>
         )}
-        {stage.required && <span className="sd-stage-req">Needed to begin</span>}
-      </p>
-      <h2 className="sd-q" id={`sd-q-${stage.id}`}>
-        {stage.question}
-      </h2>
-      <p className="sd-why">{stage.why}</p>
-      <div className="sd-control">
-        <StageControl stage={stage} st={st} draft={draft} setDraft={setDraft} commit={onAnswer} nonce={p.nonce} websiteSystems={p.websiteSystems} attachments={st.attachments} onFiles={p.onFiles} onRemoveFile={p.onRemoveFile} research={p.research} />
-      </div>
-      {stage.allowText &&
-        (own ? (
-          <label className="sd-own-words">
-            <span className="sd-field-l">{stage.textLabel}</span>
-            <textarea
-              ref={textRef}
-              rows={2}
-              value={draft.text ?? ''}
-              placeholder="In your own words"
-              onChange={(e) => setDraft({ ...draft, text: e.target.value.slice(0, 1200) })}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey && draftReady(stage, draft)) {
-                  e.preventDefault();
-                  onAnswer(draft);
-                }
-              }}
-            />
-          </label>
-        ) : (
-          <button type="button" className="sd-textlink sd-own-open" onClick={() => setOwn(true)}>
-            Something else? {stage.textLabel}
+        {(r.fonts.length > 0 || r.notes.length > 0) && <span className="sd-refcard-notes">{[r.fonts.length ? `Set in ${r.fonts.slice(0, 2).join(' and ')}` : '', ...r.notes].filter(Boolean).join(' · ')}</span>}
+      </figcaption>
+      {rejected ? (
+        <span className="sd-refcard-acts">
+          <span className="sd-refcard-off">Set aside.</span>
+          <button type="button" className="sd-textlink is-small" onClick={() => onReference(r.id, { state: 'liked' })}>
+            Use it after all
           </button>
-        ))}
-      <div className="sd-acts">
-        {canBack && (
-          <button type="button" className="sd-pill is-ghost" onClick={onBack}>
-            <Back size={15} /> Back
+        </span>
+      ) : (
+        <span className="sd-refcard-acts" role="group" aria-label={`What to take from ${r.host}`}>
+          <span className="sd-refcard-k">Take</span>
+          {REF_TAKES.map((t) => {
+            const on = !!r.take?.includes(t);
+            return (
+              <button key={t} type="button" className={`sd-chip is-tiny${on ? ' is-on' : ''}`} aria-pressed={on} onClick={() => onReference(r.id, { take: on ? (r.take ?? []).filter((x) => x !== t) : [...(r.take ?? []), t] })}>
+                {TAKE_LABEL[t]}
+              </button>
+            );
+          })}
+          <span className="sd-refcard-hint">{r.take?.length ? '' : 'or all of it'}</span>
+          <button type="button" className="sd-textlink is-small" onClick={() => onReference(r.id, { state: 'rejected' })}>
+            Not this one
           </button>
-        )}
-        {!stage.required && (
-          <button type="button" className="sd-pill is-ghost" onClick={onSkip}>
-            Skip
-          </button>
-        )}
-        {!stage.required && stage.allowDelegate && (
-          <button type="button" className="sd-pill is-ghost" onClick={onDelegate} title="Leave this choice to SocriaUX">
-            <Leave size={15} /> You decide
-          </button>
-        )}
-        <span className="sd-acts-gap" />
-        {canStartNow && (
-          <button type="button" className="sd-pill is-ghost" onClick={onSurprise} title="Leave every remaining choice to SocriaUX, and begin">
-            <Leave size={15} /> Surprise me
-          </button>
-        )}
-        {canStartNow && (
-          <button type="button" className="sd-pill is-quiet" onClick={onStartNow}>
-            Start with this
-          </button>
-        )}
-        <button type="button" className="sd-pill is-primary" disabled={!ready} onClick={() => onAnswer(draft)}>
-          Continue
-        </button>
-      </div>
-    </section>
+        </span>
+      )}
+    </figure>
   );
 }
 
-// ── the conversation ──
+function Looks({ st, systems, nonce, live, onChoose, onDifferent }: { st: StudioState; systems: readonly MasterDesignSystem[]; nonce: string; live: boolean; onChoose: ConversationProps['onChooseLook']; onDifferent: () => void }) {
+  const [picked, setPicked] = useState<number[]>([]);
+  if (!systems.length) return <p className="sd-said is-wait">Drawing the looks…</p>;
+  const toggle = (i: number) => setPicked((xs) => (xs.includes(i) ? xs.filter((x) => x !== i) : [...xs, i].slice(-2)));
+  const [a, b] = picked;
+  return (
+    <div className="sd-looks">
+      <ol className="sd-looks-list">
+        {systems.slice(0, 3).map((s, i) => (
+          <li key={`${s.direction.name}-${i}`} className={`sd-look${picked.includes(i) ? ' is-picked' : ''}`}>
+            <WebsiteShot st={st} system={s} nonce={nonce} />
+            <span className="sd-look-t">{s.direction.name}</span>
+            <span className="sd-look-h">{s.direction.concept?.split(/(?<=\.)\s/)[0]?.slice(0, 110) ?? s.personality.slice(0, 3).join(', ')}</span>
+            {live && (
+              <span className="sd-look-acts">
+                <button type="button" className="sd-pill is-sm is-primary" onClick={() => onChoose(i)}>
+                  Make it in this one
+                </button>
+                <label className="sd-look-pick">
+                  <input type="checkbox" checked={picked.includes(i)} onChange={() => toggle(i)} />
+                  Combine
+                </label>
+              </span>
+            )}
+          </li>
+        ))}
+      </ol>
+      {live && (
+        <div className="sd-looks-bar">
+          {picked.length === 2 ? (
+            <>
+              <button type="button" className="sd-pill is-sm is-quiet" onClick={() => onChoose([a, b])}>
+                {systems[a].direction.name}’s colours, {systems[b].direction.name}’s type and layout
+              </button>
+              <button type="button" className="sd-pill is-sm is-quiet" onClick={() => onChoose([b, a])}>
+                {systems[b].direction.name}’s colours, {systems[a].direction.name}’s type and layout
+              </button>
+            </>
+          ) : (
+            <span className="sd-looks-hint">Tick two to combine them.</span>
+          )}
+          <span className="sd-acts-gap" />
+          <button type="button" className="sd-pill is-sm is-ghost" onClick={onDifferent}>
+            Something different
+          </button>
+          <button type="button" className="sd-pill is-sm is-ghost" onClick={() => onChoose(0)}>
+            You choose
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function Conversation(p: ConversationProps) {
   const { studio: st, env } = p;
-  const stage = currentStage(st, env);
-  const ready = readiness(st, env);
-  const path = pathOf(st, env);
-  const depth = st.depth ?? 1;
-  const [ctxOpen, setCtxOpen] = useState(false);
+  const [words, setWords] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [briefOpen, setBriefOpen] = useState(false);
   const [modeOpen, setModeOpen] = useState(false);
-  const [reply, setReply] = useState('');
-  const [epoch, setEpoch] = useState(0);
-  // an answer taken back (Back, or a decision opened again) is offered again as the starting point, to adjust
-  const [priors, setPriors] = useState<Record<string, StudioAnswer>>({});
-  const remember = (id: string | undefined) => {
-    const a = id ? st.answers[id] : undefined;
-    if (id && a && !a.skipped && !a.delegated) setPriors((x) => ({ ...x, [id]: a }));
-  };
+  const [over, setOver] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
-  const stagePane = useRef<HTMLDivElement>(null);
-  const endRef = useRef<HTMLDivElement>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
   const modeBox = useRef<HTMLDivElement>(null);
   const info = modeInfo(st.mode);
-  const answeredByPerson = Object.values(st.answers).some((a) => a.source !== 'words');
-  const systemName = env.hasSystem ? env.systemName ?? null : null;
+  const pending = st.pending as Topic | undefined;
+  const question = pending ? questionFor(st, pending, env) : null;
+  // Socria's last turn that moved things on (a site read after a question leaves the question, and its suggestions, open)
+  const lastQuestion = [...st.transcript].reverse().find((m) => m.from === 'socria' && (m.kind === 'question' || m.kind === 'offer' || m.stage === 'making'));
+  const offerId = [...st.transcript].reverse().find((m) => m.kind === 'offer')?.id;
+  const u = understand(st);
+  // a logo cannot be made without its name, a critique without its design, an import without its source
+  const blocked = st.modeBy === 'unsure' || (st.mode === 'logo' && !u.name) || u.required.includes('file') || u.required.includes('source');
 
-  // the newest turn in view, gently (at once for those who asked for less motion), within the conversation's own column
+  // the newest turn in view, gently (at once for those who asked for less motion)
   useEffect(() => {
     const box = scroller.current;
     if (!box) return;
     const calm = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     box.scrollTo({ top: box.scrollHeight, behavior: calm ? 'auto' : 'smooth' });
-  }, [st.transcript.length]);
-  // each new question is read from its top (on a narrow screen, where everything is one column, it is brought into view)
+  }, [st.transcript.length, p.reading.length, p.starting]);
+  useEffect(() => field.current?.focus(), [st.transcript.length]);
+  // the reply grows with what is said
   useEffect(() => {
-    const el = stagePane.current;
+    const el = field.current;
     if (!el) return;
-    if (typeof window !== 'undefined' && window.matchMedia?.('(max-width: 960px)').matches) el.scrollIntoView({ block: 'start' });
-    else el.scrollTo({ top: 0 });
-  }, [stage?.id, epoch, p.starting]);
-
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(200, el.scrollHeight)}px`;
+  }, [words]);
   useEffect(() => {
-    if (!ctxOpen) return;
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setCtxOpen(false);
-    document.addEventListener('keydown', esc);
-    return () => document.removeEventListener('keydown', esc);
-  }, [ctxOpen]);
-
-  useEffect(() => {
-    if (!modeOpen) return;
-    const away = (e: PointerEvent) => !modeBox.current?.contains(e.target as Node) && setModeOpen(false);
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setModeOpen(false);
+    if (!modeOpen && !briefOpen) return;
+    const away = (e: PointerEvent) => modeOpen && !modeBox.current?.contains(e.target as Node) && setModeOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && (setModeOpen(false), setBriefOpen(false));
     document.addEventListener('pointerdown', away);
     document.addEventListener('keydown', esc);
     return () => {
       document.removeEventListener('pointerdown', away);
       document.removeEventListener('keydown', esc);
     };
-  }, [modeOpen]);
+  }, [modeOpen, briefOpen]);
 
-  const change = (next: StudioState) => {
-    p.onStudio(() => next);
-    setEpoch((e) => e + 1);
+  const send = (text = words) => {
+    const t = text.trim();
+    if (!t && !files.length) return field.current?.focus();
+    p.onSend(t, files);
+    setWords('');
+    setFiles([]);
   };
-  const answer = (d: Draft) => stage && change(answerStage(st, stage.id, d, env));
-  const back = () => {
-    const next = stepBack(st);
-    if (next === st) return;
-    const gone = Object.keys(st.answers).find((k) => !next.answers[k]);
-    remember(gone);
-    const topic = gone ? path.find((s) => s.id === gone)?.topic : '';
-    change(said(next, { from: 'socria', kind: 'change', text: topic ? `Back to ${topic.toLowerCase()}.` : 'One step back.' }));
-  };
-  const begin = (from: StudioState) => {
-    if (!readiness(from, env).canStart) return;
-    p.onStart(from);
-  };
-  const surpriseMe = () => {
-    const next = surprise(st, env);
-    change(next);
-    if (readiness(next, env).canStart) begin(next);
-  };
-  const reopenIt = (id: string) => {
-    remember(id);
-    change(said(reopen(st, id), { from: 'socria', kind: 'change', text: `Open again: ${path.find((s) => s.id === id)?.topic.toLowerCase() ?? 'that decision'}.` }));
-    setCtxOpen(false);
+  const add = (list: FileList | File[] | null) => {
+    const xs = [...(list ?? [])];
+    if (xs.length) setFiles((cur) => [...cur, ...xs.filter((f) => !cur.some((c) => c.name === f.name && c.size === f.size))].slice(0, 8));
   };
 
-  const send = () => {
-    const text = reply.trim();
-    if (!text) return;
-    setReply('');
-    const r = readReply(st, text, env);
-    const withLine = (x: StudioState) => said(x, { from: 'person', kind: 'reply', text });
-    switch (r.kind) {
-      case 'start':
-        if (ready.canStart) return begin(withLine(st));
-        return change(said(withLine(st), { from: 'socria', kind: 'note', text: `Before I begin I need ${list(ready.missing.map((m) => m.toLowerCase()))}.` }));
-      case 'surprise':
-        return surpriseMe();
-      case 'back': {
-        const next = stepBack(st);
-        return change(said(withLine(next), { from: 'socria', kind: 'change', text: 'One step back.' }));
-      }
-      case 'skip':
-        if (!stage) return change(withLine(st));
-        if (stage.required) return change(said(withLine(st), { from: 'socria', kind: 'note', text: `This one I need to begin: ${stage.why}` }));
-        return change(skipStage(st, stage.id, env));
-      case 'deeper':
-        return change(said(withLine(deeper(st)), { from: 'socria', kind: 'note', text: 'More choices, then: the finer points are open below.' }));
-      case 'switch':
-        return p.onSwitchMode(r.mode);
-      case 'answer':
-        return change(answerStage(st, r.stage, r.answer, env));
-      case 'words':
-        return change(reviseFromWords(st, r.text).st);
-    }
-  };
-
-  const shownPath = path.filter((s) => s.depth <= depth || st.answers[s.id]);
-  const moreCount = path.length - shownPath.length;
-  const done = (id: string) => {
-    const a = st.answers[id];
-    return !!a;
-  };
+  const busy = !!p.starting;
+  const refs = new Map((st.references ?? []).map((r) => [r.id, r]));
 
   return (
-    <div className="v0 sb sd sd-conv">
+    <div className="v0 sb sd sd-conv sd-chat">
       <header className="sd-head">
         <div className="sd-head-l">
           <button type="button" className="sd-mark" onClick={p.onExit} aria-label="SocriaUX home">
@@ -313,58 +230,47 @@ export function Conversation(p: ConversationProps) {
               Socria<em>UX</em>
             </span>
           </button>
-          <div className="sd-mode" ref={modeBox}>
-            <button type="button" className="sd-pill sd-mode-btn" aria-expanded={modeOpen} aria-haspopup="true" onClick={() => setModeOpen((o) => !o)}>
-              <ModeGlyph mode={st.mode} size={16} />
-              <span>{info.label}</span>
-              <Down size={13} />
-            </button>
-            {modeOpen && (
-              <div className="sd-pop is-modes" role="group" aria-label="What we are making">
-                <p className="sd-pop-k">What we are making</p>
-                {MODES.map((m) => (
-                  <button
-                    key={m.mode}
-                    type="button"
-                    className={`sd-pop-item${m.mode === st.mode ? ' is-on' : ''}`}
-                    aria-pressed={m.mode === st.mode}
-                    onClick={() => {
-                      setModeOpen(false);
-                      if (m.mode !== st.mode) p.onSwitchMode(m.mode);
-                    }}
-                  >
-                    <ModeGlyph mode={m.mode} size={18} />
-                    <span className="sd-pop-t">{m.label}</span>
-                    <span className="sd-pop-h">{m.line}</span>
-                    {m.mode === st.mode && <Check size={15} />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-        <nav className="sd-path" aria-label="The questions">
-          {shownPath.map((s) => {
-            const isNow = stage?.id === s.id;
-            const isDone = done(s.id) && !isNow;
-            return (
-              <button key={s.id} type="button" className={`sd-step${isNow ? ' is-now' : ''}${isDone ? ' is-done' : ''}`} aria-current={isNow ? 'step' : undefined} disabled={!isDone} onClick={() => reopenIt(s.id)} title={isDone ? `${s.topic}: ${summaryOf(st, s.id, env)} — open again` : s.topic}>
-                <span className="sd-step-dot" aria-hidden="true" />
-                <span className="sd-step-t">{s.topic}</span>
+          {st.modeBy !== 'unsure' && (
+            <div className="sd-mode" ref={modeBox}>
+              <button type="button" className="sd-pill sd-mode-btn" aria-expanded={modeOpen} aria-haspopup="true" onClick={() => setModeOpen((o) => !o)} title="Change what we are making">
+                <ModeGlyph mode={st.mode} size={16} />
+                <span>{info.label}</span>
+                <Down size={13} />
               </button>
-            );
-          })}
-          {moreCount > 0 && <span className="sd-step is-more">+{moreCount}</span>}
-        </nav>
+              {modeOpen && (
+                <div className="sd-pop is-modes" role="group" aria-label="What we are making">
+                  <p className="sd-pop-k">What we are making</p>
+                  {MODES.map((m) => (
+                    <button
+                      key={m.mode}
+                      type="button"
+                      className={`sd-pop-item${m.mode === st.mode ? ' is-on' : ''}`}
+                      aria-pressed={m.mode === st.mode}
+                      onClick={() => {
+                        setModeOpen(false);
+                        if (m.mode !== st.mode) p.onSwitchMode(m.mode);
+                      }}
+                    >
+                      <ModeGlyph mode={m.mode} size={18} />
+                      <span className="sd-pop-t">{m.label}</span>
+                      <span className="sd-pop-h">{m.line}</span>
+                      {m.mode === st.mode && <Check size={15} />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <div className="sd-head-r">
-          {st.mode !== 'critique' && st.mode !== 'system' && <SystemPicker systems={p.systems} value={st.systemId ?? null} onChange={p.onSystem} onManage={p.onManageSystems} label={false} align="end" />}
+          {usableSystems(p.systems).length > 0 && st.mode !== 'critique' && st.mode !== 'system' && <SystemPicker systems={p.systems} value={st.systemId ?? null} onChange={p.onSystem} onManage={p.onManageSystems} label={false} align="end" />}
           {p.saveWords && (
             <span className="sd-save" role="status">
               {p.saveWords}
             </span>
           )}
-          <button type="button" className="sd-pill is-ghost sd-ctx-toggle" aria-expanded={ctxOpen} aria-controls="sd-decisions" onClick={() => setCtxOpen((o) => !o)}>
-            <Panel size={15} /> Decisions
+          <button type="button" className="sd-pill is-ghost sd-ctx-toggle" aria-expanded={briefOpen} aria-controls="sd-brief" onClick={() => setBriefOpen((o) => !o)}>
+            <Panel size={15} /> Brief
           </button>
           <button type="button" className="sd-icon" onClick={p.onExit} aria-label="Leave the conversation (it is kept)">
             <Close size={17} />
@@ -372,129 +278,135 @@ export function Conversation(p: ConversationProps) {
         </div>
       </header>
 
-      <div className="sd-body">
-        <div className="sd-talk" ref={scroller}>
-        <ol className="sd-transcript" aria-label="The conversation">
-          {st.transcript.map((m) => {
-            const reopenable = m.from === 'person' && m.kind === 'answer' && m.stage && st.answers[m.stage] && path.some((s) => s.id === m.stage);
-            return (
-              <li key={m.id} className={`sd-msg is-${m.from} k-${m.kind}`}>
-                {m.from === 'person' ? (
-                  <div className="sd-bubble">
-                    <p>{m.text}</p>
-                    {m.attachments?.length ? (
-                      <p className="sd-bubble-files">
-                        {m.attachments
-                          .map((id) => st.attachments.find((a) => a.id === id)?.name)
-                          .filter(Boolean)
-                          .join(' · ')}
+      <div className="sd-chat-body">
+        <div className="sd-chat-scroll" ref={scroller}>
+          <ol className="sd-transcript sd-chat-col" aria-label="The conversation">
+            {st.transcript.map((m) => {
+              if (m.from === 'person')
+                return (
+                  <li key={m.id} className={`sd-msg is-person k-${m.kind}`}>
+                    <div className="sd-bubble">
+                      <p>{m.text}</p>
+                      {m.attachments?.length ? (
+                        <p className="sd-bubble-files">
+                          {m.attachments
+                            .map((id) => st.attachments.find((a) => a.id === id)?.name)
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </p>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              const r = m.kind === 'reference' && m.stage ? refs.get(m.stage) : undefined;
+              const isLast = m.id === lastQuestion?.id;
+              return (
+                <li key={m.id} className={`sd-msg is-socria k-${m.kind}`}>
+                  <div className="sd-say">
+                    <p className="sd-said">{r ? referenceSaid(r) : m.text}</p>
+                    {r && <ReferenceCard r={r} preview={p.previews[r.id]} onReference={p.onReference} />}
+                    {m.kind === 'offer' && st.mode === 'website' && m.id === offerId && <Looks st={st} systems={p.websiteSystems} nonce={p.nonce} live={!busy && st.status === 'discovering' && lookOnOffer(st)} onChoose={p.onChooseLook} onDifferent={p.onDifferent} />}
+                    {isLast && m.kind === 'question' && question && question.suggestions.length > 0 && !busy && (
+                      <p className="sd-suggest" role="group" aria-label="Some ways to answer">
+                        {question.suggestions.map((s) => (
+                          <button key={s} type="button" className="sd-suggestion" onClick={() => send(s)}>
+                            {s}
+                          </button>
+                        ))}
                       </p>
-                    ) : null}
-                    {reopenable && (
-                      <button type="button" className="sd-textlink is-small" onClick={() => reopenIt(m.stage!)}>
-                        Change
-                      </button>
                     )}
                   </div>
-                ) : (
-                  <p className={m.kind === 'question' ? 'sd-said-q' : 'sd-said'}>{m.text}</p>
-                )}
-              </li>
-            );
-          })}
-        </ol>
-          <div ref={endRef} className="sd-end" />
-        </div>
-
-        <div className="sd-stagepane" ref={stagePane}>
-          <div className="sd-stage-col">
-            {p.starting ? (
-              <section className="sd-starting" role="status" aria-live="polite">
-                <span className="sd-starting-bar" aria-hidden="true" />
-                <p className="sd-said">{p.starting}</p>
-              </section>
-            ) : stage ? (
-              <StageCard
-                key={`${stage.id}|${epoch}`}
-                stage={stage}
-                st={st}
-                env={env}
-                p={p}
-                prior={priors[stage.id] ?? null}
-                onAnswer={answer}
-                onSkip={() => change(skipStage(st, stage.id, env))}
-                onDelegate={() => change(delegateStage(st, stage.id, env))}
-                onBack={back}
-                canBack={answeredByPerson}
-                canStartNow={ready.canStart && !stage.required}
-                onStartNow={() => begin(st)}
-                onSurprise={surpriseMe}
-              />
-            ) : (
-              <section className="sd-stage is-enough" aria-labelledby="sd-enough-t">
-                <p className="sd-stage-k">
-                  <span>Ready</span>
+                </li>
+              );
+            })}
+            {p.reading.map((h) => (
+              <li key={`reading-${h}`} className="sd-msg is-socria">
+                <p className="sd-said is-wait" role="status">
+                  Reading {h}…
                 </p>
-                <h2 className="sd-q" id="sd-enough-t">
-                  {ready.canStart ? (
-                    <>
-                      I have enough to <em>begin</em>.
-                    </>
-                  ) : (
-                    <>One thing before I begin.</>
-                  )}
-                </h2>
-                <p className="sd-why">{ready.canStart ? planLine(st, env) : `Still needed: ${list(ready.missing)}.`}</p>
-                <div className="sd-acts">
-                  {answeredByPerson && (
-                    <button type="button" className="sd-pill is-ghost" onClick={back}>
-                      <Back size={15} /> Back
-                    </button>
-                  )}
-                  <span className="sd-acts-gap" />
-                  {ready.more > 0 && (
-                    <button type="button" className="sd-pill is-quiet" onClick={() => change(deeper(st))}>
-                      Keep refining · {ready.more} more
-                    </button>
-                  )}
-                  {ready.more > 0 && (
-                    <button type="button" className="sd-pill is-ghost" onClick={surpriseMe} title="Leave every remaining choice to SocriaUX, and begin">
-                      <Leave size={15} /> Surprise me
-                    </button>
-                  )}
-                  <button type="button" className="sd-pill is-primary" disabled={!ready.canStart} onClick={() => begin(st)}>
-                    {START_LABEL[st.mode]}
-                  </button>
-                </div>
-              </section>
+              </li>
+            ))}
+            {p.starting && (
+              <li className="sd-msg is-socria">
+                <section className="sd-starting" role="status" aria-live="polite">
+                  <span className="sd-starting-bar" aria-hidden="true" />
+                  <p className="sd-said">{p.starting}</p>
+                </section>
+              </li>
             )}
             {p.error && (
-              <p className="sd-error" role="alert">
-                {p.error}
-              </p>
+              <li className="sd-msg is-socria">
+                <p className="sd-error" role="alert">
+                  {p.error}
+                </p>
+              </li>
             )}
-          </div>
+          </ol>
         </div>
 
-        <Vision st={st} />
-
         <form
-          className="sd-reply"
+          className={`sd-reply sd-chat-composer${over ? ' is-over' : ''}`}
           onSubmit={(e) => {
             e.preventDefault();
             send();
           }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setOver(true);
+          }}
+          onDragLeave={() => setOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setOver(false);
+            add(e.dataTransfer.files);
+          }}
         >
+          <div className="sd-chat-acts">
+            {st.status === 'discovering' && !busy && !lookOnOffer(st) && (
+              <button type="button" className="sd-pill is-sm is-quiet sd-make" onClick={p.onMake} disabled={blocked} title={blocked ? 'One thing is needed first' : 'Leave whatever is open to SocriaUX, and make it'}>
+                Make it now
+              </button>
+            )}
+            {question?.optional && !busy && (
+              <button type="button" className="sd-textlink is-small" onClick={() => send('skip')}>
+                Skip this
+              </button>
+            )}
+          </div>
+          {files.length > 0 && (
+            <ul className="sd-attached" aria-label="To send">
+              {files.map((f) => (
+                <li key={`${f.name}|${f.size}`} className="sd-att">
+                  <FileMark size={15} />
+                  <span className="sd-att-n">{f.name}</span>
+                  <button type="button" className="sd-icon is-small" aria-label={`Remove ${f.name}`} onClick={() => setFiles((xs) => xs.filter((x) => x !== f))}>
+                    <Close size={13} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
           <div className="sd-reply-in">
+            <button type="button" className="sd-icon" onClick={() => fileInput.current?.click()} aria-label="Attach files or pictures" title="Attach files or pictures">
+              <Attach size={18} />
+            </button>
             <label htmlFor="sd-reply" className="v0-sr">
               Reply in your own words
             </label>
             <textarea
               id="sd-reply"
+              ref={field}
               rows={1}
-              value={reply}
-              placeholder={stage ? (stage.allowText || stage.control === 'fields' ? 'Answer in your own words, or say what to change' : 'Say what to change, “back”, or “surprise me”') : 'Say what to change, or “start”'}
-              onChange={(e) => setReply(e.target.value.slice(0, 1200))}
+              value={words}
+              placeholder={question ? 'Answer in your own words — or tell me anything else' : 'Tell me anything else, paste a link to something you like, or say “make it”'}
+              onChange={(e) => setWords(e.target.value.slice(0, 1200))}
+              onPaste={(e) => {
+                const pics = [...e.clipboardData.files];
+                if (pics.length) {
+                  e.preventDefault();
+                  add(pics);
+                }
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
@@ -502,36 +414,32 @@ export function Conversation(p: ConversationProps) {
                 }
               }}
             />
-            <button type="submit" className="sd-send" disabled={!reply.trim()} aria-label="Send">
+            <button type="submit" className="sd-send" disabled={(!words.trim() && !files.length) || busy} aria-label="Send">
               <ArrowUp size={17} />
             </button>
+            <input ref={fileInput} type="file" hidden multiple accept={ATTACH} onChange={(e) => (add(e.target.files), (e.target.value = ''))} />
           </div>
           <p className="sd-reply-hint">
-            {systemName && st.mode !== 'critique' && st.mode !== 'system' ? `Made in ${systemName}. ` : ''}
+            {env.hasSystem && env.systemName ? `Made in ${env.systemName}. ` : ''}
             Nothing here calls a model.
           </p>
         </form>
 
-        {ctxOpen && <button type="button" className="sd-scrim" aria-label="Close the decisions" onClick={() => setCtxOpen(false)} />}
-        <aside id="sd-decisions" className={`sd-side${ctxOpen ? ' is-open' : ''}`} aria-label="Design context" aria-hidden={!ctxOpen}>
+        {briefOpen && <button type="button" className="sd-scrim" aria-label="Close the brief" onClick={() => setBriefOpen(false)} />}
+        <aside id="sd-brief" className={`sd-side${briefOpen ? ' is-open' : ''}`} aria-label="The brief" aria-hidden={!briefOpen}>
           <div className="sd-side-head">
-            <button type="button" className="sd-icon sd-side-close" onClick={() => setCtxOpen(false)} aria-label="Close the decisions">
+            <button type="button" className="sd-icon sd-side-close" onClick={() => setBriefOpen(false)} aria-label="Close the brief">
               <Close size={16} />
             </button>
           </div>
-          <DesignContext st={st} env={env} onChange={reopenIt} systemName={systemName} />
-          <div className="sd-side-foot">
-            {st.mode !== 'critique' && st.mode !== 'system' && (
+          <Brief st={st} env={env} />
+          {st.mode !== 'critique' && st.mode !== 'system' && usableSystems(p.systems).length > 0 && (
+            <div className="sd-side-foot">
               <div className="sd-side-sys">
                 <SystemPicker systems={p.systems} value={st.systemId ?? null} onChange={p.onSystem} onManage={p.onManageSystems} />
               </div>
-            )}
-            {stage && ready.canStart && (
-              <button type="button" className="sd-pill is-primary is-block" onClick={() => begin(st)}>
-                {START_LABEL[st.mode]}
-              </button>
-            )}
-          </div>
+            </div>
+          )}
         </aside>
       </div>
     </div>

@@ -121,7 +121,7 @@ const thinking = [
   'ux-v0/direct',
   'ux-v0/generate',
   'ux-v0/refine',
-  'ux-v0/images',
+  'ux-v0/reference',
   'chat',
   'mr',
   'transcribe',

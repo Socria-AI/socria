@@ -20,7 +20,7 @@ import { emptyDNA, setDim, type CreativeDNA, type DnaKey, type DnaVector } from 
 import { contrastRatio } from '../../ux/audit';
 import { ensureContrast } from '../spec';
 import { mix } from '../color';
-import { influencesOf, likedOf, paletteOutOf, referenceColours } from './research';
+import { likedRefs, paletteOutOf, referenceFaces, referencePalette, referenceWords } from './references';
 import { graphicFont, knownFont } from '../fonts';
 import { styleById } from '../graphics/styles/registry';
 
@@ -112,20 +112,23 @@ export function prefsOf(st: StudioState): StudioPrefs {
   const dna: DnaVector = {};
   const feel = answerOf(st, `${p}.feel`);
   for (const [k, v] of Object.entries(feel?.numbers ?? {})) dna[k as DnaKey] = v;
-  // the look is never picked from a list: it comes from the references liked (the influences their own words name,
-  // the colours they hold) and from what the person says about it in their own words
-  const liked = likedOf(st);
-  const inf = influencesOf(liked);
-  const ownWords = text(st, `${p}.refs`);
-  const fromRefs = paletteOutOf(referenceColours(liked));
+  // the look is never picked from a list: it comes from what the person says about it in their own words, the
+  // websites they pointed to (what they take from each), and pictures they brought for their look
+  const refs = likedRefs(st);
+  const ownWords = text(st, `${p}.look`);
+  const fromRefs = referencePalette(refs);
+  const fromPictures = values(st, `${p}.pictures`)[0] === 'look' ? paletteOutOf(st.attachments.filter((a) => a.kind === 'image').flatMap((a) => a.swatches ?? [])) : null;
+  const ownPalette = paletteOf(answerOf(st, `${p}.palette`));
+  const borrowed = fromRefs ?? fromPictures;
+  const refFaces = referenceFaces(refs).filter((f) => graphicFont(f) ?? knownFont(f));
   return {
-    styles: [...new Set([...inf.styles, ...readFacts(st.prompt).styles, ...readFacts(ownWords).styles])].slice(0, 3),
-    styleWords: ownWords,
-    palette: paletteOf(answerOf(st, `${p}.palette`)) ?? (fromRefs ? { ground: fromRefs.ground, ink: fromRefs.ink, accent: fromRefs.accent, ...(fromRefs.accent2 ? { accent2: fromRefs.accent2 } : {}) } : null),
-    faces: facesOf(answerOf(st, `${p}.type`)),
+    styles: [...new Set([...readFacts(st.prompt).styles, ...readFacts(ownWords).styles])].slice(0, 3),
+    styleWords: [ownWords, referenceWords(refs)].filter(Boolean).join('; ').slice(0, 600),
+    palette: ownPalette ?? (borrowed ? { ground: borrowed.ground, ink: borrowed.ink, accent: borrowed.accent, ...(borrowed.accent2 ? { accent2: borrowed.accent2 } : {}) } : null),
+    faces: facesOf(answerOf(st, `${p}.type`)) ?? (refFaces.length ? { display: refFaces[0], body: refFaces[1] ?? refFaces[0] } : null),
     org: (COMPOSITIONS.find((c) => c.id === values(st, `${p}.composition`)[0])?.org ?? null) as Org | null,
     dna,
-    personality: [...new Set([...personalityOf(st), ...inf.mood])].slice(0, 8),
+    personality: personalityOf(st).slice(0, 8),
     avoid: [...labelsOf(avoidIds, AVOID_GRAPHIC).map((x) => x.toLowerCase()), ...(text(st, `${p}.avoid`) ? [text(st, `${p}.avoid`)] : []), ...readFacts(st.prompt).avoid],
     treatment: IMAGE_TREATMENTS.some((t) => t.id === values(st, `${p}.treatment`)[0]) ? values(st, `${p}.treatment`)[0] : null,
   };
@@ -213,6 +216,16 @@ export function directionsWithPrefs(dirs: readonly GraphicDirection[], prefs: St
     }
     return next;
   });
+}
+
+/** Two directions made one: the first's colours, the second's type, structure and composition. */
+export function combineDirections(colour: GraphicDirection, rest: GraphicDirection): GraphicDirection {
+  return {
+    ...rest,
+    name: `${colour.name} × ${rest.name}`.slice(0, 80),
+    concept: `The colours of ${colour.name}, with the type and structure of ${rest.name}.`,
+    tokens: { ...rest.tokens, colors: { ...colour.tokens.colors } },
+  };
 }
 
 /** A board's proposed systems held to the person's palette and faces (never a linked design system's). */

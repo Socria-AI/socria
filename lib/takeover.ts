@@ -140,14 +140,14 @@ const THINKING_API = [
   '/api/logos/room',
   // SocriaUX's design reasoning (/ux)
   '/api/ux/reason',
-  // SocriaUX v0 (/ux-v0): its model calls, and its image searches (a web fetch)
+  // SocriaUX v0 (/ux-v0): its model calls, and the websites it reads for reference (a web fetch)
   '/api/ux-v0/critique',
   '/api/ux-v0/discover',
   '/api/ux-v0/brief',
   '/api/ux-v0/direct',
   '/api/ux-v0/generate',
   '/api/ux-v0/refine',
-  '/api/ux-v0/images',
+  '/api/ux-v0/reference',
   '/api/chat',
   '/api/mr',
   '/api/transcribe',

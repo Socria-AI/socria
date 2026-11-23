@@ -40,7 +40,8 @@ import { fidelityOfDoc } from '@/lib/ux-v0/dsi/fidelity';
 import { useLinkedSystem } from '../systems/useLinkedSystem';
 import { SystemBadge } from '../systems/SystemBadge';
 import { StudioRail, useRailReply } from '../studio/StudioRail';
-import { directionsWithPrefs, prefsOf, withTreatment } from '@/lib/ux-v0/studio/apply';
+import { combineDirections, directionsWithPrefs, prefsOf, withTreatment } from '@/lib/ux-v0/studio/apply';
+import { COMBINE_WORDS, colourFirst, ordinalsIn } from '@/lib/ux-v0/studio/director';
 
 type View = 'brief' | 'directions' | 'edit';
 type Note = EditorNote;
@@ -285,16 +286,27 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
     }
     if (view === 'directions' && !isLogo && g.brief) {
       const low = words.toLowerCase();
-      const ord = [/\b(first|1st|one|1)\b/, /\b(second|2nd|two|2)\b/, /\b(third|3rd|three|3)\b/, /\b(fourth|4th|four|4)\b/].findIndex((re) => re.test(low));
-      if (/\b(more|others?|another|different|new ones?|again)\b/.test(low)) {
+      const ords = ordinalsIn(low).filter((i) => g.options[i]);
+      // two of them made one: the colours of the one named with "colours" (else the first named), the rest of the other
+      if (ords.length >= 2 && COMBINE_WORDS.test(low)) {
+        const [a, b] = colourFirst(low, ords);
+        const d = combineDirections(g.options[a], g.options[b]);
+        void composeIn(d, g.brief);
+        return `Composing “${d.name}”: the colours of ${g.options[a].name}, the type and structure of ${g.options[b].name}.`;
+      }
+      if (/\b(you choose|you pick|you decide|surprise me|up to you|your call|pick for me|choose for me|whatever you think)\b/.test(low)) {
+        void composeIn(g.options[0], g.brief);
+        return `I’d take “${g.options[0].name}”: composing in it now. Change anything by hand, or here in words.`;
+      }
+      if (/\b(more|others?|another|different|new ones?|again|none|neither|not these|nothing like)\b/.test(low)) {
         moreDirections();
-        return 'Three more directions, kept apart from those you have seen.';
+        return 'Three others, kept apart from those you have seen. Say what you’d like instead, if you know, and I’ll lean that way.';
       }
-      if (ord >= 0 && g.options[ord]) {
-        void composeIn(g.options[ord], g.brief);
-        return `Composing in “${g.options[ord].name}”. Then change anything by hand, or here in words.`;
+      if (ords.length && g.options[ords[0]]) {
+        void composeIn(g.options[ords[0]], g.brief);
+        return `Composing in “${g.options[ords[0]].name}”. Then change anything by hand, or here in words.`;
       }
-      return 'Choose one of the directions to develop — say “the second one”, or “more” for three others.';
+      return 'Say “the second one”, “the first’s colours with the third”, “something different”, or “you choose”.';
     }
     if (view === 'directions' && isLogo) return 'Choose a concept and develop it; then ask for any change here in words.';
     return 'Finish the brief on the left and continue: the directions follow from it.';
@@ -313,7 +325,7 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
 
   return (
     <>
-    {project.studio && <StudioRail studio={project.studio} onStudio={(fn) => update((p) => (p.studio ? { ...p, studio: fn(p.studio) } : p))} onAsk={railAsk} placeholder={view === 'edit' ? 'Say what to change: “make the headline bigger”, “warmer colours”…' : view === 'directions' ? '“The second one”, or “more”' : 'Say what to change'} systemName={linked?.rec.name ?? null} onOpenChange={setRailOpen} />}
+    {project.studio && <StudioRail studio={project.studio} onStudio={(fn) => update((p) => (p.studio ? { ...p, studio: fn(p.studio) } : p))} onAsk={railAsk} placeholder={view === 'edit' ? 'Say what to change: “make the headline bigger”, “warmer colours”…' : view === 'directions' ? '“The second one”, “the first’s colours with the third”, “something different”' : 'Say what to change'} systemName={linked?.rec.name ?? null} onOpenChange={setRailOpen} />}
     <div className="v0 sb gx">
       <header className="v0-head">
         <div className="v0-head-l">
@@ -391,7 +403,7 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
       )}
 
       {view === 'directions' && g.brief && !isLogo && (
-        <DirectionsStage brief={g.brief} options={g.options} assets={g.assets ?? []} measure={measure} href={href} source={g.source ?? null} onChoose={(d) => void composeIn(d, g.brief!)} onMore={moreDirections} onBack={() => setView('brief')} />
+        <DirectionsStage brief={g.brief} options={g.options} assets={g.assets ?? []} measure={measure} href={href} source={g.source ?? null} onChoose={(d) => void composeIn(d, g.brief!)} onMore={moreDirections} onCombine={(a, b) => void composeIn(combineDirections(a, b), g.brief!)} onBack={!project.studio || project.studio.via === 'hand' ? () => setView('brief') : undefined} />
       )}
 
       {view === 'edit' && g.doc && (

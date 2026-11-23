@@ -21,13 +21,7 @@ await ctx.route('https://fonts.gstatic.test/**', (r) => {
 await ctx.route('https://api.openverse.org/**', (r) => r.fulfill({ json: { result_count: 0, page_count: 0, page_size: 20, page: 1, results: [] } }));
 await ctx.route('https://images.example.test/**', (r) => r.fulfill({ contentType: 'image/jpeg', body: readFileSync(FX + r.request().url().split('/').pop()) }));
 
-const IMG = (name, category, title, w = 1600, h = 1067) => ({ provider: 'openverse', providerId: name, id: `openverse:${name}`, url: `https://images.example.test/${name}.jpg`, thumb: `https://images.example.test/${name}.jpg`, width: w, height: h, title, creator: 'A. Photographer', creatorUrl: 'https://example.org/a', sourceUrl: `https://example.org/${name}`, license: 'CC BY 2.0', licenseUrl: 'https://creativecommons.org/licenses/by/2.0/', attribution: `“${title}” by A. Photographer, CC BY 2.0`, category, state: 'proposed' });
-const LIB = {
-  imagery: [IMG('cafe-bar', 'imagery', 'Espresso bar at first light'), IMG('pour', 'imagery', 'Pour-over, close', 1000, 1400), IMG('window', 'imagery', 'Window seat'), IMG('people', 'imagery', 'Regulars at the long table')],
-  texture: [IMG('marble', 'texture', 'Marble counter'), IMG('ceramic', 'texture', 'Handmade ceramic', 1400, 1400), IMG('beans', 'texture', 'Roasted beans')],
-  composition: [IMG('grid', 'composition', 'Editorial spread, asymmetric grid', 1600, 1000)],
-};
-const calls = { discover: [], images: [], brief: [], generate: [], refine: [], critique: [] };
+const calls = { discover: [], brief: [], generate: [], refine: [], critique: [] };
 await ctx.route('**/api/ux-v0/**', async (r) => {
   const url = r.request().url();
   const body = JSON.parse(r.request().postData() || '{}');
@@ -36,10 +30,6 @@ await ctx.route('**/api/ux-v0/**', async (r) => {
     calls.discover.push(body);
     if (calls.discover.length === 1) return r.fulfill({ json: { understanding: { summary: 'A website for an independent coffee house.', known: { objective: 'Bring people in on weekday mornings' }, gaps: ['audience', 'visual'] }, questions: [{ id: 'q_a', topic: 'audience', question: 'Who walks in at 7.30 on a Tuesday, and what are they hoping to find?', why: 'The first visitor you design for decides what the page leads with.', options: ['Commuters who want to be fast', 'People who stay and work', 'Neighbours who come for the ritual'], multi: false, answer: '', skipped: false, askedAt: Date.now() }], queries: [{ category: 'imagery', query: 'espresso bar morning light' }, { category: 'texture', query: 'marble counter close' }, { category: 'composition', query: 'editorial magazine layout' }], palettes: [{ id: 'pal_1', name: 'Roast and paper', colors: [{ hex: '#f4efe6', role: 'background' }, { hex: '#221c17', role: 'text' }, { hex: '#6b6157', role: 'muted' }, { hex: '#5b3a24', role: 'accent' }, { hex: '#fbf8f2', role: 'accent-text' }], state: 'proposed' }], type: [{ id: 'type_1', display: 'Instrument Serif', body: 'Inter', note: 'quiet editorial confidence', state: 'proposed' }], ready: false, note: 'An independent coffee house that wants weekday mornings.', usage } });
     return r.fulfill({ json: { understanding: { summary: 'A coffee house for neighbours who come for the ritual; warm, unhurried, editorial.', known: { audience: 'Neighbours who come for the ritual', objective: 'Bring people in on weekday mornings', visual: 'Warm, morning light, paper and roast' }, gaps: [] }, questions: [], queries: [], palettes: [], type: [], ready: true, note: 'Enough to write the brief: neighbours, mornings, the ritual.', usage } });
-  }
-  if (url.endsWith('/images')) {
-    calls.images.push(body);
-    return r.fulfill({ json: { results: body.queries.map((q) => ({ ...q, refs: LIB[q.category].filter((x) => !body.seen.includes(x.id)).slice(0, body.per).map((x) => ({ ...x, query: q.query })), provider: 'openverse', error: '' })) } });
   }
   if (url.endsWith('/brief')) {
     calls.brief.push(body);
@@ -267,7 +257,7 @@ await part('retina crop', async () => {
   check('the crop matches the drawn rectangle on 1× and 2× screens alike', same, JSON.stringify({ one, two }));
 });
 
-// D — Create: signed out at the first model call, discovery at 390, a provider failure on the board, the brief through a reload, an area on the design, an exact undo
+// D — Create: signed out at the first model call, discovery at 390, a website read for the board (and one that cannot be), the brief through a reload, an area on the design, an exact undo
 await part('create acceptance', async () => {
   await page.route('**/api/ux-v0/discover', (r) => r.fulfill({ status: 401, json: { error: 'Sign in to let SocriaUX ask its questions.', signIn: true } }));
   await page.goto(HOME, { waitUntil: 'networkidle' });
@@ -277,7 +267,7 @@ await part('create acceptance', async () => {
   check('signed out, the first model call asks the person to sign in (and nothing breaks)', asked && /\?p=uxv0_/.test(page.url()), (await page.locator('.v0-notice, [role=alert]').first().innerText().catch(() => '')).slice(0, 100));
   await page.unroute('**/api/ux-v0/discover');
   // the real flow, at a phone's width first
-  calls.discover.length = 0; calls.images.length = 0; calls.brief.length = 0; calls.generate.length = 0;
+  calls.discover.length = 0; calls.brief.length = 0; calls.generate.length = 0;
   await page.goto(HOME, { waitUntil: 'networkidle' });
   await page.setViewportSize({ width: 390, height: 844 });
   // the model-led website workspace's own way in (its questions, references, brief and directions)
@@ -297,15 +287,25 @@ await part('create acceptance', async () => {
   await page.screenshot({ path: S + 'v0-30-discovery-390.png' });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.waitForTimeout(400);
-  // a provider failure: the board says so and keeps what it has
-  const tiles = await page.locator('.v0-tile').count();
-  await page.route('**/api/ux-v0/images', (r) => r.fulfill({ json: { results: JSON.parse(r.request().postData()).queries.map((q) => ({ ...q, next: q.page, left: 0, refs: [], providers: [], error: 'The image libraries could not be reached just now.' })) } }));
-  await page.getByRole('button', { name: 'More images' }).click();
-  await page.waitForTimeout(800);
+  // a website the designer likes: read, its colours and type join the board; one that cannot be read is said so
+  const pals = await page.locator('.v0-board .v0-pal, .v0-board [class*="pal"]').count();
+  await page.route('**/api/ux-v0/reference', (r) => {
+    const { url } = JSON.parse(r.request().postData());
+    return /larkfield/.test(url)
+      ? r.fulfill({ json: { read: { url: 'https://larkfield.example/', host: 'larkfield.example', title: 'Larkfield', colours: ['#f6f1e7', '#2b2118', '#b4532a', '#e7dccb'], ground: '#f6f1e7', ink: '#2b2118', accent: '#b4532a', fonts: ['Fraunces', 'Inter'], notes: ['a light ground', 'serif headings'] }, preview: '' } })
+      : r.fulfill({ status: 422, json: { error: 'The site did not answer.' } });
+  });
+  await page.fill('#v0-board-site', 'nowhere.example');
+  await page.getByRole('button', { name: 'Learn from it' }).click();
+  await page.waitForTimeout(600);
   const line = await page.locator('.v0-board .v0-error-line').innerText().catch(() => '');
-  check('a provider failure is said on the board, which keeps what it has', /could not be reached/.test(line) && (await page.locator('.v0-tile').count()) === tiles && tiles > 0, `${tiles} tiles · ${line}`);
-  await page.unroute('**/api/ux-v0/images');
-  for (let i = 0; i < 6; i++) { const k = page.locator('.v0-tile .sb-link', { hasText: /^Keep$/ }).first(); if (await k.count()) await k.click(); }
+  check('a site that cannot be read is said on the board, which keeps what it has', /could not be read/.test(line) && /did not answer/.test(line), line);
+  await page.fill('#v0-board-site', 'larkfield.example');
+  await page.getByRole('button', { name: 'Learn from it' }).click();
+  await page.waitForTimeout(800);
+  const board = await page.locator('.v0-board').innerText();
+  check('a site that is read joins the board as a palette and a type pairing (no image search anywhere)', /From larkfield\.example/.test(board) && /Fraunces/.test(board) && !(await page.locator('[role=search], .v0-board-search input[placeholder*="Search"]').count()), `${pals} before · ${board.slice(0, 200)}`);
+  await page.unroute('**/api/ux-v0/reference');
   await page.getByRole('button', { name: 'Neighbours who come for the ritual' }).click();
   await page.waitForSelector('text=Enough to write the brief', { timeout: 10000 });
   await page.getByRole('button', { name: /Write the brief/ }).first().click();

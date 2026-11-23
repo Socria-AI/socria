@@ -1,8 +1,9 @@
 'use client';
 // components/ux-v0/Moodboard.tsx — the human moodboard: the atmosphere the project should have.
 //
-// References come from licensed libraries (imagery, texture, composition) or
-// from the designer (pictures, GIFs, clips, kept in this browser). Each one
+// References come from the designer: their own pictures, GIFs and clips (kept in this browser), and websites they
+// point to, read for their colours and faces (/api/ux-v0/reference), which join the board as a palette and a type
+// pairing — nothing is searched for them in an image library. Each picture
 // says what to take from it and what to leave (chips, or a note SocriaUX reads
 // as it is written: "this typography, not the palette"), whether it is key,
 // whether it is something to steer away from, and whether the picture itself
@@ -10,8 +11,7 @@
 // Colours can be sampled from a picture and kept as a palette. A line under
 // the header says what SocriaUX reads from the whole board, so nothing about
 // its interpretation is hidden. Type pairs are set in the real fonts;
-// palettes show their contrast. Every image carries its creator, source and
-// licence.
+// palettes show their contrast. A picture kept from a library before carries its creator, source and licence.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { contrastRatio } from '@/lib/ux/audit';
@@ -28,13 +28,11 @@ interface Props {
   busy: string | null;
   error: string;
   onRef: (id: string, state: RefState) => void;
-  onReplace: (ref: MoodboardRef) => void;
   onPalette: (id: string, state: RefState) => void;
   onType: (id: string, state: RefState) => void;
   onDirection: (aspect: Aspect) => void;
-  onMore: () => void;
-  onMoreLike: (category: MoodCategory) => void;
-  onSearch: (category: MoodCategory, query: string) => void;
+  /** a website the designer likes: read for its colours and faces, which join the board */
+  onSite: (url: string) => void;
   /** change what a reference means: what to take, its note, key, steer away, use on the page, its colours */
   onUpdate: (id: string, patch: Partial<MoodboardRef>) => void;
   /** the designer's own files */
@@ -46,36 +44,26 @@ interface Props {
   signedIn: boolean;
 }
 
-/** The designer's own search: a few words, in one kind of image. */
-function BoardSearch({ busy, onSearch }: { busy: boolean; onSearch: Props['onSearch'] }) {
-  const [term, setTerm] = useState('');
-  const [cat, setCat] = useState<MoodCategory>('imagery');
+/** A website the designer likes, read for what it can teach: its colours and its type (never its pictures). */
+function SiteLearn({ busy, onSite }: { busy: boolean; onSite: Props['onSite'] }) {
+  const [url, setUrl] = useState('');
   return (
     <form
       className="v0-board-search"
-      role="search"
       onSubmit={(e) => {
         e.preventDefault();
-        if (term.trim()) onSearch(cat, term.trim());
+        if (url.trim()) {
+          onSite(url.trim());
+          setUrl('');
+        }
       }}
     >
-      <label className="v0-sr" htmlFor="v0-board-q">
-        Search the image libraries
+      <label className="v0-sr" htmlFor="v0-board-site">
+        Learn from a website
       </label>
-      <svg className="st-search-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-        <circle cx="7" cy="7" r="4.6" />
-        <path d="M10.4 10.4 14 14" />
-      </svg>
-      <input id="v0-board-q" className="v0-board-q" value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Search the libraries" maxLength={80} />
-      <select className="st-search-kind" aria-label="Kind of image" value={cat} onChange={(e) => setCat(e.target.value as MoodCategory)}>
-        {MOOD_CATEGORIES.map((c) => (
-          <option key={c} value={c}>
-            {CAT_LABEL[c]}
-          </option>
-        ))}
-      </select>
-      <button type="submit" className="st-search-go" disabled={busy || !term.trim()}>
-        Search
+      <input id="v0-board-site" className="v0-board-q" type="text" inputMode="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="A website you like" maxLength={300} />
+      <button type="submit" className="st-search-go" disabled={busy || !url.trim()}>
+        Learn from it
       </button>
     </form>
   );
@@ -283,11 +271,6 @@ function Tile({ r, p, big = false }: { r: MoodboardRef; p: Props; big?: boolean 
               Keep
             </button>
           )}
-          {r.provider !== 'upload' && (
-            <button type="button" className="sb-link is-meta" onClick={() => p.onReplace(r)}>
-              Replace
-            </button>
-          )}
           <button type="button" className="sb-link is-meta" onClick={() => p.onRef(r.id, 'rejected')}>
             Remove
           </button>
@@ -416,10 +399,7 @@ export function Moodboard(p: Props) {
         <button type="button" className="sb-btn is-sm st-add-own" onClick={() => files.current?.click()}>
           Add your own
         </button>
-        <BoardSearch busy={!!p.busy} onSearch={p.onSearch} />
-        <button type="button" className="sb-link is-meta" onClick={p.onMore} disabled={!!p.busy || !p.board.queries.length}>
-          More images
-        </button>
+        <SiteLearn busy={!!p.busy} onSite={p.onSite} />
         <input
           ref={files}
           type="file"
@@ -452,7 +432,7 @@ export function Moodboard(p: Props) {
       )}
       {!shown.length && !palettes.length && !pairs.length && (
         <p className="v0-empty v0-board-empty">
-          {p.signedIn ? 'Images appear here as the direction becomes clear. Answer a question or two, search for something above, or add your own: a spread, a still, a clip.' : 'Images appear here as the direction becomes clear. Sign in to let SocriaUX find them, or add your own references.'}
+          Add your own pictures — a spread, a still, a clip — or point to a website you like: its colours and its type join the board.
         </p>
       )}
       {keys.length > 0 && (
@@ -474,9 +454,6 @@ export function Moodboard(p: Props) {
           <section key={c} className="v0-board-group" aria-label={CAT_LABEL[c]}>
             <div className="v0-group-head">
               <span className="sb-label">{CAT_LABEL[c]}</span>
-              <button type="button" className="sb-link is-meta" onClick={() => p.onMoreLike(c)} disabled={!!p.busy}>
-                More like these
-              </button>
               <button type="button" className="sb-link is-meta" onClick={() => p.onDirection(c)} disabled={!!p.busy}>
                 Another direction
               </button>

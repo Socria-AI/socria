@@ -273,6 +273,27 @@
   width: 100%;
   height: 100%;
 }
+.gx-dir-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.gx-dir-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--sb-ink-70, rgba(32, 32, 27, 0.78));
+  font-size: 13px;
+  cursor: pointer;
+}
+.gx-dir-pick input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--sb-moss-tone, #5e7633);
+}
 .gx-dir h2 {
   margin: 0;
   font-family: var(--sb-voice);

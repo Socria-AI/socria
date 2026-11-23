@@ -56,7 +56,6 @@ import {
   type Viewport,
   STAGE_LABEL,
 } from '@/lib/ux-v0/types';
-import { interleave, searchOpenverse } from '@/lib/ux-v0/image-search';
 import { operationId, post, type ApiResult, type CallTiming, type Progress } from './api';
 import { readQuickEdit } from '@/lib/ux-v0/quick-edit';
 import { offSystem } from '@/lib/ux-v0/design-system';
@@ -81,6 +80,7 @@ import { LAYOUT_QUESTION_ID } from '@/lib/ux-v0/layout';
 import { designerWords } from '@/lib/ux-v0/intent';
 import { elementSelection } from '@/lib/ux-v0/selection';
 import { Moodboard } from './Moodboard';
+import type { SiteRead } from '@/lib/ux-v0/studio/references';
 import { MotionPanel } from './MotionPanel';
 import { TypePanel } from './TypePanel';
 import { PROC_LABEL, PROC_SAYS, paletteOf, procRef, ratioFor, type ProcKind, type ProcSpec } from '@/lib/ux-v0/assets';
@@ -428,64 +428,40 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
   const placeholders = useMemo(() => (spec ? placeholdersIn(spec) : []), [spec]);
 
   // ── discovery ───────────────────────────────────────────────────────
-  // the keyed libraries the server can ask (Unsplash, Pexels): null until it says, [] when none are set
-  const libraries = useRef<string[] | null>(null);
-  const fetchImages = useCallback(
-    async (queries: { category: MoodCategory; query: string; page?: number }[], per = 6): Promise<MoodboardRef[]> => {
-      if (!queries.length) return [];
-      const p = current.current;
-      const qs = queries.slice(0, 6).map((q) => ({ ...q, page: q.page ?? p.moodboard.queries.find((x) => x.query === q.query)?.page ?? 1 }));
-      setImgBusy('Looking for images…');
+  /**
+   * A website the designer likes, read on the server through the guarded reader (/api/ux-v0/reference): its colours
+   * join the board as a palette and its faces as a type pairing, said as read. Nothing is searched for in an image
+   * library, and nothing of the site is placed in the design.
+   */
+  const learnFromSite = useCallback(
+    async (address: string) => {
+      setImgBusy('Reading the site…');
       setImgError('');
-      const seen = new Set(p.moodboard.seen);
-      // the libraries with keys from the server, which also checks the person is signed in;
-      // Openverse from this browser, which has its own allowance there
-      const askServer = libraries.current === null || libraries.current.length > 0;
-      const [server, open] = await Promise.all([
-        askServer
-          ? post<{ libraries?: string[]; results: { category: MoodCategory; query: string; page: number; next?: number; left?: number; refs: MoodboardRef[]; error: string }[] }>('/api/ux-v0/images', {
-              projectId: p.id,
-              queries: qs,
-              seen: p.moodboard.seen,
-              per,
-            })
-          : Promise.resolve(null),
-        Promise.all(qs.map((q) => searchOpenverse(q, seen, per).catch(() => ({ refs: [] as MoodboardRef[], next: q.page, left: 0, error: 'The image library could not be reached just now.' })))),
-      ]);
-      setImgBusy(null);
-      if (server && !server.ok && server.signIn) {
-        setImgError('Sign in to let SocriaUX find images for the moodboard.');
-        return [];
-      }
-      if (server?.ok) libraries.current = Array.isArray(server.data.libraries) ? server.data.libraries : null;
-      const results = qs.map((q, i) => {
-        const keyed = server?.ok ? server.data.results.find((x) => x.query === q.query) : undefined;
-        const ov = open[i];
-        const { taken, left } = interleave([keyed?.refs ?? [], ov.refs], seen, per);
-        for (const r of taken) seen.add(r.id);
-        const stay = left > 0 || (keyed?.left ?? 0) > 0 || ov.left > 0 || (keyed?.next ?? q.page + 1) === q.page;
-        // a library that could not be reached, or was busy, says more than one that found nothing
-        const errors = [ov.error, keyed?.error ?? ''].filter(Boolean);
-        const error = taken.length ? '' : errors.find((e) => !/^Nothing found/.test(e)) ?? errors[0] ?? 'Nothing found for that.';
-        return { ...q, refs: taken, next: stay ? q.page : q.page + 1, error };
-      });
-      const all = results.flatMap((x) => x.refs);
-      update((p2) => {
-        const known = new Set(p2.moodboard.refs.map((x) => x.id));
-        // a found picture inspires; it is placed in the design only if the designer marks it as content
-        const add = all.filter((x) => !known.has(x.id)).map((x) => ({ ...x, asContent: false }));
-        const queriesNext = [...p2.moodboard.queries];
-        for (const res of results) {
-          const k = queriesNext.findIndex((x) => x.query === res.query);
-          if (k >= 0) queriesNext[k] = { ...queriesNext[k], page: res.next };
-          else queriesNext.push({ category: res.category, query: res.query, page: res.next });
+      try {
+        const res = await fetch('/api/ux-v0/reference', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: address }) });
+        const j = (await res.json().catch(() => null)) as { read?: SiteRead; error?: string } | null;
+        if (!res.ok || !j?.read) {
+          setImgError(res.status === 429 ? 'Too many sites read just now. Try again in a minute.' : `That site could not be read: ${(j?.error ?? 'it did not answer').replace(/\.$/, '')}.`);
+          return;
         }
-        return { ...p2, moodboard: { ...p2.moodboard, refs: [...p2.moodboard.refs, ...add], seen: [...new Set([...p2.moodboard.seen, ...add.map((x) => x.id)])], queries: queriesNext.slice(-60) } };
-      });
-      if (!all.length) setImgError(results.find((x) => x.error)?.error ?? 'Nothing found for that.');
-      return all;
+        const read = j.read;
+        const colours = read.colours.slice(0, 5);
+        const add: { palette?: Palette; type?: TypePair } = {};
+        if (colours.length >= 2) add.palette = { id: `site-${read.host}-${Date.now().toString(36)}`, name: `From ${read.host}`, colors: colours.map((hex) => ({ hex, role: hex === read.ground ? 'background' : hex === read.ink ? 'text' : hex === read.accent ? 'accent' : 'support' })), state: 'proposed' };
+        if (read.fonts.length) add.type = { id: `site-${read.host}-type-${Date.now().toString(36)}`, display: read.fonts[0], body: read.fonts[1] ?? read.fonts[0], note: `As ${read.host} sets it${read.notes.length ? `: ${read.notes.slice(0, 2).join(', ')}` : ''}.`, state: 'proposed' };
+        if (!add.palette && !add.type) {
+          setImgError(`${read.host} was read, but it says too little about its colours or type to learn from.`);
+          return;
+        }
+        update((p2) => ({ ...p2, moodboard: { ...p2.moodboard, palettes: add.palette ? [...p2.moodboard.palettes, add.palette].slice(-12) : p2.moodboard.palettes, type: add.type ? [...p2.moodboard.type, add.type].slice(-12) : p2.moodboard.type } }));
+        say(`Read ${read.host}: ${[add.palette ? 'its colours are on the board as a palette' : '', add.type ? `its type (${add.type.display}) as a pairing` : ''].filter(Boolean).join(', and ')}. Keep what helps; nothing of the site goes into the design.`);
+      } catch {
+        setImgError('That site could not be reached from here.');
+      } finally {
+        setImgBusy(null);
+      }
     },
-    [update, current]
+    [update] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const discoverTurn = useCallback(
@@ -523,9 +499,8 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
         moodboard: { ...p2.moodboard, palettes: [...p2.moodboard.palettes, ...d.palettes].slice(-12), type: [...p2.moodboard.type, ...d.type].slice(-12) },
         usage: addUsage(p2.usage, d.usage),
       }));
-      if (d.queries.length) await fetchImages(d.queries, 6);
     },
-    [current, update, failed, fetchImages, runOp]
+    [current, update, failed, runOp]
   );
 
   const begin = useCallback(
@@ -753,27 +728,6 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     else setImgError('That library does not let its pictures’ colours be read. Add your own copy to sample it.');
   };
   const addPalette = (pal: Palette) => update((p) => ({ ...p, moodboard: { ...p.moodboard, palettes: [...p.moodboard.palettes, pal].slice(-12) } }));
-  const replaceRef = async (ref: MoodboardRef) => {
-    setRef(ref.id, 'rejected');
-    const got = await fetchImages([{ category: ref.category, query: ref.query }], 1);
-    // the state as it is now, not as this render saw it: a sign-in or provider error stands
-    if (!got.length) setImgError((e) => e || 'No other image for that; try Another direction.');
-  };
-  const moreImages = () => {
-    const recent = current.current.moodboard.queries.slice(-3);
-    fetchImages(recent.map((q) => ({ category: q.category, query: q.query, page: q.page })), 6);
-  };
-  /** more from the searches behind one group of the board */
-  const moreLike = (category: MoodCategory) => {
-    const recent = current.current.moodboard.queries.filter((q) => q.category === category).slice(-2);
-    if (!recent.length) return setImgError('Search for something first, or ask for another direction.');
-    fetchImages(recent.map((q) => ({ category: q.category, query: q.query, page: q.page })), 6);
-  };
-  /** the designer's own search, in any of the libraries */
-  const searchBoard = (category: MoodCategory, query: string) => {
-    const q = query.replace(/\s+/g, ' ').trim().slice(0, 80);
-    if (q) fetchImages([{ category, query: q }], 8);
-  };
   const direction = async (aspect: Aspect) => {
     const p = current.current;
     setImgBusy('Finding another direction…');
@@ -792,7 +746,6 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const d = r.data;
     update((p2) => ({ ...p2, moodboard: { ...p2.moodboard, palettes: [...p2.moodboard.palettes, ...d.palettes].slice(-12), type: [...p2.moodboard.type, ...d.type].slice(-12) }, usage: addUsage(p2.usage, d.usage) }));
     if (d.direction) say(`Another direction: ${d.direction}`);
-    if (d.queries.length) await fetchImages(d.queries, 6);
   };
 
   // ── the brief ───────────────────────────────────────────────────────
@@ -824,12 +777,6 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
     const keptNote = merged.kept.length ? ` Kept as you locked them: ${merged.kept.map((x) => PART_LABEL[x].toLowerCase()).join(', ')}.` : '';
     const reopenNote = merged.reopened.length ? ` Changed after you approved them, so they need your approval again: ${merged.reopened.map((x) => PART_LABEL[x].toLowerCase()).join(', ')}.` : '';
     say(`The brief was changed as you asked. Check it, then approve.${keptNote}${reopenNote}`);
-    // the visual direction moved: the board follows, with images to keep or remove
-    const qs = r.data.queries ?? [];
-    if (qs.length) {
-      const got = await fetchImages(qs, 4);
-      if (got.length) say(`The brief was changed, and its visual direction moved: ${got.length} new image${got.length === 1 ? '' : 's'} on the moodboard to keep or remove.`, 'info', { acts: [{ label: 'See the moodboard', run: () => setView('discovery') }] });
-    }
   };
 
   /** The brief's changed visual parts, carried into the design in place: a new version, no regeneration. */
@@ -1836,13 +1783,10 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                   busy={imgBusy}
                   error={imgError}
                   onRef={setRef}
-                  onReplace={replaceRef}
                   onPalette={(id, state) => update((p) => ({ ...p, moodboard: { ...p.moodboard, palettes: p.moodboard.palettes.map((x) => (x.id === id ? { ...x, state } : x)) } }))}
                   onType={(id, state) => update((p) => ({ ...p, moodboard: { ...p.moodboard, type: p.moodboard.type.map((x) => (x.id === id ? { ...x, state } : x)) } }))}
                   onDirection={direction}
-                  onMore={moreImages}
-                  onMoreLike={moreLike}
-                  onSearch={searchBoard}
+                  onSite={(u) => void learnFromSite(u)}
                   signedIn={signedIn}
                 />
               </div>

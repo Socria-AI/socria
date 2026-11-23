@@ -12,7 +12,6 @@ import type { ProjectSummary } from '@/lib/ux-v0/types';
 import type { StudioMode } from '@/lib/ux-v0/studio/schema';
 import { modeInfo } from '@/lib/ux-v0/studio/modes';
 import { attachmentKindOf, recognizeIntent } from '@/lib/ux-v0/studio/intent';
-import { modeOptions } from '@/lib/ux-v0/studio/discovery';
 import type { SystemRecord } from '@/lib/ux-v0/dsi/registry';
 import { kindLine } from './Collection';
 import { SystemPicker, usableSystems } from './SystemPicker';
@@ -21,7 +20,7 @@ import { ArrowUp, Attach, Close, FileMark, LinkMark, ModeGlyph } from './glyphs'
 export interface BeginRequest {
   prompt: string;
   mode: StudioMode;
-  modeBy: 'person' | 'recognised';
+  modeBy: 'person' | 'recognised' | 'unsure';
   files: File[];
 }
 
@@ -48,7 +47,6 @@ export function StudioHome(p: Props) {
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [linking, setLinking] = useState(false);
   const [link, setLink] = useState('');
-  const [clarify, setClarify] = useState<ReturnType<typeof modeOptions> | null>(null);
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [reading, setReading] = useState(() => recognizeIntent(''));
@@ -85,25 +83,21 @@ export function StudioHome(p: Props) {
     const xs = [...(list ?? [])];
     if (!xs.length) return;
     setFiles((cur) => [...cur, ...xs.filter((f) => !cur.some((c) => c.name === f.name && c.size === f.size))].slice(0, 12));
-    setClarify(null);
   };
 
-  const begin = async (forced?: StudioMode) => {
+  const begin = async () => {
     const text = [words.trim(), link.trim()].filter(Boolean).join(' ');
-    if (!text && !files.length && !forced) {
+    if (!text && !files.length) {
       field.current?.focus();
       return;
     }
     const r = recognizeIntent(text, kinds);
-    const mode = forced ?? r.mode;
-    if (!mode) {
-      setClarify(modeOptions(r.ranked));
-      return;
-    }
-    setClarify(null);
+    // words that do not settle the kind of work begin the conversation anyway: its first question is what it is
+    const likeliest = [...r.ranked].sort((x, y) => y.score - x.score)[0];
+    const mode: StudioMode = r.mode ?? (likeliest && likeliest.score > 0 ? likeliest.mode : 'graphic');
     setBusy(true);
     try {
-      if ((await p.onBegin({ prompt: text, mode, modeBy: forced ? 'person' : 'recognised', files })) === 'refused') setFiles([]);
+      if ((await p.onBegin({ prompt: text, mode, modeBy: r.mode ? 'recognised' : 'unsure', files })) === 'refused') setFiles([]);
     } finally {
       setBusy(false);
     }
@@ -116,7 +110,7 @@ export function StudioHome(p: Props) {
     if (!said) return null;
     if (reading.mode) return { glyph: reading.mode, text: `Reads as ${modeInfo(reading.mode).label.toLowerCase()}` };
     if (top && top.score > 0 && second && second.score > 0) return { glyph: null as StudioMode | null, text: `${modeInfo(top.mode).label} or ${modeInfo(second.mode).label.toLowerCase()}? You will be asked.` };
-    return { glyph: null as StudioMode | null, text: 'Say what it is, and who it is for.' };
+    return { glyph: null as StudioMode | null, text: 'I’ll ask what it is.' };
   })();
 
   // what was in progress: conversations still going first, then what changed last
@@ -184,7 +178,7 @@ export function StudioHome(p: Props) {
             value={words}
             aria-label="What do you want to make?"
             placeholder="A poster for a creative coding night, a logo for a coffee roastery, a website that takes bookings…"
-            onChange={(e) => (setWords(e.target.value.slice(0, 4000)), setClarify(null))}
+            onChange={(e) => setWords(e.target.value.slice(0, 4000))}
             onPaste={(e) => {
               // a screenshot or picture pasted is brought in; pasted words stay words
               const pics = [...e.clipboardData.files];
@@ -275,37 +269,13 @@ export function StudioHome(p: Props) {
           <input ref={fileInput} type="file" hidden multiple accept={ANY_ACCEPT} onChange={(e) => (add(e.target.files), (e.target.value = ''))} />
         </form>
 
-        {clarify && (
-          <section className="sd-clarify" aria-labelledby="sd-clarify-t">
-            <p className="sd-said" id="sd-clarify-t">
-              I’m not sure yet what this is. Which of these?
-            </p>
-            <div className="sd-cards is-small" role="group" aria-label="What are we making?">
-              {clarify.map((o, i) => (
-                <button key={o.id} type="button" className="sd-card" style={{ ['--i' as string]: i }} onClick={() => void begin(o.id as StudioMode)}>
-                  <span className="sd-sketch is-glyph" aria-hidden="true">
-                    <ModeGlyph mode={o.id as StudioMode} size={26} />
-                  </span>
-                  <span className="sd-card-text">
-                    <span className="sd-card-label">
-                      {o.label}
-                      {o.recommended && <span className="sd-likely">Likely</span>}
-                    </span>
-                    {o.hint && <span className="sd-card-hint">{o.hint}</span>}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
         {p.error && (
           <p className="v0-error-line sd-error" role="alert">
             {p.error}
           </p>
         )}
 
-        {recent.length > 0 && !clarify && (
+        {recent.length > 0 && (
           <nav className="sd-continue" aria-label="Continue where you left off">
             <span className="sd-continue-k">Continue</span>
             {recent.map((s) => (
@@ -324,7 +294,7 @@ export function StudioHome(p: Props) {
       </main>
 
       <footer className="sd-foot">
-        <p>Nothing here calls a model. References are found on Openverse and credited; they inspire the work and are never copied into it.</p>
+        <p>Nothing here calls a model. Websites you point to are read for what they can teach — their colours, their type — and never copied into the work.</p>
       </footer>
     </div>
   );

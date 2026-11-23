@@ -15,9 +15,8 @@ export * from '@/lib/ux-v0/discovery';
 export * from '@/lib/ux-v0/design';
 export * from '@/lib/ux-v0/model';
 export * from '@/lib/ux-v0/switch';
-export { providerOrder, searchImages, pingUse } from '@/lib/ux-v0/images-server';
+export { pingUse } from '@/lib/ux-v0/images-server';
 export { costOf } from '@/lib/model-router';
-export * from '@/lib/ux-v0/image-search';
 // art direction: the visual languages and the engine, colour arithmetic, the rendered-page audit and its evaluation
 export * from '@/lib/ux-v0/direction';
 export * from '@/lib/ux-v0/color';

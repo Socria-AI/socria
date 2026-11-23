@@ -284,8 +284,9 @@ repository's small fixtures, upscaled, so photographic quality is not representa
 1. A model-backed composer behind a budget and a validator: the model proposes a plan and content placement as
    operations, `applyOps` and the checks hold them (the same contract the edits use), with the deterministic composer
    as the fallback; then model critique of the rendered artboard, said as subjective.
-2. Licensed pictures in Graphics: connect the moodboard's libraries (`/api/ux-v0/images`) to the Pictures panel,
-   with credits and licences carried into the asset records and the exports.
+2. Pictures in Graphics beyond the person's own: the moodboard's image libraries were removed (no stock-image search
+   anywhere); any return would be a deliberate, licensed source with credits carried into the asset records and the
+   exports — not a carousel.
 3. A vector PDF writer (text as text with embedded subsets, vectors as paths), then CMYK conversion with an ICC
    profile and its verification, only then claimed.
 4. Reusable components (a symbol and its instances) and saved type and colour styles shared across artboards.

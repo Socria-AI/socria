@@ -1,5 +1,5 @@
-// SocriaUX studio (lib/ux-v0/studio): the conversation's record, intent recognition, the adaptive questions, the
-// creative context and how it reaches each engine — one bundle, for test/studio.test.mjs.
+// SocriaUX studio (lib/ux-v0/studio): the conversation's record, intent recognition, the creative director, websites
+// read for reference, the creative context and how it reaches each engine — one bundle, for test/studio.test.mjs.
 export * from '@/lib/ux-v0/studio/schema';
 export * from '@/lib/ux-v0/studio/modes';
 export * from '@/lib/ux-v0/studio/facts';
@@ -7,9 +7,10 @@ export * from '@/lib/ux-v0/studio/intent';
 export * from '@/lib/ux-v0/studio/catalog';
 export * from '@/lib/ux-v0/studio/options';
 export * from '@/lib/ux-v0/studio/apply';
-export * from '@/lib/ux-v0/studio/discovery';
+export * from '@/lib/ux-v0/studio/director';
 export * from '@/lib/ux-v0/studio/start';
-export * from '@/lib/ux-v0/studio/research';
+export * from '@/lib/ux-v0/studio/references';
+export { readSiteReference, referenceAddress } from '@/lib/ux-v0/studio/reference-server';
 // the engines it reaches, for the end-to-end checks
 export { makeProject, normalizeProject, summarize } from '@/lib/ux-v0/types';
 export { composeGraphic, readGraphicBrief } from '@/lib/ux-v0/graphics/compose';

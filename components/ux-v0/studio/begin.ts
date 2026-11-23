@@ -9,16 +9,18 @@ import { checkFile } from '../files';
 import { holdFile, heldFile } from './held';
 import { makeProject, normalizeRef, type DesignProject, type MoodboardRef } from '@/lib/ux-v0/types';
 import { emptyStudio, said, studioId, type StudioAttachment, type StudioMode, type StudioState } from '@/lib/ux-v0/studio/schema';
-import { seedFromWords } from '@/lib/ux-v0/studio/discovery';
+import { opening, seedFromWords, switchKind } from '@/lib/ux-v0/studio/director';
+import { systemChosen, websiteSystems } from '@/lib/ux-v0/studio/options';
 import { attachmentKindOf } from '@/lib/ux-v0/studio/intent';
 import { readFacts } from '@/lib/ux-v0/studio/facts';
 import { modeInfo } from '@/lib/ux-v0/studio/modes';
 import { startProject, startWebsite } from '@/lib/ux-v0/studio/start';
-import { importAskOf } from '@/lib/ux-v0/studio/apply';
+import { importAskOf, websiteAskOf } from '@/lib/ux-v0/studio/apply';
 import { newId, type Asset } from '@/lib/ux-v0/graphics/doc';
 import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
 import { applySystem } from '@/lib/ux-v0/dsi/link';
-import type { SystemRecord } from '@/lib/ux-v0/dsi/registry';
+import { publishedContent, type SystemRecord } from '@/lib/ux-v0/dsi/registry';
+import { brandBoardOptions } from '@/lib/ux-v0/dsi/generate';
 
 const PICTURE = /^image\/(png|jpeg|webp|gif)$/;
 
@@ -49,22 +51,6 @@ export async function attachFiles(files: readonly File[], opts: { critique?: boo
   return { attachments: out };
 }
 
-const OPENING: Record<StudioMode, string> = {
-  graphic: 'a few questions about what it says and how it should feel, then three directions to choose from.',
-  logo: 'tell me what the name stands for, and I’ll construct concepts from it — never from a library of marks.',
-  website: 'first what it must do and for whom, then how it should look.',
-  board: 'a whole campaign in one identity: what it holds first, then how it speaks.',
-  system: 'where is it now? I’ll read it as it is, and ask before I guess.',
-  critique: 'which design should we look at?',
-};
-
-/** Socria's first line: the kind of work it heard, and how it will go. */
-export function openingLine(mode: StudioMode, by: StudioState['modeBy']): string {
-  const label = modeInfo(mode).label.toLowerCase();
-  const a = /^[aeiou]/.test(label) ? 'an' : 'a';
-  return by === 'recognised' ? `That reads as ${a} ${label}: ${OPENING[mode]} If it is something else, change it at the top.` : `${a.charAt(0).toUpperCase()}${a.slice(1)} ${label}, then — ${OPENING[mode]}`;
-}
-
 /** A first name for a work: its quoted words or its name, else the start of what was said. */
 export function nameFor(mode: StudioMode, prompt: string): string {
   const f = readFacts(prompt);
@@ -73,44 +59,23 @@ export function nameFor(mode: StudioMode, prompt: string): string {
 }
 
 /** The project a conversation is kept in, its record begun from the opening words. */
-export function conversationProject(mode: StudioMode, prompt: string, opts: { modeBy: StudioState['modeBy']; attachments: StudioAttachment[]; systemId?: string | null; now?: number }): DesignProject {
+export function conversationProject(mode: StudioMode, prompt: string, opts: { modeBy: StudioState['modeBy']; attachments: StudioAttachment[]; systemId?: string | null; systemName?: string; now?: number }): DesignProject {
   const now = opts.now ?? Date.now();
   let st = emptyStudio(mode, prompt, { modeBy: opts.modeBy, attachments: opts.attachments, now, ...(opts.systemId && mode !== 'critique' && mode !== 'system' ? { systemId: opts.systemId } : {}) });
   st = said(st, { from: 'person', kind: 'prompt', text: prompt || (opts.attachments.length ? `These: ${opts.attachments.map((a) => a.name).join(', ')}` : `A ${modeInfo(mode).label.toLowerCase()}`), attachments: opts.attachments.map((a) => a.id), at: now });
-  st = said(st, { from: 'socria', kind: 'note', text: openingLine(mode, opts.modeBy), at: now });
-  st = seedFromWords(st, now);
+  // what was understood, then one question — or straight to the work when the words are enough
+  st = opening(st, { hasSystem: !!st.systemId, ...(opts.systemName ? { systemName: opts.systemName } : {}) }, now);
   return { ...makeProject(mode === 'critique' ? 'critique' : 'create', nameFor(mode, prompt), now), intent: prompt.slice(0, 600), studio: st };
 }
 
-/** The same conversation, about another kind of work: what carries across does, the rest is asked afresh. */
-export function switchMode(st: StudioState, mode: StudioMode, now = Date.now()): StudioState {
-  const from = ({ graphic: 'g', logo: 'l', website: 'w', board: 'b', system: 's', critique: 'c' } as const)[st.mode];
-  const to = ({ graphic: 'g', logo: 'l', website: 'w', board: 'b', system: 's', critique: 'c' } as const)[mode];
-  const answers: StudioState['answers'] = {};
-  // temperament, colours and what to avoid mean the same in every kind of made work
-  for (const k of ['personality', 'palette', 'avoid'])
-    if (st.answers[`${from}.${k}`] && st.answers[`${from}.${k}`].source !== 'words') answers[`${to}.${k}`] = st.answers[`${from}.${k}`];
-  // the person's own words: a headline stays a headline, a name a name
-  const words = st.answers[st.mode === 'logo' ? 'l.name' : `${from}.words`];
-  if (words?.fields && words.source !== 'words') {
-    const headline = words.fields.headline || words.fields.name || words.fields.brand || '';
-    if (headline) {
-      if (mode === 'logo') answers['l.name'] = { ...words, fields: { name: words.fields.brand || headline } };
-      else if (mode === 'graphic' || mode === 'board') answers[`${to}.words`] = { ...words, fields: { ...words.fields, headline } };
-      else if (mode === 'website') answers['w.words'] = { ...words, fields: { ...words.fields, brand: words.fields.brand || words.fields.name || '', headline: words.fields.headline || '' } };
-    }
-  }
-  if (mode === 'critique' || mode === 'system') delete answers[`${to}.personality`];
-  // references liked or turned down stay (a choice stays a choice); the rest were found for the other kind of work,
-  // so they go, and the new kind is searched for afresh
-  const references = (st.references ?? []).filter((r) => r.state !== 'proposed');
-  let next: StudioState = { ...st, mode, modeBy: 'person', answers, depth: 1, references, research: undefined, ...(mode === 'critique' || mode === 'system' ? { systemId: undefined } : {}) };
-  next = said(next, { from: 'socria', kind: 'change', text: openingLine(mode, 'person'), at: now });
-  return seedFromWords(next, now);
-}
+/** The same conversation, about another kind of work (lib/ux-v0/studio/director.ts switchKind). */
+export const switchMode = (st: StudioState, mode: StudioMode, now = Date.now()) => switchKind(st, mode, { hasSystem: !!st.systemId }, now);
 
 /** Pictures in a conversation as a graphic's assets (kept in this browser, referenced by upload). */
 export function picturesOf(st: StudioState): Asset[] {
+  // pictures brought only for their look are learnt from, never placed
+  const p = st.mode === 'board' ? 'b' : 'g';
+  if (st.answers[`${p}.pictures`]?.values?.[0] === 'look') return [];
   return st.attachments
     .filter((a) => a.kind === 'image' && a.upload)
     .map((a) => ({ id: newId('as'), kind: 'image' as const, src: `upload:${a.upload}`, width: a.width ?? 1200, height: a.height ?? 900, name: a.name.slice(0, 120), credit: 'Your own', source: 'upload' as const }));
@@ -130,6 +95,18 @@ export type Started =
   | { ok: true; kind: 'project'; project: DesignProject; file?: File | null; intent?: string }
   | { ok: true; kind: 'import'; ask: { kind: string; url: string; projectId: string; parts: string[]; next: string; files: File[] } }
   | { ok: false; error: string };
+
+/** A website's three looks for these words: within its design system when it has one. */
+function looksFor(st: StudioState, rec: SystemRecord | null): MasterDesignSystem[] {
+  try {
+    const ask = websiteAskOf(st);
+    if (!ask) return [];
+    const content = rec ? publishedContent(rec, 'latest') : null;
+    return content ? brandBoardOptions(content, ask.board, `${st.createdAt}|${st.round ?? 0}`, { round: st.round ?? 0 }).slice(0, 3) : websiteSystems(st);
+  } catch {
+    return [];
+  }
+}
 
 /** The work a conversation was about, made from it (nothing is stored here: the caller keeps it). */
 export function startFrom(p: DesignProject, st: StudioState, opts: { systems: readonly SystemRecord[]; websiteSystems: readonly MasterDesignSystem[]; now?: number }): Started {
@@ -153,9 +130,9 @@ export function startFrom(p: DesignProject, st: StudioState, opts: { systems: re
     return { ok: true, kind: 'project', project: linked({ ...r.project, board: { ...b, assets: [...b.assets, ...assets] } }) };
   }
   if (st.mode === 'website') {
-    const chosen = st.answers['w.aesthetic']?.values?.[0];
-    const i = chosen?.startsWith('sys-') ? Number(chosen.slice(4)) : 0;
-    const sys = opts.websiteSystems[i] ?? opts.websiteSystems[0];
+    // the looks shown in the conversation; when none were drawn (made at once), drawn here the same way
+    const drawn = opts.websiteSystems.length ? opts.websiteSystems : looksFor(st, rec);
+    const sys = systemChosen(drawn, st.answers['w.aesthetic']?.values?.[0]);
     if (!sys) return { ok: false, error: 'A website needs a name or a first line before a direction can be drawn.' };
     const r = startWebsite(st, sys, { now, name: p.name });
     if (!r.ok) return r;

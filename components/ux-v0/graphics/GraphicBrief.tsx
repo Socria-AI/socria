@@ -8,7 +8,7 @@
 // required: nothing is composed around invented words. Numbers for a chart are theirs too, and the chart says where
 // they came from.
 
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { FORMATS, formatOf, sizeLabel } from '@/lib/ux-v0/graphics/formats';
 import { composeGraphic, GRAPHIC_KINDS, readGraphicBrief, type GraphicBrief, type GraphicDirection, type GraphicKind } from '@/lib/ux-v0/graphics/compose';
 import { normalizeGraphicBrief } from '@/lib/ux-v0/graphics/state';
@@ -371,6 +371,7 @@ export function DirectionsStage({
   onChoose,
   onMore,
   onBack,
+  onCombine,
 }: {
   brief: GraphicBrief;
   options: readonly GraphicDirection[];
@@ -380,8 +381,15 @@ export function DirectionsStage({
   source: { projectId: string; name: string } | null;
   onChoose: (d: GraphicDirection) => void;
   onMore: () => void;
-  onBack: () => void;
+  /** back to the brief form (not offered for work begun in conversation: its brief is the conversation) */
+  onBack?: () => void;
+  /** two directions made one: the first's colours, the second's type and structure */
+  onCombine?: (colour: GraphicDirection, rest: GraphicDirection) => void;
 }) {
+  const [picked, setPicked] = useState<number[]>([]);
+  const toggle = (i: number) => setPicked((xs) => (xs.includes(i) ? xs.filter((x) => x !== i) : [...xs, i].slice(-2)));
+  // other directions drawn: what was ticked meant the ones before
+  useEffect(() => setPicked([]), [options]);
   const previews = useMemo(
     () =>
       options.map((d, i) => {
@@ -437,20 +445,44 @@ export function DirectionsStage({
                   </ul>
                 </details>
               ) : null}
-              <button type="button" className="sb-btn is-primary is-sm" onClick={() => onChoose(d)}>
-                Make it in this direction
-              </button>
+              <span className="gx-dir-acts">
+                <button type="button" className="sb-btn is-primary is-sm" onClick={() => onChoose(d)}>
+                  Make it in this direction
+                </button>
+                {onCombine && (
+                  <label className="gx-dir-pick">
+                    <input type="checkbox" checked={picked.includes(i)} onChange={() => toggle(i)} />
+                    Combine
+                  </label>
+                )}
+              </span>
             </li>
           );
         })}
       </ol>
       <div className="gx-go">
+        {onCombine && picked.length === 2 && (
+          <>
+            <button type="button" className="sb-btn" onClick={() => onCombine(options[picked[0]], options[picked[1]])}>
+              {options[picked[0]].name}’s colours, {options[picked[1]].name}’s type and structure
+            </button>
+            <button type="button" className="sb-btn" onClick={() => onCombine(options[picked[1]], options[picked[0]])}>
+              {options[picked[1]].name}’s colours, {options[picked[0]].name}’s type and structure
+            </button>
+          </>
+        )}
+        {onCombine && picked.length < 2 && <span className="v0-quiet">Tick two to combine them.</span>}
         <button type="button" className="sb-btn" onClick={onMore}>
-          Show three others
+          Something different
         </button>
-        <button type="button" className="sb-link is-meta" onClick={onBack}>
-          Back to the brief
+        <button type="button" className="sb-link is-meta" onClick={() => options[0] && onChoose(options[0])}>
+          You choose
         </button>
+        {onBack && (
+          <button type="button" className="sb-link is-meta" onClick={onBack}>
+            Back to the brief
+          </button>
+        )}
       </div>
     </div>
   );

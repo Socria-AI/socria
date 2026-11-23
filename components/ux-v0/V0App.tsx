@@ -15,22 +15,20 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { makeNonce } from '@/lib/ux-v0/sandbox';
 import { deleteArtifacts, deleteProject, getProject, listProjects, putProject } from '@/lib/ux-v0/store';
-import { makeProject, normalizeProject, type DesignProject, type ProjectSummary } from '@/lib/ux-v0/types';
+import { normalizeProject, type DesignProject, type ProjectSummary } from '@/lib/ux-v0/types';
 import { Workspace } from './Workspace';
 import { StudioHome, type BeginRequest } from './studio/StudioHome';
 import { YourWork } from './studio/YourWork';
 import { ProjectConversation } from './studio/ProjectConversation';
 import type { RemoteWork } from './studio/Collection';
 import { attachFiles, conversationProject, critiqueProject, startFrom } from './studio/begin';
+import { readyToMake } from '@/lib/ux-v0/studio/director';
 import { usableSystems } from './studio/SystemPicker';
 import type { WizardStart } from './systems/ImportWizard';
 import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
 import { GraphicsWorkspace } from './graphics/GraphicsWorkspace';
 import { BoardWorkspace } from './boards/BoardWorkspace';
-import { emptyGraphicState } from '@/lib/ux-v0/graphics/state';
-import { emptyBoard } from '@/lib/ux-v0/boards/model';
 import { SystemsApp } from './systems/SystemsApp';
-import { applySystem } from '@/lib/ux-v0/dsi/link';
 import type { SystemRecord } from '@/lib/ux-v0/dsi/registry';
 import { listSystems } from '@/lib/ux-v0/dsi/store';
 import '@/components/brand/socria-brand.css';
@@ -208,8 +206,19 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
       setError(at.error);
       return;
     }
-    const p = conversationProject(r.mode, r.prompt, { modeBy: r.modeBy, attachments: at.attachments, systemId: chosenSystem });
+    const rec = chosenSystem ? usableSystems(dsList).find((x) => x.id === chosenSystem) : undefined;
+    const p = conversationProject(r.mode, r.prompt, { modeBy: r.modeBy, attachments: at.attachments, systemId: chosenSystem, ...(rec ? { systemName: rec.name } : {}) });
     await putProject(p);
+    // words that are already enough go straight to the work, the conversation beside it (a website's looks are
+    // chosen in the conversation first)
+    // the opening said it has enough and is making the work: straight to it (anything else opens the conversation)
+    if (p.studio && readyToMake(p.studio, { hasSystem: !!rec, ...(rec ? { systemName: rec.name } : {}) })) {
+      window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(p.id)}`);
+      const err = await startConversation(p, p.studio, []);
+      if (!err) return;
+      setError(err);
+      window.history.replaceState(null, '', '/ux-v0');
+    }
     openNew(p);
   };
 
@@ -229,13 +238,12 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
 
   /** A new project built in a registry design system: linked (identity from the system), then opened. */
   const startInSystem = async (kind: 'graphic' | 'board' | 'website', rec: SystemRecord) => {
-    const base = makeProject('create', `${rec.name} ${kind}`);
-    const p0: DesignProject = kind === 'graphic' ? { ...base, medium: 'graphic', graphic: emptyGraphicState() } : kind === 'board' ? { ...base, medium: 'board', board: emptyBoard() } : base;
-    const { project } = applySystem(p0, rec);
-    await putProject(project);
+    // a conversation like any other, the system already chosen: it asks only what the work needs
+    const p = conversationProject(kind, '', { modeBy: 'person', attachments: [], systemId: rec.id, systemName: rec.name });
+    await putProject(p);
     setSystems(null);
-    passage(() => setOpen({ p: project }));
-    window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(project.id)}`);
+    passage(() => setOpen({ p }));
+    window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(p.id)}`);
   };
 
   const remove = async (s: ProjectSummary) => {

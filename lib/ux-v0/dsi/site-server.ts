@@ -218,7 +218,7 @@ export async function guardedFetch(input: string, opts: { accept: RegExp; max: n
 }
 
 /** A public page read and reconstructed (./site.ts), with everything fetched or refused listed. */
-export async function extractSite(input: unknown, deps: { fetcher?: Fetcher; resolver?: Resolver; now?: number } = {}): Promise<{ ok: true; result: ReturnType<typeof reconstructSite>; fetched: Fetched[]; assets: BrandAsset[] } | { ok: false; error: string; status: number; fetched: Fetched[] }> {
+export async function extractSite(input: unknown, deps: { fetcher?: Fetcher; resolver?: Resolver; now?: number; logos?: boolean } = {}): Promise<{ ok: true; result: ReturnType<typeof reconstructSite>; fetched: Fetched[]; assets: BrandAsset[]; source: { url: string; html: string; css: { url: string; text: string }[] } } | { ok: false; error: string; status: number; fetched: Fetched[] }> {
   const checked = checkUrl(input);
   const fetched: Fetched[] = [];
   if (!checked.ok) return { ok: false, error: checked.reason, status: 400, fetched };
@@ -240,6 +240,8 @@ export async function extractSite(input: unknown, deps: { fetcher?: Fetcher; res
   }
   const result = reconstructSite({ url: page.url, html, css }, { now: deps.now });
   const assets: BrandAsset[] = [];
+  // a page read only to learn from (a reference) needs no logo pictures
+  if (deps.logos === false) return { ok: true, result, fetched, assets, source: { url: page.url, html, css } };
   const source = { kind: 'website' as const, ref: page.url };
   for (const svg of first.page.inlineSvgLogos.slice(0, 2)) {
     const a = await importAsset({ name: `${new URL(page.url).hostname} logo.svg`, bytes: new TextEncoder().encode(svg) }, { kind: 'logo', source: { ...source, property: 'inline svg' } });
@@ -254,5 +256,5 @@ export async function extractSite(input: unknown, deps: { fetcher?: Fetcher; res
     if (a.asset) assets.push({ ...a.asset, notes: [...a.asset.notes, 'Found on the site; not approved'].slice(0, 8) });
   }
   result.content.assets = assets;
-  return { ok: true, result, fetched, assets };
+  return { ok: true, result, fetched, assets, source: { url: page.url, html, css } };
 }

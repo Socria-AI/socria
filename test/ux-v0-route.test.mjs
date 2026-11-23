@@ -33,7 +33,7 @@ const swap = {
     b.onResolve({ filter: /^next\/(server|headers)$/ }, (a) => ({ path: `${a.path}.js`, external: true }));
   },
 };
-const ROUTES = ['critique', 'discover', 'brief', 'direct', 'generate', 'refine', 'images', 'projects', 'design-system', 'assets'];
+const ROUTES = ['critique', 'discover', 'brief', 'direct', 'generate', 'refine', 'reference', 'projects', 'design-system', 'assets'];
 await Promise.all(
   ROUTES.map((r) =>
     build({
@@ -114,8 +114,8 @@ const REASONING = {
   alternatives: [{ text: 'Use a deep brown button.', tradeoff: 'Less warm.' }],
 };
 
-console.log('\n=== nobody signed out reaches a model or a library ===');
-for (const r of ['critique', 'discover', 'brief', 'direct', 'generate', 'refine', 'images']) {
+console.log('\n=== nobody signed out reaches a model ===');
+for (const r of ['critique', 'discover', 'brief', 'direct', 'generate', 'refine']) {
   const out = await post(r, { comment: 'x', intent: 'y', selection: elementSel }, null, [REASONING]);
   ok(`${r}: refused, told to sign in, nothing asked`, out.status === 401 && out.json?.signIn === true && out.calls.length === 0, J(out));
 }
@@ -244,30 +244,23 @@ console.log('\n=== art direction ===');
   ok('a change to what is not locked goes straight through, as a look patch', free.json.challenge === '' && free.json.applies && free.json.patch.op === 'look');
 }
 
-console.log('\n=== moodboard images ===');
+console.log('\n=== websites read for reference ===');
 {
-  const fetched = [];
+  // the reader itself (pages, stylesheets, redirects, the inert preview) is checked in test/studio.test.mjs with a
+  // scripted fetcher; here, the route: what it refuses before anything is fetched
   const realFetch = globalThis.fetch;
-  globalThis.fetch = async (url) => {
-    fetched.push(String(url));
-    return { ok: true, status: 200, json: async () => ({ photos: [
-      { id: 1, src: { large2x: 'https://images.pexels.com/photos/1/a.jpeg', medium: 'https://images.pexels.com/photos/1/a-m.jpeg' }, width: 1200, height: 800, avg_color: '#776655', alt: 'Marble counter', photographer: 'Kim', photographer_url: 'https://www.pexels.com/@kim', url: 'https://www.pexels.com/photo/1/' },
-      { id: 2, src: { large2x: 'https://images.pexels.com/photos/2/b.jpeg', medium: 'https://images.pexels.com/photos/2/b-m.jpeg' }, width: 1200, height: 800, alt: 'Seen before', photographer: 'Lee', url: 'https://www.pexels.com/photo/2/' },
-    ] }) };
-  };
-  // no keyed library set: the server asks nothing and says so; the browser asks Openverse itself
-  const bare = await post('images', { projectId: 'uxv0_c', queries: [{ category: 'imagery', query: 'espresso bar', page: 1 }], per: 4 }, A);
-  ok('with no keyed library set, the server asks nothing and says so (the browser asks Openverse)', bare.status === 200 && J(bare.json.libraries) === '[]' && bare.json.results[0].refs.length === 0 && fetched.length === 0, J(bare.json));
-  process.env.PEXELS_API_KEY = 'pk';
-  const out = await post('images', { projectId: 'uxv0_c', queries: [{ category: 'texture', query: 'marble counter', page: 2 }], seen: ['pexels:2'], per: 4 }, A);
-  delete process.env.PEXELS_API_KEY;
+  const fetched = [];
+  globalThis.fetch = async (url) => (fetched.push(String(url)), new Response('no', { status: 500 }));
+  const none = await post('reference', {}, A);
+  ok('no address: refused, nothing fetched', none.status === 400 && fetched.length === 0, J(none));
+  const priv = await post('reference', { url: 'http://127.0.0.1/admin' }, A);
+  ok('a private address: refused before any request, and said', priv.status === 400 && /private|reserved|public/i.test(priv.json?.error ?? '') && fetched.length === 0, J(priv.json));
+  const meta = await post('reference', { url: 'http://169.254.169.254/latest/meta-data' }, null);
+  ok('…signed out too: reading a site needs no account, and never reaches inside a network', meta.status === 400 && fetched.length === 0, J(meta.json));
+  const cred = await post('reference', { url: 'https://user:secret@example.com/' }, A);
+  ok('an address carrying credentials is refused', cred.status === 400 && fetched.length === 0, J(cred.json));
+  ok('nothing in what it said asked a model', [none, priv, meta, cred].every((x) => x.calls.length === 0));
   globalThis.fetch = realFetch;
-  const refs = out.json?.results?.[0]?.refs ?? [];
-  ok('a keyed library answers, with licence and credit', out.status === 200 && J(out.json.libraries) === J(['pexels']) && refs.length === 1 && refs[0].license === 'Pexels License' && refs[0].creator === 'Kim', J(out.json).slice(0, 300));
-  ok('…in the category asked for, at the page asked for, a whole page at a time', refs[0]?.category === 'texture' && fetched[0].includes('page=2') && fetched[0].includes('per_page=20'), fetched[0]);
-  ok('…never one already seen', !refs.some((x) => x.id === 'pexels:2'));
-  ok('…and it says which page to ask for next', out.json.results[0].next === 3 && out.json.results[0].left === 0, J(out.json.results[0]).slice(0, 160));
-  ok('no queries, no search', (await post('images', { queries: [] }, A)).status === 400);
 }
 
 console.log('\n=== projects: private, normalised, newest wins ===');

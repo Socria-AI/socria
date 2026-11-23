@@ -11,9 +11,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { StudioState } from '@/lib/ux-v0/studio/schema';
 import { said } from '@/lib/ux-v0/studio/schema';
-import type { DiscoveryEnv } from '@/lib/ux-v0/studio/discovery';
+import type { DirectorEnv } from '@/lib/ux-v0/studio/director';
 import { modeInfo } from '@/lib/ux-v0/studio/modes';
-import { DesignContext } from './DesignContext';
+import { Brief } from './Brief';
 import { ArrowUp, Chat, Close, ModeGlyph } from './glyphs';
 
 const KEY = 'socriaux.studio.rail';
@@ -58,7 +58,7 @@ export function useRailReply<T>(signal: T | null, textOf: (s: T) => string | nul
     });
 }
 
-export function StudioRail({ studio, onStudio, onAsk, placeholder, env = {}, systemName, onOpenChange }: { studio: StudioState; onStudio: (fn: (s: StudioState) => StudioState) => void; onAsk: (words: string) => Promise<string | null>; placeholder: string; env?: DiscoveryEnv; systemName?: string | null; /** told whether the rail is open (the workspace's own ask bar steps back while it is) */ onOpenChange?: (open: boolean) => void }) {
+export function StudioRail({ studio, onStudio, onAsk, placeholder, env = {}, systemName, onOpenChange }: { studio: StudioState; onStudio: (fn: (s: StudioState) => StudioState) => void; onAsk: (words: string) => Promise<string | null>; placeholder: string; env?: DirectorEnv; systemName?: string | null; /** told whether the rail is open (the workspace's own ask bar steps back while it is) */ onOpenChange?: (open: boolean) => void }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<'talk' | 'decisions'>('talk');
   const [words, setWords] = useState('');
@@ -139,7 +139,23 @@ export function StudioRail({ studio, onStudio, onAsk, placeholder, env = {}, sys
                     <p>{m.text}</p>
                   </div>
                 ) : (
-                  <p className={m.kind === 'question' ? 'sd-said-q' : 'sd-said'}>{m.text}</p>
+                  <div className="sd-say">
+                    <p className="sd-said">{m.text}</p>
+                    {m.kind === 'reference' &&
+                      ((r) =>
+                        r ? (
+                          <p className="sd-rail-ref">
+                            <span className="sd-ref-dots" aria-hidden="true">
+                              {r.colours.slice(0, 5).map((c, i) => (
+                                <span key={`${c}-${i}`} style={{ background: c }} />
+                              ))}
+                            </span>
+                            <a href={r.url} target="_blank" rel="noopener noreferrer nofollow">
+                              {r.host}
+                            </a>
+                          </p>
+                        ) : null)((studio.references ?? []).find((x) => x.id === m.stage))}
+                  </div>
                 )}
               </li>
             ))}
@@ -153,8 +169,7 @@ export function StudioRail({ studio, onStudio, onAsk, placeholder, env = {}, sys
         </div>
       ) : (
         <div className="sd-rail-body">
-          <DesignContext st={studio} env={env} systemName={systemName} title="Decided in the conversation" />
-          <p className="sd-rail-note">To change any of it now, say so in words: the change is made in the workspace and kept here.</p>
+          <Brief st={studio} env={{ ...env, ...(systemName ? { hasSystem: true, systemName } : {}) }} title="The brief, from the conversation" />
         </div>
       )}
       <form

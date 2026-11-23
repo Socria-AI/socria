@@ -413,73 +413,17 @@ console.log('\n=== the model, the switch, the providers ===');
   ok('usage matches the router’s own arithmetic, cached tokens included', uc.cost === V.costOf('gpt-6-luna', { input: 12_000, cached: 5_000, output: 900 }) && uc.cached === 5_000, J(uc));
   ok('…and cached never exceeds what was sent', V.usageOf('gpt-6-luna', { prompt_tokens: 100, completion_tokens: 0, prompt_tokens_details: { cached_tokens: 900 } }).cached === 100);
   ok('open off production, closed in it, unless switched', V.readV0(undefined, 'preview') && !V.readV0(undefined, 'production') && V.readV0('on', 'production') && !V.readV0('off', 'development'));
-  ok('the server asks only the libraries whose key is set (Openverse is asked from the browser)', J(V.providerOrder({})) === '[]' && J(V.providerOrder({ UNSPLASH_ACCESS_KEY: 'k', PEXELS_API_KEY: 'p' })) === J(['unsplash', 'pexels']) && V.providerOrder({ SOCRIAUX_OPENVERSE_SERVER: '1' }).includes('openverse'));
-  const pexel = (id, alt = 'Marble') => ({ id, src: { large2x: `https://images.pexels.com/photos/${id}/a.jpeg`, medium: `https://images.pexels.com/photos/${id}/m.jpeg` }, width: 1200, height: 800, alt, photographer: 'Kim', photographer_url: 'https://www.pexels.com/@kim', url: `https://www.pexels.com/photo/${id}/` });
-  const calls = [];
-  const fake = async (url) => {
-    calls.push(url);
-    if (url.includes('unsplash')) return { ok: false, status: 503, json: async () => ({}) };
-    return { ok: true, json: async () => ({ photos: [pexel(1), pexel(2), pexel(3)] }) };
-  };
-  const res = await V.searchImages({ category: 'imagery', query: 'cup', page: 1 }, new Set(['pexels:2']), { env: { UNSPLASH_ACCESS_KEY: 'k', PEXELS_API_KEY: 'p' }, fetcher: fake, per: 4 });
-  ok('every keyed library is asked at once; one failing does not hold up the others', calls.length === 2 && res.refs.length === 2 && J(res.providers) === J(['pexels']) && res.error === '', J({ calls, res }).slice(0, 300));
-  ok('licence and credit come with the image', res.refs[0].license === 'Pexels License' && res.refs[0].attribution.includes('Kim') && res.refs[0].sourceUrl.startsWith('https://www.pexels.com/'));
-  ok('an image already seen is not shown again', !res.refs.some((r) => r.id === 'pexels:2'));
-  ok('a whole page is asked for at a time', calls.every((u) => /per_page=20/.test(u)));
-  const none = await V.searchImages({ category: 'imagery', query: 'cup', page: 1 }, new Set(), { env: { PEXELS_API_KEY: 'p' }, fetcher: async () => { throw new Error('offline'); } });
-  ok('no library reachable is said plainly', none.refs.length === 0 && /could not be reached/.test(none.error));
-  const inits = [];
-  const limited = await V.searchImages({ category: 'texture', query: 'linen', page: 1 }, new Set(), {
-    env: { UNSPLASH_ACCESS_KEY: 'k', PEXELS_API_KEY: 'p' },
-    fetcher: async (url, init) => (inits.push(init), url.includes('unsplash') ? { ok: false, status: 429, json: async () => ({}) } : { ok: true, json: async () => ({ photos: [] }) }),
-  });
-  ok('a rate-limited library does not stop the rest; nothing found anywhere is said as such', limited.refs.length === 0 && limited.error === 'Nothing found for that.', J(limited));
-  ok('searches are cached for a day on the server', inits.length === 2 && inits.every((i) => i?.next?.revalidate === 86400), J(inits.map((i) => i?.next)));
+  // the moodboard no longer searches image libraries (websites are read for reference instead: test/studio.test.mjs);
+  // what remains is telling Unsplash when a photo kept on a board before is used in a design
+  const pinged = [];
+  const pf = async (u) => (pinged.push(u), { ok: true });
+  await V.pingUse({ provider: 'unsplash', downloadPing: 'https://api.unsplash.com/photos/x/download' }, { env: { UNSPLASH_ACCESS_KEY: 'k' }, fetcher: pf });
+  await V.pingUse({ provider: 'unsplash', downloadPing: 'https://evil.example/x' }, { env: { UNSPLASH_ACCESS_KEY: 'k' }, fetcher: pf });
+  await V.pingUse({ provider: 'openverse', downloadPing: 'https://api.unsplash.com/photos/y/download' }, { env: { UNSPLASH_ACCESS_KEY: 'k' }, fetcher: pf });
+  await V.pingUse({ provider: 'unsplash', downloadPing: 'https://api.unsplash.com/photos/z/download' }, { env: {}, fetcher: pf });
+  ok('Unsplash is told when one of its photos is used — only Unsplash, only at its own address, only with its key', J(pinged) === J(['https://api.unsplash.com/photos/x/download']), J(pinged));
 }
 
-
-console.log('\n=== how the moodboard searches ===');
-{
-  ok('a long query is tried as asked, then by its subject pair, then its opening and closing pairs', J(V.shorterQueries('morning light espresso bar marble counter')) === J(['morning light espresso bar marble counter', 'espresso bar', 'morning light', 'marble counter']), J(V.shorterQueries('morning light espresso bar marble counter')));
-  ok('…a three-word query by its opening and closing pairs; a short one only as asked', J(V.shorterQueries('ceramic cup texture')) === J(['ceramic cup texture', 'ceramic cup', 'cup texture']) && J(V.shorterQueries('espresso bar')) === J(['espresso bar']));
-  const r = (id, provider = 'openverse') => ({ id: `${provider}:${id}`, provider });
-  const mix = V.interleave([[r(1, 'pexels'), r(2, 'pexels'), r(3, 'pexels')], [r(1), r(2)]], new Set(['pexels:2']), 3);
-  ok('lists from several libraries are interleaved, skipping what was seen', J(mix.taken.map((x) => x.id)) === J(['pexels:1', 'openverse:1', 'pexels:3']) && mix.left === 1, J(mix));
-  const ov = (id, title = 'Espresso bar', tags = []) => ({ id: `ov${id}`, url: `https://live.staticflickr.com/${id}.jpg`, thumbnail: `https://api.openverse.org/v1/images/ov${id}/thumb/`, width: 1000, height: 700, title, creator: 'Kim', foreign_landing_url: `https://flickr.com/${id}`, license: 'by', license_version: '2.0', license_url: 'https://creativecommons.org/licenses/by/2.0/', attribution: `"${title}" by Kim is licensed under CC BY 2.0. To view a copy of this license, visit https://creativecommons.org/licenses/by/2.0/.`, tags: tags.map((name) => ({ name })) });
-  const asked = [];
-  const pageOf = (n, from = 0, mk = (i) => ov(i)) => ({ results: Array.from({ length: n }, (_, i) => mk(from + i)) });
-  const fakeOv = async (url) => {
-    asked.push(url);
-    const q = new URL(url).searchParams.get('q');
-    const pg = Number(new URL(url).searchParams.get('page'));
-    if (q === 'busy now') return { ok: false, status: 429, json: async () => ({}) };
-    if (q === 'espresso bar') return { ok: true, status: 200, json: async () => pageOf(pg <= 2 ? 20 : 4, (pg - 1) * 20, (i) => ov(i, i % 2 ? 'Morning light on a lake' : 'Espresso bar', i % 2 ? [] : ['coffee'])) };
-    return { ok: true, status: 200, json: async () => ({ results: [] }) };
-  };
-  const cache = new Map();
-  const seen = new Set();
-  const a = await V.searchOpenverse({ category: 'imagery', query: 'morning light espresso bar marble counter', page: 1 }, seen, 6, { fetcher: fakeOv, cache });
-  ok('a long query that finds nothing is asked again by its subject pair', a.refs.length === 6 && a.refs.every((x) => x.query === 'espresso bar') && asked.length === 2, J(asked));
-  ok('…and stays on the page while it holds unseen images', a.next === 1 && a.left === 14, J({ next: a.next, left: a.left }));
-  ok('…its results ordered by how much of the full query they share', a.refs.slice(0, 6).every((x) => x.title === 'Espresso bar'), J(a.refs.map((x) => x.title)));
-  ok('the credit is the short form, never the library’s legal sentence', a.refs[0].attribution === '“Espresso bar” by Kim, CC BY 2.0' && V.creditText(a.refs[0]) === '“Espresso bar” by Kim, CC BY 2.0', a.refs[0].attribution);
-  a.refs.forEach((x) => seen.add(x.id));
-  const before = asked.length;
-  const b = await V.searchOpenverse({ category: 'imagery', query: 'morning light espresso bar marble counter', page: a.next }, seen, 6, { fetcher: fakeOv, cache });
-  ok('a second click on the same page asks Openverse nothing new', asked.length === before && b.refs.length === 6 && !b.refs.some((x) => seen.has(x.id)), `${asked.length - before} new requests`);
-  b.refs.forEach((x) => seen.add(x.id));
-  const c = await V.searchOpenverse({ category: 'imagery', query: 'espresso bar', page: 1 }, new Set([...seen, ...Array.from({ length: 6 }, (_, i) => `openverse:ov${i + 12}`)]), 6, { fetcher: fakeOv, cache });
-  ok('when a page runs out, the batch is filled from the next one', c.refs.length === 6 && c.refs.some((x) => Number(x.providerId.slice(2)) >= 20) && c.next === 2, J({ ids: c.refs.map((x) => x.providerId), next: c.next }));
-  const busy = await V.searchOpenverse({ category: 'imagery', query: 'busy now please wait', page: 1 }, new Set(), 6, { fetcher: fakeOv, cache: new Map() });
-  ok('a busy library says so and stops asking', busy.refs.length === 0 && /busy/.test(busy.error) && busy.next === 1, J(busy));
-  const down = await V.searchOpenverse({ category: 'imagery', query: 'espresso bar', page: 3 }, new Set(), 6, { fetcher: async () => { throw new Error('offline'); }, cache: new Map() });
-  ok('after a failure the same page is asked again next time', down.refs.length === 0 && down.next === 3 && /could not be reached/.test(down.error), J(down));
-  ok('only licences that allow commercial use and change are asked for', V.openverseUrl('linen texture', 2).includes('license_type=commercial,modification') && V.openverseUrl('linen texture', 2).includes('page_size=20'));
-  // the board lets go of removed and unkept images when it is full, never of kept ones
-  const many = Array.from({ length: 170 }, (_, i) => ({ provider: 'openverse', providerId: `m${i}`, url: `https://x.org/m${i}.jpg`, category: 'imagery', query: 'q', state: i < 5 ? 'kept' : i < 40 ? 'rejected' : 'proposed' }));
-  const board = V.normalizeMoodboard({ refs: many });
-  ok('a full board never lets go of a kept image', board.refs.length === 160 && board.refs.filter((x) => x.state === 'kept').length === 5 && board.refs.filter((x) => x.state === 'rejected').length === 25, J({ n: board.refs.length, kept: board.refs.filter((x) => x.state === 'kept').length }));
-}
 
 console.log('\n=== art direction ===');
 {

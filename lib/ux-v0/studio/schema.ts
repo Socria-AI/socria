@@ -27,49 +27,48 @@ export interface StudioAttachment {
   swatches?: string[];
 }
 
-export const REF_TAKES = ['colour', 'type', 'composition', 'mood', 'imagery'] as const;
+/** What can be taken from a reference: none chosen means the whole of it. */
+export const REF_TAKES = ['colour', 'type', 'layout', 'mood'] as const;
 export type RefTake = (typeof REF_TAKES)[number];
 
-/** A reference found on the internet, as kept with the conversation: enough to show it, credit it and learn from it. */
+/**
+ * A website the person pointed to, as SocriaUX read it (lib/ux-v0/studio/references.ts): its colours, its type and
+ * what its pages are like, said in words. A reference is learnt from, never placed in the work.
+ */
 export interface StudioReference {
-  /** provider:id */
+  /** site:<host><path> */
   id: string;
-  provider: string;
+  kind: 'site';
+  /** the page read (http or https, no credentials) */
+  url: string;
+  host: string;
   title: string;
-  creator: string;
-  /** the page it came from */
-  sourceUrl: string;
-  /** where the provider found it (Flickr, Wikimedia Commons, a museum) */
-  origin?: string;
-  /** a small picture of it, as the provider serves it */
-  thumb: string;
-  width: number;
-  height: number;
-  license: string;
-  licenseUrl: string;
-  /** the provider's own words for it */
-  tags: string[];
-  /** what was searched for to find it */
-  query: string;
-  state: 'proposed' | 'liked' | 'rejected';
-  /** what the person likes about it (none: the whole of it) */
+  description?: string;
+  /** the colours the site uses, most used first */
+  colours: string[];
+  /** its ground, its text and its accent, when the site says them */
+  ground?: string;
+  ink?: string;
+  accent?: string;
+  /** its typefaces, the headings' first */
+  fonts: string[];
+  /** what was read, in words ("a light ground", "serif headings", "square corners") */
+  notes: string[];
+  /** what to take from it (none: the whole of it) */
   take?: RefTake[];
-  /** its colours, read in the browser */
-  swatches?: string[];
+  state: 'liked' | 'rejected';
   at: number;
 }
 
-export interface ResearchSearch {
-  query: string;
-  provider: string;
-  found: number;
-  error?: string;
-}
-
-/** What was really searched, where, and what came of it: said as it was, never more. */
-export interface ResearchLog {
-  at: number;
-  searches: ResearchSearch[];
+/** A link the person may open: http or https, no credentials, bounded. */
+export function linkUrl(u: unknown): string {
+  if (typeof u !== 'string' || u.length > 600) return '';
+  try {
+    const x = new URL(u);
+    return (x.protocol === 'https:' || x.protocol === 'http:') && !x.username && !x.password ? x.toString() : '';
+  } catch {
+    return '';
+  }
 }
 
 /** Only addresses a browser may safely load or open: https, no credentials, bounded. */
@@ -102,7 +101,7 @@ export interface StudioAnswer {
   at: number;
 }
 
-export type MessageKind = 'prompt' | 'question' | 'answer' | 'note' | 'change' | 'reply';
+export type MessageKind = 'prompt' | 'question' | 'answer' | 'note' | 'change' | 'reply' | 'offer' | 'reference';
 
 export interface StudioMessage {
   id: string;
@@ -119,8 +118,8 @@ export interface StudioMessage {
 export interface StudioState {
   v: 1;
   mode: StudioMode;
-  /** chosen by the person, or recognised from their words */
-  modeBy: 'person' | 'recognised';
+  /** chosen by the person, recognised from their words, or not yet clear (asked about first) */
+  modeBy: 'person' | 'recognised' | 'unsure';
   /** the opening sentence, exactly */
   prompt: string;
   answers: Record<string, StudioAnswer>;
@@ -128,17 +127,21 @@ export interface StudioState {
   attachments: StudioAttachment[];
   /** the registry design system the work is made in */
   systemId?: string;
-  /** how deep the questions have gone: 1 the accessible ones, 2 palette, type and composition, 3 the finer points */
+  /** how deep the questions have gone (kept for records made before the conversation became free) */
   depth?: 1 | 2 | 3;
+  /** the question waiting for an answer (lib/ux-v0/studio/director.ts topics), read from the next reply */
+  pending?: string;
+  /** every topic asked once: never asked again */
+  asked?: string[];
+  /** how many times other directions were asked for (a website's looks) */
+  round?: number;
   /** discovering: still in conversation; started: the work has begun in its workspace */
   status: 'discovering' | 'started';
   startedAt?: number;
   /** how the work began: from the conversation (the default), or with the brief written by hand in the workspace */
   via?: 'hand';
-  /** references found on the internet for this work, and what the person made of each */
+  /** websites the person pointed to, as read, and what to take from each */
   references?: StudioReference[];
-  /** what was really searched for them, where, and what came of it */
-  research?: ResearchLog;
   createdAt: number;
 }
 
@@ -230,7 +233,7 @@ function normalizeAttachment(v: unknown): StudioAttachment | null {
   };
 }
 
-const KINDS: readonly MessageKind[] = ['prompt', 'question', 'answer', 'note', 'change', 'reply'];
+const KINDS: readonly MessageKind[] = ['prompt', 'question', 'answer', 'note', 'change', 'reply', 'offer', 'reference'];
 
 function normalizeMessage(v: unknown): StudioMessage | null {
   const r = o(v);
@@ -267,7 +270,7 @@ export function normalizeStudio(v: unknown): StudioState | undefined {
   return {
     v: 1,
     mode: r.mode,
-    modeBy: r.modeBy === 'recognised' ? 'recognised' : 'person',
+    modeBy: r.modeBy === 'recognised' || r.modeBy === 'unsure' ? r.modeBy : 'person',
     prompt: s(r.prompt, STUDIO_LIMITS.prompt),
     answers,
     transcript: a(r.transcript)
@@ -280,6 +283,9 @@ export function normalizeStudio(v: unknown): StudioState | undefined {
       .slice(0, STUDIO_LIMITS.attachments),
     ...(systemId && /^dsys_[\w-]{4,64}$/.test(systemId) ? { systemId } : {}),
     ...(r.depth === 2 || r.depth === 3 ? { depth: r.depth } : {}),
+    ...(s(r.pending, 24) && TOPIC.test(s(r.pending, 24)) ? { pending: s(r.pending, 24) } : {}),
+    ...((xs) => (xs.length ? { asked: xs } : {}))([...new Set(a(r.asked).map((x) => s(x, 24)).filter((x) => TOPIC.test(x)))].slice(0, 24)),
+    ...(n(r.round, 1, 99) ? { round: Math.round(n(r.round, 1, 99)!) } : {}),
     status: r.status === 'started' ? 'started' : 'discovering',
     ...(n(r.startedAt, 0, 8.64e15) ? { startedAt: n(r.startedAt, 0, 8.64e15)! } : {}),
     ...(r.via === 'hand' ? { via: 'hand' as const } : {}),
@@ -289,63 +295,49 @@ export function normalizeStudio(v: unknown): StudioState | undefined {
         .filter((x): x is StudioReference => !!x)
         .slice(0, MAX_REFERENCES),
     ),
-    ...((log) => (log ? { research: log } : {}))(normalizeResearch(r.research)),
     createdAt: n(r.createdAt, 0, 8.64e15) ?? 0,
   };
 }
 
-const MAX_REFERENCES = 60;
+const MAX_REFERENCES = 12;
 const HEX6 = /^#[0-9a-f]{6}$/i;
 
-/** A reference as stored: every address checked, every field bounded, nothing else kept. */
+const TOPIC = /^[a-z]{2,16}$/;
+
+/** A reference as stored: every address checked, every field bounded, nothing else kept (earlier kinds of reference
+ *  — pictures found in an image library — are let go). */
 function normalizeReference(v: unknown): StudioReference | null {
   const r = o(v);
-  const id = s(r.id, 140);
-  const thumb = safeUrl(r.thumb);
-  if (!id || !thumb) return null;
+  if (r.kind !== 'site') return null;
+  const id = s(r.id, 160);
+  const url = linkUrl(r.url);
+  if (!id || !url) return null;
+  const hex = (x: unknown) => (typeof x === 'string' && HEX6.test(x) ? x.toLowerCase() : '');
   const take = a(r.take).filter((x): x is RefTake => typeof x === 'string' && (REF_TAKES as readonly string[]).includes(x));
-  const swatches = a(r.swatches)
-    .filter((x): x is string => typeof x === 'string' && HEX6.test(x))
-    .map((x) => x.toLowerCase())
-    .slice(0, 6);
+  const description = s(r.description, 300);
   return {
     id,
-    provider: s(r.provider, 40) || 'openverse',
-    title: s(r.title, 200),
-    creator: s(r.creator, 120),
-    sourceUrl: safeUrl(r.sourceUrl),
-    ...(s(r.origin, 40) ? { origin: s(r.origin, 40) } : {}),
-    thumb,
-    width: n(r.width, 0, 100000) ?? 0,
-    height: n(r.height, 0, 100000) ?? 0,
-    license: s(r.license, 60),
-    licenseUrl: safeUrl(r.licenseUrl),
-    tags: a(r.tags)
-      .map((x) => s(x, 40))
+    kind: 'site',
+    url,
+    host: s(r.host, 120) || new URL(url).hostname,
+    title: s(r.title, 160),
+    ...(description ? { description } : {}),
+    colours: [...new Set(a(r.colours).map(hex).filter(Boolean))].slice(0, 8),
+    ...(hex(r.ground) ? { ground: hex(r.ground) } : {}),
+    ...(hex(r.ink) ? { ink: hex(r.ink) } : {}),
+    ...(hex(r.accent) ? { accent: hex(r.accent) } : {}),
+    fonts: a(r.fonts)
+      .map((x) => s(x, 60))
       .filter(Boolean)
-      .slice(0, 12),
-    query: s(r.query, 100),
-    state: r.state === 'liked' || r.state === 'rejected' ? r.state : 'proposed',
+      .slice(0, 4),
+    notes: a(r.notes)
+      .map((x) => s(x, 80))
+      .filter(Boolean)
+      .slice(0, 8),
     ...(take.length ? { take: [...new Set(take)] } : {}),
-    ...(swatches.length ? { swatches } : {}),
+    state: r.state === 'rejected' ? 'rejected' : 'liked',
     at: n(r.at, 0, 8.64e15) ?? 0,
   };
-}
-
-function normalizeResearch(v: unknown): ResearchLog | null {
-  const r = o(v);
-  const searches = a(r.searches)
-    .map((x) => {
-      const q = o(x);
-      const query = s(q.query, 100);
-      if (!query) return null;
-      const error = s(q.error, 200);
-      return { query, provider: s(q.provider, 40) || 'openverse', found: n(q.found, 0, 10000) ?? 0, ...(error ? { error } : {}) };
-    })
-    .filter((x): x is ResearchSearch => !!x)
-    .slice(-20);
-  const at = n(r.at, 0, 8.64e15);
-  return searches.length && at ? { at, searches } : null;
 }
 
 /** A message added to the conversation (bounded: the oldest go first). */
