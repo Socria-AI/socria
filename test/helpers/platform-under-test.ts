@@ -27,5 +27,4 @@ export { research, researchProvider, PROVIDERS as RESEARCH_PROVIDERS } from '@/l
 export { respond, hear } from '@/lib/ux-v0/studio/director';
 export { emptyStudio, normalizeStudio, said } from '@/lib/ux-v0/studio/schema';
 export { briefRealisation, vibeRealisation } from '@/lib/ux-v0/studio/realise';
-export { readingOf, normalizeReading, creativeSystem } from '@/lib/ux-v0/graphics/creative/model';
 export { FORM_LABEL } from '@/lib/ux-v0/graphics/creative/forms';

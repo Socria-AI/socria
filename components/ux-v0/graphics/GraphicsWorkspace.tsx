@@ -49,6 +49,9 @@ import { reviewAndRepair, saidOf } from './visualReview';
 import { applySystem } from '@/lib/ux-v0/dsi/link';
 import { listSystems } from '@/lib/ux-v0/dsi/store';
 import type { PlanQuestion } from '@/lib/ux-v0/graphics/creative/plan';
+import { browserBench, directorReachable, httpTransport } from './director';
+import { designFlow } from '@/lib/ux-v0/graphics/director/flow';
+import type { ProjectMemory } from '@/lib/ux-v0/graphics/director/sheet';
 
 // 'concepts': every logo concept side by side, opened from the editor's Logo tab when wanted (never a step before it)
 type View = 'brief' | 'edit' | 'concepts';
@@ -169,9 +172,97 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
     [project.id, project.studio, project.dna, linked, brandOpts],
   );
 
+  /** The kinds the creative director designs whole; the others (several coordinated artboards, a logo) are the engine's. */
+  const DIRECTED_KINDS = (k: GraphicBrief['kind']) => !['logo', 'identity', 'carousel', 'card'].includes(k);
+  /** Why the engine composed instead of the director, when it did (said in the note under the design). */
+  const fallbackLine = useRef('');
+
+  /**
+   * The design made by the creative director (lib/ux-v0/graphics/director): it reads the brief and what the
+   * conversation decided, decides the idea, the palette, the faces and the composition, and writes a program that
+   * SocriaUX validates, compiles, checks and renders; it then looks at the rendered picture once and corrects what it
+   * sees. False when it could not be reached: SocriaUX's own engine composes instead, and the note says so.
+   */
+  const designByDirector = async (dir: GraphicDirection, named: GraphicBrief, brief: GraphicBrief): Promise<boolean> => {
+    setBusy('Reading the brief…');
+    const t0 = performance.now();
+    const prefs = project.studio ? prefsOf(project.studio) : null;
+    // a brand, or a website whose direction the graphic takes, fixes the colours and faces
+    const fixed = !!linked || (!!siteDir && !!g.source);
+    const c = dir.tokens.colors;
+    const decided = {
+      ...(prefs?.palette ? { palette: prefs.palette } : fixed ? { palette: { ground: c.background, ink: c.text, accent: c.accent, ...(dir.tokens.accent2 ? { accent2: dir.tokens.accent2 } : {}) } } : {}),
+      ...(prefs?.faces ? { fonts: prefs.faces } : fixed ? { fonts: dir.tokens.fonts } : {}),
+      ...(prefs?.avoid.length ? { avoid: prefs.avoid } : {}),
+    };
+    // the feel chosen in the conversation travels as the person's own words for it
+    const felt = prefs?.vibe ? [...new Set([...named.mood, ...(prefs.vibe.name ? [prefs.vibe.name] : []), ...prefs.vibe.qualities, ...(prefs.vibe.theme ? [`a ${prefs.vibe.theme} theme`] : [])])].slice(0, 8) : named.mood;
+    const memory: ProjectMemory = {
+      brief: project.studio?.prompt || brief.purpose,
+      kind: brief.kind,
+      ...((refs) => (refs.length ? { references: refs } : {}))((project.studio?.references ?? []).filter((r) => r.state !== 'rejected').map((r) => `${r.host}${r.take?.length ? ` (take its ${r.take.join(', ')})` : ''}`)),
+      ...(linked ? { system: { name: linked.rec.name, colours: [c.background, c.text, c.accent, ...(dir.tokens.accent2 ? [dir.tokens.accent2] : [])], fonts: [dir.tokens.fonts.display, dir.tokens.fonts.body], rules: [], logo: 'its approved logo is placed by SocriaUX after you: leave room for a brand mark, do not draw one' } } : {}),
+    };
+    const r = await designFlow(
+      httpTransport({ projectId: project.id, onProgress: (p) => (p.phase === 'thinking' ? setBusy('Finding the idea…') : p.phase === 'writing' ? setBusy('Designing…') : undefined) }),
+      browserBench(resolve),
+      { ...named, mood: felt },
+      dir,
+      { memory, decided, assets: g.assets ?? [], name: current.current.name, seed: seedOf(project.id) },
+    );
+    if (!r.ok) {
+      fallbackLine.current = r.reason === 'cancelled' ? '' : 'The creative director could not be reached just now, so this was composed by SocriaUX’s own engine; ask for another interpretation in a moment to have it designed.';
+      return false;
+    }
+    setBusy('Checking the result…');
+    const m = canvasMeasure();
+    const doc = project.studio ? withTreatment(r.doc, prefsOf(project.studio)) : r.doc;
+    const brand = linked ? guardedForBrand(doc, linked.content, brandOpts, m) : null;
+    let finalDoc = brand ? brand.doc : doc;
+    let lookLine = '';
+    const looked = finalDoc.artboards[0] ? await reviewAndRepair(finalDoc, finalDoc.artboards[0].id, { measure: canvasMeasure(), resolve, rounds: 2 }) : null;
+    if (looked) {
+      finalDoc = looked.doc;
+      lookLine = saidOf(looked, { fixedLead: 'Repaired after looking' });
+    }
+    let bindings = g.bindings;
+    let brandLine = '';
+    if (linked && brand) {
+      bindings = bindForBrand(finalDoc, r.dir.look);
+      const f = fidelityOfDoc(finalDoc, linked.content, brandOpts);
+      brandLine = `Brand fidelity to ${linked.rec.name}: ${f.score}${brand.placed ? ', with its approved logo' : ''}${f.findings.length ? ` (${f.findings.length} finding${f.findings.length === 1 ? '' : 's'}: ${f.findings[0].message})` : ''}.`;
+    }
+    const secs = Math.max(1, Math.round((performance.now() - t0) / 1000));
+    setG((x) => ({ ...x, brief, direction: r.dir, doc: finalDoc, ...(bindings ? { bindings } : {}), versions: pushVersion(x.versions, finalDoc, `Designed: ${r.dir.name}`) }));
+    setPlanNotes([`Idea: ${r.design.concept.idea}`, ...r.design.concept.decisions].slice(0, 9));
+    const left = r.measured.findings.filter((f) => !/^a generic habit/.test(f)).length;
+    setNote({
+      tone: left || r.problems.length ? 'warn' : 'ok',
+      text: [
+        `Designed in ${secs} s by SocriaUX’s creative director: ${r.design.concept.idea}`,
+        r.review?.applied ? `It looked at the rendered result and corrected: ${r.review.seen.slice(0, 2).join('; ')}.` : r.review ? 'It looked at the rendered result and kept it.' : '',
+        lookLine,
+        brandLine,
+        r.problems.length ? `Adjusted by SocriaUX: ${r.problems.slice(0, 2).join('; ')}.` : '',
+        left ? `${left} thing${left === 1 ? '' : 's'} left to look at (Checks, with nothing selected).` : '',
+      ]
+        .filter(Boolean)
+        .join(' '),
+    });
+    refreshMeasure();
+    setBusy('');
+    setView('edit');
+    return true;
+  };
+
   /** The design composed in a direction, checked and repaired, as the current document and a version (with the mood
    * chosen in the conversation carried into it, when `realise`). */
   const composeIn = async (dir: GraphicDirection, brief: GraphicBrief, opts: { realise?: boolean } = {}) => {
+    fallbackLine.current = '';
+    if (DIRECTED_KINDS(brief.kind) && directorReachable()) {
+      const namedFor = linked && !brief.content.brand ? { ...brief, content: { ...brief.content, brand: linked.content.identity.name } } : brief;
+      if (await designByDirector(dir, namedFor, brief)) return;
+    }
     setBusy(`Composing in “${dir.name}”…`);
     const changed = await loadFaces(directionFaces(dir));
     const m = canvasMeasure();
@@ -223,7 +314,7 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
     setNote({
       tone: placeholders.length || remaining ? 'warn' : 'ok',
       text: [
-        `Composed and checked in ${ms} ms, without a model.`,
+        fallbackLine.current || `Composed and checked in ${ms} ms by SocriaUX’s own engine.`,
         vibeLine,
         lookLine,
         brandLine,
@@ -253,6 +344,23 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
     const out: Artboard[] = [];
     const formats = opts.format ? [opts.format, ...brief.formats.filter((f) => f !== opts.format)] : brief.formats;
     const want = { ...brief, formats: formats.slice(0, 1) };
+    // the creative director first: each alternative a different idea, told what the designs already made are (the
+    // ideas they were made from), so it stays away from their structure; the engine composes any it cannot
+    if (DIRECTED_KINDS(brief.kind) && directorReachable() && g.doc) {
+      const ideas = g.doc.artboards.map((b) => b.directed?.idea ?? `${b.direction?.name ?? b.name}: a ${brief.kind} already made`).slice(-5);
+      const base = g.direction ?? proposeFor(want, 0, [])[0];
+      for (let i = 0; base && out.length < Math.min(count, 4) && i < 4; i++) {
+        const r = await designFlow(httpTransport({ projectId: project.id }), browserBench(resolve), want, base, { memory: { brief: project.studio?.prompt || brief.purpose, kind: brief.kind }, avoid: [...ideas, ...out.map((b) => b.directed?.idea ?? b.name)], another: true, review: false, assets: g.assets ?? [], name: current.current.name });
+        if (!r.ok) break;
+        const b = r.doc.artboards[0];
+        out.push({ ...b, name: r.dir.name.slice(0, 60), tokens: r.doc.tokens, direction: { name: r.dir.name, language: r.dir.language } });
+        seen.push(r.dir.name);
+      }
+      if (out.length >= count) {
+        usedDirections.current = seen;
+        return out;
+      }
+    }
     for (let guard = 0; out.length < count && guard < 4; guard++) {
       altRound.current += 1;
       const dirs = proposeFor(want, altRound.current + 1, seen);

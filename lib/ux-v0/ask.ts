@@ -452,7 +452,7 @@ export const PREMIUM_TIMEOUT_MS = 40_000;
  * November 2026 for that stage (GPT-6 Luna: generation 10.0 s, art direction 8.5 s, the brief 7.6 s, a critique
  * 4.9 s, a question 4.0 s) with half again on top, and never less than 8 s.
  */
-export const ECONOMY_RESERVE_MS: Record<string, number> = { generate: 15_000, 'art-direction': 13_000, brief: 12_000, 'refine-brief': 12_000, critique: 9_000, refine: 8_000, discover: 8_000, direction: 8_000 };
+export const ECONOMY_RESERVE_MS: Record<string, number> = { 'graphic-design': 22_000, 'creative-edit': 14_000, 'graphic-review': 10_000, generate: 15_000, 'art-direction': 13_000, brief: 12_000, 'refine-brief': 12_000, critique: 9_000, refine: 8_000, discover: 8_000, direction: 8_000 };
 
 /**
  * One routed call. A PREMIUM call gets a time limit (SOCRIAUX_PREMIUM_TIMEOUT_MS, default 40 s, and never so

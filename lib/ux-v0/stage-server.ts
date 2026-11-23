@@ -161,7 +161,9 @@ const STAGE_WORDS: Record<CallKind, string> = {
   generate: 'Designing',
   refine: 'Working out the change',
   critique: 'Reading the design',
-  'creative-edit': 'Reading the change',
+  'creative-edit': 'Working out the change',
+  'graphic-design': 'Designing',
+  'graphic-review': 'Looking at the result',
   'studio-questions': 'Thinking about what to ask',
   image: 'Making the picture',
 };

@@ -34,7 +34,7 @@ const swap = {
     b.onResolve({ filter: /^next\/(server|headers)$/ }, (a) => ({ path: `${a.path}.js`, external: true }));
   },
 };
-const ROUTES = ['critique', 'discover', 'brief', 'direct', 'generate', 'refine', 'reference', 'projects', 'design-system', 'assets', 'graphic-edit', 'studio-questions'];
+const ROUTES = ['critique', 'discover', 'brief', 'direct', 'generate', 'refine', 'reference', 'projects', 'design-system', 'assets', 'graphic-edit', 'graphic-design', 'studio-questions'];
 await Promise.all(
   ROUTES.map((r) =>
     build({
@@ -872,61 +872,96 @@ console.log('\n=== how demanding a generation is: read in code, said, and the mo
   ok('each generation is in the call log with the tier it ran on', logged.length === 4 && J(logged.map((r) => r.tier)) === J(['premium', 'economy', 'premium', 'premium']), J(logged.map((r) => [r.tier, r.model])));
 }
 
-console.log('\n=== a creative change in words: read by the model into a plan, held to its shape ===');
+console.log('\n=== the creative director: a change read against the design, a design from a brief, a look at the render ===');
 {
   const G = 'user_v0_gfx';
   const was = { routing: process.env.SOCRIAUX_ROUTING, model: process.env.SOCRIAUX_MODEL };
   process.env.SOCRIAUX_ROUTING = 'single';
-  const reading = {
-    artboard: { name: 'Poster', format: 'a4', width: 595, height: 842 },
+  const sheet = {
+    artboard: { name: 'Poster', format: 'a4', frame: { w: 1000, h: 1414 }, safe: 57, minText: 11, ground: '#f7f4ee' },
+    palette: { ground: '#f7f4ee', ink: '#121625', accent: '#2252e6', muted: '#5d5a52' },
+    fonts: { display: 'Archivo Black', body: 'Archivo' },
     objects: [
-      { role: 'headline', kind: 'text', name: 'Headline', words: 'Open Air', face: 'Archivo Black 900', colour: '#121625', at: '6% 52%, 88% × 20%' },
-      { role: 'logo', kind: 'text', name: 'Logo', words: 'Parklife Society', face: 'Archivo 600', colour: '#121625', at: '6% 93%, 88% × 2%' },
+      { id: 's_field', is: 'large form (rect)', role: 'motif', kind: 'rect', box: [0, 0, 1000, 600], fill: 'accent' },
+      { id: 't_head', is: 'main headline', role: 'headline', kind: 'text', box: [60, 700, 880, 300], text: 'Open Air', font: 'Archivo Black', weight: 900, size: 180, lineHeight: 0.95, align: 'left', color: 'ink' },
+      { id: 't_logo', is: 'brand name / logo', role: 'logo', kind: 'text', box: [60, 1300, 400, 40], text: 'Parklife Society', font: 'Archivo', weight: 600, size: 24, lineHeight: 1.3, align: 'left', color: 'ink' },
     ],
-    palette: { background: '#f7f4ee', text: '#121625', accent: '#2252e6' },
-    type: { display: 'Archivo Black', body: 'Archivo' },
-    decisions: [{ decision: 'palette', now: 'A light ground, one accent', by: 'as the concept was made' }],
-    locked: [],
-    concepts: [],
+    readingOrder: ['main headline (180)', 'brand name / logo (24)'],
   };
-  const PLAN = {
-    intent: 'theme',
-    summary: 'You get a cloud-themed sky behind your words.',
-    keep: ['words'],
-    changes: [
-      { decision: 'theme', theme: 'cloud', forms: null, abstraction: null, mode: null },
-      { decision: 'type', character: 'soft', display: 'Not A Font', body: null, weight: null, case: null, from: null },
-      { decision: 'palette', shifts: ['cooler'], colours: { ground: 'blue', ink: null, accent: '#f0a050', support: null }, from: null },
-      { decision: 'content', role: 'headline', text: 'Sky High' },
-      { decision: 'mood', qualities: ['calm', 'nonsense'] },
-    ],
+  const EDIT = {
+    task: 'edit',
+    understanding: { level: 'aesthetic', goal: 'A design that feels like open sky.', affects: ['ground', 'forms', 'headline'], preserves: ['the wording', 'the logo'] },
     question: null,
+    summary: 'You get a pale, airy sky with the headline set lighter.',
+    palette: { ground: '#e9f1f7', ink: 'navy', accent: '#f0a050' },
+    fonts: { display: 'Not A Font', body: 'Inter' },
+    edits: [
+      { do: 'set', id: 't_head', weight: 300, font: 'Fraunces', color: 'ink', tracking: -20 },
+      { do: 'set', id: 'ghost', size: 10 },
+      { do: 'place', id: 's_field', box: { x: 0, y: 0, w: 1000, h: 900 } },
+      { do: 'words', id: 't_head', text: 'Sky High' },
+      { do: 'add', element: { op: 'path', d: 'M 0 600 C 300 500 700 700 1000 560 L 1000 0 L 0 0 Z', fill: 'accent' }, under: 't_head' },
+      { do: 'explode', id: 't_head' },
+    ],
   };
-  const signedOut = await post('graphic-edit', { words: 'make it cloud themed', reading }, null, [PLAN]);
+  const signedOut = await post('graphic-edit', { words: 'make it cloud themed', sheet }, null, [EDIT]);
   ok('signed out: refused, told to sign in, nothing asked', signedOut.status === 401 && signedOut.calls.length === 0, J(signedOut));
-  ok('no words: no call', (await post('graphic-edit', { reading }, G, [PLAN])).status === 400);
-  ok('no design: no call', (await post('graphic-edit', { words: 'make it cloud themed' }, G, [PLAN])).status === 400);
+  ok('no words: no call', (await post('graphic-edit', { sheet }, G, [EDIT])).status === 400);
+  ok('no design: no call', (await post('graphic-edit', { words: 'make it cloud themed' }, G, [EDIT])).status === 400);
 
-  process.env.SOCRIAUX_MODEL = 'gpt-6.1-sol';
-  const r = await post('graphic-edit', { projectId: 'uxv0_gfx', words: 'I want to make it cloud themed', reading, recent: [{ said: 'make it warmer', did: 'the colour warmer' }] }, G, [PLAN]);
-  const p = r.json?.plan;
-  ok('a plan comes back, read by the model', r.status === 200 && p?.by === 'model' && p.intent === 'theme', J(r.json));
-  ok('  its theme, as the model decided', !!p && p.changes.some((c) => c.decision === 'theme' && c.theme === 'cloud'), J(p));
-  ok('  a font off the list is dropped, the type character kept', !!p && p.changes.some((c) => c.decision === 'type' && c.character === 'soft' && !c.display), J(p?.changes));
-  ok('  a colour that is not a colour is dropped, the real one kept', !!p && p.changes.some((c) => c.decision === 'palette' && c.colours?.accent === '#f0a050' && !c.colours.ground), J(p?.changes));
-  ok('  words the designer did not write are never carried', !!p && !p.changes.some((c) => c.decision === 'content'), J(p?.changes));
-  ok('  a quality outside the catalogue is dropped, the others kept', !!p && p.changes.some((c) => c.decision === 'mood' && J(c.qualities) === J(['calm'])), J(p?.changes));
-  const sent = r.calls[0] ?? {};
-  ok('the model is asked for the plan as a strict schema', sent.text?.format?.type === 'json_schema' && sent.text.format.name === 'socriaux_creative_edit' && sent.text.format.strict === true, J(sent.text));
-  ok('  told the rules and the vocabulary; given the words, the design and the turns before; no pictures', /VOCABULARY/.test(sent.instructions ?? '') && /THE DESIGNER SAYS: I want to make it cloud themed/.test(J(sent.input)) && /Parklife Society/.test(J(sent.input)) && /make it warmer/.test(J(sent.input)) && !/data:image/.test(J(sent.input)));
-  const q = await post('graphic-edit', { projectId: 'uxv0_gfx', words: 'change the overall aesthetic', reading }, G, [{ intent: 'style', summary: 'A new direction.', keep: [], changes: [], question: { text: 'Which way should it go?', options: [{ label: 'Quieter and more refined', words: 'make it more sophisticated' }, { label: 'Bolder', words: 'make it more expressive' }] } }]);
-  ok('one question with ways to answer, when the words could mean different things', q.status === 200 && q.json.plan.question?.options.length === 2 && q.json.plan.changes.length === 0, J(q.json));
-  const prose = await post('graphic-edit', { projectId: 'uxv0_gfx', words: 'make it cloud themed', reading }, G, ['I would add some clouds.']);
-  ok('an answer with no plan in it: said, and no plan is made up', prose.status !== 200 && !prose.json?.plan, J(prose));
-  const broken = await post('graphic-edit', { projectId: 'uxv0_gfx', words: 'make it cloud themed', reading }, G, [new Error('upstream down')]);
-  ok('a model failure is a calm error the browser falls back from — it never speaks of being “without a model”', broken.status >= 500 && !!broken.json?.error && !/without a model/i.test(broken.json.error), J(broken));
+  const r = await post('graphic-edit', { projectId: 'uxv0_gfx', words: 'Make this cloud themed, but keep the logo.', sheet, memory: { brief: 'A poster for a park concert series', journal: [{ turn: 1, said: 'warmer colours', did: 'a warmer palette', status: 'rejected' }], system: { name: 'Parklife', colours: ['#2252e6'], fonts: ['Archivo'], rules: ['never recolour the logo'] } } }, G, [EDIT]);
+  const e = r.json?.edit;
+  ok('an edit comes back, with what was understood: the level, the goal, what it affects and preserves', r.status === 200 && e?.understanding.level === 'aesthetic' && /open sky/.test(e.understanding.goal) && e.understanding.preserves.length === 2, J(r.json));
+  ok('  edits by object id: a restyle, a move, new drawn material', !!e && e.edits.some((x) => x.do === 'set' && x.id === 't_head' && x.props.weight === 300 && x.props.font === 'Fraunces') && e.edits.some((x) => x.do === 'place' && x.id === 's_field') && e.edits.some((x) => x.do === 'add' && x.under === 't_head'), J(e?.edits));
+  ok('  an object that is not on the design, a verb that is not one, wording the person did not write: dropped, and said', !!e && !e.edits.some((x) => x.id === 'ghost' || x.do === 'words' || x.do === 'explode') && e.dropped.some((d) => /no object “ghost”/.test(d)) && e.dropped.some((d) => /new wording is only set when you wrote it/.test(d)) && e.dropped.some((d) => /“explode” is not something/.test(d)), J(e?.dropped));
+  ok('  a colour that is not a colour and a face off the library are dropped; the real ones kept', !!e && e.palette.ground === '#e9f1f7' && e.palette.accent === '#f0a050' && !('ink' in e.palette) && e.fonts.body === 'Inter' && !e.fonts.display && e.dropped.some((d) => /Not A Font/.test(d)), J([e?.palette, e?.fonts]));
+  ok('  the request is routed by what it asks (a change of feel is premium work)', r.json.complexity?.tier === 'premium', J(r.json.complexity));
+  const sentUser = J(r.calls[0]?.messages ?? r.calls[0]?.input ?? '');
+  const sentSys = J(r.calls[0]?.messages?.[0] ?? r.calls[0]?.instructions ?? '');
+  ok('the director is told its one set of instructions (understand first, no house style, the instrument, the answers)', /Understand before you act/.test(sentSys) && /There is no house style/.test(sentSys) && /TASK \\"edit\\"/.test(sentSys), sentSys.slice(0, 300));
+  ok('  and, apart, the person’s words exactly, what they said to keep, the project (brief, a turned-down turn), the brand, the design by id', /Make this cloud themed, but keep the logo\./.test(sentUser) && /the logo/.test(sentUser) && /park concert series/.test(sentUser) && /THEY TURNED IT DOWN/.test(sentUser) && /never recolour the logo/.test(sentUser) && /t_head/.test(sentUser), sentUser.slice(0, 400));
+  const small = await post('graphic-edit', { projectId: 'uxv0_gfx', words: 'Make the headline smaller', sheet }, G, [{ task: 'edit', understanding: { level: 'object', goal: 'a smaller headline', affects: ['headline'], preserves: ['everything else'] }, question: null, summary: 'The headline is a step smaller.', palette: null, fonts: null, edits: [{ do: 'set', id: 't_head', size: 150 }] }]);
+  ok('an exact change to something named is economy work: one edit, on that object', small.status === 200 && small.json.complexity.tier === 'economy' && small.json.edit.edits.length === 1 && small.json.edit.edits[0].props.size === 150, J(small.json));
+  const q = await post('graphic-edit', { projectId: 'uxv0_gfx', words: 'change the direction', sheet }, G, [{ task: 'edit', understanding: { level: 'global', goal: '?', affects: [], preserves: [] }, question: { text: 'Which way should it go?', options: ['Quieter and more refined', 'Louder and more graphic'] }, summary: '', palette: null, fonts: null, edits: [{ do: 'remove', id: 's_field' }] }]);
+  ok('one question with ways to answer, when two readings would give different designs — and no edit with it', q.status === 200 && q.json.edit.question?.options.length === 2 && q.json.edit.edits.length === 0, J(q.json));
+  const prose = await post('graphic-edit', { projectId: 'uxv0_gfx', words: 'make it cloud themed', sheet }, G, ['I would add some clouds.']);
+  ok('an answer with no edit in it: said, and nothing is made up', prose.status === 422 && !prose.json?.edit && prose.json.unreadable === true, J(prose));
+  const broken = await post('graphic-edit', { projectId: 'uxv0_gfx', words: 'make it cloud themed', sheet }, G, [new Error('upstream down')]);
+  ok('a model failure is a calm error the browser falls back from', broken.status >= 500 && !!broken.json?.error, J(broken));
+  const png = `data:image/png;base64,${'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='}`;
+  const seen = await post('graphic-edit', { projectId: 'uxv0_gfx', words: 'Make it feel more cinematic', sheet, picture: png }, G, [{ ...EDIT, edits: [] , summary: 'Darker, with more contrast.' }]);
+  ok('the rendered picture travels with a change of feel, and the director is told it is there', seen.status === 200 && /"image_url"|input_image|"type":"image"/.test(J(seen.calls[0])) && /picture attached is this design/.test(J(seen.calls[0])), J(seen.calls[0]).slice(0, 300));
+
+  // a design from a brief
+  const brief = { purpose: 'A poster for an architecture lecture series on housing.', kind: 'poster', formats: ['a3'], content: { headline: 'Rooms for Living', subhead: 'Six evenings', meta: ['2 October'], brand: 'Northlight' }, mood: ['calm'], images: [] };
+  const DESIGN = {
+    task: 'design',
+    reading: { objective: 'Fill the series.', audience: 'Architects.', feeling: 'Exact, calm.' },
+    concept: { idea: 'A plan drawing with one lit room.', decisions: ['read first: the headline', 'type: one grotesk'] },
+    direction: { name: 'Plan and section', palette: { ground: '#efe9dd', ink: '#141414', accent: '#e4572e', accent2: null, muted: 'grey' }, display: 'Archivo', body: 'Comic Sans' },
+    program: { ground: 'ground', elements: [{ op: 'rect', box: { x: 80, y: 80, w: 840, h: 620 }, fill: null, stroke: { color: 'ink', width: 3 } }, { op: 'text', content: 'headline', box: { x: 80, y: 760, w: 840, h: 380 }, weight: 800 }] },
+  };
+  ok('a design: signed out refused; no brief no call; a logo is not the director’s', (await post('graphic-design', { brief }, null, [DESIGN])).status === 401 && (await post('graphic-design', {}, G, [DESIGN])).status === 400 && (await post('graphic-design', { brief: { ...brief, kind: 'logo' } }, G, [DESIGN])).status === 400);
+  const d = await post('graphic-design', { projectId: 'uxv0_gfx', brief, decided: { palette: { ground: '#ffffff', bad: 'red' }, fonts: { display: 'Fraunces', body: 'Inter' }, avoid: ['gradients'] }, avoid: ['A grid of rooms'] }, G, [DESIGN]);
+  const dd = d.json?.design;
+  ok('a design comes back: the idea with its reasons, a palette, two faces, the program as written (compiled in the browser)', d.status === 200 && /lit room/.test(dd?.concept.idea) && dd.direction.palette.ground === '#efe9dd' && dd.direction.display === 'Archivo' && dd.program.elements.length === 2, J(d.json));
+  ok('  a face off the library and a colour that is not one are dropped, and said', !!dd && dd.direction.body === null && !('muted' in dd.direction.palette) && dd.dropped.some((x) => /Comic Sans/.test(x)), J(dd?.dropped));
+  const du = J(d.calls[0]?.messages ?? d.calls[0]?.input ?? '');
+  ok('the director is given the frame, the words to set exactly, what the conversation decided and what to stay away from', /1000 × 1414 units/.test(du) && /Rooms for Living/.test(du) && /display Fraunces/.test(du) && /gradients/.test(du) && /A grid of rooms/.test(du) && /pictures: none/.test(du), du.slice(0, 400));
+  const empty = await post('graphic-design', { projectId: 'uxv0_gfx', brief }, G, [{ task: 'design', direction: { palette: { ground: '#fff' } }, program: { elements: [] } }]);
+  ok('a design with no program or no palette: said, never built from nothing', empty.status === 422 && empty.json.unreadable === true, J(empty.json));
+
+  // a look at the rendered result
+  const REVIEW = { task: 'review', verdict: 'revise', seen: ['the headline collides with the field'], edits: [{ do: 'place', id: 't_head', box: { x: 60, y: 940, w: 880, h: 300 } }, { do: 'words', id: 't_head', text: 'x' }, { do: 'restore', turn: 1, scope: 'everything' }] };
+  ok('a review needs the design and its picture', (await post('graphic-design', { mode: 'review', sheet }, G, [REVIEW])).status === 400);
+  const rv = await post('graphic-design', { mode: 'review', projectId: 'uxv0_gfx', sheet, picture: png, made: 'a new poster', measured: ['headline over the field'] }, G, [REVIEW]);
+  ok('a review comes back: what was seen, and precise edits only (never new wording, never a restore)', rv.status === 200 && rv.json.review.verdict === 'revise' && rv.json.review.edits.length === 1 && rv.json.review.edits[0].do === 'place', J(rv.json));
+  ok('  the picture is what the director is shown, with what SocriaUX measured', /"image_url"|input_image|"type":"image"/.test(J(rv.calls[0])) && /headline over the field/.test(J(rv.calls[0])));
+  const ship = await post('graphic-design', { mode: 'review', projectId: 'uxv0_gfx', sheet, picture: png, made: 'x' }, G, [{ task: 'review', verdict: 'ship', seen: [], edits: [] }]);
+  ok('“ship”: nothing to correct', ship.status === 200 && ship.json.review.verdict === 'ship' && ship.json.review.edits.length === 0);
+
   const logged = db.rows('ux_v0_calls').filter((x) => x.user_id === G);
-  ok('each reading is in the call log on its own stage, priced', logged.length >= 2 && logged.every((x) => x.stage === 'creative-edit' && typeof x.cost_usd === 'number'), J(logged.map((x) => [x.stage, x.cost_usd])));
+  ok('each call is in the call log on its own stage, priced', logged.length >= 6 && ['creative-edit', 'graphic-design', 'graphic-review'].every((st) => logged.some((x) => x.stage === st)) && logged.every((x) => typeof x.cost_usd === 'number'), J(logged.map((x) => [x.stage, x.cost_usd])));
   if (was.routing === undefined) delete process.env.SOCRIAUX_ROUTING;
   else process.env.SOCRIAUX_ROUTING = was.routing;
   if (was.model === undefined) delete process.env.SOCRIAUX_MODEL;

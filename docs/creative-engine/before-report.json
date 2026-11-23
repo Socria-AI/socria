@@ -1,0 +1,1178 @@
+{
+  "engine": "rules",
+  "at": "2026-11-23T18:09:39.217Z",
+  "blocked": null,
+  "tests": {
+    "A": {
+      "instruction": "Make this cloud themed.",
+      "expect": "a coherent transformation of the relevant elements (not cloud icons on a blue gradient); words and logo intact",
+      "path": "reader plan (certain)",
+      "said": "the clouds palette; a clouds ground, graded; clouds in place of the shapes there, literal; depth: the forms layered by distance, with shadows",
+      "question": null,
+      "plan": {
+        "intent": "theme",
+        "keep": [],
+        "changes": [
+          {
+            "decision": "theme",
+            "theme": "cloud"
+          }
+        ]
+      },
+      "understanding": null,
+      "edits": null,
+      "failedOperations": [],
+      "kept": [],
+      "notes": [
+        "The logo’s colours moved with the palette so it stays visible on the new ground.",
+        "Fixed before showing: “Subhead” reads at 1.0:1 against what is beneath it (3:1 needed)."
+      ],
+      "review": null,
+      "ms": 48,
+      "model": null,
+      "usage": null,
+      "changed": [
+        "background “Ground”: effects, fill",
+        "headline: color",
+        "logo: color",
+        "shape “Ground for “Cta””: fill",
+        "cta: color",
+        "shape “Ground for “Subhead””: fill",
+        "meta: color",
+        "subhead: color"
+      ],
+      "added": [
+        "motif “Cloud”",
+        "motif “Cloud”",
+        "motif “Cloud”",
+        "motif “Cloud”",
+        "motif “Cloud”"
+      ],
+      "removed": [
+        "motif “Plane”",
+        "motif “Plane”",
+        "motif “Top plane”",
+        "group “Layer beneath”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Axis”",
+        "motif “Accent”",
+        "motif “Plate”"
+      ],
+      "background": "#eee8da → #f1f7fe",
+      "untouched": 0,
+      "nothingChanged": false,
+      "wordsKept": true,
+      "headline": {
+        "size": [
+          78.4,
+          78.4
+        ],
+        "font": [
+          "Outfit",
+          "Outfit"
+        ],
+        "box": [
+          [
+            280,
+            326,
+            238,
+            221
+          ],
+          [
+            280,
+            326,
+            238,
+            221
+          ]
+        ]
+      },
+      "logoSame": false,
+      "typeSame": true
+    },
+    "B": {
+      "instruction": "Make this feel more sophisticated and atmospheric.",
+      "expect": "decisions across composition, hierarchy, type, imagery and space",
+      "path": "reader plan (certain)",
+      "said": "the colour muted, restrained; the type set in Bodoni Moda with Manrope (refined); 3 of the shapes taken out, the strongest kept; a little depth: soft shadows beneath the forms",
+      "question": null,
+      "plan": {
+        "intent": "style",
+        "keep": [],
+        "changes": [
+          {
+            "decision": "mood",
+            "qualities": [
+              "sophisticated"
+            ]
+          }
+        ]
+      },
+      "understanding": null,
+      "edits": null,
+      "failedOperations": [],
+      "kept": [],
+      "notes": [
+        "The logo’s colours moved with the palette so it stays visible on the new ground.",
+        "Fixed before showing: “Logo” reads at 1.1:1 against what is beneath it (3:1 needed); “Subhead” reads at 2.9:1 against what is beneath it (3:1 needed)."
+      ],
+      "review": null,
+      "ms": 132,
+      "model": null,
+      "usage": null,
+      "changed": [
+        "background “Ground”: fill",
+        "motif “Plane”: x, y, w, h, effects, fill",
+        "motif “Plane”: x, y, w, h, effects, fill",
+        "motif “Top plane”: x, y, w, h, effects, fill",
+        "group “Layer beneath”: x, y, w, h",
+        "motif “Step”: y, w, h, fill",
+        "motif “Step”: x, y, w, h, fill",
+        "motif “Step”: x, y, w, h, fill",
+        "motif “Step”: x, y, w, h, fill",
+        "motif “Step”: x, y, w, h, fill",
+        "motif “Step”: x, y, w, h, fill",
+        "motif “Step”: x, y, w, h, fill",
+        "motif “Step”: x, y, w, h, effects",
+        "headline: font, weight, size, tracking, color, case",
+        "logo: color",
+        "shape “Ground for “Cta””: fill",
+        "cta: font, weight",
+        "meta: font",
+        "subhead: font, color"
+      ],
+      "added": [],
+      "removed": [
+        "motif “Axis”",
+        "motif “Accent”",
+        "motif “Plate”"
+      ],
+      "background": "#eee8da → #e9e6df",
+      "untouched": 1,
+      "nothingChanged": false,
+      "wordsKept": true,
+      "headline": {
+        "size": [
+          78.4,
+          75.8
+        ],
+        "font": [
+          "Outfit",
+          "Bodoni Moda"
+        ],
+        "box": [
+          [
+            280,
+            326,
+            238,
+            221
+          ],
+          [
+            280,
+            326,
+            238,
+            221
+          ]
+        ]
+      },
+      "logoSame": false,
+      "typeSame": false
+    },
+    "C": {
+      "instruction": "Make this look like a premium architecture studio.",
+      "expect": "a subject-specific solution, not a generic layout",
+      "path": "reader plan (uncertain)",
+      "said": "the colour changed; the type set in Marcellus with Source Serif 4; a graded ground; fine lines in place of the shapes there, abstract; a little depth: soft shadows beneath the forms",
+      "question": null,
+      "plan": {
+        "intent": "brand",
+        "keep": [
+          "words",
+          "composition",
+          "pictures"
+        ],
+        "changes": [
+          {
+            "decision": "palette",
+            "colours": {
+              "ground": "#f5f3ef",
+              "ink": "#2e1c1f",
+              "accent": "#512a30",
+              "support": [
+                "#cf3448",
+                "#887d7d"
+              ]
+            }
+          },
+          {
+            "decision": "type",
+            "display": "Marcellus",
+            "body": "Source Serif 4",
+            "case": "upper"
+          },
+          {
+            "decision": "mood",
+            "qualities": [
+              "premium"
+            ]
+          },
+          {
+            "decision": "forms",
+            "kind": "line",
+            "abstraction": 88
+          }
+        ]
+      },
+      "understanding": null,
+      "edits": null,
+      "failedOperations": [],
+      "kept": [],
+      "notes": [
+        "The logo’s colours moved with the palette so it stays visible on the new ground.",
+        "Fixed before showing: “Subhead” reads at 1.0:1 against what is beneath it (3:1 needed)."
+      ],
+      "review": null,
+      "ms": 134,
+      "model": null,
+      "usage": null,
+      "changed": [
+        "background “Ground”: effects, fill",
+        "headline: font, weight, size, tracking, color, case",
+        "logo: color",
+        "shape “Ground for “Cta””: fill",
+        "cta: font, weight, color",
+        "shape “Ground for “Subhead””: fill",
+        "meta: font, color",
+        "subhead: font, color"
+      ],
+      "added": [
+        "motif “Line”",
+        "motif “Line”",
+        "motif “Line”",
+        "motif “Line”",
+        "motif “Line”",
+        "motif “Line”",
+        "motif “Line”",
+        "motif “Line”",
+        "motif “Line”",
+        "motif “Line”",
+        "motif “Line”",
+        "motif “Line”",
+        "motif “Line”",
+        "motif “Line”",
+        "motif “Line”",
+        "motif “Line”",
+        "motif “Line”",
+        "motif “Line”"
+      ],
+      "removed": [
+        "motif “Plane”",
+        "motif “Plane”",
+        "motif “Top plane”",
+        "group “Layer beneath”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Axis”",
+        "motif “Accent”",
+        "motif “Plate”"
+      ],
+      "background": "#eee8da → #f5f3ef",
+      "untouched": 0,
+      "nothingChanged": false,
+      "wordsKept": true,
+      "headline": {
+        "size": [
+          78.4,
+          64.8
+        ],
+        "font": [
+          "Outfit",
+          "Marcellus"
+        ],
+        "box": [
+          [
+            280,
+            326,
+            238,
+            221
+          ],
+          [
+            280,
+            326,
+            238,
+            221
+          ]
+        ]
+      },
+      "logoSame": false,
+      "typeSame": false
+    },
+    "D": {
+      "instruction": "Keep the logo and typography. Redesign everything else.",
+      "expect": "logo and type untouched; the rest transformed",
+      "path": "reader plan (certain)",
+      "said": "the composition rethought; the colour darker, cooler; a flat ground",
+      "question": null,
+      "plan": {
+        "intent": "redesign",
+        "keep": [
+          "type",
+          "logo"
+        ],
+        "changes": [
+          {
+            "decision": "composition",
+            "action": "rethink"
+          },
+          {
+            "decision": "palette",
+            "shifts": [
+              "darker",
+              "cooler"
+            ]
+          },
+          {
+            "decision": "background",
+            "kind": "flat"
+          }
+        ]
+      },
+      "understanding": null,
+      "edits": null,
+      "failedOperations": [],
+      "kept": [],
+      "notes": [
+        "Fixed before showing: “Headline” reads at 2.4:1 against what is beneath it (3:1 needed); “Subhead” reads at 1.0:1 against what is beneath it (3:1 needed); “Meta” reads at 1.0:1 against what is beneath it (3:1 needed)."
+      ],
+      "review": null,
+      "ms": 52,
+      "model": null,
+      "usage": null,
+      "changed": [],
+      "added": [
+        "background “Ground”",
+        "motif “Form”",
+        "motif “Form”",
+        "motif “Interruption”",
+        "motif “Accent”",
+        "headline",
+        "subhead",
+        "meta",
+        "cta",
+        "logo"
+      ],
+      "removed": [
+        "background “Ground”",
+        "motif “Plane”",
+        "motif “Plane”",
+        "motif “Top plane”",
+        "group “Layer beneath”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Axis”",
+        "motif “Accent”",
+        "headline",
+        "logo",
+        "shape “Ground for “Cta””",
+        "cta",
+        "motif “Plate”",
+        "shape “Ground for “Subhead””",
+        "meta",
+        "subhead"
+      ],
+      "background": "#eee8da → #4c1b31",
+      "untouched": 0,
+      "nothingChanged": false,
+      "wordsKept": true,
+      "headline": {
+        "size": [
+          78.4,
+          152.1
+        ],
+        "font": [
+          "Outfit",
+          "Outfit"
+        ],
+        "box": [
+          [
+            280,
+            326,
+            238,
+            221
+          ],
+          [
+            43,
+            723,
+            462,
+            425
+          ]
+        ]
+      },
+      "logoSame": false,
+      "typeSame": true
+    },
+    "E": {
+      "instruction": "Make the headline slightly smaller.",
+      "expect": "only the headline changes",
+      "path": "precise reader",
+      "said": "headline slightly smaller",
+      "question": null,
+      "plan": null,
+      "understanding": null,
+      "edits": null,
+      "failedOperations": [],
+      "kept": [],
+      "notes": [],
+      "review": null,
+      "ms": 32,
+      "model": null,
+      "usage": null,
+      "changed": [
+        "headline: w, h, size"
+      ],
+      "added": [],
+      "removed": [],
+      "background": null,
+      "untouched": 22,
+      "nothingChanged": false,
+      "wordsKept": true,
+      "headline": {
+        "size": [
+          78.4,
+          72.6
+        ],
+        "font": [
+          "Outfit",
+          "Outfit"
+        ],
+        "box": [
+          [
+            280,
+            326,
+            238,
+            221
+          ],
+          [
+            280,
+            326,
+            238,
+            205
+          ]
+        ]
+      },
+      "logoSame": true,
+      "typeSame": true
+    },
+    "F": {
+      "instruction": "Make the design feel more cinematic. Adjust the imagery, lighting, background, and typography.",
+      "expect": "a coordinated change across related elements",
+      "path": "reader plan (uncertain)",
+      "said": "the colour darker, contrast, richer; the type set in Dela Gothic One with Archivo (expressive); a graded ground; the shapes larger; atmospheric depth: far forms softened, near ones shadowed",
+      "question": null,
+      "plan": {
+        "intent": "global",
+        "keep": [],
+        "changes": [
+          {
+            "decision": "mood",
+            "qualities": [
+              "dramatic"
+            ]
+          },
+          {
+            "decision": "background"
+          }
+        ]
+      },
+      "understanding": null,
+      "edits": null,
+      "failedOperations": [],
+      "kept": [],
+      "notes": [
+        "Fixed before showing: “Subhead” reads at 1.0:1 against what is beneath it (3:1 needed)."
+      ],
+      "review": null,
+      "ms": 118,
+      "model": null,
+      "usage": null,
+      "changed": [
+        "background “Ground”: effects, fill",
+        "motif “Plane”: x, y, w, h, opacity, effects, fill",
+        "motif “Plane”: x, y, w, h, opacity, effects, fill",
+        "motif “Top plane”: x, y, w, h, opacity, effects, fill",
+        "group “Layer beneath”: x, y, w, h",
+        "motif “Step”: y, w, h, fill",
+        "motif “Step”: x, y, w, h, fill",
+        "motif “Step”: x, y, w, h, fill",
+        "motif “Step”: x, y, w, h, fill",
+        "motif “Step”: x, y, w, h, fill",
+        "motif “Step”: x, y, w, h, fill",
+        "motif “Step”: x, y, w, h, fill",
+        "motif “Step”: x, y, w, h, opacity, effects",
+        "motif “Axis”: x, y, w, h, opacity, stroke, effects",
+        "motif “Accent”: x, y, w, h, opacity, fill, effects",
+        "headline: font, weight, size, color, case",
+        "shape “Ground for “Cta””: fill",
+        "cta: font, weight, color",
+        "motif “Plate”: x, y, w, h, fill, effects",
+        "shape “Ground for “Subhead””: fill",
+        "meta: font, color",
+        "subhead: font, color"
+      ],
+      "added": [],
+      "removed": [],
+      "background": "#eee8da → #272011",
+      "untouched": 1,
+      "nothingChanged": false,
+      "wordsKept": true,
+      "headline": {
+        "size": [
+          78.4,
+          49.4
+        ],
+        "font": [
+          "Outfit",
+          "Dela Gothic One"
+        ],
+        "box": [
+          [
+            280,
+            326,
+            238,
+            221
+          ],
+          [
+            280,
+            326,
+            238,
+            221
+          ]
+        ]
+      },
+      "logoSame": true,
+      "typeSame": false
+    },
+    "G": {
+      "instruction": "Make it better.",
+      "expect": "improvements found from the artifact and its brief; a question only if necessary",
+      "path": "reader plan (certain)",
+      "said": "an asymmetric, moving composition; headline much larger",
+      "question": null,
+      "plan": {
+        "intent": "global",
+        "keep": [
+          "words",
+          "logo",
+          "pictures"
+        ],
+        "changes": [
+          {
+            "decision": "object",
+            "words": "fix the problems the checks find"
+          },
+          {
+            "decision": "object",
+            "words": "make the headline much bigger"
+          },
+          {
+            "decision": "composition",
+            "action": "asymmetric"
+          }
+        ]
+      },
+      "understanding": null,
+      "edits": null,
+      "failedOperations": [],
+      "kept": [],
+      "notes": [
+        "Fixed before showing: “Headline” reads at 1.0:1 against what is beneath it (3:1 needed). No one colour reads on everything beneath it: it is given a ground of its own."
+      ],
+      "review": null,
+      "ms": 51,
+      "model": null,
+      "usage": null,
+      "changed": [],
+      "added": [
+        "background “Ground”",
+        "motif “Plane”",
+        "motif “Plane”",
+        "motif “Top plane”",
+        "group “Repeat”",
+        "group “Turned”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "group “Repeat”",
+        "group “Turned”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "group “Turned”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "shape “Ground for “Headline””",
+        "shape “Ground for “Headline””",
+        "headline",
+        "motif “Plate”",
+        "subhead",
+        "meta",
+        "cta",
+        "logo"
+      ],
+      "removed": [
+        "background “Ground”",
+        "motif “Plane”",
+        "motif “Plane”",
+        "motif “Top plane”",
+        "group “Layer beneath”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Step”",
+        "motif “Axis”",
+        "motif “Accent”",
+        "headline",
+        "logo",
+        "shape “Ground for “Cta””",
+        "cta",
+        "motif “Plate”",
+        "shape “Ground for “Subhead””",
+        "meta",
+        "subhead"
+      ],
+      "background": null,
+      "untouched": 0,
+      "nothingChanged": false,
+      "wordsKept": true,
+      "headline": {
+        "size": [
+          78.4,
+          86.4
+        ],
+        "font": [
+          "Outfit",
+          "Outfit"
+        ],
+        "box": [
+          [
+            280,
+            326,
+            238,
+            221
+          ],
+          [
+            527,
+            796,
+            255,
+            246
+          ]
+        ]
+      },
+      "logoSame": false,
+      "typeSame": true
+    },
+    "H": {
+      "instruction": "Create an experimental editorial poster for an independent architecture publication.",
+      "ms": 155,
+      "model": null,
+      "usage": null,
+      "said": [
+        "The headline is the image: set to the full width, as large as the words allow.",
+        "Shapes from the direction’s own system (right-angled), never decoration for its own sake.",
+        "Set in Experimental Editorial as principles — its type, colour, geometry, surface and what it avoids — never as a fixed layout.",
+        "Concept: Windows of an elevation, on a 4×6 modular grid with merged cells and carried across the frame on one curve; the title set monumental, the largest thing in the frame, repeated in a rhythm and layered with offsets.",
+        "Experimental Editorial — abstract, measured, strongly asymmetrical, balanced in density.",
+        "To promote: about architecture and the city, for a general audience, seen in print (portrait)."
+      ],
+      "direction": null,
+      "review": null,
+      "problems": [],
+      "instructions": null,
+      "objects": 14,
+      "palette": {
+        "background": "#f2efe9",
+        "surface": "#f8f6f3",
+        "text": "#141414",
+        "muted": "#62615f",
+        "accent": "#e93e30",
+        "accentText": "#141414",
+        "line": "#b4b2ad"
+      },
+      "fonts": {
+        "display": "Gloock",
+        "body": "Newsreader"
+      },
+      "findings": [],
+      "slop": {
+        "gradientGround": false,
+        "purpleBlueGradient": false,
+        "roundedCards": 0,
+        "smallFloatingShapes": 1,
+        "glowsShadowsBlurs": 0,
+        "centredTextShare": 0,
+        "faces": 2,
+        "objects": 26
+      }
+    },
+    "I": {
+      "designs": [
+        {
+          "name": "fashion",
+          "ms": 149,
+          "model": null,
+          "usage": null,
+          "palette": {
+            "background": "#f3eee7",
+            "surface": "#f8f6f2",
+            "text": "#111111",
+            "muted": "#605e5c",
+            "accent": "#8d7156",
+            "accentText": "#030303",
+            "line": "#b4b0ab"
+          },
+          "fonts": {
+            "display": "Bodoni Moda",
+            "body": "Cormorant Garamond"
+          },
+          "objects": 7,
+          "direction": null,
+          "review": null,
+          "problems": [],
+          "said": [
+            "Restraint: small type, wide margins, one quiet mark. The space is the design.",
+            "Shapes from the direction’s own system (angular), never decoration for its own sake.",
+            "Set in Editorial Luxury as principles — its type, colour, geometry, surface and what it avoids — never as a fixed layout.",
+            "Concept: One organic form that sets the hierarchy, built about a central axis and in horizontal strata of uneven depth; the title set monumental, the largest thing in the frame, layered with offsets and repeated in a rhythm.",
+            "Editorial Luxury — organic, calm, symmetrical, balanced in density.",
+            "To promote: about weather and seasons and fashion and textiles, for a luxury audience, seen in print (portrait)."
+          ],
+          "findings": [],
+          "slop": {
+            "gradientGround": false,
+            "purpleBlueGradient": false,
+            "roundedCards": 0,
+            "smallFloatingShapes": 0,
+            "glowsShadowsBlurs": 0,
+            "centredTextShare": 1,
+            "faces": 2,
+            "objects": 7
+          }
+        },
+        {
+          "name": "tech",
+          "ms": 135,
+          "model": null,
+          "usage": null,
+          "palette": {
+            "background": "#ffffff",
+            "surface": "#ffffff",
+            "text": "#000000",
+            "muted": "#595959",
+            "accent": "#0100ee",
+            "accentText": "#ffffff",
+            "line": "#b8b8b8"
+          },
+          "fonts": {
+            "display": "Libre Caslon Text",
+            "body": "Courier Prime"
+          },
+          "objects": 39,
+          "direction": null,
+          "review": null,
+          "problems": [],
+          "said": [
+            "Restraint: small type, wide margins, one quiet mark. The space is the design.",
+            "Shapes from the direction’s own system (right-angled), never decoration for its own sake.",
+            "Set in Digital Brutalism as principles — its type, colour, geometry, surface and what it avoids — never as a fixed layout.",
+            "The brief asks for technical work: a technical pattern is part of the design, in the language’s colours.",
+            "Concept: A programme’s grid, dividing the frame into unequal fields (48 : 52); the title set monumental, the largest thing in the frame, repeated in a rhythm and interrupted by a band.",
+            "Digital Brutalism — organic, measured, strongly asymmetrical, balanced in density."
+          ],
+          "findings": [],
+          "slop": {
+            "gradientGround": false,
+            "purpleBlueGradient": false,
+            "roundedCards": 0,
+            "smallFloatingShapes": 15,
+            "glowsShadowsBlurs": 0,
+            "centredTextShare": 0,
+            "faces": 2,
+            "objects": 85
+          }
+        },
+        {
+          "name": "architecture",
+          "ms": 125,
+          "model": null,
+          "usage": null,
+          "palette": {
+            "background": "#f2f1ec",
+            "surface": "#f8f7f5",
+            "text": "#141414",
+            "muted": "#626160",
+            "accent": "#e2251c",
+            "accentText": "#fcfcfb",
+            "line": "#b4b3b0"
+          },
+          "fonts": {
+            "display": "Hanken Grotesk",
+            "body": "Inter"
+          },
+          "objects": 12,
+          "direction": null,
+          "review": null,
+          "problems": [],
+          "said": [
+            "Restraint: small type, wide margins, one quiet mark. The space is the design.",
+            "Shapes from the direction’s own system (right-angled), never decoration for its own sake.",
+            "Set in Swiss International Typographic Style as principles — its type, colour, geometry, surface and what it avoids — never as a fixed layout.",
+            "Concept: A letter of the title, enlarged into architecture, in horizontal strata of uneven depth and carried across the frame on one curve; the title set monumental, the largest thing in the frame, cropped hard by the edge.",
+            "Swiss International Typographic Style — geometric, calm, strongly asymmetrical, balanced in density.",
+            "To promote: about architecture and the city and design and craft, for a general audience, seen in print (portrait)."
+          ],
+          "findings": [],
+          "slop": {
+            "gradientGround": false,
+            "purpleBlueGradient": false,
+            "roundedCards": 0,
+            "smallFloatingShapes": 0,
+            "glowsShadowsBlurs": 0,
+            "centredTextShare": 0,
+            "faces": 2,
+            "objects": 12
+          }
+        },
+        {
+          "name": "music",
+          "ms": 125,
+          "model": null,
+          "usage": null,
+          "palette": {
+            "background": "#eee0c8",
+            "surface": "#f6eee1",
+            "text": "#22313f",
+            "muted": "#5f6364",
+            "accent": "#e13c31",
+            "accentText": "#000000",
+            "line": "#b5afa2"
+          },
+          "fonts": {
+            "display": "Anton",
+            "body": "Khand"
+          },
+          "objects": 21,
+          "direction": null,
+          "review": null,
+          "problems": [],
+          "said": [
+            "A strict grid that shows: flush-left type in columns, rules, one block of colour.",
+            "Shapes from the direction’s own system (right-angled), never decoration for its own sake.",
+            "Set in Screen Print as principles — its type, colour, geometry, surface and what it avoids — never as a fixed layout.",
+            "Concept: Screen Print’s own geometry as structural weights, built about a central axis and in horizontal strata of uneven depth; the title broken into a narrow column, a word or two a line, with an extreme jump in scale and echoed in outline.",
+            "Screen Print — abstract, charged, symmetrical, balanced in density.",
+            "To promote: about water and the sea and children and family and music, for a family audience, seen in print (portrait)."
+          ],
+          "findings": [],
+          "slop": {
+            "gradientGround": false,
+            "purpleBlueGradient": false,
+            "roundedCards": 0,
+            "smallFloatingShapes": 0,
+            "glowsShadowsBlurs": 0,
+            "centredTextShare": 0,
+            "faces": 2,
+            "objects": 21
+          }
+        },
+        {
+          "name": "art",
+          "ms": 118,
+          "model": null,
+          "usage": null,
+          "palette": {
+            "background": "#f5f3ec",
+            "surface": "#faf8f5",
+            "text": "#111111",
+            "muted": "#61605e",
+            "accent": "#d52c1e",
+            "accentText": "#f6f4ee",
+            "line": "#b5b4af"
+          },
+          "fonts": {
+            "display": "Archivo Black",
+            "body": "Archivo"
+          },
+          "objects": 13,
+          "direction": null,
+          "review": null,
+          "problems": [],
+          "said": [
+            "Restraint: small type, wide margins, one quiet mark. The space is the design.",
+            "Shapes from the direction’s own system (angular), never decoration for its own sake.",
+            "Set in De Stijl as principles — its type, colour, geometry, surface and what it avoids — never as a fixed layout.",
+            "Concept: A flare of rays, dividing the frame into unequal fields (48 : 52); the title broken into a narrow column, a word or two a line, repeated in a rhythm.",
+            "De Stijl — abstract, charged, asymmetrical, balanced in density.",
+            "To promote: about light and energy and art and exhibitions, for a general audience, seen in print (portrait)."
+          ],
+          "findings": [],
+          "slop": {
+            "gradientGround": false,
+            "purpleBlueGradient": false,
+            "roundedCards": 0,
+            "smallFloatingShapes": 0,
+            "glowsShadowsBlurs": 0,
+            "centredTextShare": 0,
+            "faces": 2,
+            "objects": 17
+          }
+        }
+      ],
+      "structuralSimilarity": {
+        "pairs": [
+          {
+            "a": "fashion",
+            "b": "tech",
+            "similarity": 0.385
+          },
+          {
+            "a": "fashion",
+            "b": "architecture",
+            "similarity": 0.687
+          },
+          {
+            "a": "fashion",
+            "b": "music",
+            "similarity": 0.418
+          },
+          {
+            "a": "fashion",
+            "b": "art",
+            "similarity": 0.418
+          },
+          {
+            "a": "tech",
+            "b": "architecture",
+            "similarity": 0.512
+          },
+          {
+            "a": "tech",
+            "b": "music",
+            "similarity": 0.687
+          },
+          {
+            "a": "tech",
+            "b": "art",
+            "similarity": 0.535
+          },
+          {
+            "a": "architecture",
+            "b": "music",
+            "similarity": 0.491
+          },
+          {
+            "a": "architecture",
+            "b": "art",
+            "similarity": 0.471
+          },
+          {
+            "a": "music",
+            "b": "art",
+            "similarity": 0.56
+          }
+        ],
+        "mean": 0.516,
+        "max": 0.687,
+        "tooSimilar": 0
+      },
+      "distinctDisplayFaces": 5,
+      "distinctGrounds": 5
+    },
+    "J": {
+      "steps": [
+        {
+          "words": "Make the colours warm and earthy.",
+          "path": "reader plan (certain)",
+          "said": "the colour warmer, earthy",
+          "question": null,
+          "changed": 17,
+          "added": 0,
+          "removed": 0,
+          "palette": {
+            "background": "#ece6dc",
+            "surface": "#e1dcd2",
+            "text": "#161616",
+            "muted": "#676561",
+            "accent": "#c66d2f",
+            "accentText": "#111111",
+            "line": "#c5c1b8"
+          },
+          "fonts": {
+            "display": "Outfit",
+            "body": "Jost"
+          },
+          "ms": 9,
+          "usage": null
+        },
+        {
+          "words": "Make the typography more expressive.",
+          "path": "reader plan (certain)",
+          "said": "the type set in Bricolage Grotesque with Work Sans (expressive)",
+          "question": null,
+          "changed": 4,
+          "added": 0,
+          "removed": 0,
+          "palette": {
+            "background": "#ece6dc",
+            "surface": "#e1dcd2",
+            "text": "#161616",
+            "muted": "#676561",
+            "accent": "#c66d2f",
+            "accentText": "#111111",
+            "line": "#c5c1b8"
+          },
+          "fonts": {
+            "display": "Bricolage Grotesque",
+            "body": "Work Sans"
+          },
+          "ms": 76,
+          "usage": null
+        },
+        {
+          "words": "Move the focal point toward the right.",
+          "path": "precise reader",
+          "said": "the visual focus moved to the right — Blocks rising like a section through a building, in 3 overlapping planes; the title broken into a narrow column, a word or two a line, cropped hard by the edge and repeated in a rhythm.",
+          "question": null,
+          "changed": 0,
+          "added": 22,
+          "removed": 23,
+          "palette": {
+            "background": "#ece6dc",
+            "surface": "#e1dcd2",
+            "text": "#161616",
+            "muted": "#676561",
+            "accent": "#c66d2f",
+            "accentText": "#111111",
+            "line": "#c5c1b8"
+          },
+          "fonts": {
+            "display": "Bricolage Grotesque",
+            "body": "Work Sans"
+          },
+          "ms": 21,
+          "usage": null
+        },
+        {
+          "words": "Go back to the original colours.",
+          "path": "reader plan, nothing changed",
+          "said": "This design already is what those words ask for.",
+          "question": null,
+          "changed": 0,
+          "added": 0,
+          "removed": 0,
+          "palette": {
+            "background": "#ece6dc",
+            "surface": "#e1dcd2",
+            "text": "#161616",
+            "muted": "#676561",
+            "accent": "#c66d2f",
+            "accentText": "#111111",
+            "line": "#c5c1b8"
+          },
+          "fonts": {
+            "display": "Bricolage Grotesque",
+            "body": "Work Sans"
+          },
+          "ms": 1,
+          "usage": null
+        }
+      ],
+      "paletteRestored": false,
+      "typeKeptAfterRestore": true,
+      "paletteChangedAtStep1": true
+    },
+    "K": {
+      "base": {
+        "gradientGround": false,
+        "purpleBlueGradient": false,
+        "roundedCards": 0,
+        "smallFloatingShapes": 4,
+        "glowsShadowsBlurs": 3,
+        "centredTextShare": 0,
+        "faces": 2,
+        "objects": 23
+      }
+    }
+  },
+  "base": {
+    "headline": "Rooms for Living",
+    "ms": 826,
+    "model": null,
+    "usage": null,
+    "said": [
+      "A strict grid that shows: flush-left type in columns, rules, one block of colour.",
+      "Shapes from the direction’s own system (right-angled), never decoration for its own sake.",
+      "Set in Bauhaus as principles — its type, colour, geometry, surface and what it avoids — never as a fixed layout.",
+      "Concept: Blocks rising like a section through a building, in 3 overlapping planes and along a shallow axis of 23°; the title broken into a narrow column, a word or two a line, layered with offsets and cropped hard by the edge.",
+      "Bauhaus — organic, measured, strongly asymmetrical, balanced in density.",
+      "To promote: about architecture and the city and home and property, for a general audience, seen in print (portrait)."
+    ],
+    "direction": null,
+    "review": null,
+    "problems": [],
+    "objects": 16,
+    "palette": {
+      "background": "#eee8da",
+      "surface": "#f6f2eb",
+      "text": "#161616",
+      "muted": "#62605b",
+      "accent": "#d4352b",
+      "accentText": "#faf8f4",
+      "line": "#b2ada3"
+    },
+    "fonts": {
+      "display": "Outfit",
+      "body": "Jost"
+    },
+    "findings": []
+  },
+  "waiting": [],
+  "mode": null,
+  "calls": null,
+  "usage": null,
+  "sheets": [
+    "sheet-edits.png",
+    "sheet-H.png",
+    "sheet-I.png",
+    "sheet-J.png"
+  ],
+  "ms": 18032
+}

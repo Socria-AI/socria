@@ -35,7 +35,11 @@ import { logoEditFromWords } from '@/lib/ux-v0/graphics/logo/session';
 import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
 import { useStyleLibrary } from './styleLibrary';
 import { ConceptCompare, ConceptPanel } from './ConceptPanel';
-import { planChange } from './creativePlanner';
+import { browserBench, directorReachable, httpTransport } from './director';
+import { editFlow, saidOfEdit } from '@/lib/ux-v0/graphics/director/flow';
+import { diffBoards, recordTurn } from '@/lib/ux-v0/graphics/director/journal';
+import { protectionsIn } from '@/lib/ux-v0/graphics/director/protect';
+import { editTier } from '@/lib/ux-v0/graphics/director/tier';
 import { readCreative } from '@/lib/ux-v0/graphics/creative/interpret';
 import { conceptRef, executePlan } from '@/lib/ux-v0/graphics/creative/execute';
 import { conceptRefs, forgetConcept, revisitConcept, saveConcept } from '@/lib/ux-v0/graphics/creative/concepts';
@@ -154,7 +158,8 @@ export function GraphicEditor(props: GraphicEditorProps) {
   const [pathEdit, setPathEdit] = useState<string | null>(null);
   const [aids, setAids] = useState({ guides: true, grid: false, rulers: true });
   const [askWords, setAskWords] = useState('');
-  const [pending, setPending] = useState<{ edit: GraphicEdit; doc: GraphicDoc; base: GraphicDoc } | null>(null);
+  // a change previewed: `turn` is what was asked and what it did, for the artboard's journal when it is applied or turned down
+  const [pending, setPending] = useState<{ edit: GraphicEdit; doc: GraphicDoc; base: GraphicDoc; turn?: { said: string; did: string; level?: string; recorded?: boolean } } | null>(null);
   const [busy, setBusy] = useState('');
   const [explorer, setExplorer] = useState<{ open: boolean; query?: string }>({ open: false });
   const { library } = useStyleLibrary();
@@ -467,7 +472,10 @@ export function GraphicEditor(props: GraphicEditorProps) {
       }
       next = fromBoardView(cur, r.doc, board.id);
     }
-    setPending({ edit: e, doc: next, base: cur });
+    // a change that changes nothing is not one: the words go on to whoever can read them
+    const same = next.artboards.length === cur.artboards.length && next.artboards.every((b, i) => b.id === cur.artboards[i].id && diffBoards(cur.artboards[i], b, cur.artboards[i].tokens ?? cur.tokens, b.tokens ?? next.tokens).none);
+    if (same && !e.question) return false;
+    setPending({ edit: e, doc: next, base: cur, turn: { said: words, did: e.label, level: 'object' } });
     if (e.next) {
       const fresh = next.artboards.find((b) => !cur.artboards.some((c) => c.id === b.id));
       if (fresh) setBoardId(fresh.id);
@@ -556,7 +564,7 @@ export function GraphicEditor(props: GraphicEditorProps) {
     // the result looked at as rendered pixels before it is shown (what is really beneath the words), repaired if it must
     const looked = browser ? await lookAt(r.doc, board.id) : null;
     if (looked) r = { ...r, doc: looked.doc };
-    setPending({ edit: { ops: [], next: r.doc, label: r.label || r.done[0], scope: 'artboard' }, doc: r.doc, base });
+    setPending({ edit: { ops: [], next: r.doc, label: r.label || r.done[0], scope: 'artboard' }, doc: r.doc, base, turn: { said: words, did: r.done.join('; '), level: plan.intent } });
     recentRef.current = [...recentRef.current, { said: words, did: r.done.join('; ') }].slice(-6);
     // a vague improvement says what it measured first, then what it did about it
     const did = r.done.join('; ');
@@ -736,38 +744,60 @@ export function GraphicEditor(props: GraphicEditorProps) {
     if (alt) return void alternatives(alt, words);
     const refs = conceptRefs(cur, board.id);
     const read = readCreative(words, { doc: cur, board: board.id, concepts: refs, asked });
-    // what one object should do, or a command of the editor's own (a format, a colour for the selection, a size): the
-    // precise reader first, whenever the words hold no creative decision
-    const creative = !!read && read.plan.changes.some((c) => c.decision !== 'object');
+    // a move on concepts themselves (keep this concept, compare, go back to concept 2, another interpretation) is the
+    // workspace's own, read plainly
+    if (read?.certain && read.plan.changes.length > 0 && read.plan.changes.every((c) => c.decision === 'concept')) return void runPlan(read.plan, words);
     // a design in a style: its own style speaks first for what only it does well — its gradients made flat everywhere,
     // its layout re-balanced in another style's composition (styles/edit.ts)
     const styleFirst = !!cur.style?.primary && /\b(remove|lose|drop|no|without|get rid of|kill)\b[^.]*\bgradients?\b|\bflat colou?rs?\b|\b(layout|composition|arrangement)\b[^.]*\b(a-?symmetric(al)?|symmetric(al)?|centred|centered|off-?cent(re|er))\b/i.test(words);
-    if ((!creative || styleFirst) && precise(words)) return;
-    const ac = new AbortController();
-    planning.current = ac;
-    setThinking('Reading the change…');
-    let planned: Awaited<ReturnType<typeof planChange>>;
-    try {
-      planned = await planChange(words, cur, {
-        board: board.id,
-        dir: dirNow(),
-        asked,
-        recent: recentRef.current,
-        concepts: refs,
-        projectId: props.projectId,
-        memory: props.memory,
-        signal: ac.signal,
-        onProgress: (p) => (p.phase === 'thinking' ? setThinking('Thinking it through…') : p.phase === 'writing' ? setThinking('Deciding what changes…') : undefined),
-      });
-    } finally {
-      planning.current = null;
-      setThinking('');
+    // an exact change to something named ("make the headline smaller", "the background black"): read and carried out
+    // in code, at once, with no model — when it is one instruction and it really changes the design
+    const exact = editTier(words).tier === 'economy' && !protectionsIn(words).keep.length && !protectionsIn(words).only && !/[,;]|\band\b/i.test(words);
+    if ((exact || styleFirst) && precise(words)) return;
+    // everything else is read against the design by the creative director: what is meant, how far it reaches, what
+    // must stay — then carried out by object id, checked, and previewed
+    if (directorReachable()) {
+      const ac = new AbortController();
+      planning.current = ac;
+      setThinking('Reading what you mean…');
+      let r: Awaited<ReturnType<typeof editFlow>>;
+      try {
+        r = await editFlow(
+          httpTransport({ projectId: props.projectId, signal: ac.signal, onProgress: (p) => (p.phase === 'thinking' ? setThinking('Thinking it through…') : p.phase === 'writing' ? setThinking('Working out the change…') : undefined) }),
+          browserBench(props.resolve),
+          cur,
+          board.id,
+          words,
+          { kind: props.kind, memory: { ...(props.memory?.brief ? { brief: props.memory.brief } : {}), ...(props.memory?.references?.length ? { references: [...props.memory.references] } : {}), ...((cm) => (cm.length ? { comments: cm } : {}))((cur.comments ?? []).filter((c) => c.board === board.id && c.status === 'open').slice(-6).map((c) => c.text.slice(0, 200))) }, asked, selection },
+        );
+      } finally {
+        planning.current = null;
+        setThinking('');
+      }
+      if (r.kind === 'cancelled') return tell('ok', 'Stopped. Nothing changed.');
+      if (r.kind === 'question') return askQuestion(r.question);
+      if (r.kind === 'nothing') return tell('warn', saidOfEdit(r));
+      if (r.kind === 'done') {
+        // a change of feel or of the whole is looked at as rendered pixels before it is shown (what is really beneath
+        // the words); an exact change is shown exactly as made
+        const broad = ['aesthetic', 'conceptual', 'global'].includes(r.edit.understanding.level);
+        const looked = broad && typeof document !== 'undefined' ? await lookAt(r.doc, board.id) : null;
+        const next = looked ? looked.doc : r.doc;
+        const said = saidOfEdit(r);
+        setPending({ edit: { ops: [], next, label: (r.edit.summary || r.outcome.did).slice(0, 120), scope: 'artboard' }, doc: next, base: cur, turn: { said: words, did: r.edit.summary || r.outcome.did, level: r.edit.understanding.level, recorded: true } });
+        recentRef.current = [...recentRef.current, { said: words, did: r.edit.summary || r.outcome.did }].slice(-6);
+        setNote(null);
+        props.onAsked?.(`${said} Previewing it: Apply or Discard under the canvas, or say what to change next.`);
+        return;
+      }
+      // unreachable or unreadable: SocriaUX's own reader carries on below, and says it did
     }
-    if (planned.cancelled) return tell('ok', 'Stopped. Nothing changed.');
-    if (!planned.plan) {
-      // nothing in the words to act on: one question whose answers get somewhere (never an internal limitation)
+    const creative = !!read && read.plan.changes.some((c) => c.decision !== 'object');
+    if (!creative && precise(words)) return;
+    if (!read?.plan) {
+      // nothing in the words the reader can act on, and no director to ask: said plainly, with ways on
       return askQuestion({
-        text: `I want to get “${words.slice(0, 80)}” right — which is closest to what you mean?`,
+        text: `I could not reach SocriaUX’s creative director just now, and on my own I can only read plainer instructions than “${words.slice(0, 80)}”. Try again in a moment, or say it one of these ways:`,
         options: [
           { label: 'A theme (clouds, the ocean, space…)', words: 'give it a theme' },
           { label: 'More refined', words: 'make it more sophisticated' },
@@ -776,7 +806,7 @@ export function GraphicEditor(props: GraphicEditorProps) {
         ],
       });
     }
-    runPlan(planned.plan, words);
+    runPlan(read.plan, words);
   };
   // a change asked in the conversation beside the workspace, read as if typed here
   const inboxId = props.inbox?.id;
@@ -790,28 +820,33 @@ export function GraphicEditor(props: GraphicEditorProps) {
     setNote(null);
   };
   /** The preview taken as it is, quietly: the change said next builds on it (undo takes each back in turn). */
+  /** The change as it is kept: with its turn in the artboard's journal (what was asked, what it did, what it replaced). */
+  const journaled = (p: NonNullable<typeof live>): GraphicDoc => (p.turn && !p.turn.recorded && p.doc.artboards.some((b) => b.id === boardId) && p.base.artboards.some((b) => b.id === boardId) ? recordTurn(p.base, p.doc, boardId, { said: p.turn.said, did: p.turn.did, level: p.turn.level }) : p.doc);
   const takePending = () => {
     if (!live) return;
     const p = live;
     setPending(null);
-    commitDoc(remember(p.doc, changedConcepts(p.base, p.doc), 'selected'), p.edit.label, { version: true });
+    commitDoc(remember(journaled(p), changedConcepts(p.base, p.doc), 'selected'), p.edit.label, { version: true });
   };
   const applyPending = () => {
     if (!live) return;
     const p = live;
     setPending(null);
     // a new concept applied is remembered as chosen (generative/memory.ts)
-    commitDoc(remember(p.doc, changedConcepts(p.base, p.doc), 'selected'), p.edit.label, { version: true });
+    commitDoc(remember(journaled(p), changedConcepts(p.base, p.doc), 'selected'), p.edit.label, { version: true });
     setNote({ tone: 'ok', text: `Applied: ${p.edit.label}. Undo takes it back.` });
     setAskWords('');
   };
   const discardPending = () => {
     const cur = docNow();
     const turnedDown = live ? changedConcepts(live.base, live.doc) : [];
+    const turn = live?.turn;
     setPending(null);
     if (!cur.artboards.some((b) => b.id === boardId)) setBoardId(cur.artboards[0].id);
-    // a concept turned down is remembered, so the next rethink stays away from its structure
-    if (turnedDown.length) commitDoc(remember(cur, turnedDown, 'rejected'), 'remembered: not like this', { version: false });
+    // what was turned down is remembered with the artboard (the words and what was proposed), so it is not proposed
+    // again; a concept turned down is remembered too, so the next rethink stays away from its structure
+    const noted = turn && cur.artboards.some((b) => b.id === boardId) ? recordTurn(cur, cur, boardId, { said: turn.said, did: turn.did, level: turn.level, status: 'rejected' }) : cur;
+    if (turnedDown.length || noted !== cur) commitDoc(turnedDown.length ? remember(noted, turnedDown, 'rejected') : noted, 'remembered: not like this', { version: false });
     setNote({ tone: 'ok', text: turnedDown.length ? 'Discarded: the design is as it was, and that concept is remembered as not wanted.' : 'Discarded: the design is as it was.' });
   };
 

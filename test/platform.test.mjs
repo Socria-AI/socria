@@ -333,20 +333,12 @@ const high = (doc, board) => P.checkDoc({ ...doc, artboards: [board], tokens: P.
   ok('what a search found is kept with the conversation, held to its shape when read back', msg && msg.found.results.length === 1 && msg.found.results[0].url === 'https://one.example/', J(msg));
 }
 
-// ── 14. understanding at generation, and memory in the model's reading ──
+// ── 14. understanding at generation (memory in the director's reading: test/director.test.mjs) ──
 {
   const themed = P.briefRealisation(P.emptyStudio('graphic', 'A cloud-themed poster for our bakery’s opening day'));
   ok('a world named for the look in the brief (“cloud-themed”) is carried into the first design as a theme', themed && themed.changes.some((c) => c.decision === 'theme' && c.theme === 'cloud') && themed.keep.includes('words'), J(themed));
   ok('a world inside a name is not a theme (“Cloud Nine Bakery”)', P.briefRealisation(P.emptyStudio('graphic', 'A poster for “Cloud Nine Bakery”, opening Saturday')) === null);
   ok('a brief that names no world brings no theme', P.briefRealisation(P.emptyStudio('graphic', 'A poster for our summer sale, bold and loud')) === null);
-  const doc = pair();
-  const withComment = P.applyOps(doc, [{ op: 'comments', comments: [{ id: 'c1', board: 'ab_second', nodes: [P.mainWords(doc.artboards[1]).id], text: 'make this feel lighter', at: 1, status: 'open' }] }]).doc;
-  const reading = P.readingOf(withComment, 'ab_second', null, { brief: 'A poster for the Kanso open studio', references: ['kanso.example (take its colour)'] });
-  ok('the model reads the brief, the artboards in order (this one marked), open comments and references chosen', reading.brief?.includes('Kanso') && reading.boards?.length === 2 && /\(this one\)/.test(reading.boards[1]) && reading.comments?.[0]?.includes('make this feel lighter') && reading.references?.length === 1, J(reading));
-  ok('  and the artboard’s own colours, not the document’s', reading.palette.accent === doc.artboards[1].tokens.colors.accent);
-  const back = P.normalizeReading(JSON.parse(JSON.stringify(reading)));
-  ok('  all of it survives the server’s check, bounded', back.brief === reading.brief && back.boards.length === 2 && back.comments.length === 1 && back.references.length === 1);
-  ok('the instructions say how to use that memory (and stay the same for every design, so they cache)', /Memory: the reading may carry the brief/.test(P.creativeSystem()) && P.creativeSystem() === P.creativeSystem());
 }
 
 // ── 15. a theme on a crowded composition still makes its world, and says how ──

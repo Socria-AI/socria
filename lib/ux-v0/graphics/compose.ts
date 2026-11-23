@@ -39,6 +39,9 @@ import { generate, type GenerativeRequest } from './generative/engine';
 import type { ConceptConstraints, CreativeConcept, Emphasis } from './generative/concept';
 import type { Colouring, TypeStrategy } from './generative/principles';
 import { conceptRecord } from './generative/record';
+import { compileProgram, engineCC, paletteOf } from './generative/compile';
+import { normalizeProgram, type ColourRef, type Instruction } from './generative/program';
+import { readCreative as readBriefCreative } from './generative/reading';
 import { describePlan, FAMILY_BY_ID, type CompositionPlan, type FamilyInfo } from './composition/schema';
 
 export const GRAPHIC_KINDS = ['poster', 'social', 'carousel', 'ad', 'banner', 'magazine', 'book', 'album', 'card', 'label', 'infographic', 'identity', 'announcement', 'presentation', 'campaign', 'logo'] as const;
@@ -1891,4 +1894,101 @@ function newLayouts(): Record<(typeof NEW_ARCHETYPES)[number], Layout> {
       return [...out, ...foot(x)];
     },
   };
+}
+
+
+// ── a design written as a program by the creative director (director/*) ──
+//
+// The director (a model) decides the design; nothing it writes is trusted or executed. Its program passes the same
+// gate as the engine's own (generative/program.ts normalizeProgram: only known instructions, finite numbers in bounds,
+// colours by palette role or hex, path data of absolute commands, registries only, words only by reference to the
+// brief), is compiled into native objects (generative/compile.ts), held to the hard rules for words (inside the safe
+// area, never broken mid-word, never over each other), given every word of the brief the program left out, and
+// checked and repaired like any composition.
+
+export interface ProgramBoard {
+  board: Artboard;
+  /** what the gate dropped from the program, said */
+  problems: string[];
+  /** what the hard rules could not settle */
+  unresolved: string[];
+  /** the brief's words the program had no place for, placed by the engine (never dropped) */
+  placed: string[];
+}
+
+const PLAIN_PLAN = (brief: GraphicBrief): Plan => ({ archetype: 'generative', focal: brief.images.length ? 'image' : 'type', hierarchy: ['headline', 'subhead', 'meta', 'cta', 'logo'], colour: 'ground', shapes: 'none', said: [] });
+
+/** The context a program is compiled in: the direction's palette, with the ground the program itself lays. */
+function programContext(brief: GraphicBrief, dir: GraphicDirection, f: Format, measure: Measure, seed: number, ground?: ColourRef | null): Ctx {
+  const x0 = contextFor(brief, dir, f, PLAIN_PLAN(brief), measure, seed);
+  if (!ground || ground === 'ground' || ground === 'auto') return x0;
+  const c = dir.tokens.colors;
+  const named: Record<string, string> = { paper: c.surface, ink: x0.ink, accent: x0.accent, accent2: x0.accent2, accent3: x0.accent2, muted: x0.muted };
+  const hex = ground.startsWith('#') ? ground.slice(0, 7) : named[ground] ?? x0.ground;
+  if (hex.toLowerCase() === x0.ground.toLowerCase()) return x0;
+  // the program lays another ground than the palette's (the accent as a field, the ink as a night): the words' colours
+  // are chosen for the ground they will really stand on
+  const text = [c.text, c.background, c.surface].sort((p, q) => contrastRatio(q, hex) - contrastRatio(p, hex))[0];
+  return contextFor(brief, { ...dir, tokens: { ...dir.tokens, colors: { ...c, background: hex, text: ensureContrast(text, hex, 4.5) } } }, f, PLAIN_PLAN(brief), measure, seed);
+}
+
+/** One artboard composed from a program (see above). Null when the program is not one (no frame, nothing valid). */
+export function composeProgram(brief: GraphicBrief, dir: GraphicDirection, f: Format, raw: unknown, opts: { measure?: Measure; seed?: number } = {}): ProgramBoard | null {
+  const measure = opts.measure ?? approxMeasure;
+  const seed = opts.seed ?? 7;
+  const { program, problems } = normalizeProgram(raw, { images: brief.images.length });
+  if (!program || !program.elements.length) return null;
+  const g = program.ground;
+  const first: ColourRef = typeof g === 'string' ? g : 'linear' in g ? g.linear.stops[0] : g.radial.stops[0];
+  const x = programContext(brief, dir, f, measure, seed, first);
+  const cc = engineCC(KIT, x, seed, 50, 50, 50);
+  // a graded ground is the first object of the design (everything above it is coloured for what it really covers)
+  const elements: Instruction[] = typeof g === 'string' ? program.elements : [{ op: 'rect', box: { x: 0, y: 0, w: x.W, h: x.H }, fill: g, role: 'background', name: 'Ground' }, ...program.elements];
+  const compiled = compileProgram(cc, { ...program, elements }, readBriefCreative(brief, f, {}), { keepClear: false });
+  const wordsBefore = new Set(compiled.nodes.filter((n): n is TextNode => n.type === 'text' && !n.decorative).map((n) => n.text));
+  const children = ensureWords(x, compiled.nodes, brief.kind);
+  const placed = children.filter((n): n is TextNode => n.type === 'text' && !n.decorative && !wordsBefore.has(n.text)).map((n) => n.role ?? 'text');
+  const stand = brief.images.filter((id) => /^[A-Za-z][\w-]{0,47}$/.test(id)).map((id) => ({ id, kind: 'image', src: `upload:${id.slice(0, 96)}`, width: 1000, height: 1000, name: id }));
+  const tmp = normalizeDoc({ name: 'directed', tokens: dir.tokens, assets: stand, artboards: [{ id: 'dir', name: 'dir', width: x.W, height: x.H, unit: f.unit, dpi: f.dpi, safe: f.safe, bleed: f.bleed, format: f.id, background: x.ground, children }] });
+  const repaired = tmp ? refineDoc(tmp, measure).doc.artboards[0]?.children : null;
+  const board: Artboard = { id: newId('ab'), name: f.label, width: f.width, height: f.height, unit: f.unit, dpi: f.dpi, format: f.id, background: x.ground, bleed: f.bleed, safe: f.safe, children: repaired?.length ? repaired : children };
+  return { board, problems, unresolved: compiled.unresolved, placed };
+}
+
+/** The format an artboard stands for: its preset, or its own size. */
+export function formatOfBoard(board: Artboard): Format {
+  return formatOf(board.format) ?? { id: board.format ?? 'custom', label: board.name, use: '', width: board.width, height: board.height, unit: board.unit, dpi: board.dpi, bleed: board.bleed, safe: board.safe, medium: board.unit === 'pt' ? 'print' : 'screen' };
+}
+
+/**
+ * Instructions compiled for an artboard that already exists (the director adding to a design): the same gate and
+ * compiler, in the artboard's own palette and faces, its words read back from it by role. The new objects are returned
+ * (with what the gate dropped); nothing already on the artboard is touched.
+ */
+export function compileOnBoard(doc: GraphicDoc, boardId: string, instructions: unknown[], opts: { measure?: Measure; kind?: GraphicKind; look?: GraphicDirection['look'] } = {}): { nodes: Node[]; problems: string[] } {
+  const board = doc.artboards.find((b) => b.id === boardId);
+  if (!board || !instructions.length) return { nodes: [], problems: [] };
+  const f = { ...formatOfBoard(board), width: board.width, height: board.height };
+  const read = contentOf(board);
+  const brief: GraphicBrief = { purpose: '', kind: opts.kind ?? 'poster', formats: [f.id], content: read.content.headline ? read.content : { ...read.content, headline: ' ' }, mood: [], images: read.images };
+  const tokens = board.tokens ?? doc.tokens;
+  const dir: GraphicDirection = { name: 'this design', language: 'directed', tokens, look: opts.look ?? { case: 'sentence', tracking: 'normal', weight: 600 }, form: null, intensity: 50 };
+  const measure = opts.measure ?? approxMeasure;
+  const gate = normalizeProgram({ schema: 1, frame: { w: board.width, h: board.height }, ground: 'ground', elements: instructions }, { images: read.images.length });
+  const program = gate.program;
+  // (a whole program must set the headline; an addition to a design that has one need not)
+  const problems = gate.problems.filter((p) => !/^no headline\b/i.test(p));
+  if (!program) return { nodes: [], problems };
+  const base = contextFor(brief, dir, f, PLAIN_PLAN(brief), measure, 7);
+  // the ground is the artboard's own, whatever the palette's paper is
+  const x: Ctx = board.background && board.background.toLowerCase() !== base.ground.toLowerCase() ? programContext(brief, dir, f, measure, 7, board.background.slice(0, 7) as ColourRef) : base;
+  const cc = engineCC(KIT, x, 7, 50, 50, 50);
+  const pal = paletteOf(cc);
+  void pal;
+  // only what is drawn: an added text names words already on the design (its content by role), which the director
+  // moves or restyles where they are instead
+  const drawn = program.elements.filter((e) => e.op !== 'text' && e.op !== 'details' && e.op !== 'list' && e.op !== 'chart');
+  if (drawn.length !== program.elements.length) problems.push('words are restyled or moved where they are, not added again');
+  const compiled = compileProgram(cc, { ...program, elements: drawn }, readBriefCreative(brief, f, {}), { keepClear: false });
+  return { nodes: compiled.nodes, problems };
 }

@@ -29,6 +29,7 @@ import { normalizeCompositionPlan, normalizeMemory, type CompositionPlan, type M
 import { normalizeConceptRecord, type ConceptRecord } from './generative/record';
 import { normalizeLogoRecord, type LogoRecord } from './logo/record';
 import { normalizeCreative, type CreativeRecord } from './creative/decisions';
+import { normalizeDirected, type DirectedRecord } from './director/record';
 
 export const GFX_SCHEMA = 1;
 
@@ -302,6 +303,10 @@ export interface Artboard {
    * mood, where each came from, and what would restore each one — kept with the artboard, so each artboard is a
    * concept of its own */
   creative?: CreativeRecord;
+  /** how the creative director made it and changed it since (director/record.ts): the idea, and a journal of the turns
+   * — what was asked, what was done or turned down, and what each applied turn replaced, so an approved decision is
+   * kept, a rejected one avoided and an earlier state put back exactly */
+  directed?: DirectedRecord;
   /** a visual language of its own (a version made in another direction): its colours and faces; the document's
    * tokens otherwise. Edits on this artboard read and write these (boardView / fromBoardView) */
   tokens?: Tokens;
@@ -913,6 +918,7 @@ export function normalizeDoc(v: unknown, rep: Repair = { notes: [] }): GraphicDo
       ...((cr) => (cr ? { concept: cr } : {}))(b.concept ? normalizeConceptRecord(b.concept) : undefined),
       ...((lr) => (lr ? { logo: lr } : {}))(b.logo ? normalizeLogoRecord(b.logo) : null),
       ...((cr) => (cr ? { creative: cr } : {}))(normalizeCreative(b.creative)),
+      ...((dr) => (dr ? { directed: dr } : {}))(normalizeDirected(b.directed)),
       ...(b.tokens && typeof b.tokens === 'object' ? { tokens: normalizeTokens(b.tokens, tokens) } : {}),
       ...(b.direction && typeof b.direction === 'object' && str(o(b.direction).name, 80) ? { direction: { name: str(o(b.direction).name, 80), language: str(o(b.direction).language, 40) || 'editorial' } } : {}),
     });
@@ -1333,6 +1339,12 @@ export function applyOp(doc0: GraphicDoc, op: Op, opts: { force?: boolean } = {}
         const cr = op.set.creative === null ? undefined : normalizeCreative(op.set.creative);
         if (cr) b.creative = cr;
         else delete b.creative;
+      }
+      // the creative director's record: held to its shape, or removed
+      if ('directed' in op.set) {
+        const dr = op.set.directed === null ? undefined : normalizeDirected(op.set.directed);
+        if (dr) b.directed = dr;
+        else delete b.directed;
       }
       if ('logo' in op.set) {
         const lr = op.set.logo === null ? null : normalizeLogoRecord(op.set.logo);

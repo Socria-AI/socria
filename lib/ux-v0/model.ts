@@ -129,8 +129,13 @@ export const STAGE_TIER: Record<CallKind, Tier> = {
   generate: 'premium',
   refine: 'economy',
   critique: 'premium',
-  // a creative change in words read into a plan (graphics/creative/model.ts): short, structured, validated twice
+  // a change asked in words, read against the design by the creative director (graphics/director): a named object
+  // changed is economy work; a change of feel, composition or the whole is premium (editTier)
   'creative-edit': 'economy',
+  // a graphic designed from its brief by the creative director: the idea, the palette, the faces, the program
+  'graphic-design': 'premium',
+  // the director looking at the rendered result (a picture) and correcting what it sees: a few precise edits
+  'graphic-review': 'economy',
   // the studio's next creative question and its options (studio/discovery-model.ts): short, structured, validated twice
   'studio-questions': 'economy',
   // not a text stage: a picture from an image model, routed by lib/ux-v0/image-gen-server.ts
@@ -318,6 +323,8 @@ export function critiqueTier(comment: string, selection: { type?: string; elemen
   return { tier: 'economy', why: 'a short question about the selected part' };
 }
 
+export { editTier } from './graphics/director/tier';
+
 const intEnv = (v: string | undefined, fallback: number) => {
   const n = parseInt(v ?? '', 10);
   return Number.isFinite(n) && n > 0 ? n : fallback;
@@ -338,7 +345,9 @@ export const MAX_TOKENS: Record<CallKind, number> = {
   generate: 5200,
   refine: 2200,
   critique: 1400,
-  'creative-edit': 1400,
+  'creative-edit': 5000,
+  'graphic-design': 7000,
+  'graphic-review': 2600,
   'studio-questions': 1600,
   image: 0,
 };

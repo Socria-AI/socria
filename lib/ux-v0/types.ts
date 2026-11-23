@@ -462,8 +462,8 @@ export interface DesignBrief {
 
 // ── usage ────────────────────────────────────────────────────────────
 
-export type CallKind = 'discover' | 'direction' | 'brief' | 'refine-brief' | 'art-direction' | 'generate' | 'refine' | 'critique' | 'creative-edit' | 'studio-questions' | 'image';
-export const CALL_KINDS: readonly CallKind[] = ['discover', 'direction', 'brief', 'refine-brief', 'art-direction', 'generate', 'refine', 'critique', 'creative-edit', 'studio-questions', 'image'];
+export type CallKind = 'discover' | 'direction' | 'brief' | 'refine-brief' | 'art-direction' | 'generate' | 'refine' | 'critique' | 'creative-edit' | 'graphic-design' | 'graphic-review' | 'studio-questions' | 'image';
+export const CALL_KINDS: readonly CallKind[] = ['discover', 'direction', 'brief', 'refine-brief', 'art-direction', 'generate', 'refine', 'critique', 'creative-edit', 'graphic-design', 'graphic-review', 'studio-questions', 'image'];
 
 /** What each stage is, in words, for the cost panel, the settings and the report. */
 export const STAGE_LABEL: Record<CallKind, string> = {
@@ -476,6 +476,8 @@ export const STAGE_LABEL: Record<CallKind, string> = {
   refine: 'Refinement',
   critique: 'Critique',
   'creative-edit': 'Creative change',
+  'graphic-design': 'Graphic design',
+  'graphic-review': 'Design review',
   'studio-questions': 'Creative questions',
   // a picture made by an image model (lib/ux-v0/image-gen-server.ts): priced and capped apart from the text stages
   image: 'Images',

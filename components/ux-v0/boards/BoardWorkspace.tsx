@@ -40,7 +40,7 @@ import { useStyleLibrary } from '../graphics/styleLibrary';
 import { syncWebsite, websiteConcept, websiteDrift } from '@/lib/ux-v0/boards/website';
 import { boardFile, openBoardFile } from '@/lib/ux-v0/boards/export';
 import { GraphicEditor, type EditorNote } from '../graphics/GraphicEditor';
-import { planChange } from '../graphics/creativePlanner';
+import { readCreative } from '@/lib/ux-v0/graphics/creative/interpret';
 import { executePlan } from '@/lib/ux-v0/graphics/creative/execute';
 import type { Change } from '@/lib/ux-v0/graphics/creative/plan';
 import { brandBoardOptions } from '@/lib/ux-v0/dsi/generate';
@@ -540,9 +540,9 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
     if (!chosen.length) return false;
     const first = chosen[0];
     const dir = cur.system ? directionOfSystem(cur.system) : null;
-    const planned = await planChange(w, first.doc!, { board: first.doc!.artboards[0].id, dir, projectId: project.id });
-    if (planned.cancelled) return true;
-    const plan = planned.plan;
+    // a board-wide change of look is read in code (the creative director works on one design at a time, inside a material)
+    void dir;
+    const plan = readCreative(w, { doc: first.doc!, board: first.doc!.artboards[0].id })?.plan ?? null;
     if (!plan) return false;
     if (!plan.changes.length) {
       if (!plan.question) return false;

@@ -411,8 +411,11 @@ const MODULES = [
   'test/helpers/platform-under-test.ts',
 ];
 
-export async function buildAll() {
-  rmSync(OUT, { recursive: true, force: true });
+/** Some bundles built again in place (those whose path contains one of `names`): for a benchmark between full runs. */
+export const buildOnly = (names) => buildAll(names);
+
+export async function buildAll(only = null) {
+  if (!only) rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
   const root = join(here, '..', '..');
   // ONE NAME PER MODULE, AND A COLLISION IS A SILENT DISASTER.
@@ -437,7 +440,7 @@ export async function buildAll() {
   };
 
   await Promise.all(
-    MODULES.map((m) =>
+    MODULES.filter((m) => !only || only.some((n) => m.includes(n))).map((m) =>
       build({
         entryPoints: [join(root, m)],
         bundle: true,

@@ -141,31 +141,7 @@ const run = (s, w, extra = {}) => {
   ok('a question is held to two to four answers', C.normalizeQuestion({ text: 'Which?', options: ['a', 'b', 'c', 'd', 'e'] })?.options.length === 4 && C.normalizeQuestion({ text: 'Which?', options: ['a'] }) === null);
 }
 
-// ── 3. the strict schema the model answers in ──
-{
-  const S = C.CREATIVE_PLAN_SCHEMA;
-  const objects = [];
-  const visit = (s) => {
-    if (!s || typeof s !== 'object') return;
-    if (s.type === 'object') objects.push(s);
-    for (const v of Object.values(s)) if (v && typeof v === 'object') Array.isArray(v) ? v.forEach(visit) : visit(v);
-  };
-  visit(S);
-  ok('every object in the plan schema is closed and requires every field (strict mode)', objects.length > 10 && objects.every((o) => o.additionalProperties === false && J([...o.required].sort()) === J(Object.keys(o.properties).sort())), objects.length);
-  const lists = [];
-  const visitLists = (s) => {
-    if (!s || typeof s !== 'object') return;
-    if (s.type === 'array') lists.push(s);
-    for (const v of Object.values(s)) if (v && typeof v === 'object') Array.isArray(v) ? v.forEach(visitLists) : visitLists(v);
-  };
-  visitLists(S);
-  ok('every list in it is bounded', lists.length > 3 && lists.every((l) => typeof l.maxItems === 'number'), J(lists.map((l) => l.maxItems)));
-  const f = C.formatFor('creative-edit');
-  ok('the stage asks for it by name, strictly', f?.type === 'json_schema' && f.name === 'socriaux_creative_edit' && f.strict === true && f.schema === S);
-  const sys = C.creativeSystem();
-  ok('the instructions carry every theme, quality, form and move the engine knows', C.THEMES.every((t) => sys.includes(t.id)) && C.QUALITIES.every((q) => sys.includes(q.id)) && C.FORM_KINDS.every((k) => sys.includes(k)));
-  ok('  and say to preserve what was not asked, never to invent copy, and to ask only when the words mean different things', /Change only what the words ask for/.test(sys) && /Never write new words/.test(sys) && /Ask one question only when/.test(sys));
-}
+// ── 3. (the model's own answers are the creative director's now: test/director.test.mjs) ──
 
 // ── 4. the executor: what was asked changes; nothing else does ──
 {
@@ -299,19 +275,13 @@ const run = (s, w, extra = {}) => {
   ok('a kept concept can be let go', forgot.ok && forgot.doc.concepts.length === C.MAX_CONCEPTS - 1);
 }
 
-// ── 8. the decisions in words, and the model's reading ──
+// ── 8. the decisions in words ──
 {
   const s = poster();
   run(s, 'I want to make it cloud themed');
   const views = C.decisionViews(s.doc);
   ok('each decision is said in words, with where it came from', views.length === 7 && views.every((v) => v.value && ['engine', 'you', 'concept'].includes(v.source)) && views.find((v) => v.key === 'forms').source === 'you' && views.find((v) => v.key === 'type').source === 'engine', J(views.map((v) => [v.key, v.source, v.value])));
   ok('  each one changed can be put back on its own', views.filter((v) => v.revertible).map((v) => v.key).sort().join(',') === ['background', 'depth', 'forms', 'mood', 'palette'].sort().join(','), J(views.map((v) => [v.key, v.revertible])));
-  const reading = C.readingOf(s.doc, board(s.doc).id);
-  ok('the model reads the design compactly: its objects, words, palette, type and decisions — no pictures, no paths', reading.objects.length > 0 && reading.objects.length <= 40 && reading.objects.some((o) => o.words === 'Open Air') && reading.decisions.length === 7 && !/data:image|<path|"d":/.test(J(reading)), J(reading).slice(0, 400));
-  const evil = C.normalizeReading({ ...reading, objects: Array.from({ length: 90 }, () => ({ role: 'x'.repeat(99), words: 'w'.repeat(900) })), palette: { background: 'javascript:alert(1)', text: '#111111' } });
-  ok('a reading sent by a browser is held to its size and shape', evil.objects.length === 40 && evil.objects[0].words.length <= 80 && evil.objects[0].role.length <= 20 && J(evil.palette) === J({ text: '#111111' }), J(evil).slice(0, 300));
-  const user = C.creativeUser('make it cloud themed', reading, null, [{ said: 'warmer', did: 'the colour warmer' }]);
-  ok('the model is given the words, the design and the turns before', /THE DESIGNER SAYS: make it cloud themed/.test(user) && /EARLIER IN THIS CONVERSATION/.test(user) && /Open Air/.test(user));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
