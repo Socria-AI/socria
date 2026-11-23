@@ -23,6 +23,7 @@ import { EXPERIENCES } from './intent';
 import { LANGUAGES } from './direction';
 import { SIGNATURES } from './plan';
 import { MOOD_CATEGORIES, PALETTE_ROLES, VERDICTS, type CallKind } from './types';
+import { CREATIVE_PLAN_SCHEMA } from './graphics/creative/model';
 
 type Schema = Record<string, unknown>;
 
@@ -132,6 +133,8 @@ const SCHEMAS: Partial<Record<CallKind, Schema>> = {
   'refine-brief': refineBrief,
   direction: moodDirection,
   critique,
+  // lib/ux-v0/graphics/creative/model.ts: a creative change read into a plan of decisions in the engine's vocabulary
+  'creative-edit': CREATIVE_PLAN_SCHEMA,
 };
 
 /** The structured format for a kind of call, or undefined when it answers in plain JSON (see above). */

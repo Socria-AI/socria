@@ -28,6 +28,7 @@ import { normalizeSelection, type StyleSelection } from './styles/blend';
 import { normalizeCompositionPlan, normalizeMemory, type CompositionPlan, type MemoryEntry } from './composition/schema';
 import { normalizeConceptRecord, type ConceptRecord } from './generative/record';
 import { normalizeLogoRecord, type LogoRecord } from './logo/record';
+import { normalizeCreative, type CreativeRecord } from './creative/decisions';
 
 export const GFX_SCHEMA = 1;
 
@@ -297,7 +298,26 @@ export interface Artboard {
   concept?: ConceptRecord;
   /** a logo artboard's record (logo/record.ts): the brief, every concept shown, the selected and approved ones */
   logo?: LogoRecord;
+  /** the concept's creative decisions as they were decided (creative/decisions.ts): its theme, forms, ground, depth and
+   * mood, where each came from, and what would restore each one — kept with the artboard, so each artboard is a
+   * concept of its own */
+  creative?: CreativeRecord;
 }
+
+/** A concept kept to come back to, compare or take decisions from: an artboard as it was, with its palette and type. */
+export interface SavedConcept {
+  id: string;
+  name: string;
+  at: number;
+  /** the artboard as it was when it was saved, its creative record with it */
+  board: Artboard;
+  tokens: Tokens;
+  /** the words that led to it, when a change asked in words did */
+  said?: string;
+  /** the concept it was made from (a copy, a combination) */
+  from?: string;
+}
+export const MAX_CONCEPTS = 8;
 
 export interface Asset {
   id: string;
@@ -339,6 +359,8 @@ export interface GraphicDoc {
   style?: StyleSelection;
   /** the compositions shown, chosen and turned down for this design (composition/memory.ts), bounded */
   compositionMemory?: MemoryEntry[];
+  /** concepts kept to come back to, compare and combine (newest last, at most MAX_CONCEPTS) */
+  concepts?: SavedConcept[];
   revision: number;
   updatedAt: number;
 }
@@ -800,6 +822,7 @@ export function normalizeDoc(v: unknown, rep: Repair = { notes: [] }): GraphicDo
       ...((cp) => (cp ? { composition: cp } : {}))(b.composition ? normalizeCompositionPlan(b.composition) : null),
       ...((cr) => (cr ? { concept: cr } : {}))(b.concept ? normalizeConceptRecord(b.concept) : undefined),
       ...((lr) => (lr ? { logo: lr } : {}))(b.logo ? normalizeLogoRecord(b.logo) : null),
+      ...((cr) => (cr ? { creative: cr } : {}))(normalizeCreative(b.creative)),
     });
   }
   if (!artboards.length) return null;
@@ -816,9 +839,32 @@ export function normalizeDoc(v: unknown, rep: Repair = { notes: [] }): GraphicDo
     ...((v) => (v ? { vocabulary: v } : {}))(vocabularyOf(r.vocabulary)),
     ...((v) => (v ? { style: v } : {}))(normalizeSelection(r.style)),
     ...((m) => (m.length ? { compositionMemory: m } : {}))(normalizeMemory(r.compositionMemory)),
+    ...((cs) => (cs.length ? { concepts: cs } : {}))(normalizeConcepts(r.concepts, assets)),
     revision: Math.round(num(r.revision, 0, 1e9, 0)),
     updatedAt: typeof r.updatedAt === 'number' && r.updatedAt > 0 ? Math.round(r.updatedAt) : Date.now(),
   };
+}
+
+/** Saved concepts held to their shape: each artboard and its tokens as a document would hold them, at most MAX_CONCEPTS. */
+export function normalizeConcepts(v: unknown, assets: readonly Asset[]): SavedConcept[] {
+  const out: SavedConcept[] = [];
+  for (const x of a(v).slice(-MAX_CONCEPTS)) {
+    const c = o(x);
+    const made = normalizeDoc({ schema: GFX_SCHEMA, tokens: c.tokens, artboards: [c.board], assets }, { notes: [] });
+    if (!made) continue;
+    const id = typeof c.id === 'string' && /^[\w-]{1,64}$/.test(c.id) ? c.id : newId('cc');
+    if (out.some((y) => y.id === id)) continue;
+    out.push({
+      id,
+      name: str(c.name, 60, '').trim() || `Concept ${out.length + 1}`,
+      at: typeof c.at === 'number' && c.at > 0 ? Math.round(c.at) : Date.now(),
+      board: made.artboards[0],
+      tokens: made.tokens,
+      ...(str(c.said, 240, '').trim() ? { said: str(c.said, 240, '').trim() } : {}),
+      ...(typeof c.from === 'string' && /^[\w-]{1,64}$/.test(c.from) ? { from: c.from } : {}),
+    });
+  }
+  return out;
 }
 
 /** A document of another schema brought to this one; null when it cannot be (said in the repair notes). */
@@ -889,6 +935,8 @@ export type Op =
   | { op: 'artboard-reorder'; id: string; to: number }
   | { op: 'tokens'; set: Record<string, unknown> }
   | { op: 'locks'; colors?: boolean; fonts?: boolean }
+  /** the saved concepts, replaced whole (held to their shape) */
+  | { op: 'concepts'; concepts: unknown[] }
   // vector operations (vectorops.ts)
   | { op: 'boolean'; ids: string[]; mode: BoolMode; name?: string }
   | { op: 'flatten'; id: string }
@@ -960,6 +1008,13 @@ function reId(n: Node, seen: Set<string>): Node {
   while (seen.has(id)) id = newId(n.id.charAt(0));
   seen.add(id);
   return n.type === 'group' ? { ...n, id, children: n.children.map((c) => reId(c, seen)) } : { ...n, id };
+}
+
+/** Old id → new id between an artboard and its copy (the same objects in the same order). */
+export function idMap(from: Artboard, to: Artboard): Map<string, string> {
+  const a1 = walk(from).map((l) => l.node.id);
+  const a2 = walk(to).map((l) => l.node.id);
+  return new Map(a1.map((id, i) => [id, a2[i]] as [string, string]).filter(([, b]) => !!b));
 }
 
 const allIds = (doc: GraphicDoc): Set<string> => new Set(doc.artboards.flatMap((b) => [b.id, ...walk(b).map((l) => l.node.id)]));
@@ -1179,6 +1234,12 @@ export function applyOp(doc0: GraphicDoc, op: Op, opts: { force?: boolean } = {}
         if (cr) b.concept = cr;
         else delete b.concept;
       }
+      // the creative decisions kept with the artboard: held to their shape, or removed
+      if ('creative' in op.set) {
+        const cr = op.set.creative === null ? undefined : normalizeCreative(op.set.creative);
+        if (cr) b.creative = cr;
+        else delete b.creative;
+      }
       if ('logo' in op.set) {
         const lr = op.set.logo === null ? null : normalizeLogoRecord(op.set.logo);
         if (op.set.logo !== null && !lr) return { ok: false, error: 'That is not a logo record SocriaUX can use.' };
@@ -1193,6 +1254,17 @@ export function applyOp(doc0: GraphicDoc, op: Op, opts: { force?: boolean } = {}
       const ids = allIds(doc);
       const copy: Artboard = { ...clone(b), id: newId('ab'), name: op.name?.slice(0, 60) || `${b.name} copy`, children: clone(b.children).map((c) => reId(c, ids)) };
       delete copy.locked;
+      if (b.creative) {
+        const map = idMap(b, copy);
+        const was = b.creative;
+        // its decisions come with it, pointing at its own copies; what restored the original's does not apply here
+        copy.creative = {
+          ...clone(was),
+          ...(was.forms ? { forms: { ...was.forms, ids: was.forms.ids.map((id) => map.get(id)).filter((id): id is string => !!id) } } : {}),
+          ...(was.background ? { background: { ...was.background, ...(was.background.id && map.get(was.background.id) ? { id: map.get(was.background.id)! } : {}) } } : {}),
+        };
+        delete copy.creative.history;
+      }
       doc.artboards.splice(doc.artboards.indexOf(b) + 1, 0, copy);
       return done([copy.id]);
     }
@@ -1214,11 +1286,18 @@ export function applyOp(doc0: GraphicDoc, op: Op, opts: { force?: boolean } = {}
     case 'tokens': {
       const s = o(op.set);
       if (!opts.force && ((doc.locks?.colors && s.colors) || (doc.locks?.fonts && s.fonts))) return { ok: false, error: 'That part of the design system is locked.', locked: [doc.locks?.colors && s.colors ? 'the colours' : 'the typefaces'] };
-      doc.tokens = { ...doc.tokens, ...(s.colors ? { colors: { ...doc.tokens.colors, ...o(s.colors) } } : {}), ...(s.fonts ? { fonts: { ...doc.tokens.fonts, ...o(s.fonts) } } : {}) } as Tokens;
+      doc.tokens = { ...doc.tokens, ...(s.colors ? { colors: { ...doc.tokens.colors, ...o(s.colors) } } : {}), ...(s.fonts ? { fonts: { ...doc.tokens.fonts, ...o(s.fonts) } } : {}), ...(typeof s.accent2 === 'string' && /^#[0-9a-fA-F]{6}$/.test(s.accent2) ? { accent2: s.accent2.toLowerCase() } : {}) } as Tokens;
       return done([]);
     }
     case 'locks': {
       doc.locks = { ...(doc.locks ?? {}), ...(op.colors !== undefined ? { colors: op.colors } : {}), ...(op.fonts !== undefined ? { fonts: op.fonts } : {}) };
+      return done([]);
+    }
+    case 'concepts': {
+      if (!Array.isArray(op.concepts)) return { ok: false, error: 'Those are not concepts SocriaUX can keep.' };
+      const list = normalizeConcepts(op.concepts, doc.assets);
+      if (list.length) doc.concepts = list;
+      else delete doc.concepts;
       return done([]);
     }
     case 'boolean': {

@@ -161,6 +161,7 @@ const STAGE_WORDS: Record<CallKind, string> = {
   generate: 'Designing',
   refine: 'Working out the change',
   critique: 'Reading the design',
+  'creative-edit': 'Reading the change',
   image: 'Making the picture',
 };
 const secondsOf = (ms: number) => Math.max(1, Math.round(ms / 1000));

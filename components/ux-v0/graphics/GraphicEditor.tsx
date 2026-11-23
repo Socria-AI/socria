@@ -17,18 +17,24 @@ import { checkDoc, refineDoc } from '@/lib/ux-v0/graphics/check';
 import { readGraphicEdit, type GraphicEdit } from '@/lib/ux-v0/graphics/edit';
 import { changedConcepts, remember } from '@/lib/ux-v0/graphics/generative/memory';
 import { nativeFile, openNativeFile, svgFile } from '@/lib/ux-v0/graphics/export';
-import { embeddedAssets, exportBoardImage, exportPdf } from '@/lib/ux-v0/graphics/raster';
+import { canvasMeasure, embeddedAssets, exportBoardImage, exportPdf } from '@/lib/ux-v0/graphics/raster';
 import { MAX_GRAPHIC_VERSIONS, type GraphicVersion } from '@/lib/ux-v0/graphics/state';
 import type { Measure } from '@/lib/ux-v0/graphics/text';
 import { GraphicCanvas, type CanvasHandle } from './GraphicCanvas';
 import { AddPanel, ArtboardsPanel, Inspector, LayersPanel, nodeLabel } from './GraphicPanels';
 import { CeilingInspector, ShapeLibrary } from './CeilingPanels';
-import { download, slug } from './faces';
+import { download, faceKey, facesUsed, loadFaces, slug } from './faces';
 import { StyleExplorer, StylePanel } from './StyleExplorer';
 import { LogoTab } from './LogoPanel';
 import { logoEditFromWords } from '@/lib/ux-v0/graphics/logo/session';
 import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
 import { useStyleLibrary } from './styleLibrary';
+import { ConceptCompare, ConceptPanel } from './ConceptPanel';
+import { planChange } from './creativePlanner';
+import { readCreative } from '@/lib/ux-v0/graphics/creative/interpret';
+import { conceptRef, executePlan } from '@/lib/ux-v0/graphics/creative/execute';
+import { conceptRefs, forgetConcept, revisitConcept, saveConcept } from '@/lib/ux-v0/graphics/creative/concepts';
+import type { Change, CreativePlan, PlanQuestion } from '@/lib/ux-v0/graphics/creative/plan';
 
 /** Creative direction in one click: the same words the ask bar reads (generative/edits.ts). */
 const CREATIVE_ACTIONS: readonly [string, string, boolean?][] = [
@@ -46,7 +52,7 @@ const CREATIVE_ACTIONS: readonly [string, string, boolean?][] = [
 ];
 
 type Tab = 'logo' | 'layers' | 'concept' | 'boards' | 'add' | 'shapes' | 'pictures' | 'styles' | 'brand' | 'versions';
-export type EditorNote = { tone: 'ok' | 'warn' | 'ask'; text: string } | null;
+export type EditorNote = { tone: 'ok' | 'warn' | 'ask'; text: string; /** ways to answer a question, as they would be said */ options?: { label: string; words: string }[] } | null;
 export type ChangeMeta = { label: string; version?: boolean; kind: 'edit' | 'undo' | 'redo' };
 
 /** A direction for a document that has none (one opened from a file): its own tokens, a measured restraint. */
@@ -98,6 +104,8 @@ export interface GraphicEditorProps {
   onFocus?: (focus: boolean) => void;
   /** words are taken elsewhere (the conversation beside the workspace): no ask bar of its own, only what it previews */
   hideAsk?: boolean;
+  /** the project, for the model's budget when a creative change is read by it */
+  projectId?: string;
 }
 
 export function GraphicEditor(props: GraphicEditorProps) {
@@ -204,27 +212,175 @@ export function GraphicEditor(props: GraphicEditorProps) {
     setTick((t) => t + 1);
   };
 
-  // ── a change asked in words: read into operations, previewed, then applied or discarded ──
-  const ask = (said?: string) => {
-    const words = (typeof said === 'string' ? said : askWords).trim();
+  // ── a change asked in words ──
+  // What one object should do (“make the headline bigger”, “move the logo beneath the title”) goes to the precise
+  // reader, as it always has. A creative change — a theme, a quality, a new look for the type, the colours, the forms,
+  // the ground or the composition, a decision turned down, a concept kept, revisited or combined — is planned (the
+  // model when it can help, the reader always: creativePlanner.ts), carried out by the engine (creative/execute.ts)
+  // and previewed. One question is asked only when the words could mean genuinely different things, its answers
+  // offered as they would be said; anything else is decided and shown, to keep or to discard.
+  const askedRef = useRef<PlanQuestion | null>(null);
+  const recentRef = useRef<{ said: string; did: string }[]>([]);
+  const planning = useRef<AbortController | null>(null);
+  const [thinking, setThinking] = useState('');
+  const [compare, setCompare] = useState(false);
+
+  const tell = (tone: 'ok' | 'warn' | 'ask', text: string, show = true, options?: { label: string; words: string }[]) => {
+    if (show) setNote({ tone, text, ...(options?.length ? { options } : {}) });
+    props.onAsked?.(options?.length ? `${text} ${options.map((o, i) => `${i + 1}. ${o.label}`).join(' · ')} — or say it your own way.` : text);
+  };
+  const askQuestion = (q: PlanQuestion, lead = '') => {
+    askedRef.current = q;
+    tell('ask', `${lead}${q.text}`, true, q.options);
+  };
+  const dirNow = () => props.direction ?? directionOfDoc(docNow());
+
+  /** The precise reader's change of one object, previewed (false when it reads nothing in the words). */
+  const precise = (words: string): boolean => {
     const cur = docNow();
+    const e = readGraphicEdit(words, cur, { artboard: board.id, selection, dir: dirNow(), measure, kind: props.kind, customs: library.styles });
+    if (!e) return false;
+    if (e.question && !e.ops.length && !e.next) {
+      tell('ask', e.question);
+      return true;
+    }
+    let next: GraphicDoc | null = e.next ?? null;
+    if (!next) {
+      const r = applyOps(cur, e.ops);
+      if (!r.ok) {
+        tell('warn', `Nothing changed: ${r.error}`);
+        return true;
+      }
+      next = r.doc;
+    }
+    setPending({ edit: e, doc: next, base: cur });
+    if (e.next) {
+      const fresh = next.artboards.find((b) => !cur.artboards.some((c) => c.id === b.id));
+      if (fresh) setBoardId(fresh.id);
+    }
+    recentRef.current = [...recentRef.current, { said: words, did: e.label }].slice(-6);
+    setNote(e.question ? { tone: 'ask', text: e.question } : null);
+    props.onAsked?.(`Previewing: ${e.label}. Apply or Discard it under the canvas.${e.question ? ` ${e.question}` : ''}`);
+    return true;
+  };
+
+  /** A move on concepts themselves: keep, explore a copy, compare, go back, new ones, another interpretation. */
+  const conceptMove = (c: Extract<Change, { decision: 'concept' }>, words: string) => {
+    const cur = docNow();
+    if (c.action === 'save') {
+      const s = saveConcept(cur, board.id, { name: c.name, said: recentRef.current[recentRef.current.length - 1]?.said });
+      onOps([s.op], `kept as “${s.concept.name}”`);
+      setTab('concept');
+      return tell('ok', `Kept as “${s.concept.name}”. Go back to it any time from Concept, compare it, or take its type, colours or forms into another.${s.dropped ? ` (“${s.dropped.name}”, the oldest kept, made room for it.)` : ''}`);
+    }
+    if (c.action === 'duplicate') {
+      onOps([{ op: 'artboard-duplicate', id: board.id, name: c.name || `${board.name} — to explore` }], 'a copy to explore from');
+      return tell('ok', 'A copy to explore from, beside the original: change it as freely as you like — the original stays as it is.');
+    }
+    if (c.action === 'compare') {
+      if (!cur.concepts?.length && cur.artboards.length < 2) return tell('ask', 'There is only this concept so far. Say “keep this concept” or “explore a copy”, change one, and then compare them.');
+      setTab('concept');
+      setCompare(true);
+      return tell('ok', 'The concepts are side by side over the canvas, each with what it decided. Take a decision from one, or go back to it.');
+    }
+    if (c.action === 'revisit') {
+      const refs = conceptRefs(cur, board.id);
+      const kept = cur.concepts ?? [];
+      const target = c.ref ? conceptRef(refs, c.ref) : kept.length ? refs[kept.length - 1] : null;
+      if (!target) return tell('ask', kept.length ? `Which one? ${kept.map((k, i) => `${i + 1}. ${k.name}`).join(' · ')}` : 'No concept has been kept yet. Say “keep this concept” to keep one; then you can always come back to it.');
+      if (kept.some((k) => k.id === target.id)) {
+        const r = revisitConcept(cur, board.id, target.id);
+        if (!r) return tell('warn', 'That concept could not be brought back.');
+        commitDoc(r.doc, r.label, { version: true });
+        return tell('ok', `Back to “${target.name}”.${r.keptAs ? ` What was here is kept as “${r.keptAs}”, so nothing is lost.` : ''} Undo goes back.`);
+      }
+      setBoardId(target.id);
+      return tell('ok', `“${target.name}” is in front: change it as freely as this one.`);
+    }
+    if (c.action === 'new') {
+      if (precise('Show me four different compositions')) return;
+      return tell('warn', 'New concepts need an artboard composed by SocriaUX (with a headline) to start from.');
+    }
+    // another interpretation: the composition conceived again, the decisions made since put back on it
+    runPlan({ intent: 'concept', summary: 'another interpretation of this concept, its decisions kept', keep: [], changes: [{ decision: 'composition', action: 'alternative' }], by: 'reader' }, words);
+  };
+
+  /** A plan carried out by the engine and previewed (or its question asked, or its concept move made). */
+  const runPlan = async (plan: CreativePlan, words: string) => {
+    const base = docNow();
+    const move = plan.changes.find((c): c is Extract<Change, { decision: 'concept' }> => c.decision === 'concept');
+    if (move) return conceptMove(move, words);
+    if (!plan.changes.length) {
+      if (plan.question) return askQuestion(plan.question);
+      return tell('ok', plan.keep.length ? `Kept as it is: ${plan.summary.replace(/^./, (x) => x.toLowerCase())}. Say what should change.` : 'Say what should change, and how.');
+    }
+    // the same moment for both passes below, so the forms drawn are the same ones
+    const now = Date.now();
+    const exec = (m: Measure) => executePlan(base, plan, { board: board.id, dir: dirNow(), kind: props.kind, measure: m, concepts: conceptRefs(base, board.id), said: words, now });
+    // a face the design did not use until now is fetched first and the words fitted again to its real widths: until it
+    // arrives the browser measures a stand-in, and words fitted to that break once the real face is drawn. The first
+    // pass measures with a measure of its own, so the editor's measure never keeps a stand-in's widths
+    const browser = typeof document !== 'undefined';
+    let r = exec(browser ? canvasMeasure() : measure);
+    if (r && r.doc !== base && browser) {
+      const known = new Set(facesUsed(base).map(faceKey));
+      const fresh = facesUsed(r.doc).filter((f) => !known.has(faceKey(f)));
+      if (fresh.length) {
+        setThinking('Setting the type…');
+        try {
+          if (await loadFaces(fresh)) r = exec(canvasMeasure()) ?? r;
+        } finally {
+          setThinking('');
+        }
+      }
+    }
+    if (!r || r.doc === base || !r.done.length) {
+      const why = r?.notes.join(' ') || 'This design already is what those words ask for.';
+      return plan.question ? askQuestion(plan.question, `${why} `) : tell('warn', why);
+    }
+    setPending({ edit: { ops: [], next: r.doc, label: r.label || r.done[0], scope: 'artboard' }, doc: r.doc, base });
+    recentRef.current = [...recentRef.current, { said: words, did: r.done.join('; ') }].slice(-6);
+    const said = `${r.done.join('; ').replace(/^./, (x) => x.toUpperCase())}.${r.kept.length ? ` Kept: ${r.kept.join(', ')}.` : ''}${r.notes.length ? ` ${r.notes.join(' ')}` : ''}`;
+    setAskWords('');
+    if (plan.question) return askQuestion(plan.question, `${said} `);
+    setNote({ tone: 'ok', text: said });
+    props.onAsked?.(`Previewing: ${said} Apply or Discard it under the canvas.`);
+  };
+
+  const ask = async (said?: string) => {
+    let words = (typeof said === 'string' ? said : askWords).trim();
     if (!words || !board) return;
-    const tell = (tone: 'ok' | 'warn' | 'ask', text: string, show = true) => {
-      if (show) setNote({ tone, text });
-      props.onAsked?.(text);
-    };
-    // a preview waiting: “apply” or “discard” said in words settles it
-    if (live && /^\s*(apply( it)?|yes|keep( it)?|do it|ok(ay)?|looks good|perfect)\b/i.test(words)) {
+    // a preview waiting: a short “apply” or “discard” settles it (“keep the type, change the rest” is a new change, not a yes)
+    if (live && /^\s*(apply( it)?|yes( please)?|keep it|do it|ok(ay)?|looks good|perfect|great|love it)\s*[.!]*\s*$/i.test(words)) {
       const label = live.edit.label;
       applyPending();
       tell('ok', `Applied: ${label}. Undo takes it back.`, false);
       return;
     }
-    if (live && /^\s*(discard( it)?|no\b|undo|cancel|not that|never ?mind)/i.test(words)) {
+    if (live && /^\s*(discard( it)?|no|nope|undo( that)?|cancel|not that|never ?mind)\s*[.!]*\s*$/i.test(words)) {
       discardPending();
       tell('ok', 'Discarded: the design is as it was.', false);
       return;
     }
+    // “undo” with nothing waiting: the last change taken back
+    if (!live && /^\s*undo( that| it| the last change)?\s*[.!]*\s*$/i.test(words)) {
+      if (!past.current.length) return tell('ok', 'There is nothing to undo yet.');
+      undo();
+      props.onAsked?.('Undone. Redo brings it back.');
+      return;
+    }
+    if (planning.current) return tell('ask', 'Still reading the last change — a moment, or cancel it first.');
+    // a new change while one is previewed builds on it (the preview is taken), unless the words turn it down first
+    // (“no, make it darker”): continuous iteration, never a dead end of apply-or-discard
+    if (live) {
+      const refused = words.match(/^\s*(no|nope|not that|not like that)\b[,.!]?\s*/i);
+      if (refused) {
+        setPending(null);
+        words = words.slice(refused[0].length).trim();
+        if (!words) return tell('ok', 'Discarded: the design is as it was.');
+      } else takePending();
+    }
+    const cur = docNow();
     // on a logo artboard, the logo's own edits (more distinctive, simpler, a new wordmark…) are read first
     if (board.logo) {
       const lr = logoEditFromWords(cur, board.id, words);
@@ -236,31 +392,47 @@ export function GraphicEditor(props: GraphicEditorProps) {
         return;
       }
     }
-    const e = readGraphicEdit(words, cur, { artboard: board.id, selection, dir: props.direction ?? directionOfDoc(cur), measure, kind: props.kind, customs: library.styles });
-    if (!e) {
-      tell('ask', 'SocriaUX could not read that as a change it can make without a model. Try “make the headline bigger”, “increase the contrast”, “move the logo beneath the title”, “use more editorial typography”, “adapt it to a story”, or select an object and change it in the panel on the right.');
-      return;
+    const asked = askedRef.current;
+    askedRef.current = null;
+    const refs = conceptRefs(cur, board.id);
+    const read = readCreative(words, { doc: cur, board: board.id, concepts: refs, asked });
+    // what one object should do, or a command of the editor's own (a format, a colour for the selection, a size): the
+    // precise reader first, whenever the words hold no creative decision
+    const creative = !!read && read.plan.changes.some((c) => c.decision !== 'object');
+    if (!creative && precise(words)) return;
+    const ac = new AbortController();
+    planning.current = ac;
+    setThinking('Reading the change…');
+    let planned: Awaited<ReturnType<typeof planChange>>;
+    try {
+      planned = await planChange(words, cur, {
+        board: board.id,
+        dir: dirNow(),
+        asked,
+        recent: recentRef.current,
+        concepts: refs,
+        projectId: props.projectId,
+        signal: ac.signal,
+        onProgress: (p) => (p.phase === 'thinking' ? setThinking('Thinking it through…') : p.phase === 'writing' ? setThinking('Deciding what changes…') : undefined),
+      });
+    } finally {
+      planning.current = null;
+      setThinking('');
     }
-    if (e.question && !e.ops.length && !e.next) {
-      tell('ask', e.question);
-      return;
+    if (planned.cancelled) return tell('ok', 'Stopped. Nothing changed.');
+    if (!planned.plan) {
+      // nothing in the words to act on: one question whose answers get somewhere (never an internal limitation)
+      return askQuestion({
+        text: `I want to get “${words.slice(0, 80)}” right — which is closest to what you mean?`,
+        options: [
+          { label: 'A theme (clouds, the ocean, space…)', words: 'give it a theme' },
+          { label: 'More refined', words: 'make it more sophisticated' },
+          { label: 'Bolder and more alive', words: 'make it more expressive and alive' },
+          { label: 'A completely new idea', words: 'this feels too generic, try something more original' },
+        ],
+      });
     }
-    let next: GraphicDoc | null = e.next ?? null;
-    if (!next) {
-      const r = applyOps(cur, e.ops);
-      if (!r.ok) {
-        tell('warn', `Nothing changed: ${r.error}`);
-        return;
-      }
-      next = r.doc;
-    }
-    setPending({ edit: e, doc: next, base: cur });
-    if (e.next) {
-      const fresh = next.artboards.find((b) => !cur.artboards.some((c) => c.id === b.id));
-      if (fresh) setBoardId(fresh.id);
-    }
-    setNote(e.question ? { tone: 'ask', text: e.question } : null);
-    props.onAsked?.(`Previewing: ${e.label}. Apply or Discard it under the canvas.${e.question ? ` ${e.question}` : ''}`);
+    runPlan(planned.plan, words);
   };
   // a change asked in the conversation beside the workspace, read as if typed here
   const inboxId = props.inbox?.id;
@@ -272,6 +444,13 @@ export function GraphicEditor(props: GraphicEditorProps) {
     const cur = docNow();
     setPending({ edit: { ops: [], next, label, scope: 'artboard' }, doc: next, base: cur });
     setNote(null);
+  };
+  /** The preview taken as it is, quietly: the change said next builds on it (undo takes each back in turn). */
+  const takePending = () => {
+    if (!live) return;
+    const p = live;
+    setPending(null);
+    commitDoc(remember(p.doc, changedConcepts(p.base, p.doc), 'selected'), p.edit.label, { version: true });
   };
   const applyPending = () => {
     if (!live) return;
@@ -516,36 +695,36 @@ export function GraphicEditor(props: GraphicEditorProps) {
             <StylePanel doc={doc} board={board} dir={props.direction ?? directionOfDoc(doc)} kind={props.kind} measure={measure} href={href} onPreview={previewDoc} onOps={onOps} onNote={(text, tone) => setNote({ tone: tone ?? 'warn', text })} onExplore={(query) => setExplorer({ open: true, query })} />
           )}
           {tab === 'concept' && (
-            <section className="gx-panel gx-concept" aria-label="Concept">
-              <p className="gx-panel-h">Concept</p>
-              {board.concept ? (
+            <ConceptPanel
+              doc={doc}
+              board={board}
+              dir={props.direction ?? null}
+              waiting={!!pending || !!thinking}
+              onAsk={(w) => void ask(w)}
+              onPlan={runPlan}
+              onKeep={() => conceptMove({ decision: 'concept', action: 'save' }, 'keep this concept')}
+              onDuplicate={() => conceptMove({ decision: 'concept', action: 'duplicate' }, 'explore a copy')}
+              onCompare={() => setCompare((c) => !c)}
+              onRevisit={(id) => conceptMove({ decision: 'concept', action: 'revisit', ref: id }, 'go back to it')}
+              onForget={(id) => {
+                const c = (docNow().concepts ?? []).find((x) => x.id === id);
+                onOps([forgetConcept(docNow(), id)], `let go of “${c?.name ?? 'a concept'}”`);
+                setNote({ tone: 'ok', text: `Let go of “${c?.name ?? 'that concept'}”. Undo brings it back.` });
+              }}
+              extra={
                 <>
-                  <p className="gx-concept-idea">{board.concept.idea}</p>
-                  <p className="v0-quiet">{board.concept.artDirection}</p>
-                  <dl className="gx-concept-dl">
-                    {(Object.entries(board.concept.strategies) as [string, string][])
-                      .filter(([, v]) => v)
-                      .map(([k, v]) => (
-                        <div key={k}>
-                          <dt>{k}</dt>
-                          <dd>{v}</dd>
-                        </div>
-                      ))}
-                  </dl>
+                  <p className="gx-panel-sub">Composition moves</p>
+                  <div className="gx-concept-acts">
+                    {CREATIVE_ACTIONS.filter(([, , needsPicture]) => !needsPicture || doc.assets.length > 0).map(([label, words]) => (
+                      <button key={label} type="button" className="sb-btn is-sm" onClick={() => void ask(words)} disabled={!!pending || !!thinking} title={words}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="v0-quiet">Each is shown first; apply or discard it. The words, pictures, style and anything locked are kept.</p>
                 </>
-              ) : (
-                <p className="v0-quiet">This artboard was not generated from a concept (a template, an adaptation or a design made by hand). The actions below generate one for it.</p>
-              )}
-              <p className="gx-panel-sub">Direct it</p>
-              <div className="gx-concept-acts">
-                {CREATIVE_ACTIONS.filter(([, , needsPicture]) => !needsPicture || doc.assets.length > 0).map(([label, words]) => (
-                  <button key={label} type="button" className="sb-btn is-sm" onClick={() => ask(words)} disabled={!!pending} title={words}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <p className="v0-quiet">Each is shown first; apply or discard it. The words, pictures, style and anything locked are kept.</p>
-            </section>
+              }
+            />
           )}
           {tab === 'brand' && (
             <section className="gx-panel" aria-label="Brand">
@@ -755,10 +934,23 @@ export function GraphicEditor(props: GraphicEditorProps) {
             </p>
           )}
           {live && <span className="gx-preview-tag">Preview</span>}
+          {compare && (
+            <ConceptCompare
+              doc={doc}
+              board={board}
+              measure={measure}
+              href={href}
+              waiting={!!pending || !!thinking}
+              onClose={() => setCompare(false)}
+              onRevisit={(id) => (setCompare(false), conceptMove({ decision: 'concept', action: 'revisit', ref: id }, 'go back to it'))}
+              onTake={(plan, words) => (setCompare(false), runPlan(plan, words))}
+              onShow={(id) => (setCompare(false), setBoardId(id))}
+            />
+          )}
         </div>
-        {(!props.hideAsk || live || note) && (
+        {(!props.hideAsk || live || note || thinking) && (
         <div className={`gx-askbar${props.hideAsk ? ' is-quiet' : ''}`}>
-          {live ? (
+          {live && (
             <div className="gx-pending" role="status">
               <span>
                 <b>Preview:</b> {live.edit.label} <span className="v0-quiet">({live.edit.scope === 'selection' ? 'the selection' : live.edit.scope === 'object' ? 'one object' : live.edit.scope === 'artboard' ? 'this artboard' : 'the whole design'})</span>
@@ -770,12 +962,13 @@ export function GraphicEditor(props: GraphicEditorProps) {
                 Discard
               </button>
             </div>
-          ) : props.hideAsk ? null : (
+          )}
+          {!props.hideAsk && (
             <form
               className="gx-ask"
               onSubmit={(e) => {
                 e.preventDefault();
-                ask();
+                void ask();
               }}
             >
               <label htmlFor="gx-ask-in" className="v0-sr">
@@ -785,7 +978,7 @@ export function GraphicEditor(props: GraphicEditorProps) {
                 id="gx-ask-in"
                 value={askWords}
                 onChange={(e) => setAskWords(e.target.value)}
-                placeholder={selection.length ? `Change ${selection.length > 1 ? 'the selection' : nodeLabel(selected[0]?.node ?? doc.artboards[0].children[0])}: “make it bigger”, “move it beneath the title”, “#c2410c”…` : 'Ask for a change: “make the headline bigger”, “increase the contrast”, “adapt it to a story”…'}
+                placeholder={live ? 'Keep going: the next change builds on this preview — or “no, …” turns it down' : selection.length ? `Change ${selection.length > 1 ? 'the selection' : nodeLabel(selected[0]?.node ?? doc.artboards[0].children[0])}: “make it bigger”, “move it beneath the title”, “#c2410c”…` : 'Say any change: “make it cloud themed”, “more editorial”, “keep the type, change the background”, “make the headline bigger”…'}
                 autoComplete="off"
               />
               <button type="submit" className="sb-btn is-sm is-primary" disabled={!askWords.trim()}>
@@ -793,11 +986,28 @@ export function GraphicEditor(props: GraphicEditorProps) {
               </button>
             </form>
           )}
+          {thinking && (
+            <p className="gx-thinking" role="status">
+              <span>{thinking}</span>
+              <button type="button" className="sb-link is-meta" onClick={() => planning.current?.abort()}>
+                Cancel
+              </button>
+            </p>
+          )}
           {note && (
             <p className={`gx-note is-${note.tone}`} role={note.tone === 'warn' ? 'alert' : 'status'}>
               {note.text}
             </p>
           )}
+          {note?.options?.length ? (
+            <div className="gx-note-opts" role="group" aria-label="Ways to answer">
+              {note.options.map((o) => (
+                <button key={o.label} type="button" className="gx-move" onClick={() => void ask(o.words)} disabled={!!thinking}>
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
         )}
       </main>

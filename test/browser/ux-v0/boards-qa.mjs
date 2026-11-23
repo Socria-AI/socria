@@ -380,7 +380,9 @@ ok('15. the failed material is retried on its own and made; every other material
 // ── extra: invalid operations ──
 const snapshot = J(bd.nodes);
 await ask('please make it feel more like a sunday afternoon in 1974');
-ok('words the board cannot read are not guessed at: said, nothing changed', /could not read that/.test(await noteText()) && J((await projectOf(boardId)).board.nodes) === snapshot);
+// a creative change may be read by the model first (signed out here, so the browser reads it): give it a moment
+await page.waitForFunction(() => /closest to what you mean/.test(document.querySelector('.bd-askbar')?.textContent ?? ''), null, { timeout: 8000 }).catch(() => {});
+ok('words the board cannot read are not guessed at: one question with answers that work, nothing changed, never “without a model”', /closest to what you mean/.test(await noteText()) && !/without a model/i.test(await noteText()) && J((await projectOf(boardId)).board.nodes) === snapshot, await noteText());
 await ask('Keep the first three materials exactly as they are');
 await applyPending();
 bd = await boardWhere((x) => x.nodes.filter((n) => n.locked).length === 3);

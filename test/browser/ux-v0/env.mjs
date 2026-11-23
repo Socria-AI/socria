@@ -24,6 +24,10 @@ const pw = process.env.PLAYWRIGHT_MODULE ? await import(process.env.PLAYWRIGHT_M
 /** Every request to the app, answered by Node fetching it (headers, body and status as the app gave them). */
 async function forwardApp(ctx) {
   const origin = new URL(BASE).origin;
+  // a server started with placeholder Clerk keys of a development instance redirects a page without a dev-browser
+  // cookie to its handshake on the placeholder's host (which the proxy refuses); a placeholder cookie keeps every visit
+  // a plain signed-out one — nothing is signed in and nothing leaves the machine
+  await ctx.addCookies([{ name: '__clerk_db_jwt', value: 'qa-placeholder', url: origin }]);
   await ctx.route((url) => url.origin === origin, async (route) => {
     const req = route.request();
     try {

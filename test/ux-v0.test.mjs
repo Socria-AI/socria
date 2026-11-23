@@ -760,7 +760,7 @@ console.log('\n=== GPT-6.1 Sol: the Responses API, structured outputs, high effo
   ok('SOCRIAUX_API=chat puts Sol on Chat Completions; responses puts any model on the Responses API', V.socriauxApi({ ...SOL, SOCRIAUX_API: 'chat' }) === 'chat' && V.socriauxApi({ SOCRIAUX_API: 'responses' }) === 'responses');
   ok('a malformed model id is ignored: Luna', V.socriauxModel({ SOCRIAUX_MODEL: 'gpt 6; drop' }) === 'gpt-6-luna');
   // the schemas
-  ok('structured: art direction, the brief and its revision, the moodboard direction, the critique', J([...V.STRUCTURED_KINDS].sort()) === J(['art-direction', 'brief', 'critique', 'direction', 'refine-brief']));
+  ok('structured: art direction, the brief and its revision, the moodboard direction, the critique, a creative change', J([...V.STRUCTURED_KINDS].sort()) === J(['art-direction', 'brief', 'creative-edit', 'critique', 'direction', 'refine-brief']), J([...V.STRUCTURED_KINDS].sort()));
   ok('plain JSON, on purpose: discovery (an open map), generation and refinement (content by kind)', ['discover', 'generate', 'refine'].every((k) => V.formatFor(k) === undefined));
   const accepted = V.STRUCTURED_KINDS.map((k) => [k, F.judgeResponses({ model: 'gpt-6.1-sol', instructions: 'JSON', input: 'x', text: { format: V.formatFor(k) } }).error?.message ?? 'ok']);
   ok('every schema is strict and closed, as the API requires (each object closed, every field required)', accepted.every(([, m]) => m === 'ok'), J(accepted));
@@ -992,7 +992,7 @@ console.log('\n=== routing: the model for each stage; budgets ===');
 {
   const R = (stage, env = {}, want = {}) => V.routeFor(stage, want, env);
   const table = V.routingTable({});
-  ok('by default: questions, the brief and the moodboard on the economy model; direction, generation, critique on the premium', J(table.map((r) => `${r.stage}:${r.tier}:${r.model}`)) === J(['discover:economy:gpt-6-luna', 'direction:economy:gpt-6-luna', 'brief:economy:gpt-6-luna', 'refine-brief:economy:gpt-6-luna', 'art-direction:premium:gpt-6.1-sol', 'generate:premium:gpt-6.1-sol', 'refine:economy:gpt-6-luna', 'critique:premium:gpt-6.1-sol']), J(table.map((r) => `${r.stage}:${r.tier}:${r.model}`)));
+  ok('by default: questions, the brief, the moodboard and a creative change on the economy model; direction, generation, critique on the premium', J(table.map((r) => `${r.stage}:${r.tier}:${r.model}`)) === J(['discover:economy:gpt-6-luna', 'direction:economy:gpt-6-luna', 'brief:economy:gpt-6-luna', 'refine-brief:economy:gpt-6-luna', 'art-direction:premium:gpt-6.1-sol', 'generate:premium:gpt-6.1-sol', 'refine:economy:gpt-6-luna', 'critique:premium:gpt-6.1-sol', 'creative-edit:economy:gpt-6-luna']), J(table.map((r) => `${r.stage}:${r.tier}:${r.model}`)));
   ok('the premium tier on Sol: the Responses API at medium effort; the economy tier on Luna: Chat Completions at its own', R('generate').api === 'responses' && R('generate').effort === 'medium' && R('discover').api === 'chat' && R('discover').effort === undefined);
   ok('a complex refinement asks for premium; a tier set for the stage overrides it', R('refine', {}, { tier: 'premium' }).tier === 'premium' && R('refine', { SOCRIAUX_TIER_REFINE: 'economy' }, { tier: 'premium' }).tier === 'economy');
   ok('SOCRIAUX_ROUTING=single: everything on the economy model', V.routingTable({ SOCRIAUX_ROUTING: 'single' }).every((r) => r.model === 'gpt-6-luna' && r.source === 'single'));

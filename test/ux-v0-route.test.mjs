@@ -33,7 +33,7 @@ const swap = {
     b.onResolve({ filter: /^next\/(server|headers)$/ }, (a) => ({ path: `${a.path}.js`, external: true }));
   },
 };
-const ROUTES = ['critique', 'discover', 'brief', 'direct', 'generate', 'refine', 'reference', 'projects', 'design-system', 'assets'];
+const ROUTES = ['critique', 'discover', 'brief', 'direct', 'generate', 'refine', 'reference', 'projects', 'design-system', 'assets', 'graphic-edit'];
 await Promise.all(
   ROUTES.map((r) =>
     build({
@@ -865,6 +865,67 @@ console.log('\n=== how demanding a generation is: read in code, said, and the mo
   delete process.env.SOCRIAUX_SIMPLE_ECONOMY;
   const logged = db.rows('ux_v0_calls').filter((r) => r.user_id === CU || r.user_id === CU2);
   ok('each generation is in the call log with the tier it ran on', logged.length === 4 && J(logged.map((r) => r.tier)) === J(['premium', 'economy', 'premium', 'premium']), J(logged.map((r) => [r.tier, r.model])));
+}
+
+console.log('\n=== a creative change in words: read by the model into a plan, held to its shape ===');
+{
+  const G = 'user_v0_gfx';
+  const was = { routing: process.env.SOCRIAUX_ROUTING, model: process.env.SOCRIAUX_MODEL };
+  process.env.SOCRIAUX_ROUTING = 'single';
+  const reading = {
+    artboard: { name: 'Poster', format: 'a4', width: 595, height: 842 },
+    objects: [
+      { role: 'headline', kind: 'text', name: 'Headline', words: 'Open Air', face: 'Archivo Black 900', colour: '#121625', at: '6% 52%, 88% × 20%' },
+      { role: 'logo', kind: 'text', name: 'Logo', words: 'Parklife Society', face: 'Archivo 600', colour: '#121625', at: '6% 93%, 88% × 2%' },
+    ],
+    palette: { background: '#f7f4ee', text: '#121625', accent: '#2252e6' },
+    type: { display: 'Archivo Black', body: 'Archivo' },
+    decisions: [{ decision: 'palette', now: 'A light ground, one accent', by: 'as the concept was made' }],
+    locked: [],
+    concepts: [],
+  };
+  const PLAN = {
+    intent: 'theme',
+    summary: 'You get a cloud-themed sky behind your words.',
+    keep: ['words'],
+    changes: [
+      { decision: 'theme', theme: 'cloud', forms: null, abstraction: null, mode: null },
+      { decision: 'type', character: 'soft', display: 'Not A Font', body: null, weight: null, case: null, from: null },
+      { decision: 'palette', shifts: ['cooler'], colours: { ground: 'blue', ink: null, accent: '#f0a050', support: null }, from: null },
+      { decision: 'content', role: 'headline', text: 'Sky High' },
+      { decision: 'mood', qualities: ['calm', 'nonsense'] },
+    ],
+    question: null,
+  };
+  const signedOut = await post('graphic-edit', { words: 'make it cloud themed', reading }, null, [PLAN]);
+  ok('signed out: refused, told to sign in, nothing asked', signedOut.status === 401 && signedOut.calls.length === 0, J(signedOut));
+  ok('no words: no call', (await post('graphic-edit', { reading }, G, [PLAN])).status === 400);
+  ok('no design: no call', (await post('graphic-edit', { words: 'make it cloud themed' }, G, [PLAN])).status === 400);
+
+  process.env.SOCRIAUX_MODEL = 'gpt-6.1-sol';
+  const r = await post('graphic-edit', { projectId: 'uxv0_gfx', words: 'I want to make it cloud themed', reading, recent: [{ said: 'make it warmer', did: 'the colour warmer' }] }, G, [PLAN]);
+  const p = r.json?.plan;
+  ok('a plan comes back, read by the model', r.status === 200 && p?.by === 'model' && p.intent === 'theme', J(r.json));
+  ok('  its theme, as the model decided', !!p && p.changes.some((c) => c.decision === 'theme' && c.theme === 'cloud'), J(p));
+  ok('  a font off the list is dropped, the type character kept', !!p && p.changes.some((c) => c.decision === 'type' && c.character === 'soft' && !c.display), J(p?.changes));
+  ok('  a colour that is not a colour is dropped, the real one kept', !!p && p.changes.some((c) => c.decision === 'palette' && c.colours?.accent === '#f0a050' && !c.colours.ground), J(p?.changes));
+  ok('  words the designer did not write are never carried', !!p && !p.changes.some((c) => c.decision === 'content'), J(p?.changes));
+  ok('  a quality outside the catalogue is dropped, the others kept', !!p && p.changes.some((c) => c.decision === 'mood' && J(c.qualities) === J(['calm'])), J(p?.changes));
+  const sent = r.calls[0] ?? {};
+  ok('the model is asked for the plan as a strict schema', sent.text?.format?.type === 'json_schema' && sent.text.format.name === 'socriaux_creative_edit' && sent.text.format.strict === true, J(sent.text));
+  ok('  told the rules and the vocabulary; given the words, the design and the turns before; no pictures', /VOCABULARY/.test(sent.instructions ?? '') && /THE DESIGNER SAYS: I want to make it cloud themed/.test(J(sent.input)) && /Parklife Society/.test(J(sent.input)) && /make it warmer/.test(J(sent.input)) && !/data:image/.test(J(sent.input)));
+  const q = await post('graphic-edit', { projectId: 'uxv0_gfx', words: 'change the overall aesthetic', reading }, G, [{ intent: 'style', summary: 'A new direction.', keep: [], changes: [], question: { text: 'Which way should it go?', options: [{ label: 'Quieter and more refined', words: 'make it more sophisticated' }, { label: 'Bolder', words: 'make it more expressive' }] } }]);
+  ok('one question with ways to answer, when the words could mean different things', q.status === 200 && q.json.plan.question?.options.length === 2 && q.json.plan.changes.length === 0, J(q.json));
+  const prose = await post('graphic-edit', { projectId: 'uxv0_gfx', words: 'make it cloud themed', reading }, G, ['I would add some clouds.']);
+  ok('an answer with no plan in it: said, and no plan is made up', prose.status !== 200 && !prose.json?.plan, J(prose));
+  const broken = await post('graphic-edit', { projectId: 'uxv0_gfx', words: 'make it cloud themed', reading }, G, [new Error('upstream down')]);
+  ok('a model failure is a calm error the browser falls back from — it never speaks of being “without a model”', broken.status >= 500 && !!broken.json?.error && !/without a model/i.test(broken.json.error), J(broken));
+  const logged = db.rows('ux_v0_calls').filter((x) => x.user_id === G);
+  ok('each reading is in the call log on its own stage, priced', logged.length >= 2 && logged.every((x) => x.stage === 'creative-edit' && typeof x.cost_usd === 'number'), J(logged.map((x) => [x.stage, x.cost_usd])));
+  if (was.routing === undefined) delete process.env.SOCRIAUX_ROUTING;
+  else process.env.SOCRIAUX_ROUTING = was.routing;
+  if (was.model === undefined) delete process.env.SOCRIAUX_MODEL;
+  else process.env.SOCRIAUX_MODEL = was.model;
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -406,6 +406,7 @@ const MODULES = [
   'test/helpers/dsi-under-test.ts',
   // SocriaUX studio (lib/ux-v0/studio): intent recognition, adaptive discovery, the creative context, engine mappings
   'test/helpers/studio-under-test.ts',
+  'test/helpers/creative-under-test.ts',
 ];
 
 export async function buildAll() {

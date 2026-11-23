@@ -280,7 +280,8 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
   const waitReply = useRailReply(asked, (a) => a.text);
   const railAsk = async (words: string): Promise<string | null> => {
     if (view === 'edit' && g.doc) {
-      const wait = waitReply();
+      // a creative change may be read by the model: the reply can take a little longer than a precise edit
+      const wait = waitReply(50_000);
       setInbox((i) => ({ id: (i?.id ?? 0) + 1, words }));
       return wait;
     }
@@ -359,8 +360,8 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
               setNote({ tone: 'ok', text: r.say });
             }}
           />
-          <span className="gx-free" title="Composition, checks and changes in words run in this browser, without a model.">
-            No model calls · $0
+          <span className="gx-free" title="Composition and checks run in this browser, at no cost. A change in words is read here too; only one it cannot read plainly is read by the model, within your budget.">
+            Made in your browser
           </span>
           <span className={`v0-save s-${save}`} role="status">
             {SAVE_WORDS[save]}
@@ -432,6 +433,7 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
           focus={!!project.studio && !byHand}
           onFocus={project.studio ? (f) => setByHand(!f) : undefined}
           hideAsk={!!project.studio && railOpen}
+          projectId={project.id}
         />
       )}
     </div>

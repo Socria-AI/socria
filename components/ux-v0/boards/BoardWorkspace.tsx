@@ -38,6 +38,9 @@ import { useStyleLibrary } from '../graphics/styleLibrary';
 import { syncWebsite, websiteConcept, websiteDrift } from '@/lib/ux-v0/boards/website';
 import { boardFile, openBoardFile, systemOverviewSvg } from '@/lib/ux-v0/boards/export';
 import { GraphicEditor, type EditorNote } from '../graphics/GraphicEditor';
+import { planChange } from '../graphics/creativePlanner';
+import { executePlan } from '@/lib/ux-v0/graphics/creative/execute';
+import type { Change } from '@/lib/ux-v0/graphics/creative/plan';
 import { brandBoardOptions } from '@/lib/ux-v0/dsi/generate';
 import { logoBoardAsset } from '@/lib/ux-v0/dsi/adapters';
 import { useLinkedSystem } from '../systems/useLinkedSystem';
@@ -531,11 +534,67 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
       return setPending({ kind: 'confirm', label, text: `Carry the system’s ${[a.fonts ? 'typefaces' : '', a.colours ? 'colours' : ''].filter(Boolean).join(' and ')} into the website as a new version of it? The current version is kept in its history.`, run: () => void syncWebsites(a.materials, { fonts: a.fonts, colours: a.colours }) });
     }
   };
-  const ask = (said?: string) => {
+  /**
+   * A creative change of the look said to the board (“make it cloud themed”, “more sophisticated”): planned once (the
+   * model when it can help, the reader always), carried out by the engine on each graphic (the selected ones, else all)
+   * and previewed on the board. What one object or one concept should do belongs inside a material, and is said so.
+   */
+  const askCreative = async (w: string): Promise<boolean> => {
+    const cur = boardNow();
+    const picked = new Set(cur.nodes.filter((n) => selection.includes(n.id) && n.type === 'material').map((n) => (n as { material: string }).material));
+    const graphics = cur.materials.filter((m): m is GraphicMaterial => m.type === 'graphic' && !!m.doc);
+    const chosen = graphics.filter((m) => picked.has(m.id)).length ? graphics.filter((m) => picked.has(m.id)) : graphics;
+    if (!chosen.length) return false;
+    const first = chosen[0];
+    const dir = cur.system ? directionOfSystem(cur.system) : null;
+    const planned = await planChange(w, first.doc!, { board: first.doc!.artboards[0].id, dir, projectId: project.id });
+    if (planned.cancelled) return true;
+    const plan = planned.plan;
+    if (!plan) return false;
+    if (!plan.changes.length) {
+      if (!plan.question) return false;
+      setNote({ tone: 'ask', text: `${plan.question.text} ${plan.question.options.map((o, i) => `${i + 1}. ${o.label}`).join(' · ')} — or say it your own way.` });
+      return true;
+    }
+    // the look changes on every graphic; what one object or one concept should do is for inside a material
+    const changes = plan.changes.filter((c: Change) => c.decision !== 'concept' && c.decision !== 'object' && c.decision !== 'content');
+    if (!changes.length) {
+      setNote({ tone: 'ask', text: 'That is a change inside one material: open it (double-click it on the board) and say it there, or select it and say how its look should change.' });
+      return true;
+    }
+    const ops: BoardOp[] = [];
+    const done = new Set<string>();
+    const notes = new Set<string>();
+    for (const m of chosen) {
+      const x = executePlan(m.doc!, { ...plan, changes }, { kind: m.brief.kind, dir, measure, said: w });
+      x?.notes.forEach((n) => notes.add(n));
+      if (x && x.doc !== m.doc && x.done.length) {
+        ops.push({ op: 'material-update', id: m.id, set: { doc: x.doc } });
+        x.done.forEach((d) => done.add(d));
+      }
+    }
+    if (!ops.length) {
+      setNote({ tone: 'warn', text: [...notes].join(' ') || 'The graphics already are what those words ask for.' });
+      return true;
+    }
+    const r = applyBoardOps(cur, ops);
+    if (!r.ok) {
+      setNote({ tone: 'warn', text: `Nothing changed: ${r.error}` });
+      return true;
+    }
+    const what = [...done].slice(0, 4).join('; ');
+    setPending({ kind: 'ops', label: `${what.replace(/^./, (x) => x.toUpperCase())} — on ${ops.length === graphics.length ? (ops.length === 1 ? 'the graphic' : `all ${ops.length} graphics`) : `${ops.length} of the graphics`}`, ops, preview: r.board });
+    setNote(notes.size ? { tone: 'warn', text: [...notes].slice(0, 2).join(' ') } : null);
+    return true;
+  };
+  const ask = async (said?: string) => {
     const w = (typeof said === 'string' ? said : askWords).trim();
     if (!w) return;
     const e = readBoardEdit(w, boardNow(), { selection });
-    if (!e) return setNote({ tone: 'ask', text: 'SocriaUX could not read that as a change to the board without a model. Try “arrange these materials into two rows”, “make the posters slightly larger on the board”, “move the mockups to the right side”, “change the accent to green”, “regenerate only the second poster”, “add annotations explaining the visual system”.' });
+    if (!e) {
+      if (await askCreative(w)) return;
+      return setNote({ tone: 'ask', text: 'Say how the board should change: its arrangement (“arrange these materials into two rows”), a material (“regenerate only the second poster”, “make the posters slightly larger”), the look of its graphics (“make it cloud themed”, “more sophisticated”, “warmer colours”), or open a material to change it in detail.' });
+    }
     if (e.question && !e.ops && !e.action) return setNote({ tone: 'ask', text: e.question });
     if (e.ops) {
       const r = applyBoardOps(boardNow(), e.ops);
@@ -786,7 +845,8 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
     const low = said.toLowerCase();
     // a material open in the graphics editor takes the words, as if typed there
     if (editingMaterial?.doc) {
-      const wait = waitMaterial();
+      // a creative change may be read by the model: the reply can take a little longer than a precise edit
+      const wait = waitMaterial(50_000);
       setMatInbox((i) => ({ id: (i?.id ?? 0) + 1, words: said }));
       return wait;
     }
@@ -801,8 +861,8 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
       return 'Discarded: the board is as it was.';
     }
     if (view === 'board' && b.system) {
-      const wait = waitReply();
-      ask(said);
+      const wait = waitReply(50_000);
+      void ask(said);
       return wait;
     }
     if (view === 'system' && b.options.length) {
@@ -855,8 +915,8 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
               setNote({ tone: 'ok', text: r.say });
             }}
           />
-          <span className="gx-free" title="Planning, composition, checks, notes and changes in words run in this browser, without a model.">
-            No model calls · $0
+          <span className="gx-free" title="Planning, composition, checks and notes run in this browser, at no cost. A change in words is read here too; only one it cannot read plainly is read by the model, within your budget.">
+            Made in your browser
           </span>
           <span className={`v0-save s-${save}`} role="status">
             {SAVE_WORDS[save]}
@@ -1184,7 +1244,7 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
                   className="gx-ask"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    ask();
+                    void ask();
                   }}
                 >
                   <label htmlFor="bd-ask-in" className="v0-sr">
@@ -1253,6 +1313,7 @@ export function BoardWorkspace({ initial, signedIn, onExit, startIntent, onOpenP
                 inbox={matInbox}
                 onAsked={(t) => setMatSaid({ text: t })}
                 hideAsk={!!project.studio && railOpen}
+                projectId={project.id}
               />
             </div>
           )}

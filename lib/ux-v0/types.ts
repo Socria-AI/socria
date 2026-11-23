@@ -459,8 +459,8 @@ export interface DesignBrief {
 
 // ── usage ────────────────────────────────────────────────────────────
 
-export type CallKind = 'discover' | 'direction' | 'brief' | 'refine-brief' | 'art-direction' | 'generate' | 'refine' | 'critique' | 'image';
-export const CALL_KINDS: readonly CallKind[] = ['discover', 'direction', 'brief', 'refine-brief', 'art-direction', 'generate', 'refine', 'critique', 'image'];
+export type CallKind = 'discover' | 'direction' | 'brief' | 'refine-brief' | 'art-direction' | 'generate' | 'refine' | 'critique' | 'creative-edit' | 'image';
+export const CALL_KINDS: readonly CallKind[] = ['discover', 'direction', 'brief', 'refine-brief', 'art-direction', 'generate', 'refine', 'critique', 'creative-edit', 'image'];
 
 /** What each stage is, in words, for the cost panel, the settings and the report. */
 export const STAGE_LABEL: Record<CallKind, string> = {
@@ -472,6 +472,7 @@ export const STAGE_LABEL: Record<CallKind, string> = {
   generate: 'Generation',
   refine: 'Refinement',
   critique: 'Critique',
+  'creative-edit': 'Creative change',
   // a picture made by an image model (lib/ux-v0/image-gen-server.ts): priced and capped apart from the text stages
   image: 'Images',
 };
