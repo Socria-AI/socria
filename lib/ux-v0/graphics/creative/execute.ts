@@ -20,11 +20,11 @@
 import { mix } from '../../color';
 import { contrastRatio } from '../../../ux/audit';
 import { FONTS } from '../../fonts';
-import { applyOps, newId, walk, type Artboard, type GraphicDoc, type Node, type Op, type Paint, type ShapeNode, type TextNode, type Tokens } from '../doc';
+import { applyOps, boardView, fromBoardView, newId, walk, type Artboard, type GraphicDoc, type Node, type Op, type Paint, type ShapeNode, type TextNode, type Tokens } from '../doc';
 import type { GraphicDirection, GraphicKind } from '../compose';
 import { recomposeArtboard, type CreativeEdit } from '../generative/edits';
 import { refineDoc } from '../check';
-import { approxMeasure, fitSize, type Measure } from '../text';
+import { approxMeasure, fitSize, layoutText, type Measure } from '../text';
 import { readGraphicEdit } from '../edit';
 import { drawForm, placeForms, FORM_LABEL, type FormKind, type Rect } from './forms';
 import { CHARACTER_LABEL, qualityById, shiftPalette, themeById, tokensOf, typeSetFor, type Palette, type PaletteShift, type Theme, type TypeCharacter } from './lexicon';
@@ -230,7 +230,7 @@ export function regrade(stops: readonly string[], was: { ground: string; partner
 // ── typography ──
 
 const fontOk = (name: string) => FONTS.some((f) => f.name === name);
-const weightFor = (name: string, want: number) => {
+export const weightFor = (name: string, want: number) => {
   const f = FONTS.find((x) => x.name === name) as { weights?: readonly number[]; variable?: boolean } | undefined;
   const list = f?.weights ?? [400, 700];
   // a variable family takes any weight in its range; a static one the nearest it has
@@ -255,8 +255,10 @@ function retype(doc: GraphicDoc, board: Artboard, set: { display: string; body: 
       return rest;
     });
     const trial = { ...nd, ...next } as TextNode;
-    // the words never overflow their box in the new face: the size steps down until they fit
-    const size = nd.autoHeight ? nd.size : Math.min(nd.size, fitSize(trial, measure));
+    // the words never overflow their box in the new face: the size steps down until they fit (a box that grows with
+    // its words keeps the height it had, so a wider face does not push into what is below it)
+    const held = nd.autoHeight ? ({ ...trial, autoHeight: false, h: Math.max(nd.h, layoutText(nd, measure).height) } as TextNode) : trial;
+    const size = Math.min(nd.size, fitSize(held, measure));
     if (size !== nd.size) next.size = Math.round(size * 10) / 10;
     restore[nd.id] = { font: nd.font, weight: nd.weight, case: nd.case ?? 'none', tracking: nd.tracking, size: nd.size, ...(next.runs ? { runs: nd.runs } : {}) };
     ops.push({ op: 'update', id: nd.id, set: next as Record<string, unknown> });
@@ -459,7 +461,18 @@ function resolve(plan: CreativePlan, ctx: ExecContext, hasForms: boolean): Resol
 
 // ── carrying it out ──
 
-export function executePlan(doc0: GraphicDoc, plan: CreativePlan, ctx: ExecContext): Executed | null {
+/** The words of an object change that asks for the checks' own repairs (contrast, overflow, the safe margin). */
+export const FIX_WORDS = 'fix the problems the checks find';
+
+export function executePlan(given: GraphicDoc, plan: CreativePlan, ctx: ExecContext): Executed | null {
+  // an artboard with a visual language of its own is changed in its own colours and faces (the document's stay)
+  const id = boardOf(given, ctx.board)?.id;
+  const view = id ? boardView(given, id) : given;
+  const r = executeOn(view, plan, ctx);
+  return r && view !== given ? { ...r, doc: fromBoardView(given, r.doc, id!) } : r;
+}
+
+function executeOn(doc0: GraphicDoc, plan: CreativePlan, ctx: ExecContext): Executed | null {
   const measure = ctx.measure ?? approxMeasure;
   const now = ctx.now ?? Date.now();
   const turn = ctx.turn ?? (boardOf(doc0, ctx.board).creative?.qualities?.length ?? 0) + (doc0.revision ?? 0);
@@ -646,7 +659,11 @@ export function executePlan(doc0: GraphicDoc, plan: CreativePlan, ctx: ExecConte
       if (R.background.tone === 'theme' && R.theme) colours = [...(d.palette.mode === 'dark' ? R.theme.sky.dark : R.theme.sky.light)];
       else if (R.background.tone === 'darker') colours = [mix(p.ground, '#000000', 0.35)];
       else if (R.background.tone === 'lighter') colours = [mix(p.ground, '#ffffff', 0.45)];
-      else colours = kind === 'flat' ? [mix(p.ground, p.accent, p.mode === 'dark' ? 0.22 : 0.18)] : [mix(p.ground, p.accent, p.mode === 'dark' ? 0.22 : 0.2), p.ground];
+      else {
+        // a deep accent on a light ground tints it only a little (more would turn the ground muddy grey)
+        const k = p.mode !== 'dark' && contrastRatio(hex7(p.accent), hex7(p.ground)) > 6 ? 0.07 : p.mode === 'dark' ? 0.22 : 0.2;
+        colours = kind === 'flat' ? [mix(p.ground, p.accent, k * 0.9)] : [mix(p.ground, p.accent, k), p.ground];
+      }
     }
     if (kind === 'gradient' && colours.length < 2) colours = [mix(colours[0], p.accent, 0.12), colours[0]];
     if (kind === 'texture' && !colours.length) colours = [p.ground];
@@ -726,6 +743,8 @@ export function executePlan(doc0: GraphicDoc, plan: CreativePlan, ctx: ExecConte
       const theme = R.theme ?? themeById(rec.theme);
       const drawn = formsFor(temp, { kind, abstraction, count, scale, seed, ids: [] }, d.palette, depthNow(), theme, theme && kind === theme.forms ? theme.forms2 : undefined);
       ids = drawn.ids;
+      // no clear room in this composition: they were set faintly behind the words (said, with what would give them room)
+      if (drawn.nodes.length && drawn.nodes.every((n) => (n.opacity ?? 1) <= 0.34)) notes.push(`There was no clear room for ${FORM_LABEL[kind]} in this composition, so they sit faintly behind the words — say “more space” or “smaller ${FORM_LABEL[kind]}” to give them room of their own.`);
       const at = Math.max(0, formIndex(temp));
       drawn.nodes.forEach((nd, i) => ops.push({ op: 'add', artboard: boardId, node: nd, index: at + i }));
     }
@@ -745,16 +764,24 @@ export function executePlan(doc0: GraphicDoc, plan: CreativePlan, ctx: ExecConte
     const b = board();
     const restoreNodes: Record<string, Record<string, unknown>> = {};
     const ops: Op[] = [];
-    const ours = new Set(creativeFormIds(doc, b));
+    // the forms on record now (drawn by this very change, too: the record is put on the artboard only at the end)
+    const ours = new Set([...creativeFormIds(doc, b), ...(rec.forms?.ids ?? [])]);
     const shapes = walk(b).filter((l) => l.node.type === 'shape' && l.node.role === 'motif' && !l.node.locked && l.parents.length === 0);
+    // forms set behind the words stay faint whatever the depth (they are atmosphere there, never a shape to read over)
+    const words = walk(b).filter((l) => l.node.type === 'text' && !l.node.hidden && !(l.node as TextNode).decorative).map((l) => ({ x: l.node.x, y: l.node.y, w: l.node.w, h: l.node.h }));
+    const underWords = (n: ShapeNode) => words.some((r) => Math.min(n.x + n.w, r.x + r.w) - Math.max(n.x, r.x) > Math.min(n.w, r.w) * 0.1 && Math.min(n.y + n.h, r.y + r.h) - Math.max(n.y, r.y) > Math.min(n.h, r.h) * 0.1);
     shapes.forEach((l, i) => {
       const nd = l.node as ShapeNode;
       const keepFx = (nd.effects ?? []).filter((e) => !/^(drop-shadow|blur|glow)$/.test(e.kind));
       const far = shapes.length > 1 ? 1 - i / (shapes.length - 1) : 0.3;
       const fx = [...keepFx];
-      if (level >= 1 && far < 0.6) fx.push({ kind: 'drop-shadow', on: true, params: { dx: 0, dy: 4 + level * 4, blur: 12 + level * 10, spread: 0, opacity: 10 + level * 6 }, color: '#141a2e' });
-      if (level >= 3 && far > 0.6) fx.push({ kind: 'blur', on: true, params: { radius: 1.5 + far * 2.5 } });
-      const opacity = level >= 2 ? Math.round((1 - far * 0.4) * 100) / 100 : ours.has(nd.id) ? nd.opacity : 1;
+      const behind = ours.has(nd.id) && underWords(nd);
+      if (level >= 1 && far < 0.6 && !behind) fx.push({ kind: 'drop-shadow', on: true, params: { dx: 0, dy: 4 + level * 4, blur: 12 + level * 10, spread: 0, opacity: 10 + level * 6 }, color: '#141a2e' });
+      // only soft forms soften with distance: a blurred rule, grid or ring reads as a mistake, not as air
+      const soft = !rec.forms || !['line', 'grid', 'ring', 'block', 'sparkle'].includes(rec.forms.kind);
+      if (level >= 3 && far > 0.6 && soft) fx.push({ kind: 'blur', on: true, params: { radius: 1.5 + far * 2.5 } });
+      const opacity0 = level >= 2 ? Math.round((1 - far * 0.4) * 100) / 100 : ours.has(nd.id) ? nd.opacity : 1;
+      const opacity = behind ? Math.min(opacity0 ?? 1, 0.34) : opacity0;
       restoreNodes[nd.id] = { effects: nd.effects ?? [], opacity: nd.opacity };
       ops.push({ op: 'update', id: nd.id, set: { effects: fx, opacity } });
     });
@@ -785,6 +812,15 @@ export function executePlan(doc0: GraphicDoc, plan: CreativePlan, ctx: ExecConte
 
   // 8. what was said about one object goes to the precise reader, on the design as it now is
   for (const words of R.objects) {
+    // the checks' own repairs (a vague "make it better" that measured faults)
+    if (words === FIX_WORDS) {
+      const fixed = refineDoc({ ...doc, artboards: [board()] }, measure);
+      if (fixed.fixed.length && fixed.doc.artboards[0]) {
+        doc = { ...doc, artboards: doc.artboards.map((b) => (b.id === boardId ? fixed.doc.artboards[0] : b)) };
+        done.push(`fixed: ${fixed.fixed.slice(0, 3).map((f) => f.replace(/\.$/, '').toLowerCase()).join('; ')}`);
+      }
+      continue;
+    }
     const e = readGraphicEdit(words, doc, { artboard: boardId, selection: [], dir: ctx.dir ?? null, measure, kind: ctx.kind });
     if (!e) {
       notes.push(`“${words.slice(0, 60)}” — say which object (the headline, the logo, the background picture) and what about it should change.`);

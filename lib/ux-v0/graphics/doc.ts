@@ -302,6 +302,11 @@ export interface Artboard {
    * mood, where each came from, and what would restore each one — kept with the artboard, so each artboard is a
    * concept of its own */
   creative?: CreativeRecord;
+  /** a visual language of its own (a version made in another direction): its colours and faces; the document's
+   * tokens otherwise. Edits on this artboard read and write these (boardView / fromBoardView) */
+  tokens?: Tokens;
+  /** the direction its own visual language came from (a version made in another direction) */
+  direction?: { name: string; language: string };
 }
 
 /** A concept kept to come back to, compare or take decisions from: an artboard as it was, with its palette and type. */
@@ -338,6 +343,22 @@ export interface Tokens {
   accent2?: string;
 }
 
+/** A comment pinned on objects of an artboard: what the person wants of them, in their words. */
+export interface DocComment {
+  id: string;
+  board: string;
+  /** the objects it is about (stable ids) */
+  nodes: string[];
+  text: string;
+  at: number;
+  /** open until applied or set aside */
+  status: 'open' | 'done' | 'dismissed';
+  /** what was done about it, in a line */
+  said?: string;
+}
+
+export const MAX_COMMENTS = 60;
+
 export interface GraphicDoc {
   schema: typeof GFX_SCHEMA;
   id: string;
@@ -361,6 +382,8 @@ export interface GraphicDoc {
   compositionMemory?: MemoryEntry[];
   /** concepts kept to come back to, compare and combine (newest last, at most MAX_CONCEPTS) */
   concepts?: SavedConcept[];
+  /** comments pinned on objects: instructions about those objects, applied when asked (newest last, bounded) */
+  comments?: DocComment[];
   revision: number;
   updatedAt: number;
 }
@@ -763,6 +786,87 @@ export function normalizeAsset(x: unknown, rep: Repair = { notes: [] }): Asset |
   return { id, kind: 'image', src: src.slice(0, 6_000_000), width: num(s.width, 1, 40000, 1000), height: num(s.height, 1, 40000, 1000), name: str(s.name, 120, 'Picture') || 'Picture', ...(typeof s.credit === 'string' ? { credit: s.credit.slice(0, 200) } : {}), source: pick(s.source, ['upload', 'library', 'made', 'generated'] as const, 'upload') };
 }
 
+/** Tokens held to their shape (colours that are colours, faces named), each missing one taken from `fallback`. */
+export function normalizeTokens(v: unknown, fallback: Tokens = DEFAULT_TOKENS): Tokens {
+  const t = o(v);
+  const tc = o(t.colors);
+  return {
+    colors: {
+      background: colour(tc.background, fallback.colors.background),
+      surface: colour(tc.surface, fallback.colors.surface),
+      text: colour(tc.text, fallback.colors.text),
+      muted: colour(tc.muted, fallback.colors.muted),
+      accent: colour(tc.accent, fallback.colors.accent),
+      accentText: colour(tc.accentText, fallback.colors.accentText),
+      line: colour(tc.line, fallback.colors.line),
+    },
+    fonts: { display: str(o(t.fonts).display, 60) || fallback.fonts.display, body: str(o(t.fonts).body, 60) || fallback.fonts.body },
+    ...(colour(t.accent2, '') ? { accent2: colour(t.accent2, '') } : {}),
+  };
+}
+
+/** Comments held to their shape: on an artboard that exists, about objects that exist on it, bounded. */
+export function normalizeComments(v: unknown, doc: Pick<GraphicDoc, 'artboards'>): DocComment[] {
+  const boards = new Map(doc.artboards.map((b) => [b.id, new Set(walk(b).map((l) => l.node.id))]));
+  const out: DocComment[] = [];
+  const seen = new Set<string>();
+  for (const x of a(v).slice(-MAX_COMMENTS)) {
+    const c = o(x);
+    const id = typeof c.id === 'string' && /^[\w-]{1,48}$/.test(c.id) ? c.id : newId('cm');
+    const ids = boards.get(typeof c.board === 'string' ? c.board : '');
+    const text = str(c.text, 400).trim();
+    if (!ids || !text || seen.has(id)) continue;
+    seen.add(id);
+    const nodes = [...new Set(a(c.nodes).filter((n): n is string => typeof n === 'string' && ids.has(n)))].slice(0, 24);
+    out.push({ id, board: c.board as string, nodes, text, at: typeof c.at === 'number' && c.at > 0 ? Math.round(c.at) : Date.now(), status: c.status === 'done' || c.status === 'dismissed' ? c.status : 'open', ...(str(c.said, 300) ? { said: str(c.said, 300) } : {}) });
+  }
+  return out;
+}
+
+/** The tokens an artboard is drawn in: its own when it has a visual language of its own, else the document's. */
+export const boardTokens = (doc: Pick<GraphicDoc, 'tokens'>, board: Pick<Artboard, 'tokens'>): Tokens => board.tokens ?? doc.tokens;
+
+/**
+ * The document as one artboard sees it: its own tokens in the document's place (for readers, edits and the executor),
+ * and every other artboard holding the tokens it is really drawn in, so a decision taken from one of them is its own.
+ * The document itself when the artboard has no language of its own.
+ */
+export function boardView(doc: GraphicDoc, boardId: string): GraphicDoc {
+  const b = doc.artboards.find((x) => x.id === boardId);
+  if (!b?.tokens) return doc;
+  return { ...doc, tokens: b.tokens, ...(b.direction ? { direction: b.direction } : {}), artboards: doc.artboards.map((x) => (x.id === boardId || x.tokens ? x : { ...x, tokens: doc.tokens })) };
+}
+
+/** A view's changes put back: the artboard keeps the tokens the change gave it, the document keeps its own, and the
+ * artboards that shared the document's tokens share them again. */
+export function fromBoardView(original: GraphicDoc, view: GraphicDoc, boardId: string): GraphicDoc {
+  const b = original.artboards.find((x) => x.id === boardId);
+  if (!b?.tokens || view === original) return view;
+  const shared = new Set(original.artboards.filter((x) => !x.tokens).map((x) => x.id));
+  return {
+    ...view,
+    tokens: original.tokens,
+    direction: original.direction,
+    artboards: view.artboards.map((x) => {
+      if (x.id === boardId) return { ...x, tokens: view.tokens };
+      if (shared.has(x.id) && x.tokens) {
+        const { tokens: _t, ...rest } = x;
+        return rest as Artboard;
+      }
+      return x;
+    }),
+  };
+}
+
+/** The artboard given a visual language of its own (a copy of the tokens it is drawn in), so what changes on it from
+ * now on is its own. */
+export function withOwnTokens(doc: GraphicDoc, boardId: string, tokens?: Tokens): GraphicDoc {
+  const b = doc.artboards.find((x) => x.id === boardId);
+  if (!b) return doc;
+  const t = clone(tokens ?? b.tokens ?? doc.tokens);
+  return { ...doc, artboards: doc.artboards.map((x) => (x.id === boardId ? { ...x, tokens: t } : x)) };
+}
+
 export function normalizeDoc(v: unknown, rep: Repair = { notes: [] }): GraphicDoc | null {
   const r = o(v);
   if (r.schema !== undefined && r.schema !== GFX_SCHEMA) {
@@ -770,21 +874,7 @@ export function normalizeDoc(v: unknown, rep: Repair = { notes: [] }): GraphicDo
     if (!migrated) return null;
     return normalizeDoc(migrated, rep);
   }
-  const t = o(r.tokens);
-  const tc = o(t.colors);
-  const tokens: Tokens = {
-    colors: {
-      background: colour(tc.background, DEFAULT_TOKENS.colors.background),
-      surface: colour(tc.surface, DEFAULT_TOKENS.colors.surface),
-      text: colour(tc.text, DEFAULT_TOKENS.colors.text),
-      muted: colour(tc.muted, DEFAULT_TOKENS.colors.muted),
-      accent: colour(tc.accent, DEFAULT_TOKENS.colors.accent),
-      accentText: colour(tc.accentText, DEFAULT_TOKENS.colors.accentText),
-      line: colour(tc.line, DEFAULT_TOKENS.colors.line),
-    },
-    fonts: { display: str(o(t.fonts).display, 60) || DEFAULT_TOKENS.fonts.display, body: str(o(t.fonts).body, 60) || DEFAULT_TOKENS.fonts.body },
-    ...(colour(t.accent2, '') ? { accent2: colour(t.accent2, '') } : {}),
-  };
+  const tokens = normalizeTokens(r.tokens);
   const assetIds = new Set<string>();
   const assets: Asset[] = [];
   for (const x of a(r.assets).slice(0, 200)) {
@@ -823,6 +913,8 @@ export function normalizeDoc(v: unknown, rep: Repair = { notes: [] }): GraphicDo
       ...((cr) => (cr ? { concept: cr } : {}))(b.concept ? normalizeConceptRecord(b.concept) : undefined),
       ...((lr) => (lr ? { logo: lr } : {}))(b.logo ? normalizeLogoRecord(b.logo) : null),
       ...((cr) => (cr ? { creative: cr } : {}))(normalizeCreative(b.creative)),
+      ...(b.tokens && typeof b.tokens === 'object' ? { tokens: normalizeTokens(b.tokens, tokens) } : {}),
+      ...(b.direction && typeof b.direction === 'object' && str(o(b.direction).name, 80) ? { direction: { name: str(o(b.direction).name, 80), language: str(o(b.direction).language, 40) || 'editorial' } } : {}),
     });
   }
   if (!artboards.length) return null;
@@ -840,6 +932,7 @@ export function normalizeDoc(v: unknown, rep: Repair = { notes: [] }): GraphicDo
     ...((v) => (v ? { style: v } : {}))(normalizeSelection(r.style)),
     ...((m) => (m.length ? { compositionMemory: m } : {}))(normalizeMemory(r.compositionMemory)),
     ...((cs) => (cs.length ? { concepts: cs } : {}))(normalizeConcepts(r.concepts, assets)),
+    ...((cm) => (cm.length ? { comments: cm } : {}))(normalizeComments(r.comments, { artboards })),
     revision: Math.round(num(r.revision, 0, 1e9, 0)),
     updatedAt: typeof r.updatedAt === 'number' && r.updatedAt > 0 ? Math.round(r.updatedAt) : Date.now(),
   };
@@ -937,6 +1030,7 @@ export type Op =
   | { op: 'locks'; colors?: boolean; fonts?: boolean }
   /** the saved concepts, replaced whole (held to their shape) */
   | { op: 'concepts'; concepts: unknown[] }
+  | { op: 'comments'; comments: unknown[] }
   // vector operations (vectorops.ts)
   | { op: 'boolean'; ids: string[]; mode: BoolMode; name?: string }
   | { op: 'flatten'; id: string }
@@ -1291,6 +1385,13 @@ export function applyOp(doc0: GraphicDoc, op: Op, opts: { force?: boolean } = {}
     }
     case 'locks': {
       doc.locks = { ...(doc.locks ?? {}), ...(op.colors !== undefined ? { colors: op.colors } : {}), ...(op.fonts !== undefined ? { fonts: op.fonts } : {}) };
+      return done([]);
+    }
+    case 'comments': {
+      if (!Array.isArray(op.comments)) return { ok: false, error: 'Those are not comments SocriaUX can keep.' };
+      const list = normalizeComments(op.comments, doc);
+      if (list.length) doc.comments = list;
+      else delete doc.comments;
       return done([]);
     }
     case 'concepts': {

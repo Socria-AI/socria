@@ -38,6 +38,8 @@ export interface PlanOptions {
   recent?: readonly { said: string; did: string }[];
   concepts?: readonly { id: string; name: string }[];
   projectId?: string;
+  /** what the model remembers beyond the design: the brief, references chosen */
+  memory?: { brief?: string; references?: readonly string[] };
   signal?: AbortSignal;
   onProgress?: (p: Progress) => void;
 }
@@ -48,7 +50,7 @@ export async function planChange(words: string, doc: GraphicDoc, o: PlanOptions)
   if ((read && read.certain) || !modelWorthAsking()) return { plan: read?.plan ?? null, read, by: 'reader' };
   const r = await post<{ plan: unknown }>(
     '/api/ux-v0/graphic-edit',
-    { words, reading: readingOf(doc, o.board, o.dir), asked: o.asked ?? null, recent: (o.recent ?? []).slice(-4), projectId: o.projectId },
+    { words, reading: readingOf(doc, o.board, o.dir, o.memory), asked: o.asked ?? null, recent: (o.recent ?? []).slice(-4), projectId: o.projectId },
     { signal: o.signal, operationId: operationId('creative'), timeoutMs: 45_000, onProgress: o.onProgress },
   );
   if (r.ok) {

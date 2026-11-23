@@ -489,6 +489,43 @@ const withHsl = (hex: string, f: (h: number, s: number, l: number) => [number, n
   return hslHex(a, b, c);
 };
 
+/** One colour moved by a shift, on its own (an object's colour changed without the rest of the palette). */
+export function nudgeColour(hex: string, shift: PaletteShift): string {
+  if (!/^#[0-9a-f]{6}/i.test(hex)) return hex;
+  const c = hex.slice(0, 7).toLowerCase();
+  switch (shift) {
+    case 'warmer':
+      return shiftHue(c, 30, 24);
+    case 'cooler':
+      return shiftHue(c, 215, 30);
+    case 'darker':
+      return withHsl(c, (h, s, l) => [h, s, Math.max(0.06, l * 0.72)]);
+    case 'lighter':
+      return withHsl(c, (h, s, l) => [h, s, Math.min(0.94, l + (1 - l) * 0.35)]);
+    case 'vivid':
+    case 'neon':
+      return withHsl(c, (h, s, l) => [h, Math.min(1, Math.max(0.6, s * 1.4)), Math.min(0.6, Math.max(0.4, l))]);
+    case 'muted':
+    case 'restrained':
+      return withHsl(c, (h, s, l) => [h, s * 0.5, l]);
+    case 'pastel':
+      return withHsl(c, (h, s) => [h, Math.min(0.55, s), 0.8]);
+    case 'monochrome':
+      return withHsl(c, (h, _s, l) => [h, 0.04, l]);
+    case 'richer':
+      return withHsl(c, (h, s, l) => [h, Math.min(1, s * 1.15), Math.max(0.12, l * 0.85)]);
+    case 'earthy':
+      return withHsl(shiftHue(c, 30, 30), (h, s, l) => [h, s * 0.6, l * 0.9]);
+    case 'vintage':
+      return withHsl(c, (h, s, l) => [h, s * 0.65, Math.min(0.9, l * 1.05)]);
+    case 'metallic':
+      return hslOf(c)[2] < 0.5 ? '#a8843e' : '#c9a86a';
+    case 'contrast':
+      return withHsl(c, (h, s, l) => [h, s, l < 0.5 ? Math.max(0.05, l * 0.6) : Math.min(0.97, l + (1 - l) * 0.5)]);
+  }
+  return c;
+}
+
 /** A palette moved by one shift, the way a designer would move it. */
 export function shiftPalette(p: Palette, shift: PaletteShift): Palette {
   const all = (f: (c: string) => string): Palette => ({ ground: f(p.ground), ink: f(p.ink), accent: f(p.accent), support: p.support.map(f) });

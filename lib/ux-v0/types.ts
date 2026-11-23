@@ -245,6 +245,9 @@ export interface ReasoningCard {
 
 export type MoodCategory = 'imagery' | 'texture' | 'composition';
 export const MOOD_CATEGORIES: readonly MoodCategory[] = ['imagery', 'texture', 'composition'];
+// The picture libraries a moodboard reference was found in. 'openverse' is kept only so that references saved before
+// the Openverse integration was removed still read back: nothing in SocriaUX calls Openverse any more (research now
+// goes through the workspace's configured search provider, lib/ux-v0/research/providers-server.ts).
 export type Provider = 'unsplash' | 'openverse' | 'pexels';
 export const PROVIDERS: readonly Provider[] = ['unsplash', 'openverse', 'pexels'];
 export type RefState = 'proposed' | 'kept' | 'rejected';

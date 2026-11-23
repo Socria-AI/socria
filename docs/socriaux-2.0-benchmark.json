@@ -1,0 +1,130 @@
+{
+  "pass": 23,
+  "fail": 0,
+  "results": [
+    {
+      "name": "the design is made at once from the brief, and looked at as rendered pixels before it is shown",
+      "ok": true
+    },
+    {
+      "name": "1  “Make this cloud themed.”: clouds drawn as editable shapes, the sky graded, the words exactly kept",
+      "ok": true
+    },
+    {
+      "name": "2  “Make it more interesting.”: measured first — what holds it back said, then changed (no question needed)",
+      "ok": true
+    },
+    {
+      "name": "3  the faces kept role by role and the logo kept, the composition and the ground redesigned",
+      "ok": true
+    },
+    {
+      "name": "4  an identity generated from the words: new faces and colours, the same words and arrangement, the reason said",
+      "ok": true
+    },
+    {
+      "name": "5  only the headline, a little smaller (a nudge, under 10%)",
+      "ok": true
+    },
+    {
+      "name": "a comment on the selected headline (“make this warmer”) changes the headline alone, and is kept as done",
+      "ok": true
+    },
+    {
+      "name": "7  controls made for this design (named for its own forms and its headline) genuinely change it and read back",
+      "ok": true
+    },
+    {
+      "name": "   undo takes a control’s change back",
+      "ok": true
+    },
+    {
+      "name": "6a “Try something completely different” makes a second design on its own artboard, in another direction (its own colours and faces), the first unchanged",
+      "ok": true
+    },
+    {
+      "name": "6b the combination is a new artboard: the first’s typography on the second’s composition, both sources unchanged, nothing failing",
+      "ok": true
+    },
+    {
+      "name": "“critique it”: the design rendered and measured as pixels, then the objects checked — said as such",
+      "ok": true
+    },
+    {
+      "name": "12 five versions from the brief, each on its own artboard, structurally different (no pair the same structure; measured)",
+      "ok": true
+    },
+    {
+      "name": "11 reopened: every artboard, the comment, each artboard’s own look and the whole conversation are as they were",
+      "ok": true
+    },
+    {
+      "name": "   and the versions to go back to",
+      "ok": true
+    },
+    {
+      "name": "8  with no search provider configured here, the conversation says so plainly — no results invented, other ways offered",
+      "ok": true
+    },
+    {
+      "name": "8b found references are shown as cards, each linked to its source (opened safely), each with “Use as a reference”",
+      "ok": true
+    },
+    {
+      "name": "8c choosing one reads it through the guarded reader — here it cannot be reached, and that is said, not faked",
+      "ok": true
+    },
+    {
+      "name": "9  a website is made (no model): its sections composed for the brief, with a working contact form",
+      "ok": true
+    },
+    {
+      "name": "   rendered in its sealed frame, with navigation; at phone width nothing runs off the side",
+      "ok": true
+    },
+    {
+      "name": "10 an original logo: valid SVG, editable vector objects, concepts and variants to choose from",
+      "ok": true
+    },
+    {
+      "name": "no page errors",
+      "ok": true
+    },
+    {
+      "name": "no model was needed or used: every model route refused, nothing waited on it",
+      "ok": true
+    }
+  ],
+  "captured": {
+    "made": "Composed and checked in 354 ms, without a model. Checked the rendered pixels: every text reads against what is really beneath it (the hardest at 15.5:1).",
+    "t1": "The clouds palette; a clouds ground, graded; clouds in place of the shapes there, literal; depth: the forms layered by distance, with shadows. There was no clear room for clouds in this composition, so they sit faintly behind the words — say “more space” or “smaller clouds” to give them room of their own. Checked the rendered pixels: every text reads against what is really beneath it (the hardest at 13:1). Previewing: The clouds palette; a clouds ground, graded; clouds in place of the shapes there, literal; depth: the forms layered by distance, with shadows. There was no clear room for clouds in this composition, so they sit faintly behind the words — say “more space” or “smaller clouds” to give them room of their own. Checked the rendered pixels: every text reads against what is really beneath it (the hardest at 13:1). Apply or Discard it under the canvas.",
+    "t2": "It is crowded (4% left open). So: more space around everything; a graded ground; clouds, literal. Kept: the words, the logo, the pictures. There was no clear room for clouds in this composition, so they sit faintly behind the words — say “more space” or “smaller clouds” to give them room of their own. Checked the rendered pixels: every text reads against what is really beneath it (the hardest at 13:1). Previewing: It is crowded (4% left open). So: more space around everything; a graded ground; clouds, literal. Kept: the words, the logo, the pictures. There was no clear room for clouds in this composition, so they sit faintly behind the words — say “more space” or “smaller clouds” to give them room of their own. Checked the rendered pixels: every text reads against what is really beneath it (the hardest at 13:1). Apply or Discard it under the canvas.",
+    "t3": "A composition away from the usual arrangement; the colour darker, cooler, richer; a flat ground; clouds, stylised. Kept: the typography, the logo. Checked the rendered pixels: every text reads against what is really beneath it (the hardest at 13.2:1). Previewing: A composition away from the usual arrangement; the colour darker, cooler, richer; a flat ground; clouds, stylised. Kept: the typography, the logo. Checked the rendered pixels: every text reads against what is really beneath it (the hardest at 13.2:1). Apply or Discard it under the canvas.",
+    "t4": "For a premium architectural studio identity, a language generated from those words: Deep, quiet colour on ivory: a neutral and signal palette around a hue of 43°. Bodoni Moda for display, EB Garamond for reading, with the city's forms drawn abstractly. So: the colour changed; the type set in Bodoni Moda with EB Garamond; a graded ground; fine lines in place of the clouds, abstract; atmospheric depth: far forms softened, near ones shadowed. Kept: the words, the composition, the pictures. Checked the rendered pixels: every text reads against what is really beneath it (the hardest at 13.6:1). Previewing: For a premium architectural studio identity, a language generated from those words: Deep, quiet colour on ivory: a neutral and signal palette around a hue of 43°. Bodoni Moda for display, EB Garamond for reading, with the city's forms drawn abstractly. So: the colour changed; the type set in Bodoni Moda with EB Garamond; a graded ground; fine lines in place of the clouds, abstract; atmospheric depth: far forms softened, near ones shadowed. Kept: the words, the composition, the pictures. Checked the rendered pixels: every text reads against what is really beneath it (the hardest at 13.6:1). Apply or Discard it under the canvas.",
+    "comment": "Comment 1: headline: its colour warmer. Only the headline changed.",
+    "controls": [
+      "Fine lines — how many",
+      "Fine lines — how abstract",
+      "Fine lines — how large",
+      "Headline — size",
+      "Headline — weight (Bodoni Moda)",
+      "Headline — letter spacing",
+      "Sky — tone",
+      "Accent — hue",
+      "Depth",
+      "Room — how much is left open"
+    ],
+    "t6a": "“Japanese Modernist Editorial” — a different direction, beside this one: its own colours, type and composition. “A4 poster or flyer” is unchanged. Combine any of them in words (“the type of the first with the composition of the second”). Previewing: “Japanese Modernist Editorial” — a different direction, beside this one: its own colours, type and composition. “A4 poster or flyer” is unchanged. Combine any of them in words (“the type of the first with the composition of the second”). Apply or Discard it under the canvas.",
+    "t6b": "A new artboard built on the composition of “Japanese Modernist Editorial”; the typography of “A4 poster or flyer”: Bodoni Moda with EB Garamond. Checked the rendered pixels: every text reads against what is really beneath it (the hardest at 16.3:1). The designs it came from are unchanged. Previewing: A new artboard built on the composition of “Japanese Modernist Editorial”; the typography of “A4 poster or flyer”: Bodoni Moda with EB Garamond. Checked the rendered pixels: every text reads against what is really beneath it (the hardest at 16.3:1). The designs it came from are unchanged. Apply or Discard it under the canvas.",
+    "critique": "I rendered it and measured the pixels (396×560), then checked the objects. Every text was measured against what is beneath it: 3 of 3 read clearly. 1. The headline is small against the frame. I rendered it and measured the pixels (396×560), then checked the objects. Every text was measured against what is beneath it: 3 of 3 read clearly. 1. The headline is small against the frame. 1. The headline is small against the frame · 2. Make it more interesting — or say it your own way.",
+    "diversity": {
+      "versions": 5,
+      "meanSimilarity": 0.584,
+      "maxSimilarity": 0.742,
+      "pairs": 15
+    },
+    "t8": "Find me some interesting references for an experimental architecture website An experimental website for architecture. What is it called? And if you have it, the first thing people should read. Looking for references: “experimental architecture website”. Searching the internet needs a search provider set up for this workspace (Brave Search, Google Programmable Search or Serper, each with its own key), and none is. Paste links to sites you admire, or add pictures, and they will be read as references instead."
+  },
+  "modelCallsRefused": 1,
+  "errors": []
+}

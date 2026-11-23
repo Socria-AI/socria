@@ -10,6 +10,29 @@ import type { StudioState } from './schema';
 import { prefsOf } from './apply';
 import { vibePlanOf } from './discovery';
 import type { Change, CreativePlan, Keepable } from '../graphics/creative/plan';
+import { qualitiesIn, themeIn } from '../graphics/creative/lexicon';
+
+/**
+ * The world the opening sentence names for the look — "a cloud-themed poster", "an ocean-inspired label", "a poster
+ * with a forest feel" — carried into the first design as a theme (its forms, ground and depth; its palette and faces
+ * unless the person chose their own), the same way it would be if said afterwards. Only a world named as the look
+ * counts ("Cloud Bakery" names a bakery, not a theme). Null when the sentence names none, or a mood was chosen in the
+ * conversation (the mood's own theme is carried by vibeRealisation).
+ */
+export function briefRealisation(st: StudioState): CreativePlan | null {
+  if (vibePlanOf(st)) return null;
+  const text = (st.prompt ?? '').toLowerCase().replace(/[“”"]/g, '"');
+  // what the person quoted is a name or their words, never a theme
+  const unquoted = text.replace(/"[^"]*"/g, ' ');
+  const clause = unquoted.split(/[.;,]|\bbut\b/).find((c) => themeIn(c) && /\b(theme|themed|inspired|feel|vibe|world|atmosphere|aesthetic|motifs?|look and feel)\b/.test(c));
+  const theme = clause ? themeIn(clause) : null;
+  if (!theme) return null;
+  const prefs = prefsOf(st);
+  const qualities = qualitiesIn(clause!).map((q) => q.id).slice(0, 2);
+  const keep: Keepable[] = [...(prefs.palette ? (['palette'] as const) : []), ...(prefs.faces ? (['type'] as const) : []), 'words', 'logo', 'pictures'];
+  const changes: Change[] = [{ decision: 'theme', theme: theme.id }, ...(qualities.length ? [{ decision: 'mood' as const, qualities }] : [])];
+  return { intent: 'theme', summary: `Made in the world your brief names: ${theme.label} — ${theme.says}.`, keep, changes, by: 'reader' };
+}
 
 /** The plan that carries the chosen mood into a composed work, or null when no mood was chosen. */
 export function vibeRealisation(st: StudioState): CreativePlan | null {

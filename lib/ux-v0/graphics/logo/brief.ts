@@ -284,6 +284,8 @@ export function nameOf(text: string): string | null {
     /\b(?:called|named|name is|brand(?:ed)? as|company is)\s+([A-Z0-9][\w&'’.-]*(?:\s+(?:&|and|[A-Z0-9][\w&'’.-]*)){0,4})/,
     /\b(?:logo|identity|wordmark|brand) (?:for|of)\s+([A-Z0-9][\w&'’.-]*(?:\s+(?:&|[A-Z0-9][\w&'’.-]*)){0,4})/,
     /^([A-Z][\w&'’.-]*(?:\s+(?:&|[A-Z][\w&'’.-]*)){0,3})\s*(?:is|—|–|-|:|,)\s/,
+    // "a website for Kanso, an architecture studio": a capitalised name with what it is said after it
+    /\b(?:website|site|web ?page|landing page|page|poster|flyer|campaign|shop|store|app|portfolio|menu|newsletter|board|brochure|card|banner|invitation)s? (?:for|of)\s+([A-Z0-9][\w&'’.-]*(?:\s+(?:&|[A-Z0-9][\w&'’.-]*)){0,3})(?=\s*(?:,|—|–|\(|:)\s*(?:an?|the|our|my)?\s*[a-z])/,
   ];
   for (const p of pats) {
     const m = text.match(p);

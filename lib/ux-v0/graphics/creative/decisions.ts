@@ -195,7 +195,8 @@ export const stopsOf = (fill: unknown): { at: number; color: string }[] => (fill
 export function readDecisions(doc: GraphicDoc, boardId?: string, dir?: GraphicDirection | null): Decisions {
   const board = boardOf(doc, boardId);
   const rec = board.creative ?? {};
-  const t = doc.tokens;
+  // an artboard made in another direction has its own colours and faces
+  const t = board.tokens ?? doc.tokens;
   // the ground as it is now: the artboard's own (kept as the bottom of any gradient), never a colour remembered from before
   const ground = (board.background || t.colors.background).slice(0, 7);
   const carrier = groundCarrier(board);

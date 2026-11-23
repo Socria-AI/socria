@@ -18,7 +18,7 @@ import { addUpload } from '../uploads';
 import { getProject, listProjects } from '@/lib/ux-v0/store';
 import { normalizeBrief, type DesignProject } from '@/lib/ux-v0/types';
 import { proposeDirections } from '@/lib/ux-v0/direction';
-import { newId, type Asset, type GraphicDoc } from '@/lib/ux-v0/graphics/doc';
+import { newId, type Artboard, type Asset, type GraphicDoc } from '@/lib/ux-v0/graphics/doc';
 import { accentFor, composeGraphic, graphicDirectionOf, type GraphicBrief, type GraphicDirection } from '@/lib/ux-v0/graphics/compose';
 import { interpretations } from '@/lib/ux-v0/graphics/generative/engine';
 import { languageDirection } from '@/lib/ux-v0/graphics/generative/language';
@@ -43,8 +43,12 @@ import { useLinkedSystem } from '../systems/useLinkedSystem';
 import { SystemBadge } from '../systems/SystemBadge';
 import { StudioRail, useRailReply } from '../studio/StudioRail';
 import { directionsWithPrefs, prefsOf, withTreatment } from '@/lib/ux-v0/studio/apply';
-import { vibeRealisation } from '@/lib/ux-v0/studio/realise';
+import { briefRealisation, vibeRealisation } from '@/lib/ux-v0/studio/realise';
 import { executePlan } from '@/lib/ux-v0/graphics/creative/execute';
+import { reviewAndRepair, saidOf } from './visualReview';
+import { applySystem } from '@/lib/ux-v0/dsi/link';
+import { listSystems } from '@/lib/ux-v0/dsi/store';
+import type { PlanQuestion } from '@/lib/ux-v0/graphics/creative/plan';
 
 // 'concepts': every logo concept side by side, opened from the editor's Logo tab when wanted (never a step before it)
 type View = 'brief' | 'edit' | 'concepts';
@@ -185,7 +189,7 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
     let finalDoc = refined.doc;
     // the mood chosen in the conversation: its forms, depth and ground carried into the work by the creative executor
     // (its colours and faces are already the composition's); never over a design system's identity
-    const vibe = opts.realise && project.studio && !linked ? vibeRealisation(project.studio) : null;
+    const vibe = opts.realise && project.studio && !linked ? vibeRealisation(project.studio) ?? briefRealisation(project.studio) : null;
     let vibeLine = '';
     if (vibe) {
       const run = (mm: typeof m) => executePlan(finalDoc, vibe, { board: finalDoc.artboards[0]?.id, dir, kind: brief.kind, measure: mm, said: vibe.summary });
@@ -197,6 +201,13 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
         finalDoc = refineDoc(r.doc, canvasMeasure()).doc;
         vibeLine = vibe.summary;
       }
+    }
+    // the composition looked at as rendered pixels (what is really beneath each text), repaired where it must be
+    let lookLine = '';
+    const looked = finalDoc.artboards[0] ? await reviewAndRepair(finalDoc, finalDoc.artboards[0].id, { measure: canvasMeasure(), resolve, rounds: 2 }) : null;
+    if (looked) {
+      finalDoc = looked.doc;
+      lookLine = saidOf(looked, { fixedLead: 'Repaired after looking' });
     }
     let bindings = g.bindings;
     let brandLine = '';
@@ -214,6 +225,7 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
       text: [
         `Composed and checked in ${ms} ms, without a model.`,
         vibeLine,
+        lookLine,
         brandLine,
         refined.fixed.length ? `Fixed before showing: ${refined.fixed.slice(0, 3).map((f) => f.replace(/\.$/, '')).join('; ')}.` : '',
         remaining ? `${remaining} thing${remaining === 1 ? '' : 's'} left to look at (Checks, with nothing selected).` : '',
@@ -225,6 +237,59 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
     if (changed) refreshMeasure();
     setBusy('');
     setView('edit');
+  };
+
+  /**
+   * Alternatives asked for in the editor ("try something completely different", "three new directions"): designs
+   * composed from the same brief in directions not used yet — each its own palette, faces and composition — as
+   * artboards to add beside the one in front (in its format). Composed by the engine, without a model.
+   */
+  const altRound = useRef(0);
+  const usedDirections = useRef<string[]>([]);
+  const alternativesFor = async (count: number, opts: { avoid: readonly string[]; said: string; format?: string }): Promise<Artboard[] | null> => {
+    const brief = g.brief;
+    if (!brief || brief.kind === 'logo') return null;
+    const seen = [...new Set([...usedDirections.current, ...(g.direction ? [g.direction.name] : []), ...opts.avoid])];
+    const out: Artboard[] = [];
+    const formats = opts.format ? [opts.format, ...brief.formats.filter((f) => f !== opts.format)] : brief.formats;
+    const want = { ...brief, formats: formats.slice(0, 1) };
+    for (let guard = 0; out.length < count && guard < 4; guard++) {
+      altRound.current += 1;
+      const dirs = proposeFor(want, altRound.current + 1, seen);
+      for (const dir of dirs) {
+        if (out.length >= count) break;
+        if (seen.includes(dir.name)) continue;
+        seen.push(dir.name);
+        await loadFaces(directionFaces(dir));
+        const m = canvasMeasure();
+        const composed = composeGraphic(want, dir, { measure: m, seed: seedOf(`${project.id}|alt|${altRound.current}|${out.length}`), assets: g.assets ?? [], name: current.current.name });
+        const refined = refineDoc(composed.doc, m).doc;
+        const b = refined.artboards[0];
+        if (b) out.push({ ...b, name: dir.name.slice(0, 60), tokens: refined.tokens, direction: { name: dir.name, language: dir.language } });
+      }
+    }
+    usedDirections.current = seen;
+    return out.length ? out : null;
+  };
+
+  /**
+   * "Make this fit our brand": the design system the words name, else the one the project is linked to, else the only
+   * one there is, applied to the design (its colours, faces and logo where the design has a place for them; the version
+   * before kept in Versions). With several and none named, which one is asked; with none, how to bring one in is said.
+   */
+  const brandFor = async (words: string): Promise<{ said: string; question?: PlanQuestion } | null> => {
+    const systems = (await listSystems()).filter((r) => r.status === 'active' && r.published > 0);
+    const w = words.toLowerCase();
+    const named = systems.find((r) => r.name.length > 2 && w.includes(r.name.toLowerCase()));
+    const target = named ?? (linked ? systems.find((r) => r.id === linked.rec.id) ?? linked.rec : systems.length === 1 ? systems[0] : null);
+    if (!target) {
+      if (!systems.length) return { said: 'There is no published design system in your library yet, so there is no brand to fit it to. Bring one in from Design systems (a tokens or CSS file, a PDF of guidelines, a website or a Figma file), publish it, and ask again — or tell me the brand’s colours and typefaces and I will use those.' };
+      return { said: 'You have more than one design system.', question: { text: 'Which brand should it fit?', options: systems.slice(0, 4).map((r) => ({ label: r.name, words: `make this fit ${r.name}` })) } };
+    }
+    const a = applySystem(current.current, target, { measure: canvasMeasure() });
+    if (a.report.outcome === 'error') return { said: a.report.summary };
+    update(() => a.project);
+    return { said: `${a.report.summary}${a.report.outcome === 'applied' || a.report.outcome === 'updated' ? ' The version before is kept in Versions.' : ''}` };
   };
 
   /** A logo brief: concepts explored (no directions, no templates), the first on its artboard, the concepts shown. */
@@ -413,6 +478,9 @@ export function GraphicsWorkspace({ initial, signedIn, onExit, startIntent, onOp
           onFocus={project.studio ? (f) => setByHand(!f) : undefined}
           hideAsk={!!project.studio && railOpen}
           projectId={project.id}
+          onAlternatives={g.brief && g.brief.kind !== 'logo' ? alternativesFor : undefined}
+          onBrand={brandFor}
+          memory={{ brief: project.studio?.prompt || g.brief?.purpose, references: (project.studio?.references ?? []).filter((r) => r.state !== 'rejected').map((r) => `${r.host}${r.take?.length ? ` (take its ${r.take.join(', ')})` : ''}`) }}
         />
       )}
     </div>

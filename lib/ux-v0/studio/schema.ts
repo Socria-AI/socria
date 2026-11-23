@@ -6,6 +6,7 @@
 // the person's own words in the opening sentence, a choice they made, or something left to SocriaUX. Normalised on
 // read like the rest of the project, so a stored record can never break the page.
 
+import { cleanResult } from '../research/schema';
 import { normalizeDiscovery, type DiscoveryState } from './discovery';
 
 export const STUDIO_MODES = ['graphic', 'website', 'logo', 'system', 'board', 'critique'] as const;
@@ -103,7 +104,19 @@ export interface StudioAnswer {
   at: number;
 }
 
-export type MessageKind = 'prompt' | 'question' | 'answer' | 'note' | 'change' | 'reply' | 'offer' | 'reference';
+export type MessageKind = 'prompt' | 'question' | 'answer' | 'note' | 'change' | 'reply' | 'offer' | 'reference' | 'research';
+
+/** What a search for references found (lib/ux-v0/research/schema.ts ResearchResult), as kept with the conversation. */
+export interface FoundReference {
+  id: string;
+  kind: 'website' | 'image';
+  title: string;
+  url: string;
+  host: string;
+  snippet?: string;
+  thumb?: string;
+  provider: string;
+}
 
 export interface StudioMessage {
   id: string;
@@ -115,6 +128,8 @@ export interface StudioMessage {
   stage?: string;
   /** attachments it carried (ids) */
   attachments?: string[];
+  /** a search for references: what was searched for and what was found (each with its source) */
+  found?: { query: string; provider: string; results: FoundReference[] };
 }
 
 export interface StudioState {
@@ -237,7 +252,7 @@ function normalizeAttachment(v: unknown): StudioAttachment | null {
   };
 }
 
-const KINDS: readonly MessageKind[] = ['prompt', 'question', 'answer', 'note', 'change', 'reply', 'offer', 'reference'];
+const KINDS: readonly MessageKind[] = ['prompt', 'question', 'answer', 'note', 'change', 'reply', 'offer', 'reference', 'research'];
 
 function normalizeMessage(v: unknown): StudioMessage | null {
   const r = o(v);
@@ -257,7 +272,22 @@ function normalizeMessage(v: unknown): StudioMessage | null {
     kind: KINDS.includes(r.kind as MessageKind) ? (r.kind as MessageKind) : 'note',
     ...(stage && ID.test(stage) ? { stage } : {}),
     ...(atts.length ? { attachments: atts } : {}),
+    ...((f) => (f ? { found: f } : {}))(normalizeFound(r.found)),
   };
+}
+
+/** A search's results held to their shape again (web addresses only, bounded), as read back from storage. */
+function normalizeFound(v: unknown): StudioMessage['found'] | null {
+  const r = o(v);
+  const results = a(r.results)
+    .map((x, i) => {
+      const c = cleanResult(o(x), s(o(x).provider, 60) || 'search', o(x).kind === 'image' ? 'image' : 'website', i);
+      return c ? { id: s(o(x).id, 120) || c.id, kind: c.kind, title: c.title, url: c.url, host: c.host, ...(c.snippet ? { snippet: c.snippet } : {}), ...(c.thumb ? { thumb: c.thumb } : {}), provider: c.provider } : null;
+    })
+    .filter((x): x is FoundReference => !!x)
+    .slice(0, 12);
+  const query = s(r.query, 160);
+  return results.length && query ? { query, provider: s(r.provider, 60) || 'search', results } : null;
 }
 
 /** A stored record held to its shape; undefined when it is not one. */
@@ -347,6 +377,6 @@ function normalizeReference(v: unknown): StudioReference | null {
 
 /** A message added to the conversation (bounded: the oldest go first). */
 export function said(st: StudioState, m: Omit<StudioMessage, 'id' | 'at'> & { at?: number }): StudioState {
-  const msg: StudioMessage = { id: studioId('m'), at: m.at ?? Date.now(), from: m.from, text: m.text.slice(0, STUDIO_LIMITS.text * 2), kind: m.kind, ...(m.stage ? { stage: m.stage } : {}), ...(m.attachments?.length ? { attachments: m.attachments } : {}) };
+  const msg: StudioMessage = { id: studioId('m'), at: m.at ?? Date.now(), from: m.from, text: m.text.slice(0, STUDIO_LIMITS.text * 2), kind: m.kind, ...(m.stage ? { stage: m.stage } : {}), ...(m.attachments?.length ? { attachments: m.attachments } : {}), ...((f) => (f ? { found: f } : {}))(m.found ? normalizeFound(m.found) : null) };
   return { ...st, transcript: [...st.transcript, msg].slice(-STUDIO_LIMITS.transcript) };
 }

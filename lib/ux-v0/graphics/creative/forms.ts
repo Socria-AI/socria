@@ -180,6 +180,8 @@ export interface FormBox {
   h: number;
   /** 0 near … 1 far: far forms are smaller, paler and softer */
   far: number;
+  /** set behind the words, faint (a composition with no clear room for them): the atmosphere they sit in */
+  behind?: boolean;
 }
 
 const motif = (name: string, box: { x: number; y: number; w: number; h: number }, extra: Partial<ShapeNode>): ShapeNode =>
@@ -216,7 +218,9 @@ export function drawForm(kind: FormKind, box: FormBox, style: FormStyle, seed: n
   const rand = rng(seed);
   const a = clamp(style.abstraction, 0, 100);
   const c2 = style.color2 ?? style.color;
-  const d = depthOf(box.far, style.depth);
+  const d0 = depthOf(box.far, style.depth);
+  // behind the words they are only atmosphere: faint, never a shape the words have to fight
+  const d = box.behind ? { ...d0, opacity: Math.min(d0.opacity ?? 1, 0.34) } : d0;
   switch (kind) {
     case 'cloud': {
       if (a >= 72) {
@@ -435,6 +439,15 @@ export function placeForms(kind: FormKind, W: number, H: number, avoid: readonly
     const h = kind === 'cloud' ? w * 0.5 : kind === 'leaf' ? w * 1.6 : w;
     const spot = clearSpot(W, H, w, h, avoid, out, rand, zone);
     if (spot) out.push({ ...spot, far });
+  }
+  // a composition with no clear room: the forms go behind the words, faint, as the atmosphere they sit in (the
+  // rendered result is then checked for legibility, and repaired if a word would not read)
+  if (!out.length) {
+    for (let i = 0; i < Math.min(count, 3); i++) {
+      const w = unit * (kind === 'cloud' ? 0.63 : kind === 'sparkle' || kind === 'snow' || kind === 'drop' ? 0.1 : 0.32) * clamp(scale, 0.4, 2) * (0.8 + rand() * 0.3);
+      const h = kind === 'cloud' ? w * 0.5 : kind === 'leaf' ? w * 1.6 : w;
+      out.push({ ...bestSpot(W, H, w, h, avoid, out, rand, zone), far: 0.7 + i * 0.1, behind: true });
+    }
   }
   // far forms first (drawn beneath)
   return out.sort((p, q) => q.far - p.far);

@@ -44,6 +44,9 @@ export function GraphicCanvas({
   rulers = true,
   pathEdit = null,
   onPathEdit,
+  pins,
+  onPin,
+  onComment,
 }: {
   doc: GraphicDoc;
   boardId: string;
@@ -64,6 +67,11 @@ export function GraphicCanvas({
   /** the path whose nodes are being edited (a Bézier shape), and how to leave that mode */
   pathEdit?: string | null;
   onPathEdit?: (id: string | null) => void;
+  /** comments pinned on objects of this artboard, numbered (a pin sits at the first object's corner) */
+  pins?: readonly { id: string; n: number; nodes: readonly string[]; open: boolean; text: string }[];
+  onPin?: (id: string) => void;
+  /** “Comment” beside the selection: a comment on what is selected */
+  onComment?: () => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(0.5);
@@ -488,6 +496,30 @@ export function GraphicCanvas({
             {board.unit}
           </span>
         </>
+      )}
+      {(!!pins?.length || (onComment && sel.length > 0 && !drag && !editing)) && (
+        <div className="gx-pins">
+          {pins?.map((p) => {
+            const l = p.nodes.map((id) => located.find((x) => x.node.id === id)).find(Boolean);
+            if (!l) return null;
+            const b = boxOnBoard(l);
+            return (
+              <button key={p.id} type="button" className={`gx-pin${p.open ? '' : ' is-done'}`} style={{ left: pan.x + (b.x + b.w) * zoom, top: pan.y + b.y * zoom }} onPointerDown={(e) => e.stopPropagation()} onClick={() => onPin?.(p.id)} title={p.text} aria-label={`Comment ${p.n}${p.open ? '' : ' (done)'}: ${p.text}`}>
+                {p.n}
+              </button>
+            );
+          })}
+          {onComment && sel.length > 0 && !drag && !editing && (() => {
+            const boxes = sel.map((l) => boxOnBoard(l));
+            const right = Math.max(...boxes.map((b) => b.x + b.w));
+            const top = Math.min(...boxes.map((b) => b.y));
+            return (
+              <button type="button" className="gx-comment-btn" style={{ left: pan.x + right * zoom, top: Math.max(4, pan.y + top * zoom - 34) }} onPointerDown={(e) => e.stopPropagation()} onClick={onComment} title="Comment on the selection: say what should change about it">
+                Comment
+              </button>
+            );
+          })()}
+        </div>
       )}
       <span className="gx-zoom" aria-live="polite">
         {Math.round(zoom * 100)}%

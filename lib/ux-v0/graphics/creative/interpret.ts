@@ -14,8 +14,10 @@ import { readGraphicEdit } from '../edit';
 import { readCreativeEdit } from '../generative/edits';
 import type { FormKind } from './forms';
 import { characterIn, qualitiesIn, QUALITIES, themeIn, type PaletteShift, type TypeCharacter } from './lexicon';
-import { boardOf, creativeFormIds, type DecisionKey } from './decisions';
+import { boardOf, creativeFormIds, readDecisions, type DecisionKey } from './decisions';
 import type { Change, CreativePlan, Intent, Keepable, PlanQuestion } from './plan';
+import { readIdentity } from './identity';
+import { improveAimOf, improvementPlan } from './improve';
 
 export interface ReadContext {
   doc: GraphicDoc;
@@ -62,6 +64,16 @@ const FORM_WORDS: readonly [RegExp, FormKind][] = [
   [/\b(sun|suns)\b/, 'sun'],
   [/\bgeometric (forms?|shapes?)\b/, 'ring'],
 ];
+/** A colour's hue, 0–360 (grey reads as 0). */
+const hueOf = (hex: string): number => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const mx = Math.max(r, g, b);
+  const mn = Math.min(r, g, b);
+  if (mx === mn || Number.isNaN(mx)) return 0;
+  const d = mx - mn;
+  const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return (h * 60 + 360) % 360;
+};
 const formIn = (s: string): FormKind | null => FORM_WORDS.find(([re]) => re.test(s))?.[1] ?? null;
 const abstractionIn = (s: string): number | undefined =>
   /\b(very|highly|completely|fully) abstract|\bgeometric\b/.test(s) ? 92 : /\babstract(ed)?\b/.test(s) ? 80 : /\b(stylised|stylized|graphic|simplified|simple)\b/.test(s) ? 55 : /\b(realistic|literal|lifelike|natural-looking|detailed)\b/.test(s) ? 12 : undefined;
@@ -82,7 +94,7 @@ const SHIFT_WORDS: readonly [RegExp, PaletteShift][] = [
   [/\b(gold|golden|metallic|silver)\b/, 'metallic'],
   [/\bricher\b|\bdeep(er)? colou?rs?\b/, 'richer'],
 ];
-const shiftsIn = (s: string): PaletteShift[] => [...new Set(SHIFT_WORDS.filter(([re]) => re.test(s)).map(([, k]) => k))];
+export const shiftsIn = (s: string): PaletteShift[] => [...new Set(SHIFT_WORDS.filter(([re]) => re.test(s)).map(([, k]) => k))];
 
 const NAMED: Record<string, string> = { red: '#d6402b', orange: '#e8772e', yellow: '#f2c230', green: '#3f8f4f', teal: '#1f8a8a', turquoise: '#1fb3aa', blue: '#2f6bd6', navy: '#1c2c5b', purple: '#6b4fbb', violet: '#7b4fd6', pink: '#e05a8c', magenta: '#d62f8f', black: '#141414', white: '#ffffff', gold: '#c9a86a', silver: '#b8bcc2', brown: '#7a4b2a', grey: '#8a8a86', gray: '#8a8a86', cream: '#f3ead8', coral: '#ff7a59', lilac: '#b7a3e0', mint: '#9fdcc0', burgundy: '#7a1f33', olive: '#7a7a2f', sky: '#8fc3f2' };
 const namedIn = (s: string) => Object.keys(NAMED).find((k) => new RegExp(`\\b${k}\\b`).test(s));
@@ -130,15 +142,23 @@ export function readCreative(words0: string, ctx: ReadContext): ReadResult | nul
 
   // a short answer to the question asked last
   if (ctx.asked?.options.length) {
-    const opts = ctx.asked.options;
-    const ord = ['first', 'second', 'third', 'fourth'].findIndex((w) => new RegExp(`\\b${w}\\b`).test(words));
-    const num = words.match(/^\s*(\d)\b/);
-    const pick = ord >= 0 ? opts[ord] : num ? opts[Number(num[1]) - 1] : opts.find((o) => lower(o.label).split(' ').filter((w) => w.length > 3).some((w) => words.includes(w)) || words === lower(o.label));
-    if (pick) return readCreative(pick.words, { ...ctx, asked: null });
+    const picked = answerOf(words, ctx.asked);
+    if (picked) return readCreative(picked, { ...ctx, asked: null });
   }
 
   const concept = conceptMove(words, ctx);
   if (concept) return { plan: concept, unread: [], certain: true };
+
+  // a vague improvement ("make it more interesting", "it feels flat"): the design in front is measured for what holds it
+  // back, and the strongest moves planned with their reasons (a question only when nothing measures weak)
+  const aim = improveAimOf(words);
+  if (aim) {
+    const { plan } = improvementPlan(ctx.doc, ctx.board, words0, aim);
+    return { plan, unread: [], certain: !plan.question };
+  }
+  // an identity ("turn this into a premium architectural studio identity"): a visual language generated from the words
+  const identity = readIdentity(words0, { doc: ctx.doc, board: ctx.board });
+  if (identity) return { plan: identity.plan, unread: [], certain: false };
 
   // genuinely open: a change with no direction at all
   if (/^(change|redo|redesign|update|switch up|refresh|rework|transform)( the| its)?( (overall|whole|entire|general))? (aesthetic|style|look|vibe|feel|design|it|this)( completely)?$/.test(words) || /^(make it|can you make it) (better|nicer|look better|more interesting|look good|work)$/.test(words) || /^(something else|try again|change it|do something)$/.test(words)) {
@@ -186,6 +206,12 @@ export function readCreative(words0: string, ctx: ReadContext): ReadResult | nul
   for (const c of clauses) {
     // ── kept ──
     if (KEEP.test(c) || /\b(as it is|unchanged|the same|intact|untouched)\b/.test(c) && !/\b(make|change|replace|add|remove)\b/.test(c)) {
+      // the visual language, the look: every decision of the look, the arrangement free to change
+      if (/\b(visual language|look( and feel)?|aesthetic|vibe|visual identity)\b/.test(c) && !aboutOf(c).length) {
+        (['palette', 'type', 'forms', 'background', 'depth'] as Keepable[]).forEach((k) => keep.add(k));
+        said.push('keeping the visual language');
+        continue;
+      }
       const what = aboutOf(c);
       if (/\b(everything else|the rest|all else)\b/.test(c) && !what.length) continue;
       (what.length ? what : (['composition'] as Keepable[])).forEach((k) => keep.add(k));
@@ -361,6 +387,20 @@ export function readCreative(words0: string, ctx: ReadContext): ReadResult | nul
       continue;
     }
 
+    // ── the whole redesigned around what is kept ("keep the type and logo, but completely redesign the rest") ──
+    if (/\b(re-?design|rework|redo|reinvent|re-?imagine|overhaul|rebuild|reconceive)\b/.test(c) && /\b(the rest|everything else|all else|everything|the whole( thing| design)?|it all|it|this|completely|entirely|totally|from scratch)\b/.test(c) && !aboutOf(c.replace(/\b(the rest|everything else|all else)\b/g, '')).some((k) => k !== 'composition')) {
+      const bold = /\b(completely|entirely|totally|radically|from scratch)\b/.test(c);
+      const d = readDecisions(doc, board.id);
+      // a new palette that moves away from the one there: the other mode, the other temperature
+      const hue = hueOf(d.palette.accent);
+      const shifts: PaletteShift[] = [d.palette.mode === 'dark' ? 'lighter' : 'darker', hue < 75 || hue > 300 ? 'cooler' : 'warmer', ...(bold ? (['richer'] as PaletteShift[]) : [])];
+      add({ decision: 'composition', action: bold ? 'unexpected' : 'rethink' }, 'a new composition', 'redesign');
+      changes.push({ decision: 'palette', shifts }, { decision: 'background', kind: d.background.kind === 'flat' ? 'gradient' : 'flat' });
+      if (bold) changes.push({ decision: 'mood', qualities: ['original'] });
+      said.push(`a new palette (${shifts.join(', ')}) and ground`);
+      continue;
+    }
+
     // ── the composition ──
     if (aboutOf(c).includes('composition') || /\b(rethink|re-?think|re-?imagine|rearrange|re-?compose|start over|from scratch)\b/.test(c)) {
       const action = /\b(unexpected|surprising|unusual|original|experimental|daring|radical)\b/.test(c) ? 'unexpected' : /\b(more (space|room|air)|airier|breath|spacious|open it up|negative space)\b/.test(c) ? 'airy' : /\b(fuller|denser|tighter|more compact|fill)\b/.test(c) ? 'denser' : /\b(asymmetric\w*|off-?centre|off-?center|dynamic|diagonal)\b/.test(c) ? 'asymmetric' : /\b(centre|center|centred|centered|symmetrical)\b/.test(c) ? 'centred' : 'rethink';
@@ -457,6 +497,24 @@ export function readCreative(words0: string, ctx: ReadContext): ReadResult | nul
   // that the precise reader would have to interpret
   const certain = !unread.length && clauses.length - keepList.length <= 1 && finalChanges.length > 0 && finalChanges.every((ch) => ch.decision !== 'object');
   return { plan: { intent, summary, keep: keepList, changes: finalChanges, by: 'reader' }, unread, certain };
+}
+
+/**
+ * A short answer to the question asked last — "the second one", "2", a few words of an option — as the words of the
+ * option it picks; null when the words are an instruction of their own (longer than an answer, or naming none).
+ */
+export function answerOf(words0: string, asked: PlanQuestion): string | null {
+  const words = lower(words0);
+  const opts = asked.options;
+  if (!opts.length || !words) return null;
+  const exact = opts.find((o) => words === lower(o.label) || words === lower(o.words));
+  if (exact) return exact.words;
+  // an instruction of its own is not an answer ("take the type from the first and the layout from the second")
+  if (words.split(' ').length > 6) return null;
+  const ord = ['first', 'second', 'third', 'fourth'].findIndex((w) => new RegExp(`\\b${w}\\b`).test(words));
+  const num = words.match(/^\s*(\d)\b/);
+  const pick = ord >= 0 ? opts[ord] : num ? opts[Number(num[1]) - 1] : opts.find((o) => lower(o.label).split(' ').filter((w) => w.length > 3).some((w) => words.includes(w)));
+  return pick?.words ?? null;
 }
 
 /** Moves on concepts themselves: save, duplicate, compare, revisit, combine, new ones, another interpretation. */

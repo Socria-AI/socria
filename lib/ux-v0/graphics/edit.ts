@@ -243,7 +243,11 @@ export function readGraphicEdit(words0: string, doc: GraphicDoc, ctx: EditContex
   if (bigger !== smaller && (bigger || smaller)) {
     const t = targets(doc, board, words, ctx.selection, ['text', 'shape', 'image']);
     if (!t.list.length) return null;
-    const k = bigger ? 1.2 : 1 / 1.2;
+    // how much: "slightly" is a nudge, "much" a real change, a percentage exactly that
+    const pct = words.match(/\b(\d{1,3})\s*(%|percent)/);
+    const degree = pct ? Number(pct[1]) / 100 : /\b(slightly|a (little|touch|tad|bit)|a little bit|subtly|marginally|just a bit|fractionally)\b/.test(words) ? 0.08 : /\b(much|a lot|way|far|significantly|dramatically|considerably|substantially|massively|hugely)\b/.test(words) ? 0.45 : 0.2;
+    const k = bigger ? 1 + Math.min(2, degree) : 1 / (1 + Math.min(2, degree));
+    const how = degree <= 0.1 ? 'slightly ' : degree >= 0.4 ? 'much ' : '';
     // larger words never break mid-word: the box widens (moving left where the right edge stops it) to hold the widest
     // word, and the size stops where even the full measure cannot
     const grown = (l: Located): Op => {
@@ -273,7 +277,7 @@ export function readGraphicEdit(words0: string, doc: GraphicDoc, ctx: EditContex
       return { op: 'update', id: n.id, set: { size, h: Math.round(n.h * (size / n.size) * 10) / 10, w: Math.round(w * 10) / 10, ...(x !== n.x ? { x: Math.round(x * 10) / 10 } : {}) } } as Op;
     };
     const ops: Op[] = t.list.map((l) => (l.node.type === 'text' ? grown(l) : ({ op: 'resize', id: l.node.id, x: l.node.x - (l.node.w * (k - 1)) / 2, y: l.node.y - (l.node.h * (k - 1)) / 2, w: l.node.w * k, h: l.node.h * k } as Op)));
-    return finish({ ops, label: `${t.list.length === 1 ? (t.list[0].node.name ?? 'it').toLowerCase() : `${t.list.length} objects`} ${bigger ? 'larger' : 'smaller'}`, scope: t.scope });
+    return finish({ ops, label: `${t.list.length === 1 ? (t.list[0].node.name ?? 'it').toLowerCase() : `${t.list.length} objects`} ${how}${bigger ? 'larger' : 'smaller'}`, scope: t.scope });
   }
 
   // more editorial: a serif display face, a lighter weight, sentence case, tighter tracking

@@ -139,7 +139,9 @@ function clientId(req: NextRequest, userId: string | null): { id: string; authed
 // "felt broken" for no reason of its own. Cheap writes and reads, in bursts.
 // 'uxref' is SocriaUX reading a website the person points to, for reference: one page and its stylesheets, fetched
 // by the server on their behalf, so it is held tighter than the bookkeeping, and tighter still signed out.
-type Kind = 'chat' | 'aux' | 'room' | 'count' | 'code' | 'rsvp' | 'staff' | 'voice' | 'capture' | 'media' | 'enter' | 'uxmodel' | 'uxsync' | 'uxref';
+// 'uxsearch' is SocriaUX searching the internet for references through the workspace's search provider: each one
+// spends that provider's quota, so it is held tightest of all.
+type Kind = 'chat' | 'aux' | 'room' | 'count' | 'code' | 'rsvp' | 'staff' | 'voice' | 'capture' | 'media' | 'enter' | 'uxmodel' | 'uxsync' | 'uxref' | 'uxsearch';
 const LIMITS: Record<Kind, { authed: { minute: number; day: number }; anon: { minute: number; day: number } }> = {
   chat: { authed: { minute: 20, day: 400 }, anon: { minute: 8, day: 80 } },
   aux: { authed: { minute: 40, day: 1200 }, anon: { minute: 20, day: 300 } },
@@ -158,6 +160,7 @@ const LIMITS: Record<Kind, { authed: { minute: number; day: number }; anon: { mi
   uxmodel: { authed: { minute: 20, day: 800 }, anon: { minute: 5, day: 30 } },
   uxsync: { authed: { minute: 90, day: 6000 }, anon: { minute: 10, day: 200 } },
   uxref: { authed: { minute: 12, day: 300 }, anon: { minute: 4, day: 40 } },
+  uxsearch: { authed: { minute: 8, day: 150 }, anon: { minute: 3, day: 20 } },
 };
 
 function tooMany(r: RLResult): NextResponse {

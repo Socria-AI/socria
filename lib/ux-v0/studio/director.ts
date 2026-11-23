@@ -18,6 +18,7 @@
 // colour or a typeface named, a change of mind, a link to learn from, "make it", "surprise me", "skip", "show me
 // others" — and mapped onto the decisions the engines already read (./apply.ts), so making the work is unchanged.
 
+import { researchAskOf, type ResearchKind } from '../research/schema';
 import type { StudioAnswer, StudioMode, StudioState } from './schema';
 import { said } from './schema';
 import { readFacts } from './facts';
@@ -115,7 +116,13 @@ const purposeIn = (low: string) => PURPOSE_WORDS.find(([re]) => re.test(low))?.[
 const functionsIn = (low: string) => [...new Set(FUNCTION_WORDS.filter(([re]) => re.test(low)).map(([, id]) => id))];
 
 /** Everything the person has said, in order (the opening words and every reply). */
-const allWords = (st: StudioState) => st.prompt;
+/** The opening sentence as the brief reads it: "find me references for an experimental architecture website" is about
+ * an experimental architecture website (the search is run apart, and its words are not the work's subject). */
+export const briefText = (st: Pick<StudioState, 'prompt'>): string => {
+  const r = researchAskOf(st.prompt ?? '');
+  return r ? r.query.replace(/\s+design$/, '') : st.prompt;
+};
+const allWords = (st: StudioState) => briefText(st);
 
 export interface Understanding {
   /** the kind of work, said plainly ("poster", "logo", "website", "campaign") */
@@ -276,7 +283,7 @@ function materialNumbers(words: string): Record<string, number> {
 /** What the work is called in a question, and the words its lettering is shown in (./discovery.ts Subject). */
 export function subjectFor(st: StudioState, u: Understanding = understand(st)): Subject {
   const it = st.mode === 'graphic' ? (u.kindLabel === 'graphic' ? 'it' : `the ${u.kindLabel}`) : st.mode === 'logo' ? 'the logo' : st.mode === 'website' ? 'the site' : st.mode === 'board' ? 'the campaign' : 'it';
-  return { it, sample: (u.name || u.headline || title(subjectOf(st.prompt)) || modeInfo(st.mode).label).slice(0, 60) };
+  return { it, sample: (u.name || u.headline || title(subjectOf(briefText(st))) || modeInfo(st.mode).label).slice(0, 60) };
 }
 
 /** What to do next: ask what the work cannot be made without, ask a creative question worth asking, or make it. */
@@ -384,7 +391,7 @@ export function restate(st: StudioState): string {
   const art = a_(lead);
   if (st.mode === 'logo') {
     // what it is, in the person's words ("a coffee roastery"), never a category ("food")
-    const subj = yourSubject(st.prompt);
+    const subj = yourSubject(briefText(st));
     const what = subj && u.name && !subj.toLowerCase().includes(u.name.toLowerCase()) ? `, ${/^your /.test(subj) ? subj : `${a_(subj)} ${subj}`}` : '';
     const own = answerOf(st, 'l.about')?.text;
     const forWhom = u.name ? `“${u.name}”` : subj ? (/^your /.test(subj) ? subj : `${a_(subj)} ${subj}`) : 'you';
@@ -393,7 +400,7 @@ export function restate(st: StudioState): string {
   if (st.mode === 'website') {
     const parts = C.SITE_FUNCTIONS.filter((x) => u.functions.includes(x.id)).map((x) => FUNCTION_SAID[x.id] ?? x.label.toLowerCase()).slice(0, 3);
     const pur = PURPOSE_SAID[u.purpose] ?? '';
-    return `${title(art)} ${lead} for ${u.name ? `“${u.name}”` : yourSubject(st.prompt) || 'you'}${pur ? `, ${pur}` : ''}${parts.length ? `, with ${list(parts)}` : ''}`;
+    return `${title(art)} ${lead} for ${u.name ? `“${u.name}”` : yourSubject(briefText(st)) || 'you'}${pur ? `, ${pur}` : ''}${parts.length ? `, with ${list(parts)}` : ''}`;
   }
   if (st.mode === 'board') {
     const pieces = u.materials.map((m) => {
@@ -403,7 +410,7 @@ export function restate(st: StudioState): string {
     return `${title(art)} ${lead}${u.headline ? ` for “${u.headline}”` : ''}${pieces.length ? `: ${list(pieces)}` : ''}`;
   }
   if (st.mode === 'graphic') {
-    const subject = u.headline ? `“${u.headline}”` : yourSubject(st.prompt);
+    const subject = u.headline ? `“${u.headline}”` : yourSubject(briefText(st));
     return `${title(art)} ${lead}${subject ? ` for ${subject}` : ''}${u.details.length ? `, ${u.details.slice(0, 2).join(' · ')}` : ''}`;
   }
   return '';
@@ -547,7 +554,7 @@ export function hear(st: StudioState, text: string): Heard {
   if (/^(skip|skip it|skip this|next|pass|not sure|no idea|don'?t know|i don'?t know|no|nope|none|nothing)$/.test(low)) return { kind: 'skip' };
   if (/^(something (completely |totally )?different|other (directions|options|ones)|show me (others|other ones|something else)|none of these|not these|more|more options|try again|again)$/.test(low)) return { kind: 'different' };
   if (/^(show me (some )?(directions|looks|options|ideas)|what could it look like|ideas)$/.test(low)) return { kind: 'looks' };
-  if (/\b(find|show|get|look for|search for)\b.*\b(references?|inspiration|examples?)\b|^(references?|inspiration)$/.test(low)) return { kind: 'research' };
+  if (/\b(find|show|get|look for|search for)\b.*\b(references?|inspiration|examples?)\b|^(references?|inspiration)$/.test(low) || researchAskOf(text)) return { kind: 'research' };
   const r = recognizeIntent(text);
   if (r.mode && r.mode !== st.mode && r.confidence >= 0.45 && /\b(actually|instead|rather|no,|not a|make it a|switch to)\b/.test(low)) return { kind: 'switch', mode: r.mode };
   return { kind: 'words' };
@@ -759,7 +766,7 @@ function answerTopic(st: StudioState, topic: Topic, text: string, env: DirectorE
 /** The person said to just make it: whatever is open is left to SocriaUX (the person's words left as marked gaps). */
 export function makeItNow(st: StudioState, now = Date.now()): StudioState {
   const answers: StudioState['answers'] = { ...st.answers, go: { values: ['now'], source: 'person', at: now } };
-  const subject = title(subjectOf(st.prompt));
+  const subject = title(subjectOf(briefText(st)));
   const u = understand({ ...st, answers });
   if (st.mode === 'graphic') {
     if (u.required.includes('kind')) answers['g.kind'] = { values: ['poster'], source: 'socria', at: now };
@@ -777,6 +784,8 @@ export interface Turn {
   move: Move;
   /** websites to read for reference (the caller reads them, then adds what it read) */
   research: string[];
+  /** a search for references to run (the caller searches through the workspace's provider and says what it found) */
+  search?: { query: string; kind: ResearchKind };
   /** the person changed the kind of work (the caller switches it) */
   switchTo?: StudioMode;
 }
@@ -797,7 +806,11 @@ export function respond(st: StudioState, text: string, env: DirectorEnv = {}, op
     return { st: speak(next, move, heard.kind === 'surprise' ? 'Leaving the rest to me, then.' : '', now), move, research };
   }
   if (heard.kind === 'research' && !research.length) {
-    const lead = 'I can read any website you point me to and take what is useful from it — its colours, its type, how its pages feel. Paste a link to something you like, or drop in a picture.';
+    // a search the words can be turned into is run by the caller (and what it found, or why nothing was, is said)
+    const ask = researchAskOf(t);
+    if (ask) return { st: said(next, { from: 'socria', kind: 'note', text: `Looking for references: “${ask.query}”.`, at: now }), move: nextMove(next, env), research, search: ask };
+    // no subject to search for: how references work, and how to ask for a search
+    const lead = 'I can read any website you point me to and take what is useful from it — its colours, its type, how its pages feel. Paste a link to something you like, or drop in a picture — or tell me what to search for (“find references for brutalist concert posters”).';
     return { st: said(next, { from: 'socria', kind: 'note', text: lead, at: now }), move: nextMove(next, env), research };
   }
   // other options for the question waiting ("show me others", "none of these")

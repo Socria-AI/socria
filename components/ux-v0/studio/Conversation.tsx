@@ -11,7 +11,7 @@
 // from.
 
 import { useEffect, useRef, useState } from 'react';
-import type { RefTake, StudioMode, StudioReference, StudioState } from '@/lib/ux-v0/studio/schema';
+import type { RefTake, StudioMessage, StudioMode, StudioReference, StudioState } from '@/lib/ux-v0/studio/schema';
 import { REF_TAKES } from '@/lib/ux-v0/studio/schema';
 import { MODES, modeInfo } from '@/lib/ux-v0/studio/modes';
 import { questionFor, subjectFor, understand, type DirectorEnv, type Topic } from '@/lib/ux-v0/studio/director';
@@ -45,6 +45,10 @@ export interface ConversationProps {
   previews: Record<string, string>;
   /** sites being read right now */
   reading: string[];
+  /** a search for references running right now (its words) */
+  searching?: string;
+  /** a page a search found, chosen as a reference: it is read like a link the person pasted */
+  onUseFound?: (url: string) => void;
   /** what is happening while the work begins ('' when nothing is) */
   starting: string;
   error: string;
@@ -54,6 +58,34 @@ export interface ConversationProps {
 
 const ATTACH = '.png,.jpg,.jpeg,.webp,.gif,.svg,.json,.css,.scss,.pdf,.ttf,.otf,.woff,.woff2,.html,.htm,image/*,application/json,text/css,application/pdf,text/html';
 const TAKE_LABEL: Record<RefTake, string> = { colour: 'Colours', type: 'Type', layout: 'Layout', mood: 'Mood' };
+
+/** What a search for references found: each page or picture with its source, to open, or to take as a reference. */
+function FoundList({ found, used, onUse }: { found: NonNullable<StudioMessage['found']>; used: ReadonlySet<string>; onUse?: (url: string) => void }) {
+  return (
+    <ul className="sd-found" role="list" aria-label={`Found for “${found.query}” by ${found.provider}`}>
+      {found.results.map((f, i) => (
+        <li key={f.id} className={`sd-found-item k-${f.kind}`} style={{ ['--i' as string]: i }}>
+          {f.thumb ? <img className="sd-found-thumb" src={f.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <span className="sd-found-thumb is-empty" aria-hidden="true" />}
+          <span className="sd-found-body">
+            <a className="sd-found-title" href={f.url} target="_blank" rel="noopener noreferrer nofollow">
+              {f.title}
+            </a>
+            <span className="sd-found-host">{f.host}</span>
+            {f.snippet ? <span className="sd-found-snip">{f.snippet}</span> : null}
+            {onUse &&
+              (used.has(f.url) ? (
+                <span className="sd-found-used">Taken as a reference</span>
+              ) : (
+                <button type="button" className="sd-chip is-tiny" onClick={() => onUse(f.url)}>
+                  Use as a reference
+                </button>
+              ))}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 function ReferenceCard({ r, preview, onReference }: { r: StudioReference; preview?: string; onReference: ConversationProps['onReference'] }) {
   const rejected = r.state === 'rejected';
@@ -263,6 +295,7 @@ export function Conversation(p: ConversationProps) {
                   <div className="sd-say">
                     <p className="sd-said">{r ? referenceSaid(r) : m.text}</p>
                     {r && <ReferenceCard r={r} preview={p.previews[r.id]} onReference={p.onReference} />}
+                    {m.kind === 'research' && m.found ? <FoundList found={m.found} used={new Set((st.references ?? []).map((x) => x.url))} onUse={p.onUseFound} /> : null}
                     {asking && creative && !busy && <DiscoveryOptions key={creative.id} q={creative} sample={sample} onChoose={p.onChoose} onSend={(w) => p.onSend(w, [])} />}
                     {isLast && m.kind === 'question' && question && question.suggestions.length > 0 && !busy && (
                       <p className="sd-suggest" role="group" aria-label="Some ways to answer">
@@ -277,6 +310,13 @@ export function Conversation(p: ConversationProps) {
                 </li>
               );
             })}
+            {p.searching && (
+              <li className="sd-msg is-socria">
+                <p className="sd-said is-wait" role="status">
+                  Searching for “{p.searching}”…
+                </p>
+              </li>
+            )}
             {p.reading.map((h) => (
               <li key={`reading-${h}`} className="sd-msg is-socria">
                 <p className="sd-said is-wait" role="status">

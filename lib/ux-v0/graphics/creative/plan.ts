@@ -50,6 +50,8 @@ export interface CreativePlan {
   changes: Change[];
   /** one question, when the instruction can mean genuinely different things */
   question?: PlanQuestion;
+  /** why these changes (what was measured, for a vague improvement), said back with what was done; the reader's own */
+  reason?: string;
   /** who read the words into this plan */
   by: 'model' | 'reader';
 }

@@ -27,13 +27,24 @@ export interface DesignReading {
   decisions: { decision: string; now: string; by: string }[];
   locked: string[];
   concepts: string[];
+  /** what the work is for, in the person's words (the brief) */
+  brief?: string;
+  /** the artboards in order ("the first", "the second"…), the one being changed marked */
+  boards?: string[];
+  /** comments still open on this artboard: what the person wants of which object */
+  comments?: string[];
+  /** references the person chose, and what they took from each */
+  references?: string[];
 }
 
 const pct = (v: number, of: number) => `${Math.round((v / of) * 100)}%`;
 
 /** The design as the model reads it: compact, without pictures or geometry it does not need. */
-export function readingOf(doc: GraphicDoc, boardId?: string, dir?: GraphicDirection | null): DesignReading {
-  const b = boardOf(doc, boardId);
+export function readingOf(doc0: GraphicDoc, boardId?: string, dir?: GraphicDirection | null, memory: { brief?: string; references?: readonly string[] } = {}): DesignReading {
+  const b0 = boardOf(doc0, boardId);
+  // an artboard with a visual language of its own is read in it
+  const doc = b0?.tokens ? { ...doc0, tokens: b0.tokens } : doc0;
+  const b = b0;
   const objects = walk(b)
     .filter((l) => !l.node.hidden && l.node.type !== 'group')
     .slice(0, 40)
@@ -53,6 +64,18 @@ export function readingOf(doc: GraphicDoc, boardId?: string, dir?: GraphicDirect
     decisions: decisionViews(doc, b.id, dir).map((v) => ({ decision: v.key, now: v.value, by: v.source === 'engine' ? 'as the concept was made' : v.source === 'concept' ? 'taken from another concept' : `you said: ${v.said ?? ''}`.slice(0, 120) })),
     locked: [...(doc.locks?.colors ? ['colours'] : []), ...(doc.locks?.fonts ? ['typefaces'] : []), ...walk(b).filter((l) => l.node.locked).slice(0, 8).map((l) => l.node.name ?? l.node.role ?? l.node.type)],
     concepts: (doc.concepts ?? []).map((c, i) => `${i + 1}. ${c.name}`),
+    ...(memory.brief ? { brief: memory.brief.replace(/\s+/g, ' ').slice(0, 300) } : {}),
+    ...(doc0.artboards.length > 1 ? { boards: doc0.artboards.map((x, i) => `${i + 1}. ${x.name}${x.id === b.id ? ' (this one)' : ''}`.slice(0, 80)) } : {}),
+    ...((cm) => (cm.length ? { comments: cm } : {}))(
+      (doc0.comments ?? [])
+        .filter((c) => c.board === b.id && c.status === 'open')
+        .slice(-6)
+        .map((c) => {
+          const on = c.nodes.map((id) => walk(b).find((l) => l.node.id === id)?.node).filter(Boolean).map((n) => n!.name ?? n!.role ?? n!.type);
+          return `on the ${on.join(', ') || 'design'}: ${c.text}`.slice(0, 200);
+        }),
+    ),
+    ...(memory.references?.length ? { references: memory.references.slice(0, 6).map((r) => r.slice(0, 120)) } : {}),
   };
 }
 
@@ -71,6 +94,10 @@ export function normalizeReading(v: unknown): DesignReading | null {
     decisions: arr(r.decisions, 10).map((x: Record<string, unknown>) => ({ decision: s(x?.decision, 20), now: s(x?.now, 160), by: s(x?.by, 140) })),
     locked: arr(r.locked, 10).map((x: unknown) => s(x, 40)),
     concepts: arr(r.concepts, 8).map((x: unknown) => s(x, 70)),
+    ...(s(r.brief, 300) ? { brief: s(r.brief, 300) } : {}),
+    ...(arr(r.boards, 12).length ? { boards: arr(r.boards, 12).map((x: unknown) => s(x, 80)) } : {}),
+    ...(arr(r.comments, 6).length ? { comments: arr(r.comments, 6).map((x: unknown) => s(x, 200)) } : {}),
+    ...(arr(r.references, 6).length ? { references: arr(r.references, 6).map((x: unknown) => s(x, 120)) } : {}),
   };
 }
 
@@ -91,6 +118,7 @@ export function creativeSystem(): string {
     '9. Ask one question only when the words could mean clearly different results and nothing in the design or the conversation settles which — "change the overall aesthetic" with no direction, say. Give two to four answers, each with the words that would be said. Otherwise decide as a good designer would and act: never ask what you can reasonably decide.',
     '10. Several instructions in one breath are separate changes: read each.',
     '11. summary: one plain sentence to the designer, in the second person, saying what will change.',
+    '12. Memory: the reading may carry the brief (what the work is for), the artboards in order (so "the first" and "the second" can be told apart), comments still open on objects, and references the designer chose. Use them to settle what words refer to and to keep the work true to the brief; never act on a comment that was not asked for now.',
     '',
     'VOCABULARY (use these exact ids)',
     `themes: ${THEMES.map((t) => `${t.id} (${t.label})`).join(', ')}`,

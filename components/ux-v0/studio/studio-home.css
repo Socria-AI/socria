@@ -1710,3 +1710,76 @@ body:has(.sd-rail-tab) .env-badge {
   left: auto;
   right: 10px;
 }
+
+/* ── references found by a search (SocriaUX 2.0) ── */
+.sd-found {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.sd-found-item {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 10px;
+  border-radius: 18px;
+  background: #ffffff;
+  border: 1px solid var(--sb-rule-2);
+  animation: sd-found-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+@keyframes sd-found-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sd-found-item {
+    animation: none;
+  }
+}
+.sd-found-thumb {
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: var(--sb-paper);
+}
+.sd-found-thumb.is-empty {
+  display: block;
+  border: 1px dashed var(--sb-rule-2);
+}
+.sd-found-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font: 400 14px/1.4 Inter, system-ui, sans-serif;
+}
+.sd-found-title {
+  color: var(--sb-ink);
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.sd-found-title:hover {
+  text-decoration: underline;
+}
+.sd-found-host {
+  color: var(--sb-moss-tone, #5e7633);
+  font-size: 12px;
+}
+.sd-found-snip {
+  color: var(--sb-ink-70);
+  font-size: 13px;
+}
+.sd-found-used {
+  font-size: 12px;
+  color: var(--sb-ink-60);
+}
+.sd-found-body .sd-chip {
+  justify-self: start;
+}

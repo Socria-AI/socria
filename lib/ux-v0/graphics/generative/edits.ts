@@ -133,9 +133,25 @@ export function recomposeArtboard(doc: GraphicDoc, boardId: string, edit: Creati
     // alternatives beside it: nothing replaced; each a new concept, kept apart from the others
     const out: Artboard[] = [];
     const sigs = [...avoidSigs];
+    // each kept apart as it is drawn: measured against the original and the ones before it, tried again (a bounded few
+    // times) when it comes out the same structure, the least alike kept
+    const drawn = [signatureOfBoard(board)];
     for (let i = 0; i < edit.explore; i++) {
-      const r = one(i);
+      let r: ReturnType<typeof one> = null;
+      let worst = Infinity;
+      for (let k = 0; k < 4; k++) {
+        const c = one(i + k * 17);
+        if (!c) continue;
+        const sg = signatureOfBoard(c.board);
+        const near = Math.max(...drawn.map((d) => similarity(d, sg)));
+        if (near < worst) {
+          worst = near;
+          r = c;
+        }
+        if (near < TOO_SIMILAR - 0.04) break;
+      }
       if (!r) continue;
+      drawn.push(signatureOfBoard(r.board));
       sigs.push(r.concept?.signature ?? '');
       out.push({ ...r.board, id: newId('ab'), name: `Alternative ${i + 1}${r.concept ? ` — ${r.concept.org}, ${r.concept.type}` : ''}` });
     }

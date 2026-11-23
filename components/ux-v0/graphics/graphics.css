@@ -1835,3 +1835,187 @@
   .gx-move:hover:not(:disabled) { transform: none; }
   .gx-thinking span::after { animation: none; }
 }
+
+/* ── comments pinned on objects (SocriaUX 2.0) ── */
+.gx-pins {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.gx-pin,
+.gx-comment-btn {
+  position: absolute;
+  pointer-events: auto;
+  font: 600 12px/1 Inter, system-ui, sans-serif;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.gx-pin {
+  width: 24px;
+  height: 24px;
+  margin: -12px 0 0 -12px;
+  border-radius: 999px 999px 999px 4px;
+  border: 2px solid var(--sb-paper);
+  background: var(--sb-moss-tone, #5e7633);
+  color: var(--sb-paper);
+  box-shadow: 0 2px 8px rgba(32, 32, 27, 0.25);
+}
+.gx-pin.is-done {
+  background: var(--sb-paper);
+  color: var(--sb-ink-60);
+  border-color: var(--sb-rule-2);
+}
+.gx-pin:hover,
+.gx-comment-btn:hover {
+  transform: translateY(-2px);
+}
+.gx-comment-btn {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--sb-rule-2);
+  background: var(--sb-paper);
+  color: var(--sb-ink);
+  transform: translateX(-100%);
+  box-shadow: 0 2px 10px rgba(32, 32, 27, 0.12);
+}
+.gx-comment-btn:hover {
+  transform: translate(-100%, -2px);
+}
+.gx-comment-compose {
+  box-sizing: border-box;
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+  width: min(360px, calc(100% - 24px));
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid var(--sb-rule-2);
+  box-shadow: 0 10px 30px rgba(32, 32, 27, 0.14);
+}
+.gx-comment-compose .gx-panel-sub {
+  margin: 0;
+}
+.gx-comment-compose textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 64px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--sb-rule-2);
+  font: 400 14px/1.4 Inter, system-ui, sans-serif;
+  color: var(--sb-ink);
+  background: var(--sb-paper);
+}
+.gx-comment-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.gx-comments {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.gx-comment {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+.gx-comment-n {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px 999px 999px 4px;
+  border: 0;
+  background: var(--sb-moss-tone, #5e7633);
+  color: var(--sb-paper);
+  font: 600 12px/1 Inter, system-ui, sans-serif;
+  cursor: pointer;
+}
+.gx-comment.is-done .gx-comment-n,
+.gx-comment.is-dismissed .gx-comment-n {
+  background: var(--sb-rule-2);
+  color: var(--sb-ink-70);
+}
+.gx-comment-body {
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+}
+.gx-comment-text {
+  font-family: var(--sb-voice);
+  font-weight: var(--sb-voice-weight);
+  font-size: 16px;
+  line-height: 1.3;
+}
+.gx-comment.is-dismissed .gx-comment-text {
+  color: var(--sb-ink-60);
+  text-decoration: line-through;
+}
+
+/* ── creative controls made for the design (SocriaUX 2.0) ── */
+.gx-controls {
+  box-sizing: border-box;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 4;
+  width: min(300px, calc(100% - 24px));
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: #ffffff;
+  border: 1px solid var(--sb-rule-2);
+  box-shadow: 0 10px 30px rgba(32, 32, 27, 0.12);
+}
+.gx-controls .gx-panel-h,
+.gx-controls .v0-quiet {
+  margin: 0;
+}
+.gx-ctl-group {
+  display: grid;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--sb-rule-2);
+}
+.gx-ctl {
+  display: grid;
+  gap: 6px;
+}
+.gx-ctl-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font: 500 13px/1.3 Inter, system-ui, sans-serif;
+  color: var(--sb-ink);
+}
+.gx-ctl-label {
+  flex: 1;
+}
+.gx-ctl-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--sb-ink-70);
+}
+.gx-ctl input[type='range'] {
+  width: 100%;
+  accent-color: var(--sb-moss-tone, #5e7633);
+}
+@media (max-width: 720px) {
+  .gx-controls {
+    top: auto;
+    left: 12px;
+    width: auto;
+    max-height: 55%;
+  }
+}

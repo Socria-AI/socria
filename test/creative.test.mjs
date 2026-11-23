@@ -88,8 +88,10 @@ const run = (s, w, extra = {}) => {
   ok('“change the overall aesthetic” has no direction: one question, four ways to answer, nothing changed yet', open && !open.plan.changes.length && open.plan.question?.options.length === 4 && !open.certain, J(open?.plan));
   const answer = read('the second one', doc, { asked: open.plan.question });
   ok('a short answer is read against the question asked', answer && answer.plan.changes.length > 0 && J(answer.plan.changes) === J(read(open.plan.question.options[1].words, doc).plan.changes), J(answer?.plan));
+  // 2.0: a vague improvement reads the design in front first — what it measures weak is acted on, with the reason said;
+  // a question only when nothing measures weak (lib/ux-v0/graphics/creative/improve.ts)
   const better = t('make it better');
-  ok('“make it better” is genuinely open: one question', better && better.plan.question && !better.plan.changes.length, J(better?.plan));
+  ok('“make it better” is measured, not asked: moves with the reason they were chosen (or one question when nothing measures weak)', better && ((better.plan.changes.length > 0 && better.plan.changes.length <= 3 && typeof better.plan.reason === 'string' && better.plan.reason.length > 10 && !better.plan.question) || (!better.plan.changes.length && better.plan.question)), J(better?.plan));
   const nonsense = t('flibber the wotsit');
   ok('words nothing can be made of: a question whose answers get somewhere (never an internal limitation)', nonsense && nonsense.plan.question?.options.length === 4 && !/model/i.test(J(nonsense.plan)), J(nonsense?.plan));
   // concepts

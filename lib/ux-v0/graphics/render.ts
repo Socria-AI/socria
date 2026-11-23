@@ -759,7 +759,9 @@ function nodeEl(n: Node, doc: GraphicDoc, defs: Defs, opts: RenderOptions, measu
 }
 
 /** One artboard as an SVG document (see the head of this file). */
-export function renderArtboard(doc: GraphicDoc, board: Artboard, opts: RenderOptions = {}): string {
+export function renderArtboard(doc0: GraphicDoc, board: Artboard, opts: RenderOptions = {}): string {
+  // an artboard with a visual language of its own is drawn in its own tokens (a chart's colours, when it names none)
+  const doc = board.tokens ? { ...doc0, tokens: board.tokens } : doc0;
   const measure = opts.measure ?? approxMeasure;
   const defs = new Defs(opts.idPrefix ?? `${board.id}-`);
   const b = opts.bleed ? board.bleed : 0;

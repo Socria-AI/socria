@@ -10,7 +10,12 @@
 // materials of a board, so there is one graphics editor, not two.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { applyOps, locate, newId, type Asset, type GraphicDoc, type Located, type Node, type Op } from '@/lib/ux-v0/graphics/doc';
+import { applyOps, boardTokens, boardView, fromBoardView, locate, newId, withOwnTokens, type Artboard, type Asset, type DocComment, type GraphicDoc, type Located, type Node, type Op } from '@/lib/ux-v0/graphics/doc';
+import { readScoped } from '@/lib/ux-v0/graphics/creative/scoped';
+import { applyControl, controlsFor, type CreativeControl } from '@/lib/ux-v0/graphics/creative/controls';
+import { reviewAndRepair, reviewBoard, saidOf } from './visualReview';
+import { weaknesses } from '@/lib/ux-v0/graphics/creative/improve';
+import type { Op as DocOp } from '@/lib/ux-v0/graphics/doc';
 import { formatOf, sizeLabel } from '@/lib/ux-v0/graphics/formats';
 import { adaptBoard, type GraphicDirection, type GraphicKind } from '@/lib/ux-v0/graphics/compose';
 import { checkDoc, refineDoc } from '@/lib/ux-v0/graphics/check';
@@ -35,6 +40,9 @@ import { readCreative } from '@/lib/ux-v0/graphics/creative/interpret';
 import { conceptRef, executePlan } from '@/lib/ux-v0/graphics/creative/execute';
 import { conceptRefs, forgetConcept, revisitConcept, saveConcept } from '@/lib/ux-v0/graphics/creative/concepts';
 import type { Change, CreativePlan, PlanQuestion } from '@/lib/ux-v0/graphics/creative/plan';
+import { readSynthesis, synthesize, type SynthesisPlan } from '@/lib/ux-v0/graphics/creative/synthesis';
+import { readAlternatives, type AlternativeAsk } from '@/lib/ux-v0/graphics/creative/alternatives';
+import { answerOf } from '@/lib/ux-v0/graphics/creative/interpret';
 
 /** Creative direction in one click: the same words the ask bar reads (generative/edits.ts). */
 const CREATIVE_ACTIONS: readonly [string, string, boolean?][] = [
@@ -51,7 +59,7 @@ const CREATIVE_ACTIONS: readonly [string, string, boolean?][] = [
   ['Four alternatives', 'Show me four different compositions'],
 ];
 
-type Tab = 'logo' | 'layers' | 'concept' | 'boards' | 'add' | 'shapes' | 'pictures' | 'styles' | 'brand' | 'versions';
+type Tab = 'logo' | 'layers' | 'concept' | 'comments' | 'boards' | 'add' | 'shapes' | 'pictures' | 'styles' | 'brand' | 'versions';
 export type EditorNote = { tone: 'ok' | 'warn' | 'ask'; text: string; /** ways to answer a question, as they would be said */ options?: { label: string; words: string }[] } | null;
 export type ChangeMeta = { label: string; version?: boolean; kind: 'edit' | 'undo' | 'redo' };
 
@@ -108,7 +116,18 @@ export interface GraphicEditorProps {
   hideAsk?: boolean;
   /** the project, for the model's budget when a creative change is read by it */
   projectId?: string;
+  /** alternatives in other directions, composed from the brief (each an artboard with its own colours and faces, in
+   * the format given); without it, "something completely different" is made from the design in front */
+  onAlternatives?: (count: number, opts: { avoid: readonly string[]; said: string; format?: string }) => Promise<Artboard[] | null>;
+  /** "make this fit our brand": the design system named, or linked, applied by the workspace (what it did, said; or a
+   * question when there are several to choose from) */
+  onBrand?: (words: string) => Promise<{ said: string; question?: PlanQuestion } | null>;
+  /** what a creative change is read against beyond the design: the brief, references chosen */
+  memory?: { brief?: string; references?: readonly string[] };
 }
+
+/** Words that ask for the design to fit a brand the person has (a design system in their library), not a look. */
+export const BRAND_INTENT = /\b(fit|match|follow|use|apply|put (it|this) in|align (it |this )?with|bring (it|this) in line with|make (it|this) (fit|match|consistent with)|stick to|respect)\b[^.]*\b(our|my|the company'?s|the client'?s|the)\s+(brand( guidelines| system| colou?rs| identity)?|design system|guidelines|style ?guide)\b(?!\s+(name|mark|logo|wordmark))|\bon[- ]brand\b|\bin (our|my) brand\b/i;
 
 export function GraphicEditor(props: GraphicEditorProps) {
   const { doc: given, onChange, measure, href, note, onNote } = props;
@@ -181,12 +200,14 @@ export function GraphicEditor(props: GraphicEditorProps) {
     const cur = docNow();
     if (!ops.length) return;
     if (pending) setPending(null);
-    const r = applyOps(cur, ops);
+    // an artboard with a visual language of its own is changed in it (its colours and faces, not the document's)
+    const view = boardView(cur, board.id);
+    const r = applyOps(view, ops);
     if (!r.ok) {
       setNote({ tone: 'warn', text: `Nothing changed: ${r.error}${r.locked?.length ? ' Unlock it first (Layers), or change something else.' : ''}` });
       return;
     }
-    commitDoc(r.doc, label);
+    commitDoc(fromBoardView(cur, r.doc, board.id), label);
     // what was just made (added, pasted, duplicated, grouped) is what is selected next
     if (ops.every((o) => ['add', 'asset', 'duplicate', 'group'].includes(o.op))) {
       const made = r.touched.filter((id) => !!locate(r.doc, id));
@@ -236,24 +257,215 @@ export function GraphicEditor(props: GraphicEditorProps) {
     tell('ask', `${lead}${q.text}`, true, q.options);
   };
   const dirNow = () => props.direction ?? directionOfDoc(docNow());
+  /** The direction an artboard is drawn in: its own when it was made in another direction (its colours and faces). */
+  const dirFor = (id: string): GraphicDirection => {
+    const base = dirNow();
+    const b = docNow().artboards.find((x) => x.id === id);
+    if (!b?.tokens) return base;
+    return { ...base, name: b.direction?.name || base.name, language: b.direction?.language || base.language, tokens: b.tokens, form: null, style: undefined };
+  };
+
+  // ── comments pinned on objects ──
+  // Select objects and comment on them: the comment is pinned there (kept with the design), and when it is applied it
+  // changes those objects alone — what the precise reader knows first (bigger, bolder, red, centred, these words), then
+  // the qualities and colour moves it names (creative/scoped.ts). Kept for later, it waits in Comments until applied or
+  // set aside; applied, it is previewed like any change and marked done with what was done.
+  const [commenting, setCommenting] = useState<string[] | null>(null);
+  const [commentWords, setCommentWords] = useState('');
+  const nameOf = (ids: readonly string[], d: GraphicDoc = docNow()) => {
+    const names = ids.map((id) => locate(d, id)).filter((l): l is Located => !!l).map((l) => nodeLabel(l.node).toLowerCase());
+    return names.length ? (names.length > 2 ? `${names.slice(0, 2).join(', ')} and ${names.length - 2} more` : names.join(' and ')) : 'objects no longer there';
+  };
+  const setComments = (list: DocComment[], label: string) => onOps([{ op: 'comments', comments: list }], label);
+  /** A comment carried out on its objects alone, previewed (the comment marked done with the change). */
+  const applyComment = (c: DocComment) => {
+    const cur = docNow();
+    const n = (cur.comments ?? []).filter((x) => x.board === c.board).findIndex((x) => x.id === c.id) + 1;
+    const nodes = c.nodes.filter((id) => !!locate(cur, id));
+    if (!nodes.length) return tell('warn', `The objects comment ${n} was about are no longer there. Set it aside, or say what should change in words.`);
+    if (c.board !== board.id) setBoardId(c.board);
+    setSelection(nodes);
+    const view = boardView(cur, c.board);
+    let next: GraphicDoc | null = null;
+    let label = '';
+    const e = readGraphicEdit(c.text, view, { artboard: c.board, selection: nodes, dir: dirFor(c.board), measure, kind: props.kind, customs: library.styles });
+    if (e && !e.question && (e.scope === 'selection' || e.scope === 'object')) {
+      if (e.next) next = fromBoardView(cur, e.next, c.board);
+      else {
+        const r = applyOps(view, e.ops);
+        if (r.ok) next = fromBoardView(cur, r.doc, c.board);
+      }
+      label = e.label;
+    }
+    if (!next) {
+      const sc = readScoped(c.text, view, c.board, nodes, measure);
+      if (sc) {
+        const r = applyOps(view, sc.ops);
+        if (r.ok) {
+          next = fromBoardView(cur, r.doc, c.board);
+          label = sc.label;
+        }
+      }
+    }
+    if (!next) return tell('ask', `I could not tell what to change about the ${nameOf(nodes, cur)} from “${c.text.slice(0, 80)}”. Say what it should become — “larger”, “in the accent colour”, “in capitals”, “warmer”, “more premium”, “move it to the top” — and apply it again.`);
+    const list = (next.comments ?? cur.comments ?? []).map((x) => (x.id === c.id ? { ...x, status: 'done' as const, said: label.slice(0, 300) } : x));
+    const marked = applyOps(next, [{ op: 'comments', comments: list }]);
+    const doc2 = marked.ok ? marked.doc : next;
+    setPending({ edit: { ops: [], next: doc2, label: `comment ${n}: ${label}`, scope: 'selection' }, doc: doc2, base: cur });
+    recentRef.current = [...recentRef.current, { said: c.text, did: label }].slice(-6);
+    tell('ok', `Comment ${n}: ${label}. Only the ${nameOf(nodes, cur)} changed.`);
+  };
+  /** The comment being written: kept on the selection, and applied at once when asked. */
+  const submitComment = (now: boolean) => {
+    const text = commentWords.trim();
+    const nodes = commenting ?? [];
+    if (!text || !nodes.length) return;
+    const c: DocComment = { id: newId('cm'), board: board.id, nodes, text: text.slice(0, 400), at: Date.now(), status: 'open' };
+    setComments([...(docNow().comments ?? []), c], 'comment added');
+    setCommenting(null);
+    setCommentWords('');
+    if (now) applyComment(c);
+    else {
+      setTab('comments');
+      tell('ok', `Kept as a comment on the ${nameOf(nodes)}. Apply it from Comments when you are ready.`);
+    }
+  };
+
+  // ── creative controls made for this design (creative/controls.ts) ──
+  // Moved, a control previews at once; let go, it is applied as one step (undo takes it back), and the words can carry
+  // on from there. Each reads its value from the design, so it always tells the truth; reset puts back the value it had
+  // when it was first moved.
+  const [tuning, setTuning] = useState(false);
+  const [sliding, setSliding] = useState<{ id: string; value: number } | null>(null);
+  const ctlOrig = useRef<Record<string, Record<string, number>>>({});
+  const ctlRaf = useRef(0);
+  const moveControl = (c: CreativeControl, value: number, commit: boolean) => {
+    const base = docNow();
+    const id = board.id;
+    const orig = (ctlOrig.current[id] ??= {});
+    if (orig[c.id] === undefined) orig[c.id] = c.value;
+    const run = () => {
+      const r = applyControl(base, id, c.id, value, { dir: dirFor(id), kind: props.kind, measure: typeof document !== 'undefined' ? canvasMeasure() : measure });
+      if (!r) {
+        setPending(null);
+        return tell('warn', `${c.label} could not be set on this artboard.`);
+      }
+      if (commit) {
+        setPending(null);
+        setSliding(null);
+        commitDoc(r.doc, r.label);
+        recentRef.current = [...recentRef.current, { said: `${c.label}: ${value}`, did: r.label }].slice(-6);
+        tell('ok', `${r.label.replace(/^./, (x) => x.toUpperCase())}. Undo takes it back; say what else should change, or keep tuning.`);
+      } else setPending({ edit: { ops: [], next: r.doc, label: r.label, scope: 'artboard' }, doc: r.doc, base });
+    };
+    cancelAnimationFrame(ctlRaf.current);
+    if (commit || typeof window === 'undefined') return run();
+    ctlRaf.current = requestAnimationFrame(run);
+  };
+
+  // ── the design looked at as rendered pixels (visualReview.ts; lib/ux-v0/graphics/visual.ts) ──
+  /** A design reviewed from its pixels and repaired once if it must be; what was found, said briefly. */
+  const lookAt = async (d: GraphicDoc, boardId: string): Promise<{ doc: GraphicDoc; said: string } | null> => {
+    setThinking('Looking at the result…');
+    try {
+      const vr = await reviewAndRepair(d, boardId, { measure: canvasMeasure(), resolve: props.resolve, rounds: 1 });
+      return vr ? { doc: vr.doc, said: saidOf(vr, { fixedLead: 'Repaired after looking' }) } : null;
+    } finally {
+      setThinking('');
+    }
+  };
+  /** The last critique's repairs, to apply when asked ("fix them"). */
+  const critiqueRef = useRef<{ board: string; ops: DocOp[]; fixChecks: boolean } | null>(null);
+  /** A critique: the rendered pixels, the objects and the measures, each finding with what would answer it. */
+  const critique = async () => {
+    const cur = docNow();
+    const id = board.id;
+    setThinking('Looking at it…');
+    let vr: Awaited<ReturnType<typeof reviewBoard>> = null;
+    try {
+      vr = await reviewBoard(cur, id, { measure: canvasMeasure(), resolve: props.resolve });
+    } finally {
+      setThinking('');
+    }
+    const view = boardView(cur, id);
+    const checks = checkDoc({ ...view, artboards: view.artboards.filter((b) => b.id === id) }, canvasMeasure()).filter((f) => f.severity !== 'low');
+    const weak = weaknesses(cur, id, 'quality', canvasMeasure()).filter((w) => w.key !== 'faults' && w.gain >= 10).slice(0, 2);
+    const lines: string[] = [];
+    // each thing said once (the same finding on several objects is one line)
+    const add = (line: string) => {
+      if (!lines.includes(line)) lines.push(line);
+    };
+    for (const f of vr?.report.findings ?? []) add(`${f.message}${f.fix ? ' (I can repair this.)' : ''}`);
+    for (const f of checks.slice(0, 6)) add(`${f.message}${f.fix?.length ? ' (I can repair this.)' : ''}`);
+    for (const w of weak) add(`${w.found.replace(/^./, (c) => c.toUpperCase())}.`);
+    const ops = [...(vr ? vr.report.findings.filter((f) => f.fix).flatMap((f) => f.fix!) : [])];
+    critiqueRef.current = { board: id, ops, fixChecks: checks.some((f) => f.fix?.length) };
+    const head = vr ? `I rendered it and measured the pixels (${vr.report.size[0]}×${vr.report.size[1]}${vr.fontsSubstituted ? ', a stand-in face where one could not be fetched' : ''}), then checked the objects.` : 'I checked the objects (this browser could not render the pixels to look at).';
+    const legible = vr?.report.measures.legibility ?? [];
+    const summary = legible.length ? ` Every text was measured against what is beneath it: ${legible.filter((l) => l.ratio >= l.need).length} of ${legible.length} read clearly.` : '';
+    if (!lines.length) return tell('ok', `${head}${summary} Nothing measures wrong — balance, room and contrast hold. Say how you would like it to change.`);
+    const canFix = ops.length > 0 || critiqueRef.current.fixChecks;
+    const text = `${head}${summary} ${lines.slice(0, 5).map((l, i) => `${i + 1}. ${l}`).join(' ')}`;
+    if (!canFix && !weak.length) return tell('ok', text);
+    askQuestion({ text, options: [...(canFix ? [{ label: 'Repair what can be repaired', words: 'apply the repairs' }] : []), ...weak.slice(0, 2).map((w) => ({ label: w.found.replace(/^./, (c) => c.toUpperCase()).slice(0, 70), words: w.change.decision === 'object' ? w.change.words : w.change.decision === 'composition' ? `make the composition ${w.change.action === 'airy' ? 'airier, with more space' : w.change.action === 'denser' ? 'fuller' : w.change.action}` : 'make it more interesting' })), { label: 'Make it more interesting', words: 'make it more interesting' }].slice(0, 4) });
+  };
+  /** The critique's repairs carried out (pixels first, then the checks' own), previewed. */
+  const applyRepairs = async (): Promise<boolean> => {
+    const c = critiqueRef.current;
+    if (!c) return false;
+    critiqueRef.current = null;
+    const cur = docNow();
+    let next = cur;
+    const done: string[] = [];
+    if (c.ops.length) {
+      const view = boardView(cur, c.board);
+      const r = applyOps(view, c.ops);
+      if (r.ok) {
+        next = fromBoardView(cur, r.doc, c.board);
+        done.push('the words recoloured (or given a quiet panel) to read on what is really beneath them');
+      }
+    }
+    if (c.fixChecks) {
+      const view = boardView(next, c.board);
+      const mine = view.artboards.find((b) => b.id === c.board);
+      if (mine) {
+        const fixed = refineDoc({ ...view, artboards: [mine] }, canvasMeasure());
+        if (fixed.fixed.length && fixed.doc.artboards[0]) {
+          next = fromBoardView(next, { ...view, artboards: view.artboards.map((b) => (b.id === c.board ? fixed.doc.artboards[0] : b)) }, c.board);
+          done.push(...fixed.fixed.slice(0, 3).map((f) => f.replace(/\.$/, '').toLowerCase()));
+        }
+      }
+    }
+    if (next === cur) {
+      tell('ok', 'There was nothing left to repair.');
+      return true;
+    }
+    const looked = await lookAt(next, c.board);
+    const shown = looked?.doc ?? next;
+    setPending({ edit: { ops: [], next: shown, label: 'repairs from the review', scope: 'artboard' }, doc: shown, base: cur });
+    tell('ok', `Repaired: ${done.join('; ')}.${looked ? ` ${looked.said}` : ''}`);
+    return true;
+  };
 
   /** The precise reader's change of one object, previewed (false when it reads nothing in the words). */
   const precise = (words: string): boolean => {
     const cur = docNow();
-    const e = readGraphicEdit(words, cur, { artboard: board.id, selection, dir: dirNow(), measure, kind: props.kind, customs: library.styles });
+    // read and carried out as the artboard in front sees the design (its own colours and faces, when it has them)
+    const view = boardView(cur, board.id);
+    const e = readGraphicEdit(words, view, { artboard: board.id, selection, dir: dirFor(board.id), measure, kind: props.kind, customs: library.styles });
     if (!e) return false;
     if (e.question && !e.ops.length && !e.next) {
       tell('ask', e.question);
       return true;
     }
-    let next: GraphicDoc | null = e.next ?? null;
+    let next: GraphicDoc | null = e.next ? fromBoardView(cur, e.next, board.id) : null;
     if (!next) {
-      const r = applyOps(cur, e.ops);
+      const r = applyOps(view, e.ops);
       if (!r.ok) {
         tell('warn', `Nothing changed: ${r.error}`);
         return true;
       }
-      next = r.doc;
+      next = fromBoardView(cur, r.doc, board.id);
     }
     setPending({ edit: e, doc: next, base: cur });
     if (e.next) {
@@ -300,6 +512,7 @@ export function GraphicEditor(props: GraphicEditorProps) {
       return tell('ok', `“${target.name}” is in front: change it as freely as this one.`);
     }
     if (c.action === 'new') {
+      if (props.onAlternatives) return void alternatives({ kind: 'directions', count: 3, summary: 'three new concepts from the brief, beside this one' }, words);
       if (precise('Show me four different compositions')) return;
       return tell('warn', 'New concepts need an artboard composed by SocriaUX (with a headline) to start from.');
     }
@@ -318,7 +531,7 @@ export function GraphicEditor(props: GraphicEditorProps) {
     }
     // the same moment for both passes below, so the forms drawn are the same ones
     const now = Date.now();
-    const exec = (m: Measure) => executePlan(base, plan, { board: board.id, dir: dirNow(), kind: props.kind, measure: m, concepts: conceptRefs(base, board.id), said: words, now });
+    const exec = (m: Measure) => executePlan(base, plan, { board: board.id, dir: dirFor(board.id), kind: props.kind, measure: m, concepts: conceptRefs(base, board.id), said: words, now });
     // a face the design did not use until now is fetched first and the words fitted again to its real widths: until it
     // arrives the browser measures a stand-in, and words fitted to that break once the real face is drawn. The first
     // pass measures with a measure of its own, so the editor's measure never keeps a stand-in's widths
@@ -340,13 +553,99 @@ export function GraphicEditor(props: GraphicEditorProps) {
       const why = r?.notes.join(' ') || 'This design already is what those words ask for.';
       return plan.question ? askQuestion(plan.question, `${why} `) : tell('warn', why);
     }
+    // the result looked at as rendered pixels before it is shown (what is really beneath the words), repaired if it must
+    const looked = browser ? await lookAt(r.doc, board.id) : null;
+    if (looked) r = { ...r, doc: looked.doc };
     setPending({ edit: { ops: [], next: r.doc, label: r.label || r.done[0], scope: 'artboard' }, doc: r.doc, base });
     recentRef.current = [...recentRef.current, { said: words, did: r.done.join('; ') }].slice(-6);
-    const said = `${r.done.join('; ').replace(/^./, (x) => x.toUpperCase())}.${r.kept.length ? ` Kept: ${r.kept.join(', ')}.` : ''}${r.notes.length ? ` ${r.notes.join(' ')}` : ''}`;
+    // a vague improvement says what it measured first, then what it did about it
+    const did = r.done.join('; ');
+    const said = `${plan.reason ? `${plan.reason} So: ${did}` : did.replace(/^./, (x) => x.toUpperCase())}.${r.kept.length ? ` Kept: ${r.kept.join(', ')}.` : ''}${r.notes.length ? ` ${r.notes.join(' ')}` : ''}${looked?.said ? ` ${looked.said}` : ''}`;
     setAskWords('');
     if (plan.question) return askQuestion(plan.question, `${said} `);
     setNote({ tone: 'ok', text: said });
     props.onAsked?.(`Previewing: ${said} Apply or Discard it under the canvas.`);
+  };
+
+  /** Designs combined: the synthesis carried out and previewed (on a new artboard, shown in front). */
+  const combine = async (plan: SynthesisPlan, words: string) => {
+    const base = docNow();
+    const here = board.id;
+    const now = Date.now();
+    const run = (m: Measure) => synthesize(base, plan, { current: here, measure: m, dir: dirFor(here), kind: props.kind, said: words, now });
+    const browser = typeof document !== 'undefined';
+    let r = run(browser ? canvasMeasure() : measure);
+    if (r && browser) {
+      const known = new Set(facesUsed(base).map(faceKey));
+      const fresh = facesUsed(r.doc).filter((f) => !known.has(faceKey(f)));
+      if (fresh.length) {
+        setThinking('Setting the type…');
+        try {
+          if (await loadFaces(fresh)) r = run(canvasMeasure()) ?? r;
+        } finally {
+          setThinking('');
+        }
+      }
+    }
+    if (!r) return tell('warn', 'Those designs could not be combined: one of them is no longer there.');
+    const looked = browser ? await lookAt(r.doc, r.board) : null;
+    if (looked) r = { ...r, doc: looked.doc, notes: [...r.notes, looked.said] };
+    setPending({ edit: { ops: [], next: r.doc, label: r.label, scope: 'artboard' }, doc: r.doc, base });
+    if (r.created) setBoardId(r.board);
+    recentRef.current = [...recentRef.current, { said: words, did: r.label }].slice(-6);
+    const said = `${r.done.join('; ').replace(/^./, (x) => x.toUpperCase())}.${plan.measured ? ` Chosen by measure — ${plan.summary}.` : ''}${r.notes.length ? ` ${r.notes.join(' ')}` : ''}${r.created ? ' The designs it came from are unchanged.' : ''}`;
+    setAskWords('');
+    setNote({ tone: 'ok', text: said });
+    props.onAsked?.(`Previewing: ${said} Apply or Discard it under the canvas.`);
+  };
+
+  /** Alternatives, each on an artboard of its own beside the one in front (which stays as it is), previewed. */
+  const alternatives = async (alt: AlternativeAsk, words: string) => {
+    const base = docNow();
+    const from = board;
+    const fresh = (d: GraphicDoc) => d.artboards.filter((b) => !base.artboards.some((x) => x.id === b.id));
+    const show = (next: GraphicDoc, label: string, said: string) => {
+      setPending({ edit: { ops: [], next, label, scope: 'artboard' }, doc: next, base });
+      const made = fresh(next);
+      if (made[0]) setBoardId(made[0].id);
+      recentRef.current = [...recentRef.current, { said: words, did: label }].slice(-6);
+      setAskWords('');
+      setNote({ tone: 'ok', text: said });
+      props.onAsked?.(`Previewing: ${said} Apply or Discard it under the canvas.`);
+    };
+    if (alt.kind === 'compositions') {
+      if (precise(`show me ${alt.count} different compositions`)) return;
+      return tell('warn', 'Other arrangements need an artboard composed by SocriaUX (with a headline) to start from.');
+    }
+    if (alt.kind === 'directions' && props.onAlternatives) {
+      setThinking(alt.count > 1 ? `Composing ${alt.count} new directions…` : 'Composing a new direction…');
+      let made: Artboard[] | null = null;
+      try {
+        const avoid = [...new Set([...base.artboards.map((b) => b.direction?.name ?? ''), base.direction?.name ?? '', props.direction?.name ?? ''].filter(Boolean))];
+        made = await props.onAlternatives(alt.count, { avoid, said: words, format: from.format });
+      } finally {
+        setThinking('');
+      }
+      if (!made?.length) return tell('warn', 'No new direction could be composed for this brief. Say how it should feel instead, and ask again.');
+      const r = applyOps(base, made.map((b) => ({ op: 'artboard-add', artboard: b }) as Op));
+      if (!r.ok) return tell('warn', `Nothing changed: ${r.error}`);
+      const names = fresh(r.doc).map((b) => `“${b.name}”`);
+      return show(r.doc, alt.summary, `${names.join(', ')} — ${alt.summary}: ${names.length === 1 ? 'its own' : 'each with its own'} colours, type and composition. “${from.name}” is unchanged. Combine any of them in words (“the type of the first with the composition of the second”).`);
+    }
+    // the same look in another arrangement (or, with no brief to compose directions from, a bolder departure), on a copy
+    const r0 = applyOps(base, [{ op: 'artboard-duplicate', id: from.id, name: `${from.name.slice(0, 40)} — ${alt.kind === 'same-look' ? 'rearranged' : 'another take'}` }]);
+    if (!r0.ok) return tell('warn', `Nothing changed: ${r0.error}`);
+    const id = r0.touched[0];
+    const moved = applyOps(r0.doc, [{ op: 'artboard-reorder', id, to: r0.doc.artboards.length - 1 }]);
+    const copy = withOwnTokens(moved.ok ? moved.doc : r0.doc, id, boardTokens(base, from));
+    const plan: CreativePlan =
+      alt.kind === 'same-look'
+        ? { intent: 'composition', summary: alt.summary, keep: ['palette', 'type', 'forms', 'background', 'depth', 'words', 'logo', 'pictures'], changes: [{ decision: 'composition', action: 'rethink' }], by: 'reader' }
+        : { intent: 'redesign', summary: alt.summary, keep: ['words', 'logo', 'pictures'], changes: [{ decision: 'composition', action: 'unexpected' }, { decision: 'mood', qualities: ['original'] }], by: 'reader' };
+    const m = typeof document !== 'undefined' ? canvasMeasure() : measure;
+    const e = executePlan(copy, plan, { board: id, dir: { ...dirFor(from.id), tokens: boardTokens(base, from) }, kind: props.kind, measure: m, concepts: conceptRefs(copy, id), said: words, now: Date.now() });
+    if (!e || e.doc === copy || !e.done.length) return tell('warn', e?.notes.join(' ') || 'This artboard cannot be re-composed (it was not made by the composer, or has no headline).');
+    show(e.doc, alt.summary, `${e.done.join('; ').replace(/^./, (x) => x.toUpperCase())} — ${alt.summary}. “${from.name}” is unchanged.${e.notes.length ? ` ${e.notes.join(' ')}` : ''}`);
   };
 
   const ask = async (said?: string) => {
@@ -394,8 +693,47 @@ export function GraphicEditor(props: GraphicEditorProps) {
         return;
       }
     }
-    const asked = askedRef.current;
+    let asked = askedRef.current;
     askedRef.current = null;
+    // a short answer to the question asked last ("the second", "2", a few of its words): the words it stands for
+    const answer = asked ? answerOf(words, asked) : null;
+    if (answer) {
+      words = answer;
+      asked = null;
+    }
+    // a critique of the design in front, and its repairs
+    if (/^(please )?(critique|review|assess|evaluate|look at|check|judge)( it| this| the design| this design| my design)?( for me)?[.!?]*$|^what'?s wrong( with it| with this)?\??$|^(what do you think|how does it look|how'?s it looking|any (feedback|thoughts|notes))\??$|^(give me )?(feedback|a critique|notes)( on (it|this))?[.!?]*$/i.test(words)) {
+      setAskWords('');
+      return void critique();
+    }
+    if (critiqueRef.current && /^(apply|make|do)( the| those| these)? (repairs|fixes|changes)\b|^(fix|repair) (them|it|those|that|all|everything)\b|^yes,? (fix|repair)/i.test(words.trim())) {
+      setAskWords('');
+      return void applyRepairs();
+    }
+    // the person's own brand: their design system applied (the workspace knows which, and asks when it cannot tell)
+    if (props.onBrand && BRAND_INTENT.test(words)) {
+      setThinking('Fitting it to your brand…');
+      let r: Awaited<ReturnType<NonNullable<typeof props.onBrand>>> = null;
+      try {
+        r = await props.onBrand(words);
+      } finally {
+        setThinking('');
+      }
+      if (r) {
+        setAskWords('');
+        return r.question ? askQuestion(r.question, `${r.said} `) : tell('ok', r.said);
+      }
+    }
+    // designs combined ("the typography of the first with the composition of the second", "combine the best elements")
+    const syn = readSynthesis(words, cur, board.id, measure);
+    if (syn) {
+      if ('question' in syn) return askQuestion(syn.question);
+      if ('note' in syn) return tell('ask', syn.note);
+      return void combine(syn.plan, words);
+    }
+    // alternatives, each on an artboard of its own ("try something completely different", "five different versions")
+    const alt = readAlternatives(words);
+    if (alt) return void alternatives(alt, words);
     const refs = conceptRefs(cur, board.id);
     const read = readCreative(words, { doc: cur, board: board.id, concepts: refs, asked });
     // what one object should do, or a command of the editor's own (a format, a colour for the selection, a size): the
@@ -417,6 +755,7 @@ export function GraphicEditor(props: GraphicEditorProps) {
         recent: recentRef.current,
         concepts: refs,
         projectId: props.projectId,
+        memory: props.memory,
         signal: ac.signal,
         onProgress: (p) => (p.phase === 'thinking' ? setThinking('Thinking it through…') : p.phase === 'writing' ? setThinking('Deciding what changes…') : undefined),
       });
@@ -627,6 +966,7 @@ export function GraphicEditor(props: GraphicEditorProps) {
     ...(board.logo ? ([['logo', 'Logo']] as [Tab, string][]) : []),
     ['layers', 'Layers'],
     ['concept', 'Concept'],
+    ['comments', (doc.comments ?? []).some((c) => c.board === board.id && c.status === 'open') ? `Comments (${(doc.comments ?? []).filter((c) => c.board === board.id && c.status === 'open').length})` : 'Comments'],
     ['boards', 'Artboards'],
     ['add', 'Add'],
     ['shapes', 'Shapes'],
@@ -637,6 +977,8 @@ export function GraphicEditor(props: GraphicEditorProps) {
   ];
 
   const focus = !!props.focus;
+  // the controls this design calls for (read once a render, only while they are shown)
+  const ctls = tuning ? controlsFor(doc, board.id) : [];
   return (
     <div className={`gx-ws${focus ? ' is-focus' : ''}${focus && !selection.length && !pathEdit ? ' no-right' : ''}`}>
       <aside className="gx-left" aria-label="Layers, artboards and adding" hidden={focus}>
@@ -651,6 +993,54 @@ export function GraphicEditor(props: GraphicEditorProps) {
           {tab === 'logo' && board.logo && <LogoTab doc={doc} board={board} measure={measure} onDoc={(next, label) => commitDoc(next, label, { version: true })} onMakeBoard={props.onMakeBoard} onConcepts={props.onLogoConcepts} />}
           {tab === 'logo' && !board.logo && <p className="v0-quiet">This artboard is not a logo. Pick the logo artboard in Artboards.</p>}
           {tab === 'layers' && <LayersPanel board={board} selection={selection} onSelect={setSelection} onOps={onOps} />}
+          {tab === 'comments' && (
+            <section className="gx-panel" aria-label="Comments">
+              <p className="gx-panel-h">Comments</p>
+              <p className="v0-quiet">Select objects and press “Comment” beside them. A comment changes only what it is pinned to.</p>
+              {selection.length > 0 && !commenting && (
+                <button type="button" className="sb-btn is-sm" onClick={() => (setCommenting(selection.slice()), setCommentWords(''))}>
+                  Comment on the {nameOf(selection, doc)}
+                </button>
+              )}
+              {!(doc.comments ?? []).some((c) => c.board === board.id) && <p className="v0-quiet">No comments on this artboard yet.</p>}
+              <ol className="gx-comments">
+                {(doc.comments ?? [])
+                  .filter((c) => c.board === board.id)
+                  .map((c, i) => (
+                    <li key={c.id} className={`gx-comment is-${c.status}`}>
+                      <button type="button" className="gx-comment-n" onClick={() => setSelection(c.nodes.filter((id) => !!locate(doc, id)))} aria-label={`Select what comment ${i + 1} is on`}>
+                        {i + 1}
+                      </button>
+                      <span className="gx-comment-body">
+                        <span className="gx-comment-text">{c.text}</span>
+                        <em className="v0-quiet">
+                          On the {nameOf(c.nodes, doc)} · {c.status === 'done' ? `Done${c.said ? `: ${c.said}` : ''}` : c.status === 'dismissed' ? 'Set aside' : 'Open'}
+                        </em>
+                        <span className="gx-comment-acts">
+                          {c.status === 'open' ? (
+                            <>
+                              <button type="button" className="sb-btn is-sm is-primary" disabled={!!pending || !!thinking} onClick={() => applyComment(c)}>
+                                Apply
+                              </button>
+                              <button type="button" className="sb-link is-meta" onClick={() => setComments((doc.comments ?? []).map((x) => (x.id === c.id ? { ...x, status: 'dismissed' as const } : x)), 'comment set aside')}>
+                                Set aside
+                              </button>
+                            </>
+                          ) : (
+                            <button type="button" className="sb-link is-meta" onClick={() => setComments((doc.comments ?? []).map((x) => (x.id === c.id ? { ...x, status: 'open' as const } : x)), 'comment reopened')}>
+                              Reopen
+                            </button>
+                          )}
+                          <button type="button" className="sb-link is-meta" onClick={() => setComments((doc.comments ?? []).filter((x) => x.id !== c.id), 'comment deleted')}>
+                            Delete
+                          </button>
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+              </ol>
+            </section>
+          )}
           {tab === 'boards' && <ArtboardsPanel doc={doc} boardId={board.id} onPick={(id) => (setBoardId(id), setSelection([]))} onOps={onOps} onAdapt={adapt} />}
           {tab === 'add' && <AddPanel board={board} form={props.direction?.form ?? null} doc={doc} onOps={onOps} onUpload={addPicture} />}
           {tab === 'shapes' && <ShapeLibrary board={board} doc={doc} onOps={onOps} onNote={(text) => setNote({ tone: 'warn', text })} />}
@@ -814,6 +1204,9 @@ export function GraphicEditor(props: GraphicEditorProps) {
               {focus ? 'Edit by hand' : 'Focus on the work'}
             </button>
           )}
+          <button type="button" className={`sb-btn is-sm${tuning ? '' : ' is-quiet'}`} aria-pressed={tuning} onClick={() => setTuning((t) => !t)} title="Controls made for this design: each one changes the design itself">
+            Controls
+          </button>
           <span className="v0-zoom">
             <button type="button" className="sb-link is-meta" onClick={undo} disabled={!past.current.length} title="Undo (⌘Z)">
               Undo
@@ -929,7 +1322,147 @@ export function GraphicEditor(props: GraphicEditorProps) {
           onNote={(text, tone) => setNote({ tone: tone ?? 'warn', text })}
         />
         <div className={`gx-stage${live ? ' is-preview' : ''}`}>
-          <GraphicCanvas doc={doc} boardId={board.id} selection={selection} measure={measure} href={href} onSelect={(ids) => (setSelection(ids), pathEdit && !ids.includes(pathEdit) && setPathEdit(null))} onCommit={onOps} onEditText={() => window.setTimeout(() => textRef.current?.focus(), 30)} zoomRef={zoomRef} guides={aids.guides} grid={aids.grid} rulers={aids.rulers} pathEdit={pathEdit} onPathEdit={setPathEdit} />
+          <GraphicCanvas
+            doc={doc}
+            boardId={board.id}
+            selection={selection}
+            measure={measure}
+            href={href}
+            onSelect={(ids) => (setSelection(ids), pathEdit && !ids.includes(pathEdit) && setPathEdit(null))}
+            onCommit={onOps}
+            onEditText={() => window.setTimeout(() => textRef.current?.focus(), 30)}
+            zoomRef={zoomRef}
+            guides={aids.guides}
+            grid={aids.grid}
+            rulers={aids.rulers}
+            pathEdit={pathEdit}
+            onPathEdit={setPathEdit}
+            pins={(doc.comments ?? [])
+              .filter((c) => c.board === board.id)
+              .map((c, i) => ({ id: c.id, n: i + 1, nodes: c.nodes, open: c.status === 'open', text: c.text, gone: c.status === 'dismissed' }))
+              .filter((p) => !p.gone)}
+            onPin={(id) => {
+              const c = (doc.comments ?? []).find((x) => x.id === id);
+              if (c) setSelection(c.nodes.filter((n) => !!locate(doc, n)));
+              setTab('comments');
+            }}
+            onComment={live ? undefined : () => (setCommenting(selection.slice()), setCommentWords(''))}
+          />
+          {tuning && (
+            <aside className="gx-controls" aria-label="Controls for this design">
+              <p className="gx-panel-h">Controls</p>
+              <p className="v0-quiet">Made for this design from what it holds. Each one changes the design itself; undo takes a change back.</p>
+              {(['forms', 'type', 'colour', 'depth', 'space'] as const).map((g) => {
+                const list = ctls.filter((c) => c.group === g);
+                if (!list.length) return null;
+                return (
+                  <div key={g} className="gx-ctl-group">
+                    {list.map((c) => {
+                      const shown = sliding?.id === c.id ? sliding.value : c.value;
+                      const orig = ctlOrig.current[board.id]?.[c.id];
+                      const resettable = orig !== undefined && orig !== c.value;
+                      return (
+                        <div key={c.id} className="gx-ctl" title={c.says}>
+                          <span className="gx-ctl-head">
+                            <span className="gx-ctl-label">{c.label}</span>
+                            <span className="gx-ctl-value">{c.kind === 'choice' ? c.options?.find((o) => o.value === shown)?.label ?? shown : `${shown}${c.unit ?? ''}`}</span>
+                            {resettable && (
+                              <button type="button" className="sb-link is-meta" onClick={() => moveControl(c, orig!, true)} disabled={!!thinking}>
+                                Reset
+                              </button>
+                            )}
+                          </span>
+                          {c.kind === 'range' ? (
+                            <input
+                              type="range"
+                              min={c.min}
+                              max={c.max}
+                              step={c.step}
+                              value={shown}
+                              aria-label={c.label}
+                              onChange={(e) => {
+                                const v = Number(e.target.value);
+                                setSliding({ id: c.id, value: v });
+                                // laying the composition out again waits for the hand to stop
+                                if (c.id !== 'room') moveControl(c, v, false);
+                              }}
+                              onPointerUp={(e) => moveControl(c, Number(e.currentTarget.value), true)}
+                              onKeyUp={(e) => /Arrow|Page|Home|End/.test(e.key) && moveControl(c, Number(e.currentTarget.value), true)}
+                            />
+                          ) : (
+                            <span className="sb-seg is-tight" role="group" aria-label={c.label}>
+                              {c.options?.map((o) => (
+                                <button key={o.value} type="button" className={`sb-seg-item${o.value === c.value ? ' is-on' : ''}`} aria-pressed={o.value === c.value} onClick={() => moveControl(c, o.value, true)}>
+                                  {o.label}
+                                </button>
+                              ))}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+              {Object.keys(ctlOrig.current[board.id] ?? {}).length > 0 && (
+                <button
+                  type="button"
+                  className="sb-btn is-sm"
+                  onClick={() => {
+                    const orig = ctlOrig.current[board.id] ?? {};
+                    let d = docNow();
+                    for (const [id, v] of Object.entries(orig)) {
+                      const r = applyControl(d, board.id, id, v, { dir: dirFor(board.id), kind: props.kind, measure: canvasMeasure() });
+                      if (r) d = r.doc;
+                    }
+                    ctlOrig.current[board.id] = {};
+                    commitDoc(d, 'controls reset');
+                    tell('ok', 'Every control is back where it was before you moved it. Undo takes that back too.');
+                  }}
+                >
+                  Reset all
+                </button>
+              )}
+            </aside>
+          )}
+          {commenting && (
+            <form
+              className="gx-comment-compose"
+              aria-label="Comment on the selection"
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitComment(true);
+              }}
+            >
+              <p className="gx-panel-sub">On the {nameOf(commenting, doc)}</p>
+              <textarea
+                autoFocus
+                rows={3}
+                value={commentWords}
+                onChange={(e) => setCommentWords(e.target.value.slice(0, 400))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    submitComment(true);
+                  }
+                  if (e.key === 'Escape') setCommenting(null);
+                }}
+                placeholder="What should change about it? “Make this lighter”, “this should feel more premium”, “move it to the top”."
+                aria-label="What should change about it"
+              />
+              <span className="gx-comment-acts">
+                <button type="submit" className="sb-btn is-sm is-primary" disabled={!commentWords.trim()}>
+                  Apply now
+                </button>
+                <button type="button" className="sb-btn is-sm" disabled={!commentWords.trim()} onClick={() => submitComment(false)}>
+                  Keep for later
+                </button>
+                <button type="button" className="sb-link is-meta" onClick={() => setCommenting(null)}>
+                  Cancel
+                </button>
+              </span>
+            </form>
+          )}
           {pathEdit && (
             <p className="gx-pathtag" role="status">
               Editing nodes: drag a node or a handle; Alt-click a node for smooth or corner; double-click the path to add a node; Delete removes one.{' '}

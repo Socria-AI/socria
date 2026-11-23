@@ -13,6 +13,7 @@ import type { DesignProject } from '@/lib/ux-v0/types';
 import { said, type StudioMode, type StudioState } from '@/lib/ux-v0/studio/schema';
 import { chooseOption, enoughToMake, readyToMake, respond, rethinkQuestion, seedFromWords, type DirectorEnv } from '@/lib/ux-v0/studio/director';
 import { addReference, referenceOf, type SiteRead } from '@/lib/ux-v0/studio/references';
+import { researchAskOf, type ResearchResponse } from '@/lib/ux-v0/research/schema';
 import type { SystemRecord } from '@/lib/ux-v0/dsi/registry';
 import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
 import { Conversation } from './Conversation';
@@ -158,6 +159,37 @@ export function ProjectConversation(props: {
     }
   };
 
+  /** References searched for through the workspace's provider; what was found (each with its source), or why nothing
+   * was, is said — never results that were not found. */
+  const [searching, setSearching] = useState('');
+  const searchRefs = async (ask: { query: string; kind: 'websites' | 'images' }) => {
+    setSearching(ask.query);
+    try {
+      const res = await fetch('/api/ux-v0/research', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ask) });
+      const j = (await res.json().catch(() => null)) as ResearchResponse | null;
+      if (res.status === 429) return change((s) => said(s, { from: 'socria', kind: 'note', text: 'Too many searches just now — try again in a minute. Links you paste are read meanwhile.' }));
+      if (!j || !Array.isArray(j.results)) return change((s) => said(s, { from: 'socria', kind: 'note', text: 'The search did not happen just now, so nothing was found. Paste links to sites you like, or drop in pictures.' }));
+      if (j.status !== 'ok' || !j.results.length) return change((s) => said(s, { from: 'socria', kind: 'note', text: j.message }));
+      const results = j.results.slice(0, 12).map((r) => ({ id: r.id, kind: r.kind, title: r.title, url: r.url, host: r.host, ...(r.snippet ? { snippet: r.snippet } : {}), ...(r.thumb ? { thumb: r.thumb } : {}), provider: r.provider }));
+      change((s) => said(s, { from: 'socria', kind: 'research', text: `${j.message} Each one is linked to where it was found. Choose the ones worth learning from and I will read them — they are for inspiration, never copied into the work.`, found: { query: j.query, provider: j.provider ?? 'search', results } }));
+    } catch {
+      change((s) => said(s, { from: 'socria', kind: 'note', text: 'The search could not be reached from here, so nothing was found. Paste links to sites you like, or drop in pictures.' }));
+    } finally {
+      setSearching('');
+    }
+  };
+  // an opening sentence that asks for references: they are searched for at once
+  const searchedOpening = useRef(false);
+  useEffect(() => {
+    if (searchedOpening.current) return;
+    searchedOpening.current = true;
+    const ask = researchAskOf(st.prompt);
+    if (ask && st.transcript.length <= 3 && !st.transcript.some((m) => m.kind === 'research' || /^Looking for references/.test(m.text))) {
+      change((s) => said(s, { from: 'socria', kind: 'note', text: `Looking for references: “${ask.query}”.` }));
+      void searchRefs(ask);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const onSend = async (text: string, files: File[]) => {
     setError('');
     settle();
@@ -178,8 +210,9 @@ export function ProjectConversation(props: {
       change((s) => switchMode(s, turn.switchTo!));
       return after();
     }
-    // a site to learn from is read before anything is made from what was said
+    // a site to learn from is read before anything is made from what was said; a search is run when one was asked for
     if (turn.research.length) await readSites(turn.research);
+    if (turn.search) await searchRefs(turn.search);
     if (turn.move.kind === 'create') await after();
   };
 
@@ -216,6 +249,8 @@ export function ProjectConversation(props: {
         props.onManageSystems();
       }}
       onSend={(t, f) => void onSend(t, f)}
+      searching={searching}
+      onUseFound={(url) => void readSites([url])}
       onMake={() => void onMake()}
       onChoose={(id) => void onChoose(id)}
       thinking={!!thinking && thinking === waiting?.id}
