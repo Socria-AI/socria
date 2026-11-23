@@ -1,5 +1,7 @@
 # SocriaUX — Style Intelligence 1.0
 
+> **Historical.** The workspace and generation engines this describes were replaced by the design workspace, where the model writes each design as HTML and CSS (`docs/SOCRIAUX-REBUILD.md`). Old projects open there, carried over as drawn; what remains of these engines, and why, is listed in that document.
+
 Design languages for SocriaUX Graphics and Boards: a library of 75 styles, each a validated profile (its Style DNA) that changes what is built — the construction of the frame, the type, the geometry, the colour, the surface, the picture treatment, the ornament — not only its colours. Styles are chosen from a brief, blended, explored, compared, read from a reference picture, changed in words, kept as one's own, and shared by every material of a board. Modern design is one choice among many, never the default.
 
 Everything is deterministic and runs in the browser. No model is called, and nothing here needs one: where a model could later propose a style, its answer is validated against the library first (`validateStyleRequest`, `styleMenu`).

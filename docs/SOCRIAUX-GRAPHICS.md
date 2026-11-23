@@ -1,5 +1,7 @@
 # SocriaUX Graphics 1.0
 
+> **Historical.** The workspace and generation engines this describes were replaced by the design workspace, where the model writes each design as HTML and CSS (`docs/SOCRIAUX-REBUILD.md`). Old projects open there, carried over as drawn; what remains of these engines, and why, is listed in that document.
+
 A second medium for SocriaUX: posters, social posts, carousels, advertisements, covers, cards, labels, banners,
 identity boards and infographics, composed from a brief, in a direction, as an **editable document** (text stays
 text, shapes stay vectors, pictures stay the designer's files) and edited by hand or in words. Formats are presets of

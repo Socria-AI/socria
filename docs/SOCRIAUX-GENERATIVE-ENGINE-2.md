@@ -1,5 +1,7 @@
 # SocriaUX — Generative Design Engine 2.0
 
+> **Historical.** The workspace and generation engines this describes were replaced by the design workspace, where the model writes each design as HTML and CSS (`docs/SOCRIAUX-REBUILD.md`). Old projects open there, carried over as drawn; what remains of these engines, and why, is listed in that document.
+
 Template-independent graphics, original logos and brand identities. No model is called anywhere in this work; everything
 runs in code, in the browser (and in Node for tests and benchmarks). Numbers below are measured, not estimated; the
 benchmark and QA commands that produce them are listed at the end.

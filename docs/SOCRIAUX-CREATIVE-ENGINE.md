@@ -1,5 +1,7 @@
 # SocriaUX — the creative engine overhaul
 
+> **Historical.** The workspace and generation engines this describes were replaced by the design workspace, where the model writes each design as HTML and CSS (`docs/SOCRIAUX-REBUILD.md`). Old projects open there, carried over as drawn; what remains of these engines, and why, is listed in that document.
+
 What was wrong with how SocriaUX understood, planned, made, changed and judged graphic design; what was rebuilt; how
 it was verified; and what is still open. Every count here was measured in this repository on the commit that adds
 this file, from documents that were really built and rendered. Two things were **not** measured and are marked as

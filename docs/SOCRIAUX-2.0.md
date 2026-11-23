@@ -1,5 +1,7 @@
 # SocriaUX 2.0 — the creative platform
 
+> **Historical.** The workspace and generation engines this describes were replaced by the design workspace, where the model writes each design as HTML and CSS (`docs/SOCRIAUX-REBUILD.md`). Old projects open there, carried over as drawn; what remains of these engines, and why, is listed in that document.
+
 Describe → understand → generate → inspect → refine → export, in one conversation beside one canvas. This document is
 the audit, what was built, how it was verified, and an honest classification of every feature. Numbers quoted here
 were measured in this repository on the commit that adds this file (`test/platform.test.mjs`, the browser benchmark

@@ -1,5 +1,7 @@
 # SocriaUX — creative language into design
 
+> **Historical.** The workspace and generation engines this describes were replaced by the design workspace, where the model writes each design as HTML and CSS (`docs/SOCRIAUX-REBUILD.md`). Old projects open there, carried over as drawn; what remains of these engines, and why, is listed in that document.
+
 > You talk to SocriaUX in creative language. It turns that language into design decisions, and the engine carries
 > them out. You never have to adapt how you think to what the editor can do.
 

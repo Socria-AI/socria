@@ -1,5 +1,7 @@
 # SocriaUX Graphics — creative-ceiling expansion
 
+> **Historical.** The workspace and generation engines this describes were replaced by the design workspace, where the model writes each design as HTML and CSS (`docs/SOCRIAUX-REBUILD.md`). Old projects open there, carried over as drawn; what remains of these engines, and why, is listed in that document.
+
 A larger visual vocabulary for SocriaUX Graphics and Boards: parametric shapes, editable Bézier paths, booleans, a gradient and colour engine, a non-destructive effect stack, procedural pattern generators, advanced typography, masks and blend modes, picture adjustments, a vocabulary planner that chooses among all of these for a brief, edits in words that use them, and the canvas controls to do every one of them by hand.
 
 Everything is an editable document property. No new capability is a picture of itself, and none needs a model.

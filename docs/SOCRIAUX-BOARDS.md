@@ -1,5 +1,7 @@
 # SocriaUX Boards
 
+> **Historical.** The workspace and generation engines this describes were replaced by the design workspace, where the model writes each design as HTML and CSS (`docs/SOCRIAUX-REBUILD.md`). Old projects open there, carried over as drawn; what remains of these engines, and why, is listed in that document.
+
 Many materials, one Master Design System, one canvas. A board is a project type of its own (next to websites and
 graphics). From one request ("a launch campaign: two posters, two Instagram graphics, a website and a product mockup;
 annotate the design decisions") SocriaUX plans every material, proposes three design systems to choose between, then

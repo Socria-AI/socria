@@ -1,5 +1,7 @@
 # SocriaUX — the Generative Creative Engine
 
+> **Historical.** The workspace and generation engines this describes were replaced by the design workspace, where the model writes each design as HTML and CSS (`docs/SOCRIAUX-REBUILD.md`). Old projects open there, carried over as drawn; what remains of these engines, and why, is listed in that document.
+
 SocriaUX Graphics no longer chooses a design from stored layouts. For every expressive graphic (posters, social
 posts, ads, announcements, campaign pieces, presentation covers) the default path now works like this:
 
