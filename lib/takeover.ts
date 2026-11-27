@@ -86,7 +86,7 @@ export function takeoverOn(env: Env = takeoverEnv()): boolean {
 export type PathClass = 'home' | 'app' | 'open' | 'site';
 
 /** Logos 5, and what opens into it. */
-const APP = ['/chat', '/logos', '/logos2', '/logos2-test', '/memory', '/model', '/mind-ar', '/onboarding', '/s', '/logos-5-internal', '/ux', '/ux-v0'];
+const APP = ['/chat', '/logos', '/logos2', '/logos2-test', '/memory', '/model', '/mind-ar', '/onboarding', '/s', '/logos-5-internal', '/ux', '/ux-v0', '/new-logos'];
 
 /** What keeps working whatever the campaign. */
 const OPEN = [

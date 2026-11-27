@@ -1283,3 +1283,68 @@ values (
   (extract(epoch from now()) * 1000)::bigint
 )
 on conflict (id) do nothing;
+
+-- ═══════════════════════════════════════════════════════════════════
+-- New Logos (route /new-logos; docs/NEW-LOGOS.md): nodes, relations, versions
+-- ═══════════════════════════════════════════════════════════════════
+--
+-- ADDITIVE ONLY. Three new tables; nothing existing is altered. Conversations are NOT copied: a conversation node
+-- points at conversations.id, and the conversations table stays the single source of truth that the existing
+-- application also reads and writes. Until this block has run, New Logos still lists and continues every
+-- conversation; only objectives and the other node types wait for it.
+--
+-- CONTAINMENT vs RELATIONS. parent_id is the nested matrix (a tree of objectives; the app refuses cycles). Its
+-- foreign key refuses to delete a node that still contains others (no recursive deletion, by accident or otherwise);
+-- it is checked at the end of each statement, so deleting a whole account's nodes at once still works.
+-- nl_relations is the graph: typed edges between any two of a person's nodes.
+--
+-- A deleted conversation does not leave a dangling pointer: conversation_id is set to null, and the app shows the
+-- node as a conversation that no longer exists rather than silently pointing nowhere.
+--
+-- Times are epoch milliseconds (bigint), like conversations.updated_at. Safe to re-run.
+create table if not exists nl_nodes (
+  id text primary key,
+  user_id text not null,
+  type text not null check (type in ('objective', 'conversation', 'question', 'knowledge', 'decision', 'artifact')),
+  title text not null default '',
+  description text not null default '',
+  parent_id text references nl_nodes(id),
+  conversation_id text references conversations(id) on delete set null,
+  content jsonb not null default '{}'::jsonb,
+  state text not null default '',
+  provenance jsonb not null default '{}'::jsonb,
+  position double precision not null default 0,
+  archived_at bigint,
+  version integer not null default 1,
+  created_at bigint not null,
+  updated_at bigint not null,
+  check (parent_id is null or parent_id <> id)
+);
+create index if not exists nl_nodes_user_parent on nl_nodes (user_id, parent_id);
+-- one placement per conversation per person
+create unique index if not exists nl_nodes_user_conversation on nl_nodes (user_id, conversation_id) where conversation_id is not null;
+
+create table if not exists nl_relations (
+  id text primary key,
+  user_id text not null,
+  from_id text not null references nl_nodes(id) on delete cascade,
+  to_id text not null references nl_nodes(id) on delete cascade,
+  kind text not null,
+  note text not null default '',
+  provenance jsonb not null default '{}'::jsonb,
+  created_at bigint not null,
+  check (from_id <> to_id),
+  unique (user_id, from_id, to_id, kind)
+);
+create index if not exists nl_relations_user on nl_relations (user_id);
+
+create table if not exists nl_node_versions (
+  id text primary key,
+  node_id text not null references nl_nodes(id) on delete cascade,
+  user_id text not null,
+  version integer not null,
+  snapshot jsonb not null,
+  created_at bigint not null,
+  unique (node_id, version)
+);
+create index if not exists nl_node_versions_user_node on nl_node_versions (user_id, node_id);

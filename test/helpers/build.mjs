@@ -370,6 +370,8 @@ const MODULES = [
   'test/helpers/mindmap-under-test.tsx',
   'test/helpers/objective-under-test.tsx',
   'test/helpers/omnibox-under-test.tsx',
+  // New Logos: nodes, containment and relations, the context package, conversation helpers (docs/NEW-LOGOS.md)
+  'test/helpers/new-logos-under-test.ts',
   // what to make, seen before it is chosen: the gallery, its templates, the artifacts the map draws
   'test/helpers/make-under-test.tsx',
   // four views, four jobs: routing, the shape a reply may take, Content's write-ups, made-when-asked

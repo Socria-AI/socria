@@ -193,3 +193,15 @@ grant execute on function bump_ux_v0_usage(text, text, text, integer, integer, b
 alter table ux_v0_calls enable row level security;
 alter table ux_v0_calls force row level security;
 revoke all on ux_v0_calls from anon, authenticated;
+
+-- New Logos (schema.sql, "New Logos"). Reached only through lib/new-logos/store-supabase.ts, which scopes every
+-- query to the owner. Deny-by-default like everything above.
+alter table nl_nodes         enable row level security;
+alter table nl_nodes         force row level security;
+alter table nl_relations     enable row level security;
+alter table nl_relations     force row level security;
+alter table nl_node_versions enable row level security;
+alter table nl_node_versions force row level security;
+revoke all on nl_nodes         from anon, authenticated;
+revoke all on nl_relations     from anon, authenticated;
+revoke all on nl_node_versions from anon, authenticated;

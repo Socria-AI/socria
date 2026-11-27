@@ -265,6 +265,22 @@ export async function GET(req: NextRequest) {
   const uxV0SystemsErr = missingTable(uxV0SystemsRaw) ? null : uxV0SystemsRaw;
   out.designSystemsV0 = uxV0Systems ?? [];
 
+  // New Logos (/new-logos): their nodes — objectives, questions, knowledge, decisions, artifacts and where their
+  // conversations are placed — the relations between them, and every kept version. The conversations themselves are
+  // in `conversations` above.
+  const { data: nlNodes, error: nlNodesRaw } = await db
+    .from('nl_nodes').select('id, type, title, description, parent_id, conversation_id, content, state, provenance, position, archived_at, version, created_at, updated_at').eq('user_id', userId).order('created_at', { ascending: true });
+  const nlNodesErr = missingTable(nlNodesRaw) ? null : nlNodesRaw;
+  out.workspaceNodes = nlNodes ?? [];
+  const { data: nlRelations, error: nlRelationsRaw } = await db
+    .from('nl_relations').select('id, from_id, to_id, kind, note, provenance, created_at').eq('user_id', userId).order('created_at', { ascending: true });
+  const nlRelationsErr = missingTable(nlRelationsRaw) ? null : nlRelationsRaw;
+  out.workspaceRelations = nlRelations ?? [];
+  const { data: nlVersions, error: nlVersionsRaw } = await db
+    .from('nl_node_versions').select('node_id, version, snapshot, created_at').eq('user_id', userId).order('created_at', { ascending: true });
+  const nlVersionsErr = missingTable(nlVersionsRaw) ? null : nlVersionsRaw;
+  out.workspaceNodeVersions = nlVersions ?? [];
+
   // Metacognitive Regulation's intervention ledger: which condition each turn
   // ran under, what MR decided, how it went and what its integrity checks
   // caught — as codes, counts and turn indices. Their MR settings are on the
@@ -386,6 +402,9 @@ export async function GET(req: NextRequest) {
     ['designUsageV0', uxV0UsageErr],
     ['designCallsV0', uxV0CallsErr],
     ['designSystemsV0', uxV0SystemsErr],
+    ['workspaceNodes', nlNodesErr],
+    ['workspaceRelations', nlRelationsErr],
+    ['workspaceNodeVersions', nlVersionsErr],
     ['mrLedger', mrLedgerErr],
     ['roomSeats', roomSeatsErr],
     ['rooms', roomsErr],
