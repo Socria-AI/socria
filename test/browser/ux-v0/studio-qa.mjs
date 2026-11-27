@@ -388,6 +388,11 @@ p = await started();
 ok('a website with what it is about, signed out: made at once', p?.mode === 'create' && p.specs?.length > 0 && (await asked()).length === 0, JSON.stringify(p?.studio?.transcript?.map((m) => m.text.slice(0, 60))));
 await page.waitForTimeout(800);
 await shot('08-website-made');
+// its checks say which look it is in, and that it changes in words — never a set of directions to choose from
+await page.locator('button, [role="tab"]').filter({ hasText: /^(Checks|Checking…)$/ }).first().click().catch(() => null);
+await page.waitForTimeout(1500);
+const rail = (await page.locator('.v0-rail-body').innerText().catch(() => '')) ?? '';
+ok('the website’s look is changed in words: no “Choose a different direction”, no directions to explore', /The direction it follows/.test(rail) && /say so in your own words/.test(rail) && !/Choose a different direction|Explore directions/.test(await page.locator('body').innerText()), rail.slice(0, 400));
 
 console.log('\n=== a phone ===');
 await page.setViewportSize({ width: 390, height: 844 });

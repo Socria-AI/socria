@@ -208,10 +208,10 @@ recorded. Picture: `docs/discovery/poster-refined.jpg`.
 - `test/browser/ux-v0/discover-bench.mjs` — the real-conversation benchmark above.
 
 Results against a fresh production build (`next build`, `next start`, placeholder sign-in keys — signed out, as this
-environment is): studio-qa 41/41 (including each aid sample fitting its card in its own face, never broken inside a
-word); design-qa 39/39 (the workspace and its edits, unchanged); legacy-qa 8/8 (older graphics and boards still open);
-dsi-qa 40/40 (one step adjusted: a board in a design system is now made as soon as its pieces are known, without asking
-for its words). Typecheck clean.
+environment is): studio-qa 46/46 (including Skip, Surprise me with no model call, a colour of their own written into the
+reply, each aid sample fitting its card in its own face, and a website made in conversation offering no directions to
+choose); design-qa 39/39 (the workspace and its edits, unchanged); legacy-qa 8/8 (older graphics and boards still open);
+dsi-qa 40/40. Typecheck clean.
 
 ## Limits
 
