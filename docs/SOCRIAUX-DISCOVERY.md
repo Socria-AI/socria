@@ -76,7 +76,16 @@ Only when seeing would help more than reading, at most one per question, each ki
 
 Never for something already said or chosen, never inside a design system for palettes or type (the system decides),
 never a generic preset, never an image. Every aid can be picked, or ignored: the person writes instead — mix two, change
-one, name hex codes, skip.
+one, name hex codes, take one pairing's headline face with another's text. Palettes also offer **your own colour**: the
+system's colour picker, whose colour is written into the reply (not sent) so it can go with anything else they say.
+
+### Never required
+
+Under every waiting question: **Skip** and **Surprise me**. A skip is said as the person's reply ("Skip"); the model is
+told to settle that point itself, never ask it again, and either ask the next thing that matters or make it; the reader
+does the same, and never reads "Skip" as what the work is about, its words or its name. **Surprise me** makes the work at
+once with no model call. While these show, the composer's **Make it now** steps aside (it is there whenever no question
+is waiting).
 
 ### Stopping
 
@@ -94,7 +103,18 @@ an answer into a headline. Then it makes the work.
 ### What stayed
 
 The design engine, the workspace and its edits are untouched: an existing project is edited in its workspace, never
-re-discovered. Critiques and design-system imports keep their own director flow. No new provider, model or image
+re-discovered. Critiques and design-system imports keep their own director flow.
+
+### What was removed
+
+- The old fixed question machinery — `lib/ux-v0/studio/discovery.ts` (engine-drawn moods from a fixed vocabulary of
+  themes and qualities, palettes derived by rule, type pairings from a fixed table of characters), `vibe-preview.ts`,
+  `realise.ts`, and the director's creative questioning (`creativeNeeds`, `discoveryQuestion`, "show me others",
+  discovery taps). It had been unreachable since discovery moved to the model; now it is gone, with its tests. The only
+  questions written in code are the signed-out reader's three factual ones (what it is, a logo's name, what it is for).
+- Choosing a direction for a website made in conversation: the website workspace no longer offers "Choose a different
+  direction" for it, nor "Explore directions" from its Creative DNA — it is changed in words. (Older website projects
+  made in the pre-studio flow keep their own steps.) No new provider, model or image
 service: the turn uses the existing `studio-questions` stage (economy tier, one call per turn, 2400 max tokens).
 
 ## Conversations (real model turns)
@@ -159,6 +179,19 @@ Pictures: `docs/discovery/poster-bare.png`, `poster-discovered.jpg`, `logo-bare.
 The questions changed what was made, not just how it was labelled: the bare request leaves the designer to guess a
 subject and a register; two questions gave it the event, the feeling in the person's words, the name and the analogy.
 
+## Refinement after discovery
+
+The discovered poster above, refined in words through the same designer (stand-in model, `design-bench.mjs`
+`Q-A-refine`, starting from `Q-A-discovered`):
+
+1. "Make the acid green a warm orange instead." — every green element recoloured (registration marks, STRATE, the SUB
+   outline, 07, the headline act, the highlights); layout, type and words untouched.
+2. "Make the line-up bigger and easier to read from across the room." — artist names 44→52 px, times and rooms
+   14→18 px, rows taller; nothing else moved.
+
+Across both: 58 of 58 elements kept, 54 unchanged (the four line-up rows changed), none added or removed; two versions
+recorded. Picture: `docs/discovery/poster-refined.jpg`.
+
 ## Tests
 
 - `test/discover.test.mjs` — the turn, the brief, the aids (contrast, library faces, one per kind), picks kept and the
@@ -175,10 +208,10 @@ subject and a register; two questions gave it the event, the feeling in the pers
 - `test/browser/ux-v0/discover-bench.mjs` — the real-conversation benchmark above.
 
 Results against a fresh production build (`next build`, `next start`, placeholder sign-in keys — signed out, as this
-environment is): studio-qa 41/41 (including each aid sample fitting its card in its own face, never broken inside a
-word); design-qa 39/39 (the workspace and its edits, unchanged); legacy-qa 8/8 (older graphics and boards still open);
-dsi-qa 40/40 (one step adjusted: a board in a design system is now made as soon as its pieces are known, without asking
-for its words). Typecheck clean.
+environment is): studio-qa 46/46 (including Skip, Surprise me with no model call, a colour of their own written into the
+reply, each aid sample fitting its card in its own face, and a website made in conversation offering no directions to
+choose); design-qa 39/39 (the workspace and its edits, unchanged); legacy-qa 8/8 (older graphics and boards still open);
+dsi-qa 40/40. Typecheck clean.
 
 ## Limits
 

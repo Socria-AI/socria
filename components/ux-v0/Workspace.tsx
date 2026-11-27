@@ -1840,8 +1840,7 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                   setMeasuring(({ [r.id]: _was, ...rest }) => rest);
                   void measureRef(r);
                 }}
-                onExplore={openDirection}
-                onBack={() => setView('brief')}
+                {...(studioBorn ? { onBack: () => setView('design'), backLabel: 'Back to the design' } : { onExplore: openDirection, onBack: () => setView('brief') })}
               />
             )}
 
@@ -2054,9 +2053,14 @@ export function Workspace({ initial, signedIn, onExit, startIntent, startFile }:
                       {languageOf(project.direction.chosen.language)?.name ?? 'Its own'} · {spec.tokens.fonts.display} and {spec.tokens.fonts.body}
                       {project.direction.chosen.locks.length ? ` · kept: ${project.direction.chosen.locks.map((g) => LOCK_LABEL[g].toLowerCase()).join(', ')}` : ''}
                     </p>
-                    <button type="button" className="sb-link is-meta is-strong" onClick={() => setView('direction')}>
-                      Choose a different direction
-                    </button>
+                    {studioBorn ? (
+                      // begun in conversation: no directions to choose from — any change is said in words
+                      <p className="v0-quiet">To change it, say so in your own words: warmer, more editorial, another typeface.</p>
+                    ) : (
+                      <button type="button" className="sb-link is-meta is-strong" onClick={() => setView('direction')}>
+                        Choose a different direction
+                      </button>
+                    )}
                   </section>
                 )}
                 {project.dna && (

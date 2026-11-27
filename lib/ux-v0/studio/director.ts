@@ -1,28 +1,14 @@
 // lib/ux-v0/studio/director.ts — the studio's readers and the short exchange a critique or a design-system import
 // needs (the design to look at, the system's source). Graphics, logos, campaigns and websites are discussed through
 // creative discovery instead (./discover.ts): the model decides each turn, and nothing here asks them anything; what
-// remains used from here for them is reading words (subjectOf, seedFromWords, makeItNow for the website engine). The
-// description below is the reader as it was, kept for records made before discovery.
+// remains used from here for them is reading words (subjectOf, seedFromWords, makeItNow for the website engine).
 //
-// The creative director: understanding what is asked, deciding how much there is to
-// ask, asking one meaningful question at a time, reading the person's own words for the answer, and knowing when to
-// stop talking and make the work.
-//
-// There are no question paths. Every turn starts from what is understood so far (everything the person has said and
-// brought, read by the engines' own readers: ./facts.ts) and asks at most one thing:
-//   · what the work cannot be made without, and nothing in the words gives (the words a poster says, a logo's name, a
-//     campaign's pieces, the design for a critique) — and even these can be left as marked gaps when the person asks
-//     to just make it, except where the work would mean nothing without them (a logo's name);
-//   · then a few creative questions, only those that would change this work and that the brief leaves open
-//     (./discovery.ts): what a logo stands for, what a site is for, whether a picture is placed; and, as visual aids,
-//     how it should feel (moods drawn for the brief), its colours (palettes) or its lettering (real typefaces) — at
-//     most three in all, never all three visual ones, none when the brief is complete. Each is generated for this
-//     brief and the answers so far; the model writes them when it can be reached (the browser asks it:
-//     components/ux-v0/studio/questionPlanner.ts), the reader here otherwise.
-// A detailed brief is made at once; a vague one gets a question or two, then the work is made — there is no separate
-// stage of choosing a direction. Replies are read as the person writes them — an answer, a tap on an option, a
-// colour or a typeface named, a change of mind, a link to learn from, "make it", "surprise me", "skip", "show me
-// others" — and mapped onto the decisions the engines already read (./apply.ts), so making the work is unchanged.
+// What is left of the director here: understanding what is asked from the person's own words (the engines' own
+// readers: ./facts.ts), asking only what a critique or an import cannot be made without (the design to look at, the
+// system's source — "make it now" never skips those), reading replies (an answer, a link to learn from, "make it",
+// "skip", a change of kind) and mapping them onto the decisions the engines already read (./apply.ts). It asks no
+// creative questions and offers no moods, palettes or typefaces of its own: those are discovery's, written by the
+// model for each brief (./discover.ts, ./brief.ts).
 
 import { researchAskOf, type ResearchKind } from '../research/schema';
 import type { StudioAnswer, StudioMode, StudioState } from './schema';
@@ -33,7 +19,17 @@ import { answerOf, wordsOf } from './apply';
 import { recognizeIntent } from './intent';
 import { modeInfo } from './modes';
 import { likedRefs } from './references';
-import { answerDiscoveryWords, askDiscovery, chooseDiscovery, closeDiscovery, creativeNeeds, discoveryQuestion, onlyPointsElsewhere, skipDiscovery, type DiscoveryQuestion, type Subject } from './discovery';
+
+/** Words that only point to a site to learn from ("like larkfield.studio"): they describe nothing of the work. */
+export function onlyPointsElsewhere(text: string): boolean {
+  const rest = text
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/\b(?:www\.)?[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.(?:com|org|net|io|co|app|design|studio|dev|ai|uk|de|fr|nl|se|dk|no|it|es|jp|xyz|art|me|so|site|page|website|agency|shop|store|cafe|coffee)\b\S*/gi, ' ')
+    .replace(/\b(something|anything|like|look at|looking at|see|similar to|inspired by|in the style of|the feel of|the vibe of|or|and|a bit|kind of|sort of|maybe|perhaps|the|this|that|one|site|website|page|please)\b/gi, ' ')
+    .replace(/[^\p{L}\p{N}#]+/gu, ' ')
+    .trim();
+  return rest.length === 0 && /https?:\/\/|\.[a-z]{2,}\b/i.test(text);
+}
 
 export type Topic = 'what' | 'kind' | 'words' | 'name' | 'about' | 'purpose' | 'materials' | 'feel' | 'pictures' | 'file' | 'source';
 
@@ -49,8 +45,6 @@ export interface Question {
 
 export type Move =
   | { kind: 'ask'; question: Question }
-  /** a creative question (./discovery.ts), with options generated for this brief */
-  | { kind: 'discover'; question: DiscoveryQuestion }
   | { kind: 'create' };
 
 /** What the browser knows that the record does not. */
@@ -286,13 +280,8 @@ function materialNumbers(words: string): Record<string, number> {
 
 // ── how much to ask ──
 
-/** What the work is called in a question, and the words its lettering is shown in (./discovery.ts Subject). */
-export function subjectFor(st: StudioState, u: Understanding = understand(st)): Subject {
-  const it = st.mode === 'graphic' ? (u.kindLabel === 'graphic' ? 'it' : `the ${u.kindLabel}`) : st.mode === 'logo' ? 'the logo' : st.mode === 'website' ? 'the site' : st.mode === 'board' ? 'the campaign' : 'it';
-  return { it, sample: (u.name || u.headline || title(subjectOf(briefText(st))) || modeInfo(st.mode).label).slice(0, 60) };
-}
-
-/** What to do next: ask what the work cannot be made without, ask a creative question worth asking, or make it. */
+/** What to do next: ask what the work cannot be made without, or make it. (A graphic, a logo, a campaign or a website
+ * is discovered in conversation instead — ./discover.ts — and never reaches this.) */
 export function nextMove(st: StudioState, env: DirectorEnv = {}): Move {
   if (st.modeBy === 'unsure' && !st.answers.what) return { kind: 'ask', question: questionFor(st, 'what', env) };
   const u = understand(st);
@@ -300,11 +289,6 @@ export function nextMove(st: StudioState, env: DirectorEnv = {}): Move {
   // what the work cannot be made without (when the person asked to just make it, only what cannot be left as a gap)
   const required = go ? u.required.filter((t) => !GAPPABLE[st.mode].includes(t)) : u.required;
   if (required.length) return { kind: 'ask', question: questionFor(st, required[0], env) };
-  // then the creative questions that would change this work, while the brief leaves them open
-  for (const d of go ? [] : creativeNeeds(st)) {
-    const q = discoveryQuestion(st, d, subjectFor(st, u));
-    if (q) return { kind: 'discover', question: q };
-  }
   return { kind: 'create' };
 }
 
@@ -461,54 +445,9 @@ function speak(st: StudioState, move: Move, lead: string, now: number): StudioSt
     const asked = [...new Set([...(st.asked ?? []), q.topic])];
     return said({ ...st, pending: q.topic, asked }, { from: 'socria', kind: 'question', stage: q.topic, text: [lead, q.text].filter(Boolean).join(' '), at: now });
   }
-  if (move.kind === 'discover') {
-    const q = move.question;
-    return said(askDiscovery(st, q), { from: 'socria', kind: 'question', stage: 'discover', text: [lead, q.text].filter(Boolean).join(' '), at: now });
-  }
   const { pending: _, ...rest } = st;
   const enough = lead ? `${lead} That’s enough to begin.` : 'That’s enough to begin.';
   return said(rest, { from: 'socria', kind: 'note', stage: 'making', text: `${enough} ${makingLine(rest)}`, at: now });
-}
-
-/** Socria's last question message about the creative question waiting, and the words that led into it. */
-function questionMessage(st: StudioState, q: DiscoveryQuestion): { index: number; lead: string } | null {
-  for (let i = st.transcript.length - 1; i >= 0; i--) {
-    const m = st.transcript[i];
-    if (m.from !== 'socria') continue;
-    if (m.kind !== 'question' || m.stage !== 'discover') return null;
-    return { index: i, lead: m.text.endsWith(q.text) ? m.text.slice(0, m.text.length - q.text.length).trim() : '' };
-  }
-  return null;
-}
-
-/**
- * The model's question in place of the reader's (asked while it was being written, never seen): the same turn, the
- * same lead, its own words and options. Nothing changes when the reader's question was answered in the meantime.
- */
-export function rethinkQuestion(st: StudioState, readerId: string, q: DiscoveryQuestion | null): StudioState {
-  const cur = st.discovery?.current;
-  if (!q || st.pending !== 'discover' || !cur || cur.id !== readerId) return st;
-  const at = questionMessage(st, cur);
-  if (!at) return st;
-  const asked = [...new Set([...(st.discovery?.asked ?? []).filter((d) => d !== cur.decides), q.decides])];
-  const transcript = st.transcript.map((m, i) => (i === at.index ? { ...m, text: [at.lead, q.text].filter(Boolean).join(' ').slice(0, 2400) } : m));
-  return { ...st, transcript, discovery: { ...st.discovery, asked, current: q } };
-}
-
-/**
- * The brief is enough (the model judged it so before the reader's question was seen): nothing more is asked, and the
- * turn says the work is being made instead.
- */
-export function enoughToMake(st: StudioState, readerId: string, env: DirectorEnv = {}): StudioState {
-  const cur = st.discovery?.current;
-  if (st.pending !== 'discover' || !cur || cur.id !== readerId) return st;
-  const at = questionMessage(st, cur);
-  const { pending: _, ...rest } = st;
-  const next: StudioState = { ...rest, discovery: { asked: (st.discovery?.asked ?? []).filter((d) => d !== cur.decides), done: true } };
-  if (nextMove(next, env).kind !== 'create') return st;
-  const enough = at?.lead ? `${at.lead} That’s enough to begin.` : 'That’s enough to begin.';
-  const text = `${enough} ${makingLine(next)}`;
-  return { ...next, transcript: next.transcript.map((m, i) => (at && i === at.index ? { ...m, kind: 'note' as const, stage: 'making', text } : m)) };
 }
 
 /** The directions named in words, in the order they are named ("the third and the first" → [2, 0]). */
@@ -803,10 +742,9 @@ export function respond(st: StudioState, text: string, env: DirectorEnv = {}, op
   let next = said(st, { from: 'person', kind: 'reply', text: t || 'These', ...(opts.attachments?.length ? { attachments: opts.attachments } : {}), at: now });
   const heard = t ? hear(st, t) : ({ kind: 'words' } as Heard);
   const research = referenceUrls(t);
-  const waiting = st.pending === 'discover' ? st.discovery?.current : undefined;
   if (heard.kind === 'switch') return { st: next, move: nextMove(next, env), research, switchTo: heard.mode };
   if (heard.kind === 'make' || heard.kind === 'surprise') {
-    next = makeItNow(waiting ? closeDiscovery(next) : next, now);
+    next = makeItNow(next, now);
     const move = nextMove(next, env);
     if (move.kind === 'ask') return { st: speak(next, move, 'I need one thing before I can make it.', now), move, research };
     return { st: speak(next, move, heard.kind === 'surprise' ? 'Leaving the rest to me, then.' : '', now), move, research };
@@ -819,22 +757,8 @@ export function respond(st: StudioState, text: string, env: DirectorEnv = {}, op
     const lead = 'I can read any website you point me to and take what is useful from it — its colours, its type, how its pages feel. Paste a link to something you like, or drop in a picture — or tell me what to search for (“find references for brutalist concert posters”).';
     return { st: said(next, { from: 'socria', kind: 'note', text: lead, at: now }), move: nextMove(next, env), research };
   }
-  // other options for the question waiting ("show me others", "none of these")
-  if (waiting && (heard.kind === 'different' || heard.kind === 'looks')) {
-    next = { ...next, round: (next.round ?? 0) + 1 };
-    const q = discoveryQuestion(next, waiting.decides, subjectFor(next));
-    if (q && q.kind !== 'text') {
-      const move: Move = { kind: 'discover', question: q };
-      return { st: speak(next, move, 'Here are some others.', now), move, research };
-    }
-  }
-  const pending = st.pending as Topic | 'discover' | undefined;
-  if (heard.kind === 'skip' && pending === 'discover') {
-    next = skipDiscovery(next, now);
-    const move = nextMove(next, env);
-    return { st: speak(next, move, 'Fine — I’ll decide that.', now), move, research };
-  }
-  if (heard.kind === 'skip' && pending && pending !== 'discover') {
+  const pending = st.pending && st.pending !== 'discover' ? (st.pending as Topic) : undefined;
+  if (heard.kind === 'skip' && pending) {
     const q = questionFor(st, pending, env);
     if (!q.optional && !GAPPABLE[st.mode].includes(pending)) {
       return { st: said(next, { from: 'socria', kind: 'question', stage: pending, text: `I can’t make it without that, I’m afraid. ${q.text}`, at: now }), move: { kind: 'ask', question: q }, research };
@@ -846,14 +770,7 @@ export function respond(st: StudioState, text: string, env: DirectorEnv = {}, op
   // the answer to what was asked, then whatever else the words change
   let ack = '';
   let readAs: string | null = null;
-  if (waiting && t) {
-    const r = answerCreative(next, waiting, t, env, now);
-    if (r.read) {
-      next = r.st;
-      ack = r.ack;
-      readAs = waiting.decides;
-    }
-  } else if (pending && pending !== 'discover' && t) {
+  if (pending && t) {
     const r = answerTopic(next, pending, t, env, now);
     if (r.read) {
       next = r.st;
@@ -876,46 +793,16 @@ export function respond(st: StudioState, text: string, env: DirectorEnv = {}, op
     if (!readAs && ab.changed.length) ack = `Changed ${list(ab.changed)}.`;
     // words that settle something of what is still open are kept with everything said, for the engines to read
     // (words that only point to a site are not: the site's address is not a description of the work)
-    if (!onlyPointsElsewhere(t) && (!readAs || ['feel', 'about', 'purpose', 'vibe', 'type'].includes(readAs) || (waiting?.kind === 'text' && !['pictures'].includes(readAs)))) next = seedFromWords({ ...next, prompt: `${next.prompt} — ${t}`.slice(0, 2000) }, now);
+    if (!onlyPointsElsewhere(t) && (!readAs || ['feel', 'about', 'purpose'].includes(readAs))) next = seedFromWords({ ...next, prompt: `${next.prompt} — ${t}`.slice(0, 2000) }, now);
   }
   if (research.length && !ack) ack = `I’ll take a look at ${list(research.map((u) => u.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')))}.`;
   if (!readAs && pending && t && !research.length && !ack) {
     // a reply that answers nothing that was asked, and changes nothing named: the question again, said another way
-    if (waiting) return { st: said(next, { from: 'socria', kind: 'question', stage: 'discover', text: `I didn’t quite catch that. ${waiting.text}`, at: now }), move: { kind: 'discover', question: waiting }, research };
-    const q = questionFor(next, pending as Topic, env);
+    const q = questionFor(next, pending, env);
     return { st: said(next, { from: 'socria', kind: 'question', stage: pending, text: `I didn’t quite catch that. ${q.text}`, at: now }), move: { kind: 'ask', question: q }, research };
   }
-  // the question waiting stays waiting when the reply only changed something else (a site to read, a colour named)
-  if (waiting && !readAs) return { st: next, move: { kind: 'discover', question: waiting }, research };
   const move = nextMove(next, env);
   return { st: speak(next, move, ack, now), move, research };
-}
-
-/** The person's words read as the answer to the creative question waiting (./discovery.ts), when they answer it. */
-function answerCreative(st: StudioState, q: DiscoveryQuestion, text: string, env: DirectorEnv, now: number): { st: StudioState; ack: string; read: boolean } {
-  // words that only point to a site to learn from answer nothing: the site is read, and the question goes on waiting
-  if (onlyPointsElsewhere(text)) return { st, ack: '', read: false };
-  if (q.kind === 'colour' || q.kind === 'type' || q.kind === 'vibe') return answerDiscoveryWords(st, text, now);
-  // what a logo stands for, what a site is for, whether a picture is placed: read as those topics always were
-  if (q.decides === 'about' || q.decides === 'purpose' || q.decides === 'pictures') {
-    const r = answerTopic(st, q.decides, text, env, now);
-    return r.read ? { ...r, st: closeDiscovery(r.st) } : r;
-  }
-  // a question the model wrote about something else (who it is for, the occasion…): the words kept for the engines
-  const answers = { ...st.answers, [`d.${q.decides}`]: { values: [], text: text.slice(0, 300), source: 'person' as const, at: now } };
-  return { st: closeDiscovery({ ...st, answers }), ack: 'Good — I’ll take that into it.', read: true };
-}
-
-/** A tap on one of the options a creative question offered: the decision taken, said back, and what comes next. */
-export function chooseOption(st: StudioState, optionId: string, env: DirectorEnv = {}, now = Date.now()): Turn {
-  const q = st.pending === 'discover' ? st.discovery?.current : undefined;
-  const r = q ? chooseDiscovery(st, optionId, now) : null;
-  if (!q || !r) return { st, move: nextMove(st, env), research: [] };
-  // a suggested answer to a written question is read as the person's own words
-  if (!r.ack) return respond(st, r.words, env, { now });
-  const next = said(r.st, { from: 'person', kind: 'reply', text: r.words, at: now });
-  const move = nextMove(next, env);
-  return { st: speak(next, move, r.ack, now), move, research: [] };
 }
 
 /**

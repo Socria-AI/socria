@@ -195,6 +195,11 @@ export function Conversation(p: ConversationProps) {
     setWords('');
     setFiles([]);
   };
+  /** Words added to the reply without sending it (a colour of their own, picked from an aid). */
+  const write = (text: string) => {
+    setWords((w) => (w.trim() ? `${w.trim().replace(/[,.]$/, '')}, ${text}` : text).slice(0, 1200));
+    field.current?.focus();
+  };
   const add = (list: FileList | File[] | null) => {
     const xs = [...(list ?? [])];
     if (xs.length) setFiles((cur) => [...cur, ...xs.filter((f) => !cur.some((c) => c.name === f.name && c.size === f.size))].slice(0, 8));
@@ -291,7 +296,7 @@ export function Conversation(p: ConversationProps) {
                     <p className="sd-said">{r ? referenceSaid(r) : m.text}</p>
                     {r && <ReferenceCard r={r} preview={p.previews[r.id]} onReference={p.onReference} />}
                     {m.kind === 'research' && m.found ? <FoundList found={m.found} used={new Set((st.references ?? []).map((x) => x.url))} onUse={p.onUseFound} /> : null}
-                    {asking && m.aid && !busy && <AidPicker key={m.id} aid={m.aid} onPick={(i) => p.onChoose(String(i))} />}
+                    {asking && m.aid && !busy && <AidPicker key={m.id} aid={m.aid} onPick={(i) => p.onChoose(String(i))} onWrite={write} />}
                     {asking && !m.aid && (m.suggestions?.length ?? 0) > 0 && !busy && (
                       <p className="sd-suggest" role="group" aria-label="Some ways to answer">
                         {m.suggestions!.map((x) => (
@@ -299,6 +304,17 @@ export function Conversation(p: ConversationProps) {
                             {x}
                           </button>
                         ))}
+                      </p>
+                    )}
+                    {asking && !busy && (
+                      // never required: pass on this one (SocriaUX settles it and moves on), or hand the rest over
+                      <p className="sd-qacts" role="group" aria-label="Or">
+                        <button type="button" className="sd-chip is-tiny" onClick={() => send('Skip')}>
+                          Skip
+                        </button>
+                        <button type="button" className="sd-chip is-tiny" onClick={() => send('Surprise me')}>
+                          Surprise me
+                        </button>
                       </p>
                     )}
                     {!discovering && isLast && m.kind === 'question' && question && question.suggestions.length > 0 && !busy && (
@@ -373,7 +389,7 @@ export function Conversation(p: ConversationProps) {
           }}
         >
           <div className="sd-chat-acts">
-            {st.status === 'discovering' && !busy && (
+            {st.status === 'discovering' && !busy && !(waitingAsk && !p.thinking) && (
               <button type="button" className="sd-pill is-sm is-quiet sd-make" onClick={p.onMake} disabled={blocked} title={blocked ? 'One thing is needed first' : 'Leave whatever is open to SocriaUX, and make it'}>
                 Make it now
               </button>

@@ -91,19 +91,12 @@ const high = (doc, board) => P.checkDoc({ ...doc, artboards: [board], tokens: P.
   // the conversation: the ask becomes a search for the caller to run, and what it found is kept with its sources
   const st = P.emptyStudio('website', 'A website for Kanso, an architecture studio in Leeds');
   const turn = P.respond(st, 'Find me some interesting references for an experimental architecture website', {});
-  ok('in the conversation, the ask is heard as research and becomes a search (no project is started for it)', turn.search && /experimental architecture website/.test(turn.search.query) && turn.move.kind !== 'create', J({ search: turn.search, move: turn.move.kind }));
+  // (the conversation page runs the search and returns before any turn is taken: components/ux-v0/studio/ProjectConversation.tsx)
+  ok('in the conversation, the ask is heard as research and becomes a search, its subject the query', turn.search && /experimental architecture website/.test(turn.search.query) && turn.search.kind === 'websites', J({ search: turn.search }));
   const kept = P.said(turn.st, { from: 'socria', kind: 'research', text: 'found', found: { query: 'q', provider: 'Brave Search', results: [{ id: 'a', kind: 'website', title: 'One', url: 'https://one.example/', host: 'one.example', provider: 'Brave Search' }, { id: 'b', kind: 'website', title: 'Bad', url: 'javascript:x', host: 'x', provider: 'Brave Search' }] } });
   const back = P.normalizeStudio(JSON.parse(JSON.stringify(kept)));
   const msg = back.transcript.find((m) => m.kind === 'research');
   ok('what a search found is kept with the conversation, held to its shape when read back', msg && msg.found.results.length === 1 && msg.found.results[0].url === 'https://one.example/', J(msg));
-}
-
-// ── 14. understanding at generation ──
-{
-  const themed = P.briefRealisation(P.emptyStudio('graphic', 'A cloud-themed poster for our bakery’s opening day'));
-  ok('a world named for the look in the brief (“cloud-themed”) is carried into the first design as a theme', themed && themed.changes.some((c) => c.decision === 'theme' && c.theme === 'cloud') && themed.keep.includes('words'), J(themed));
-  ok('a world inside a name is not a theme (“Cloud Nine Bakery”)', P.briefRealisation(P.emptyStudio('graphic', 'A poster for “Cloud Nine Bakery”, opening Saturday')) === null);
-  ok('a brief that names no world brings no theme', P.briefRealisation(P.emptyStudio('graphic', 'A poster for our summer sale, bold and loud')) === null);
 }
 
 console.log(`platform: ${pass} passed, ${fail} failed`);

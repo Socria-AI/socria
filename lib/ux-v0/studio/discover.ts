@@ -34,9 +34,15 @@ export const wantsMake = (text: string) => {
   return t.length > 0 && t.length <= 90 && DELEGATE.test(t);
 };
 
-/** Everything the person has said, in order (the opening words alone for a record that kept no messages). */
+const SKIP = /^(?:(?:ok(?:ay)?|no|nah|hmm+)[,.! ]+)?(?:skip(?: (?:it|this(?: one)?|that(?: one)?|this question))?|pass|next(?: question)?)[.!]*$/i;
+
+/** A question passed on ("Skip", "pass", "next"): SocriaUX settles that point itself and does not ask it again. */
+export const skips = (text: string) => SKIP.test((text ?? '').trim().replace(/\s+/g, ' '));
+
+/** Everything the person has said, in order (the opening words alone for a record that kept no messages); a question
+ * passed on says nothing about the work, so "Skip" is never read as its subject or its words. */
 const personWords = (st: StudioState) => {
-  const said_ = st.transcript.filter((m) => m.from === 'person' && m.text.trim()).map((m) => m.text.trim());
+  const said_ = st.transcript.filter((m) => m.from === 'person' && m.text.trim() && !skips(m.text)).map((m) => m.text.trim());
   return said_.length ? said_ : st.prompt.trim() ? [st.prompt.trim()] : [];
 };
 const lastPerson = (st: StudioState) => [...st.transcript].reverse().find((m) => m.from === 'person');

@@ -46,8 +46,11 @@ interface Props {
   onRemove: (key: DnaKey) => void;
   onAspects: (refId: string, take: RefAspect[], leave: RefAspect[]) => void;
   onMeasure: (ref: MoodboardRef) => void;
-  onExplore: () => void;
+  /** directions to choose from (an older project's own step); a site begun in conversation has none: it is changed in words */
+  onExplore?: () => void;
   onBack: () => void;
+  /** where "back" goes, said ("Back to the brief" unless told otherwise) */
+  backLabel?: string;
 }
 
 const SOURCE_SAYS: Record<DnaSource, string> = { designer: 'Set by you', brief: 'From your brief', references: 'From your references', kind: 'Typical of this kind of work' };
@@ -285,14 +288,16 @@ export function DnaStudio(p: Props) {
       </div>
 
       <footer className="v0-brief-foot dna-foot">
-        <button type="button" className="sb-btn is-primary" onClick={p.onExplore} disabled={!!p.busy}>
-          Explore directions
-        </button>
+        {p.onExplore && (
+          <button type="button" className="sb-btn is-primary" onClick={p.onExplore} disabled={!!p.busy}>
+            Explore directions
+          </button>
+        )}
         <button type="button" className="sb-link" onClick={p.onDelegateAll} disabled={!set.length}>
           SocriaUX decides everything{locked.length ? ' (locks kept)' : ''}
         </button>
         <button type="button" className="sb-link" onClick={p.onBack}>
-          Back to the brief
+          {p.backLabel ?? 'Back to the brief'}
         </button>
       </footer>
     </div>
