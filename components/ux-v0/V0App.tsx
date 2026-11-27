@@ -23,6 +23,7 @@ import { ProjectConversation } from './studio/ProjectConversation';
 import type { RemoteWork } from './studio/Collection';
 import { attachFiles, conversationProject, critiqueProject, startFrom } from './studio/begin';
 import { readyToMake } from '@/lib/ux-v0/studio/director';
+import { isCreative, makingNow } from '@/lib/ux-v0/studio/discover';
 import { usableSystems } from './studio/SystemPicker';
 import type { WizardStart } from './systems/ImportWizard';
 import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
@@ -210,7 +211,7 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
     // words that are already enough go straight to the work, the conversation beside it (a website's looks are
     // chosen in the conversation first)
     // the opening said it has enough and is making the work: straight to it (anything else opens the conversation)
-    if (p.studio && readyToMake(p.studio, { hasSystem: !!rec, ...(rec ? { systemName: rec.name } : {}) })) {
+    if (p.studio && (isCreative(p.studio.mode) ? makingNow(p.studio) : readyToMake(p.studio, { hasSystem: !!rec, ...(rec ? { systemName: rec.name } : {}) }))) {
       window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(p.id)}`);
       const err = await startConversation(p, p.studio, []);
       if (!err) return;

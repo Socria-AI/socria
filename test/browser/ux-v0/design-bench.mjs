@@ -8,6 +8,7 @@
 // when the answers are there. Latency and cost are not measured this way (the answers are not the API's).
 //
 //   UXV0_OUT=<dir> node test/browser/ux-v0/design-bench.mjs [scenario-filter]
+//   DESIGN_EXTRA=<file.json> adds first designs from other briefs ([{ id, brief, kind, format }])
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -46,6 +47,9 @@ const SCENARIOS = [
   { id: 'logo', brief: 'A logo for Harbour & Co, a seafood restaurant in an old fishing town: honest, salty, a little old-fashioned, never twee.', kind: 'logo', format: 'logo-sheet' },
   { id: 'formats', from: 'base', steps: ['Adapt “Rooms for Living — A3” to Story (vertical) (format="story"), LinkedIn post (format="linkedin"), Landscape post (1.91:1) (format="landscape"): one new artboard each, in one group beside it, each recomposed for its own shape — the same idea, words, palette and type, not just resized.'] },
   { id: 'web', brief: 'A landing page for Fieldwork, a small studio that designs and builds furniture from reclaimed timber. Sections: what they make, how they work, three recent pieces, a commission enquiry, the workshop address (Unit 4, Mill Lane, Hebden Bridge).', kind: 'website', format: 'web-page' },
+  // DESIGN_EXTRA=<file.json>: more first designs, [{ id, brief, kind, format }] — e.g. a bare request beside the brief
+  // creative discovery wrote for it (test/browser/ux-v0/discover-bench.mjs brief-*.txt), to compare what each makes
+  ...(process.env.DESIGN_EXTRA ? JSON.parse(readFileSync(process.env.DESIGN_EXTRA, 'utf8')) : []),
 ].filter((s) => !only || s.id === only || s.id.startsWith(only));
 
 // ── the exchange ──

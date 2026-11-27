@@ -4,14 +4,36 @@
 // the person to fill. Nothing here is a form: to change any of it, they say so in the conversation.
 
 import type { StudioState } from '@/lib/ux-v0/studio/schema';
-import { briefLines, type DirectorEnv } from '@/lib/ux-v0/studio/director';
+import { briefLines, type BriefLine, type DirectorEnv } from '@/lib/ux-v0/studio/director';
+import type { CreativeBrief } from '@/lib/ux-v0/studio/brief';
 import { likedRefs } from '@/lib/ux-v0/studio/references';
 import { FileMark } from './glyphs';
 
 const SOURCE: Record<string, string> = { words: 'From your words', person: 'You said', socria: 'SocriaUX decides', gap: 'Yours to fill in' };
+// for what discovery understood: SocriaUX's reading is a reading, and what is open is SocriaUX's to decide
+const SOURCE_DISCOVERED: Record<string, string> = { words: 'From your words', person: 'You said', socria: 'My reading — say if it’s wrong', gap: 'I’ll decide unless you say' };
+
+/** What discovery understood (lib/ux-v0/studio/brief.ts), line by line: the person's words, or SocriaUX's reading. */
+function creativeLines(b: CreativeBrief): BriefLine[] {
+  const out: BriefLine[] = [];
+  const add = (label: string, value: string, source: BriefLine['source']) => value.trim() && out.push({ label, value: value.trim(), source });
+  add('What it is', b.kind, 'words');
+  add('What it is for', b.purpose, 'words');
+  add('Who it is for', b.audience, 'words');
+  add('Its words', b.content.replace(/\n/g, ' · '), 'person');
+  add('How it should feel', b.feel, 'person');
+  add('You asked for', b.explicit.slice(-4).join(' · '), 'person');
+  add('Colours you picked', b.chosen.palette ? `${b.chosen.palette.name} — ${b.chosen.palette.colours.join(' ')}` : '', 'person');
+  add('Lettering you picked', b.chosen.type ? `${b.chosen.type.name} — ${b.chosen.type.display}${b.chosen.type.body !== b.chosen.type.display ? ` with ${b.chosen.type.body}` : ''}` : '', 'person');
+  add('Mood you picked', b.chosen.mood ? `${b.chosen.mood.name} — ${b.chosen.mood.note}` : '', 'person');
+  add('Kept out', b.avoid.join(' · '), 'person');
+  add('My reading', b.tentative.join(' · '), 'socria');
+  add('Still open', b.open.join(' · '), 'gap');
+  return out;
+}
 
 export function Brief({ st, env, title = 'What I have so far' }: { st: StudioState; env: DirectorEnv; title?: string }) {
-  const lines = briefLines(st, env);
+  const lines = st.brief ? creativeLines(st.brief) : briefLines(st, env);
   const refs = likedRefs(st);
   return (
     <div className="sd-ctx">
@@ -22,7 +44,7 @@ export function Brief({ st, env, title = 'What I have so far' }: { st: StudioSta
             <dt>{l.label}</dt>
             <dd>
               <span className="sd-ctx-v">{l.value}</span>
-              <span className="sd-ctx-src">{SOURCE[l.source]}</span>
+              <span className="sd-ctx-src">{(st.brief ? SOURCE_DISCOVERED : SOURCE)[l.source]}</span>
             </dd>
           </div>
         ))}

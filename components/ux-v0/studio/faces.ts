@@ -1,12 +1,9 @@
 'use client';
 
-// components/ux-v0/studio/faces.ts — faces loaded into the page before words are measured, for the studio's visual
-// question cards (DiscoveryOptions), whose previews are drawn by lib/ux-v0/graphics/render.ts.
+// components/ux-v0/studio/faces.ts — faces loaded into the page before words are shown in them: the lettering and
+// moods a question offers (./AidPicker.tsx) are never shown in a fallback face.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
 import { graphicFontStylesheet } from '@/lib/ux-v0/fonts';
-import { canvasMeasure } from '@/lib/ux-v0/graphics/raster';
-import type { Measure } from '@/lib/ux-v0/graphics/text';
 
 export type Face = { face: string; weight: number; italic: boolean };
 
@@ -38,28 +35,4 @@ export async function loadFaces(faces: readonly Face[]): Promise<boolean> {
     new Promise((res) => window.setTimeout(res, 3500)),
   ]);
   return true;
-}
-
-/**
- * The measure text is laid out with, made again once the faces given have loaded (so a line measured before its face
- * arrived is measured again with it). `refresh` remakes it after faces were loaded by hand.
- */
-export function useFaceMeasure(faces: readonly Face[]): { measure: Measure; refresh: () => void } {
-  const [tick, setTick] = useState(0);
-  const key = useMemo(() => [...new Set(faces.map(faceKey))].sort().join(';'), [faces]);
-  useEffect(() => {
-    if (!key) return;
-    let live = true;
-    const list = key.split(';').map((k) => {
-      const [face, weight, italic] = k.split('|');
-      return { face, weight: Number(weight), italic: italic === '1' };
-    });
-    loadFaces(list).then((changed) => live && changed && setTick((t) => t + 1));
-    return () => {
-      live = false;
-    };
-  }, [key]);
-  const measure = useMemo(() => canvasMeasure(), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
-  const refresh = useCallback(() => setTick((t) => t + 1), []);
-  return { measure, refresh };
 }

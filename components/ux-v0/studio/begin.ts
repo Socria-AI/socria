@@ -9,7 +9,8 @@ import { checkFile } from '../files';
 import { holdFile, heldFile } from './held';
 import { makeProject, normalizeRef, type DesignProject, type MoodboardRef } from '@/lib/ux-v0/types';
 import { emptyStudio, said, studioId, type StudioAttachment, type StudioMode, type StudioState } from '@/lib/ux-v0/studio/schema';
-import { opening, seedFromWords, switchKind } from '@/lib/ux-v0/studio/director';
+import { makeItNow, opening, seedFromWords, switchKind } from '@/lib/ux-v0/studio/director';
+import { applyDecision, isCreative, makeNow, wantsMake } from '@/lib/ux-v0/studio/discover';
 import { systemChosen, websiteSystems } from '@/lib/ux-v0/studio/options';
 import { attachmentKindOf } from '@/lib/ux-v0/studio/intent';
 import { readFacts } from '@/lib/ux-v0/studio/facts';
@@ -64,8 +65,14 @@ export function conversationProject(mode: StudioMode, prompt: string, opts: { mo
   const now = opts.now ?? Date.now();
   let st = emptyStudio(mode, prompt, { modeBy: opts.modeBy, attachments: opts.attachments, now, ...(opts.systemId && mode !== 'critique' && mode !== 'system' ? { systemId: opts.systemId } : {}) });
   st = said(st, { from: 'person', kind: 'prompt', text: prompt || (opts.attachments.length ? `These: ${opts.attachments.map((a) => a.name).join(', ')}` : `A ${modeInfo(mode).label.toLowerCase()}`), attachments: opts.attachments.map((a) => a.id), at: now });
-  // what was understood, then one question — or straight to the work when the words are enough
-  st = opening(st, { hasSystem: !!st.systemId, ...(opts.systemName ? { systemName: opts.systemName } : {}) }, now);
+  if (isCreative(mode)) {
+    // a graphic, a logo, a campaign, a website: SocriaUX's first turn is taken in the conversation (it may ask, or make
+    // it); words that hand it over ("surprise me, just make something") are made at once
+    if (wantsMake(prompt)) st = applyDecision(st, makeNow(st), now);
+  } else {
+    // a critique or an import: what it needs (the file), then straight to it
+    st = opening(st, { hasSystem: !!st.systemId, ...(opts.systemName ? { systemName: opts.systemName } : {}) }, now);
+  }
   return { ...makeProject(mode === 'critique' ? 'critique' : 'create', nameFor(mode, prompt), now), intent: prompt.slice(0, 600), studio: st };
 }
 
@@ -110,8 +117,9 @@ function looksFor(st: StudioState, rec: SystemRecord | null): MasterDesignSystem
 }
 
 /** The work a conversation was about, made from it (nothing is stored here: the caller keeps it). */
-export function startFrom(p: DesignProject, st: StudioState, opts: { systems: readonly SystemRecord[]; websiteSystems: readonly MasterDesignSystem[]; now?: number }): Started {
+export function startFrom(p: DesignProject, st0: StudioState, opts: { systems: readonly SystemRecord[]; websiteSystems: readonly MasterDesignSystem[]; now?: number }): Started {
   const now = opts.now ?? Date.now();
+  let st = st0;
   // the design system: chosen for the work, or (a board) the identity it was asked to share
   const identity = st.answers['b.identity']?.values?.[0] ?? '';
   const sysId = st.systemId ?? (st.mode === 'board' && identity.startsWith('system:') ? identity.slice('system:'.length) : undefined);
@@ -126,6 +134,12 @@ export function startFrom(p: DesignProject, st: StudioState, opts: { systems: re
     return { ok: true, kind: 'project', project: linked(r.project) };
   }
   if (st.mode === 'website') {
+    // the website engine reads its decisions from words: everything the person said in discovery, with what is still
+    // open left as marked gaps it fills in
+    if (st.brief) {
+      const words = st.transcript.filter((m) => m.from === 'person' && m.text.trim()).map((m) => m.text.trim()).join(' — ');
+      st = makeItNow(seedFromWords({ ...st, prompt: words.slice(0, 2000) }, now), now);
+    }
     // the looks shown in the conversation; when none were drawn (made at once), drawn here the same way
     const drawn = opts.websiteSystems.length ? opts.websiteSystems : looksFor(st, rec);
     const sys = systemChosen(drawn, st.answers['w.aesthetic']?.values?.[0]);
