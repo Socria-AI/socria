@@ -23,10 +23,14 @@ export { renderDesign } from '@/lib/ux-v0/render';
 export { proposeDirections } from '@/lib/ux-v0/direction';
 export { normalizeBrief } from '@/lib/ux-v0/types';
 // the creative questions: the model's side, the mood carried into the work, the moods drawn small
-export * from '@/lib/ux-v0/studio/discovery-model';
 export * from '@/lib/ux-v0/studio/realise';
 export * from '@/lib/ux-v0/studio/vibe-preview';
 export { renderArtboard } from '@/lib/ux-v0/graphics/render';
 export { FONTS } from '@/lib/ux-v0/fonts';
 export { contrastRatio } from '@/lib/ux/audit';
 export { QUALITIES, THEMES, TYPE_CHARACTERS } from '@/lib/ux-v0/graphics/creative/lexicon';
+// creative discovery: the turn (model or reader), the brief and its aids, the model's side
+export * from '@/lib/ux-v0/studio/discover';
+export * from '@/lib/ux-v0/studio/discover-model';
+export * from '@/lib/ux-v0/studio/brief';
+export { designFromStudio } from '@/lib/ux-v0/design/start';

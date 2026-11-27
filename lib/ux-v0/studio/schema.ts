@@ -8,6 +8,7 @@
 
 import { cleanResult } from '../research/schema';
 import { normalizeDiscovery, type DiscoveryState } from './discovery';
+import { normalizeAid, normalizeCreativeBrief, type Aid, type CreativeBrief } from './brief';
 
 export const STUDIO_MODES = ['graphic', 'website', 'logo', 'system', 'board', 'critique'] as const;
 export type StudioMode = (typeof STUDIO_MODES)[number];
@@ -130,6 +131,10 @@ export interface StudioMessage {
   attachments?: string[];
   /** a search for references: what was searched for and what was found (each with its source) */
   found?: { query: string; provider: string; results: FoundReference[] };
+  /** palettes, pairings of faces or moods shown with a question (./brief.ts) */
+  aid?: Aid;
+  /** short replies offered with a question */
+  suggestions?: string[];
 }
 
 export interface StudioState {
@@ -161,6 +166,8 @@ export interface StudioState {
   references?: StudioReference[];
   /** the creative questions: the one waiting (with the options offered) and what has been asked (./discovery.ts) */
   discovery?: DiscoveryState;
+  /** what is understood about the work so far, in the person's words (./brief.ts, ./discover.ts) */
+  brief?: CreativeBrief;
   createdAt: number;
 }
 
@@ -273,6 +280,8 @@ function normalizeMessage(v: unknown): StudioMessage | null {
     ...(stage && ID.test(stage) ? { stage } : {}),
     ...(atts.length ? { attachments: atts } : {}),
     ...((f) => (f ? { found: f } : {}))(normalizeFound(r.found)),
+    ...((x) => (x ? { aid: x } : {}))(r.aid ? normalizeAid(r.aid) : null),
+    ...((xs) => (xs.length ? { suggestions: xs } : {}))(a(r.suggestions).map((x) => s(x, 80).trim()).filter(Boolean).slice(0, 3)),
   };
 }
 
@@ -330,6 +339,7 @@ export function normalizeStudio(v: unknown): StudioState | undefined {
         .slice(0, MAX_REFERENCES),
     ),
     ...((d) => (d ? { discovery: d } : {}))(normalizeDiscovery(r.discovery)),
+    ...((b) => (b ? { brief: b } : {}))(normalizeCreativeBrief(r.brief)),
     createdAt: n(r.createdAt, 0, 8.64e15) ?? 0,
   };
 }
@@ -377,6 +387,6 @@ function normalizeReference(v: unknown): StudioReference | null {
 
 /** A message added to the conversation (bounded: the oldest go first). */
 export function said(st: StudioState, m: Omit<StudioMessage, 'id' | 'at'> & { at?: number }): StudioState {
-  const msg: StudioMessage = { id: studioId('m'), at: m.at ?? Date.now(), from: m.from, text: m.text.slice(0, STUDIO_LIMITS.text * 2), kind: m.kind, ...(m.stage ? { stage: m.stage } : {}), ...(m.attachments?.length ? { attachments: m.attachments } : {}), ...((f) => (f ? { found: f } : {}))(m.found ? normalizeFound(m.found) : null) };
+  const msg: StudioMessage = { id: studioId('m'), at: m.at ?? Date.now(), from: m.from, text: m.text.slice(0, STUDIO_LIMITS.text * 2), kind: m.kind, ...(m.stage ? { stage: m.stage } : {}), ...(m.attachments?.length ? { attachments: m.attachments } : {}), ...((f) => (f ? { found: f } : {}))(m.found ? normalizeFound(m.found) : null), ...(m.aid ? { aid: m.aid } : {}), ...(m.suggestions?.length ? { suggestions: m.suggestions.slice(0, 3) } : {}) };
   return { ...st, transcript: [...st.transcript, msg].slice(-STUDIO_LIMITS.transcript) };
 }

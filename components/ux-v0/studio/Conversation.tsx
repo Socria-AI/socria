@@ -1,11 +1,10 @@
 'use client';
 // components/ux-v0/studio/Conversation.tsx — talking it through with a creative director, before the work is made.
 //
-// A conversation, not a questionnaire: SocriaUX says what it understood and asks a question only when one would change
-// the work (lib/ux-v0/studio/director.ts) — at most a few, each written for this brief. Creative questions show their
-// answers (./DiscoveryOptions.tsx): palettes to see, lettering set in real faces, moods drawn by the engine; the person
-// taps one, answers in their own words, asks for others, skips it, or says "surprise me" — or "make it now" at any
-// point. Links to websites they like are read and shown as references (what was read, the page drawn as it is, what to
+// A conversation, not a questionnaire: SocriaUX takes what was said, and asks one question only when it would change
+// the work (lib/ux-v0/studio/discover.ts), written for this work. When seeing would help more than reading, the
+// question shows a few palettes, pairings of typefaces or moods (./AidPicker.tsx); the person picks one or just writes —
+// anything, in their own words — and "make it now", "you decide" or "surprise me" make it at any point. Links to websites they like are read and shown as references (what was read, the page drawn as it is, what to
 // take from it); pictures can be dropped in at any point. Once the brief is enough the work is made: there is no
 // separate stage of choosing a direction. Everything understood is in the brief drawer, each line with where it came
 // from.
@@ -14,13 +13,14 @@ import { useEffect, useRef, useState } from 'react';
 import type { RefTake, StudioMessage, StudioMode, StudioReference, StudioState } from '@/lib/ux-v0/studio/schema';
 import { REF_TAKES } from '@/lib/ux-v0/studio/schema';
 import { MODES, modeInfo } from '@/lib/ux-v0/studio/modes';
-import { questionFor, subjectFor, understand, type DirectorEnv, type Topic } from '@/lib/ux-v0/studio/director';
+import { questionFor, understand, type DirectorEnv, type Topic } from '@/lib/ux-v0/studio/director';
 import { referenceSaid } from '@/lib/ux-v0/studio/references';
 import type { SystemRecord } from '@/lib/ux-v0/dsi/registry';
 import { SystemPicker, usableSystems } from './SystemPicker';
 import { Brief } from './Brief';
 import { SitePreview } from './previews';
-import { DiscoveryOptions } from './DiscoveryOptions';
+import { AidPicker } from './AidPicker';
+import { isCreative } from '@/lib/ux-v0/studio/discover';
 import { ArrowUp, Attach, Check, Close, Down, FileMark, ModeGlyph, Panel } from './glyphs';
 
 export interface ConversationProps {
@@ -35,9 +35,9 @@ export interface ConversationProps {
   onSend: (text: string, files: File[]) => void;
   /** "Make it now": whatever is open is left to SocriaUX */
   onMake: () => void;
-  /** one of the options a creative question offered, tapped */
+  /** one of the options an aid offered, tapped (its place in the aid) */
   onChoose: (optionId: string) => void;
-  /** the creative question waiting is being written for this brief (its words and options are not shown yet) */
+  /** SocriaUX is deciding what to say next (the question model, or the reader) */
   thinking?: boolean;
   /** what to take from a reference, or that it is not wanted */
   onReference: (id: string, patch: Partial<Pick<StudioReference, 'take' | 'state'>>) => void;
@@ -148,15 +148,18 @@ export function Conversation(p: ConversationProps) {
   const fileInput = useRef<HTMLInputElement>(null);
   const modeBox = useRef<HTMLDivElement>(null);
   const info = modeInfo(st.mode);
-  const pending = st.pending && st.pending !== 'discover' ? (st.pending as Topic) : undefined;
+  // a graphic, a logo, a campaign, a website: creative discovery (lib/ux-v0/studio/discover.ts) — the question waiting is
+  // Socria's last message, when nothing has been said since; a critique or an import keeps the director's own topics
+  const discovering = isCreative(st.mode);
+  const lastMsg = st.transcript[st.transcript.length - 1];
+  const waitingAsk = discovering && st.status === 'discovering' && lastMsg?.from === 'socria' && lastMsg.kind === 'question' ? lastMsg : null;
+  const pending = !discovering && st.pending && st.pending !== 'discover' ? (st.pending as Topic) : undefined;
   const question = pending ? questionFor(st, pending, env) : null;
-  const creative = st.pending === 'discover' ? st.discovery?.current : undefined;
   // Socria's last turn that moved things on (a site read after a question leaves the question, and its suggestions, open)
   const lastQuestion = [...st.transcript].reverse().find((m) => m.from === 'socria' && (m.kind === 'question' || m.kind === 'offer' || m.stage === 'making'));
   const u = understand(st);
-  const sample = subjectFor(st, u).sample;
-  // a logo cannot be made without its name, a critique without its design, an import without its source
-  const blocked = st.modeBy === 'unsure' || (st.mode === 'logo' && !u.name) || u.required.includes('file') || u.required.includes('source');
+  // a critique cannot be made without its design, an import without its source (discovery never blocks: "make it" makes it)
+  const blocked = !discovering && (st.modeBy === 'unsure' || u.required.includes('file') || u.required.includes('source'));
 
   // the newest turn in view, gently (at once for those who asked for less motion)
   useEffect(() => {
@@ -280,24 +283,25 @@ export function Conversation(p: ConversationProps) {
                 );
               const r = m.kind === 'reference' && m.stage ? refs.get(m.stage) : undefined;
               const isLast = m.id === lastQuestion?.id;
-              const asking = isLast && m.kind === 'question' && m.stage === 'discover' && !!creative && st.status === 'discovering';
-              // the question being written for this brief: its words and options are shown once they are ready
-              if (asking && p.thinking)
-                return (
-                  <li key={m.id} className="sd-msg is-socria k-note">
-                    <p className="sd-said is-wait sd-thinking" role="status" aria-live="polite">
-                      Thinking about what would change this most…
-                    </p>
-                  </li>
-                );
+              // the question waiting, with what it shows (an aid only when seeing helps) and any short replies to tap
+              const asking = !!waitingAsk && m.id === waitingAsk.id && !p.thinking;
               return (
                 <li key={m.id} className={`sd-msg is-socria k-${m.kind}${asking ? ' is-asking' : ''}`}>
                   <div className="sd-say">
                     <p className="sd-said">{r ? referenceSaid(r) : m.text}</p>
                     {r && <ReferenceCard r={r} preview={p.previews[r.id]} onReference={p.onReference} />}
                     {m.kind === 'research' && m.found ? <FoundList found={m.found} used={new Set((st.references ?? []).map((x) => x.url))} onUse={p.onUseFound} /> : null}
-                    {asking && creative && !busy && <DiscoveryOptions key={creative.id} q={creative} sample={sample} onChoose={p.onChoose} onSend={(w) => p.onSend(w, [])} />}
-                    {isLast && m.kind === 'question' && question && question.suggestions.length > 0 && !busy && (
+                    {asking && m.aid && !busy && <AidPicker key={m.id} aid={m.aid} onPick={(i) => p.onChoose(String(i))} />}
+                    {asking && !m.aid && (m.suggestions?.length ?? 0) > 0 && !busy && (
+                      <p className="sd-suggest" role="group" aria-label="Some ways to answer">
+                        {m.suggestions!.map((x) => (
+                          <button key={x} type="button" className="sd-suggestion" onClick={() => send(x)}>
+                            {x}
+                          </button>
+                        ))}
+                      </p>
+                    )}
+                    {!discovering && isLast && m.kind === 'question' && question && question.suggestions.length > 0 && !busy && (
                       <p className="sd-suggest" role="group" aria-label="Some ways to answer">
                         {question.suggestions.map((s) => (
                           <button key={s} type="button" className="sd-suggestion" onClick={() => send(s)}>
@@ -310,6 +314,15 @@ export function Conversation(p: ConversationProps) {
                 </li>
               );
             })}
+            {p.thinking && !busy && (
+              <li className="sd-msg is-socria k-note">
+                <p className="sd-said is-wait sd-typing" role="status" aria-live="polite" aria-label="SocriaUX is thinking">
+                  <span />
+                  <span />
+                  <span />
+                </p>
+              </li>
+            )}
             {p.searching && (
               <li className="sd-msg is-socria">
                 <p className="sd-said is-wait" role="status">
@@ -365,7 +378,7 @@ export function Conversation(p: ConversationProps) {
                 Make it now
               </button>
             )}
-            {question?.optional && !busy && (
+            {!discovering && question?.optional && !busy && (
               <button type="button" className="sd-textlink is-small" onClick={() => send('skip')}>
                 Skip this
               </button>
@@ -396,7 +409,7 @@ export function Conversation(p: ConversationProps) {
               ref={field}
               rows={1}
               value={words}
-              placeholder={creative ? (creative.kind === 'colour' ? 'Choose a palette, or name your colours — hex codes or words' : creative.kind === 'type' ? 'Choose one, or name a typeface or describe the lettering you like' : creative.kind === 'vibe' ? 'Choose a mood, or describe the feel in your own words' : 'Answer in your own words') : question ? 'Answer in your own words — or tell me anything else' : 'Tell me anything else, paste a link to something you like, or say “make it”'}
+              placeholder={waitingAsk?.aid ? (waitingAsk.aid.kind === 'palettes' ? 'Pick one, mix them, or name your own colours' : waitingAsk.aid.kind === 'type' ? 'Pick one, or describe the lettering you want' : 'Pick one, combine them, or say it in your own words') : waitingAsk || question ? 'Answer in your own words — or say “make it”' : 'Tell me anything else, paste a link to something you like, or say “make it”'}
               onChange={(e) => setWords(e.target.value.slice(0, 1200))}
               onPaste={(e) => {
                 const pics = [...e.clipboardData.files];

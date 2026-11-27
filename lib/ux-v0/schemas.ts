@@ -23,7 +23,7 @@ import { EXPERIENCES } from './intent';
 import { LANGUAGES } from './direction';
 import { SIGNATURES } from './plan';
 import { MOOD_CATEGORIES, PALETTE_ROLES, VERDICTS, type CallKind } from './types';
-import { STUDIO_QUESTION_SCHEMA } from './studio/discovery-model';
+import { DISCOVER_SCHEMA } from './studio/discover-model';
 
 type Schema = Record<string, unknown>;
 
@@ -133,8 +133,9 @@ const SCHEMAS: Partial<Record<CallKind, Schema>> = {
   'refine-brief': refineBrief,
   direction: moodDirection,
   critique,
-  // lib/ux-v0/studio/discovery-model.ts: the studio's next creative question, with options generated for the brief
-  'studio-questions': STUDIO_QUESTION_SCHEMA,
+  // lib/ux-v0/studio/discover-model.ts: the next turn of creative discovery — one question (with an aid when seeing
+  // helps) or "make it", and the brief in the person's words
+  'studio-questions': DISCOVER_SCHEMA,
 };
 
 /** The structured format for a kind of call, or undefined when it answers in plain JSON (see above). */

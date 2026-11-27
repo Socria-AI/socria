@@ -138,7 +138,7 @@ export const STAGE_TIER: Record<CallKind, Tier> = {
   'design-look': 'economy',
   // the director looking at the rendered result (a picture) and correcting what it sees: a few precise edits
   'graphic-review': 'economy',
-  // the studio's next creative question and its options (studio/discovery-model.ts): short, structured, validated twice
+  // the next turn of creative discovery (studio/discover-model.ts): one question or make it, the brief, an aid — validated twice
   'studio-questions': 'economy',
   // not a text stage: a picture from an image model, routed by lib/ux-v0/image-gen-server.ts
   image: 'economy',
@@ -351,7 +351,7 @@ export const MAX_TOKENS: Record<CallKind, number> = {
   'design-write': 16000,
   'design-look': 4000,
   'graphic-review': 2600,
-  'studio-questions': 1600,
+  'studio-questions': 2400,
   image: 0,
 };
 

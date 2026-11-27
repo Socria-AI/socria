@@ -1,23 +1,25 @@
 'use client';
 // components/ux-v0/studio/ProjectConversation.tsx — a project still in conversation: the one writer of its record
-// (useV0Project, like every workspace), every message and every option tapped read by the creative director
-// (lib/ux-v0/studio/director.ts), each creative question written for this brief by the model when it can be reached
-// (./questionPlanner.ts; the reader's question stands otherwise), websites the person points to read for reference
-// (/api/ux-v0/reference) before anything is made from them, files attached as they come, and the hand-over when the
-// work begins — as soon as the brief is enough, with no direction to choose first.
+// (useV0Project, like every workspace). For a graphic, a logo, a campaign or a website, each time the person speaks
+// SocriaUX decides one thing — ask one question, or make it (lib/ux-v0/studio/discover.ts; the model decides when it
+// can be reached: ./discoverClient.ts) — and "make it", "you decide" or "surprise me" make it at once. Websites the
+// person points to are read for reference (/api/ux-v0/reference) before the turn that follows, files are attached as
+// they come, and the work begins as soon as the brief is enough, with no direction to choose first. A critique and a
+// design-system import keep their own short exchange (lib/ux-v0/studio/director.ts): they only need the file.
 
 import { useEffect, useRef, useState } from 'react';
 import { SAVE_WORDS, useV0Project } from '../useV0Project';
 import { putProject } from '@/lib/ux-v0/store';
 import type { DesignProject } from '@/lib/ux-v0/types';
 import { said, type StudioMode, type StudioState } from '@/lib/ux-v0/studio/schema';
-import { chooseOption, enoughToMake, readyToMake, respond, rethinkQuestion, seedFromWords, type DirectorEnv } from '@/lib/ux-v0/studio/director';
+import { chooseOption, readyToMake, referenceUrls, respond, seedFromWords, type DirectorEnv } from '@/lib/ux-v0/studio/director';
+import { applyDecision, awaitingTurn, chooseAid, isCreative, makeNow, makingNow, personSays, wantsMake } from '@/lib/ux-v0/studio/discover';
 import { addReference, referenceOf, type SiteRead } from '@/lib/ux-v0/studio/references';
 import { researchAskOf, type ResearchResponse } from '@/lib/ux-v0/research/schema';
 import type { SystemRecord } from '@/lib/ux-v0/dsi/registry';
 import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
 import { Conversation } from './Conversation';
-import { planQuestion, questionModelWorthAsking } from './questionPlanner';
+import { decideTurn, TurnCancelled } from './discoverClient';
 import { attachFiles, switchMode } from './begin';
 import { usableSystems } from './SystemPicker';
 
@@ -87,43 +89,33 @@ export function ProjectConversation(props: {
     if (readyToMake(latest.current, envRef.current)) await start(latest.current);
   };
 
-  // each creative question is written for this brief by the model when it can be reached: the reader's question is
-  // held back while it writes (a moment), then the model's takes its place — or the brief is judged enough and the
-  // work is made. Answered in the meantime, or not reachable: the reader's question stands, nothing is lost.
-  const [thinking, setThinking] = useState<string | null>(null);
-  const tried = useRef(new Set<string>());
-  const planning = useRef<AbortController | null>(null);
-  const waiting = st.status === 'discovering' && st.pending === 'discover' ? st.discovery?.current : undefined;
-  useEffect(() => {
-    const q = waiting;
-    if (!q || q.by !== 'reader' || tried.current.has(q.id) || !questionModelWorthAsking()) return;
-    tried.current.add(q.id);
-    setThinking(q.id);
+  // creative discovery: SocriaUX's turn, decided by the model when it can be reached (the reader otherwise). A turn
+  // still being decided when the person says something else is let go; the newer words get the turn.
+  const [thinking, setThinking] = useState(false);
+  const turning = useRef<AbortController | null>(null);
+  const creative = isCreative(st.mode);
+  const turn = async () => {
+    turning.current?.abort();
     const ctl = new AbortController();
-    planning.current = ctl;
-    void planQuestion(latest.current, { projectId: project.id, signal: ctl.signal })
-      .then(async (r) => {
-        if (r.by !== 'model' || ctl.signal.aborted) return;
-        const now = latest.current;
-        if (now.pending !== 'discover' || now.discovery?.current?.id !== q.id) return;
-        if (r.ready) {
-          const next = enoughToMake(now, q.id, envRef.current);
-          if (next !== now) {
-            commit(next);
-            await after();
-          }
-          return;
-        }
-        commit(rethinkQuestion(now, q.id, r.question));
-      })
-      .finally(() => setThinking((t) => (t === q.id ? null : t)));
-  }, [waiting?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => () => planning.current?.abort(), []);
-  /** Whatever the person does next answers the question as shown: a question still being written is let go. */
+    turning.current = ctl;
+    const from = latest.current;
+    setThinking(true);
+    try {
+      const d = await decideTurn(from, { projectId: project.id, signal: ctl.signal, ...(envRef.current.systemName ? { systemName: envRef.current.systemName } : {}) });
+      if (ctl.signal.aborted || latest.current.transcript.length !== from.transcript.length) return;
+      commit(applyDecision(latest.current, d));
+      if (d.action === 'make') await start(latest.current);
+    } catch (e) {
+      if (!(e instanceof TurnCancelled)) setError('Something went wrong while thinking about that. Say it again, or press “Make it now”.');
+    } finally {
+      if (turning.current === ctl) setThinking(false);
+    }
+  };
+  useEffect(() => () => turning.current?.abort(), []);
+  /** Whatever the person does next is answered on its own: a turn still being decided is let go. */
   const settle = () => {
-    if (!thinking) return;
-    planning.current?.abort();
-    setThinking(null);
+    turning.current?.abort();
+    setThinking(false);
   };
 
   // a conversation that said it was making the work, opened before it could (a reload): it is made now
@@ -131,8 +123,16 @@ export function ProjectConversation(props: {
   useEffect(() => {
     if (resumed.current) return;
     resumed.current = true;
+    if (st.status !== 'discovering') return;
+    if (isCreative(st.mode)) {
+      // a conversation opened on the person's words (a new one, or one left before SocriaUX answered): its turn now;
+      // one that said it was making the work before it could: made now
+      if (makingNow(st)) void start(st);
+      else if (awaitingTurn(st)) void turn();
+      return;
+    }
     const last = [...st.transcript].reverse().find((m) => m.from === 'socria');
-    if (st.status === 'discovering' && last?.kind === 'note' && readyToMake(st, env)) void start(st);
+    if (last?.kind === 'note' && readyToMake(st, env)) void start(st);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Websites the person pointed to, read one after another; what was read (or why it could not be) is said. */
@@ -204,33 +204,62 @@ export function ProjectConversation(props: {
       }
       if (!r.attachments.length && !text) return;
     }
-    const turn = respond(latest.current, text || (ids.length ? 'These' : ''), env, { attachments: ids });
-    commit(turn.st);
-    if (turn.switchTo) {
-      change((s) => switchMode(s, turn.switchTo!));
+    if (isCreative(latest.current.mode)) {
+      commit(personSays(latest.current, text || (ids.length ? 'These' : ''), { attachments: ids }));
+      // "make it", "you decide", "surprise me": made now, with what is understood
+      if (wantsMake(text)) {
+        commit(applyDecision(latest.current, makeNow(latest.current)));
+        return start(latest.current);
+      }
+      // a site to learn from is read before SocriaUX answers; a search is run when one was asked for
+      const urls = referenceUrls(text);
+      if (urls.length) await readSites(urls);
+      const ask = researchAskOf(text);
+      if (ask && !urls.length) {
+        change((s) => said(s, { from: 'socria', kind: 'note', text: `Looking for references: “${ask.query}”.` }));
+        await searchRefs(ask);
+        return;
+      }
+      return turn();
+    }
+    const turn0 = respond(latest.current, text || (ids.length ? 'These' : ''), env, { attachments: ids });
+    commit(turn0.st);
+    if (turn0.switchTo) {
+      change((s) => switchMode(s, turn0.switchTo!));
       return after();
     }
     // a site to learn from is read before anything is made from what was said; a search is run when one was asked for
-    if (turn.research.length) await readSites(turn.research);
-    if (turn.search) await searchRefs(turn.search);
-    if (turn.move.kind === 'create') await after();
+    if (turn0.research.length) await readSites(turn0.research);
+    if (turn0.search) await searchRefs(turn0.search);
+    if (turn0.move.kind === 'create') await after();
   };
 
   const onMake = async () => {
     settle();
-    const turn = respond(latest.current, 'Make it now', env);
-    commit(turn.st);
-    if (turn.move.kind === 'create') await start(latest.current);
+    if (isCreative(latest.current.mode)) {
+      commit(applyDecision(personSays(latest.current, 'Make it now'), makeNow(latest.current)));
+      return start(latest.current);
+    }
+    const t = respond(latest.current, 'Make it now', env);
+    commit(t.st);
+    if (t.move.kind === 'create') await start(latest.current);
   };
 
   /** One of the options a creative question offered, tapped: the decision taken, then the next question or the work. */
   const onChoose = async (optionId: string) => {
     setError('');
     settle();
-    const turn = chooseOption(latest.current, optionId, env);
-    commit(turn.st);
-    if (turn.research.length) await readSites(turn.research);
-    if (turn.move.kind === 'create') await after();
+    if (isCreative(latest.current.mode)) {
+      // an option an aid offered (its place in the aid): said as the person's reply and kept as their taste
+      const next = chooseAid(latest.current, Number(optionId));
+      if (!next) return;
+      commit(next);
+      return turn();
+    }
+    const t = chooseOption(latest.current, optionId, env);
+    commit(t.st);
+    if (t.research.length) await readSites(t.research);
+    if (t.move.kind === 'create') await after();
   };
 
   return (
@@ -253,7 +282,7 @@ export function ProjectConversation(props: {
       onUseFound={(url) => void readSites([url])}
       onMake={() => void onMake()}
       onChoose={(id) => void onChoose(id)}
-      thinking={!!thinking && thinking === waiting?.id}
+      thinking={thinking}
       onReference={(id, patch) => change((s) => ({ ...s, references: (s.references ?? []).map((r) => (r.id === id ? { ...r, ...patch } : r)) }))}
       previews={previews}
       reading={reading}
@@ -264,6 +293,13 @@ export function ProjectConversation(props: {
         props.onExit();
       }}
       onSwitchMode={(mode) => {
+        if (isCreative(latest.current.mode) && isCreative(mode)) {
+          // another kind of work: said, and SocriaUX thinks again about what it needs
+          settle();
+          change((s) => said({ ...s, mode, modeBy: 'person' }, { from: 'person', kind: 'reply', text: `Make it a ${mode === 'board' ? 'campaign' : mode} instead.` }));
+          void turn();
+          return;
+        }
         change((s) => switchMode(s, mode));
         void after();
       }}

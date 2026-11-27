@@ -1,4 +1,10 @@
-// lib/ux-v0/studio/director.ts — the creative director: understanding what is asked, deciding how much there is to
+// lib/ux-v0/studio/director.ts — the studio's readers and the short exchange a critique or a design-system import
+// needs (the design to look at, the system's source). Graphics, logos, campaigns and websites are discussed through
+// creative discovery instead (./discover.ts): the model decides each turn, and nothing here asks them anything; what
+// remains used from here for them is reading words (subjectOf, seedFromWords, makeItNow for the website engine). The
+// description below is the reader as it was, kept for records made before discovery.
+//
+// The creative director: understanding what is asked, deciding how much there is to
 // ask, asking one meaningful question at a time, reading the person's own words for the answer, and knowing when to
 // stop talking and make the work.
 //

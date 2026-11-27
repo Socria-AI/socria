@@ -1,5 +1,7 @@
 # SocriaUX — dynamic creative discovery
 
+> **Superseded** by [SOCRIAUX-DISCOVERY.md](SOCRIAUX-DISCOVERY.md): the fixed topics, the vibe/palette/type question cards and the question planner described here were replaced by one model-decided turn at a time (ask or make), visual aids only when they help, and a brief in the person's words. Kept for history.
+
 Prompt → a few questions drawn for it → the work → changes in your own words.
 
 You type what you want into the one chatbox. SocriaUX reads it, asks only what the work cannot be made without (a
