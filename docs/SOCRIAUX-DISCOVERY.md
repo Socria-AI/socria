@@ -174,6 +174,12 @@ subject and a register; two questions gave it the event, the feeling in the pers
   host, no page errors.
 - `test/browser/ux-v0/discover-bench.mjs` — the real-conversation benchmark above.
 
+Results against a fresh production build (`next build`, `next start`, placeholder sign-in keys — signed out, as this
+environment is): studio-qa 41/41 (including each aid sample fitting its card in its own face, never broken inside a
+word); design-qa 39/39 (the workspace and its edits, unchanged); legacy-qa 8/8 (older graphics and boards still open);
+dsi-qa 40/40 (one step adjusted: a board in a design system is now made as soon as its pieces are known, without asking
+for its words). Typecheck clean.
+
 ## Limits
 
 - The conversations were answered by a stand-in model, not the production model; the prompt is the same, the words

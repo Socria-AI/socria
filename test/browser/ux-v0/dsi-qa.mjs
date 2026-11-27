@@ -275,7 +275,9 @@ await tab('Usage');
 await page.getByRole('button', { name: 'New board in it' }).click();
 await page.waitForSelector('.sd-chat', { timeout: 15000 });
 await say('one poster and one Instagram post');
-await say('“Slow coffee, early mornings”, “Roasted in Halden”');
+// its words, only if they are asked for (what the pieces are is enough to make it: the words can be stand-ins)
+await page.waitForSelector('#sd-reply, .dx', { timeout: 15000 });
+if (!(await page.locator('.dx').count())) await say('“Slow coffee, early mornings”, “Roasted in Halden”');
 await page.waitForSelector('.dx', { timeout: 30000 });
 ok('a new board is made linked to the system (its badge says so), at once in an expression of its identity (no systems to choose from)', /Halden v4/.test(await page.locator('.ds-sysbadge').innerText()));
 const bpid = new URL(page.url()).searchParams.get('p');
