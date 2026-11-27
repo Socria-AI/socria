@@ -103,110 +103,18 @@ ok('…said in one turn: what was understood, then what happens now (marked as m
 ok('…with no direction to choose first: the work itself is next', !/three directions|choose one|pick one/i.test(lastSaid(detailed).text), lastSaid(detailed).text);
 ok('…what the words said is recorded as said, never asked', detailed.answers['g.kind']?.source === 'words' && detailed.answers['g.words']?.fields?.headline === 'Field Lines' && detailed.answers['g.words']?.fields?.subhead === 'Code that draws' && detailed.answers['g.personality']?.values.includes('bold'), J(detailed.answers));
 ok('…and the work begins with it: a graphic project, composed the moment it opens', S.startProject({ ...S.makeProject('create', 'Untitled graphic', NOW), medium: 'graphic' }, detailed, { now: NOW }).ok);
-ok('the home goes straight to the work only when the opening said it is making it', S.readyToMake(detailed) && !S.readyToMake(open('graphic', 'A poster for “Open Day”')) && !S.readyToMake(open('website', 'A website for “Stillwater Yoga” with bookings')));
 
 const logoFull = open('logo', 'A logo for “Halden”, a small coffee roastery, warm and crafted');
 ok('a logo with its name, its subject and its feel: made at once', questions(logoFull).length === 0 && S.nextMove(logoFull).kind === 'create' && /Constructing “Halden”/.test(lastSaid(logoFull).text), J(logoFull.transcript.map((m) => m.text)));
 const siteFull = open('website', 'A website for “Stillwater Yoga” with bookings, calm and warm');
 ok('a website with its name, its purpose and its feel: made at once, in a look drawn from the words (no looks to choose from)', questions(siteFull).length === 0 && S.nextMove(siteFull).kind === 'create' && lastSaid(siteFull).stage === 'making' && S.readyToMake(siteFull), J(siteFull.transcript.map((m) => m.text)));
 
-// a vague request: what it is, then only what the work cannot be made without, then the creative questions worth asking
-const vagueIntent = S.recognizeIntent('something for my bakery');
-let v = open(vagueIntent.ranked[0].mode, 'something for my bakery', { modeBy: 'unsure' });
-ok('words that settle nothing: the first question is what it is, said plainly, with at most three ways to answer', S.nextMove(v).kind === 'ask' && v.pending === 'what' && questions(v).length === 1 && S.questionFor(v, 'what').suggestions.length <= 3, J(v.transcript));
-let t = reply(v, 'a poster for the opening weekend');
-v = t.st;
-ok('“a poster”: it is a poster now, chosen by the person, and the next question is the one thing a poster needs — its words', v.mode === 'graphic' && v.modeBy === 'person' && v.pending === 'words' && t.move.kind === 'ask', J({ mode: v.mode, pending: v.pending, said: lastSaid(v).text }));
-ok('…one question per turn, never a list of them', v.transcript.filter((m) => m.from === 'socria').every((m) => (m.text.match(/\?/g) ?? []).length <= 2));
-t = reply(v, 'Grand Opening — Saturday 4 May, 9am, 12 Mill Lane');
-v = t.st;
-ok('the words, in the person’s own way of writing them: headline, then what supports it', v.answers['g.words']?.fields?.headline === 'Grand Opening' && /4 May|9am|Mill Lane/.test(J(v.answers['g.words']?.fields)), J(v.answers['g.words']));
-ok('with its words, a date and a place, one creative question is left worth asking: how it should feel, with moods drawn for it', t.move.kind === 'discover' && t.move.question.kind === 'vibe' && v.pending === 'discover' && v.discovery?.current?.vibes?.length >= 3 && questions(v).length === 3, J({ move: t.move.kind, q: questions(v).length, said: lastSaid(v).text }));
-t = reply(v, 'warm and handmade');
-v = t.st;
-ok('…answered in the person’s words: the feel kept, and the work is made (three questions in all)', t.move.kind === 'create' && v.answers['g.personality']?.values.includes('warm') && lastSaid(v).stage === 'making' && questions(v).length === 3, J({ move: t.move.kind, p: v.answers['g.personality'], said: lastSaid(v).text }));
-
-let thin = open('graphic', 'A poster for “Spring Fair”');
-const thinQ = thin.discovery?.current;
-ok('a thin brief: the first creative question is how it should feel — moods drawn for it, each the engine’s own qualities with colours, type and forms', thin.pending === 'discover' && thinQ?.kind === 'vibe' && thinQ.vibes.length >= 3 && thinQ.vibes.every((x) => x.qualities.every((q) => S.QUALITIES.some((y) => y.id === q)) && /^#[0-9a-f]{6}$/.test(x.palette.ground) && S.TYPE_CHARACTERS.includes(x.character) && x.form), J(thinQ));
-ok('…the moods differ from each other (never four of the same)', new Set(thinQ.vibes.map((x) => x.qualities.join('+'))).size === thinQ.vibes.length && new Set(thinQ.vibes.map((x) => x.name)).size === thinQ.vibes.length, J(thinQ.vibes.map((x) => x.name)));
-t = reply(thin, 'warm, a bit retro');
-ok('answered in a few words: the feel kept (as the engine’s qualities, and as personality words)', t.st.answers['g.vibe']?.values.includes('warm') && t.st.answers['g.vibe']?.values.includes('retro') && t.st.answers['g.personality']?.values.includes('warm'), J({ v: t.st.answers['g.vibe'], p: t.st.answers['g.personality'] }));
-ok('…then its colours, palettes drawn for the feel just chosen', t.move.kind === 'discover' && t.move.question.kind === 'colour' && t.move.question.palettes.length >= 3 && /feel you chose/.test(t.move.question.text), J(t.move.question?.text));
-const palPick = t.move.question.palettes[1];
-t = S.chooseOption(t.st, palPick.id, {}, NOW + 40);
-keep(t.st);
-ok('a palette tapped: recorded as the person’s, said back, and the work is made (two creative questions, never all three)', t.move.kind === 'create' && t.st.answers['g.palette']?.fields?.accent === palPick.accent && t.st.answers['g.palette']?.source === 'person' && t.st.transcript.at(-2).from === 'person' && t.st.transcript.at(-2).text === palPick.name && (t.st.discovery?.asked ?? []).filter((d) => ['vibe', 'colour', 'type'].includes(d)).length === 2, J({ move: t.move.kind, pal: t.st.answers['g.palette'], asked: t.st.discovery?.asked }));
-ok('…and the engines read it: the tapped palette is the work’s', S.prefsOf(t.st).palette?.accent === palPick.accent && S.prefsOf(t.st).palette?.ground === palPick.ground, J(S.prefsOf(t.st).palette));
-
-const bakery = open('graphic', 'A poster for “Crumb & Co”, our bakery’s opening');
-const bakeryVibes = bakery.discovery?.current?.vibes ?? [];
-ok('…the moods belong to the subject (a bakery: warm and crafted, never “futuristic” or “professional”)', bakeryVibes.length >= 3 && !bakeryVibes.some((x) => x.qualities.includes('futuristic') || x.qualities.includes('corporate')) && bakeryVibes.some((x) => x.qualities.some((q) => ['warm', 'organic', 'retro', 'alive', 'playful'].includes(q))), J(bakeryVibes.map((x) => [x.name, x.qualities])));
-const jazz = open('graphic', 'A poster for “Blue Hour”, a late-night jazz evening');
-const jazzVibes = jazz.discovery?.current?.vibes ?? [];
-ok('…and another subject gets other moods (a jazz night is not offered the bakery’s)', jazzVibes.length >= 3 && J(jazzVibes.map((x) => x.qualities)) !== J(bakeryVibes.map((x) => x.qualities)), J({ jazz: jazzVibes.map((x) => x.name), bakery: bakeryVibes.map((x) => x.name) }));
-
-// what the director never asks about, and never asks too much
-ok('no question is about spacing, kerning, leading or a grid as such', !SAID.some((x) => /\b(spacing|kerning|leading|grid)\b/i.test(x) && /\?/.test(x)), J(SAID.filter((x) => /spacing|kerning|leading|grid/i.test(x))));
-
-// an optional question: asked once, skippable, never again
-let o = open('graphic', 'A poster for “Open Day”');
-ok('a poster with only its words: how it should feel is asked (optional)', o.pending === 'discover' && o.discovery?.current?.kind === 'vibe');
-t = reply(o, 'skip');
-o = t.st;
-ok('skipped: “I’ll decide that”, and the next question worth asking (its colours)', t.move.kind === 'discover' && t.move.question.kind === 'colour' && /I’ll decide that/.test(lastSaid(o).text) && o.answers['g.vibe']?.skipped === true, lastSaid(o).text);
-t = reply(o, 'skip');
-o = t.st;
-ok('skipped again: the work is made', t.move.kind === 'create' && /I’ll decide that/.test(lastSaid(o).text) && o.answers['g.palette']?.skipped === true, lastSaid(o).text);
-ok('…never asked again', S.nextMove({ ...o, answers: { ...o.answers, 'g.vibe': undefined } }).kind === 'create');
-ok('…and the conversation is ready to make it (a reload picks it up)', S.readyToMake(o));
-const waiting = S.addReference(open('graphic', 'A poster for “Open Day”'), S.referenceOf({ url: 'https://larkfield.example/', host: 'larkfield.example', title: '', colours: ['#f6f1e7', '#2b2118', '#b4532a'], fonts: [], notes: [] }, NOW), NOW);
-ok('a question waiting is still waiting after a site is read (not ready to make)', !S.readyToMake(waiting) && waiting.pending === 'discover');
-let o2 = open('graphic', 'A poster for “Open Day”');
-t = reply(o2, 'make it now');
-ok('“make it now” instead of answering: made, the rest left to SocriaUX (said so)', t.move.kind === 'create' && /I’ll decide whatever you left open/.test(lastSaid(t.st).text) && !t.st.pending, lastSaid(t.st).text);
-t = reply(open('graphic', 'A poster for “Open Day”'), 'Surprise me');
-ok('“surprise me”: made, everything open left to SocriaUX', t.move.kind === 'create' && /Leaving the rest to me/.test(lastSaid(t.st).text), lastSaid(t.st).text);
-
-// a required question cannot be skipped, and "make it now" leaves only what cannot be a gap
-let needName = open('logo', 'A logo for a coffee roastery');
-ok('a logo without its name: the name is asked (the subject is already known, so not that)', needName.pending === 'name' && !(needName.discovery?.asked ?? []).includes('about'), J({ pending: needName.pending, asked: needName.asked }));
-t = reply(needName, 'skip');
-ok('…it cannot be skipped: said kindly, asked again', t.move.kind === 'ask' && /can’t make it without that/.test(lastSaid(t.st).text));
-t = reply(needName, 'just make it');
-ok('…and “make it now” still needs it: a logo means nothing without its name', t.move.kind === 'ask' && t.move.question.topic === 'name' && /I need one thing before I can make it/.test(lastSaid(t.st).text), lastSaid(t.st).text);
-t = reply(t.st, 'It’s called Halden');
-ok('the name, read from a sentence, set exactly', t.st.answers['l.name']?.fields?.name === 'Halden' && t.move.kind === 'create', J(t.st.answers['l.name']));
-
-// gaps left as marked placeholders when the person asks to just make it
-let gap = open('graphic', 'a poster for the open day');
-ok('a poster without its words asks for them', gap.pending === 'words' || gap.pending === 'kind', gap.pending);
-t = reply(gap, 'Make it now');
-gap = t.st;
-ok('“make it now”: the words left as a marked gap, in brackets, from what it is about', t.move.kind === 'create' && /^\[.+\]$/.test(gap.answers['g.words']?.fields?.headline ?? '') && gap.answers['g.words'].source === 'socria', J(gap.answers['g.words']));
-ok('…shown in the brief as yours to fill in', S.briefLines(gap).some((l) => l.source === 'gap'), J(S.briefLines(gap)));
-ok('…and the work can begin with the gap in place', S.startProject({ ...S.makeProject('create', 'Untitled graphic', NOW), medium: 'graphic' }, gap, { now: NOW }).ok);
-
-// a reply that answers nothing is asked again, said another way; a reply that changes something else says so
-let w0 = open('logo', 'A logo for a coffee roastery');
-t = reply(w0, 'hmm');
-ok('a reply that is plainly not a name is still taken as one when short (the person’s words win)', t.st.answers['l.name']?.fields?.name === 'hmm');
-let f0 = open('graphic', 'A poster for “Open Day”');
-t = reply(f0, 'calm and quiet, a bit like a Swiss poster');
-ok('a feel answered in the person’s words: the feel, and the look they named', t.st.answers['g.personality']?.values.includes('calm') && /swiss/i.test(t.st.answers['g.look']?.text ?? ''), J({ p: t.st.answers['g.personality'], l: t.st.answers['g.look'] }));
-t = reply(open('graphic', 'A poster for “Open Day”'), 'use #f4f1e8, #20201b and #5e7633');
-ok('colours named while the feel is asked: they become the palette, and the feel is still asked (colours are not a feel)', S.prefsOf(t.st).palette?.accent === '#5e7633' && t.st.pending === 'discover' && t.st.discovery?.current?.kind === 'vibe' && !t.st.answers['g.vibe'], J({ pal: S.prefsOf(t.st).palette, pending: t.st.pending, vibe: t.st.answers['g.vibe'] }));
 
 // commands understood in the person's words
 const fresh = start('graphic', 'A poster for “Field Lines”');
 ok('commands in the person’s words: make it, surprise me, skip, something different, show me some ideas', S.hear(fresh, 'Go ahead').kind === 'make' && S.hear(fresh, 'Surprise me!').kind === 'surprise' && S.hear(fresh, 'not sure').kind === 'skip' && S.hear(fresh, 'something completely different').kind === 'different' && S.hear(fresh, 'Show me others').kind === 'different' && S.hear(fresh, 'Show me some directions').kind === 'looks' && S.hear(fresh, 'a poster about trees').kind === 'words');
-let others = open('graphic', 'A poster for “Open Day”');
-const firstMoods = others.discovery.current.vibes.map((x) => x.qualities.join('+'));
-t = reply(others, 'Show me others');
-const nextMoods = t.st.discovery?.current?.vibes?.map((x) => x.qualities.join('+')) ?? [];
-ok('“show me others”: the same question with other options, kept apart from those offered', t.move.kind === 'discover' && t.move.question.kind === 'vibe' && nextMoods.length >= 3 && nextMoods.filter((m) => firstMoods.includes(m)).length <= 1 && /some others/i.test(lastSaid(t.st).text), J({ firstMoods, nextMoods }));
 ok('“actually, a website instead” changes the kind', S.hear(fresh, 'Actually I need a website instead').kind === 'switch' && S.hear(fresh, 'Actually I need a website instead').mode === 'website');
-t = reply(open('graphic', 'A poster for “Field Lines”, warm and quiet'), 'Actually, make it a website instead');
+let t = reply(open('graphic', 'A poster for “Field Lines”, warm and quiet'), 'Actually, make it a website instead');
 ok('…and the turn hands the switch to the conversation', t.switchTo === 'website');
 const switched = S.switchKind(S.respond(open('graphic', 'A poster for “Field Lines”'), 'warm and quiet', {}, { now: NOW + 1 }).st, 'website', {}, NOW + 2);
 ok('switching keeps what the person said (the feel) and asks only what a website still needs', switched.mode === 'website' && switched.answers['w.personality']?.values.includes('warm') && switched.transcript.at(-1).from === 'socria' && /A website, then/.test(switched.transcript.at(-1).text), J({ a: switched.answers, said: switched.transcript.at(-1).text }));
@@ -230,17 +138,6 @@ ok('…and a contact form when the words ask for one (the interface’s own labe
 ok('…the person’s words exactly, nothing invented', spec && spec.sections.find((s) => s.kind === 'hero')?.content.title === 'Stillwater Yoga');
 ok('…and it renders', site.ok && S.renderDesign(spec, []).html.includes('Stillwater Yoga'));
 ok('…the conversation goes with it, marked started', site.ok && site.project.studio?.status === 'started' && site.project.studio.transcript.length > 0);
-const calmSite = S.respond(open('website', 'A website for “Mira Studio”, a ceramics studio'), 'skip', {}, { now: NOW + 1 }).st;
-const vibeSite = S.chooseOption(open('website', 'A website for “Mira Studio”, a ceramics studio, where people can book a workshop'), 'vibe-0', {}, NOW + 1).st;
-ok('a mood chosen in the conversation reaches the website engine: its colours hold the look drawn', !!vibeSite.answers['w.vibe'] && S.websiteSystems(vibeSite)[0].tokens.colors.background === S.prefsOf(vibeSite).palette.ground, J({ vibe: vibeSite.answers['w.vibe'], pal: S.prefsOf(vibeSite).palette, sys: S.websiteSystems(vibeSite)[0]?.tokens.colors }));
-void calmSite;
-
-let wp = open('website', 'A website for “Mira Studio”');
-ok('a website whose purpose is not said: what people should be able to do on it is asked first, with a few suggested answers', wp.pending === 'discover' && wp.discovery?.current?.decides === 'purpose' && wp.discovery.current.options.length >= 2 && wp.discovery.current.options.length <= 4, J(wp.discovery?.current));
-t = reply(wp, 'people should be able to book a session and get in touch');
-ok('…answered in a sentence: bookings, with a booking calendar and a contact form; then how it should feel', t.st.answers['w.purpose']?.values[0] === 'bookings' && t.st.answers['w.functions']?.values.includes('booking') && t.st.answers['w.functions']?.values.includes('contact') && t.move.kind === 'discover' && t.move.question.kind === 'vibe', J({ p: t.st.answers['w.purpose'], f: t.st.answers['w.functions'], m: t.move.kind }));
-const wpo = S.chooseOption(wp, wp.discovery.current.options[0].id, {}, NOW + 2);
-ok('…or a suggested answer tapped: read as the person’s own words', !!wpo.st.answers['w.purpose'] && wpo.st.transcript.some((m) => m.from === 'person' && m.text === wp.discovery.current.options[0].words), J(wpo.st.answers['w.purpose']));
 let wn = open('website', 'a website for my pottery classes');
 ok('a website without its name: what it is called is asked first', wn.pending === 'name', wn.pending);
 t = reply(wn, 'Make it now');
@@ -250,7 +147,6 @@ ok('…“make it now”: the name left as a marked gap, and the page made', t.m
 sec('a board, a critique and an import: only what each cannot be made without');
 let b = open('board', 'A launch campaign for “Night Market Lisbon”: two posters, three Instagram posts and a website');
 ok('materials counted from the words; the objective read (a launch)', b.answers['b.materials']?.numbers?.poster === 2 && b.answers['b.materials']?.numbers?.social === 3 && b.answers['b.materials']?.numbers?.website === 1 && b.answers['b.objective']?.values[0] === 'launch', J(b.answers));
-ok('…and only how it should feel is asked (optional), since nothing about its feel was said', b.pending === 'discover' && b.discovery?.current?.kind === 'vibe' && questions(b).length === 1);
 t = reply(b, 'skip');
 t = reply(t.st, 'skip');
 const bs = S.startProject({ ...S.makeProject('create', 'Untitled board', NOW), medium: 'board' }, t.st, { now: NOW });
@@ -273,18 +169,7 @@ ok('a website address: the website source and its address', web.answers['s.sourc
 
 // ── a logo: what it stands for, asked only when not said; then its lettering ──
 sec('a logo: its name exactly; what it stands for asked only when the words do not say; its lettering in real faces');
-let l = open('logo', 'A logo for “Halden”');
-ok('a name and nothing else: what it does or stands for is asked first (optional, once)', l.pending === 'discover' && l.discovery?.current?.decides === 'about' && /“Halden”/.test(l.discovery.current.text));
-t = reply(l, 'we roast coffee in small batches, by hand');
-ok('…answered: kept in the person’s words', /roast coffee/.test(t.st.answers['l.about']?.text ?? ''), J(t.st.answers['l.about']));
-const typeQ = t.move.question;
-ok('…then its lettering: pairings of real faces from the library, the body face a text face, each a different personality', t.move.kind === 'discover' && typeQ.kind === 'type' && typeQ.faces.length >= 3 && typeQ.faces.every((f) => S.FONTS.some((x) => x.name === f.display) && S.FONTS.some((x) => x.name === f.body && !x.displayOnly)) && new Set(typeQ.faces.map((f) => f.name)).size === typeQ.faces.length, J(typeQ));
-t = S.chooseOption(t.st, typeQ.faces[0].id, {}, NOW + 30);
-keep(t.st);
-ok('a pairing tapped: the faces recorded, and the engines read them', t.st.answers['l.type']?.fields?.display === typeQ.faces[0].display && S.prefsOf(t.st).faces?.display === typeQ.faces[0].display && S.prefsOf(t.st).faces?.body === typeQ.faces[0].body, J(S.prefsOf(t.st).faces));
-ok('…then its colours (a logo: lettering first, then colour, never the third visual question)', t.move.kind === 'discover' && t.move.question.kind === 'colour', J(t.move.kind));
-t = reply(t.st, 'surprise me');
-ok('“surprise me” on the last question: the concepts are made', t.move.kind === 'create', J(t.move.kind));
+t = { st: open('logo', 'A logo for “Halden”: we roast coffee in small batches, by hand') };
 const lw = S.logoWordsOf(t.st);
 ok('the logo brief carries the name and what it stands for, in words the logo engine reads', /“Halden”/.test(lw.words) && /roast/.test(lw.words), lw.words);
 const lb = S.logoBriefOfGraphic(S.logoBriefOf(t.st));
@@ -295,15 +180,6 @@ ok('concepts are constructed for it (no library)', concepts.length >= 3);
 // ── pictures the person brings ──
 sec('pictures: placed in the design, or used for their look only — asked only when it matters');
 let pics = open('graphic', 'A poster for “Open Day”', { attachments: [{ id: 'at1', name: 'pour.jpg', kind: 'image', upload: 'up_1', width: 1200, height: 900, swatches: ['#f4efe6', '#2b1d14', '#c2410c'] }] });
-ok('a picture brought: whether to place it or learn from it is the first question', pics.pending === 'discover' && pics.discovery?.current?.decides === 'pictures' && pics.discovery.current.options.length === 2, pics.pending);
-t = reply(pics, 'just take its look, the colours');
-ok('“just its look”: recorded, and the work is made (its look gives the colours and the mood: nothing more to ask)', t.st.answers['g.pictures']?.values[0] === 'look' && t.move.kind === 'create', J({ a: t.st.answers['g.pictures'], move: t.move.kind }));
-const pl = S.prefsOf(t.st);
-ok('…its colours become the palette: the lightest the ground, the darkest the ink, the most saturated the accent', pl.palette?.ground === '#f4efe6' && pl.palette?.ink === '#2b1d14' && pl.palette?.accent === '#c2410c', J(pl.palette));
-const placed = reply(pics, 'place it in the design').st;
-ok('“place it”: recorded, and its colours are not taken for the palette', placed.answers['g.pictures']?.values[0] === 'place' && S.prefsOf(placed).palette === null, J(S.prefsOf(placed).palette));
-ok('a poster with no picture of its own is never asked about pictures', !(open('graphic', 'A poster for “Open Day”').discovery?.asked ?? []).includes('pictures'));
-
 // treatments of the person's own pictures (kept from the engine)
 const tpics = S.respond(pics, 'use #f4efe6, #1b1b1b and #c2410c', {}, { now: NOW + 5 }).st;
 const tp = { ...S.prefsOf(tpics), treatment: 'duotone' };
@@ -384,7 +260,7 @@ ok('combining is asked for in many ways; choosing one is not combining', ['combi
 // ── the brief, as understood ──
 sec('the brief: each line with where it came from');
 const bl = S.briefLines(S.respond(open('graphic', 'A poster for “Open Day”'), 'skip', {}, { now: NOW + 1 }).st);
-ok('what, words, and what was left to SocriaUX', bl[0].label === 'What' && bl.some((x) => x.label === 'Words' && /Open Day/.test(x.value) && x.source === 'words') && bl.some((x) => x.label === 'Left to SocriaUX' && /the feel/.test(x.value)), J(bl));
+ok('what it is and its words, each said where it came from', bl[0].label === 'What' && bl.some((x) => x.label === 'Words' && /Open Day/.test(x.value) && x.source === 'words'), J(bl));
 
 // ── the engines read the decisions ──
 sec('decisions reach the engines unchanged: briefs, directions, DNA');
@@ -405,114 +281,8 @@ const gp = S.startProject({ ...S.makeProject('create', 'Untitled graphic', NOW),
 ok('a graphic project ready for its directions, the conversation marked started', gp.ok && gp.project.graphic.brief.content.headline === 'Field Lines' && gp.project.studio.status === 'started' && gp.project.name === 'Field Lines');
 ok('a graphic without its words cannot start, and says why', !S.startProject(S.makeProject('create', 'x', NOW), start('graphic', 'a poster'), { now: NOW }).ok);
 
-// ── creative questions: generated, never what is known, never too many ──
-sec('discovery: never what the brief says, never all three visual questions, at most three in all');
-const BRIEFS = [
-  ['graphic', 'A poster for a jazz night'],
-  ['graphic', 'A poster for “Blue Hour”'],
-  ['graphic', 'A poster for “Blue Hour”, warm and smoky'],
-  ['graphic', 'A poster for “Blue Hour” in deep blue and gold'],
-  ['graphic', 'A poster for “Blue Hour”, set in Fraunces'],
-  ['graphic', 'An Instagram post for my bakery opening'],
-  ['graphic', 'A typographic poster for “Type Week”, 3 March'],
-  ['logo', 'A logo for “Halden”'],
-  ['logo', 'A logo for “Halden”, a coffee roastery'],
-  ['logo', 'A logo for “Halden”, a coffee roastery, in Fraunces'],
-  ['website', 'A website for “Mira Studio”'],
-  ['website', 'A website for my pottery studio called “Kiln”'],
-  ['board', 'A launch campaign for “Night Market”: two posters and a website'],
-];
-const walk = (mode, prompt, answer = 'skip') => {
-  let st = open(mode, prompt);
-  const seen = [];
-  for (let i = 0; i < 12 && st.pending; i++) {
-    if (st.pending === 'discover') seen.push({ decides: st.discovery.current.decides, kind: st.discovery.current.kind, known: S.knownOf({ ...st, discovery: { asked: [] } }) });
-    st = reply(st, st.pending === 'discover' ? answer : st.pending === 'words' ? '“Blue Hour”' : st.pending === 'name' ? 'Halden' : 'skip').st;
-  }
-  return { st, seen };
-};
-for (const [mode, prompt] of BRIEFS) {
-  const { st, seen } = walk(mode, prompt);
-  const visual = seen.filter((x) => ['colour', 'type', 'vibe'].includes(x.kind));
-  ok(`“${prompt}”: at most three creative questions, at most two visual, each asked once, then the work`, seen.length <= 3 && visual.length <= 2 && new Set(seen.map((x) => x.decides)).size === seen.length && !st.pending && S.nextMove(st).kind === 'create', J(seen.map((x) => x.decides)));
-}
-const asksAbout = (mode, prompt) => walk(mode, prompt).seen.map((x) => x.decides);
-ok('a feel in the words: no visual questions (its colours and lettering follow from it)', asksAbout('graphic', 'A poster for “Blue Hour”, warm and smoky').length === 0 && asksAbout('logo', 'A logo for “Halden”, a small coffee roastery, warm and crafted').length === 0, J([asksAbout('graphic', 'A poster for “Blue Hour”, warm and smoky'), asksAbout('logo', 'A logo for “Halden”, a small coffee roastery, warm and crafted')]));
-ok('colours in the words: never asked about colours', !asksAbout('graphic', 'A poster for “Blue Hour” in deep blue and gold').includes('colour'), J(asksAbout('graphic', 'A poster for “Blue Hour” in deep blue and gold')));
-ok('a typeface named: never asked about lettering', !asksAbout('logo', 'A logo for “Halden”, a coffee roastery, in Fraunces').includes('type') && !asksAbout('graphic', 'A poster for “Blue Hour”, set in Fraunces').includes('type'), J(asksAbout('logo', 'A logo for “Halden”, a coffee roastery, in Fraunces')));
-ok('a subject named: a logo is not asked what it stands for', !asksAbout('logo', 'A logo for “Halden”, a coffee roastery').includes('about'), J(asksAbout('logo', 'A logo for “Halden”, a coffee roastery')));
-ok('a poster is asked about its lettering only when its words make the lettering matter', asksAbout('graphic', 'A typographic poster for “Type Week”, 3 March').length <= 1 && !asksAbout('graphic', 'A poster for “Blue Hour”').includes('type'), J([asksAbout('graphic', 'A typographic poster for “Type Week”, 3 March'), asksAbout('graphic', 'A poster for “Blue Hour”')]));
-ok('made in a design system: never asked about mood, colours or lettering (the system’s identity decides)', walk('graphic', 'A poster for “Blue Hour”').seen.length > 0 && S.creativeNeeds({ ...open('graphic', 'A poster for “Blue Hour”', { systemId: 'dsys_abcd1234' }), discovery: undefined }).length === 0 && S.visualBudget(S.emptyStudio('logo', 'A logo for “Halden”', { now: NOW, systemId: 'dsys_abcd1234' })) === 0);
-ok('answering one question does not take away the next the brief left room for (the budget is the opening brief’s)', (() => {
-  let st = open('graphic', 'A poster for “Blue Hour”');
-  st = S.chooseOption(st, st.discovery.current.vibes[0].id, {}, NOW + 50).st;
-  return st.pending === 'discover' && st.discovery.current.kind === 'colour' && st.discovery.budget === 2;
-})());
-
-sec('discovery: answers in the person’s own words');
-const colourQ = () => {
-  const st = open('graphic', 'A poster for “Blue Hour”');
-  return S.skipDiscovery(st, NOW + 1).discovery ? S.respond(st, 'skip', {}, { now: NOW + 1 }).st : st;
-};
-let cq = colourQ();
-ok('(a colour question is waiting)', cq.pending === 'discover' && cq.discovery.current.kind === 'colour');
-let r1 = S.respond(cq, '#c2410c', {}, { now: NOW + 2 }).st;
-ok('one hex colour: the accent, on a ground and ink that let it read', S.prefsOf(r1).palette?.accent === '#c2410c' && S.contrastRatio(S.prefsOf(r1).palette.ink, S.prefsOf(r1).palette.ground) >= 4.5, J(S.prefsOf(r1).palette));
-r1 = S.respond(cq, 'deep navy with a mustard accent', {}, { now: NOW + 2 }).st;
-ok('colours named in words become the palette', !!S.prefsOf(r1).palette && r1.answers['g.palette']?.source === 'person', J(r1.answers['g.palette']));
-r1 = S.respond(cq, 'earthy and a bit muted', {}, { now: NOW + 2 }).st;
-ok('a way of colouring described: a palette made that way, the words kept', !!S.prefsOf(r1).palette && /earthy/.test(r1.answers['g.palette']?.text ?? ''), J(r1.answers['g.palette']));
-r1 = S.respond(cq, 'Use #2e5e4e', {}, { now: NOW + 2 }).st;
-ok('a colour of their own picked (“Use #2e5e4e”): the accent', S.prefsOf(r1).palette?.accent === '#2e5e4e', J(S.prefsOf(r1).palette));
-let tq = open('logo', 'A logo for “Halden”, a coffee roastery');
-ok('(a lettering question is waiting)', tq.pending === 'discover' && tq.discovery.current.kind === 'type');
-let r2 = S.respond(tq, 'Fraunces with Inter', {}, { now: NOW + 3 }).st;
-ok('typefaces named: those faces, exactly', S.prefsOf(r2).faces?.display === 'Fraunces' && S.prefsOf(r2).faces?.body === 'Inter', J(S.prefsOf(r2).faces));
-r2 = S.respond(tq, 'something geometric and modern', {}, { now: NOW + 3 }).st;
-ok('a style of letter described: a real pairing in that character', !!S.prefsOf(r2).faces && S.FONTS.some((f) => f.name === S.prefsOf(r2).faces.display) && r2.answers['l.type']?.fields?.name, J(r2.answers['l.type']));
-let vq = open('graphic', 'A poster for “Blue Hour”');
-let r3 = S.respond(vq, 'moody and cinematic', {}, { now: NOW + 4 }).st;
-ok('a feel in their words: the engine’s qualities for it, kept as the vibe', r3.answers['g.vibe']?.values.includes('dramatic') && /moody/i.test(r3.answers['g.vibe']?.fields?.name ?? ''), J(r3.answers['g.vibe']));
-r3 = S.respond(vq, 'like a cloudy sky', {}, { now: NOW + 4 }).st;
-ok('a world named for the feel: the theme it is', r3.answers['g.vibe']?.fields?.theme === 'cloud', J(r3.answers['g.vibe']));
-
-const pointed = S.respond(open('website', 'A website for “Mira Studio”'), 'something like larkfield.studio, or like nowhere.design', {}, { now: NOW + 5 });
-ok('a reply that only points to sites answers nothing: the sites are read, the question goes on waiting, and their addresses never become the brief', pointed.research.length === 2 && pointed.st.pending === 'discover' && pointed.st.discovery?.current?.decides === 'purpose' && !/larkfield/.test(pointed.st.prompt) && S.onlyPointsElsewhere('something like larkfield.studio, or like nowhere.design') && !S.onlyPointsElsewhere('we take bookings, like larkfield.studio does'), J({ pending: pointed.st.pending, q: pointed.st.discovery?.current?.decides, prompt: pointed.st.prompt }));
-const coffeeType = S.respond(open('logo', 'A logo for a coffee roastery'), 'It’s called Halden', {}, { now: NOW + 6 }).st;
-const coffeeColours = S.chooseOption(coffeeType, coffeeType.discovery.current.faces[0].id, {}, NOW + 7).move.question;
-ok('a subject whose own colours are close (a coffee roastery’s browns) still gets real alternatives to choose from', coffeeColours?.kind === 'colour' && coffeeColours.palettes.length >= 3 && new Set(coffeeColours.palettes.map((x) => x.accent)).size === coffeeColours.palettes.length, J(coffeeColours?.palettes?.map((x) => [x.name, x.accent])));
-
-sec('discovery: options held to their shape');
-const shapes = ['A poster for a jazz night', 'An Instagram post for my bakery opening', 'A poster for “Field Lines”, a technology festival'].map((pr) => S.respond(open('graphic', pr), 'skip', {}, { now: NOW + 1 }).st).map((st) => st.pending === 'discover' ? st : S.respond(st, '“Blue Hour”', {}, { now: NOW + 2 }).st);
-const pals = shapes.flatMap((st) => st.discovery?.current?.palettes ?? S.paletteChoices(st));
-ok('every palette reads: its ink at least 4.5:1 on its ground, its accent apart from the ground', pals.length >= 6 && pals.every((p) => S.contrastRatio(p.ink, p.ground) >= 4.5 && S.contrastRatio(p.accent, p.ground) >= 1.6 && [p.ground, p.ink, p.accent, ...p.support].every((c) => /^#[0-9a-f]{6}$/.test(c))), J(pals.filter((p) => S.contrastRatio(p.ink, p.ground) < 4.5)));
-ok('palettes are named for what they are and say how their colours relate', pals.every((p) => p.name.length > 3 && /accent/.test(p.note)), J(pals.map((p) => [p.name, p.note])));
-ok('palettes for different subjects differ', J(S.paletteChoices(open('graphic', 'A poster for a jazz night')).map((p) => p.accent)) !== J(S.paletteChoices(open('graphic', 'An Instagram post for my bakery opening')).map((p) => p.accent)));
-const faceSets = [S.typeChoices(open('logo', 'A logo for “Halden”, a coffee roastery')), S.typeChoices(open('logo', 'A logo for “Orbit”, a space science lab')), S.typeChoices(open('graphic', 'A typographic poster for “Type Week”'))];
-ok('every pairing is from the font library, its body face a text face, its weight one the face has', faceSets.flat().every((f) => { const d = S.FONTS.find((x) => x.name === f.display); const bo = S.FONTS.find((x) => x.name === f.body); return d && bo && !bo.displayOnly && f.weight >= 100 && f.weight <= 900; }), J(faceSets));
-ok('pairings in one question are different personalities', faceSets.every((xs) => new Set(xs.map((x) => x.name)).size === xs.length && xs.length >= 2), J(faceSets.map((xs) => xs.map((x) => x.name))));
-const moods = S.vibeChoices(open('graphic', 'A poster for “Blue Hour”, a cloud-themed evening'));
-ok('a world the words name leads the moods, with its own colours and forms', moods[0]?.theme === 'cloud' && moods[0].form === 'cloud', J(moods.map((x) => [x.name, x.theme, x.form])));
-ok('moods are named in plain adjectives, never in comparatives', moods.concat(bakeryVibes, jazzVibes).every((x) => !/\b(darker|lighter|warmer|cooler|more)\b/i.test(x.name)), J(moods.concat(bakeryVibes).map((x) => x.name)));
-const preview = S.vibePreviewDoc(moods[1] ?? moods[0], 'Blue Hour', 3);
-const previewSvg = S.renderArtboard(preview, preview.artboards[0], { idPrefix: 'vp-' });
-ok('a mood is drawn small by the engine: its ground, its forms, the brief’s own words in its type', /<svg/.test(previewSvg) && previewSvg.includes('Blue Hour') && preview.artboards[0].children.some((n) => n.role === 'motif') && preview.artboards[0].background === (moods[1] ?? moods[0]).palette.ground, previewSvg.slice(0, 300));
-
-sec('discovery: the mood chosen is carried into the work');
-let mood = open('graphic', 'A poster for “Blue Hour”');
-const chosenVibe = mood.discovery.current.vibes[0];
-mood = S.chooseOption(mood, chosenVibe.id, {}, NOW + 1).st;
-mood = S.respond(mood, 'skip', {}, { now: NOW + 2 }).st;
-const mp = S.prefsOf(mood);
-ok('its colours and lettering reach the engines as the work’s when nothing more particular was chosen', mp.palette?.ground === chosenVibe.palette.ground && !!mp.faces && mp.vibe?.qualities.join() === chosenVibe.qualities.join(), J({ pal: mp.palette, faces: mp.faces, vibe: mp.vibe }));
-const plan = S.vibeRealisation(mood);
-ok('its qualities are asked of the creative executor as a plan, keeping the palette and faces it already gave', plan && plan.changes.some((c) => c.decision === 'mood' && J(c.qualities) === J(chosenVibe.qualities)) && plan.keep.includes('palette') && plan.keep.includes('type') && plan.keep.includes('words'), J(plan));
-// a mood whose qualities ask for forms and depth (not only colours and faces, which the composition already has)
-let formed = S.respond(open('graphic', 'A poster for “Blue Hour”'), 'playful and dreamy', {}, { now: NOW + 3 }).st;
-formed = S.respond(formed, 'skip', {}, { now: NOW + 4 }).st;
-const fplan = S.vibeRealisation(formed);
-ok('a mood that asks for forms and depth is a plan of its own', fplan && fplan.changes.some((c) => c.decision === 'mood'), J(fplan));
-ok('no mood chosen: nothing to carry', S.vibeRealisation(open('graphic', 'A poster for “Blue Hour”, warm and smoky')) === null);
+// (the creative questions themselves — what is asked, its visual aids, the brief they build — are tested in
+// test/discover.test.mjs: a graphic, a logo, a campaign or a website is discovered there, never by the director)
 
 // ── voice ──
 sec('voice: second person, no emoji, never a questionnaire');

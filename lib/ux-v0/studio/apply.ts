@@ -23,8 +23,6 @@ import { mix } from '../color';
 import { likedRefs, paletteOutOf, referenceFaces, referencePalette, referenceWords } from './references';
 import { graphicFont, knownFont } from '../fonts';
 import { styleById } from '../graphics/styles/registry';
-import { TYPE_CHARACTERS, type TypeCharacter } from '../graphics/creative/lexicon';
-import { readableSet } from './discovery';
 
 // ── reading answers ──
 
@@ -132,12 +130,11 @@ export function prefsOf(st: StudioState): StudioPrefs {
   const vibeAns = answerOf(st, `${p}.vibe`);
   const vibe = vibeAns && !vibeAns.skipped && vibeAns.values.length ? vibeAns : null;
   const vibePalette = vibe ? paletteOf({ ...vibe, values: [] }) : null;
-  const vibeSet = vibe?.fields?.character && (TYPE_CHARACTERS as readonly string[]).includes(vibe.fields.character) ? readableSet(vibe.fields.character as TypeCharacter, 0) : null;
   return {
     styles: [...new Set([...readFacts(st.prompt).styles, ...readFacts(ownWords).styles])].slice(0, 3),
     styleWords: [ownWords, referenceWords(refs)].filter(Boolean).join('; ').slice(0, 600),
     palette: ownPalette ?? (borrowed ? { ground: borrowed.ground, ink: borrowed.ink, accent: borrowed.accent, ...(borrowed.accent2 ? { accent2: borrowed.accent2 } : {}) } : null) ?? vibePalette,
-    faces: facesOf(answerOf(st, `${p}.type`)) ?? (refFaces.length ? { display: refFaces[0], body: refFaces[1] ?? refFaces[0] } : null) ?? (vibeSet ? { display: vibeSet.display, body: vibeSet.body } : null),
+    faces: facesOf(answerOf(st, `${p}.type`)) ?? (refFaces.length ? { display: refFaces[0], body: refFaces[1] ?? refFaces[0] } : null),
     org: (COMPOSITIONS.find((c) => c.id === values(st, `${p}.composition`)[0])?.org ?? null) as Org | null,
     dna,
     personality: personalityOf(st).slice(0, 8),

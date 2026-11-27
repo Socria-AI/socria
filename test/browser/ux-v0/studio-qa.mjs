@@ -8,8 +8,10 @@
 //   aids            moods, palettes and lettering only when the model shows them: real colours (ink readable on its
 //                   ground), real faces from the font library (loaded before they are shown); picked, or answered in
 //                   the person's own words; a pick reaches the designer's brief as taste
-//   freedom         "You decide." and "Make it now" make the work at once (no model call); a suggested reply tapped;
-//                   the kind of work changed by what was said; a reload keeps the waiting question and its aid
+//   freedom         "Skip" under every question (the model settles that point and moves on), "Surprise me" and
+//                   "You decide." make the work at once (no model call); a colour of their own from the colour picker,
+//                   written into the reply; a suggested reply tapped; the kind of work changed by what was said; a
+//                   reload keeps the waiting question and its aid
 //   signed out      the real answer here: the reader decides (what it is, a logo's name, what a poster is for), at
 //                   most two questions, never a headline asked for; a detailed request is made at once
 //   references      websites the person names, read through the server's guarded reader (recorded here) before
@@ -178,7 +180,7 @@ ok('while the model thinks, SocriaUX is shown thinking', (await page.locator('.s
 await waitAsked(1);
 ok('the model’s own question, alone — no aid, no tap-replies, no form', (await lastSaid()) === 'What’s the poster for?' && (await page.locator('.sd-aid, .sd-suggestion').count()) === 0, await lastSaid());
 ok('…asked with the conversation as it stands: the person’s words, nothing asked yet', questionCalls.at(-1)?.conversation?.[0]?.text === 'Make me a poster.' && questionCalls.at(-1)?.asked === 0 && questionCalls.at(-1)?.mode === 'graphic', JSON.stringify(questionCalls.at(-1)));
-ok('“Make it now” is always there', (await page.locator('.sd-make').count()) === 1 && !(await page.locator('.sd-make').isDisabled()));
+ok('under the question, never required: “Skip” and “Surprise me” (the composer’s “Make it now” steps aside while they show)', (await page.locator('.sd-qacts .sd-chip').allInnerTexts()).join('|') === 'Skip|Surprise me' && (await page.locator('.sd-make').count()) === 0, (await page.locator('.sd-qacts .sd-chip').allInnerTexts()).join('|'));
 await reply('An underground electronic music event.');
 await waitAsked(2);
 await page.waitForSelector('.sd-dq-grid.is-moods.is-ready', { timeout: 15000 }).catch(() => null);
@@ -239,8 +241,20 @@ const contrasts = await page.locator('.sd-dq-pal').evaluateAll((els) =>
 );
 ok('palettes to look at: each its real colours, its hex codes, and “Aa” in its ink on its ground — readable (4.5:1 or better)', contrasts.length === 3 && contrasts.every((x) => x >= 4.5) && (await page.locator('.sd-dq-hex').first().innerText()).includes('#f4f1e4'), JSON.stringify(contrasts));
 ok('…and the reply invites mixing or naming colours (hex codes are fine)', /hex codes are fine/.test(await page.locator('.sd-aid-hint').innerText()) && /name your own colours/.test((await page.locator('#sd-reply').getAttribute('placeholder')) ?? ''));
+ok('…and a colour of their own, from the system’s colour picker', (await page.locator('.sd-aid-own input[type="color"]').count()) === 1);
+await page.locator('.sd-aid-own input[type="color"]').evaluate((el) => {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, '#3fa34d');
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+});
+await page.waitForTimeout(200);
+ok('…picked: written into the reply (not sent), to say more around it', (await page.locator('#sd-reply').inputValue()) === '#3fa34d' && (await asked()).length === 1, await page.locator('#sd-reply').inputValue());
 await shot('05-palettes');
-await reply('The second one, but with a brighter green accent like #3fa34d');
+await page.locator('#sd-reply').focus();
+await page.keyboard.press('Home');
+await page.keyboard.type('The second one, but with a brighter green accent like ');
+await page.keyboard.press('Enter');
+await page.waitForTimeout(500);
 await designed();
 const c4 = questionCalls.at(-1);
 ok('answered in words instead of a pick: the model reads their words as said, and nothing counts as picked', c4?.conversation?.at(-1)?.text === 'The second one, but with a brighter green accent like #3fa34d' && JSON.stringify(c4?.justPicked) === '[]', JSON.stringify(c4));
@@ -285,6 +299,25 @@ await reply('You decide.');
 await designed();
 const db3 = await designBrief();
 ok('“You decide.”: made at once — no model call — with the lettering they picked in the brief', questionCalls.length === callsAtDecide && /Lettering they picked \(Loud and inky\): Dela Gothic One for display, Space Grotesk for text/.test(db3) && /Kerning Club/.test(db3) && /left to SocriaUX’s judgement/.test(db3), db3);
+
+console.log('\n=== a question skipped ===');
+model = {
+  mode: 'scripted',
+  delay: 0,
+  answers: [
+    ask('Should it feel like a studio you wander into, or an event you plan for?', { aid: MOODS, brief: { kind: 'poster', purpose: 'Open studio weekend' } }),
+    make('I’ll settle the feel myself — making it now.', { brief: { kind: 'poster', purpose: 'Open studio weekend' } }),
+  ],
+};
+await goHome();
+await begin('A poster for our open studio weekend');
+await waitAsked(1);
+await page.locator('.sd-qacts .sd-chip').filter({ hasText: 'Skip' }).click();
+await designed();
+p = await started();
+ok('“Skip”: said as the person’s reply, the model told so (it settles that point and moves on), nothing picked', p.studio.transcript.filter((m) => m.from === 'person').at(-1)?.text === 'Skip' && questionCalls.at(-1)?.conversation?.at(-1)?.text === 'Skip' && !p.studio.brief?.chosen?.mood, JSON.stringify(questionCalls.at(-1)?.conversation?.slice(-2)));
+const db6 = await designBrief();
+ok('…and made: the skipped question left to SocriaUX, “Skip” never read as what it is about', /Open studio weekend/.test(db6) && !/What it is for: Skip/.test(db6), db6);
 
 console.log('\n=== the work turns out to be another kind ===');
 model = {
@@ -344,10 +377,11 @@ await goHome();
 await begin('Make me a poster.');
 await waitAsked(1);
 ok('a vague poster, signed out: what it is for (never its headline)', /What’s the poster for\?/.test(await lastSaid()) && !/headline|say\b/i.test(await lastSaid()), await lastSaid());
-await page.locator('.sd-make').click();
+const callsAtSurprise = questionCalls.length;
+await page.locator('.sd-qacts .sd-chip').filter({ hasText: 'Surprise me' }).click();
 await designed();
 const db5 = await designBrief();
-ok('“Make it now”: made at once, what was not said left to SocriaUX and the words written as stand-ins', /left to SocriaUX’s judgement/.test(db5) && /stand-in words/.test(db5), db5);
+ok('“Surprise me”: made at once with no model call, what was not said left to SocriaUX and the words written as stand-ins', questionCalls.length === callsAtSurprise && /left to SocriaUX’s judgement/.test(db5) && /stand-in words/.test(db5), db5);
 await goHome();
 await begin('A website for my pottery studio');
 p = await started();

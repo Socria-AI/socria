@@ -213,5 +213,30 @@ sec('the brief, as the designer reads it');
   ok('a logo with no name is not refused: the designer invents one and says so (on a logo sheet)', lg.ok && lg.project.design.kind === 'logo' && lg.project.design.format === 'logo-sheet', lg);
 }
 
+sec('a question skipped');
+{
+  const yes = ['Skip', 'skip', 'Skip this one', 'skip it.', 'pass', 'Next question', 'ok, skip'];
+  const no = ['Skip the gradients', 'skip the date, it is not set yet', 'Make me a poster.', 'not sure'];
+  ok('“Skip”, “pass”, “next” pass on the question — and words about the work that start with “skip” are words about the work', yes.every((t) => S.skips(t)) && !no.some((t) => S.skips(t)), { yes: yes.filter((t) => !S.skips(t)), no: no.filter((t) => S.skips(t)) });
+  // the reader (no model): what a poster is for, skipped → made; never asked again, and "Skip" is never its subject
+  let st = begin('graphic', 'Make me a poster.');
+  st = S.applyDecision(st, S.readerDecision(st), NOW + 1);
+  const q1 = last(st).text;
+  st = reply(st, 'Skip');
+  const d = S.readerDecision(st);
+  st = S.applyDecision(st, d, NOW + 3);
+  const db = S.designBriefOf(st);
+  ok('signed out: what the poster is for, skipped — made, not asked again', /for\?/.test(q1) && d.action === 'make' && S.questionsAsked(st) === 1, J({ q1, d: d.action }));
+  ok('…“Skip” is never read as what it is about, its words or its name (the designer writes stand-ins)', !/What it is for: Skip|Words to set[^\n]*\nSkip/.test(db) && /stand-in words/.test(db) && !/^skip$/i.test(S.nameOf(st)), db);
+  // a logo's name, skipped: made, the designer invents one
+  let lg = begin('logo', 'A logo for a coffee roastery');
+  lg = S.applyDecision(lg, S.readerDecision(lg), NOW + 1);
+  const qn = last(lg).text;
+  lg = reply(lg, 'skip this one');
+  const dl = S.readerDecision(lg);
+  ok('a logo’s name, skipped: no second asking of it, and no name taken from “skip this one”', /called/.test(qn) && !(dl.action === 'ask' && /called/.test(dl.ask?.text ?? '')) && !/skip/i.test(dl.brief.content), J({ qn, dl: dl.action, content: dl.brief.content }));
+  ok('the model is told what a skip means: settle it, never ask it again, move on or make it', /If they skip a question \("Skip"\), settle that point yourself, never ask it again/.test(S.discoverSystem()));
+}
+
 console.log(`\ndiscover: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

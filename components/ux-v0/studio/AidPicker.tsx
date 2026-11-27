@@ -123,7 +123,37 @@ function MoodCard({ m, i, sample, ready, onPick }: { m: Mood; i: number; sample:
   );
 }
 
-export function AidPicker({ aid, onPick }: { aid: Aid; onPick: (index: number) => void }) {
+/** A colour of the person's own, picked from the system's colour picker and written into their reply (not sent). */
+function OwnColour({ onWrite }: { onWrite: (text: string) => void }) {
+  const [hex, setHex] = useState('#c2410c');
+  const input = useRef<HTMLInputElement>(null);
+  // written once the picker is closed on a colour (the browser's own "change"), not on every step of dragging
+  useEffect(() => {
+    const el = input.current;
+    if (!el) return;
+    const done = () => onWrite(el.value);
+    el.addEventListener('change', done);
+    return () => el.removeEventListener('change', done);
+  }, [onWrite]);
+  return (
+    <li>
+      <label className="sd-dq-card sd-aid-own">
+        <span className="sd-aid-own-sw" style={{ background: hex }} aria-hidden="true" />
+        <span className="sd-dq-name">Your own colour</span>
+        <span className="sd-dq-note">Pick one — it goes into your reply, to send with anything else you want to say.</span>
+        <input
+          type="color"
+          value={hex}
+          aria-label="Pick a colour of your own"
+          ref={input}
+          onChange={(e) => setHex(e.target.value)}
+        />
+      </label>
+    </li>
+  );
+}
+
+export function AidPicker({ aid, onPick, onWrite }: { aid: Aid; onPick: (index: number) => void; onWrite?: (text: string) => void }) {
   const faces: Face[] =
     aid.kind === 'type'
       ? aid.options.flatMap((t) => [
@@ -142,6 +172,7 @@ export function AidPicker({ aid, onPick }: { aid: Aid; onPick: (index: number) =
           {aid.options.map((p, i) => (
             <PaletteCard key={p.name} p={p} i={i} onPick={onPick} />
           ))}
+          {onWrite && <OwnColour onWrite={onWrite} />}
         </ul>
       )}
       {aid.kind === 'type' && (
@@ -158,7 +189,7 @@ export function AidPicker({ aid, onPick }: { aid: Aid; onPick: (index: number) =
           ))}
         </ul>
       )}
-      <p className="sd-aid-hint">Pick one, or just write — mix them, change one, name your own{aid.kind === 'palettes' ? ' colours (hex codes are fine)' : aid.kind === 'type' ? ' typefaces' : ''}, or skip it.</p>
+      <p className="sd-aid-hint">Pick one, or just write — mix them, change one, name your own{aid.kind === 'palettes' ? ' colours (hex codes are fine)' : aid.kind === 'type' ? ' typefaces, or take one’s headline face with another’s text' : ''}.</p>
     </div>
   );
 }

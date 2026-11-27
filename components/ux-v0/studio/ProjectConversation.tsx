@@ -12,7 +12,7 @@ import { SAVE_WORDS, useV0Project } from '../useV0Project';
 import { putProject } from '@/lib/ux-v0/store';
 import type { DesignProject } from '@/lib/ux-v0/types';
 import { said, type StudioMode, type StudioState } from '@/lib/ux-v0/studio/schema';
-import { chooseOption, readyToMake, referenceUrls, respond, seedFromWords, type DirectorEnv } from '@/lib/ux-v0/studio/director';
+import { readyToMake, referenceUrls, respond, seedFromWords, type DirectorEnv } from '@/lib/ux-v0/studio/director';
 import { applyDecision, awaitingTurn, chooseAid, isCreative, makeNow, makingNow, personSays, wantsMake } from '@/lib/ux-v0/studio/discover';
 import { addReference, referenceOf, type SiteRead } from '@/lib/ux-v0/studio/references';
 import { researchAskOf, type ResearchResponse } from '@/lib/ux-v0/research/schema';
@@ -249,17 +249,12 @@ export function ProjectConversation(props: {
   const onChoose = async (optionId: string) => {
     setError('');
     settle();
-    if (isCreative(latest.current.mode)) {
-      // an option an aid offered (its place in the aid): said as the person's reply and kept as their taste
-      const next = chooseAid(latest.current, Number(optionId));
-      if (!next) return;
-      commit(next);
-      return turn();
-    }
-    const t = chooseOption(latest.current, optionId, env);
-    commit(t.st);
-    if (t.research.length) await readSites(t.research);
-    if (t.move.kind === 'create') await after();
+    // an option an aid offered (its place in the aid): said as the person's reply and kept as their taste (aids are
+    // only ever shown in creative discovery)
+    const next = chooseAid(latest.current, Number(optionId));
+    if (!next) return;
+    commit(next);
+    return turn();
   };
 
   return (

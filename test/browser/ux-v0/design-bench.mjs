@@ -10,7 +10,7 @@
 //   UXV0_OUT=<dir> node test/browser/ux-v0/design-bench.mjs [scenario-filter]
 //   DESIGN_EXTRA=<file.json> adds first designs from other briefs ([{ id, brief, kind, format }])
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium, S, ROOT } from './env.mjs';
@@ -77,6 +77,11 @@ const ORIGIN = 'http://harness.test';
 const report = { at: new Date().toISOString(), scenarios: {} };
 const states = {};
 if (existsSync(`${OUT}base-project.json`)) states.base = JSON.parse(readFileSync(`${OUT}base-project.json`, 'utf8'));
+// any first design kept from an earlier run, so a scenario can go on from it (from: '<id>')
+for (const f of readdirSync(OUT)) {
+  const m = f.match(/^project-(.+)\.json$/);
+  if (m) states[m[1]] = JSON.parse(readFileSync(`${OUT}${f}`, 'utf8'));
+}
 
 async function run(sc) {
   const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
@@ -129,6 +134,9 @@ async function run(sc) {
   if (sc.id === 'base') {
     writeFileSync(`${OUT}base-project.json`, JSON.stringify(p));
     states.base = p;
+  } else if (!sc.from) {
+    writeFileSync(`${OUT}project-${sc.id}.json`, JSON.stringify(p));
+    states[sc.id] = p;
   }
   const before = sc.from ? states[sc.from].design : null;
   out.turns = st.turns.slice(before ? before.turns.length : 0).map((t) => ({ role: t.role, text: t.text, failed: t.failed ?? [], touched: t.touched ?? [] }));
