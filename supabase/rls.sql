@@ -205,3 +205,6 @@ alter table nl_node_versions force row level security;
 revoke all on nl_nodes         from anon, authenticated;
 revoke all on nl_relations     from anon, authenticated;
 revoke all on nl_node_versions from anon, authenticated;
+alter table nl_canvases      enable row level security;
+alter table nl_canvases      force row level security;
+revoke all on nl_canvases      from anon, authenticated;

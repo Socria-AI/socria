@@ -1,11 +1,11 @@
 import { Suspense } from 'react';
-import { ConversationView } from '@/components/new-logos/Conversation';
+import { ConversationCanvas } from '@/components/new-logos/ConversationCanvas';
 
 export default function NewLogosConversation({ params }: { params: { id: string } }) {
   const id = decodeURIComponent(params.id);
   return (
     <Suspense fallback={null}>
-      <ConversationView key={id} id={id} />
+      <ConversationCanvas key={id} id={id} />
     </Suspense>
   );
 }

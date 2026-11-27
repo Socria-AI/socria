@@ -443,6 +443,14 @@ function ObjectiveBody({ node }: { node: NodeRow }) {
   const archived = node.archived_at !== null;
   return (
     <>
+      {!archived ? (
+        <div className="nl-notice" style={{ alignItems: 'center' }}>
+          <span className="nl-grow">This is the objective’s matrix: how it is broken down. Its workspace is a canvas where the work happens.</span>
+          <Link className="nl-btn is-primary" href={`/new-logos/w/${encodeURIComponent(node.id)}`}>
+            Open workspace
+          </Link>
+        </div>
+      ) : null}
       <div className="nl-form" style={{ marginBottom: 24 }}>
         <label className="nl-field">
           <span className="nl-label">Outcome</span>

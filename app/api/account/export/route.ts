@@ -280,6 +280,10 @@ export async function GET(req: NextRequest) {
     .from('nl_node_versions').select('node_id, version, snapshot, created_at').eq('user_id', userId).order('created_at', { ascending: true });
   const nlVersionsErr = missingTable(nlVersionsRaw) ? null : nlVersionsRaw;
   out.workspaceNodeVersions = nlVersions ?? [];
+  const { data: nlCanvases, error: nlCanvasesRaw } = await db
+    .from('nl_canvases').select('key, layout, version, updated_at').eq('user_id', userId);
+  const nlCanvasesErr = missingTable(nlCanvasesRaw) ? null : nlCanvasesRaw;
+  out.workspaceCanvases = nlCanvases ?? [];
 
   // Metacognitive Regulation's intervention ledger: which condition each turn
   // ran under, what MR decided, how it went and what its integrity checks
@@ -405,6 +409,7 @@ export async function GET(req: NextRequest) {
     ['workspaceNodes', nlNodesErr],
     ['workspaceRelations', nlRelationsErr],
     ['workspaceNodeVersions', nlVersionsErr],
+    ['workspaceCanvases', nlCanvasesErr],
     ['mrLedger', mrLedgerErr],
     ['roomSeats', roomSeatsErr],
     ['rooms', roomsErr],

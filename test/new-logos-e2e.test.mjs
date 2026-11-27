@@ -43,6 +43,7 @@ const ROUTES = [
   ['rels', 'app/api/new-logos/relations/route.ts'],
   ['rel', 'app/api/new-logos/relations/[id]/route.ts'],
   ['ctx', 'app/api/new-logos/context/route.ts'],
+  ['canvas', 'app/api/new-logos/canvas/route.ts'],
   ['helpers', 'lib/new-logos/convo.ts'],
 ];
 for (const [name, file] of ROUTES) {
@@ -220,6 +221,42 @@ console.log('\n=== another account sees nothing ===');
   ok("they cannot remove Una's relation", unlink.status === 404 && db.rows('nl_relations').length === rels.length);
   const versions = await call(R.node.GET, 'GET', `/api/new-logos/nodes/${obj.id}`, null, { id: obj.id });
   ok("they cannot read Una's node or its versions", versions.status === 404);
+}
+
+console.log('\n=== canvas layouts: presentation, owner-scoped, versioned ===');
+{
+  as('una');
+  const getL = (key) => call(R.canvas.GET, 'GET', `/api/new-logos/canvas?key=${encodeURIComponent(key)}`);
+  const putL = (b) => call(R.canvas.PUT, 'PUT', '/api/new-logos/canvas', b);
+  const fresh = await getL('c:lg_old');
+  ok('a canvas never saved is empty, at version 0', fresh.status === 200 && fresh.json.version === 0 && Object.keys(fresh.json.layout.items).length === 0);
+  const before = JSON.stringify(row('lg_old'));
+  const s1 = await putL({ key: 'c:lg_old', version: 0, layout: { items: { 'x:m_aaaaaa01': { x: 40, y: 80, open: true }, 'bad ref': { x: 1, y: 1 } }, view: { x: 10, y: 20, k: 0.8 } } });
+  ok('a layout is saved', s1.status === 200 && s1.json.version === 1);
+  const got = await getL('c:lg_old');
+  ok('…cleaned on the way in', got.json.layout.items['x:m_aaaaaa01'].x === 40 && !got.json.layout.items['bad ref'] && got.json.layout.view.k === 0.8);
+  ok('saving a layout never touches the conversation', JSON.stringify(row('lg_old')) === before);
+  const stale = await putL({ key: 'c:lg_old', version: 0, layout: { items: { 'x:m_aaaaaa01': { x: 999, y: 999 } } } });
+  ok('a save from a stale copy is refused with the newer layout (409)', stale.status === 409 && stale.json.version === 1 && stale.json.layout.items['x:m_aaaaaa01'].x === 40);
+  const s2 = await putL({ key: 'c:lg_old', version: 1, layout: { items: { 'x:m_aaaaaa01': { x: 41, y: 80 } } } });
+  ok('a save from the current version lands', s2.status === 200 && s2.json.version === 2);
+  ok('an unknown canvas key is refused', (await getL('z:nope')).status === 400 && (await putL({ key: '../x', version: 0, layout: {} })).status === 400);
+  const big = await call(R.canvas.PUT, 'PUT', '/api/new-logos/canvas', { key: 'c:lg_old', version: 2, layout: { items: {}, pad: 'x'.repeat(500000) } });
+  ok('an oversized layout is refused', big.status === 413);
+  as('vic');
+  const theirs = await getL('c:lg_old');
+  ok("another account does not see this account's layout", theirs.json.version === 0 && Object.keys(theirs.json.layout.items).length === 0);
+  await putL({ key: 'c:lg_old', version: 0, layout: { items: { 'x:m_aaaaaa01': { x: -5, y: -5 } } } });
+  as('una');
+  ok("…and cannot change it", (await getL('c:lg_old')).json.layout.items['x:m_aaaaaa01'].x === 41);
+  as(null);
+  ok('signed out: 401', (await getL('c:lg_old')).status === 401);
+  as('una');
+  db.absent.add('nl_canvases');
+  const g = await getL('o:n_whatever');
+  const pw = await putL({ key: 'o:n_whatever', version: 0, layout: { items: {} } });
+  ok('before the migration: setup:false, and nothing written (the page keeps it in the browser)', g.status === 200 && g.json.setup === false && pw.status === 503);
+  db.absent.delete('nl_canvases');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

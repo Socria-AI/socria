@@ -1348,3 +1348,15 @@ create table if not exists nl_node_versions (
   unique (node_id, version)
 );
 create index if not exists nl_node_versions_user_node on nl_node_versions (user_id, node_id);
+
+-- New Logos canvases: where things sit on a workspace's spatial canvas (an objective's, or a conversation's), which
+-- are open, what each was asked from, and the camera. Presentation only — never a message, never a node. One row per
+-- canvas; `key` is o:<objective node id> or c:<conversation id>. Additive; safe to re-run.
+create table if not exists nl_canvases (
+  user_id text not null,
+  key text not null,
+  layout jsonb not null default '{}'::jsonb,
+  version integer not null default 1,
+  updated_at bigint not null,
+  primary key (user_id, key)
+);

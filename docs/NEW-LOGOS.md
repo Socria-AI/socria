@@ -156,21 +156,11 @@ accept them.
 | Page | What it shows |
 |---|---|
 | `/new-logos` | Home. The top-level matrix, plus conversations not in an objective. |
-| `/new-logos/n/:id` | One node. An objective opens as its own matrix (outcome and description above, members below). The other types open in their editors. Beside each: Related, Where it came from, History. |
-| `/new-logos/c/:id`, `/new-logos/c/new` | The conversation workspace (details below). |
+| `/new-logos/n/:id` | One node's details. An objective opens as its matrix (how it is broken down), with **Open workspace** leading to its canvas. The other types open in their editors. Beside each: Related, Where it came from, History. |
+| `/new-logos/w/:id` | An objective's workspace: its spatial canvas (below). |
+| `/new-logos/c/:id`, `/new-logos/c/new` | A conversation's spatial canvas (below). |
 | `/new-logos/conversations` | Every conversation, searchable, filterable to unplaced, with place or move actions. |
 | `/new-logos/archive` | Archived nodes: restore, or delete for good when empty. |
-
-**The conversation workspace** shows:
-
-- the title (renamed on the canonical conversation) and the objective it sits in;
-- breadcrumbs back to its matrix;
-- the messages and a composer;
-- linked nodes and nodes kept from it;
-- "Create from this conversation": an objective (which then contains the conversation), a question, knowledge, a
-  decision or an artifact;
-- on every message, **Keep as** knowledge, a question, a decision or an artifact, with provenance (AI or human, the
-  conversation and the message).
 
 **The nested matrix** replaces the chronological sidebar.
 
@@ -186,6 +176,88 @@ The workspace and the matrix are separate interfaces. There is no persistent sid
 panels. Every action is keyboard-reachable through links, buttons and menus; drag and drop is an extra, never the only
 way. Layouts collapse to one column on narrow screens.
 
+## The spatial canvas
+
+The nested matrix is how work is **organised and reached**. The canvas is where it is **worked on**. They are two
+layers. The canvas is never a grid of panels, and the matrix is never a canvas.
+
+**No chatbot.** There are no stacked bubbles, no chat sidebar, no fixed composer and no feed with a panel beside it.
+Talking to the assistant is a capability you use from anywhere on the canvas.
+
+### What the canvas does
+
+`components/new-logos/canvas/Canvas.tsx` is built from scratch. Its interaction principles come from the earlier
+spatial canvas; none of its components or styling are reused.
+
+- **Pan and zoom.**
+  - Drag the empty plane to pan. The wheel or a two-finger scroll also pans.
+  - Ctrl/⌘ and the wheel, or a pinch, zooms at the pointer.
+  - Buttons give zoom out, zoom in and fit; the zoom level is shown.
+  - Keys: arrows pan, `+` and `−` zoom, `0` fits.
+- **Direct manipulation.** An object moves when you drag its top bar. A press that doesn't move is a click, which
+  selects. With an object selected, the arrow keys move it.
+- **Persistent positions.** Where each object sits, whether it is open, what it was asked from, and the camera are
+  saved per workspace.
+- **Open and closed.** Closed, an object is a compact summary. Open, it is the thing itself, worked on in place:
+  - an exchange's whole reply, rendered;
+  - a question's state and resolution;
+  - a decision's rationale, with Accept, Reject or Reopen;
+  - knowledge you can edit;
+  - a document artifact, written and previewed on the canvas;
+  - for a conversation on an objective's canvas, its latest exchanges and a box to continue it.
+- **Relationships.**
+  - Drag an object's handle onto another object, then choose what the connection means.
+  - It is saved as a relation, the same graph the rest of the app uses.
+  - Lines are labelled in words and also differ by pattern, not only colour: solid for a relation, dashed for "asked
+    about", dotted for "kept as".
+- **Making things where you are.** Double-click the empty plane, or press **Add**, to ask the assistant or to place a
+  question, knowledge, a decision, a document or (on an objective) a sub-objective at that point.
+- **Asking in context.** Any object can be asked about:
+  - The question goes to the existing chat endpoint with the object as "this". It uses the existing Point & Ask
+    contract: the `focus` brief for the current turn, and `about` kept on the message.
+  - The answer appears beside the object, joined by an "asked about" line.
+
+### Data versus presentation
+
+**A conversation stays one ordered list of messages.** It lives in the canonical table, the existing interface still
+reads it as a thread, and the assistant always reads it in order.
+
+**On a canvas, the same messages are exchanges.** An exchange is a person's turn plus the replies to it
+(`exchangesOf`, `lib/new-logos/canvas.ts`). Its key is its first message's id, or its position when a message has no
+id. Appending a message never changes an earlier exchange's key.
+
+**Where things sit is a layout, kept apart.** That means each object's position, its open state, what it was asked
+from, and the camera. It is stored per workspace in `nl_canvases`, with key `o:<objective>` or `c:<conversation>`.
+It is never written into a message or a node.
+
+- Saves are compare-and-swap on a version; a save that loses the race merges its own changes into the newer layout.
+- Before the migration has run, the layout is kept in the browser, so the canvas works and remembers either way.
+
+**Objects without a saved place get one.** Something kept from an exchange goes beside that exchange; a history opened
+for the first time is laid out in reading order. Nothing is placed on top of another object, and nothing already
+placed is moved (`placeMissing`).
+
+**The order stays available.** A conversation's **History** opens an index of its exchanges, in order, on request.
+Choosing one brings it into view.
+
+### The two workspaces
+
+**A conversation's canvas** (`ConversationCanvas.tsx`).
+
+- Each exchange is an object.
+- Asking from an exchange or a node puts the new exchange beside it.
+- Asking from the empty plane puts it where you clicked.
+- What you keep from an exchange (knowledge, a question, a decision, a document) appears beside it, with provenance.
+- A new conversation opens as an empty canvas, ready to ask.
+
+**An objective's canvas** (`ObjectiveCanvas.tsx`, `/new-logos/w/:id`).
+
+- Everything the objective contains is an object; whatever is related to it from elsewhere appears too, marked as
+  linked.
+- Asking from the plane starts a conversation there, inside the objective and told about it.
+- Asking from an object starts a conversation about that object, beside it.
+- A conversation's own card continues that conversation.
+
 ## Server and storage
 
 The API routes:
@@ -197,11 +269,12 @@ The API routes:
 | `/api/new-logos/relations` | POST |
 | `/api/new-logos/relations/:id` | DELETE |
 | `/api/new-logos/context` | GET |
+| `/api/new-logos/canvas` | GET, PUT (one canvas's layout: compare-and-swap on its version) |
 
 Every query is scoped with `.eq('user_id', userId)`, and the tables are walled by RLS like every other table.
 
-The tables are `nl_nodes`, `nl_relations` and `nl_node_versions`, in `supabase/schema.sql` (additive only: three new
-tables, nothing altered) and walled in `supabase/rls.sql`.
+The tables are `nl_nodes`, `nl_relations`, `nl_node_versions` and `nl_canvases`, in `supabase/schema.sql` (additive
+only: four new tables, nothing altered) and walled in `supabase/rls.sql`.
 
 **To enable organisation on a database, run `supabase/schema.sql`, then `supabase/rls.sql`.** Both are idempotent.
 Until then, New Logos lists and continues every conversation, and shows a neutral notice that objectives and the other
@@ -223,14 +296,20 @@ The relaunch gate (`lib/takeover.ts`) treats `/new-logos` as part of the app. Th
   - the context package against the existing objective contract;
   - conversation helpers that never drop a column from a save;
   - the relaunch gate.
-- `test/new-logos-e2e.test.mjs` (48 checks), through the real routes (the new ones and the existing conversations
+- `test/new-logos-canvas.test.mjs` (35 checks), the spatial layer:
+  - exchanges from messages, with the messages left unchanged;
+  - layouts cleaned, placement that never overlaps or moves what is placed;
+  - fitting and connectors;
+  - an ask from an object meeting the existing Point & Ask contracts.
+- `test/new-logos-e2e.test.mjs` (60 checks), through the real routes (the new ones and the existing conversations
   route) with the fake database and fake accounts:
   - before the migration;
   - signed out;
   - one set of conversations in both directions, including concurrent writes that merge and keep the map and draft;
   - placement and context;
   - removal never deleting;
-  - another account seeing nothing.
+  - another account seeing nothing;
+  - canvas layouts: versioned, cleaned, owner-scoped, never touching a conversation.
 
 ## What comes next (deliberately not built)
 

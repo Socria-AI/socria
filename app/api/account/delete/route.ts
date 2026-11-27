@@ -95,6 +95,8 @@ const OWNED_TABLES = [
   'nl_relations',
   'nl_node_versions',
   'nl_nodes',
+  // …and where things sit on their workspace canvases (presentation only)
+  'nl_canvases',
 ] as const;
 
 /**
@@ -108,6 +110,7 @@ const LATE_TABLES = new Set<string>([
   'nl_relations',
   'nl_node_versions',
   'nl_nodes',
+  'nl_canvases',
   'ux_v0_projects',
   'ux_v0_usage',
   'ux_v0_calls',

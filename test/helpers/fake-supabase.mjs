@@ -33,6 +33,8 @@ const PK = {
   logos_usage: ['user_id', 'scope', 'counter'],
   // supabase/schema.sql: a design system's row is its owner's (primary key user_id, id)
   ux_v0_systems: ['user_id', 'id'],
+  // New Logos: one canvas layout per person and canvas key (supabase/schema.sql nl_canvases)
+  nl_canvases: ['user_id', 'key'],
 };
 
 // Unique indexes beyond the primary key (supabase/schema.sql), as Postgres

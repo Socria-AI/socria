@@ -218,6 +218,11 @@ function Tile({
         <Menu label={`Actions for ${title}`}>
           {(close) => (
             <>
+              {node.type === 'objective' ? (
+                <Link href={`/new-logos/w/${encodeURIComponent(node.id)}`} role="menuitem" className="nl-menu-link" onClick={close}>
+                  Open workspace
+                </Link>
+              ) : null}
               <button type="button" role="menuitem" onClick={() => (close(), onMove(node))}>
                 Move to…
               </button>
