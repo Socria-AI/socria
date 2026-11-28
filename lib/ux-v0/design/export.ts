@@ -14,6 +14,14 @@ import type { DesignArtboard } from './doc';
 import { baseCss, facesFor, scopeCss, scopeFragment } from './frame';
 import { bleedMm, exportPixels, formatOf, pointsOf } from './formats';
 import { framePlan, freezeAt, freezeCss } from './motion';
+import { ownFamilies, ownFontCss } from './typefaces';
+import { faceHeads } from './frame';
+
+/** Whether an artboard is set in any of the company's own fonts (then a standalone file must carry them). */
+export const ownFamiliesUsed = (a: Pick<DesignArtboard, 'html'>, tokens: string): boolean => {
+  const mine = new Set(ownFamilies().map((f) => f.toLowerCase()));
+  return mine.size > 0 && faceHeads(a, tokens).some((f) => mine.has(f.toLowerCase()));
+};
 
 const fontCache = new Map<string, string>();
 
@@ -54,7 +62,7 @@ export function artboardSvg(a: DesignArtboard, tokens: string, o: { fontCss: str
   const d = parser.parseFromString(`<!doctype html><html><body><div class="sx-root">${scopeFragment(a.html, o.assets)}</div></body></html>`, 'text/html');
   const root = d.body.firstElementChild as HTMLElement;
   const style = d.createElement('style');
-  style.textContent = `${o.fontCss}\n${baseCss(a.width, a.height, o.background ?? 'transparent').replace(/html,body\{[^}]*\}/, '')}\n${scopeCss(tokens)}${o.extraCss ? `\n${o.extraCss}` : ''}`;
+  style.textContent = `${o.fontCss}\n${ownFontCss()}\n${baseCss(a.width, a.height, o.background ?? 'transparent').replace(/html,body\{[^}]*\}/, '')}\n${scopeCss(tokens)}${o.extraCss ? `\n${o.extraCss}` : ''}`;
   const holder = d.createElement('div');
   holder.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
   holder.setAttribute('style', `width:${a.width}px;height:${a.height}px;overflow:hidden;margin:0;padding:0`);
@@ -244,6 +252,8 @@ export function artboardHtml(a: DesignArtboard, tokens: string, assets: Readonly
     `<meta name="viewport" content="width=${page ? 'device-width' : a.width}, initial-scale=1">`,
     `<title>${a.name.replace(/[<&]/g, '')}</title>`,
     fonts.href ? `<link rel="stylesheet" href="${fonts.href}">` : '',
+    // (the company's own font files travel inside the file: whether that is allowed is their licence)
+    ownFontCss() && ownFamiliesUsed(a, tokens) ? `<style>${ownFontCss()}</style>` : '',
     `<style>${page ? `html,body{margin:0;padding:0}.sx-root{position:relative;width:${a.width}px;max-width:100%;min-height:${a.height}px;margin:0 auto}.sx-root *,.sx-root *::before,.sx-root *::after{box-sizing:border-box}` : baseCss(a.width, a.height)}</style>`,
     tokens ? `<style>${scopeCss(tokens)}</style>` : '',
     '</head><body>',

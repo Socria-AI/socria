@@ -552,6 +552,8 @@ export interface DesignProject {
   systemLink?: SystemLink;
   /** the company it is made for (lib/ux-v0/company): designed within it, never changing it */
   companyId?: string;
+  /** brand guidelines: the design system and the version its pages were written from (lib/ux-v0/design/guidelines.ts) */
+  guidelinesOf?: { systemId: string; version: number; at: number };
   /** the studio conversation it was begun in (lib/ux-v0/studio): what was asked for, every decision since, the
    * conversation itself; read by the workspace the work continues in */
   studio?: StudioState;
@@ -1154,6 +1156,7 @@ export function normalizeProject(v: unknown, opts: { forSync?: boolean } = {}): 
     ...((l) => (r.medium === 'design' && (l.medium === 'graphic' || l.medium === 'board') && l.data && typeof l.data === 'object' ? { legacy: { medium: l.medium as 'graphic' | 'board', data: l.data, at: Number.isFinite(l.at) ? Number(l.at) : 0 } } : {}))(obj(r.legacy)),
     ...((ln) => (ln ? { systemLink: ln } : {}))(normalizeSystemLink(r.systemLink)),
     ...(typeof r.companyId === 'string' && /^co_[A-Za-z0-9_-]{4,64}$/.test(r.companyId) ? { companyId: r.companyId } : {}),
+    ...((g) => (typeof g.systemId === 'string' && /^dsys_[\w-]{4,64}$/.test(g.systemId) && Number.isInteger(g.version) && (g.version as number) >= 0 ? { guidelinesOf: { systemId: g.systemId, version: g.version as number, at: Number.isFinite(g.at) ? Number(g.at) : 0 } } : {}))(obj(r.guidelinesOf)),
     ...((st) => (st ? { studio: st } : {}))(normalizeStudio(r.studio)),
     artifact: normalizeArtifact(r.artifact),
     cards,

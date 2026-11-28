@@ -10,7 +10,7 @@ import { JSDOM } from 'jsdom';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const T = await import(pathToFileURL(join(here, '.tmp', 'design-under-test.mjs')).href);
-const { protocol: P, apply: A, elements: E, doc: D, formats: F, prompts: PR, frame: FR, flow: FL, start: ST, locks: LK, pins: PN, history: HI, request: RQ, contrast: CT, brandcheck: BC, identity: ID, motion: MO, production: PD, dependents: DP, exporting: EX } = T;
+const { protocol: P, apply: A, elements: E, doc: D, formats: F, prompts: PR, frame: FR, flow: FL, start: ST, locks: LK, pins: PN, history: HI, request: RQ, contrast: CT, brandcheck: BC, identity: ID, motion: MO, production: PD, dependents: DP, exporting: EX, typefaces: TF } = T;
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, typeof x === 'string' ? x.slice(0, 600) : JSON.stringify(x).slice(0, 600))));
@@ -604,6 +604,45 @@ sec('a print sheet with bleed and crop marks; many artboards as one file');
   ok('…its links lead between screens, and it says what it is', /parent\.postMessage\(\{go:n\.getAttribute\('data-go'\)\}/.test(walk) && /d\.go/.test(walk) && /A click-through of designed screens — not a working product\./.test(walk));
   ok('…the canvas’s ids are not in it, and its title is safe', !/data-sx=/.test(walk) && /<title>Proto 1><\/title>|<title>Proto 1&gt;<\/title>|<title>Proto 1><\/title>/.test(walk.replace('&lt;', '')) || /<title>Proto 1><\/title>/.test(walk) || !/<title>[^<]*<1>/.test(walk));
   ok('a deck is the same file without the prototype’s note, advancing on a click', !/not a working product/.test(EX.walkthroughHtml(boards, '', new Map(), { title: 'Deck' })) && /else if\(true\)\{parent\.postMessage\(\{next:true\}/.test(EX.walkthroughHtml(boards, '', new Map(), { title: 'Deck' })));
+}
+
+sec('typefaces: what really draws each, the company’s own, the same design in another');
+{
+  const st = TF.faceStatus(['Fraunces', 'Söhne', 'Northlight Grotesk'], [{ family: 'Northlight Grotesk', weight: 400, italic: false, data: 'data:font/woff2;base64,AAAA', format: 'woff2', licence: '' }]);
+  ok('a library face is drawn as itself; the company’s own font is its own; anything else is a fallback, and is said to be', st[0].by === 'library' && st[1].by === 'fallback' && /a fallback, which is a different typeface/.test(st[1].note) && st[2].by === 'own');
+  ok('a font file that states no licence says so', /states no licence: check what yours allows/.test(st[2].note) && /Its licence, as the file states it: OFL/.test(TF.faceStatus(['X'], [{ family: 'X', weight: 400, italic: false, data: 'data:font/ttf;base64,AA', format: 'truetype', licence: 'OFL 1.1' }])[0].note));
+  const asset = { kind: 'font', format: 'woff2', name: 'northlight-grotesk-bold', font: { family: 'Northlight Grotesk', weight: 700, italic: false, licence: 'Licensed to Northlight Ltd.' } };
+  const f = TF.ownFontOf(asset, 'data:font/woff2;base64,AAAA');
+  ok('a font file of the library becomes a face a design can name, with its weight and licence', f.family === 'Northlight Grotesk' && f.weight === 700 && f.format === 'woff2' && f.licence === 'Licensed to Northlight Ltd.' && TF.ownFontOf({ ...asset, kind: 'image' }, 'data:x') === null && TF.ownFontOf(asset, 'upload:abc') === null);
+  const byName = TF.ownFontOf({ kind: 'font', format: 'woff2', name: 'CormorantGaramond-500-italic' }, 'data:font/woff2;base64,AAAA');
+  ok('a file whose names cannot be read is named by its own file name: family, weight, slant', byName.family === 'CormorantGaramond' && byName.weight === 500 && byName.italic === true && TF.ownFontOf({ kind: 'font', format: 'woff2', name: 'Kalam-700' }, 'data:font/woff2;base64,AAAA').weight === 700 && TF.ownFontOf({ kind: 'font', format: 'ttf', name: 'Northlight Bold' }, 'data:font/ttf;base64,AA').family === 'Northlight');
+  ok('…as an @font-face that carries the file', /@font-face\{font-family:'Northlight Grotesk';font-weight:700;font-style:normal;font-display:block;src:url\(data:font\/woff2;base64,AAAA\) format\('woff2'\)\}/.test(TF.fontFaceCss([f])));
+  TF.setOwnFonts([f]);
+  ok('once registered, every frame draws with it and it is no longer “not available”', FR.frameDoc({ id: 'a', name: 'A', format: 'a3', width: 100, height: 100, medium: 'print', html: '<p style="font-family:\'Northlight Grotesk\'">x</p>', x: 0, y: 0 }, '', { parse, nonce: 'n', assets: new Map(), interactive: false }).includes("font-family:'Northlight Grotesk';font-weight:700") && FR.unservedFaces({ html: '<p style="font-family:\'Northlight Grotesk\'">x</p>' }, '').length === 0);
+  ok('…and a standalone HTML file carries it only when the artboard uses it', EX.artboardHtml({ id: 'a', name: 'A', format: 'a3', width: 100, height: 100, medium: 'print', html: '<style>p{font-family:"Northlight Grotesk",sans-serif}</style><p>x</p>', x: 0, y: 0 }, '', new Map()).includes('src:url(data:font/woff2') && !EX.artboardHtml({ id: 'a', name: 'A', format: 'a3', width: 100, height: 100, medium: 'print', html: '<style>p{font-family:Inter}</style><p>x</p>', x: 0, y: 0 }, '', new Map()).includes('src:url(data:font/woff2'));
+  TF.setOwnFonts([]);
+  // the same design in another face
+  const a = { html: `<style>.h{font-family:'Fraunces',serif;font-size:120px}.s{font:400 30px/1.2 "Fraunces", Georgia, serif}.b{font-family:Inter,sans-serif}.v{font-family:var(--display)}.x{font-family:'Fraunces Display'}</style><h1 class="h" data-sx="e1">Title</h1><p class="b" data-sx="e2" style="font-family: Fraunces">body</p>` };
+  const out = TF.swapFace(a, ":root{--display:'Fraunces',serif;--text:'Inter',sans-serif}", 'Fraunces', 'Anton');
+  ok('one face is replaced wherever it leads a list: in rules, in the shorthand, inline', /\.h\{font-family:'Anton', sans-serif;font-size:120px\}/.test(out) && /\.s\{font:400 30px\/1\.2 'Anton', sans-serif\}/.test(out) && /style="font-family: 'Anton', sans-serif"/.test(out), out);
+  ok('the other faces are left alone, and so is a different face that only begins the same', /\.b\{font-family:Inter,sans-serif\}/.test(out) && /\.x\{font-family:'Fraunces Display'\}/.test(out));
+  ok('a shared property that carries the face is overridden on this artboard alone', /<style>\.sx-root\{--display:'Anton', sans-serif\}<\/style>/.test(out) && !/--text/.test(out.split('</style>')[1] ?? ''));
+  ok('nothing but the face changes: the words, the ids, the sizes', /<h1 class="h" data-sx="e1">Title<\/h1>/.test(out) && /font-size:120px/.test(out) && out.split('data-sx').length === a.html.split('data-sx').length);
+  ok('a serif replacement is given a serif fallback', /'Fraunces', serif/.test(TF.swapFace({ html: '<style>.h{font-family:Anton}</style>' }, '', 'Anton', 'Fraunces')));
+}
+
+sec('what is real stays real: screenshots and photographs of people');
+{
+  const html = '<img data-sx="e1" src="asset:lib-shot00000001" alt=""><img data-sx="e2" src="asset:lib-team00000001" alt=""><img data-sx="e3" src="asset:mine" alt="">';
+  const box = (o = {}) => ({ id: 'e1', nw: 1600, nh: 1000, w: 800, h: 500, fit: 'fill', filter: 'none', opacity: 1, blend: 'normal', tilt: false, clip: 'none', ...o });
+  const real = { screenshots: new Set(['lib-shot00000001']), people: new Set(['lib-team00000001']) };
+  ok('a real screenshot scaled, framed, cropped to a detail or toned: nothing to say', BC.integrityFacts([box(), box({ w: 400, h: 400, fit: 'cover' }), box({ filter: 'grayscale(1) contrast(1.1)' }), box({ tilt: true })], html, real).length === 0);
+  const f = BC.integrityFacts([box({ w: 900, h: 400 })], html, real);
+  ok('a real screenshot stretched is found, and said as a requirement about what is true', f.length === 1 && /^requirement, measured: the real screenshot \(data-sx="e1"\) is drawn stretched: 900×400 against its own 1600×1000; a product is shown as it is/.test(BC.brandSaid(f[0])), f);
+  ok('…and one blurred into showing something else', /has a filter that changes what it shows \(blur\(6px\)\)/.test(BC.integrityFacts([box({ filter: 'blur(6px)' })], html, real)[0]?.text ?? ''));
+  const p = BC.integrityFacts([box({ id: 'e2', w: 900, h: 400 }), box({ id: 'e2', tilt: true })], html, real);
+  ok('people in a photograph are not reshaped: stretched or skewed is found', p.length === 2 && /the photograph of real people[^\n]*people are not reshaped/.test(p[0].text) && /skewed or tilted/.test(p[1].text));
+  ok('a picture that is neither is the designer’s to treat', BC.integrityFacts([box({ id: 'e3', w: 900, h: 400, filter: 'blur(4px)' })], html, real).length === 0);
 }
 
 sec('screens that lead to one another');

@@ -31,3 +31,4 @@ export * as motion from '@/lib/ux-v0/design/motion';
 export * as production from '@/lib/ux-v0/design/production';
 export * as dependents from '@/lib/ux-v0/design/dependents';
 export * as exporting from '@/lib/ux-v0/design/export';
+export * as typefaces from '@/lib/ux-v0/design/typefaces';

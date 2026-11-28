@@ -57,13 +57,19 @@ import { frameDoc } from '@/lib/ux-v0/design/frame';
 import { artboardHtml, artboardPicture, artboardsPdf, artboardsPrintPdf, artboardSvg, artboardsZip, download, embeddedFonts, fileName, motionFrames, motionVideo, motionZip, videoType, walkthroughHtml } from '@/lib/ux-v0/design/export';
 import { moves } from '@/lib/ux-v0/design/production';
 import { carrying, changeWords, type Dependent } from '@/lib/ux-v0/design/dependents';
+import { guidelinesDoc, refreshGuidelines } from '@/lib/ux-v0/design/guidelines';
+import { faceStatus, ownFamilies, ownFontOf, setOwnFonts, swapFace, type OwnFont } from '@/lib/ux-v0/design/typefaces';
+import { GRAPHIC_FONTS } from '@/lib/ux-v0/fonts';
+import { getArtifact } from '@/lib/ux-v0/store';
+import { toDataUrl } from '@/lib/ux-v0/design/export';
+import { faceHeads } from '@/lib/ux-v0/design/frame';
 import { facesFor } from '@/lib/ux-v0/design/frame';
 import { addUpload } from '../uploads';
 import { Canvas, fitView, type ElementPick, type FrameEvent, type View } from './Canvas';
 import { Inspector } from './Inspector';
 import { Chat } from './Chat';
 import { CompareModal, HistoryPanel } from './Versions';
-import { assetData, brandOf, browserBench, parseHtml, routeTransport, type BrandContext } from './runtime';
+import { assetData, brandOf, browserBench, deckFact, parseHtml, routeTransport, type BrandContext } from './runtime';
 import './design.css';
 
 type Busy = { phase: 'writing' | 'looking' | 'fixing' | 'reviewing'; say: string; started: number } | null;
@@ -122,7 +128,34 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent, onBran
     const own = cur.current.design!.assets;
     return [...own, ...sharedRef.current.filter((x) => !own.some((a) => a.id === x.id))];
   }, []);
-  const assetsKey = `${s.assets.map((a) => a.id).join(',')}|${shared.map((a) => a.id).join(',')}`;
+  // the company's and the brand's own font files: from here on every frame and export draws with them
+  const [fontsKey, setFontsKey] = useState('');
+  useEffect(() => {
+    let live = true;
+    const files = [...(brand?.fonts ?? []), ...(company ? company.library.filter((i) => i.asset.kind === 'font' && !i.retired).map((i) => i.asset) : [])];
+    void (async () => {
+      const out: OwnFont[] = [];
+      const seen = new Set<string>();
+      for (const a of files) {
+        if (seen.has(a.hash) || !a.src) continue;
+        seen.add(a.hash);
+        let data = a.src;
+        if (data.startsWith('upload:')) {
+          const rec = await getArtifact(data.slice('upload:'.length)).catch(() => null);
+          data = rec ? await toDataUrl(rec.data).catch(() => '') : '';
+        }
+        const f = ownFontOf(a, data);
+        if (f) out.push(f);
+      }
+      if (!live) return;
+      setOwnFonts(out);
+      setFontsKey(out.map((f) => `${f.family}:${f.weight}:${f.italic ? 'i' : 'n'}`).join(','));
+    })();
+    return () => {
+      live = false;
+    };
+  }, [brand, company]);
+  const assetsKey = `${s.assets.map((a) => a.id).join(',')}|${shared.map((a) => a.id).join(',')}|${fontsKey}`;
   const [assets, setAssets] = useState<Map<string, string>>(new Map());
   useEffect(() => {
     let live = true;
@@ -139,7 +172,9 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent, onBran
       for (const a of [...(brand?.pictures ?? []), ...(company ? libraryFor(company, words) : [])]) if (!lib.has(a.id)) lib.set(a.id, { id: a.id, name: a.name, width: a.width, height: a.height, note: a.note });
       const absent = company ? missingFor(company, words) : [];
       const told = company ? companyTold(company) : null;
-      return { company: told ? { ...told, missing: [...new Set([...absent, ...told.missing])] } : undefined, library: [...lib.values()], absent };
+      const mine = ownFamilies();
+      const faces = mine.length ? [`Its own typefaces, available here by name as font-family (beside the library): ${mine.join(', ')}`] : [];
+      return { company: told ? { ...told, about: [...told.about, ...faces], missing: [...new Set([...absent, ...told.missing])] } : undefined, library: [...lib.values()], absent };
     },
     [brand, company]
   );
@@ -201,7 +236,13 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent, onBran
   // what every artboard is checked against: the brand's colours and faces, its protected logos, what was allowed here
   const brandCtx = useRef<BrandContext | null>(null);
   brandCtx.current = useMemo(
-    () => ({ basis: brand?.basis ?? null, protectedIds: new Set([...(brand?.protected ?? []), ...(company ? company.library.filter((i) => i.asset.protected).map(libraryAssetId) : [])]), allowed: s.memory.allowed }),
+    () => ({
+      basis: brand?.basis ?? null,
+      protectedIds: new Set([...(brand?.protected ?? []), ...(company ? company.library.filter((i) => i.asset.protected).map(libraryAssetId) : [])]),
+      allowed: s.memory.allowed,
+      screenshots: new Set(company ? company.library.filter((i) => i.what === 'screenshot').map(libraryAssetId) : []),
+      people: new Set(company ? company.library.filter((i) => i.people).map(libraryAssetId) : []),
+    }),
     [brand, company, s.memory.allowed]
   );
   const bench = useMemo(() => browserBench(assetsNow, () => brandCtx.current), [assetsNow]);
@@ -230,7 +271,10 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent, onBran
       abort.current = ctl;
       setBusy({ phase: 'reviewing', say: '', started: Date.now() });
       const more = beyond(words);
-      const out = await runReview(st, { words, artboards: ids, system: brand ? { name: brand.name, rules: brand.rules } : null, company: more.company, library: more.library }, transport, bench, { signal: ctl.signal });
+      // a deck is also looked at as a whole: whether most of its slides arrange their words the same way (measured)
+      const first = artboardOf(st.doc, ids[0])!;
+      const deck = await deckFact(st.doc, first, await assetsNow()).catch(() => null);
+      const out = await runReview(st, { words, artboards: ids, system: brand ? { name: brand.name, rules: brand.rules } : null, company: more.company, library: more.library, ...(deck ? { facts: { [first.id]: [deck] } } : {}) }, transport, bench, { signal: ctl.signal });
       abort.current = null;
       setBusy(null);
       if (out.kind === 'failed') {
@@ -240,7 +284,7 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent, onBran
       }
       update((x) => ({ ...x, turns: [...x.turns, ...out.state.turns.slice(st.turns.length)] }));
     },
-    [bench, beyond, brand, sel.artboard, transport, update]
+    [assetsNow, bench, beyond, brand, sel.artboard, transport, update]
   );
 
   const ask = useCallback(
@@ -614,6 +658,35 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent, onBran
       return { ...x, memory: Object.keys(allowed).length ? { ...memory, allowed } : memory };
     });
 
+  // ── typefaces: what really draws each, and the same artboard tried in others (by code, no model) ──
+  const facesNow = useMemo(() => {
+    const a = artboardOf(s.doc, sel.artboard);
+    return a ? faceStatus(faceHeads(a, s.doc.tokens)) : [];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel.artboard, selHtml, s.doc.tokens, fontsKey]);
+  const [typeFor, setTypeFor] = useState<{ artboard: string; from: string } | null>(null);
+  const [typePick, setTypePick] = useState<string[]>([]);
+  const [typeFind, setTypeFind] = useState('');
+  const compareType = () => {
+    const t = typeFor;
+    setTypeFor(null);
+    const a = t ? artboardOf(s.doc, t.artboard) : null;
+    if (!a || !t || !typePick.length) return;
+    const group = `type-${newId('g').slice(-6)}`;
+    let at = placeNew(s.doc, a.width, a.height, a);
+    const made: DesignArtboard[] = typePick.map((face) => {
+      const { state: _s, locked: _l, locks: _k, ...plain } = a;
+      void _s, _l, _k;
+      const copy = { ...plain, id: newId('ab'), name: `${a.name} — ${face}`.slice(0, 80), group, html: swapFace(a, s.doc.tokens, t.from, face), x: at.x, y: at.y };
+      at = { x: at.x + a.width + 120, y: at.y };
+      return copy;
+    });
+    setArtboards((list) => [...list, ...made], `Set “${a.name}” in ${typePick.join(', ')} in place of ${t.from}`);
+    setSel({ artboard: made[0].id, element: null });
+    setPick(null);
+    tell(`${made.length} cop${made.length === 1 ? 'y' : 'ies'} beside it, each with ${t.from} replaced and nothing else changed. No model was asked.`);
+  };
+
   // ── comments ──
   const comment = (text: string) => {
     if (!sel.artboard) return;
@@ -789,12 +862,45 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent, onBran
             comments={notesBy}
             control={control}
             guides={guides}
+            fontsKey={fontsKey}
           />
           {absentPictures > 0 && assets.size + absentPictures > 0 && (
             <div className="dx-warn" role="status">
               {absentPictures === 1 ? 'A picture this design uses is' : `${absentPictures} pictures this design uses are`} not in this browser, so {absentPictures === 1 ? 'it is' : 'they are'} drawn as nothing here. {company ? `Add ${absentPictures === 1 ? 'it' : 'them'} to ${company.name}’s library on this device.` : 'Add the file again to see it.'}
             </div>
           )}
+          {project.guidelinesOf && (project.guidelinesOf.version === 0 || (linked && linked.rec.published > project.guidelinesOf.version)) ? (
+            <div className="dx-warn dx-version" role="status">
+              {project.guidelinesOf.version === 0 ? (
+                'A preview written from a draft. It is not the brand: every page says so, and it stays a preview until the draft is published and guidelines are written from that version.'
+              ) : (
+                <>
+                  Written from {linked!.rec.name} v{project.guidelinesOf.version}; v{linked!.rec.published} is published.{' '}
+                  <button
+                    type="button"
+                    className="dx-btn dx-small"
+                    disabled={!!busy}
+                    onClick={() => {
+                      const rec = linked!.rec;
+                      const fresh = guidelinesDoc(rec, { version: 'latest', parse: parseHtml });
+                      if (!fresh.ok) return tell(fresh.error);
+                      const r = refreshGuidelines(cur.current.design!, fresh);
+                      setProject((p) => ({
+                        ...p,
+                        design: { ...commit(p.design!, r.doc, `Brought up to date with ${rec.name} v${fresh.of.version}`, 'person'), assets: r.assets },
+                        // (held where an approved page would change: the project stays on the version its approved pages were written from)
+                        ...(r.tokensHeld ? {} : { guidelinesOf: fresh.of, systemLink: p.systemLink ? { ...p.systemLink, pin: fresh.of.version, version: fresh.of.version, at: Date.now() } : p.systemLink }),
+                        updatedAt: Date.now(),
+                      }));
+                      tell(`${r.replaced.length} page${r.replaced.length === 1 ? '' : 's'} rewritten from v${fresh.of.version}${r.added.length ? `, ${r.added.length} added` : ''}.${r.kept.length ? ` Left as approved: ${r.kept.join(', ')} — reopen ${r.kept.length === 1 ? 'it' : 'them'} to bring ${r.kept.length === 1 ? 'it' : 'them'} up to date.` : ''} The pages as they were are in the history.`);
+                    }}
+                  >
+                    Bring them up to date
+                  </button>
+                </>
+              )}
+            </div>
+          ) : null}
           {follow && (
             <div className="dx-follow" role="status">
               <p>
@@ -847,6 +953,13 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent, onBran
             onExport={(k) => void doExport(k)}
             onComment={comment}
             pins={s.memory.pins}
+            faces={facesNow}
+            onCompareType={(from) => {
+              if (!sel.artboard) return;
+              setTypePick([]);
+              setTypeFind('');
+              setTypeFor({ artboard: sel.artboard, from });
+            }}
             brand={brand || brandCtx.current?.protectedIds.size ? { name: brand?.name ?? company?.name ?? 'the brand', facts: brandNow, allowed: s.memory.allowed, onAllow: allow } : null}
             busy={!!busy}
             onState={(st) => sel.artboard && setState(sel.artboard, st)}
@@ -928,6 +1041,37 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent, onBran
           )}
         </div>
       </div>
+
+      {typeFor && (
+        <div className="dx-modal" role="dialog" aria-label="Compare typefaces" onClick={(e) => e.target === e.currentTarget && setTypeFor(null)}>
+          <div className="dx-modal-box">
+            <h3 className="dx-h">See it in other typefaces</h3>
+            <p className="dx-muted">
+              A copy of the artboard for each face you choose, with <strong>{typeFor.from}</strong> replaced wherever it is used and nothing else changed — real specimens, in context, side by side. Up to six. None is suggested: the choice is yours.
+            </p>
+            <input className="dx-note-in" type="search" placeholder="Find a face by name" aria-label="Find a face" value={typeFind} onChange={(e) => setTypeFind(e.target.value)} />
+            <div className="dx-formats dx-faces">
+              {[...ownFamilies().map((name) => ({ name, kind: 'yours' })), ...GRAPHIC_FONTS.map((f) => ({ name: f.name, kind: String(f.kind) }))]
+                .filter((f) => f.name.toLowerCase() !== typeFor.from.toLowerCase() && (!typeFind.trim() || f.name.toLowerCase().includes(typeFind.trim().toLowerCase())))
+                .map((f) => (
+                  <label key={`${f.kind}:${f.name}`} className="dx-check">
+                    <input type="checkbox" checked={typePick.includes(f.name)} disabled={!typePick.includes(f.name) && typePick.length >= 6} onChange={(e) => setTypePick((c) => (e.target.checked ? [...c, f.name].slice(0, 6) : c.filter((x) => x !== f.name)))} />
+                    <span>{f.name}</span>
+                    <small>{f.kind === 'yours' ? 'your font file' : f.kind}</small>
+                  </label>
+                ))}
+            </div>
+            <div className="dx-row dx-end">
+              <button type="button" className="dx-btn dx-ghost" onClick={() => setTypeFor(null)}>
+                Cancel
+              </button>
+              <button type="button" className="dx-btn dx-primary" onClick={compareType} disabled={!typePick.length}>
+                Make {typePick.length || ''} {typePick.length === 1 ? 'copy' : 'copies'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {formatsFor && (
         <div className="dx-modal" role="dialog" aria-label="Other formats" onClick={(e) => e.target === e.currentTarget && setFormatsFor(null)}>

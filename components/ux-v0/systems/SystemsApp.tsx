@@ -61,7 +61,7 @@ async function svgToPng(svg: string, width: number): Promise<Blob | null> {
   });
 }
 
-export function SystemsApp(p: { signedIn: boolean; initialId?: string | null; onExit: () => void; onOpenProject: (id: string) => void; onNewProject: (kind: 'graphic' | 'board' | 'website', rec: SystemRecord) => void; startImport?: (WizardStart & { next?: string }) | null; onImportTaken?: () => void }) {
+export function SystemsApp(p: { signedIn: boolean; initialId?: string | null; onExit: () => void; onOpenProject: (id: string) => void; onNewProject: (kind: 'graphic' | 'board' | 'website' | 'guidelines' | 'guidelines-draft', rec: SystemRecord) => void; startImport?: (WizardStart & { next?: string }) | null; onImportTaken?: () => void }) {
   const [records, setRecords] = useState<SystemRecord[]>([]);
   const [selected, setSelected] = useState<string | null>(p.initialId ?? null);
   const [tab, setTab] = useState<Tab>('Overview');
@@ -964,7 +964,7 @@ function GovernanceTab({ rec, save }: { rec: SystemRecord; save: Save }) {
 
 // ── usage: the projects it reaches ──
 
-function UsageTab({ rec, save, signedIn, projects, onOpenProject, onNewProject, onChanged }: { rec: SystemRecord; save: Save; signedIn: boolean; projects: ProjectSummary[]; onOpenProject: (id: string) => void; onNewProject: (kind: 'graphic' | 'board' | 'website', rec: SystemRecord) => void; onChanged: () => void }) {
+function UsageTab({ rec, save, signedIn, projects, onOpenProject, onNewProject, onChanged }: { rec: SystemRecord; save: Save; signedIn: boolean; projects: ProjectSummary[]; onOpenProject: (id: string) => void; onNewProject: (kind: 'graphic' | 'board' | 'website' | 'guidelines' | 'guidelines-draft', rec: SystemRecord) => void; onChanged: () => void }) {
   const [full, setFull] = useState<DesignProject[]>([]);
   const [reports, setReports] = useState<Record<string, ApplyReport & { previous?: DesignProject['systemLink'] }>>({});
   const [preview, setPreview] = useState<Record<string, ApplyReport>>({});
@@ -1092,6 +1092,12 @@ function UsageTab({ rec, save, signedIn, projects, onOpenProject, onNewProject, 
           </button>
           <button type="button" className="sb-btn is-sm" onClick={() => onNewProject('board', rec)}>
             New board in it
+          </button>
+          <button type="button" className="sb-btn is-sm" disabled={!rec.published} title={rec.published ? 'Pages that state what this version holds: its colours, typefaces, logo and rules. No model is asked.' : 'Publish a version first: guidelines are written from what is approved'} onClick={() => onNewProject('guidelines', rec)}>
+            Brand guidelines{rec.published ? ` (v${rec.published})` : ''}
+          </button>
+          <button type="button" className="sb-btn is-sm" title="A preview from the draft, marked DRAFT — NOT APPROVED on every page" onClick={() => onNewProject('guidelines-draft', rec)}>
+            Preview guidelines from the draft
           </button>
           <button type="button" className="sb-btn is-sm" onClick={() => onNewProject('website', rec)}>
             New website in it

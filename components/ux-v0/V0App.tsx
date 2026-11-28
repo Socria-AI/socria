@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { makeNonce } from '@/lib/ux-v0/sandbox';
 import { deleteArtifacts, deleteProject, getProject, listProjects, putProject } from '@/lib/ux-v0/store';
-import { normalizeProject, type DesignProject, type ProjectSummary } from '@/lib/ux-v0/types';
+import { makeProject, normalizeProject, type DesignProject, type ProjectSummary } from '@/lib/ux-v0/types';
 import { Workspace } from './Workspace';
 import { StudioHome, type BeginRequest } from './studio/StudioHome';
 import { YourWork } from './studio/YourWork';
@@ -31,6 +31,9 @@ import { DesignWorkspace } from './design/DesignWorkspace';
 import { openLegacy } from './design/legacy-open';
 import { SystemsApp } from './systems/SystemsApp';
 import { CompanyApp } from './company/CompanyApp';
+import { guidelinesDoc } from '@/lib/ux-v0/design/guidelines';
+import { commit as commitDesign, emptyState as emptyDesignState } from '@/lib/ux-v0/design/doc';
+import { currentCompanyId } from '@/lib/ux-v0/company/store';
 import type { SystemRecord } from '@/lib/ux-v0/dsi/registry';
 import { listSystems } from '@/lib/ux-v0/dsi/store';
 import '@/components/brand/socria-brand.css';
@@ -257,7 +260,34 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
   };
 
   /** A new project built in a registry design system: linked (identity from the system), then opened. */
-  const startInSystem = async (kind: 'graphic' | 'board' | 'website', rec: SystemRecord) => {
+  /** Brand guidelines written from a system (lib/ux-v0/design/guidelines.ts): a design project of its pages, no model asked. */
+  const writeGuidelines = async (rec: SystemRecord, draft: boolean) => {
+    const made = guidelinesDoc(rec, { version: draft ? 'draft' : 'latest', parse: (h) => new DOMParser().parseFromString(h, 'text/html') });
+    if (!made.ok) return setError(made.error);
+    const now = Date.now();
+    const base = makeProject('create', `${rec.name} — brand guidelines${draft ? ' (draft preview)' : ''}`, now);
+    const st0 = emptyDesignState('brand guidelines', 'presentation', `Brand guidelines for ${rec.name}, written from ${draft ? 'its draft (a preview: not approved)' : `version ${made.of.version}`}. Every value on them is the system's own.`);
+    const said = draft ? `Written from the draft of ${rec.name} — a preview, marked as a draft on every page` : `Written from ${rec.name} v${made.of.version}`;
+    const design = commitDesign({ ...st0, assets: made.assets }, made.doc, said, 'model', now);
+    const turn = { id: `t${now.toString(36)}`, role: 'designer' as const, text: `${said}. ${made.doc.artboards.length} pages, each stating only what the system holds.${made.notes.length ? ` ${made.notes.join(' ')}` : ''} Every page can be edited, redesigned in words, and approved like any other.`, at: now };
+    const companyId = currentCompanyId();
+    const p: DesignProject = {
+      ...base,
+      medium: 'design',
+      design: { ...design, turns: [turn] },
+      guidelinesOf: made.of,
+      // (a draft is never applied to work: a preview is linked to nothing)
+      ...(draft ? {} : { systemLink: { id: rec.id, name: rec.name, pin: made.of.version, version: made.of.version, overrides: {}, applied: {}, at: now } }),
+      ...(companyId ? { companyId } : {}),
+    };
+    await putProject(p);
+    setSystems(null);
+    passage(() => setOpen({ p }));
+    window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(p.id)}`);
+  };
+
+  const startInSystem = async (kind: 'graphic' | 'board' | 'website' | 'guidelines' | 'guidelines-draft', rec: SystemRecord) => {
+    if (kind === 'guidelines' || kind === 'guidelines-draft') return writeGuidelines(rec, kind === 'guidelines-draft');
     // a conversation like any other, the system already chosen: it asks only what the work needs (never its colours,
     // lettering or mood: the system decides those)
     const p = conversationProject(kind, '', { modeBy: 'person', attachments: [], systemId: rec.id, systemName: rec.name });

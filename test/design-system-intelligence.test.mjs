@@ -595,5 +595,48 @@ sec('a family of systems: a product within the brand, an experiment beside it �
   ok('…and with no hard rule about colour, a colour outside it is a principle too', D.brandBasis('x', relaxed).colour === 'principle');
 }
 
+sec('brand guidelines: written from a published version, stating only what it holds');
+{
+  const { JSDOM } = await import('jsdom');
+  const parse = (html) => new JSDOM(html).window.document;
+  let brand = D.newRecord(D.analyzeBrand({ ...pc }), { now: 800 });
+  const none = D.guidelinesDoc(brand, { parse });
+  ok('nothing published, no guidelines — and it says why', !none.ok && /has no published version\. Guidelines are written from what is approved/.test(none.error));
+  const preview = D.guidelinesDoc(brand, { version: 'draft', parse, now: 801 });
+  ok('a preview from the draft is marked as a draft on every page, and is of no version', preview.ok && preview.of.version === 0 && preview.doc.artboards.every((a) => /DRAFT — NOT APPROVED/.test(a.html)) && /This is a preview of a draft\. It is not the brand/.test(preview.doc.artboards.at(-1).html));
+  brand = D.publish(brand, { now: 802, confirm: true }).record;
+  const g = D.guidelinesDoc(brand, { parse, now: 803 });
+  const by = Object.fromEntries(g.doc.artboards.map((a) => [a.id, a]));
+  ok('written from the published version, and every page says which', g.ok && g.of.version === 1 && g.of.systemId === brand.id && g.doc.artboards.every((a) => /Version 1 · published/.test(a.html) && !/DRAFT/.test(a.html)));
+  ok('the pages are the things the system holds: colour, typography, rules, sources — and a cover', ['gl-cover', 'gl-colour', 'gl-type', 'gl-rules', 'gl-sources'].every((id) => by[id]), Object.keys(by));
+  const content = D.publishedContent(brand);
+  const palette = new Set([...D.resolveAll(content, { mode: content.modes[0] }).values()].filter((r) => r.ok && r.type === 'color').map((r) => D.hexOf(r.value)));
+  const shown = [...by['gl-colour'].html.matchAll(/background:(#[0-9a-f]{6})/gi)].map((m) => m[1].toLowerCase());
+  ok('every colour on the colour page is one of the system’s (none is invented)', shown.length >= 3 && shown.every((h) => palette.has(h)), shown.filter((h) => !palette.has(h)));
+  const bg = D.hexOf(D.resolveAll(content).get(content.roles.background.path).value);
+  const tx = D.hexOf(D.resolveAll(content).get(content.roles.text.path).value);
+  const lum = (h) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(parseInt(h.slice(1, 3), 16)) + 0.7152 * f(parseInt(h.slice(3, 5), 16)) + 0.0722 * f(parseInt(h.slice(5, 7), 16)); };
+  const ratio = Math.round(((Math.max(lum(bg), lum(tx)) + 0.05) / (Math.min(lum(bg), lum(tx)) + 0.05)) * 10) / 10;
+  ok('contrast is stated as measured: the text colour against the ground', by['gl-colour'].html.includes(`${ratio}:1 on the ground`), ratio);
+  ok('typefaces are shown as specimens, and one SocriaUX cannot draw is said to be a fallback — never passed off', /Fraunces/.test(by['gl-type'].html) && (/Drawn here in Fraunces itself\./.test(by['gl-type'].html) || /is not a face SocriaUX can draw: unless this computer has it, what you see here is a fallback/.test(by['gl-type'].html)));
+  ok('rules are kept apart as requirements and principles, each with where it came from', /<h3[^>]*>Requirements<\/h3>/.test(by['gl-rules'].html) && /<h3[^>]*>Principles<\/h3>/.test(by['gl-rules'].html) && /<em[^>]*>(from |stated by the owner|approved by the owner)/.test(by['gl-rules'].html));
+  const hasLogo = content.assets.some((a) => a.kind === 'logo' && a.approved && !a.lowRes);
+  ok('a logo page is written only when the system has an approved logo; without one the cover says so', hasLogo ? !!by['gl-logo'] && g.assets.length >= 1 && /src="asset:lib-[0-9a-f]{12}"/.test(by['gl-logo'].html) : !by['gl-logo'] && /It does not hold [^.]*an approved logo/.test(by['gl-cover'].html) && g.notes.some((n) => /no approved logo: no logo page was written/.test(n)), [hasLogo, Object.keys(by), g.notes]);
+  ok('no advice is offered: nothing about breathing room, consistency or best practice', g.doc.artboards.every((a) => !/breathe|best practice|consistency is key|always ensure|make sure to/i.test(a.html)));
+  ok('the pages are artboards like any other: ids on their elements, the system’s values as shared styles, set side by side', g.doc.artboards.every((a) => /data-sx="e1"/.test(a.html) && a.width === 1920 && a.height === 1080) && /--/.test(g.doc.tokens) && g.doc.artboards[1].x > g.doc.artboards[0].x);
+  // a new version: brought up to date by the person; an approved page stays
+  const colourPath = content.roles.accent?.path ?? Object.values(content.tokens).find((t) => t.type === 'color').path;
+  let next = D.updateDraft(brand, D.setToken(brand.draft, colourPath, { value: '#0a5cff' }).content, 'new accent');
+  next = D.publish(next, { now: 810, confirm: true }).record;
+  const fresh = D.guidelinesDoc(next, { parse, now: 811 });
+  const state = { doc: { ...g.doc, artboards: g.doc.artboards.map((a) => (a.id === 'gl-cover' ? { ...a, state: 'approved', locked: true } : a)).concat([{ id: 'mine', name: 'My page', format: 'presentation', width: 1920, height: 1080, medium: 'screen', x: 99999, y: 0, html: '<p data-sx="e1">mine</p>' }]) }, assets: g.assets };
+  const r = D.refreshGuidelines(state, fresh);
+  ok('brought up to date: written pages are rewritten from the new version, and say so', fresh.of.version === 2 && r.replaced.includes('Colour') && /#0a5cff/i.test(r.doc.artboards.find((a) => a.id === 'gl-colour').html) && /Version 2/.test(r.doc.artboards.find((a) => a.id === 'gl-sources').html));
+  ok('…the approved page is left exactly as approved, and named; the shared styles are held for it', r.kept.join() === 'Cover' && r.doc.artboards.find((a) => a.id === 'gl-cover').html === state.doc.artboards.find((a) => a.id === 'gl-cover').html && r.tokensHeld && r.doc.tokens === g.doc.tokens);
+  ok('…a page the person added is not touched', r.doc.artboards.find((a) => a.id === 'mine').html === '<p data-sx="e1">mine</p>');
+  const free = D.refreshGuidelines({ doc: g.doc, assets: g.assets }, fresh);
+  ok('with nothing approved, the shared styles move to the new version too', !free.tokensHeld && free.doc.tokens === fresh.doc.tokens && free.kept.length === 0);
+}
+
 console.log(`\ndesign-system-intelligence: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

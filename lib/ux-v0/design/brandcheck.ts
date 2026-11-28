@@ -152,5 +152,31 @@ export function logoFacts(images: readonly ImageBox[], html: string, protectedId
   return out;
 }
 
+/**
+ * What was done to a real screenshot, or to a photograph of real people, that changes what it shows — as measured.
+ * A real screenshot may be scaled, framed and cropped to a detail; it may not be stretched, tilted out of true, or
+ * blurred or recoloured into showing something the product does not. A photograph of real people may be cropped and
+ * toned; the people in it may not be distorted. Each is a requirement: it is about what is true, not about taste.
+ */
+export function integrityFacts(images: readonly ImageBox[], html: string, real: { screenshots: ReadonlySet<string>; people: ReadonlySet<string> }): BrandFact[] {
+  if (!real.screenshots.size && !real.people.size) return [];
+  const placed = placedAssets(html);
+  const out: BrandFact[] = [];
+  for (const im of images) {
+    const asset = placed.get(im.id);
+    if (!asset || !im.nw || !im.nh || !im.w || !im.h) continue;
+    const shot = real.screenshots.has(asset);
+    const people = real.people.has(asset);
+    if (!shot && !people) continue;
+    const what = shot ? 'the real screenshot' : 'the photograph of real people';
+    const said = (text: string) => out.push({ level: 'requirement', about: 'logo', value: im.id, text: `${what} (data-sx="${im.id}") ${text}` });
+    const off = im.w / im.h / (im.nw / im.nh);
+    if (Math.abs(off - 1) > 0.03 && (im.fit || 'fill').toLowerCase() === 'fill') said(`is drawn stretched: ${im.w}×${im.h} against its own ${im.nw}×${im.nh}; ${shot ? 'a product is shown as it is' : 'people are not reshaped'} — give it its own proportions (crop it with object-fit: cover if it must fill a shape)`);
+    if (im.tilt && people) said('is skewed or tilted: people are not reshaped');
+    if (/\b(blur|hue-rotate|invert)\(/i.test(im.filter)) said(`has a filter that changes what it shows (${im.filter.slice(0, 40)}); ${shot ? 'a real screenshot shows the product as it is' : 'a photograph of real people shows them as they were'}`);
+  }
+  return out;
+}
+
 /** A finding in words, for the designer and for a review: what it is, and how firmly it holds. */
-export const brandSaid = (f: BrandFact): string => `${f.level === 'requirement' ? 'brand requirement, checked' : 'brand principle (a departure is a choice, not a defect), checked'}: ${f.text}`;
+export const brandSaid = (f: BrandFact): string => `${/^the (real screenshot|photograph of real people)/.test(f.text) ? 'requirement, measured' : f.level === 'requirement' ? 'brand requirement, checked' : 'brand principle (a departure is a choice, not a defect), checked'}: ${f.text}`;

@@ -15,6 +15,7 @@ import { buildSandboxDoc } from '../sandbox';
 import { graphicFontStylesheet, graphicFont } from '../fonts';
 import type { DesignArtboard } from './doc';
 import { facesNamed, type Parse } from './elements';
+import { ownFamilies, ownFontCss } from './typefaces';
 
 /** The model's CSS, read against one root element (see the head of this file). */
 export function scopeCss(css: string): string {
@@ -59,7 +60,7 @@ export function faceHeads(a: Pick<DesignArtboard, 'html'>, tokens: string): stri
  * Of those, the ones the library cannot serve (and no imported face provides): they are drawn in a fallback, so the
  * design is not what was written. Said to the look (lib/ux-v0/design/flow.ts) with what was measured.
  */
-export function unservedFaces(a: Pick<DesignArtboard, 'html'>, tokens: string, own: readonly string[] = []): string[] {
+export function unservedFaces(a: Pick<DesignArtboard, 'html'>, tokens: string, own: readonly string[] = ownFamilies()): string[] {
   const mine = new Set(own.map((x) => x.toLowerCase()));
   return faceHeads(a, tokens)
     .filter((f) => !graphicFont(f) && !mine.has(f.toLowerCase()))
@@ -98,6 +99,7 @@ export function frameDoc(a: DesignArtboard, tokens: string, o: FrameOptions): st
   const fonts = facesFor(a, tokens);
   const head = [
     fonts.href ? `<link rel="stylesheet" href="${fonts.href}">` : '',
+    ownFontCss() ? `<style data-sx-fonts>${ownFontCss()}</style>` : '',
     `<style>${baseCss(a.width, a.height)}</style>`,
     tokens ? `<style data-sx-tokens>${scopeCss(tokens)}</style>` : '',
     o.interactive ? `<style>${CANVAS_CSS}</style>` : o.walk ? '<style>[data-go]{cursor:pointer}</style>' : '',

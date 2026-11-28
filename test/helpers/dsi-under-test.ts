@@ -47,3 +47,4 @@ export * as family from '@/lib/ux-v0/dsi/family';
 export { applySync, syncDiff } from '@/lib/ux-v0/dsi/sync';
 export { brandBasis } from '@/lib/ux-v0/design/brandcheck';
 export { brandForDesign } from '@/lib/ux-v0/design/brand';
+export { guidelinesDoc, refreshGuidelines } from '@/lib/ux-v0/design/guidelines';

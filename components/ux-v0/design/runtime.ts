@@ -12,7 +12,7 @@ import type { DesignArtboard, DesignAsset, DesignDoc } from '@/lib/ux-v0/design/
 import { frameDoc } from '@/lib/ux-v0/design/frame';
 import { artboardPixels, lookPicture, toDataUrl } from '@/lib/ux-v0/design/export';
 import { contrastFacts, contrastSaid, type TextBox } from '@/lib/ux-v0/design/contrast';
-import { brandFacts, brandSaid, logoFacts, type Allowed, type BrandBasis, type ImageBox } from '@/lib/ux-v0/design/brandcheck';
+import { brandFacts, brandSaid, integrityFacts, logoFacts, type Allowed, type BrandBasis, type ImageBox } from '@/lib/ux-v0/design/brandcheck';
 import { layoutSignature, motionFacts, placementFacts, repeatedLayout, repetitionSaid, resolutionFacts } from '@/lib/ux-v0/design/production';
 import type { Bench, Sent, Transport, WriteBody } from '@/lib/ux-v0/design/flow';
 import { operationId, post } from '../api';
@@ -117,12 +117,16 @@ export interface BrandContext {
   basis: BrandBasis | null;
   protectedIds: ReadonlySet<string>;
   allowed: Allowed | undefined;
+  /** pictures that are real screenshots of a product, and photographs of real people (their ids on a design) */
+  screenshots?: ReadonlySet<string>;
+  people?: ReadonlySet<string>;
 }
 
 /** What an artboard does against its brand, as checked and as measured (lib/ux-v0/design/brandcheck.ts). */
 export async function brandOf(a: DesignArtboard, tokens: string, assets: ReadonlyMap<string, string>, ctx: BrandContext, images?: ImageBox[]) {
-  const imgs = images ?? (ctx.protectedIds.size && /asset:/.test(a.html) ? (await measureOffscreen(a, tokens, assets))?.images ?? [] : []);
-  return [...logoFacts(imgs, a.html, ctx.protectedIds, ctx.basis), ...brandFacts(a, tokens, ctx.basis, ctx.allowed)];
+  const real = { screenshots: ctx.screenshots ?? new Set<string>(), people: ctx.people ?? new Set<string>() };
+  const imgs = images ?? ((ctx.protectedIds.size || real.screenshots.size || real.people.size) && /asset:/.test(a.html) ? (await measureOffscreen(a, tokens, assets))?.images ?? [] : []);
+  return [...logoFacts(imgs, a.html, ctx.protectedIds, ctx.basis), ...integrityFacts(imgs, a.html, real), ...brandFacts(a, tokens, ctx.basis, ctx.allowed)];
 }
 
 /** The browser's bench for the flow: pictures and measures of artboards. */

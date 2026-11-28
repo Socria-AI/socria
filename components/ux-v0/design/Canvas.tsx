@@ -115,6 +115,8 @@ export interface CanvasProps {
   onMenu: (id: string, action: 'duplicate' | 'delete' | 'variations' | 'export') => void;
   /** dim everything but these (a comparison, a review): absent, nothing is dimmed */
   focus?: ReadonlySet<string> | null;
+  /** changes when the company's own fonts do: every frame is drawn again with them */
+  fontsKey?: string;
   /** draw each format's guides over its artboard: where a platform covers it, a sheet's safe margin and bleed */
   guides?: boolean;
   comments: Record<string, number>;
@@ -141,7 +143,7 @@ export function Canvas(p: CanvasProps) {
   // a frame drawn again from the document (a drag or a retyping that was refused, or let go, leaves no trace)
   const [bumps, setBumps] = useState<Record<string, number>>({});
   const redraw = useCallback((id: string) => setBumps((b) => ({ ...b, [id]: (b[id] ?? 0) + 1 })), []);
-  const assetsKey = useMemo(() => [...p.assets.keys()].sort().join(','), [p.assets]);
+  const assetsKey = useMemo(() => `${[...p.assets.keys()].sort().join(',')}|${p.fontsKey ?? ''}`, [p.assets, p.fontsKey]);
   const onFrame = useRef(p.onFrame);
   onFrame.current = p.onFrame;
 

@@ -15,6 +15,7 @@ import { ARTBOARD_STATES, STATE_LABEL, isElementLocked, type ArtboardState, type
 import { FORMATS, sizeLabel } from '@/lib/ux-v0/design/formats';
 import type { HandEdit } from '@/lib/ux-v0/design/elements';
 import type { BrandFact } from '@/lib/ux-v0/design/brandcheck';
+import type { FaceStatus } from '@/lib/ux-v0/design/typefaces';
 import type { ElementPick } from './Canvas';
 
 const firstFace = (v: string) => (v.split(',')[0] ?? '').trim().replace(/^['"]|['"]$/g, '');
@@ -69,6 +70,9 @@ export interface InspectorProps {
   onRelease: (what: 'faces' | 'colours') => void;
   onShow: (element: string) => void;
   onReview: () => void;
+  /** the faces the artboard is set in, with what really draws each; and the way to see it in others */
+  faces?: FaceStatus[];
+  onCompareType?: (from: string) => void;
   /** the artboard against its brand, as checked (requirements apart from principles), and what was allowed here */
   brand?: { name: string; facts: BrandFact[]; allowed?: DesignPins; onAllow: (what: 'faces' | 'colours', value: string, on: boolean) => void } | null;
   /** more of the artboard panel, from the workspace (print marks, motion, exports that belong to its kind) */
@@ -78,7 +82,7 @@ export interface InspectorProps {
 
 const labelFor = (pick: ElementPick) => (pick.text ? `“${pick.text.slice(0, 40)}${pick.text.length > 40 ? '…' : ''}”` : pick.classes ? `the ${pick.tag} “${pick.classes.split(' ')[0]}”` : `the ${pick.tag}`);
 
-export function Inspector({ pick, artboard, onEdit, onParent, onAsk, onFormat, onExport, onComment, pins, onState, onApprove, onReopen, onLockArtboard, onLockElement, onKeep, onRelease, onShow, onReview, extra, busy, brand }: InspectorProps) {
+export function Inspector({ pick, artboard, onEdit, onParent, onAsk, onFormat, onExport, onComment, pins, onState, onApprove, onReopen, onLockArtboard, onLockElement, onKeep, onRelease, onShow, onReview, extra, busy, brand, faces, onCompareType }: InspectorProps) {
   const [text, setText] = useState(pick?.text ?? '');
   const [note, setNote] = useState('');
   useEffect(() => setText(pick?.text ?? ''), [pick?.id, pick?.text]);
@@ -178,6 +182,27 @@ export function Inspector({ pick, artboard, onEdit, onParent, onAsk, onFormat, o
           </p>
         ) : null}
         <p className="dx-muted dx-small">What is kept is checked on everything made afterwards; anything outside it is said, never changed for you.</p>
+
+        {faces?.length ? (
+          <>
+            <h4 className="dx-sub">Typefaces</h4>
+            <ul className="dx-brand dx-typefaces">
+              {faces.map((f) => (
+                <li key={f.name} className={f.by === 'fallback' ? 'is-requirement' : ''} data-face={f.name} data-by={f.by}>
+                  <span className="dx-brand-level">{f.by === 'library' ? 'From the library' : f.by === 'own' ? 'Your font' : 'Not available — a fallback is drawn'}</span>
+                  <p>
+                    <strong>{f.name}</strong>. {f.note}
+                  </p>
+                  {onCompareType && !artboard.locked ? (
+                    <button type="button" className="dx-btn dx-ghost dx-small" onClick={() => onCompareType(f.name)}>
+                      See it in other typefaces
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
 
         {brand ? (
           <>
