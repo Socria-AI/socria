@@ -5,6 +5,7 @@
 // conversation hands over to the import, which makes a system, not a project.
 
 import { addUpload } from '../uploads';
+import { currentCompanyId } from '@/lib/ux-v0/company/store';
 import { checkFile } from '../files';
 import { holdFile, heldFile } from './held';
 import { makeProject, normalizeRef, type DesignProject, type MoodboardRef } from '@/lib/ux-v0/types';
@@ -75,7 +76,9 @@ export function conversationProject(mode: StudioMode, prompt: string, opts: { mo
     // a critique or an import: what it needs (the file), then straight to it
     st = opening(st, { hasSystem: !!st.systemId, ...(opts.systemName ? { systemName: opts.systemName } : {}) }, now);
   }
-  return { ...makeProject(mode === 'critique' ? 'critique' : 'create', nameFor(mode, prompt), now), intent: prompt.slice(0, 600), studio: st };
+  // work begun while a company is chosen in this browser is made for it (lib/ux-v0/company)
+  const companyId = currentCompanyId();
+  return { ...makeProject(mode === 'critique' ? 'critique' : 'create', nameFor(mode, prompt), now), intent: prompt.slice(0, 600), studio: st, ...(companyId && mode !== 'critique' ? { companyId } : {}) };
 }
 
 /** The same conversation, about another kind of work (lib/ux-v0/studio/director.ts switchKind). */

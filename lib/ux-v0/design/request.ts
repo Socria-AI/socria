@@ -29,6 +29,21 @@ const list = (v: unknown, n: number, len: number) => (Array.isArray(v) ? v : [])
 const obj = (v: unknown): Record<string, any> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, any>) : {});
 
 /** An artboard's words, for those the designer is told of in brief (tags stripped; no parser needed). */
+/**
+ * Whether the words ask for the designer's judgement of the work rather than a change to it ("review this", "what do
+ * you think of the typography?", "is it ready?"). A criticism the person makes themselves ("this looks generic") is
+ * not that: it is a change to make. Nothing is changed by a review (flow.ts runReview).
+ */
+export function wantsReview(words: string): boolean {
+  const w = String(words ?? '').trim().toLowerCase().replace(/[’`]/g, "'");
+  if (!w || w.length > 600) return false;
+  if (/^(?:(?:please|can you|could you|would you|now)\s+)*(?:review|critique|criticise|criticize|evaluate|assess|vet|audit|appraise|scrutini[sz]e)\b(?!\s+(?:section|page|card|panel|tab|screen|button|list|form|step)\b)/.test(w)) return true;
+  if (/\b(?:what do you (?:think|make) of|give (?:me |us )?(?:your |some |an? )?(?:honest |candid |critical )?(?:feedback|critique|opinion|thoughts|review)|your (?:honest |candid )?(?:opinion|critique|feedback|thoughts|verdict) on|any (?:feedback|thoughts|critique|criticism)\??|what(?:'s| is) (?:wrong|weak|not working|working|missing)\b|how (?:could|can|would|might) (?:this|it|we) (?:be (?:better|improved|stronger)|improve)\??$)/.test(w)) return true;
+  // a question about the work with nothing asked to be made or changed
+  if (/^(?:is|does|do|are) (?:this|it|the|these|our)\b[^.!]*\?$/.test(w) && !/\b(?:make|change|add|remove|replace|try|use|turn|set|move|redo|rewrite)\b/.test(w)) return true;
+  return false;
+}
+
 export const wordsOfHtml = (html: string) =>
   html
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
@@ -49,7 +64,7 @@ export function readCompany(v: unknown): CompanyTold | null {
   const c = obj(v);
   const name = text(c.name, 80);
   if (!v || typeof v !== 'object' || !name) return null;
-  return { name, about: list(c.about, 8, 400), products: list(c.products, 12, 300), audiences: list(c.audiences, 8, 200), principles: list(c.principles, 12, 300), avoid: list(c.avoid, 16, 200), missing: list(c.missing, 8, 200) };
+  return { name, about: list(c.about, 14, 400), products: list(c.products, 16, 300), audiences: list(c.audiences, 8, 300), principles: list(c.principles, 12, 300), avoid: list(c.avoid, 16, 300), missing: list(c.missing, 14, 240) };
 }
 
 /** Earlier versions as the browser sent them (their HTML held to size; nothing in them is trusted as instruction). */
@@ -88,7 +103,7 @@ export function readDesignRequest(body: unknown, picture: (v: unknown) => string
   const system = b.system && typeof b.system === 'object' ? { name: text(sys.name, 80) || 'the brand', rules: list(sys.rules, 30, 300) } : null;
   const assets = (Array.isArray(b.assets) ? b.assets : [])
     .slice(0, 40)
-    .map((x: any) => ({ id: text(x?.id, 40), name: text(x?.name, 120) || 'image', src: '', width: Math.round(Number(x?.width) || 1000), height: Math.round(Number(x?.height) || 1000), ...(text(x?.note, 200) ? { note: text(x?.note, 200) } : {}) }))
+    .map((x: any) => ({ id: text(x?.id, 40), name: text(x?.name, 120) || 'image', src: '', width: Math.round(Number(x?.width) || 1000), height: Math.round(Number(x?.height) || 1000), ...(text(x?.note, 480) ? { note: text(x?.note, 480) } : {}) }))
     .filter((x: { id: string }) => /^[\w-]{1,40}$/.test(x.id));
 
   const company = readCompany(b.company);

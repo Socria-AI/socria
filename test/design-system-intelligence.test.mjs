@@ -502,6 +502,19 @@ sec('a design in the system: its shared styles are the system’s, and follow ne
   ok('the impact preview for a design names only what the new version changes', imp.changed.length >= 1 && imp.changed.every((c) => c.from !== c.to) && imp.changed.length < 6 && imp.changed.some((c) => /#101820/i.test(String(c.to))), J(imp.changed));
   const pr2 = D.propagateTo(dp, sysR, { now: 511 });
   ok('a new version reaches the design: its shared styles are the new ones, every artboard that uses them follows', pr2.report.outcome === 'updated' && pr2.project.design.doc.tokens !== dp.design.doc.tokens && /#101820/i.test(pr2.project.design.doc.tokens) && pr2.project.systemLink.version === 2, J(pr2.report));
+  // approved work is never changed by a system's update
+  const varsOf = (css) => Object.fromEntries([...css.matchAll(/(--[\w-]+)\s*:\s*([^;}]+)/g)].map((m) => [m[1], m[2].trim()]));
+  const v1 = varsOf(dp.design.doc.tokens), v2 = varsOf(pr2.project.design.doc.tokens);
+  const moved = Object.keys(v2).find((k) => v1[k] !== v2[k]);
+  const still = Object.keys(v2).find((k) => v1[k] === v2[k] && !/var\(/.test(v2[k]));
+  const approved = { ...art, id: 'a2', name: 'Approved poster', html: `<style>h1{color:var(${moved})}</style><h1 data-sx="e1">Walk further</h1>`, state: 'approved', locked: true };
+  const apart = { ...art, id: 'a3', name: 'Signed-off card', html: `<style>h1{color:var(${still})}</style><h1 data-sx="e1">Walk</h1>`, state: 'approved', locked: true };
+  const withApproved = { ...dp, design: { ...dp.design, doc: { ...dp.design.doc, artboards: [art, approved] } } };
+  const heldBack = D.propagateTo(withApproved, sysR, { now: 512 });
+  ok('an update that would change an approved artboard is held: nothing changes, the project stays on its version, and it says which artboard', heldBack.report.outcome === 'held' && heldBack.project === withApproved && /Approved poster/.test(heldBack.report.summary) && /Nothing was changed/.test(heldBack.report.summary) && heldBack.project.systemLink.version === 1, J(heldBack.report));
+  const untouched = { ...dp, design: { ...dp.design, doc: { ...dp.design.doc, artboards: [art, apart] } } };
+  const through = D.propagateTo(untouched, sysR, { now: 513 });
+  ok('…an approved artboard the update does not reach holds nothing back', through.report.outcome === 'updated' && through.project.design.doc.artboards[1].html === apart.html && through.project.systemLink.version === 2, J(through.report));
   const back = D.undoApply(pr2.project, pr2.report);
   ok('…and can be put back (the earlier styles, history kept)', back.ok && back.project.design.doc.tokens === dp.design.doc.tokens && back.project.design.versions.length === 3, back.error);
   // shared styles the person changed are theirs: kept, and said

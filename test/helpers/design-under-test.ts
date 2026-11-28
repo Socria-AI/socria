@@ -20,3 +20,8 @@ export * as fonts from '@/lib/ux-v0/fonts';
 export * as locks from '@/lib/ux-v0/design/locks';
 export * as pins from '@/lib/ux-v0/design/pins';
 export * as history from '@/lib/ux-v0/design/history';
+export * as contrast from '@/lib/ux-v0/design/contrast';
+export * as company from '@/lib/ux-v0/company/schema';
+export * as companyTold from '@/lib/ux-v0/company/told';
+export * as companyRead from '@/lib/ux-v0/company/read';
+export * as dsiAssets from '@/lib/ux-v0/dsi/assets';

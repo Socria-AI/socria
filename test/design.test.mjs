@@ -10,7 +10,7 @@ import { JSDOM } from 'jsdom';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const T = await import(pathToFileURL(join(here, '.tmp', 'design-under-test.mjs')).href);
-const { protocol: P, apply: A, elements: E, doc: D, formats: F, prompts: PR, frame: FR, flow: FL, start: ST, locks: LK, pins: PN, history: HI, request: RQ } = T;
+const { protocol: P, apply: A, elements: E, doc: D, formats: F, prompts: PR, frame: FR, flow: FL, start: ST, locks: LK, pins: PN, history: HI, request: RQ, contrast: CT } = T;
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, typeof x === 'string' ? x.slice(0, 600) : JSON.stringify(x).slice(0, 600))));
@@ -412,6 +412,69 @@ sec('a review: findings to act on or set aside');
   ok('the instructions: how to review (specific, kinds kept apart, never the designer’s own taste), what the person has decided, the company, the kinds of work', /# Reviewing/.test(sys) && /never "improve the hierarchy"/.test(sys) && /# What the person has decided/.test(sys) && /Criticism is aimed/.test(sys) && /# The company/.test(sys) && /never invent facts/i.test(sys) && /# Kinds of work/.test(sys) && /<lock artboard=/.test(sys));
   const a = P.parseAnswer('<artboard id="new-1" format="story" seconds="6"><p>x</p></artboard>');
   ok('an artboard that moves says how long', a.blocks[0].seconds === 6 && A.applyAnswer({ artboards: [], tokens: '' }, a, { parse, format: 'story' }).doc.artboards[0].seconds === 6);
+}
+
+sec('what is kept stays as it was kept; what is protected holds under new shared styles');
+{
+  const art = (o = {}) => ({ id: 'ab1', name: 'Poster', format: 'a3', width: 1123, height: 1587, medium: 'print', html: '<style>.h{color:var(--ink);font-family:var(--display)}</style><h1 class="h" data-sx="e1">Rooms</h1><p data-sx="e2" style="color:var(--quiet)">Six evenings</p>', x: 0, y: 0, ...o });
+  let st = D.commit(D.emptyState('poster', 'a3', ''), { artboards: [art()], tokens: ':root{--ink:#111;--quiet:#777;--display:Fraunces}' }, 'first', 'model', NOW);
+  const ap = D.approveArtboard(st, 'ab1', NOW + 1);
+  const approvedAt = ap.at;
+  const re = D.reopenArtboard(ap, 'ab1', 'revision', NOW + 2);
+  ok('reopening an approved artboard is a version of its own: the approved version is not rewritten', re.versions.length === ap.versions.length + 1 && /Reopened “Poster”/.test(re.versions[re.at].said) && re.versions[approvedAt].doc.artboards[0].state === 'approved' && re.versions[approvedAt].doc.artboards[0].locked === true && re.doc.artboards[0].state === 'revision' && !re.doc.artboards[0].locked);
+  const noted = D.annotate(ap, D.withState(ap.doc, 'ab1', 'archived'), 'Changed its status', NOW + 3);
+  ok('…nor by any later note on it (a status, a lock): a kept version is never changed in place', noted.versions.length === ap.versions.length + 1 && noted.versions[approvedAt].doc.artboards[0].state === 'approved');
+  const plain = D.annotate(st, D.withElementLock(st.doc, 'ab1', 'e1', 'the headline', NOW), 'Locked an element');
+  ok('a note on a version that is not kept makes no new version', plain.versions.length === st.versions.length && plain.doc.artboards[0].locks?.[0].id === 'e1');
+
+  // new shared styles against what is protected
+  const lockedDoc = { artboards: [art({ locked: true, state: 'approved' }), art({ id: 'ab2', name: 'Draft' })], tokens: st.doc.tokens };
+  const hits = (after, p) => LK.protectedUnder(lockedDoc, after, p).map((a) => a.id).join();
+  ok('new shared styles that change a colour an approved artboard uses would change it (exactly, with a parser)', hits(':root{--ink:#222;--quiet:#777;--display:Fraunces}', parse) === 'ab1');
+  ok('…and the same is found without a parser (the server’s check)', hits(':root{--ink:#222;--quiet:#777;--display:Fraunces}') === 'ab1');
+  ok('a new property it never uses changes nothing on it', hits(':root{--ink:#111;--quiet:#777;--display:Fraunces;--accent:#f06}', parse) === '' && hits(':root{--ink:#111;--quiet:#777;--display:Fraunces;--accent:#f06}') === '');
+  const elDoc = { artboards: [art({ locks: [{ id: 'e1', what: 'the headline', at: NOW }] })], tokens: st.doc.tokens };
+  ok('a locked element is touched only by what reaches it: the other line’s colour may change', LK.protectedUnder(elDoc, ':root{--ink:#111;--quiet:#555;--display:Fraunces}', parse).length === 0 && LK.protectedUnder(elDoc, ':root{--ink:#111;--quiet:#777;--display:Anton}', parse).length === 1);
+  ok('nothing protected, nothing held', LK.protectedUnder({ artboards: [art()], tokens: st.doc.tokens }, ':root{--ink:#000}', parse).length === 0);
+
+  // a picture's note is kept with the project
+  const kept = D.normalizeDesignState({ ...st, assets: [{ id: 'logo', name: 'Logo', src: 'upload:abc', width: 10, height: 10, note: 'The approved logo: use it as it is.' }] });
+  ok('what a picture is (its note) is kept with the project', kept.assets[0].note === 'The approved logo: use it as it is.');
+  ok('the canvas is told what is locked, and holds it still (no drag, no retyping)', /m\.sx==='locks'/.test(FR.INTERACT_SOURCE) && /if\(isLocked\(el\)\|\|holdsLocked\(el\)\) return;/.test(FR.INTERACT_SOURCE) && /if\(!el\|\|isLocked\(el\)\) return;/.test(FR.INTERACT_SOURCE));
+}
+
+sec('asked for a judgement, or for a change');
+{
+  const yes = ['Review this poster', 'Critique the typography', 'please evaluate this against our brand', 'What do you think of the headline?', 'Give me your honest feedback', 'Any feedback?', "What's wrong with this?", 'How could this be better?', 'Is this ready for print?', 'Does it communicate our philosophy?', 'Can you vet this before it goes out'];
+  const no = ['This looks too much like generic AI branding.', 'The typography feels immature.', 'Make the headline bigger', 'The colors are good, but the composition has no personality.', 'Review section should come before pricing', 'Is this ready? If not, make it bolder', 'Add a review from a customer', 'The headline works. Do not change it.', 'Does this work in dark? Make a dark one'];
+  ok('asking for the designer’s judgement is a review', yes.every((w) => RQ.wantsReview(w)), yes.filter((w) => !RQ.wantsReview(w)));
+  ok('the person’s own criticism, and anything asked to be made or changed, is a change', no.every((w) => !RQ.wantsReview(w)), no.filter((w) => RQ.wantsReview(w)));
+}
+
+sec('contrast, measured on the picture');
+{
+  // a 200 × 100 picture of what is behind the words (the artboard drawn without them): one ground, or two halves
+  const picture = (ground, _words, _box, vary = null) => {
+    const w = 200, h = 100, data = new Uint8ClampedArray(w * h * 4);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const c = vary && x >= w / 2 ? vary : ground;
+      data[i] = c[0]; data[i + 1] = c[1]; data[i + 2] = c[2]; data[i + 3] = 255;
+    }
+    return { data, width: w, height: h, scale: 1 };
+  };
+  const box = { x: 20, y: 20, w: 160, h: 40 };
+  const t = (color, size = 16, weight = 400) => [{ id: 'e1', ...box, color, size, weight, text: 'Reserve a table' }];
+  const grey = CT.contrastFacts(t('rgb(150, 150, 150)'), picture([255, 255, 255], [150, 150, 150], box));
+  ok('grey words on white are measured and fall short (about 3:1 against 4.5:1)', grey.length === 1 && grey[0].ratio > 2.7 && grey[0].ratio < 3.2 && grey[0].needs === 4.5 && grey[0].over === 'flat', grey);
+  ok('black on white is fine: nothing is said', CT.contrastFacts(t('rgb(0, 0, 0)'), picture([255, 255, 255], [0, 0, 0], box)).length === 0);
+  ok('the same grey set large needs only 3:1, and passes', CT.contrastFacts(t('rgb(148, 148, 148)', 40), picture([255, 255, 255], [148, 148, 148], box)).length === 0);
+  const photo = CT.contrastFacts(t('rgb(255, 255, 255)'), picture([20, 20, 20], [255, 255, 255], box, [230, 230, 230]));
+  ok('white words half over a dark ground and half over a pale one: measured at the weaker part, and said to be over something that varies', photo.length === 1 && photo[0].over === 'varied' && photo[0].ratio < 1.5, photo);
+  ok('words set on their own colour are found', CT.contrastFacts(t('rgb(200, 30, 30)'), picture([200, 30, 30], [200, 30, 30], box))[0]?.ratio === 1);
+  ok('a translucent colour is not guessed at', CT.contrastFacts(t('rgba(0, 0, 0, 0.4)'), picture([255, 255, 255], [150, 150, 150], box)).length === 0);
+  ok('it is said as a measurement, with the element and what it needs', /measured/.test(CT.contrastSaid(grey[0])) && /data-sx="e1"/.test(CT.contrastSaid(grey[0])) && /4\.5:1/.test(CT.contrastSaid(grey[0])));
+  ok('the frame reports where words are and what they are set in, leaving out decoration', /texts\.push\(\{id:/.test(FR.INTERACT_SOURCE) && /aria-hidden="true"/.test(FR.INTERACT_SOURCE));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

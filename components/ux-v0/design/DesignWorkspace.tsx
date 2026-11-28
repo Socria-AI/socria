@@ -12,11 +12,43 @@ import { putProject } from '@/lib/ux-v0/store';
 import { makeNonce } from '@/lib/ux-v0/sandbox';
 import { getSystem } from '@/lib/ux-v0/dsi/store';
 import type { DesignProject } from '@/lib/ux-v0/types';
-import { amend, artboardOf, canRedo, canUndo, commit, emptyState, moveTo, newId, placeNew, redoTarget, undoTarget, type DesignArtboard, type DesignAsset, type DesignDoc, type DesignState } from '@/lib/ux-v0/design/doc';
-import { applyHandEdit, labelOf, type HandEdit } from '@/lib/ux-v0/design/elements';
-import { runRequest } from '@/lib/ux-v0/design/flow';
+import {
+  amend,
+  annotate,
+  approveArtboard,
+  artboardOf,
+  canRedo,
+  canUndo,
+  commit,
+  emptyState,
+  keepVersion,
+  moveTo,
+  newId,
+  placeNew,
+  redoTarget,
+  reopenArtboard,
+  restoreArtboard,
+  undoTarget,
+  withArtboardLock,
+  withElementLock,
+  withState,
+  type ArtboardState,
+  type DesignArtboard,
+  type DesignAsset,
+  type DesignDoc,
+  type DesignFinding,
+  type DesignState,
+} from '@/lib/ux-v0/design/doc';
+import { applyHandEdit, elementFacts, labelOf, type HandEdit } from '@/lib/ux-v0/design/elements';
+import { markFinding, runRequest, runReview } from '@/lib/ux-v0/design/flow';
+import { checkLocks } from '@/lib/ux-v0/design/locks';
+import { mergePins, pinsFrom } from '@/lib/ux-v0/design/pins';
+import { wantsReview } from '@/lib/ux-v0/design/request';
 import { firstRequest } from '@/lib/ux-v0/design/start';
 import { brandForDesign, type BrandForDesign } from '@/lib/ux-v0/design/brand';
+import { getCompany } from '@/lib/ux-v0/company/store';
+import { companyTold, libraryFor, libraryPictures, missingFor } from '@/lib/ux-v0/company/told';
+import type { Company } from '@/lib/ux-v0/company/schema';
 import { SystemBadge } from '../systems/SystemBadge';
 import { useLinkedSystem } from '../systems/useLinkedSystem';
 import { FORMATS, formatOf, sizeLabel } from '@/lib/ux-v0/design/formats';
@@ -27,10 +59,11 @@ import { addUpload } from '../uploads';
 import { Canvas, fitView, type ElementPick, type FrameEvent, type View } from './Canvas';
 import { Inspector } from './Inspector';
 import { Chat } from './Chat';
+import { CompareModal, HistoryPanel } from './Versions';
 import { assetData, browserBench, parseHtml, routeTransport } from './runtime';
 import './design.css';
 
-type Busy = { phase: 'writing' | 'looking' | 'fixing'; say: string; started: number } | null;
+type Busy = { phase: 'writing' | 'looking' | 'fixing' | 'reviewing'; say: string; started: number } | null;
 
 const withDesign = (p: DesignProject): DesignProject => (p.design ? p : { ...p, medium: 'design', design: emptyState('graphic', undefined, p.intent ?? '') });
 
@@ -57,17 +90,56 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
   const update = useCallback((fn: (st: DesignState) => DesignState) => setProject((p) => ({ ...p, design: fn(p.design!), updatedAt: Date.now() })), []);
 
   // ── pictures and the brand ──
-  const assetsKey = s.assets.map((a) => a.id).join(',');
-  const [assets, setAssets] = useState<Map<string, string>>(new Map());
+  // the project's own, the brand's approved ones, and its company's library: all placed as asset:<id>
+  const [brand, setBrand] = useState<BrandForDesign | null>(null);
+  const [company, setCompany] = useState<Company | null>(null);
+  // (the first request waits for the company too, so the first design is made within it)
+  const [companyReady, setCompanyReady] = useState(!initial.companyId);
   useEffect(() => {
     let live = true;
-    void assetData(cur.current.design!.assets).then((m) => live && setAssets(m));
+    void getCompany(project.companyId)
+      .catch(() => null)
+      .then((c) => {
+        if (!live) return;
+        setCompany(c);
+        setCompanyReady(true);
+      });
     return () => {
       live = false;
     };
-  }, [assetsKey]);
-  const assetsNow = useCallback(() => assetData(cur.current.design!.assets), []);
-  const [brand, setBrand] = useState<BrandForDesign | null>(null);
+  }, [project.companyId]);
+  const shared = useMemo(() => {
+    const m = new Map<string, DesignAsset>();
+    for (const a of [...(brand?.pictures ?? []), ...(company ? libraryPictures(company) : [])]) if (!m.has(a.id)) m.set(a.id, a);
+    return [...m.values()];
+  }, [brand, company]);
+  const sharedRef = useRef(shared);
+  sharedRef.current = shared;
+  const allAssets = useCallback(() => {
+    const own = cur.current.design!.assets;
+    return [...own, ...sharedRef.current.filter((x) => !own.some((a) => a.id === x.id))];
+  }, []);
+  const assetsKey = `${s.assets.map((a) => a.id).join(',')}|${shared.map((a) => a.id).join(',')}`;
+  const [assets, setAssets] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    let live = true;
+    void assetData(allAssets()).then((m) => live && setAssets(m));
+    return () => {
+      live = false;
+    };
+  }, [assetsKey, allAssets]);
+  const assetsNow = useCallback(() => assetData(allAssets()), [allAssets]);
+  /** What a request is told beyond the project: its company, and the pictures of the brand and the library it may use. */
+  const beyond = useCallback(
+    (words: string) => {
+      const lib = new Map<string, { id: string; name: string; width: number; height: number; note?: string }>();
+      for (const a of [...(brand?.pictures ?? []), ...(company ? libraryFor(company, words) : [])]) if (!lib.has(a.id)) lib.set(a.id, { id: a.id, name: a.name, width: a.width, height: a.height, note: a.note });
+      const absent = company ? missingFor(company, words) : [];
+      const told = company ? companyTold(company) : null;
+      return { company: told ? { ...told, missing: [...new Set([...absent, ...told.missing])] } : undefined, library: [...lib.values()], absent };
+    },
+    [brand, company]
+  );
   // the first request waits for the system a project is built in, so the first design is made in it
   const [brandReady, setBrandReady] = useState(!initial.systemLink);
   const linked = useLinkedSystem(project.systemLink);
@@ -125,15 +197,55 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
   const transport = useMemo(() => routeTransport(project.id), [project.id]);
   const bench = useMemo(() => browserBench(assetsNow), [assetsNow]);
 
-  const ask = useCallback(
-    async (words: string, o: { selection?: boolean; picture?: boolean } = {}) => {
+  // something said about what just happened on the canvas (a protected thing left alone), gone after a moment
+  const [notice, setNotice] = useState<string | null>(null);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tell = useCallback((text: string) => {
+    setNotice(text);
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(null), 6000);
+  }, []);
+  useEffect(() => () => void (noticeTimer.current && clearTimeout(noticeTimer.current)), []);
+
+  // a critical look at the work: findings to apply or set aside, and nothing changed (flow.ts runReview)
+  const review = useCallback(
+    async (words = '') => {
       if (abort.current) return;
       const st = cur.current.design!;
+      const one = artboardOf(st.doc, sel.artboard);
+      const ids = one ? [one.id] : st.doc.artboards.slice(-3).map((a) => a.id);
+      if (!ids.length) return;
       setError(null);
       setDraft('');
-      const a = artboardOf(st.doc, sel.artboard);
+      const ctl = new AbortController();
+      abort.current = ctl;
+      setBusy({ phase: 'reviewing', say: '', started: Date.now() });
+      const more = beyond(words);
+      const out = await runReview(st, { words, artboards: ids, system: brand ? { name: brand.name, rules: brand.rules } : null, company: more.company, library: more.library }, transport, bench, { signal: ctl.signal });
+      abort.current = null;
+      setBusy(null);
+      if (out.kind === 'failed') {
+        if (words) setDraft(words);
+        setError(out.cancelled ? 'Stopped. Nothing changed.' : out.signIn ? 'Sign in to design with SocriaUX. Your work stays in this browser either way.' : out.error);
+        return;
+      }
+      update((x) => ({ ...x, turns: [...x.turns, ...out.state.turns.slice(st.turns.length)] }));
+    },
+    [bench, beyond, brand, sel.artboard, transport, update]
+  );
+
+  const ask = useCallback(
+    async (words: string, o: { selection?: boolean; picture?: boolean; target?: { artboard: string; element: string | null }; finding?: string } = {}) => {
+      if (abort.current) return;
+      const st = cur.current.design!;
+      // asked for a judgement of the work, not a change to it: a review
+      if (!o.target && st.doc.artboards.length && wantsReview(words)) return review(words);
+      setError(null);
+      setDraft('');
+      const a = artboardOf(st.doc, o.target?.artboard ?? sel.artboard);
+      const element = o.target ? o.target.element : sel.element;
       const useSel = o.selection !== false && !!a;
-      const selection = useSel ? { artboard: a!.id, element: sel.element, label: sel.element && pick ? labelOf({ id: pick.id, tag: pick.tag, text: pick.text, classes: pick.classes, style: '' }) : `artboard “${a!.name}”` } : null;
+      const selection = useSel ? { artboard: a!.id, element, label: element ? (pick && pick.id === element && !o.target ? labelOf({ id: pick.id, tag: pick.tag, text: pick.text, classes: pick.classes, style: '' }) : labelOf(elementFacts(a!.html, element, parseHtml))) : `artboard “${a!.name}”` } : null;
       const last = st.turns[st.turns.length - 1];
       const answering = last?.role === 'designer' && last.options?.length ? { text: last.text, options: last.options } : null;
       // a change of look travels with a picture of the artboard as it is
@@ -145,7 +257,10 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
       const pending = { id: newId('t'), role: 'person' as const, text: words, at: Date.now(), ...(selection ? { selection } : {}) };
       update((x) => ({ ...x, turns: [...x.turns, pending] }));
       const before = { ...st };
-      const out = await runRequest(before, { words, selection, answering, system: brand ? { name: brand.name, rules: brand.rules } : null, withPicture: !!selection && (o.picture ?? looky) }, transport, bench, {
+      const more = beyond(words);
+      // what was asked for that the company does not have: said at once, and told to the designer so nothing stands in
+      if (more.absent.length) tell(`Not in ${company?.name ?? 'the company'}’s library: ${more.absent.join('; ')}. The designer is told not to invent it.`);
+      const out = await runRequest(before, { words, selection, answering, system: brand ? { name: brand.name, rules: brand.rules } : null, withPicture: !!selection && (o.picture ?? looky), company: more.company, library: more.library }, transport, bench, {
         parse: parseHtml,
         signal: ctl.signal,
         onDraft: (doc, ans) => {
@@ -178,20 +293,22 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
         setSel({ artboard: out.applied.made[0], element: null });
         setPick(null);
       }
+      // a finding is applied when something was really changed for it
+      if (o.finding && out.kind === 'done' && (out.applied.touched.length || out.applied.tokensChanged)) update((x) => markFinding(x, o.finding!, 'applied'));
     },
-    [bench, brand, pick, sel.artboard, sel.element, transport, update]
+    [bench, beyond, brand, company, pick, review, sel.artboard, sel.element, tell, transport, update]
   );
 
   // the first design is asked for the moment a project begun in conversation opens
   const started = useRef(false);
   useEffect(() => {
-    if (started.current || !signedIn || !brandReady) return;
+    if (started.current || !signedIn || !brandReady || !companyReady) return;
     const st = cur.current.design!;
     if (st.doc.artboards.length || st.turns.length) return;
     started.current = true;
     if (startIntent?.trim()) void ask(startIntent.trim(), { selection: false });
     else if (st.memory.brief) void ask(firstRequest(st.kind), { selection: false });
-  }, [ask, signedIn, startIntent, brandReady]);
+  }, [ask, signedIn, startIntent, brandReady, companyReady]);
 
   // ── by hand ──
   const lastHand = useRef<{ key: string; at: number } | null>(null);
@@ -200,8 +317,18 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
       const st = cur.current.design!;
       const a = artboardOf(st.doc, artboard);
       if (!a) return;
+      // what the person protected is not changed by hand either: said, and the frame drawn again as it was
+      const refuse = (why: string) => {
+        tell(why);
+        control.current?.(artboard, { sx: 'redraw' });
+      };
+      if (a.locked) return refuse(a.state === 'approved' ? `“${a.name}” is approved and locked. Reopen it to change it.` : `“${a.name}” is locked. Unlock it to change it.`);
       const html = applyHandEdit(a.html, e, parseHtml);
       if (html == null || html === a.html) return;
+      if (a.locks?.length) {
+        const c = checkLocks(a, html, st.doc.tokens, st.doc.tokens, parseHtml);
+        if (!c.ok) return refuse(`${c.broken[0][0].toUpperCase()}${c.broken[0].slice(1)} is protected. Unlock it to change it.`);
+      }
       const doc = { ...st.doc, artboards: st.doc.artboards.map((x) => (x.id === artboard ? { ...x, html } : x)) };
       const key = `${artboard}:${e.id}:${e.op}${e.op === 'style' ? `:${Object.keys(e.props).join(',')}` : ''}`;
       const recent = lastHand.current && lastHand.current.key === key && Date.now() - lastHand.current.at < 1500 && st.versions[st.at]?.by === 'person';
@@ -212,7 +339,23 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
         setPick(null);
       }
     },
-    [pick, update]
+    [pick, tell, update]
+  );
+
+  /** A key that acts on the selected element (delete, duplicate, nudge), wherever the keyboard's focus is. */
+  const keyOnSelection = useCallback(
+    (key: string, shift: boolean, mod: boolean): boolean => {
+      const el = sel.element;
+      if (!sel.artboard || !el) return false;
+      if (mod && /^d$/i.test(key)) hand(sel.artboard, { op: 'duplicate', id: el });
+      else if (key === 'Delete' || key === 'Backspace') hand(sel.artboard, { op: 'remove', id: el });
+      else if (key.startsWith('Arrow')) {
+        const d = shift ? 10 : 1;
+        hand(sel.artboard, { op: 'move', id: el, dx: key === 'ArrowLeft' ? -d : key === 'ArrowRight' ? d : 0, dy: key === 'ArrowUp' ? -d : key === 'ArrowDown' ? d : 0 });
+      } else return false;
+      return true;
+    },
+    [hand, sel.artboard, sel.element]
   );
 
   // undo: the version this one was made from; redo: the newest made from this one (a branch is never lost)
@@ -228,21 +371,15 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
       } else if (e.type === 'move') hand(e.artboard, { op: 'move', id: e.id, dx: e.dx, dy: e.dy });
       else if (e.type === 'text') hand(e.artboard, { op: 'text', id: e.id, text: e.text });
       else if (e.type === 'key') {
-        const el = sel.artboard === e.artboard ? sel.element : null;
         if (e.mod && /^z$/i.test(e.key)) (e.shift ? redo : undo)();
         else if (e.mod && /^y$/i.test(e.key)) redo();
-        else if (e.mod && /^d$/i.test(e.key) && el) hand(e.artboard, { op: 'duplicate', id: el });
-        else if ((e.key === 'Delete' || e.key === 'Backspace') && el) hand(e.artboard, { op: 'remove', id: el });
         else if (e.key === 'Escape') {
           setSel({ artboard: e.artboard, element: null });
           setPick(null);
-        } else if (e.key.startsWith('Arrow') && el) {
-          const d = e.shift ? 10 : 1;
-          hand(e.artboard, { op: 'move', id: el, dx: e.key === 'ArrowLeft' ? -d : e.key === 'ArrowRight' ? d : 0, dy: e.key === 'ArrowUp' ? -d : e.key === 'ArrowDown' ? d : 0 });
-        }
+        } else if (sel.artboard === e.artboard) keyOnSelection(e.key, e.shift, e.mod);
       }
     },
-    [hand, redo, sel.artboard, sel.element, undo]
+    [hand, keyOnSelection, redo, sel.artboard, undo]
   );
 
   useEffect(() => {
@@ -259,11 +396,11 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
       } else if (e.key === 'Escape') {
         setSel((x) => ({ ...x, element: null }));
         setPick(null);
-      }
+      } else if (!abort.current && !document.querySelector('.dx-modal, .dx-present') && keyOnSelection(e.key, e.shiftKey, mod)) e.preventDefault();
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [redo, undo]);
+  }, [keyOnSelection, redo, undo]);
 
   // ── artboards ──
   const setArtboards = (fn: (a: DesignArtboard[]) => DesignArtboard[], said: string) => update((x) => commit(x, { ...x.doc, artboards: fn(x.doc.artboards) }, said, 'person'));
@@ -272,10 +409,14 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
     if (!a) return;
     if (action === 'duplicate') {
       const at = placeNew(s.doc, a.width, a.height, a);
-      const copy = { ...a, id: newId('ab'), name: `${a.name} copy`.slice(0, 80), x: at.x, y: at.y };
+      // a copy is a new piece of work: it starts unprotected and unapproved
+      const { state: _s, locked: _l, locks: _k, ...plain } = a;
+      void _s, _l, _k;
+      const copy = { ...plain, id: newId('ab'), name: `${a.name} copy`.slice(0, 80), x: at.x, y: at.y };
       setArtboards((list) => [...list, copy], `Duplicated “${a.name}”`);
       setSel({ artboard: copy.id, element: null });
     } else if (action === 'delete') {
+      if (a.locked) return tell(`“${a.name}” is ${a.state === 'approved' ? 'approved and ' : ''}locked. ${a.state === 'approved' ? 'Reopen' : 'Unlock'} it first.`);
       setArtboards((list) => list.filter((x) => x.id !== id), `Deleted “${a.name}”`);
       setSel({ artboard: null, element: null });
       setPick(null);
@@ -290,7 +431,8 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
 
   const [formatsFor, setFormatsFor] = useState<string | null>(null);
   const [chosenFormats, setChosenFormats] = useState<string[]>([]);
-  const quick = (kind: 'variations' | 'formats' | 'better') => {
+  const quick = (kind: 'variations' | 'formats' | 'better' | 'review') => {
+    if (kind === 'review') return void review();
     const a = artboardOf(s.doc, sel.artboard) ?? s.doc.artboards[s.doc.artboards.length - 1];
     if (!a) return;
     if (kind === 'variations') return menu(a.id, 'variations');
@@ -333,7 +475,7 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
     if (!boards.length) return;
     setExporting(`Exporting ${kind.toUpperCase()}…`);
     try {
-      const map = await assetData(st.assets);
+      const map = await assetData(allAssets());
       if (kind === 'pdf') {
         const r = await artboardsPdf(boards, st.doc.tokens, map, project.name);
         download(r.blob, `${fileName(project.name)}.pdf`);
@@ -354,6 +496,46 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
     }
   };
 
+  // ── the person's authority: states, locks, what to keep, findings ──
+  const setState = (id: string, state: ArtboardState) => update((x) => annotate(x, withState(x.doc, id, state), 'Changed its status'));
+  const approve = (id: string) => {
+    update((x) => approveArtboard(x, id));
+    const a = artboardOf(s.doc, id);
+    if (a) tell(`“${a.name}” is approved and locked. This version is kept in the history for good.`);
+  };
+  const lockArtboard = (id: string, locked: boolean) => update((x) => annotate(x, withArtboardLock(x.doc, id, locked), locked ? 'Locked an artboard' : 'Unlocked an artboard'));
+  const lockElement = (id: string, element: string, what: string | null) => update((x) => annotate(x, withElementLock(x.doc, id, element, what), what === null ? 'Unlocked an element' : 'Locked an element'));
+  const keep = (what: 'faces' | 'colours') => {
+    const a = artboardOf(s.doc, sel.artboard);
+    if (!a) return;
+    const pins = pinsFrom(a, s.doc.tokens, what);
+    const got = what === 'faces' ? pins.faces ?? [] : pins.colours ?? [];
+    if (!got.length) return tell(what === 'faces' ? 'No typeface is named on this artboard to keep.' : 'No colour is written on this artboard to keep.');
+    update((x) => ({ ...x, memory: { ...x.memory, pins: mergePins(x.memory.pins, pins) } }));
+    tell(what === 'faces' ? `Keeping ${got.join(', ')}: everything made from now on is held to ${got.length === 1 ? 'it' : 'them'}.` : `Keeping these ${got.length} colours, their tints and shades.`);
+  };
+  const release = (what: 'faces' | 'colours') =>
+    update((x) => {
+      const { [what]: _gone, ...rest } = x.memory.pins ?? {};
+      void _gone;
+      const { pins: _p, ...memory } = x.memory;
+      void _p;
+      return { ...x, memory: Object.keys(rest).length ? { ...memory, pins: rest } : memory };
+    });
+  const showElement = (artboard: string, element: string | null) => {
+    setSel({ artboard, element });
+    setPick(null);
+    if (element) control.current?.(artboard, { sx: 'select', id: element, report: true });
+  };
+  const onFinding = (f: DesignFinding, action: 'apply' | 'dismiss' | 'show' | 'reopen') => {
+    if (action === 'show') return showElement(f.artboard, f.element);
+    if (action === 'dismiss') return update((x) => markFinding(x, f.id, 'dismissed'));
+    if (action === 'reopen') return update((x) => markFinding(x, f.id, 'open'));
+    // applied: asked of the designer about that element only — a targeted change, never a new design
+    showElement(f.artboard, f.element);
+    void ask(f.fix, { target: { artboard: f.artboard, element: f.element }, finding: f.id });
+  };
+
   // ── comments ──
   const comment = (text: string) => {
     if (!sel.artboard) return;
@@ -363,7 +545,14 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
   const notesBy = useMemo(() => notes.reduce<Record<string, number>>((m, c) => ((m[c.artboard] = (m[c.artboard] ?? 0) + 1), m), {}), [notes]);
 
   // ── versions, presenting ──
+  // pictures the design places that this browser does not hold (a library kept on another device): said, not hidden
+  const absentPictures = useMemo(() => {
+    const out = new Set<string>();
+    for (const a of s.doc.artboards) for (const m of a.html.matchAll(/asset:([A-Za-z0-9_-]{1,40})/g)) if (!assets.has(m[1])) out.add(m[1]);
+    return out.size;
+  }, [s.doc.artboards, assets]);
   const [history, setHistory] = useState(false);
+  const [comparing, setComparing] = useState<number | null>(null);
   const [presenting, setPresenting] = useState<number | null>(null);
   const shown = draftDoc ?? s.doc;
   const selArtboard = artboardOf(shown, sel.artboard);
@@ -379,6 +568,11 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
         </button>
         <input className="dx-name" value={project.name} onChange={(e) => setProject((p) => ({ ...p, name: e.target.value.slice(0, 80), updatedAt: Date.now() }))} aria-label="Design name" />
         <div className="dx-head-r">
+          {company && (
+            <a className="dx-badge" href={`/ux-v0?company=${company.id}`} title={`Made for ${company.name}: designed within its identity, with its library. Nothing here changes the company.`}>
+              For {company.name}
+            </a>
+          )}
           <SystemBadge
             project={project}
             linked={linked}
@@ -399,28 +593,18 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
               History{s.versions.length ? ` (${s.versions.length})` : ''}
             </button>
             {history && (
-              <ol className="dx-history">
-                {[...s.versions]
-                  .map((v, i) => ({ v, i }))
-                  .reverse()
-                  .map(({ v, i }) => (
-                    <li key={i}>
-                      <button
-                        type="button"
-                        className={i === s.at ? 'is-on' : ''}
-                        onClick={() => {
-                          update((x) => moveTo(x, i));
-                          setHistory(false);
-                        }}
-                      >
-                        <span>{v.said || 'A version'}</span>
-                        <small>
-                          {v.by === 'model' ? 'Designer' : 'You'} · {new Date(v.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </small>
-                      </button>
-                    </li>
-                  ))}
-              </ol>
+              <HistoryPanel
+                s={s}
+                onOpen={(i) => {
+                  update((x) => moveTo(x, i));
+                  setHistory(false);
+                }}
+                onCompare={(i) => {
+                  setComparing(i);
+                  setHistory(false);
+                }}
+                onKeep={(i) => update((x) => keepVersion(x, i, 'Kept by you'))}
+              />
             )}
           </div>
           <button type="button" className="dx-btn dx-ghost" onClick={() => fit()} disabled={!count}>
@@ -451,6 +635,8 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
           }}
           onAttach={(f) => void attach(f)}
           onQuick={quick}
+          onFinding={onFinding}
+          names={Object.fromEntries(s.doc.artboards.map((a) => [a.id, a.name]))}
           hasArtboards={!!count}
           signedIn={signedIn}
         />
@@ -484,6 +670,16 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
             comments={notesBy}
             control={control}
           />
+          {absentPictures > 0 && assets.size + absentPictures > 0 && (
+            <div className="dx-warn" role="status">
+              {absentPictures === 1 ? 'A picture this design uses is' : `${absentPictures} pictures this design uses are`} not in this browser, so {absentPictures === 1 ? 'it is' : 'they are'} drawn as nothing here. {company ? `Add ${absentPictures === 1 ? 'it' : 'them'} to ${company.name}’s library on this device.` : 'Add the file again to see it.'}
+            </div>
+          )}
+          {notice && (
+            <div className="dx-toast" role="status">
+              {notice}
+            </div>
+          )}
         </div>
         <div className="dx-side">
           <Inspector
@@ -500,6 +696,17 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
             }}
             onExport={(k) => void doExport(k)}
             onComment={comment}
+            pins={s.memory.pins}
+            busy={!!busy}
+            onState={(st) => sel.artboard && setState(sel.artboard, st)}
+            onApprove={() => sel.artboard && approve(sel.artboard)}
+            onReopen={() => sel.artboard && update((x) => reopenArtboard(x, sel.artboard!))}
+            onLockArtboard={(l) => sel.artboard && lockArtboard(sel.artboard, l)}
+            onLockElement={(el, what) => sel.artboard && lockElement(sel.artboard, el, what)}
+            onKeep={keep}
+            onRelease={release}
+            onShow={(el) => sel.artboard && showElement(sel.artboard, el)}
+            onReview={() => void review()}
           />
           {selArtboard && notes.some((c) => c.artboard === selArtboard.id) && (
             <div className="dx-notes">
@@ -555,6 +762,29 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
             </div>
           </div>
         </div>
+      )}
+
+      {comparing != null && s.versions[comparing] && comparing !== s.at && (
+        <CompareModal
+          s={s}
+          other={comparing}
+          assets={assets}
+          nonce={nonce}
+          selected={sel.artboard}
+          onOther={setComparing}
+          onOpen={(i) => {
+            update((x) => moveTo(x, i));
+            setComparing(null);
+          }}
+          onRestore={(id) => {
+            const from = comparing;
+            update((x) => restoreArtboard(x, from, id));
+            setComparing(null);
+            const back = s.versions[from]?.doc.artboards.find((a) => a.id === id);
+            tell(`Brought back from v${from + 1}${back?.state === 'approved' ? ', approved and locked as it was there' : ''}. Everything else is as it was.`);
+          }}
+          onClose={() => setComparing(null)}
+        />
       )}
 
       {presenting != null && s.doc.artboards[presenting] && <Present doc={s.doc} at={presenting} assets={assets} nonce={nonce} onAt={setPresenting} />}

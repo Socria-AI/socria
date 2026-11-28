@@ -6,7 +6,7 @@ import type { ProjectSummary } from '@/lib/ux-v0/types';
 import { Collection, type RemoteWork } from './Collection';
 import { Plus } from './glyphs';
 
-export function YourWork(p: { signedIn: boolean; ready: boolean; list: ProjectSummary[]; elsewhere: RemoteWork[]; nonce: string; onOpen: (id: string) => void; onDelete: (s: ProjectSummary) => void; onNew: () => void; onSystems: () => void }) {
+export function YourWork(p: { signedIn: boolean; ready: boolean; list: ProjectSummary[]; elsewhere: RemoteWork[]; nonce: string; onOpen: (id: string) => void; onDelete: (s: ProjectSummary) => void; onNew: () => void; onSystems: () => void; onCompany: () => void }) {
   return (
     <div className="v0-home-page sb mu sd sd-home sd-work">
       <header className="sd-mast">
@@ -17,6 +17,9 @@ export function YourWork(p: { signedIn: boolean; ready: boolean; list: ProjectSu
           </span>
         </button>
         <nav className="sd-mast-nav" aria-label="SocriaUX">
+          <button type="button" className="sd-textlink" onClick={p.onCompany}>
+            Company
+          </button>
           <button type="button" className="sd-textlink" onClick={p.onSystems}>
             Design systems
           </button>

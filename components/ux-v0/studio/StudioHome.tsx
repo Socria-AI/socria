@@ -34,6 +34,7 @@ interface Props {
   /** resolves 'refused' when what was attached cannot be taken (it is then let go from the composer) */
   onBegin: (r: BeginRequest) => Promise<'refused' | void> | void;
   onSystems: () => void;
+  onCompany: () => void;
   /** everything made, in its own view */
   onWork: () => void;
   onOpen: (id: string) => void;
@@ -129,6 +130,9 @@ export function StudioHome(p: Props) {
         <nav className="sd-mast-nav" aria-label="SocriaUX">
           <button type="button" className="sd-textlink" onClick={p.onWork}>
             Your work
+          </button>
+          <button type="button" className="sd-textlink" onClick={p.onCompany}>
+            Company
           </button>
           <button type="button" className="sd-textlink" onClick={p.onSystems}>
             Design systems

@@ -48,12 +48,12 @@ export async function embeddedFonts(faces: readonly string[]): Promise<{ css: st
 }
 
 /** The artboard as an SVG document whose content is its HTML (see the head of this file). */
-export function artboardSvg(a: DesignArtboard, tokens: string, o: { fontCss: string; assets: ReadonlyMap<string, string>; background?: string | null }): string {
+export function artboardSvg(a: DesignArtboard, tokens: string, o: { fontCss: string; assets: ReadonlyMap<string, string>; background?: string | null; extraCss?: string }): string {
   const parser = new DOMParser();
   const d = parser.parseFromString(`<!doctype html><html><body><div class="sx-root">${scopeFragment(a.html, o.assets)}</div></body></html>`, 'text/html');
   const root = d.body.firstElementChild as HTMLElement;
   const style = d.createElement('style');
-  style.textContent = `${o.fontCss}\n${baseCss(a.width, a.height, o.background ?? 'transparent').replace(/html,body\{[^}]*\}/, '')}\n${scopeCss(tokens)}`;
+  style.textContent = `${o.fontCss}\n${baseCss(a.width, a.height, o.background ?? 'transparent').replace(/html,body\{[^}]*\}/, '')}\n${scopeCss(tokens)}${o.extraCss ? `\n${o.extraCss}` : ''}`;
   const holder = d.createElement('div');
   holder.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
   holder.setAttribute('style', `width:${a.width}px;height:${a.height}px;overflow:hidden;margin:0;padding:0`);
@@ -63,32 +63,57 @@ export function artboardSvg(a: DesignArtboard, tokens: string, o: { fontCss: str
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${a.width}" height="${a.height}" viewBox="0 0 ${a.width} ${a.height}"><foreignObject x="0" y="0" width="${a.width}" height="${a.height}">${xhtml}</foreignObject></svg>`;
 }
 
-/** An SVG drawn into a canvas of the given size, as a PNG or JPEG. */
-export async function rasterize(svg: string, w: number, h: number, type: 'image/png' | 'image/jpeg', quality = 0.92, background: string | null = null): Promise<Blob> {
+/** An SVG drawn into a canvas of the given size. */
+async function drawn(svg: string, w: number, h: number, background: string | null): Promise<{ canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D }> {
   // a data address, not an object address: Chromium taints a canvas that draws a foreignObject SVG from a blob:
   // address (found by the browser check), and a tainted canvas cannot be written out
   const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-  {
-    const img = new Image();
-    img.decoding = 'sync';
-    await new Promise<void>((res, rej) => {
-      img.onload = () => res();
-      img.onerror = () => rej(new Error('The design could not be drawn as a picture.'));
-      img.src = url;
-    });
-    // (the faces are inside the SVG as data: give the decoder a moment to apply them)
-    await new Promise((r) => setTimeout(r, 30));
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('This browser cannot draw the picture.');
-    if (background || type === 'image/jpeg') {
-      ctx.fillStyle = background ?? '#ffffff';
-      ctx.fillRect(0, 0, w, h);
-    }
-    ctx.drawImage(img, 0, 0, w, h);
-    return await new Promise<Blob>((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error('The picture could not be written.'))), type, quality));
+  const img = new Image();
+  img.decoding = 'sync';
+  await new Promise<void>((res, rej) => {
+    img.onload = () => res();
+    img.onerror = () => rej(new Error('The design could not be drawn as a picture.'));
+    img.src = url;
+  });
+  // (the faces are inside the SVG as data: give the decoder a moment to apply them)
+  await new Promise((r) => setTimeout(r, 30));
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) throw new Error('This browser cannot draw the picture.');
+  if (background) {
+    ctx.fillStyle = background;
+    ctx.fillRect(0, 0, w, h);
+  }
+  ctx.drawImage(img, 0, 0, w, h);
+  return { canvas, ctx };
+}
+
+/** An SVG drawn into a canvas of the given size, as a PNG or JPEG. */
+export async function rasterize(svg: string, w: number, h: number, type: 'image/png' | 'image/jpeg', quality = 0.92, background: string | null = null): Promise<Blob> {
+  const { canvas } = await drawn(svg, w, h, background ?? (type === 'image/jpeg' ? '#ffffff' : null));
+  return await new Promise<Blob>((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error('The picture could not be written.'))), type, quality));
+}
+
+/** Every word left out of the drawing (its place kept): what remains is what the words sit on. */
+const NO_WORDS = '.sx-root,.sx-root *,.sx-root *::before,.sx-root *::after{color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important;-webkit-text-stroke-color:transparent!important;text-decoration-color:transparent!important}.sx-root svg text,.sx-root svg tspan{fill:transparent!important;stroke:transparent!important}';
+
+/**
+ * The artboard's pixels as drawn with its words left out, small (its longer side at most `maxSide`): what the
+ * contrast of words is measured against (contrast.ts). Null when it cannot be drawn or read.
+ */
+export async function artboardPixels(a: DesignArtboard, tokens: string, assets: ReadonlyMap<string, string>, maxSide = 900): Promise<{ data: Uint8ClampedArray; width: number; height: number; scale: number } | null> {
+  try {
+    const fonts = await embeddedFonts(facesFor(a, tokens).faces);
+    const svg = artboardSvg(a, tokens, { fontCss: fonts.css, assets, background: '#ffffff', extraCss: NO_WORDS });
+    const scale = Math.min(1, maxSide / Math.max(a.width, a.height));
+    const w = Math.max(1, Math.round(a.width * scale));
+    const h = Math.max(1, Math.round(a.height * scale));
+    const { ctx } = await drawn(svg, w, h, '#ffffff');
+    return { data: ctx.getImageData(0, 0, w, h).data, width: w, height: h, scale };
+  } catch {
+    return null;
   }
 }
 
