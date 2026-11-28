@@ -10,7 +10,9 @@
 //   • one account cannot see, place, edit or be told about another's conversations or nodes;
 //   • before the migration has run, organisation answers { setup: false } and conversations keep working;
 //   • an artifact's composition changes only through validated operations, applied to what is stored, owner-scoped;
-//   • the artifact picture routes refuse what is not theirs to keep or show.
+//   • the artifact picture routes refuse what is not theirs to keep or show;
+//   • sources: one record per file, references that never copy it, passages (not documents) for a question, deletion
+//     that takes references and nothing else, owner-scoped, and { setup: false } before the migration.
 
 import { build } from 'esbuild';
 import { mkdirSync, rmSync } from 'node:fs';
@@ -49,6 +51,11 @@ const ROUTES = [
   ['ops', 'app/api/new-logos/nodes/[id]/ops/route.ts'],
   ['media', 'app/api/new-logos/media/route.ts'],
   ['mediaOne', 'app/api/new-logos/media/[id]/route.ts'],
+  ['srcs', 'app/api/new-logos/sources/route.ts'],
+  ['srcOne', 'app/api/new-logos/sources/[id]/route.ts'],
+  ['srcPassages', 'app/api/new-logos/sources/passages/route.ts'],
+  ['srcRefs', 'app/api/new-logos/sources/refs/route.ts'],
+  ['srcRef', 'app/api/new-logos/sources/refs/[id]/route.ts'],
   ['helpers', 'lib/new-logos/convo.ts'],
 ];
 for (const [name, file] of ROUTES) {
@@ -325,6 +332,46 @@ console.log('\n=== artifacts: compositions changed by operations ===');
   as(null);
   const readOut = await R.mediaOne.GET(new NextRequest(`http://localhost/api/new-logos/media/${'c'.repeat(32)}`), { params: { id: 'c'.repeat(32) } });
   ok('signed out, no picture is shown (401)', readOut.status === 401);
+}
+
+console.log('\n=== sources: the library, references, passages ===');
+{
+  as('una');
+  const X = await import(pathToFileURL(join(here, '.tmp', 'new-logos-under-test.mjs')).href);
+  const text = ['# Plan', '', 'We sell repair kits to cycle shops.', '', '## Pricing', '', 'Each kit sells for £24 wholesale; margin is 58%.', ...Array.from({ length: 40 }, (_, i) => `\nFiller ${i} about the warehouse lease and staffing.`)].join('\n');
+  const reading = X.sanitizeSourceDoc(X.readPlain('Plan.md', text, { id: '0123456789abcdef' }).doc);
+  const FILE = 'b'.repeat(32);
+  const made = await call(R.srcs.POST, 'POST', '/api/new-logos/sources', { name: 'Plan.md', mime: 'text/markdown', size: 999, fileId: FILE, reading, conversationIds: ['lg_old'] });
+  ok('a file is brought into the library, with its reading', made.status === 200 && !made.json.existing && made.json.source.status === 'ready' && made.json.source.doc_id === reading.id);
+  const sid = made.json.source.id;
+  const again = await call(R.srcs.POST, 'POST', '/api/new-logos/sources', { name: 'Plan again.md', fileId: FILE, reading });
+  ok('the same file again is the same source', again.status === 200 && again.json.existing && again.json.source.id === sid && db.rows('nl_sources').filter((r) => r.user_id === 'una').length === 1);
+  const list = await call(R.srcs.GET, 'GET', '/api/new-logos/sources');
+  ok('the library lists sources without their (large) readings', list.status === 200 && list.json.sources.length === 1 && !('reading' in list.json.sources[0]));
+  const one = await call(R.srcOne.GET, 'GET', `/api/new-logos/sources/${sid}`, null, { id: sid });
+  ok('one source comes with its reading', one.status === 200 && one.json.reading?.id === reading.id);
+  const ren = await call(R.srcOne.PATCH, 'PATCH', `/api/new-logos/sources/${sid}`, { name: 'Plan v2' }, { id: sid });
+  ok('a source is renamed', ren.status === 200 && ren.json.source.name === 'Plan v2');
+  const ref = await call(R.srcRefs.POST, 'POST', '/api/new-logos/sources/refs', { sourceId: sid, nodeId: obj.id, passage: 'p1.3', quote: '£24 wholesale', ground: 'verbatim' });
+  ok('a component refers to a source', ref.status === 200 && ref.json.ref.node_id === obj.id && ref.json.ref.passage === 'p1.3');
+  const pas = await call(R.srcPassages.POST, 'POST', '/api/new-logos/sources/passages', { ids: [sid], query: 'What does a kit sell for?' });
+  ok('a question gets the passages that bear on it, not the document', pas.status === 200 && pas.json.docs[0].blocks.some((b) => /£24/.test(b.text)) && pas.json.docs[0].blocks.length < reading.blocks.length / 3);
+  as('vic');
+  ok("another account sees none of it", (await call(R.srcs.GET, 'GET', '/api/new-logos/sources')).json.sources.length === 0 && (await call(R.srcOne.GET, 'GET', `/api/new-logos/sources/${sid}`, null, { id: sid })).status === 404);
+  ok("…cannot rename, refer to, draw from or delete it", (await call(R.srcOne.PATCH, 'PATCH', `/api/new-logos/sources/${sid}`, { name: 'x' }, { id: sid })).status === 404 && (await call(R.srcRefs.POST, 'POST', '/api/new-logos/sources/refs', { sourceId: sid, nodeId: obj.id })).status === 404 && (await call(R.srcPassages.POST, 'POST', '/api/new-logos/sources/passages', { ids: [sid], query: 'kit' })).json.docs.length === 0 && (await call(R.srcOne.DELETE, 'DELETE', `/api/new-logos/sources/${sid}`, null, { id: sid })).status === 404);
+  ok("…nor remove its references", (await call(R.srcRef.DELETE, 'DELETE', `/api/new-logos/sources/refs/${ref.json.ref.id}`, null, { id: ref.json.ref.id })).status === 404 && db.rows('nl_source_refs').length === 1);
+  as(null);
+  ok('signed out: 401', (await call(R.srcs.GET, 'GET', '/api/new-logos/sources')).status === 401);
+  as('una');
+  const huge = await call(R.srcs.POST, 'POST', '/api/new-logos/sources', { name: 'huge.txt', fileId: 'c'.repeat(32), pad: 'x'.repeat(2_700_000) });
+  ok('a record larger than the ceiling is refused', huge.status === 413);
+  const del = await call(R.srcOne.DELETE, 'DELETE', `/api/new-logos/sources/${sid}`, null, { id: sid });
+  ok('deleting a source removes it and its references, and nothing else', del.status === 200 && del.json.deleted.references === 1 && !db.rows('nl_sources').some((r) => r.id === sid) && db.rows('nl_source_refs').length === 0 && db.rows('nl_nodes').some((n) => n.id === obj.id) && !!row('lg_old'));
+  db.absent.add('nl_sources');
+  const g = await call(R.srcs.GET, 'GET', '/api/new-logos/sources');
+  const pw = await call(R.srcs.POST, 'POST', '/api/new-logos/sources', { name: 'x.md', fileId: FILE, reading });
+  ok('before the migration: setup:false, nothing written', g.status === 200 && g.json.setup === false && pw.status === 503);
+  db.absent.delete('nl_sources');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

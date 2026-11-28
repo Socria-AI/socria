@@ -1,16 +1,18 @@
 'use client';
 // components/new-logos/canvas/Frame.tsx — what surrounds a canvas: the canvas fills the window under the top bar;
 // a small floating header says where you are (breadcrumbs, title) and offers the few things a workspace needs; an
-// Add button makes something without a double-click (touch, keyboard); a chooser names a connection once it is drawn.
+// omnibox floats at the bottom centre for asking (and making); the source library is in the bottom-left corner (the
+// Shell's); a chooser names a connection once it is drawn.
 // Nothing here is a fixed panel: the header floats and the side drawer opens only when asked.
 
 import type { ReactNode } from 'react';
 import { RELATION_KINDS, RELATION_LABEL, type RelationKind } from '@/lib/new-logos/model';
 
-export function WorkspaceFrame({ header, tools, children, drawer, onAdd }: { header: ReactNode; tools?: ReactNode; children: ReactNode; drawer?: ReactNode; onAdd?: () => void }) {
+export function WorkspaceFrame({ header, tools, children, drawer, onAdd, omnibox }: { header: ReactNode; tools?: ReactNode; children: ReactNode; drawer?: ReactNode; onAdd?: () => void; omnibox?: ReactNode }) {
   return (
     <main className="nl-ws">
       {children}
+      {omnibox}
       <div className="nl-ws-head nl-cv-ui">{header}</div>
       {tools ? <div className="nl-ws-tools nl-cv-ui">{tools}</div> : null}
       {onAdd ? (

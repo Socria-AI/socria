@@ -34,8 +34,9 @@ export interface CanvasLayout {
 
 export const EMPTY_LAYOUT: CanvasLayout = { items: {} };
 
-/** What an object on a canvas refers to: n:<node id> or x:<exchange key>. */
-export const REF_RE = /^(n|x):[A-Za-z0-9_-]{1,120}$/;
+/** What an object on a canvas refers to: n:<node id>, x:<exchange key>, or s:<source id> (a source placed there: a
+ *  reference to the library's record, never a copy). */
+export const REF_RE = /^(n|x|s):[A-Za-z0-9_-]{1,120}$/;
 /** A canvas's key: o:<objective node id>, c:<conversation id>, or a:<artifact node id> (an artifact's camera only:
  *  where its primitives sit is part of the artifact itself). */
 export const KEY_RE = /^(o|c|a):[A-Za-z0-9_-]{1,120}$/;

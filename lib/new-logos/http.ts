@@ -8,6 +8,8 @@ import 'server-only';
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabaseStore } from './store-supabase';
+import { supabaseSourceStore } from './source-store-supabase';
+import type { SourceStore } from './source-store';
 import { NlSetupError, type NodeStore } from './store';
 import { statusOf, type Result } from './ops';
 
@@ -45,4 +47,32 @@ export async function withStore(fn: (store: NodeStore) => Promise<NextResponse>,
 export async function body(req: Request): Promise<Record<string, unknown>> {
   const b = await req.json().catch(() => null);
   return b && typeof b === 'object' && !Array.isArray(b) ? (b as Record<string, unknown>) : {};
+}
+
+/** Run a handler with the source store; the missing-tables case and unexpected failures answered as withStore does. */
+export async function withSources(fn: (store: SourceStore) => Promise<NextResponse>, write: boolean): Promise<NextResponse> {
+  try {
+    return await fn(supabaseSourceStore());
+  } catch (e) {
+    if (e instanceof NlSetupError) {
+      return NextResponse.json(
+        { ok: false, setup: false, error: 'Sources are not set up on this database yet.', code: 'setup' },
+        { status: write ? 503 : 200 }
+      );
+    }
+    console.error('[new-logos/sources]', e);
+    return NextResponse.json({ ok: false, error: 'Something went wrong on the server. Nothing was changed.', code: 'server' }, { status: 500 });
+  }
+}
+
+/** A JSON body read no further than `max` characters: null past it, {} when it is not an object. */
+export async function bodyUpTo(req: Request, max: number): Promise<Record<string, unknown> | null> {
+  const text = await req.text().catch(() => '');
+  if (text.length > max) return null;
+  try {
+    const j = JSON.parse(text || '{}');
+    return j && typeof j === 'object' && !Array.isArray(j) ? (j as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
 }

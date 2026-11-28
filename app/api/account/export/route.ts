@@ -284,6 +284,16 @@ export async function GET(req: NextRequest) {
     .from('nl_canvases').select('key, layout, version, updated_at').eq('user_id', userId);
   const nlCanvasesErr = missingTable(nlCanvasesRaw) ? null : nlCanvasesRaw;
   out.workspaceCanvases = nlCanvases ?? [];
+  // their source library: each file's record and reading (the originals' bytes are listed with attachedFiles), and
+  // which of their components refer to which source
+  const { data: nlSources, error: nlSourcesRaw } = await db
+    .from('nl_sources').select('id, name, file_name, mime, size, kind, file_id, doc_id, status, pages, format, conversation_ids, reading, created_at, updated_at').eq('user_id', userId).order('created_at', { ascending: true });
+  const nlSourcesErr = missingTable(nlSourcesRaw) ? null : nlSourcesRaw;
+  out.workspaceSources = nlSources ?? [];
+  const { data: nlSourceRefs, error: nlSourceRefsRaw } = await db
+    .from('nl_source_refs').select('id, source_id, node_id, passage, quote, note, ground, origin, created_at').eq('user_id', userId).order('created_at', { ascending: true });
+  const nlSourceRefsErr = missingTable(nlSourceRefsRaw) ? null : nlSourceRefsRaw;
+  out.workspaceSourceReferences = nlSourceRefs ?? [];
 
   // Metacognitive Regulation's intervention ledger: which condition each turn
   // ran under, what MR decided, how it went and what its integrity checks
@@ -410,6 +420,8 @@ export async function GET(req: NextRequest) {
     ['workspaceRelations', nlRelationsErr],
     ['workspaceNodeVersions', nlVersionsErr],
     ['workspaceCanvases', nlCanvasesErr],
+    ['workspaceSources', nlSourcesErr],
+    ['workspaceSourceReferences', nlSourceRefsErr],
     ['mrLedger', mrLedgerErr],
     ['roomSeats', roomSeatsErr],
     ['rooms', roomsErr],

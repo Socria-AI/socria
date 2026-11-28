@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CANVAS_LIMITS, DEFAULT_SIZE, connector, fitView, type Box, type CanvasLayout, type View } from '@/lib/new-logos/canvas';
+import { SOURCE_DRAG } from '@/lib/new-logos/sources';
 
 export interface CanvasObject {
   ref: string;
@@ -53,6 +54,8 @@ export interface CanvasProps {
   onResize?: (ref: string, w: number, h: number) => void;
   /** a file dropped on the plane, at a plane point */
   onDropFiles?: (files: File[], at: { x: number; y: number }) => void;
+  /** a source dragged from the library and dropped: at a plane point, onto an object (its ref) or onto the plane (null) */
+  onDropSource?: (sourceId: string, at: { x: number; y: number }, onto: string | null) => void;
   /** centre the camera on this object (changes of `nonce` repeat it) */
   focus?: { ref: string; nonce: number } | null;
   empty?: ReactNode;
@@ -223,6 +226,9 @@ export function Canvas(p: CanvasProps) {
       const from = connect.dataset.connect as string;
       const at = toPlane(e.clientX, e.clientY);
       gesture.current = { kind: 'link', from };
+      // a drag is a drag: the browser must not start selecting the page's text under it
+      e.preventDefault();
+      hostRef.current?.focus({ preventScroll: true });
       setLinking({ from, ...at });
       hostRef.current?.setPointerCapture(e.pointerId);
       return;
@@ -244,6 +250,9 @@ export function Canvas(p: CanvasProps) {
       const it = p.layout.items[ref] ?? { x: 0, y: 0 };
       const at = toPlane(e.clientX, e.clientY);
       gesture.current = { kind: 'drag', ref, dx: at.x - it.x, dy: at.y - it.y, sx: e.clientX, sy: e.clientY, moved: false };
+      // no text selection under a drag; and since that also keeps focus where it was, the canvas takes it (its keys)
+      e.preventDefault();
+      hostRef.current?.focus({ preventScroll: true });
       hostRef.current?.setPointerCapture(e.pointerId);
       return;
     }
@@ -406,14 +415,31 @@ export function Canvas(p: CanvasProps) {
       onPointerCancel={onPointerUp}
       onDoubleClick={onDoubleClick}
       onKeyDown={onKeyDown}
-      onDragOver={p.onDropFiles ? (e) => e.dataTransfer.types.includes('Files') && e.preventDefault() : undefined}
-      onDrop={
-        p.onDropFiles
+      onDragOver={
+        p.onDropFiles || p.onDropSource
           ? (e) => {
+              const t = e.dataTransfer.types;
+              if ((p.onDropFiles && t.includes('Files')) || (p.onDropSource && t.includes(SOURCE_DRAG))) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+              }
+            }
+          : undefined
+      }
+      onDrop={
+        p.onDropFiles || p.onDropSource
+          ? (e) => {
+              const sid = p.onDropSource ? e.dataTransfer.getData(SOURCE_DRAG) : '';
+              if (sid) {
+                e.preventDefault();
+                const onto = (e.target as HTMLElement).closest<HTMLElement>('[data-ref]')?.dataset.ref ?? null;
+                p.onDropSource?.(sid, toPlane(e.clientX, e.clientY), onto);
+                return;
+              }
               const files = [...e.dataTransfer.files];
-              if (!files.length) return;
+              if (!files.length || !p.onDropFiles) return;
               e.preventDefault();
-              p.onDropFiles?.(files, toPlane(e.clientX, e.clientY));
+              p.onDropFiles(files, toPlane(e.clientX, e.clientY));
             }
           : undefined
       }

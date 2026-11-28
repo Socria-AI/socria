@@ -18,3 +18,9 @@ export * as Prim from '../../lib/new-logos/primitives';
 export * as Compose from '../../lib/new-logos/compose';
 export * as AOps from '../../lib/new-logos/artifact-ops';
 export { readEquationLine, equationLine } from '../../components/new-logos/primitives/Equation';
+// sources: the canonical records, references, retrieval for a question — and the existing reader they reuse
+export * as Src from '../../lib/new-logos/sources';
+export * as SrcOps from '../../lib/new-logos/source-ops';
+export { memorySourceStore } from '../../lib/new-logos/source-store';
+export { readPlain } from '../../lib/docs/plain';
+export { sanitizeSourceDoc } from '../../lib/docs/sanitize';

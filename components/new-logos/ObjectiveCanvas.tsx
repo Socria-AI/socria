@@ -18,6 +18,10 @@ import { useNL } from './state';
 import { starterComposition, type Starter } from '@/lib/new-logos/primitives';
 import { artifactFacts } from '@/lib/new-logos/context';
 import { askMessage, reply, saveAsk, type About } from './ask';
+import { Omnibox } from './sources/Omnibox';
+import { mentionContext } from './sources/mentions';
+import { useCanvasSources } from './sources/useCanvasSources';
+import { useSources } from './sources/state';
 import { Canvas, type CanvasLine, type CanvasObject } from './canvas/Canvas';
 import { CardFrame, ConversationCard, NodeCard } from './canvas/Cards';
 import { Creator, type Makeable } from './canvas/Creator';
@@ -29,6 +33,7 @@ const W = { closed: 290, open: 440, doc: 620, conv: 480 };
 
 export function ObjectiveCanvas({ id }: { id: string }) {
   const { loaded, nodes, relations, conversations, setup, appendTurns, createNode, link, nodeAction, say } = useNL();
+  const { sources, passages } = useSources();
   const objective = nodes.find((n) => n.id === id && n.type === 'objective');
   const L = useCanvasLayout(objective ? `o:${id}` : null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -81,8 +86,15 @@ export function ObjectiveCanvas({ id }: { id: string }) {
     if (fresh.length) L.setItems(Object.fromEntries(fresh.map((r) => [r, layout.items[r]])));
   }, [L, layout]);
 
+  // ── sources placed here (a reference to the library's record each) ──
+  const centre = () => {
+    const v = layout.view ?? { x: window.innerWidth / 2, y: window.innerHeight / 2, k: 1 };
+    return { x: (window.innerWidth / 2 - v.x) / v.k, y: (window.innerHeight / 2 - 48 - v.y) / v.k };
+  };
+  const src = useCanvasSources({ layout, setItem: L.setItem, sizeOf, centre, focusOn: (ref) => setFocus({ ref, nonce: Date.now() }) });
+
   // ── asking ──
-  const deps = { appendTurns, placed: true };
+  const deps = { appendTurns, placed: true, passages: (q: { docIds: string[]; query: string }) => passages(q) };
   const aboutNode = (n: NodeRow): About => {
     const c = n.content as Record<string, unknown>;
     return {
@@ -93,10 +105,10 @@ export function ObjectiveCanvas({ id }: { id: string }) {
   };
 
   /** A new conversation in this objective, begun with `text`, placed at a point or beside an object. */
-  async function askNew(text: string, opts: { at?: { x: number; y: number }; from?: string; about?: About }) {
+  async function askNew(text: string, opts: { at?: { x: number; y: number }; from?: string; about?: About; attachments?: unknown[] }) {
     if (busy || !objective) return;
     const convId = newConversationId();
-    const mine = askMessage(text, opts.about, Date.now());
+    const mine = askMessage(text, opts.about, Date.now(), opts.attachments);
     const at = opts.at
       ? placeNear(layout, opts.at, { w: W.conv, h: 460 }, sizeOf)
       : opts.from
@@ -215,8 +227,10 @@ export function ObjectiveCanvas({ id }: { id: string }) {
     });
   }
   const shown = pending ? { ...layout, items: { ...layout.items, 'n:pending': { x: pending.at.x, y: pending.at.y, open: true } } } : layout;
+  objects.push(...src.objects);
   const present = new Set(objects.map((o) => o.ref));
   const lines: CanvasLine[] = [
+    ...src.lines(present),
     ...relations
       .filter((r) => present.has(nodeRef(r.from_id)) && present.has(nodeRef(r.to_id)))
       .map((r) => ({ id: r.id, from: nodeRef(r.from_id), to: nodeRef(r.to_id), label: RELATION_LABEL[r.kind], style: 'solid' as const })),
@@ -227,7 +241,16 @@ export function ObjectiveCanvas({ id }: { id: string }) {
 
   return (
     <WorkspaceFrame
-      onAdd={openCreatorAtCentre}
+      omnibox={
+        <Omnibox
+          placeholder="Ask about this objective. Type @ to bring in a source or anything in it"
+          busy={busy}
+          onAsk={(t, m) =>
+            void mentionContext(m, t, { sources, nodes, passages }).then((ctx) => askNew(t, { at: centre(), about: ctx.about, attachments: ctx.attachments }))
+          }
+          onMake={openCreatorAtCentre}
+        />
+      }
       header={
         <>
           <Crumbs nodes={nodes} at={objective.parent_id} current={objective.title} />
@@ -261,7 +284,10 @@ export function ObjectiveCanvas({ id }: { id: string }) {
           onMove={(ref, x, y) => ref !== 'n:pending' && L.setItem(ref, { x, y })}
           onView={L.setView}
           onCreateAt={(at, screen) => setCreator({ at, screen })}
+          onDropSource={src.dropSource}
+          onDropFiles={(files, at) => void src.dropFiles(files, at)}
           onConnect={(from, to) => {
+            if (src.connect(from, to)) return;
             if (from === 'n:pending' || to === 'n:pending') return;
             const el = document.querySelector(`[data-ref="${CSS.escape(to)}"]`)?.getBoundingClientRect();
             setConnecting({ from, to, screen: { x: el ? el.left : window.innerWidth / 2, y: el ? el.top : window.innerHeight / 2 } });
@@ -271,7 +297,7 @@ export function ObjectiveCanvas({ id }: { id: string }) {
           empty={
             <div>
               <p>This objective’s workspace is empty.</p>
-              <p className="nl-hint">Double-click anywhere, or use Add, to ask the assistant or to put down a question, knowledge, a decision, a document or a sub-objective.</p>
+              <p className="nl-hint">Ask in the box below, or double-click anywhere to ask or to put down a question, knowledge, a decision, an artifact or a sub-objective there. Sources stay in the library, bottom left, until you place or mention one.</p>
             </div>
           }
         />

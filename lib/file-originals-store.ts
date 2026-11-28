@@ -127,7 +127,8 @@ export async function purgeOriginals(userId: string): Promise<number> {
 
 /**
  * The originals a deleted conversation held, removed — unless another of their
- * conversations still holds one (the same file attached twice is kept once). Called
+ * conversations still holds one (the same file attached twice is kept once), or
+ * their workspace source library does. Called
  * after the row is gone. Anything uncertain keeps the file: a failed check is a file
  * kept until the account goes, never one lost from a conversation still using it.
  */
@@ -142,7 +143,15 @@ export async function releaseOriginals(userId: string, ids: string[]): Promise<n
         console.error('[socria/files] release check failed', error.message);
         return 0;
       }
-      if (!data?.length) free.push(id);
+      if (data?.length) continue;
+      // a file in their workspace source library (/new-logos, nl_sources) is still in use too; a database without
+      // that table has no library to hold it
+      const lib = await db.from('nl_sources').select('id').eq('user_id', userId).eq('file_id', id).limit(1);
+      if (lib.error && !/42P01|PGRST205|does not exist|could not find the table/i.test(`${lib.error.code ?? ''} ${lib.error.message ?? ''}`)) {
+        console.error('[socria/files] release check failed', lib.error.message);
+        return 0;
+      }
+      if (!lib.data?.length) free.push(id);
     }
     return free.length ? await removeOriginals(userId, free) : 0;
   } catch (e) {

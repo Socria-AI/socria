@@ -18,6 +18,11 @@ import { useNL } from './state';
 import { starterComposition, type Starter } from '@/lib/new-logos/primitives';
 import { artifactFacts } from '@/lib/new-logos/context';
 import { askMessage, reply, saveAsk, type About } from './ask';
+import { Omnibox } from './sources/Omnibox';
+import { mentionContext } from './sources/mentions';
+import { useCanvasSources } from './sources/useCanvasSources';
+import { useSources } from './sources/state';
+import { exchangeDocs, withoutCitations } from '@/lib/new-logos/sources';
 import { Canvas, type CanvasLine, type CanvasObject } from './canvas/Canvas';
 import { ExchangeCard, NodeCard } from './canvas/Cards';
 import { Creator, type Makeable } from './canvas/Creator';
@@ -31,6 +36,7 @@ const W = { exchange: 320, exchangeOpen: 480, node: 280, nodeOpen: 420, docOpen:
 export function ConversationCanvas({ id }: { id: string }) {
   const nl = useNL();
   const { conversations, conversationsLoaded, nodes, relations, setup, appendTurns, rename, createNode, link, nodeAction, say } = nl;
+  const { sources, passages, addRef } = useSources();
   const params = useSearchParams();
   const isNew = id === 'new';
   const [convId] = useState(() => (isNew ? newConversationId() : id));
@@ -106,12 +112,19 @@ export function ConversationCanvas({ id }: { id: string }) {
     L.setItems(Object.fromEntries(fresh.map((r) => [r, { ...layout.items[r], ...(first && r === lastRef ? { open: true } : {}) }])));
   }, [L, layout, exchanges]);
 
-  // ── a turn ──
-  const deps = useCallback((placed: boolean) => ({ appendTurns, placed }), [appendTurns]);
+  // ── sources placed here (a reference to the library's record each) ──
+  const centre = () => {
+    const v = layout.view ?? { x: window.innerWidth / 2, y: window.innerHeight / 2, k: 1 };
+    return { x: (window.innerWidth / 2 - v.x) / v.k, y: (window.innerHeight / 2 - 48 - v.y) / v.k };
+  };
+  const src = useCanvasSources({ layout, setItem: L.setItem, sizeOf, centre, conversationId: created ? convId : undefined, focusOn: (ref) => setFocus({ ref, nonce: Date.now() }) });
 
-  async function ask(text: string, opts: { at?: { x: number; y: number }; from?: string; about?: About } = {}) {
+  // ── a turn ──
+  const deps = useCallback((placed: boolean) => ({ appendTurns, placed, passages: (q: { docIds: string[]; query: string }) => passages(q) }), [appendTurns, passages]);
+
+  async function ask(text: string, opts: { at?: { x: number; y: number }; from?: string; about?: About; attachments?: unknown[] } = {}) {
     if (busy) return;
-    const mine = askMessage(text, opts.about, Date.now());
+    const mine = askMessage(text, opts.about, Date.now(), opts.attachments);
     const key = mine.id as string;
     const ref = exchangeRef(key);
     if (opts.about) abouts.current[key] = opts.about;
@@ -171,7 +184,7 @@ export function ConversationCanvas({ id }: { id: string }) {
   async function keep(type: NodeType, ex: Exchange, which: 'ask' | 'reply') {
     const m = which === 'reply' ? ex.replies[ex.replies.length - 1] : ex.ask;
     if (!m) return;
-    const text = which === 'reply' ? ex.replies.map((r) => r.content).join('\n\n') : m.content;
+    const text = withoutCitations(which === 'reply' ? ex.replies.map((r) => r.content).join('\n\n') : m.content);
     const r = await createNode({
       type,
       title: excerpt(text, 120) || typeLabel(type),
@@ -183,6 +196,15 @@ export function ConversationCanvas({ id }: { id: string }) {
     const ref = nodeRef(r.node.id);
     const p = placeMissing(layout, [{ ref, near: exchangeRef(ex) }], sizeOf).items[ref];
     L.setItem(ref, { x: p.x, y: p.y });
+    // what it was drawn from comes with it: each cited passage (or the attached document) becomes a reference,
+    // marked as the assistant's citation and an interpretation when it was the reply that was kept
+    for (const d of exchangeDocs(messages, ex)) {
+      const s = sources.find((x) => x.doc_id === d.doc_id);
+      if (!s) continue;
+      const fromReply = which === 'reply';
+      const at = fromReply && d.passages.length ? d.passages.slice(0, 6) : [null];
+      for (const passage of at) await addRef({ sourceId: s.id, nodeId: r.node.id, passage, origin: fromReply ? 'ai' : 'human', ground: fromReply ? 'interpretation' : null });
+    }
     if (live) await link(r.node.id, live.id, 'derived_from');
     say(`Kept as ${typeLabel(type).toLowerCase()}${type === 'decision' && which === 'reply' ? ', a proposal until you accept it' : ''}.`);
   }
@@ -225,6 +247,7 @@ export function ConversationCanvas({ id }: { id: string }) {
             onAsk={(t) => void ask(t, { from: ref, about: aboutExchange(ex) })}
             onKeep={(t, which) => void keep(t, ex, which)}
             onRetry={() => retry(ex)}
+            docs={exchangeDocs(messages, ex)}
           />
         ),
       };
@@ -241,8 +264,10 @@ export function ConversationCanvas({ id }: { id: string }) {
       };
     }),
   ];
+  objects.push(...src.objects);
   const present = new Set(objects.map((o) => o.ref));
   const lines: CanvasLine[] = [
+    ...src.lines(present),
     ...Object.entries(layout.items)
       .filter(([ref, it]) => it.from && present.has(ref) && present.has(it.from))
       .map(([ref, it]) => ({ id: `from-${ref}`, from: it.from as string, to: ref, label: 'asked about', style: 'dashed' as const })),
@@ -255,16 +280,17 @@ export function ConversationCanvas({ id }: { id: string }) {
       .map((r) => ({ id: r.id, from: nodeRef(r.from_id), to: nodeRef(r.to_id), label: RELATION_LABEL[r.kind], style: 'solid' as const })),
   ];
 
+  const askFromBox = async (text: string, mentions: Parameters<typeof mentionContext>[0]) => {
+    const ctx = await mentionContext(mentions, text, { sources, nodes, passages });
+    void ask(text, { about: ctx.about, attachments: ctx.attachments });
+  };
+
   const openCreatorAtCentre = () => {
     const v = layout.view ?? { x: window.innerWidth / 2, y: window.innerHeight / 2, k: 1 };
     const sx = window.innerWidth / 2, sy = window.innerHeight / 2;
     setCreator({ at: { x: (sx - v.x) / v.k, y: (sy - 48 - v.y) / v.k }, screen: { x: sx - 180, y: sy - 80 } });
   };
-  // a new conversation opens ready to ask
-  useEffect(() => {
-    if (isNew && L.loaded && !messages.length) openCreatorAtCentre();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isNew, L.loaded]);
+  // a new conversation opens ready to ask: the omnibox takes the first question (it is focused)
 
   if (!isNew && conversationsLoaded && !conv && !local.length)
     return (
@@ -276,7 +302,16 @@ export function ConversationCanvas({ id }: { id: string }) {
 
   return (
     <WorkspaceFrame
-      onAdd={openCreatorAtCentre}
+      omnibox={
+        <Omnibox
+          placeholder={exchanges.length ? 'Ask, or type @ to bring in a source or anything in the workspace' : 'Ask anything. Type @ to bring in a source'}
+          busy={busy}
+          autoFocus={isNew && !messages.length}
+          conversationId={created ? convId : undefined}
+          onAsk={(t, m) => void askFromBox(t, m)}
+          onMake={setup === false || !created ? undefined : openCreatorAtCentre}
+        />
+      }
       header={
         <>
           <Crumbs nodes={nodes} at={container?.id ?? null} current={title} />
@@ -353,7 +388,10 @@ export function ConversationCanvas({ id }: { id: string }) {
           onMove={(ref, x, y) => L.setItem(ref, { x, y })}
           onView={L.setView}
           onCreateAt={(at, screen) => setCreator({ at, screen })}
+          onDropSource={src.dropSource}
+          onDropFiles={(files, at) => void src.dropFiles(files, at)}
           onConnect={(from, to) => {
+            if (src.connect(from, to)) return;
             if (!from.startsWith('n:') || !to.startsWith('n:')) return say('Connections join nodes. Keep an exchange as a node to connect it.');
             const el = document.querySelector(`[data-ref="${CSS.escape(to)}"]`)?.getBoundingClientRect();
             setConnecting({ from, to, screen: { x: el ? el.left : window.innerWidth / 2, y: el ? el.top : window.innerHeight / 2 } });
@@ -363,7 +401,7 @@ export function ConversationCanvas({ id }: { id: string }) {
           empty={
             <div>
               <p>Nothing here yet.</p>
-              <p className="nl-hint">Double-click anywhere, or use Add, to ask the assistant. Each exchange becomes an object you can move, open and build on.</p>
+              <p className="nl-hint">Ask in the box below, or double-click anywhere to ask from there. Each exchange becomes an object you can move, open and build on. Sources stay in the library, bottom left, until you place or mention one.</p>
             </div>
           }
         />

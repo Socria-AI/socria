@@ -1349,6 +1349,52 @@ create table if not exists nl_node_versions (
 );
 create index if not exists nl_node_versions_user_node on nl_node_versions (user_id, node_id);
 
+-- New Logos sources (docs/NEW-LOGOS.md, "Sources"): one canonical record per file a person brought into their
+-- workspace — its name, kind, how well it was read, its reading (the structured text the existing reader makes of a
+-- file) and the id of its original in the account's existing private file storage (bucket socria-files). Components
+-- refer to a source through nl_source_refs; a source placed on a canvas is a layout item, never a copy. Additive; safe
+-- to re-run.
+create table if not exists nl_sources (
+  id text primary key,
+  user_id text not null,
+  name text not null default '',
+  file_name text not null default '',
+  mime text not null default '',
+  size bigint not null default 0,
+  kind text not null default 'document',
+  file_id text,
+  doc_id text,
+  status text not null default 'ready',
+  pages integer not null default 0,
+  format text not null default '',
+  conversation_ids text[] not null default '{}',
+  reading jsonb,
+  created_at bigint not null,
+  updated_at bigint not null
+);
+create index if not exists nl_sources_user on nl_sources (user_id, created_at desc);
+-- one record per document per person: the same file brought in twice is the same source
+create unique index if not exists nl_sources_user_doc on nl_sources (user_id, doc_id) where doc_id is not null;
+create index if not exists nl_sources_user_file on nl_sources (user_id, file_id) where file_id is not null;
+
+-- A component's reference to a source, optionally at one passage ("p3.12"), with the words quoted, how the component
+-- stands on it (verbatim, derived, interpretation) and who made the tie (human or ai). Removing one never touches the
+-- source; a source or a component deleted takes its references with it.
+create table if not exists nl_source_refs (
+  id text primary key,
+  user_id text not null,
+  source_id text not null references nl_sources(id) on delete cascade,
+  node_id text not null references nl_nodes(id) on delete cascade,
+  passage text,
+  quote text not null default '',
+  note text not null default '',
+  ground text,
+  origin text not null default 'human',
+  created_at bigint not null
+);
+create index if not exists nl_source_refs_user on nl_source_refs (user_id);
+create unique index if not exists nl_source_refs_once on nl_source_refs (node_id, source_id, coalesce(passage, ''));
+
 -- New Logos canvases: where things sit on a workspace's spatial canvas (an objective's, or a conversation's), which
 -- are open, what each was asked from, and the camera. Presentation only — never a message, never a node. One row per
 -- canvas; `key` is o:<objective node id> or c:<conversation id>. Additive; safe to re-run.

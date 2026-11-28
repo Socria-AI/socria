@@ -13,6 +13,9 @@ import { KNOWLEDGE_KINDS, STATES, type NodeRow, type NodeType } from '@/lib/new-
 import { sanitizeComposition } from '@/lib/new-logos/primitives';
 import { summarize } from '@/lib/new-logos/compose';
 import { Surface } from '../primitives/Surface';
+import { ExchangeSources, NodeSources } from '../sources/SourceBadge';
+import { useSources } from '../sources/state';
+import { standingOf } from '@/lib/new-logos/sources';
 import { displayTitle, type Conversation } from '@/lib/new-logos/convo';
 import { excerpt, exchangesOf, type Exchange } from '@/lib/new-logos/canvas';
 import { Prose } from '../Prose';
@@ -29,6 +32,7 @@ export function CardFrame({
   children,
   foot,
   linked,
+  badge,
 }: {
   type: NodeType | 'exchange';
   kicker: string;
@@ -39,6 +43,8 @@ export function CardFrame({
   children?: ReactNode;
   foot?: ReactNode;
   linked?: boolean;
+  /** a small indicator in the head (its sources) */
+  badge?: ReactNode;
 }) {
   return (
     <div className={`nl-card is-${type}${open ? ' is-open' : ''}${linked ? ' is-linked' : ''}`}>
@@ -47,6 +53,7 @@ export function CardFrame({
         <Glyph type={type === 'exchange' ? 'conversation' : type} size={14} />
         <span className="nl-card-kicker">{kicker}</span>
         <span className="nl-grow" />
+        {badge}
         {menu}
         <button type="button" className="nl-icon-btn nl-card-toggle" aria-expanded={open} aria-label={open ? 'Close' : 'Open'} onClick={onToggle}>
           {open ? '−' : '+'}
@@ -146,6 +153,7 @@ export function ExchangeCard({
   onKeep,
   onRetry,
   busy,
+  docs,
 }: {
   ex: Exchange;
   open: boolean;
@@ -157,6 +165,8 @@ export function ExchangeCard({
   onKeep: (type: NodeType, which: 'ask' | 'reply') => void;
   onRetry?: () => void;
   busy: boolean;
+  /** the documents it draws on: attached to its question, cited in its replies */
+  docs?: { doc_id: string; name: string; passages: string[] }[];
 }) {
   const [asking, setAsking] = useState(false);
   const reply = ex.replies.map((r) => r.content).join('\n\n');
@@ -170,6 +180,7 @@ export function ExchangeCard({
       title={title}
       open={open}
       onToggle={onToggle}
+      badge={docs?.length ? <ExchangeSources docs={docs} /> : null}
       menu={
         <Menu label="Exchange actions">
           {(close) => (
@@ -238,7 +249,10 @@ export function NodeCard({
   extra?: ReactNode;
 }) {
   const { nodeAction, nodes, say } = useNL();
+  const { refs } = useSources();
   const [asking, setAsking] = useState(false);
+  const [addingSource, setAddingSource] = useState(false);
+  const myRefs = refs.filter((r) => r.node_id === node.id);
   const saveRef = useRef(nodeAction);
   saveRef.current = nodeAction;
   const save = async (fields: Record<string, unknown>) => {
@@ -259,7 +273,7 @@ export function NodeCard({
       : node.type === 'question'
         ? `Question · ${node.state}`
         : node.type === 'knowledge'
-          ? `Knowledge · ${origin}`
+          ? `Knowledge · ${myRefs.length || node.provenance.origin === 'ai' ? standingOf(node, myRefs) : origin}`
           : node.type === 'artifact'
             ? `Artifact · ${summarize(sanitizeComposition(c)).toLowerCase()}`
             : node.type === 'objective'
@@ -273,10 +287,16 @@ export function NodeCard({
       open={open}
       onToggle={onToggle}
       linked={linked}
+      badge={node.type !== 'conversation' ? <NodeSources nodeId={node.id} adding={addingSource} onAddingDone={() => setAddingSource(false)} /> : null}
       menu={
         <Menu label={`${typeLabel(node.type)} actions`}>
           {(close) => (
             <>
+              {node.type !== 'conversation' ? (
+                <button type="button" role="menuitem" onClick={() => (close(), setAddingSource(true))}>
+                  Add a source…
+                </button>
+              ) : null}
               {onAsk ? (
                 <button type="button" role="menuitem" onClick={() => (close(), setAsking(true))}>
                   Ask about this

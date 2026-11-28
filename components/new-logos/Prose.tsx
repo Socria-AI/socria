@@ -20,20 +20,41 @@ function tex(src: string, display: boolean): ReactNode {
   }
 }
 
+// a citation of a document passage ([A3.12]): a small, quiet marker — what it points at is shown by the source indicator
+const CITE = /\[([A-Z]\d{1,4}\.\d{1,5})\]/g;
+function withCites(text: string, key: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  let last = 0;
+  let i = 0;
+  for (const m of text.matchAll(CITE)) {
+    const at = m.index ?? 0;
+    if (at > last) out.push(text.slice(last, at));
+    out.push(
+      <sup key={`${key}-c${i++}`} className="nl-cite" title={`Passage ${m[1]} of an attached document`}>
+        {m[1]}
+      </sup>
+    );
+    last = at + m[0].length;
+  }
+  if (!out.length) return [text];
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
 function withMath(text: string, key: string): ReactNode[] {
   const out: ReactNode[] = [];
   let last = 0;
   let i = 0;
   for (const m of text.matchAll(MATH)) {
     const at = m.index ?? 0;
-    if (at > last) out.push(text.slice(last, at));
+    if (at > last) out.push(...withCites(text.slice(last, at), `${key}-t${i}`));
     const s = m[0];
     const display = s.startsWith('$$') || s.startsWith('\\[');
     const inner = s.startsWith('$$') ? s.slice(2, -2) : s.startsWith('\\[') || s.startsWith('\\(') ? s.slice(2, -2) : s.slice(1, -1);
     out.push(<Fragment key={`${key}-m${i++}`}>{tex(inner.trim(), display)}</Fragment>);
     last = at + s.length;
   }
-  if (last < text.length) out.push(text.slice(last));
+  if (last < text.length) out.push(...withCites(text.slice(last), `${key}-e`));
   return out;
 }
 

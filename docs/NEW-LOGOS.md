@@ -209,9 +209,9 @@ spatial canvas; none of its components or styling are reused.
   - It is saved as a relation, the same graph the rest of the app uses.
   - Lines are labelled in words and also differ by pattern, not only colour: solid for a relation, dashed for "asked
     about", dotted for "kept as".
-- **Making things where you are.** Double-click the empty plane, or press **Add**, to ask the assistant or to place a
-  question, knowledge, a decision, an artifact (begun from a primitive or a small model) or, on an objective, a
-  sub-objective at that point.
+- **Making things where you are.** Ask in the **omnibox** at the bottom centre, or double-click the empty plane to ask
+  from there. The omnibox's **+**, or the same double-click, places a question, knowledge, a decision, an artifact
+  (begun from a primitive or a small model) or, on an objective, a sub-objective.
 - **Asking in context.** Any object can be asked about:
   - The question goes to the existing chat endpoint with the object as "this". It uses the existing Point & Ask
     contract: the `focus` brief for the current turn, and `about` kept on the message.
@@ -416,6 +416,134 @@ Content written before compositions existed (a Markdown document) is read as one
 or needs migrating. It keeps up to 100,000 characters, as before, and its `{{…}}` stay as written rather than becoming
 live values.
 
+## Sources
+
+The fundamental rule: **sources belong to the workspace, references belong to components, and the canvas belongs to the
+person.** There is no Content tab, no content page and no source sidebar. A file stays in the library, out of the way,
+until the person places it on a canvas or mentions it in a question.
+
+### The record and its references (`lib/new-logos/sources.ts`, `source-ops.ts`)
+
+A **source** is one canonical record per file a person brought in. It holds the name (renameable), the kind, how well
+the file was read, and pointers into storage that already exists:
+
+- **The original.** It is kept privately under the account by its content hash, through the existing file storage
+  (`lib/preview/originals.ts` `keepOriginal`, bucket `socria-files`). Account deletion already empties that storage
+  and export already lists it.
+- **The reading.** This is the structured text the existing reader makes of a file (`lib/docs`: pages; blocks with ids
+  like `p3.12`; tables; checks), made by `readFileAsDoc` through `/api/files/read`. It is kept on the record, so it is
+  the same on every device. A reading too large to keep is trimmed visibly: the rest is marked unread.
+
+The rules:
+
+- **One record per file.** The same file brought in twice, matched by its reading or its original, is the same
+  source. If brought in from a new conversation, it also joins that conversation.
+- **References tie components to sources.** A reference connects a question, finding, decision, artifact or
+  objective to a source. It can point at one passage, quote its words, and record how the component stands on the
+  source: quoted (verbatim), derived, or an interpretation. It also records who made the tie: the person, or the
+  assistant citing the source. Many components can reference the same source; nothing is copied, and the same tie
+  twice is one reference.
+- **Removing a reference** never touches the source.
+- **Deleting a source** is its own confirmed act. It removes the record and its references. The original file is
+  released only if no conversation still shows it. Deleting a conversation, in turn, no longer releases an original
+  the library still holds (`releaseOriginals`).
+- **Reading status** comes from what the reader recorded: read, partly read (with the pages not read), scanned pages
+  not read yet, nothing could be read, or kept as an image.
+- **Existing uploads stay in view.** Documents already attached in conversations appear in the library under "In
+  your conversations" and can be added with their conversations kept.
+
+### The library (`components/new-logos/sources/Library.tsx`)
+
+The library is a compact button in the bottom-left corner. Pressing it opens a popover above the button. Opening it
+moves nothing: the canvas keeps its size, place and camera. It takes no part in panning or zooming, and closes on a
+click elsewhere or on Escape.
+
+In the library you can:
+
+- upload files, or drop them on it;
+- search by name, and filter to all, documents, images, in use or not in use;
+- see each file's reading status;
+- open a source in **focus**;
+- rename a source;
+- see what uses it: components, conversations and canvases, each a link;
+- drag it onto a canvas, or use **Place on canvas** where dragging is not available;
+- delete it, after a dialog that says exactly what is removed and what is kept.
+
+### On a canvas
+
+A source placed on a canvas is a **source reference component**: a layout item `s:<source id>` on that canvas, never
+a copy. Uploading never puts anything on a canvas by itself.
+
+- **Closed**, it shows the name, how well it was read and its opening words.
+- **Open**, it shows its outline. Each heading opens the source in focus at that heading.
+- **Connecting.** Drag its circle onto a component, or drop a source from the library straight onto a component, and
+  that component references the source. The line between them says "draws on".
+- **Take off this canvas** removes the placement only. The source stays in the library, and so does every reference
+  to it.
+
+### Indicators and focus
+
+**The indicator.** A component with sources shows a small page-and-number indicator in its head; one without sources
+shows nothing. Pressing it shows, for each reference:
+
+- the source, and the passage in the source's own words, with its page;
+- how the component stands on it, and who made the tie;
+- **Open at passage**;
+- a way to remove the reference, and to add another source ("Add a source…" in the component's menu too).
+
+An exchange shows the documents attached to its question and the passages its replies cite (`[A3.12]`), letter by
+letter as the chat endpoint counts them.
+
+**Provenance stays visible.** A finding kept from a reply keeps the passages that reply cited, as references marked
+as the assistant's interpretation. Its kicker says so: "AI interpretation of 1 source". That reads differently from
+"Quoted from a source", "Backed by a source", or "AI-generated, no source cited".
+
+**Focus** (`Viewer.tsx`) opens one source over everything, in two views:
+
+- **Original:** a PDF's pages through the existing page viewer (`components/preview/PdfView`), with the passage
+  marked where the reading boxed it; an image as itself.
+- **Reading:** the blocks that were read, with the passage highlighted and brought into view.
+
+The original is fetched from this device or the account's file storage. The existing preview window is not used,
+because its words name the product; its page viewer is reused with neutral styles.
+
+### The omnibox (`Omnibox.tsx`, `mentions.ts`, `ask.ts`)
+
+The omnibox floats at the bottom centre of conversation and objective canvases, and replaces the corner Add button.
+
+- **@ mentions.** Typing `@` searches the workspace: sources, artifacts, findings, questions, decisions, objectives
+  and conversations. Choosing one attaches it, shown as a removable mark ("@Business Plan ×").
+- **A mentioned source** becomes a document attachment on the person's message, exactly as the existing interface
+  attaches a document, so the other interface shows it too. For every turn, the passages of the conversation's
+  library documents that bear on the question are fetched (`passagesFor`: the outline and the main app's own BM25
+  retrieval, within a budget) and sent as the chat endpoint's existing `docs`. The endpoint letters, shows and cites
+  them. Whole documents are never injected.
+- **A mentioned component** brings a few lines of what it says in the existing focus brief. For an artifact, that is
+  its structured state.
+- **Files brought in through the omnibox** go to the library and are attached to the question. Nothing is put on the
+  canvas.
+- **The + button** opens the maker for questions, findings, decisions, artifacts and sub-objectives.
+
+### Storage and permissions
+
+Sources use two additive tables, in `supabase/schema.sql` and walled in `supabase/rls.sql`, both included in account
+deletion and export:
+
+- `nl_sources`: one row per file, unique per person by reading;
+- `nl_source_refs`: references, cascading from both sources and nodes.
+
+Every query is scoped to the owner. The routes:
+
+- `GET` and `POST /api/new-logos/sources`;
+- `GET`, `PATCH` and `DELETE /api/new-logos/sources/:id`;
+- `POST /api/new-logos/sources/passages`;
+- `POST /api/new-logos/sources/refs` and `DELETE /api/new-logos/sources/refs/:id`.
+
+Before the migration they answer `{ setup: false }`, and the library says sources are not set up yet.
+
+Scanned pages that still need reading are shown as such. Reading them with vision from the library, as the main app
+can, is not wired in yet.
+
 ## Server and storage
 
 The API routes:
@@ -426,6 +554,9 @@ The API routes:
 | `/api/new-logos/nodes/:id` | GET (with versions), PATCH (update, move, reorder, archive, restore, accept, reject, reopen, restore-version), DELETE |
 | `/api/new-logos/nodes/:id/ops` | POST (a batch of artifact operations, applied to what is stored) |
 | `/api/new-logos/media`, `/api/new-logos/media/:id` | POST (an image for a media primitive), GET (the owner's own image) |
+| `/api/new-logos/sources`, `/api/new-logos/sources/:id` | GET, POST (the library; a file's record); GET (with its reading), PATCH (rename), DELETE (for good: references too; the original only when nothing else shows it) |
+| `/api/new-logos/sources/passages` | POST (what a question draws from sources: outlines and passages, never whole documents) |
+| `/api/new-logos/sources/refs`, `/api/new-logos/sources/refs/:id` | POST (a component refers to a source), DELETE (one reference; the source stays) |
 | `/api/new-logos/relations` | POST |
 | `/api/new-logos/relations/:id` | DELETE |
 | `/api/new-logos/context` | GET |
@@ -461,7 +592,7 @@ The relaunch gate (`lib/takeover.ts`) treats `/new-logos` as part of the app. Th
   - layouts cleaned, placement that never overlaps or moves what is placed;
   - fitting and connectors;
   - an ask from an object meeting the existing Point & Ask contracts.
-- `test/new-logos-e2e.test.mjs` (78 checks), through the real routes (the new ones and the existing conversations
+- `test/new-logos-e2e.test.mjs` (92 checks), through the real routes (the new ones and the existing conversations
   route) with the fake database and fake accounts:
   - before the migration;
   - signed out;
@@ -472,7 +603,16 @@ The relaunch gate (`lib/takeover.ts`) treats `/new-logos` as part of the app. Th
   - canvas layouts: versioned, cleaned, owner-scoped, never touching a conversation;
   - artifact operations: applied to what is stored, concurrent batches both landing, retries skipped, malformed and
     oversized batches refused whole, owner-scoped, archived artifacts unchanged;
-  - the picture routes refusing the signed-out, bad ids, and anything that is not an image whatever it claims.
+  - the picture routes refusing the signed-out, bad ids, and anything that is not an image whatever it claims;
+  - sources: one record per file, references that never copy it, passages rather than documents for a question,
+    deletion that takes references and nothing else, owner-scoped, and `{ setup: false }` before the migration.
+- `test/new-logos-sources.test.mjs` (35 checks), sources:
+  - the record, reading status and visible trimming of large readings;
+  - one record per file and conversation joins;
+  - references and their isolation;
+  - what a question draws: outline and relevant passages, as a reading the chat endpoint accepts;
+  - deletion;
+  - documents already in conversations, uses, citations, mentions, and a component's standing.
 - `test/new-logos-primitives.test.mjs` (110 checks), primitives and artifacts:
   - the expression language: precedence, implicit multiplication, errors in words, no way to reach anything but
     numbers;

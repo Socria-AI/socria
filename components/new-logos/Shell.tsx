@@ -1,13 +1,17 @@
 'use client';
 // components/new-logos/Shell.tsx — the frame around every signed-in New Logos page: a thin top bar (home, all
-// conversations, archive, the account), the shared state, and one place for passing notices. No sidebar: the nested
-// matrix is the navigation.
+// conversations, archive, the account), the shared state, one place for passing notices, the source library (a small
+// button in the bottom-left corner that opens over whatever is there) and the focus viewer. No sidebar and no content
+// page: the nested matrix is the navigation, and sources stay out of the way until asked for.
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useClerk, useUser } from '@clerk/nextjs';
 import type { ReactNode } from 'react';
 import { NLProvider, useNL } from './state';
+import { SourcesProvider } from './sources/state';
+import { SourceLibrary } from './sources/Library';
+import { SourceViewer } from './sources/Viewer';
 import { Glyph } from './ui';
 
 function Account() {
@@ -65,6 +69,8 @@ function Frame({ children }: { children: ReactNode }) {
         </div>
       ) : null}
       {children}
+      <SourceLibrary />
+      <SourceViewer />
       <div aria-live="polite" className={notice ? '' : 'nl-sr'}>
         {notice ? (
           <div className="nl-toast" role="status">
@@ -82,7 +88,9 @@ function Frame({ children }: { children: ReactNode }) {
 export function Shell({ children }: { children: ReactNode }) {
   return (
     <NLProvider>
-      <Frame>{children}</Frame>
+      <SourcesProvider>
+        <Frame>{children}</Frame>
+      </SourcesProvider>
     </NLProvider>
   );
 }

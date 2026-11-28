@@ -92,11 +92,15 @@ const OWNED_TABLES = [
   // New Logos (/new-logos; docs/NEW-LOGOS.md): their nodes, the relations between them and the nodes' kept versions.
   // Relations and versions first; the nodes in one statement (containment is checked at the end of it, so a whole
   // tree goes at once). Their conversations are deleted above, with the conversations table.
+  // Components' references to sources go first (they point at both nodes and sources).
+  'nl_source_refs',
   'nl_relations',
   'nl_node_versions',
   'nl_nodes',
-  // …and where things sit on their workspace canvases (presentation only)
+  // …where things sit on their workspace canvases (presentation only)
   'nl_canvases',
+  // …and their source records (the originals' bytes are removed with the account's file storage, purgeOriginals)
+  'nl_sources',
 ] as const;
 
 /**
@@ -107,6 +111,8 @@ const OWNED_TABLES = [
  * missing table is forgiven; any other error still stops the deletion.
  */
 const LATE_TABLES = new Set<string>([
+  'nl_source_refs',
+  'nl_sources',
   'nl_relations',
   'nl_node_versions',
   'nl_nodes',
