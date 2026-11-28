@@ -33,23 +33,37 @@ export function scopeFragment(html: string, assets: ReadonlyMap<string, string>)
 
 export const TRANSPARENT = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
+const GENERIC_HEAD = /^(serif|sans-serif|monospace|cursive|fantasy|system-ui|ui-[\w-]+|emoji|math|inherit|initial|unset|revert|var\()/i;
+
 /**
- * The faces an artboard asks for first (the head of each font-family list, and of each custom property carrying a
- * face) that the library cannot serve: they are drawn in a fallback, so the design is not what was written. Said to the
- * look (lib/ux-v0/design/flow.ts) with what was measured.
+ * The faces an artboard asks for first: the head of each font-family list (in rules, attributes and the font
+ * shorthand) and of each custom property carrying a face — in the library's spelling when it is a library face.
+ * These are the faces the design is really set in (the names after them are fallbacks).
  */
-export function unservedFaces(a: Pick<DesignArtboard, 'html'>, tokens: string): string[] {
+export function faceHeads(a: Pick<DesignArtboard, 'html'>, tokens: string): string[] {
   const out = new Set<string>();
   const head = (list: string) => {
     const first = list.split(',').map((x) => x.trim().replace(/&quot;|&#39;|&apos;/g, '"').replace(/^['"]|['"]$/g, '').replace(/\s*!important$/, '').trim()).find(Boolean) ?? '';
-    if (first && !/^(serif|sans-serif|monospace|cursive|fantasy|system-ui|ui-[\w-]+|emoji|math|inherit|initial|unset|revert|var\()/i.test(first) && !graphicFont(first)) out.add(first.slice(0, 60));
+    if (first && !GENERIC_HEAD.test(first)) out.add((graphicFont(first)?.name ?? first).slice(0, 60));
   };
   for (const css of [a.html, tokens]) {
     for (const m of css.matchAll(/font-family\s*:\s*((?:[^;}"]|"[^"]*")+)/gi)) head(m[1]);
     for (const m of css.matchAll(/font-family\s*=\s*(?:"([^"]*)"|'([^']*)')/gi)) head(m[1] ?? m[2] ?? '');
+    for (const m of css.matchAll(/font\s*:[^;}]*?(?:\d+(?:px|pt|em|rem|%)\S*)\s+([^;}]+)/gi)) head(m[1]);
     for (const m of css.matchAll(/(--[\w-]*(?:font|family|face)[\w-]*)\s*:\s*([^;}]+)/gi)) head(m[2]);
   }
-  return [...out].slice(0, 8);
+  return [...out];
+}
+
+/**
+ * Of those, the ones the library cannot serve (and no imported face provides): they are drawn in a fallback, so the
+ * design is not what was written. Said to the look (lib/ux-v0/design/flow.ts) with what was measured.
+ */
+export function unservedFaces(a: Pick<DesignArtboard, 'html'>, tokens: string, own: readonly string[] = []): string[] {
+  const mine = new Set(own.map((x) => x.toLowerCase()));
+  return faceHeads(a, tokens)
+    .filter((f) => !graphicFont(f) && !mine.has(f.toLowerCase()))
+    .slice(0, 8);
 }
 
 /** The faces an artboard uses that the library can serve, and the stylesheet that serves them. */

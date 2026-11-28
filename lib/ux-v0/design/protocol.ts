@@ -12,6 +12,9 @@
 //   <remember>a decision that should hold from now on</remember>
 //   <question>What to ask<option>One</option><option>Another</option></question>
 //   <ok/>                                                                    (a look that found nothing to fix)
+//   <lock artboard="ab123" element="e12">the headline</lock>                  (the person said to keep it as it is)
+//   <keep what="typography" artboard="ab123"/>   <keep what="colours" artboard="ab123"/>
+//   <finding kind="communication" artboard="ab123" element="e12">what is happening<fix>what would address it</fix></finding>
 //
 // The parser reads the whole text so far every time it is called: while the answer streams, an artboard that is still
 // being written comes back as `open`, with what it has so far, so the canvas can draw it as it grows. Nothing here
@@ -26,6 +29,8 @@ export interface ArtboardBlock {
   height: number | null;
   group: string | null;
   beside: string | null;
+  /** it moves: the length of its animation in seconds (seconds="6") */
+  seconds: number | null;
   html: string;
   /** still being written */
   open: boolean;
@@ -42,7 +47,10 @@ export type Block =
   | { kind: 'remove'; artboard: string }
   | { kind: 'tokens'; css: string; open: boolean }
   | { kind: 'remember'; text: string }
-  | { kind: 'question'; text: string; options: string[] };
+  | { kind: 'question'; text: string; options: string[] }
+  | { kind: 'lock'; artboard: string; element: string; what: string }
+  | { kind: 'keep'; what: 'faces' | 'colours'; artboard: string }
+  | { kind: 'finding'; type: string; artboard: string; element: string | null; text: string; fix: string };
 
 export interface Answer {
   say: string;
@@ -53,7 +61,7 @@ export interface Answer {
   open: boolean;
 }
 
-const TAGS = ['say', 'artboard', 'edit', 'remove', 'tokens', 'remember', 'question', 'ok'] as const;
+const TAGS = ['say', 'artboard', 'edit', 'remove', 'tokens', 'remember', 'question', 'ok', 'lock', 'keep', 'finding'] as const;
 type Tag = (typeof TAGS)[number];
 const OPEN_RE = new RegExp(`<(${TAGS.join('|')})\\b([^>]*?)(/?)>`, 'gi');
 
@@ -112,6 +120,13 @@ export function parseAnswer(raw: string): Answer {
       at = !selfClosing && close >= 0 && close - start < 40 ? close + 9 : start;
       continue;
     }
+    if (tag === 'keep') {
+      const what = /typ|font|face|letter/i.test(a.what ?? '') ? 'faces' : /colou?r|palette/i.test(a.what ?? '') ? 'colours' : null;
+      if (what && a.artboard) blocks.push({ kind: 'keep', what, artboard: a.artboard });
+      const close = src.indexOf('</keep>', start);
+      at = !selfClosing && close >= 0 && close - start < 40 ? close + 7 : start;
+      continue;
+    }
     if (selfClosing) {
       at = start;
       continue;
@@ -135,6 +150,7 @@ export function parseAnswer(raw: string): Answer {
           height: int(a.height),
           group: a.group || null,
           beside: a.beside || null,
+          seconds: a.seconds && Number.isFinite(parseFloat(a.seconds)) && parseFloat(a.seconds) >= 0.5 ? Math.min(60, parseFloat(a.seconds)) : null,
           html: inner.trim(),
           open: !closed,
         });
@@ -150,6 +166,16 @@ export function parseAnswer(raw: string): Answer {
       case 'remember':
         if (closed && text(inner)) blocks.push({ kind: 'remember', text: text(inner).slice(0, 300) });
         break;
+      case 'lock':
+        if (closed && a.artboard && /^e\d{1,6}$/.test(a.element ?? '')) blocks.push({ kind: 'lock', artboard: a.artboard, element: a.element, what: text(inner).slice(0, 120) || 'an element' });
+        break;
+      case 'finding': {
+        if (!closed) break;
+        const fix = text(inner.match(/<fix>([\s\S]*?)<\/fix>/i)?.[1] ?? '').slice(0, 500);
+        const said = text(inner.replace(/<fix>[\s\S]*?<\/fix>/gi, '')).slice(0, 700);
+        if (said) blocks.push({ kind: 'finding', type: (a.kind ?? '').toLowerCase(), artboard: a.artboard ?? '', element: /^e\d{1,6}$/.test(a.element ?? '') ? a.element : null, text: said, fix });
+        break;
+      }
       case 'question': {
         if (!closed) break;
         const options = [...inner.matchAll(/<option>([\s\S]*?)<\/option>/gi)].map((x) => text(x[1]).slice(0, 120)).filter(Boolean).slice(0, 6);
@@ -162,6 +188,6 @@ export function parseAnswer(raw: string): Answer {
     at = close + closeTag.length;
   }
   // an answer with no tags at all is something said
-  if (!blocks.length && !say && !ok && src.trim() && !/<(artboard|edit|say)\b/i.test(src)) say = text(src).slice(0, 2000);
+  if (!blocks.length && !say && !ok && src.trim() && !/<(artboard|edit|say|finding)\b/i.test(src)) say = text(src).slice(0, 2000);
   return { say: say.slice(0, 4000), blocks, ok, open };
 }

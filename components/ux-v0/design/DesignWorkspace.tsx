@@ -12,7 +12,7 @@ import { putProject } from '@/lib/ux-v0/store';
 import { makeNonce } from '@/lib/ux-v0/sandbox';
 import { getSystem } from '@/lib/ux-v0/dsi/store';
 import type { DesignProject } from '@/lib/ux-v0/types';
-import { amend, artboardOf, canRedo, canUndo, commit, emptyState, moveTo, newId, placeNew, type DesignArtboard, type DesignAsset, type DesignDoc, type DesignState } from '@/lib/ux-v0/design/doc';
+import { amend, artboardOf, canRedo, canUndo, commit, emptyState, moveTo, newId, placeNew, redoTarget, undoTarget, type DesignArtboard, type DesignAsset, type DesignDoc, type DesignState } from '@/lib/ux-v0/design/doc';
 import { applyHandEdit, labelOf, type HandEdit } from '@/lib/ux-v0/design/elements';
 import { runRequest } from '@/lib/ux-v0/design/flow';
 import { firstRequest } from '@/lib/ux-v0/design/start';
@@ -215,8 +215,9 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
     [pick, update]
   );
 
-  const undo = useCallback(() => update((x) => (canUndo(x) ? moveTo(x, x.at - 1) : x)), [update]);
-  const redo = useCallback(() => update((x) => (canRedo(x) ? moveTo(x, x.at + 1) : x)), [update]);
+  // undo: the version this one was made from; redo: the newest made from this one (a branch is never lost)
+  const undo = useCallback(() => update((x) => (canUndo(x) ? moveTo(x, undoTarget(x)) : x)), [update]);
+  const redo = useCallback(() => update((x) => (canRedo(x) ? moveTo(x, redoTarget(x)) : x)), [update]);
 
   const onFrame = useCallback(
     (e: FrameEvent) => {

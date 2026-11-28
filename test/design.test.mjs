@@ -10,7 +10,7 @@ import { JSDOM } from 'jsdom';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const T = await import(pathToFileURL(join(here, '.tmp', 'design-under-test.mjs')).href);
-const { protocol: P, apply: A, elements: E, doc: D, formats: F, prompts: PR, frame: FR, flow: FL, start: ST } = T;
+const { protocol: P, apply: A, elements: E, doc: D, formats: F, prompts: PR, frame: FR, flow: FL, start: ST, locks: LK, pins: PN, history: HI, request: RQ } = T;
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, typeof x === 'string' ? x.slice(0, 600) : JSON.stringify(x).slice(0, 600))));
@@ -135,11 +135,23 @@ sec('a design project, kept');
   s = D.moveTo(s, 0);
   ok('undo shows the version before', s.doc.artboards[0].html.includes('>1<') && D.canRedo(s));
   s = D.commit(s, d3, 'third', 'person', NOW + 2);
-  ok('a change after an undo replaces what could have been redone', s.versions.length === 2 && s.versions[1].said === 'third' && !D.canRedo(s));
+  ok('a change after going back branches: nothing is let go, the new version is made from the one shown', s.versions.length === 3 && s.versions[1].said === 'second' && s.versions[2].said === 'third' && s.versions[2].from === 0 && s.at === 2 && !D.canRedo(s));
+  ok('…undo goes to the version it was made from (not merely the one before it in time)', D.undoTarget(s) === 0);
+  const atFirst = D.moveTo(s, 0);
+  ok('…and from there, redo goes to the newest branch', D.redoTarget(atFirst) === 2 && D.canRedo(atFirst));
   s = D.amend(s, d2, NOW + 3);
-  ok('a quick run of edits by hand is one version', s.versions.length === 2 && s.doc === d2);
+  ok('a quick run of edits by hand is one version', s.versions.length === 3 && s.doc === d2);
+  const onOld = D.amend(D.moveTo(s, 1), d3, NOW + 4);
+  ok('…but an edit to an older version (one with later work) becomes a new version, never a rewrite of history', onOld.versions.length === 4 && onOld.versions[1].doc === d2 && onOld.versions[3].from === 1);
+  let big = D.keepVersion(D.commit(D.emptyState('poster', 'a3', ''), d1, 'approved one', 'person', NOW), 0, 'Approved: A');
+  for (let i = 0; i < D.MAX_VERSIONS + 5; i++) big = D.commit(big, i % 2 ? d2 : d3, `v${i}`, 'person', NOW + i + 1);
+  ok('the history is held to its length, but a kept (approved) version is never trimmed, and branches stay linked', big.versions.length === D.MAX_VERSIONS && big.versions[0].kept === 'Approved: A' && big.versions.every((v, i) => v.from === undefined || (v.from >= 0 && v.from < i)), big.versions.slice(0, 3).map((v) => [v.said, v.from, v.kept]));
+  const legacy = D.normalizeDesignState({ doc: d2, versions: [{ at: 1, said: 'a', by: 'model', doc: d1 }, { at: 2, said: 'b', by: 'person', doc: d2 }], at: 1 });
+  ok('an older history (written before branches) reads as a line: each made from the one before', legacy.versions[1].from === 0 && legacy.versions[0].from === undefined && D.canUndo(legacy));
+  const stated = D.normalizeArtboard({ ...d1.artboards[0], state: 'approved', locked: true, locks: [{ id: 'e1', what: 'the headline', at: 5 }, { id: 'nope', what: 'x' }, { id: 'e1', what: 'twice' }] });
+  ok('an artboard keeps its state, its lock and its element locks (held to shape: real ids, once each)', stated.state === 'approved' && stated.locked === true && stated.locks.length === 1 && stated.locks[0].what === 'the headline', stated);
   const back = D.normalizeDesignState(JSON.parse(JSON.stringify({ ...s, assets: [{ id: 'img1', name: 'p', src: 'javascript:alert(1)', width: 10, height: 10 }, { id: 'img2', name: 'q', src: 'upload:abc', width: 10, height: 10 }], doc: { ...s.doc, artboards: [...s.doc.artboards, { id: 'bad', width: 0, height: 0 }] } })));
-  ok('read back: a picture that is not an upload or an image is dropped; an artboard with no size is dropped', back.assets.length === 1 && back.assets[0].id === 'img2' && back.doc.artboards.length === 1 && back.versions.length === 2);
+  ok('read back: a picture that is not an upload or an image is dropped; an artboard with no size is dropped', back.assets.length === 1 && back.assets[0].id === 'img2' && back.doc.artboards.length === 1 && back.versions.length === 3 && back.versions[2].from === 0);
   const p = T.normalizeProject(JSON.parse(JSON.stringify({ ...T.makeProject('create', 'x', NOW), medium: 'design', design: s })));
   ok('a design project survives the project store’s normaliser, and is summarised as a design', p.medium === 'design' && p.design.doc.artboards.length === 1 && T.summarize(p).stage === 'design' && T.summarize(p).graphic === 'poster');
 }
@@ -274,6 +286,132 @@ sec('a broad change made by edits is looked at; an exact one is not');
   modes.length = 0;
   await FL.runRequest(made.state, { words: 'Make the headline slightly smaller' }, t('font-size:140px'), bench, { parse, now: NOW + 2 });
   ok('an exact change to something named: not looked at', modes.join() === 'write', modes);
+}
+
+
+sec('the person’s authority: locks, kept typography and colour, approvals');
+{
+  const HTML = `<style>.sx-root{background:var(--paper);font-family:'Fraunces',serif;color:var(--ink)} .wrap{opacity:1} .h{font-size:160px;line-height:.9} .sub{font-size:20px;color:#c8401c}</style><div class="wrap" data-sx="e1"><h1 class="h" data-sx="e2">Rooms for Living</h1><p class="sub" data-sx="e3">Six evenings</p></div>`;
+  const TOK = ':root{--paper:#f4efe4;--ink:#141414;--other:#00ff00}';
+  const ab = (o = {}) => ({ id: 'ab1', name: 'Poster', format: 'a3', width: 1123, height: 1587, medium: 'print', html: HTML, x: 0, y: 0, ...o });
+  const doc = (o = {}) => ({ artboards: [ab(o)], tokens: TOK });
+  const ans = (raw) => P.parseAnswer(raw);
+  const apply = (d, raw) => A.applyAnswer(d, ans(raw), { parse, format: 'a3' });
+  const edit = (find, replace) => `<edit artboard="ab1"><find>${find}</find><replace>${replace}</replace></edit>`;
+  const lockedH = { locks: [{ id: 'e2', what: 'the headline', at: 1 }] };
+
+  let r = apply(doc(lockedH), edit('.sub{font-size:20px', '.sub{font-size:28px'));
+  ok('with the headline locked, something else on the artboard still changes', r.touched.length === 1 && !r.failed.length && /font-size:28px/.test(r.doc.artboards[0].html));
+  r = apply(doc(lockedH), edit('.h{font-size:160px', '.h{font-size:120px'));
+  ok('a change to the locked headline’s own style is refused, and said', !r.touched.length && r.failed.length === 1 && /the headline/.test(r.failed[0]) && /locked/.test(r.failed[0]), r.failed);
+  r = apply(doc(lockedH), edit('Rooms for Living', 'Rooms to Live In'));
+  ok('…so is a change to its words', !r.touched.length && /the headline/.test(r.failed[0] ?? ''));
+  r = apply(doc(lockedH), edit("font-family:'Fraunces',serif", "font-family:'Anton',sans-serif"));
+  ok('…and a change to a style it inherits (the root’s face): its typography is part of it', !r.touched.length && /the headline/.test(r.failed[0] ?? ''), r.failed);
+  r = apply(doc(lockedH), edit('.wrap{opacity:1}', '.wrap{opacity:.4}'));
+  ok('…and to what its container does to everything inside it (opacity)', !r.touched.length && /the headline/.test(r.failed[0] ?? ''));
+  r = apply(doc(lockedH), `${edit('.sub{font-size:20px', '.sub{font-size:28px')}${edit('.h{font-size:160px', '.h{font-size:90px')}`);
+  ok('of several changes, those that respect the lock are made and the one that breaks it is not', r.touched.length === 1 && r.failed.length === 1 && /font-size:28px/.test(r.doc.artboards[0].html) && /font-size:160px/.test(r.doc.artboards[0].html));
+  const REWRITE_OK = `<artboard id="ab1"><style>.sx-root{background:#101010;font-family:'Fraunces',serif;color:var(--ink)} .wrap{opacity:1} .h{font-size:160px;line-height:.9} .band{height:40px;background:#c8401c}</style><div class="band" data-sx="e9"></div><div class="wrap" data-sx="e1"><h1 class="h" data-sx="e2">Rooms for Living</h1></div></artboard>`;
+  r = apply(doc(lockedH), REWRITE_OK);
+  ok('a whole rewrite that keeps the locked element exactly (its markup and every style reaching it) is made', r.touched.length === 1 && !r.failed.length && /band/.test(r.doc.artboards[0].html) && r.doc.artboards[0].locks.length === 1, r.failed);
+  r = apply(doc(lockedH), REWRITE_OK.replace('font-size:160px', 'font-size:200px'));
+  ok('a whole rewrite that changes it is refused whole', !r.touched.length && /not rewritten/.test(r.failed[0] ?? '') && /the headline/.test(r.failed[0] ?? ''));
+  r = apply(doc(lockedH), `<tokens>:root{--paper:#f4efe4;--ink:#aa0000;--other:#00ff00}</tokens>`);
+  ok('shared styles that would recolour the locked headline (through var) are kept as they were, and said', !r.tokensChanged && r.doc.tokens === TOK && /shared styles were not changed/.test(r.failed[0] ?? '') && /the headline/.test(r.failed[0] ?? ''), r.failed);
+  r = apply(doc(lockedH), `<tokens>:root{--paper:#f4efe4;--ink:#141414;--other:#0000ff}</tokens>`);
+  ok('…shared styles that do not reach it change freely', r.tokensChanged && !r.failed.length);
+
+  const whole = { locked: true, state: 'approved' };
+  r = apply(doc(whole), edit('.sub{font-size:20px', '.sub{font-size:28px'));
+  ok('an approved, locked artboard: nothing on it changes', !r.touched.length && /locked \(approved\)/.test(r.failed[0] ?? ''), r.failed);
+  r = apply(doc(whole), `<artboard id="ab1"><p>new</p></artboard>`);
+  ok('…it is not rewritten', !r.touched.length && /not rewritten/.test(r.failed[0] ?? ''));
+  r = apply(doc(whole), `<remove artboard="ab1"/>`);
+  ok('…nor removed', !r.removed.length && /not removed/.test(r.failed[0] ?? ''));
+  r = apply(doc(whole), `<tokens>:root{--paper:#000000;--ink:#141414;--other:#00ff00}</tokens>`);
+  ok('…nor changed from under it by the shared styles', !r.tokensChanged && /“Poster”/.test(r.failed[0] ?? ''));
+  r = apply(doc(whole), `<artboard id="new-1" format="a3" beside="ab1"><style>.sx-root{background:#000}</style><h1>Another take</h1></artboard><tokens>:root{--paper:#f4efe4;--ink:#141414;--other:#123456}</tokens>`);
+  ok('…while another take beside it is made freely, with shared styles it does not use', r.made.length === 1 && r.tokensChanged && !r.failed.length, r.failed);
+
+  r = apply(doc(), `<say>Kept.</say><lock artboard="ab1" element="e2">the headline</lock><lock artboard="ab1" element="e77">a ghost</lock><keep what="typography" artboard="ab1"/><keep what="colours" artboard="ab1"/>`);
+  ok('the designer records a lock the person asked for — only on an element that is there', r.locked.length === 1 && r.doc.artboards[0].locks[0].what === 'the headline' && /not there/.test(r.failed[0] ?? '') && r.keep.length === 2, r);
+  ok('what is kept is read from the artboard: its faces, and its colours (those written and those reaching it by var)', PN.facesUsed(ab(), TOK).join() === 'Fraunces' && ['#f4efe4', '#141414', '#c8401c'].every((c) => PN.coloursUsed(ab(), TOK).includes(c)) && !PN.coloursUsed(ab(), TOK).includes('#00ff00'), PN.coloursUsed(ab(), TOK));
+  ok('a tint or shade of a kept colour is that colour; a neutral beside a kept neutral is kept; another hue is not', PN.colourKept('#e8a48f', ['#c8401c']) && PN.colourKept('#2a2a2a', ['#141414']) && !PN.colourKept('#2f6bff', ['#c8401c', '#141414', '#f4efe4']));
+  const pinsKept = { faces: ['Fraunces'], colours: ['#f4efe4', '#141414', '#c8401c'] };
+  ok('an artboard set in another face, or in another colour, is said against what was kept', PN.pinNotes({ html: `<style>h1{font-family:"Anton",sans-serif;color:#2f6bff}</style><h1>x</h1>` }, '', pinsKept).length === 2 && PN.pinNotes(ab(), TOK, pinsKept).length === 0, PN.pinNotes({ html: `<style>h1{font-family:"Anton",sans-serif;color:#2f6bff}</style><h1>x</h1>` }, '', pinsKept));
+
+  // through a whole request
+  const said = [];
+  const transport = (answers) => ({ async send(body) { said.push(body); return { ok: true, text: answers[said.length - 1] ?? '<ok/>', model: 'fake', usage: null }; } });
+  const bench = { picture: async () => 'data:image/jpeg;base64,AAAA', measure: async () => ({}) };
+  let st = D.commit(D.emptyState('poster', 'a3', 'A lecture poster'), doc(), 'first', 'model', NOW);
+  said.length = 0;
+  let out = await FL.runRequest(st, { words: 'The headline works. Do not change it.' }, transport(['<say>Locked the headline.</say><lock artboard="ab1" element="e2">the headline</lock>']), bench, { parse, now: NOW + 5 });
+  ok('“the headline works, do not change it”: locked, with no new version (a note on the design, not a change to it)', out.kind === 'done' && out.state.versions.length === 1 && out.state.doc.artboards[0].locks?.[0]?.id === 'e2' && out.state.versions[0].doc.artboards[0].locks?.length === 1 && out.turn.text === 'Locked the headline.', out.kind === 'done' ? out.turn : out);
+  st = out.state;
+  said.length = 0;
+  out = await FL.runRequest(st, { words: 'I love this typography. Keep it while exploring a completely different composition.' }, transport([`<say>Two new compositions, same type.</say><keep what="typography" artboard="ab1"/><artboard id="new-1" format="a3" beside="ab1"><style>.sx-root{background:#141414;font-family:'Fraunces',serif;color:#f4efe4}</style><h1>Rooms</h1></artboard><artboard id="new-2" format="a3" beside="ab1"><style>.sx-root{background:#f4efe4;font-family:"Anton",sans-serif}</style><h1>Rooms</h1></artboard>`, '<say>Fine.</say><ok/>']), bench, { parse, now: NOW + 10 });
+  ok('“keep this typography, explore other compositions”: the faces are kept for the project', out.kind === 'done' && out.state.memory.pins?.faces?.join() === 'Fraunces', out.kind === 'done' ? out.state.memory : out);
+  ok('…the look is told which new artboard left them, and what is still off afterwards is said to the person (never hidden)', said[1]?.mode === 'look' && Object.values(said[1].measured ?? {}).flat().some((x) => /Anton/.test(x) && /said to keep/.test(x)) && out.turn.failed?.some((x) => /Anton/.test(x) && /typefaces/.test(x)), out.kind === 'done' ? out.turn.failed : out);
+  const told = RQ.readDesignRequest({ words: 'Try a third', doc: out.state.doc, kind: 'poster', format: 'a3', memory: out.state.memory, turns: [], comments: [] }, () => null);
+  ok('…and every later request says what is kept and what is locked', told.ok && /Typefaces the person said to keep — use only these: Fraunces/.test(told.user) && /Locked on ab1[^\n]*\[data-sx="e2"\] the headline/.test(told.user), told.ok ? told.user.slice(0, 1500) : told);
+
+  // approval
+  let ap = D.approveArtboard(st, 'ab1', NOW + 20);
+  ok('approving an artboard: marked approved, locked whole, and its version kept for good', ap.doc.artboards[0].state === 'approved' && ap.doc.artboards[0].locked === true && ap.versions[ap.at].kept === 'Approved: Poster' && ap.versions.length === st.versions.length + 1);
+  said.length = 0;
+  out = await FL.runRequest(ap, { words: 'Make the headline red' }, transport([edit('.h{font-size:160px', '.h{color:red;font-size:160px')]), bench, { parse, now: NOW + 30 });
+  ok('…a request to change it afterwards changes nothing, and says why', out.kind === 'done' && out.state.versions.length === ap.versions.length && /Nothing on the design changed/.test(out.turn.text) && /locked \(approved\)/.test(out.turn.failed?.[0] ?? ''), out.kind === 'done' ? out.turn : out);
+  const reopened = D.reopenArtboard(ap, 'ab1');
+  ok('…until the person reopens it (revision requested): then it can change, and the approved version is still in the history', reopened.doc.artboards[0].state === 'revision' && !reopened.doc.artboards[0].locked && reopened.versions.some((v) => v.kept === 'Approved: Poster'));
+  const changedLater = D.commit(reopened, { ...reopened.doc, artboards: [{ ...reopened.doc.artboards[0], html: '<p data-sx="e1">later</p>' }] }, 'later', 'person', NOW + 40);
+  const keptAt = changedLater.versions.findIndex((v) => v.kept);
+  const restored = D.restoreArtboard(changedLater, keptAt, 'ab1', NOW + 50);
+  ok('an artboard is brought back from an earlier version as a new version (nothing is overwritten)', /Rooms for Living/.test(restored.doc.artboards[0].html) && restored.versions.length === changedLater.versions.length + 1 && /Brought back “Poster” from version/.test(restored.versions.at(-1).said));
+
+  // earlier versions in a request
+  let hv = D.commit(D.emptyState('poster', 'a3', ''), doc({ html: '<style>.sx-root{background:#111}</style><h1 data-sx="e1">One</h1>' }), 'first', 'model', NOW);
+  hv = D.commit(hv, doc({ html: '<style>.sx-root{background:#eee}</style><h1 data-sx="e1">Two</h1>' }), 'second', 'model', NOW + 1);
+  hv = D.commit(hv, doc({ html: '<style>.sx-root{background:#c00}</style><h1 data-sx="e1">Three</h1>' }), 'third', 'model', NOW + 2);
+  ok('the versions the words point at: by number, by order, “before”, “the original”', HI.versionsNamed('take the background from the first version and the typography from version 2', hv).join() === '1,0' && HI.versionsNamed('go back to the colours from before', hv).join() === '1,0' && HI.versionsNamed('the original was better', hv).join() === '0' && HI.versionsNamed('make it bigger', hv).length === 0, HI.versionsNamed('take the background from the first version and the typography from version 2', hv));
+  said.length = 0;
+  await FL.runRequest(hv, { words: 'Take the background from the first version.', noLook: true }, transport(['<say>Done.</say>']), bench, { parse, now: NOW + 9 });
+  const sent = RQ.readDesignRequest(said[0], () => null);
+  ok('…are sent with the request, as they were, and shown to the designer', said[0].earlier?.[0]?.n === 1 && /background:#111/.test(said[0].earlier[0].artboards[0].html) && sent.ok && /## Earlier versions/.test(sent.user) && /<was artboard="ab1" version="1">/.test(sent.user), sent.ok ? sent.user.slice(0, 600) : sent);
+  const cmp = HI.compareVersions(hv.versions[0].doc, hv.versions[2].doc);
+  ok('two versions compared, artboard by artboard', cmp.artboards[0].change === 'changed' && cmp.artboards[0].elements.changed + cmp.artboards[0].elements.same === 1 && !cmp.tokensChanged, cmp);
+}
+
+sec('a review: findings to act on or set aside');
+{
+  const HTML = `<style>.h{font-size:120px}</style><h1 class="h" data-sx="e1">Open House</h1><p data-sx="e2">Friday 18 September</p>`;
+  const d = { artboards: [{ id: 'ab1', name: 'Poster', format: 'a3', width: 1123, height: 1587, medium: 'print', html: HTML, x: 0, y: 0 }], tokens: '' };
+  const st = D.commit(D.emptyState('poster', 'a3', 'An open house'), d, 'first', 'model', NOW);
+  const said = [];
+  const RAW = `<say>It reads as an invitation, but the date is easy to miss.</say>
+<finding kind="communication" artboard="ab1" element="e2">The date sits at the same size as the address line, so nothing tells a passer-by when to come.<fix>Make the date the second-largest thing on the sheet.</fix></finding>
+<finding kind="accessibility" artboard="ab1" element="e9">Grey on cream at 3.1:1.<fix>Darken the grey.</fix></finding>
+<finding kind="opinion" artboard="zzz">About nothing shown.</finding>
+<edit artboard="ab1"><find>Open House</find><replace>Changed</replace></edit>`;
+  const t = { async send(body) { said.push(body); return { ok: true, text: RAW, model: 'fake', usage: { cost: 0.02 } }; } };
+  const bench = { picture: async () => 'data:image/jpeg;base64,AAAA', measure: async () => ({ ab1: ['“Friday 18 September” is cut off'] }) };
+  const r = await FL.runReview(st, { words: 'Does this tell people when to come?', artboards: ['ab1'], facts: { ab1: ['text at 3.1:1 against its ground'] } }, t, bench, { now: NOW + 5 });
+  ok('a review is asked with the pictures and what was measured, and changes nothing', r.kind === 'done' && said[0].mode === 'review' && said[0].pictures.length === 1 && said[0].measured.ab1.length === 2 && r.state.doc === st.doc && r.state.versions.length === 1, r.kind === 'done' ? said[0].measured : r);
+  ok('its findings are kept on the turn, by kind, each about something that is there (an element that is not there is not pointed at; a kind it invented is a matter of judgement)', r.kind === 'done' && r.findings.length === 3 && r.findings[0].kind === 'communication' && r.findings[0].element === 'e2' && r.findings[0].fix.startsWith('Make the date') && r.findings[1].kind === 'accessibility' && r.findings[1].element === null && r.findings[2].kind === 'opportunity' && r.findings.every((f) => f.status === 'open' && f.artboard === 'ab1'), r.kind === 'done' ? r.findings : r);
+  const two = { ...st, doc: { ...st.doc, artboards: [...st.doc.artboards, { ...st.doc.artboards[0], id: 'ab2', name: 'Second' }] } };
+  const r2 = await FL.runReview(two, { words: '', artboards: ['ab1', 'ab2'] }, t, bench, { now: NOW + 6 });
+  ok('…with several artboards shown, a finding about one that was not shown is left out', r2.kind === 'done' && r2.findings.length === 2 && said.at(-1).words === 'Review this design.', r2.kind === 'done' ? r2.findings.length : r2);
+  const marked = FL.markFinding(r.state, r.findings[0].id, 'applied');
+  ok('a finding is applied or set aside one at a time', marked.turns.at(-1).findings[0].status === 'applied' && marked.turns.at(-1).findings[1].status === 'open');
+  const back = D.normalizeDesignState(JSON.parse(JSON.stringify(marked)));
+  ok('…and kept with the project', back.turns.at(-1).findings.length === 3 && back.turns.at(-1).findings[0].status === 'applied');
+  const req = RQ.readDesignRequest({ ...said[0], company: { name: 'Northlight', about: ['An architecture studio'], products: [], audiences: [], principles: ['Plain words'], avoid: ['stock photography'], missing: ['an approved logo'] } }, (v) => (typeof v === 'string' ? v : null));
+  ok('the reviewer is told to review, not change — with the company apart from the project', req.ok && req.mode === 'review' && req.tier === 'premium' && /Review, do not change/.test(req.user) && /## The company: Northlight \(permanent/.test(req.user) && /turned down, for good: stock photography/.test(req.user) && /Not available[^\n]*an approved logo/.test(req.user), req.ok ? req.user.slice(0, 900) : req);
+  const sys = PR.designSystem();
+  ok('the instructions: how to review (specific, kinds kept apart, never the designer’s own taste), what the person has decided, the company, the kinds of work', /# Reviewing/.test(sys) && /never "improve the hierarchy"/.test(sys) && /# What the person has decided/.test(sys) && /Criticism is aimed/.test(sys) && /# The company/.test(sys) && /never invent facts/i.test(sys) && /# Kinds of work/.test(sys) && /<lock artboard=/.test(sys));
+  const a = P.parseAnswer('<artboard id="new-1" format="story" seconds="6"><p>x</p></artboard>');
+  ok('an artboard that moves says how long', a.blocks[0].seconds === 6 && A.applyAnswer({ artboards: [], tokens: '' }, a, { parse, format: 'story' }).doc.artboards[0].seconds === 6);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

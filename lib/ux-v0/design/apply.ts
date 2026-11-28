@@ -8,10 +8,15 @@
 //
 // The same function draws an answer that is still being written (`partial`): finished edits apply, the artboard
 // being written shows what it has so far, and nothing is cleaned or committed — the canvas just shows it growing.
+//
+// What the person has protected is enforced here, not hoped for (locks.ts): an edit that would change a locked element
+// — its markup or any style that reaches it — is refused pair by pair; a locked artboard is not rewritten, changed or
+// removed; shared tokens that would change something locked are kept as they were. Every refusal is said.
 
 import { artboardOf, newId, placeNew, MAX_ARTBOARDS, MAX_HTML, MAX_TOKENS_CSS, type DesignArtboard, type DesignDoc } from './doc';
 import { prepareFragment, type Parse } from './elements';
 import { formatOf, type Format } from './formats';
+import { checkLocks, sharedPrint } from './locks';
 import type { Answer, ArtboardBlock } from './protocol';
 
 export interface Applied {
@@ -28,6 +33,12 @@ export interface Applied {
   question: { text: string; options: string[] } | null;
   /** the model's own temporary names (new-1) for the ids they became */
   ids: Record<string, string>;
+  /** elements the designer locked because the person said to keep them (already on the artboards) */
+  locked: { artboard: string; element: string; what: string }[];
+  /** typography or colour to keep from an artboard (<keep>): the project's pins are set from them by the caller */
+  keep: { what: 'faces' | 'colours'; artboard: string }[];
+  /** what a review found (<finding>), on artboards that exist */
+  findings: { type: string; artboard: string; element: string | null; text: string; fix: string }[];
 }
 
 export interface ApplyOptions {
@@ -69,6 +80,8 @@ function sizeFor(b: ArtboardBlock, fallback: Format): { format: string; width: n
   return { format: fallback.id, width: fallback.width, height: fallback.height, medium: fallback.medium };
 }
 
+const listed = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+
 const short = (s: string) => {
   const t = s.replace(/\s+/g, ' ').trim();
   return t.length > 60 ? `${t.slice(0, 60)}…` : t;
@@ -85,6 +98,9 @@ export function applyAnswer(doc0: DesignDoc, answer: Answer, o: ApplyOptions): A
   const names = o.names ?? {};
   const made: string[] = [];
   const removed: string[] = [];
+  const lockAsked: { artboard: string; element: string; what: string }[] = [];
+  const keep: Applied['keep'] = [];
+  const findings: Applied['findings'] = [];
   let question: Applied['question'] = null;
   const real = (id: string) => ids[id] ?? id;
   const byId = (id: string) => artboards.find((a) => a.id === real(id)) ?? null;
@@ -96,8 +112,21 @@ export function applyAnswer(doc0: DesignDoc, answer: Answer, o: ApplyOptions): A
         const html = b.html.slice(0, MAX_HTML);
         const existing = byId(b.id);
         if (existing) {
+          const was0 = doc0.artboards.find((x) => x.id === existing.id);
+          if (!o.partial && was0?.locked) {
+            failed.push(`“${existing.name}” is locked${was0.state === 'approved' ? ' (approved)' : ''}, so it was not rewritten — unlock it first, or ask for a new artboard.`);
+            break;
+          }
+          if (!o.partial && was0?.locks?.length) {
+            const c = checkLocks(was0, prepareFragment(html, o.parse), doc0.tokens, doc0.tokens, o.parse);
+            if (!c.ok) {
+              failed.push(`“${existing.name}” was not rewritten: the new version changed ${listed(c.broken)}, which ${c.broken.length > 1 ? 'are' : 'is'} locked.`);
+              break;
+            }
+          }
           existing.html = html;
           if (b.name) existing.name = b.name.slice(0, 80);
+          if (b.seconds) existing.seconds = b.seconds;
           const f = formatOf(b.format);
           if (f && f.id !== existing.format) Object.assign(existing, { format: f.id, width: f.width, height: f.height, medium: f.medium });
           else if (existing.medium === 'web' && b.height) existing.height = Math.min(20000, Math.max(200, b.height));
@@ -115,7 +144,7 @@ export function applyAnswer(doc0: DesignDoc, answer: Answer, o: ApplyOptions): A
         const at = placeNew({ artboards, tokens }, size.width, size.height, prevInGroup ?? beside);
         const id = (names[`ab:${b.id}`] ??= newId('ab'));
         ids[b.id] = id;
-        artboards.push({ id, name: (b.name || formatOf(size.format)?.label || 'Artboard').slice(0, 80), ...size, html, ...(group ? { group } : {}), x: at.x, y: at.y });
+        artboards.push({ id, name: (b.name || formatOf(size.format)?.label || 'Artboard').slice(0, 80), ...size, html, ...(group ? { group } : {}), x: at.x, y: at.y, ...(b.seconds ? { seconds: b.seconds } : {}) });
         made.push(id);
         break;
       }
@@ -124,6 +153,11 @@ export function applyAnswer(doc0: DesignDoc, answer: Answer, o: ApplyOptions): A
         const a = byId(b.artboard);
         if (!a) {
           if (!o.partial) failed.push(`An edit named an artboard that is not there (${b.artboard}).`);
+          break;
+        }
+        const was0 = doc0.artboards.find((x) => x.id === a.id);
+        if (!o.partial && was0?.locked) {
+          failed.push(`“${a.name}” is locked${was0.state === 'approved' ? ' (approved)' : ''}, so nothing on it was changed — unlock it first, or ask for a new artboard.`);
           break;
         }
         for (const p of b.pairs) {
@@ -136,7 +170,15 @@ export function applyAnswer(doc0: DesignDoc, answer: Answer, o: ApplyOptions): A
             if (!o.partial) failed.push(`On “${a.name}”, “${short(p.find)}” is there more than once, so it was not changed.`);
             continue;
           }
-          a.html = (a.html.slice(0, at.start) + p.replace + a.html.slice(at.end)).slice(0, MAX_HTML);
+          const next = (a.html.slice(0, at.start) + p.replace + a.html.slice(at.end)).slice(0, MAX_HTML);
+          if (!o.partial && was0?.locks?.length) {
+            const c = checkLocks(was0, prepareFragment(next, o.parse), doc0.tokens, doc0.tokens, o.parse);
+            if (!c.ok) {
+              failed.push(`On “${a.name}”, a change would have altered ${listed(c.broken)}, which ${c.broken.length > 1 ? 'are' : 'is'} locked, so it was not made.`);
+              continue;
+            }
+          }
+          a.html = next;
         }
         if (!b.pairs.length && !b.open && !o.partial) failed.push(`An edit to “${a.name}” said nothing to change.`);
         break;
@@ -145,6 +187,11 @@ export function applyAnswer(doc0: DesignDoc, answer: Answer, o: ApplyOptions): A
         const a = byId(b.artboard);
         if (!a) {
           if (!o.partial) failed.push(`An artboard to remove is not there (${b.artboard}).`);
+          break;
+        }
+        const was0 = doc0.artboards.find((x) => x.id === a.id);
+        if (was0?.locked || was0?.locks?.length) {
+          if (!o.partial) failed.push(`“${a.name}” ${was0.locked ? 'is locked' : 'holds locked elements'}, so it was not removed.`);
           break;
         }
         artboards = artboards.filter((x) => x !== a);
@@ -160,6 +207,17 @@ export function applyAnswer(doc0: DesignDoc, answer: Answer, o: ApplyOptions): A
       case 'question':
         question = { text: b.text, options: b.options };
         break;
+      case 'lock':
+        lockAsked.push({ artboard: b.artboard, element: b.element, what: b.what });
+        break;
+      case 'keep':
+        keep.push({ what: b.what, artboard: b.artboard });
+        break;
+      case 'finding': {
+        const a = byId(b.artboard) ?? (artboards.length === 1 ? artboards[0] : null);
+        if (a) findings.push({ type: b.type, artboard: a.id, element: b.element && a.html.includes(`data-sx="${b.element}"`) ? b.element : null, text: b.text, fix: b.fix });
+        break;
+      }
     }
   }
 
@@ -171,9 +229,43 @@ export function applyAnswer(doc0: DesignDoc, answer: Answer, o: ApplyOptions): A
       a.html = prepareFragment(a.html, o.parse);
     }
     if (tokens !== doc0.tokens) tokens = tokens.replace(/@import[^;]*;?/gi, '').replace(/javascript:/gi, '').replace(/<\/?style[^>]*>/gi, '');
+    // shared styles that would change something locked are kept as they were
+    if (tokens !== doc0.tokens) {
+      const hit: string[] = [];
+      for (const was of doc0.artboards) {
+        const nowA = artboards.find((x) => x.id === was.id);
+        if (!nowA) continue;
+        if (was.locked) {
+          if (sharedPrint(nowA.html, doc0.tokens, o.parse) !== sharedPrint(nowA.html, tokens, o.parse)) hit.push(`“${was.name}”`);
+        } else if (was.locks?.length) {
+          const c = checkLocks({ html: nowA.html, locks: was.locks }, nowA.html, doc0.tokens, tokens, o.parse);
+          if (!c.ok) hit.push(...c.broken);
+        }
+      }
+      if (hit.length) {
+        const names = [...new Set(hit)];
+        tokens = doc0.tokens;
+        failed.push(`The shared styles were not changed: the new ones would have changed ${listed(names)}, which ${names.length > 1 ? 'are' : 'is'} locked. Change those values on the other artboards instead, or unlock ${names.length > 1 ? 'them' : 'it'}.`);
+      }
+    }
   }
   const touched = artboards.filter((a) => before.get(a.id) !== a.html).map((a) => a.id);
-  return { doc: { artboards, tokens }, touched, made, removed, tokensChanged: tokens !== doc0.tokens, failed, remember, question, ids };
+  // locks the designer recorded for the person: on elements that are really there, once each (a lock is never
+  // taken off here — only the person unlocks)
+  const locked: Applied['locked'] = [];
+  if (!o.partial) {
+    for (const l of lockAsked) {
+      const a = byId(l.artboard);
+      if (!a || !a.html.includes(`data-sx="${l.element}"`)) {
+        failed.push(`A lock named something that is not there (${l.what}).`);
+        continue;
+      }
+      if ((a.locks ?? []).some((x) => x.id === l.element)) continue;
+      a.locks = [...(a.locks ?? []), { id: l.element, what: l.what, at: Date.now() }];
+      locked.push({ artboard: a.id, element: l.element, what: l.what });
+    }
+  }
+  return { doc: { artboards, tokens }, touched, made, removed, tokensChanged: tokens !== doc0.tokens, failed, remember, question, ids, locked, keep: keep.map((k) => ({ ...k, artboard: real(k.artboard) })), findings };
 }
 
 /** What changed, in a sentence, from what really changed (never from what was meant to). */
@@ -185,6 +277,7 @@ export function changedSentence(a: Applied, doc: DesignDoc): string {
   if (changed.length) parts.push(changed.length === 1 ? `changed “${name(changed[0])}”` : `changed ${changed.length} artboards`);
   if (a.removed.length) parts.push(`removed ${a.removed.length === 1 ? 'an artboard' : `${a.removed.length} artboards`}`);
   if (a.tokensChanged) parts.push('changed the shared styles');
+  if (a.locked.length) parts.push(`locked ${listed(a.locked.map((l) => l.what))}`);
   if (!parts.length) return 'Nothing on the design changed.';
   const s = parts.join(', ');
   return `${s[0].toUpperCase()}${s.slice(1)}.`;

@@ -17,3 +17,6 @@ export { startFrom } from '@/components/ux-v0/studio/begin';
 export * as request from '@/lib/ux-v0/design/request';
 export * as legacy from '@/lib/ux-v0/design/legacy';
 export * as fonts from '@/lib/ux-v0/fonts';
+export * as locks from '@/lib/ux-v0/design/locks';
+export * as pins from '@/lib/ux-v0/design/pins';
+export * as history from '@/lib/ux-v0/design/history';

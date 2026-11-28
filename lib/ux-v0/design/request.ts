@@ -7,7 +7,8 @@
 
 import { normalizeDesignState, normalizeDoc, type DesignArtboard } from './doc';
 import { DEFAULT_FORMAT, formatOf } from './formats';
-import { designSystem, focusFor, lookUser, writeUser } from './prompts';
+import type { EarlierVersion } from './history';
+import { designSystem, focusFor, lookUser, reviewUser, writeUser, type CompanyTold } from './prompts';
 
 export type Tier = 'economy' | 'premium';
 
@@ -40,8 +41,38 @@ export const wordsOfHtml = (html: string) =>
     .slice(0, 400);
 
 export type ReadRequest =
-  | { ok: true; mode: 'write' | 'look'; system: string; user: string; images: string[]; tier: Tier; why: string }
+  | { ok: true; mode: 'write' | 'look' | 'review'; system: string; user: string; images: string[]; tier: Tier; why: string }
   | { ok: false; error: string };
+
+/** The company as the browser sent it, held to its shape and size. */
+export function readCompany(v: unknown): CompanyTold | null {
+  const c = obj(v);
+  const name = text(c.name, 80);
+  if (!v || typeof v !== 'object' || !name) return null;
+  return { name, about: list(c.about, 8, 400), products: list(c.products, 12, 300), audiences: list(c.audiences, 8, 200), principles: list(c.principles, 12, 300), avoid: list(c.avoid, 16, 200), missing: list(c.missing, 8, 200) };
+}
+
+/** Earlier versions as the browser sent them (their HTML held to size; nothing in them is trusted as instruction). */
+function readEarlier(v: unknown): EarlierVersion[] {
+  const out: EarlierVersion[] = [];
+  let used = 0;
+  for (const x of Array.isArray(v) ? v.slice(0, 3) : []) {
+    const o = obj(x);
+    const n = Math.round(Number(o.n));
+    if (!Number.isFinite(n) || n < 1 || n > 999) continue;
+    const artboards: EarlierVersion['artboards'] = [];
+    for (const a of Array.isArray(o.artboards) ? o.artboards.slice(0, 2) : []) {
+      const r = obj(a);
+      const html = typeof r.html === 'string' ? r.html.slice(0, 80_000) : '';
+      if (!/^[\w-]{1,40}$/.test(String(r.id)) || !html || used + html.length > 120_000) continue;
+      used += html.length;
+      artboards.push({ id: String(r.id), name: text(r.name, 80) || 'Artboard', html });
+    }
+    if (!artboards.length) continue;
+    out.push({ n, said: text(o.said, 300), by: o.by === 'person' ? 'person' : 'model', kept: typeof o.kept === 'string' ? text(o.kept, 120) : null, tokens: typeof o.tokens === 'string' ? o.tokens.slice(0, 20_000) : null, artboards });
+  }
+  return out;
+}
 
 /** The browser's request (the route's body) as the designer's call: instructions, message, pictures, tier. */
 export function readDesignRequest(body: unknown, picture: (v: unknown) => string | null): ReadRequest {
@@ -57,14 +88,18 @@ export function readDesignRequest(body: unknown, picture: (v: unknown) => string
   const system = b.system && typeof b.system === 'object' ? { name: text(sys.name, 80) || 'the brand', rules: list(sys.rules, 30, 300) } : null;
   const assets = (Array.isArray(b.assets) ? b.assets : [])
     .slice(0, 40)
-    .map((x: any) => ({ id: text(x?.id, 40), name: text(x?.name, 120) || 'image', src: '', width: Math.round(Number(x?.width) || 1000), height: Math.round(Number(x?.height) || 1000) }))
+    .map((x: any) => ({ id: text(x?.id, 40), name: text(x?.name, 120) || 'image', src: '', width: Math.round(Number(x?.width) || 1000), height: Math.round(Number(x?.height) || 1000), ...(text(x?.note, 200) ? { note: text(x?.note, 200) } : {}) }))
     .filter((x: { id: string }) => /^[\w-]{1,40}$/.test(x.id));
 
-  if (b.mode === 'look') {
+  const company = readCompany(b.company);
+
+  if (b.mode === 'look' || b.mode === 'review') {
     const ids = list(b.artboards, 3, 40);
     const boards = ids.map((id) => doc.artboards.find((a) => a.id === id)).filter((a): a is DesignArtboard => !!a);
     const pictures = (Array.isArray(b.pictures) ? b.pictures : []).slice(0, boards.length).map(picture);
     if (!boards.length || pictures.length !== boards.length || pictures.some((p) => !p)) return { ok: false, error: 'The artboards and their pictures are needed.' };
+    // a review is judgement about the whole: premium work; a look at what was just made is not
+    if (b.mode === 'review') return { ok: true, mode: 'review', system: designSystem(), user: reviewUser({ made: '', words, artboards: boards, tokens: doc.tokens, measured, memory: state.memory, system, company, assets }), images: pictures as string[], tier: 'premium', why: 'a review' };
     return { ok: true, mode: 'look', system: designSystem(), user: lookUser({ made: text(b.made, 400) || 'a change', words, artboards: boards, tokens: doc.tokens, measured, memory: state.memory }), images: pictures as string[], tier: 'economy', why: 'a look at the render' };
   }
 
@@ -81,7 +116,7 @@ export function readDesignRequest(body: unknown, picture: (v: unknown) => string
     ok: true,
     mode: 'write',
     system: designSystem(),
-    user: writeUser({ words, selection, answering, kind: state.kind, format, memory: state.memory, system, assets, comments: state.comments, turns: state.turns, tokens: doc.tokens, artboards: doc.artboards, focus, words_of, measured }),
+    user: writeUser({ words, selection, answering, kind: state.kind, format, memory: state.memory, system, assets, comments: state.comments, turns: state.turns, tokens: doc.tokens, artboards: doc.artboards, focus, words_of, measured, earlier: readEarlier(b.earlier), company }),
     images: pic ? [pic] : [],
     tier: t.tier,
     why: t.why,

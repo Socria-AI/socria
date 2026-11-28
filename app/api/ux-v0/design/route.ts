@@ -37,16 +37,18 @@ export const POST = withMeter(async function POST(req: NextRequest) {
   if (!r.ok) return refuse(req, bad(r.error));
   const ctx = { userId: a.userId, orgId: a.orgId, projectId: projectIdOf(body.projectId), fingerprint: print };
   const look = r.mode === 'look';
+  // a review is the designer's stage at its premium tier (judgement about the whole), answered briefly: findings only
+  const review = r.mode === 'review';
   return runStage(req, ctx, {
     stage: look ? 'design-look' : 'design-write',
-    operation: look ? 'look' : 'design',
-    label: look ? 'ux-v0/design-look' : 'ux-v0/design-write',
-    budgetMs: look ? Math.min(budgetMs(), 120_000) : budgetMs(),
+    operation: look ? 'look' : review ? 'review' : 'design',
+    label: look ? 'ux-v0/design-look' : review ? 'ux-v0/design-review' : 'ux-v0/design-write',
+    budgetMs: look || review ? Math.min(budgetMs(), 120_000) : budgetMs(),
     prompt: {
       system: r.system,
       user: r.user,
-      maxTokens: MAX_TOKENS[look ? 'design-look' : 'design-write'],
-      temperature: look ? 0.3 : 0.7,
+      maxTokens: review ? Math.min(MAX_TOKENS['design-write'], 4000) : MAX_TOKENS[look ? 'design-look' : 'design-write'],
+      temperature: look || review ? 0.3 : 0.7,
       ...(r.images.length ? { images: r.images.map((url) => ({ url, detail: 'high' as const })), extraChars: 8000 * r.images.length } : {}),
       ...(look ? {} : { tier: r.tier }),
       cacheScope: 'design',

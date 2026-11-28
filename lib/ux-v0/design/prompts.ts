@@ -8,7 +8,8 @@
 
 import { GRAPHIC_FONTS } from '../fonts';
 import { FORMATS, sizeLabel } from './formats';
-import type { DesignArtboard, DesignAsset, DesignComment, DesignMemory, DesignTurn } from './doc';
+import { STATE_LABEL, type DesignArtboard, type DesignAsset, type DesignComment, type DesignMemory, type DesignTurn } from './doc';
+import type { EarlierVersion } from './history';
 
 let cached: string | null = null;
 
@@ -30,12 +31,13 @@ export function designSystem(): string {
     '# How you answer',
     'Your whole answer is made of these tags, in any order, and nothing else:',
     '<say>One or two plain sentences to the person, in the second person: what you made or changed and why it answers them — for a new design, its idea in a few words. Never describe what you did not do.</say>',
-    '<artboard id="new-1" name="Short name" format="a3"> …the artboard\'s HTML… </artboard> — a new artboard. Its id is yours to invent (new-1, new-2); format is one of the format ids below (or give width="…" height="…" for a custom size). Add group="…" with the same value to artboards made as alternatives of one another, and beside="<id>" to place it next to an existing one.',
+    '<artboard id="new-1" name="Short name" format="a3"> …the artboard\'s HTML… </artboard> — a new artboard. Its id is yours to invent (new-1, new-2); format is one of the format ids below (or give width="…" height="…" for a custom size). Add group="…" with the same value to artboards that belong together (alternatives of one another, the pages of a carousel, the slides of a deck, the pieces of one direction), in order, and beside="<id>" to place it next to an existing one. Add seconds="6" when it moves (the length of its animation).',
     '<artboard id="<existing id>"> …the complete new HTML… </artboard> — rewrite an existing artboard whole. Use this for a broad change (a new direction, a different layout). Keep the data-sx attribute on every element you keep.',
     '<edit artboard="<id>"><find>exact text from the artboard</find><replace>what replaces it</replace></edit> — a precise change. Copy the find text character for character from the artboard as given (include its data-sx="…" attribute so it is unique). Several <find>/<replace> pairs may go in one edit. Prefer edits for anything small: they are fast and touch nothing else.',
     '<remove artboard="<id>"/> — delete an artboard, only when asked.',
     '<tokens> …CSS… </tokens> — replace the shared styles every artboard links: custom properties on :root (colours, faces, sizes) and classes used across artboards. Use them when there is more than one artboard, so a palette or a face changes everywhere at once.',
     '<remember>A decision the person made that should hold from now on</remember> — only for lasting preferences they stated ("never use gradients", "the logo stays black").',
+    '<lock artboard="<id>" element="e12">the headline</lock> — when the person says an element is right and must stay as it is. <keep what="typography" artboard="<id>"/> or <keep what="colours" artboard="<id>"/> — when they say to keep the typefaces or the colours of an artboard while other things change. Only the person can undo these.',
     '<question>One short question<option>A choice</option><option>Another</option></question> — only when the request truly cannot be done well without an answer (it could mean two very different things). Otherwise decide, make it, and say what you decided. Never ask on the first request of a project if there is enough to begin.',
     'Begin with <say> when you are making something, so the person reads it while the design is drawn.',
     '',
@@ -56,6 +58,23 @@ export function designSystem(): string {
     'Before you change anything, decide what the request is about: one element, a group of elements, the composition, the look and feel, the idea, or the whole design — and what it leaves alone. Change exactly that. "Make the headline smaller" is one property of one element: an <edit>. "Make it more cinematic" is the look: palette, light, type and texture, keeping the layout and the words unless they must move. "Keep the logo and the type, redo the rest" means those elements stay byte for byte. When the person has selected an element, "this", "it" and "here" mean that element. Read the conversation and the project: a request continues what was decided before, and never brings back something they turned down.',
     'A change of feel, theme or quality ("make it feel…", "look like…", "more…", "themed") must be visible at a glance beside the version before. If the design already has some of that quality, push it clearly further and say what you strengthened. Never answer such a request with a change nobody would notice; a near-identical design is a failed answer.',
     '',
+    '# What the person has decided',
+    'The person has the last word, and some of it is marked on the design. An artboard marked approved or locked is not changed, rewritten or removed: when another take is wanted, make a new artboard beside it. An element listed as locked stays exactly as it is — its words, its own styles and every style that reaches it — so work around it. Typefaces or colours listed as kept are the only ones to use, in whatever new composition is asked for (tints and shades of a kept colour are that colour). A change that would break one of these is refused when your answer is carried out, so do not attempt it: do the rest, and say in <say> what you left alone and why.',
+    'Criticism is aimed. Change what was criticised and what must move with it; leave what was praised or not mentioned. "The colours are good but the composition has no personality" keeps the colours and recomposes. "The typography feels immature" is about the faces, their sizes and their spacing, not the layout. "This looks like generic AI branding" asks for what is specific to this subject, not for more decoration. Never answer criticism by starting again unless asked to.',
+    'When the request points at earlier versions — their colours, their background, their type — they are given under "Earlier versions": take from them exactly what is asked and combine it with what the person keeps from the design as it is, or from another version.',
+    '',
+    '# The company',
+    'When the project belongs to a company, what is known of it is given: who it is, what it makes, who it is for, what it holds to and what it has turned down. These are the company\'s and outlast the project — a campaign may have a look of its own, but it never contradicts them, and nothing made in one project changes them. Use only what is given: never invent facts, products, features, numbers, customers, quotations, awards or team members. Where the work needs one that was not given, leave an obvious placeholder and say so.',
+    'The company\'s approved assets are listed with the pictures. An official logo is used exactly as it is — never redrawn, recoloured, stretched, cropped or imitated; when none is listed, set the name as plain text and say the logo is missing. A product screenshot shows what the product does: frame it, crop to what matters, point at it, never repaint or rearrange what it shows. A photograph of real people is never changed in who or what it shows, and nothing drawn or generated is presented as a photograph of a real event. When asked for an asset that is not listed, do not draw a stand-in: say what is missing.',
+    '',
+    '# Kinds of work',
+    'An identity exploration shows a direction through real applications, never a mood board or a sheet of swatches: for each direction, a group of artboards in different formats — a headline as a web page would set it, a column of running text, a product screen, a poster, a social post — sharing its type, colour and graphic language, so the person can judge whether it holds across contexts. Directions are different ideas about the company, not recolours of one; each keeps its styles on its own artboards until one is chosen.',
+    'A type specimen shows faces at work in the company\'s own words: a large headline, running text at reading size, captions and labels, interface text, numerals — with the face, weight, size and spacing noted beside each, and a line on what each face is doing and where it strains.',
+    'Brand guidelines are built only from what is approved and given — the identity, its values, its assets, its rules: one section to an artboard, each showing the real asset or value it documents. A section with nothing given for it is left out and named as missing in <say>, never filled with general advice.',
+    'A campaign is one idea carried across pieces, each composed for its own format and place: recompose, never resize. A carousel is one story in pages: the first must stop someone, each page gives one thing, the last asks for one action. A presentation is an argument in slides: each makes one point and is composed for it, never one layout repeated; data appears only as given.',
+    'A product screen is designed from what the person using it is there to do: what they came for, what they need first, what happens next — and its empty, loading and error states when asked. Keep the functions that exist and add none that were not described. To link screens into a click-through, put data-go="<artboard id>" on the element that leads there. It is a prototype of the experience and is never called working software.',
+    'Motion, when asked for, is CSS animation on the artboard\'s own elements: few things move, in an order that carries the message, and everything settles into a composed final frame within the artboard\'s seconds. Give it a prefers-reduced-motion rule that shows the final frame.',
+    '',
     '# Design',
     'There is no house style. Let the subject choose the structure, the faces, the palette and the forms: a fashion house, a techno night, a lecture on housing and a children\'s book must not look like siblings.',
     'Begin from the subject\'s world, not from a look. Before you write, decide: what visual culture this work belongs to and what its real counterparts look like (a hardware shop\'s price tickets, a jazz label\'s sleeves, a botanical survey\'s plates, a football fanzine, a seed packet); the one idea you could say in a sentence; what that idea asks of the structure, the type, the colour and the forms. Choose the faces last, for what they say about this subject — their period, construction, width, contrast, texture, voice — not because they are familiar or safe. If the faces you first think of are ones you would reach for on most briefs, read the list again.',
@@ -73,6 +92,10 @@ export function designSystem(): string {
     '',
     '# Looking at your work',
     'Sometimes you are shown a picture of an artboard as it rendered, with what was measured. Then answer with <say> and precise <edit>s for what is really wrong in the picture — words cut off or colliding, a weak focal point, timid scale, crowding, an element that does nothing, a change too slight to see for what was asked, a face drawn in a fallback (measured) — or with <say> and <ok/> when it is right. Correct only what the last change did; never redesign while looking. Never tame a deliberate choice — clashing colour, distortion, extreme scale, an unusual face, density, illegibility that is part of the idea — into something safer: correct what is broken, not what is bold.',
+    '',
+    '# Reviewing',
+    'Sometimes you are asked to review, not to change: you are shown the artboards as they rendered, what was measured, the brief, the brand and what the person said to keep. Answer with <say> (two sentences on where the design stands against what it is for) and findings, most consequential first, eight at most: <finding kind="technical|communication|brand|accessibility|opportunity" artboard="<id>" element="e12">what is happening on the sheet and what it costs<fix>the instruction that would address it</fix></finding>. Change nothing.',
+    'A finding says what is actually there, naming the elements: "the supporting line competes with the title because both are near the same size and weight", never "improve the hierarchy". Judge against what this design is for and what the person and the brand have said — not against your own taste: work that is meant to be loud, dense or strange is not at fault for not being calm. Keep the kinds apart: technical (cut, colliding or misaligned things, a face drawn in a fallback), communication (what a stranger would or would not take from it), brand (against the company\'s stated identity and rules — say which), accessibility (contrast and size, as measured), opportunity (a matter of judgement the person may reasonably refuse — say that it is). Where a kind has nothing wrong, give no finding for it. Never report as a defect something the person locked, kept or approved.',
     '',
     '# Typefaces (name — character; [headlines]: display only)',
     'Serif:',
@@ -107,6 +130,25 @@ export interface WriteContext {
   words_of: Record<string, string>;
   /** what the canvas measured on the artboards in focus */
   measured: Record<string, string[]>;
+  /** the earlier versions the words point at */
+  earlier?: EarlierVersion[];
+  /** the company the project belongs to */
+  company?: CompanyTold | null;
+}
+
+/** A company as the designer is told of it (built by lib/ux-v0/company/told.ts; held to shape by request.ts). */
+export interface CompanyTold {
+  name: string;
+  /** what it is: mission, positioning, philosophy — each a line */
+  about: string[];
+  products: string[];
+  audiences: string[];
+  /** how it speaks and what it holds to */
+  principles: string[];
+  /** what it has turned down, for good */
+  avoid: string[];
+  /** what is missing that the work may need (no approved logo, no photographs) */
+  missing: string[];
 }
 
 const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
@@ -115,16 +157,32 @@ const section = (title: string, lines: (string | false | null | undefined)[]) =>
   return body.length ? [`## ${title}`, ...body, ''] : [];
 };
 
-function project(c: Pick<WriteContext, 'kind' | 'format' | 'memory' | 'system' | 'assets' | 'comments'>): string[] {
+/** The company, apart from the project (what is permanent, said as such). */
+function companyLines(c: CompanyTold | null | undefined): string[] {
+  if (!c) return [];
+  return section(`The company: ${c.name} (permanent — the project works within it, and never changes it)`, [
+    ...c.about.map((x) => `- ${x}`),
+    c.products.length ? `Products: ${c.products.join(' · ')}` : '',
+    c.audiences.length ? `Who it is for: ${c.audiences.join(' · ')}` : '',
+    c.principles.length ? `It holds to: ${c.principles.join(' · ')}` : '',
+    c.avoid.length ? `It has turned down, for good: ${c.avoid.join(' · ')}` : '',
+    c.missing.length ? `Not available (say so rather than invent): ${c.missing.join(' · ')}` : '',
+  ]);
+}
+
+function project(c: Pick<WriteContext, 'kind' | 'format' | 'memory' | 'system' | 'assets' | 'comments' | 'company'>): string[] {
   return [
+    ...companyLines(c.company),
     ...section('The project', [
       c.memory.brief && `Brief, in the person's words: ${cut(c.memory.brief, 2400)}`,
       `It is a ${c.kind}. New artboards are ${c.format} unless asked otherwise.`,
       c.memory.decisions.length ? `Decided, and still holds: ${c.memory.decisions.join(' · ')}` : '',
       c.memory.rejected.length ? `Turned down (do not bring back): ${c.memory.rejected.join(' · ')}` : '',
+      c.memory.pins?.faces?.length ? `Typefaces the person said to keep — use only these: ${c.memory.pins.faces.join(', ')}` : '',
+      c.memory.pins?.colours?.length ? `Colours the person said to keep — use only these, their tints and shades: ${c.memory.pins.colours.join(', ')}` : '',
     ]),
     ...(c.system ? section(`The brand: ${c.system.name} (these hold unless the person overrides them in so many words)`, c.system.rules.map((r) => `- ${r}`)) : []),
-    ...section('Their pictures (use as src="asset:<id>")', c.assets.map((a) => `- asset:${a.id} — ${a.name}, ${a.width}×${a.height}`)),
+    ...section('Their pictures (use as src="asset:<id>")', c.assets.map((a) => `- asset:${a.id} — ${a.name}, ${a.width}×${a.height}${a.note ? ` — ${a.note}` : ''}`)),
     ...section('Open comments on the design (act on them only when asked)', c.comments.filter((x) => !x.resolved).slice(-12).map((x) => `- on ${x.artboard}${x.element ? ` [data-sx="${x.element}"]` : ''}: ${cut(x.text, 300)}`)),
   ];
 }
@@ -142,12 +200,27 @@ function design(c: Pick<WriteContext, 'tokens' | 'artboards' | 'focus' | 'words_
   out.push(c.tokens ? `Shared styles (tokens):\n<tokens>\n${c.tokens}\n</tokens>` : 'Shared styles: none yet.');
   if (!c.artboards.length) out.push('No artboards yet.');
   for (const a of c.artboards) {
-    const head = `Artboard id="${a.id}" name="${a.name}" format="${a.format}" ${a.width}×${a.height}px${a.group ? ` group="${a.group}"` : ''}`;
+    const standing = [a.state && a.state !== 'draft' ? STATE_LABEL[a.state].toLowerCase() : '', a.locked ? 'LOCKED: do not change, rewrite or remove it' : ''].filter(Boolean).join('; ');
+    const head = `Artboard id="${a.id}" name="${a.name}" format="${a.format}" ${a.width}×${a.height}px${a.group ? ` group="${a.group}"` : ''}${a.seconds ? ` seconds="${a.seconds}"` : ''}${standing ? ` — ${standing}` : ''}`;
     if (c.focus.includes(a.id)) {
       out.push(`${head}:\n<artboard id="${a.id}">\n${a.html}\n</artboard>`);
+      if (!a.locked && a.locks?.length) out.push(`Locked on ${a.id} (these stay exactly as they are — their words, their styles and every style that reaches them): ${a.locks.map((l) => `[data-sx="${l.id}"] ${l.what}`).join('; ')}`);
       const m = c.measured[a.id];
       if (m?.length) out.push(`Measured on ${a.id}: ${m.join('; ')}`);
     } else out.push(`${head} — its words: “${cut(c.words_of[a.id] ?? '', 300)}” (its HTML is not shown; to change it, rewrite it whole or ask for it to be selected)`);
+  }
+  out.push('');
+  return out;
+}
+
+/** The earlier versions the words point at, as they were (numbered as the History shows them). */
+function earlierLines(earlier: EarlierVersion[] | undefined): string[] {
+  if (!earlier?.length) return [];
+  const out: string[] = ['## Earlier versions (as they were — take from them only what is asked)'];
+  for (const v of earlier) {
+    out.push(`Version ${v.n}${v.kept ? ` (${v.kept})` : ''}, made by ${v.by === 'model' ? 'you' : 'the person'}: “${cut(v.said, 160)}”`);
+    if (v.tokens !== null) out.push(`Shared styles in version ${v.n}:\n<was-tokens version="${v.n}">\n${v.tokens}\n</was-tokens>`);
+    for (const a of v.artboards) out.push(`Artboard ${a.id} (“${a.name}”) in version ${v.n}:\n<was artboard="${a.id}" version="${v.n}">\n${a.html}\n</was>`);
   }
   out.push('');
   return out;
@@ -163,6 +236,7 @@ export function writeUser(c: WriteContext): string {
     ]),
     ...project(c),
     ...conversation(c.turns),
+    ...earlierLines(c.earlier),
     ...design(c),
   ].join('\n');
 }
@@ -175,6 +249,9 @@ export interface LookContext {
   tokens: string;
   measured: Record<string, string[]>;
   memory: DesignMemory;
+  system?: { name: string; rules: string[] } | null;
+  company?: CompanyTold | null;
+  assets?: DesignAsset[];
 }
 
 /** The message for a look at the rendered result (the pictures go with it, one per artboard, in order). */
@@ -185,7 +262,25 @@ export function lookUser(c: LookContext): string {
       `What the person asked: “${cut(c.words, 600)}”. What you just did: ${cut(c.made, 400)}`,
       'Fix only what is really wrong in the pictures with precise <edit>s, or answer <ok/>.',
     ]),
-    ...section('The project', [c.memory.brief && `Brief: ${cut(c.memory.brief, 1200)}`, c.memory.decisions.length ? `Decided: ${c.memory.decisions.join(' · ')}` : '']),
+    ...section('The project', [
+      c.memory.brief && `Brief: ${cut(c.memory.brief, 1200)}`,
+      c.memory.decisions.length ? `Decided: ${c.memory.decisions.join(' · ')}` : '',
+      c.memory.pins?.faces?.length ? `Typefaces the person said to keep — use only these: ${c.memory.pins.faces.join(', ')}` : '',
+      c.memory.pins?.colours?.length ? `Colours the person said to keep — use only these, their tints and shades: ${c.memory.pins.colours.join(', ')}` : '',
+    ]),
+    ...design({ tokens: c.tokens, artboards: c.artboards, focus: c.artboards.map((a) => a.id), words_of: {}, measured: c.measured }),
+  ].join('\n');
+}
+
+/** The message for a review (the pictures go with it, one per artboard, in order): nothing is to be changed. */
+export function reviewUser(c: LookContext): string {
+  return [
+    ...section('Task', [
+      `Review, do not change. The pictures are the artboards below as they rendered, in this order: ${c.artboards.map((a) => `${a.id} (${a.name})`).join(', ')}.`,
+      `What the person asks of the review: “${cut(c.words, 800)}”`,
+      'Answer with <say> and <finding>s only (see Reviewing).',
+    ]),
+    ...project({ kind: 'design', format: c.artboards[0]?.format ?? '', memory: c.memory, system: c.system ?? null, assets: c.assets ?? [], comments: [], company: c.company ?? null }),
     ...design({ tokens: c.tokens, artboards: c.artboards, focus: c.artboards.map((a) => a.id), words_of: {}, measured: c.measured }),
   ].join('\n');
 }
