@@ -56,6 +56,9 @@ interface SourcesCtx {
   /** the current canvas's way of placing a source in view; null when no canvas is open */
   placer: ((sourceId: string) => void) | null;
   setPlacer: (fn: ((sourceId: string) => void) | null) => void;
+  /** the library asked to open (by a command: "find the document I uploaded yesterday"), with what to look for */
+  libraryAsk: { query?: string; since?: number; nonce: number } | null;
+  openLibrary: (ask?: { query?: string; since?: number }) => void;
 }
 
 const Ctx = createContext<SourcesCtx | null>(null);
@@ -108,6 +111,8 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
   const [placements, setPlacements] = useState<Record<string, string[]>>({});
   const [uploading, setUploading] = useState<{ name: string; note?: string }[]>([]);
   const [viewer, setViewer] = useState<ViewerTarget | null>(null);
+  const [libraryAsk, setLibraryAsk] = useState<{ query?: string; since?: number; nonce: number } | null>(null);
+  const openLibrary = useCallback((ask?: { query?: string; since?: number }) => setLibraryAsk({ ...(ask ?? {}), nonce: Date.now() }), []);
   const [placer, setPlacerState] = useState<{ fn: ((id: string) => void) | null }>({ fn: null });
   const readings = useRef<Map<string, SourceDoc | null>>(new Map());
   // readings arrive after they are asked for: a change here re-renders whatever is waiting for one
@@ -295,8 +300,8 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
   const setPlacer = useCallback((fn: ((id: string) => void) | null) => setPlacerState({ fn }), []);
 
   const value = useMemo<SourcesCtx>(
-    () => ({ loaded, setup, sources, refs, placements, pending, uploading, readingsSeen, refresh, upload, adopt, rename, remove, addRef, removeRef, reading, readingNow, passages, viewer, openViewer: setViewer, placer: placer.fn, setPlacer }),
-    [loaded, setup, sources, refs, placements, pending, uploading, readingsSeen, refresh, upload, adopt, rename, remove, addRef, removeRef, reading, readingNow, passages, viewer, placer, setPlacer]
+    () => ({ loaded, setup, sources, refs, placements, pending, uploading, readingsSeen, refresh, upload, adopt, rename, remove, addRef, removeRef, reading, readingNow, passages, viewer, openViewer: setViewer, placer: placer.fn, setPlacer, libraryAsk, openLibrary }),
+    [loaded, setup, sources, refs, placements, pending, uploading, readingsSeen, refresh, upload, adopt, rename, remove, addRef, removeRef, reading, readingNow, passages, viewer, placer, setPlacer, libraryAsk, openLibrary]
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

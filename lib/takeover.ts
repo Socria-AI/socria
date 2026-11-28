@@ -138,6 +138,8 @@ const THINKING_API = [
   '/api/logos/guest',
   '/api/logos/sources',
   '/api/logos/room',
+  // the new workspace's representation turns (/new-logos): its model calls
+  '/api/new-logos/represent',
   // SocriaUX's design reasoning (/ux)
   '/api/ux/reason',
   // SocriaUX v0 (/ux-v0): its model calls, and the websites it reads for reference (a web fetch)

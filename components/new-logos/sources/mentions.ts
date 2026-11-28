@@ -59,3 +59,25 @@ export async function mentionContext(
   const about: About | undefined = lines.length ? { label: cut(mentions.filter((m) => m.kind !== 'source' || !picked.find((p) => p.id === m.id)?.doc_id).map((m) => m.label).join(', '), 80) || 'what was mentioned', of: 'what this question mentions', lines } : undefined;
   return { attachments, about };
 }
+
+/** The sources (s:) and nodes (n:) among some refs, as the mentions mentionContext reads. */
+export function mentionsOf(refs: readonly string[], sources: readonly SourceMeta[], nodes: readonly NodeRow[]): Mention[] {
+  const out: Mention[] = [];
+  for (const r of refs) {
+    if (r.startsWith('s:')) {
+      const s = sources.find((x) => x.id === r.slice(2));
+      if (s) out.push({ kind: 'source', id: s.id, label: s.name, hint: 'Source' });
+    } else if (r.startsWith('n:')) {
+      const n = nodes.find((x) => x.id === r.slice(2));
+      if (n) out.push({ kind: n.type, id: n.id, label: n.title || TYPE_LABEL[n.type].one, hint: TYPE_LABEL[n.type].one });
+    }
+  }
+  return out;
+}
+
+/** What a turn is about, from two places (the workspace's own parts, and nodes or sources mentioned), as one. */
+export function mergeAbout(a: About | undefined, b: About | undefined): About | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  return { label: cut(`${a.label}, ${b.label}`, 80), of: a.of, lines: [...a.lines, ...b.lines].slice(0, 12) };
+}

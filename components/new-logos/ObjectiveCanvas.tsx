@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RELATION_LABEL, type NodeRow, type RelationKind } from '@/lib/new-logos/model';
 import { childrenOf } from '@/lib/new-logos/ops';
-import { displayTitle, newConversationId, titleFromMessage } from '@/lib/new-logos/convo';
+import { displayTitle, failureText, newConversationId, newMessage, titleFromMessage } from '@/lib/new-logos/convo';
 import { DEFAULT_SIZE, excerpt, factLines, nodeRef, placeMissing, placeNear } from '@/lib/new-logos/canvas';
 import { useNL } from './state';
 import { starterComposition, type Starter } from '@/lib/new-logos/primitives';
@@ -28,6 +28,8 @@ import { Creator, type Makeable } from './canvas/Creator';
 import { ConnectChooser, WorkspaceFrame } from './canvas/Frame';
 import { useCanvasLayout } from './canvas/useLayout';
 import { Crumbs, InlineText, typeLabel } from './ui';
+import { useWorkspace } from './engine/useWorkspace';
+import { mentionsOf, mergeAbout } from './sources/mentions';
 
 const W = { closed: 290, open: 440, doc: 620, conv: 480 };
 
@@ -45,6 +47,21 @@ export function ObjectiveCanvas({ id }: { id: string }) {
   const [focus, setFocus] = useState<{ ref: string; nonce: number } | null>(null);
   const busy = !!pending || Object.keys(streams).length > 0;
   const measured = useRef<Record<string, { w: number; h: number }>>({});
+  // this objective's own components (thoughts, tables, models…), grouped, connected, transformed — the same layer as a
+  // conversation's space; a question asked here starts a conversation in it
+  const thinkRef = useRef<(text: string, about: About | undefined, refs: string[]) => void>(() => {});
+  const WS = useWorkspace({
+    wsKey: `o:${id}`,
+    enabled: !!objective && setup !== false,
+    container: id,
+    L,
+    measured,
+    think: (t, a, r) => thinkRef.current(t, a, r),
+    setFocus,
+    openHistory: () => {},
+    busy,
+    working: pending ? { text: 'Starting a conversation about it' } : null,
+  });
 
   const members = useMemo(() => (objective ? childrenOf(nodes, id) : []), [nodes, id, objective]);
   const linked = useMemo(() => {
@@ -74,10 +91,11 @@ export function ObjectiveCanvas({ id }: { id: string }) {
   const all = useMemo(() => [...members, ...linked], [members, linked]);
   const sizeOf = useCallback(
     (ref: string) => {
+      if (ref.startsWith('r:')) return WS.sizeOf(ref);
       const n = all.find((x) => nodeRef(x.id) === ref);
       return measured.current[ref] ?? { w: n ? widthOf(n) : W.closed, h: L.layout.items[ref]?.open ? 440 : DEFAULT_SIZE.h };
     },
-    [all, widthOf, L.layout.items]
+    [all, widthOf, L.layout.items, WS]
   );
   const layout = useMemo(() => (L.loaded ? placeMissing(L.layout, all.map((n) => ({ ref: nodeRef(n.id) })), sizeOf) : L.layout), [L.loaded, L.layout, all, sizeOf]);
   useEffect(() => {
@@ -105,7 +123,7 @@ export function ObjectiveCanvas({ id }: { id: string }) {
   };
 
   /** A new conversation in this objective, begun with `text`, placed at a point or beside an object. */
-  async function askNew(text: string, opts: { at?: { x: number; y: number }; from?: string; about?: About; attachments?: unknown[] }) {
+  async function askNew(text: string, opts: { at?: { x: number; y: number }; from?: string; about?: About; attachments?: unknown[]; sourceIds?: string[] }) {
     if (busy || !objective) return;
     const convId = newConversationId();
     const mine = askMessage(text, opts.about, Date.now(), opts.attachments);
@@ -126,8 +144,28 @@ export function ObjectiveCanvas({ id }: { id: string }) {
     const ref = nodeRef(placed.node.id);
     L.setItem(ref, { x: Math.round(at.x), y: Math.round(at.y), open: true, ...(opts.from ? { from: opts.from } : {}) });
     setFocus({ ref, nonce: Date.now() });
-    await stream(convId, text, [mine], opts.about);
+    // the conversation's first turn: a representation of it (its card shows it), as on the conversation's own canvas
+    const res = await fetch('/api/new-logos/represent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversationId: convId, message: { id: mine.id, content: mine.content }, history: [], ...(opts.about ? { about: opts.about } : {}), sourceIds: opts.sourceIds ?? [] }),
+    }).catch(() => null);
+    const j = res ? await res.json().catch(() => null) : null;
+    if (res?.ok && j?.ok) {
+      await appendTurns(convId, [newMessage('assistant', String(j.record ?? ''), Date.now())]);
+      return;
+    }
+    // before the representations' table exists: answered as before
+    if (j?.setup === false) return void (await stream(convId, text, [mine], opts.about));
+    setNotes((n) => ({ ...n, [convId]: typeof j?.error === 'string' && j.error ? j.error : failureText(res?.status ?? 0) }));
   }
+  thinkRef.current = (t, a, r) => {
+    const srcRefs = r.filter((x) => x.startsWith('s:'));
+    const asMentions = mentionsOf(r, sources, nodes);
+    void (asMentions.length ? mentionContext(asMentions, t, { sources, nodes, passages }) : Promise.resolve({ attachments: [] as unknown[], about: undefined as About | undefined })).then((ctx) =>
+      askNew(t, { at: centre(), about: mergeAbout(a, ctx.about), attachments: ctx.attachments, sourceIds: srcRefs.map((x) => x.slice(2)) })
+    );
+  };
 
   /** Continue a conversation that is on this canvas. */
   async function askIn(n: NodeRow, text: string) {
@@ -211,7 +249,10 @@ export function ObjectiveCanvas({ id }: { id: string }) {
       content: <NodeCard node={n} open={open} linked={isLinked} busy={busy} onToggle={toggle} onAsk={(t) => void askNew(t, { from: ref, about: aboutNode(n) })} />,
     };
   };
-  const objects: CanvasObject[] = [...members.map((n) => card(n, false)), ...linked.map((n) => card(n, true))];
+  const objects: CanvasObject[] = [
+    ...WS.objects,
+    ...[...members.map((n) => card(n, false)), ...linked.map((n) => card(n, true))].filter((o) => !WS.hidden.has(o.ref)).map((o) => ({ ...o, className: `${o.className ?? ''} ${WS.classOf(o.ref)}` })),
+  ];
   if (pending) {
     objects.push({
       ref: 'n:pending',
@@ -226,10 +267,12 @@ export function ObjectiveCanvas({ id }: { id: string }) {
       ),
     });
   }
-  const shown = pending ? { ...layout, items: { ...layout.items, 'n:pending': { x: pending.at.x, y: pending.at.y, open: true } } } : layout;
-  objects.push(...src.objects);
+  const withTiles = { ...layout, items: { ...layout.items, ...WS.tilePlaces } };
+  const shown = pending ? { ...withTiles, items: { ...withTiles.items, 'n:pending': { x: pending.at.x, y: pending.at.y, open: true } } } : withTiles;
+  objects.push(...src.objects.filter((o) => !WS.hidden.has(o.ref)).map((o) => ({ ...o, className: `${o.className ?? ''} ${WS.classOf(o.ref)}` })));
   const present = new Set(objects.map((o) => o.ref));
   const lines: CanvasLine[] = [
+    ...WS.lines,
     ...src.lines(present),
     ...relations
       .filter((r) => present.has(nodeRef(r.from_id)) && present.has(nodeRef(r.to_id)))
@@ -243,12 +286,14 @@ export function ObjectiveCanvas({ id }: { id: string }) {
     <WorkspaceFrame
       omnibox={
         <Omnibox
-          placeholder="Ask about this objective. Type @ to bring in a source or anything in it"
+          placeholder="Ask about this objective, or say what to do. / for commands, @ to point at anything"
           busy={busy}
-          onAsk={(t, m) =>
-            void mentionContext(m, t, { sources, nodes, passages }).then((ctx) => askNew(t, { at: centre(), about: ctx.about, attachments: ctx.attachments }))
-          }
+          onAsk={(t, m) => WS.submit(t, m)}
           onMake={openCreatorAtCentre}
+          extra={WS.mentionables}
+          slash={WS.slash}
+          pointing={WS.pointing}
+          onUnpoint={WS.unpoint}
         />
       }
       header={
@@ -279,9 +324,9 @@ export function ObjectiveCanvas({ id }: { id: string }) {
           objects={objects}
           lines={lines}
           layout={shown}
-          selected={selected}
-          onSelect={setSelected}
-          onMove={(ref, x, y) => ref !== 'n:pending' && L.setItem(ref, { x, y })}
+          selected={WS.primary ?? selected}
+          onSelect={(ref) => (setSelected(ref), WS.select(ref ? [ref] : []))}
+          onMove={(ref, x, y) => (ref.startsWith('r:') || ref.startsWith('g:') ? WS.onMove(ref, x, y) : ref !== 'n:pending' && L.setItem(ref, { x, y }))}
           onView={L.setView}
           onCreateAt={(at, screen) => setCreator({ at, screen })}
           onDropSource={src.dropSource}
@@ -294,6 +339,7 @@ export function ObjectiveCanvas({ id }: { id: string }) {
           }}
           focus={focus}
           onSizes={(s) => (measured.current = s)}
+          {...WS.canvasProps}
           empty={
             <div>
               <p>This objective’s workspace is empty.</p>
@@ -306,6 +352,7 @@ export function ObjectiveCanvas({ id }: { id: string }) {
           Loading…
         </p>
       )}
+      {WS.overlays}
       {creator ? <Creator screen={creator.screen} types={['ask', 'question', 'knowledge', 'decision', 'artifact', 'objective']} onClose={() => setCreator(null)} onSubmit={(t, text, starter) => void createAt(t, text, creator.at, starter)} /> : null}
       {connecting ? (
         <ConnectChooser

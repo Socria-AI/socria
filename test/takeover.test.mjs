@@ -114,6 +114,8 @@ const thinking = [
   'logos/guest',
   'logos/sources',
   'logos/room',
+  // the new workspace's representation turns (its model calls)
+  'new-logos/represent',
   'ux/reason',
   'ux-v0/critique',
   'ux-v0/discover',

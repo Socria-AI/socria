@@ -99,6 +99,8 @@ const OWNED_TABLES = [
   'nl_nodes',
   // …where things sit on their workspace canvases (presentation only)
   'nl_canvases',
+  // …their workspaces' components, with the logs that could reverse them
+  'nl_representations',
   // …and their source records (the originals' bytes are removed with the account's file storage, purgeOriginals)
   'nl_sources',
 ] as const;
@@ -117,6 +119,7 @@ const LATE_TABLES = new Set<string>([
   'nl_node_versions',
   'nl_nodes',
   'nl_canvases',
+  'nl_representations',
   'ux_v0_projects',
   'ux_v0_usage',
   'ux_v0_calls',

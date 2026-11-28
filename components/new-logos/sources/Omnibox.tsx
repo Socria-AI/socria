@@ -20,7 +20,7 @@ export type Mention = Mentionable;
  *  not when a file brought in was attached (it has no words: only its × removes it) */
 type Attached = Mention & { typed?: boolean };
 
-const KIND_WORD = (k: Mention['kind']) => (k === 'source' ? 'Source' : TYPE_LABEL[k].one);
+const KIND_WORD = (m: Mention) => (m.kind === 'source' ? 'Source' : m.kind === 'component' || m.kind === 'group' ? m.hint : TYPE_LABEL[m.kind].one);
 /** what is being typed after an @, up to the caret */
 const atQuery = (text: string, caret: number) => /(^|\s)@([^\s@]{0,40})$/.exec(text.slice(0, caret));
 const atLabel = (m: Mention) => `@${m.label.replace(/\s+/g, ' ')}`;
@@ -32,6 +32,10 @@ export function Omnibox({
   onMake,
   conversationId,
   autoFocus,
+  pointing,
+  onUnpoint,
+  extra,
+  slash,
 }: {
   placeholder: string;
   busy?: boolean;
@@ -40,6 +44,13 @@ export function Omnibox({
   /** the conversation files brought in here join */
   conversationId?: string;
   autoFocus?: boolean;
+  /** what the next question is about, pointed at on the canvas ("Ask about this"): a mark above the line */
+  pointing?: { label: string } | null;
+  onUnpoint?: () => void;
+  /** more that can be mentioned here: this workspace's components and groups */
+  extra?: Mention[];
+  /** the / commands offered here; `now`: run as soon as chosen (they need no words) */
+  slash?: { name: string; hint: string; now?: boolean }[];
 }) {
   const { nodes, conversations } = useNL();
   const { sources, upload } = useSources();
@@ -51,7 +62,7 @@ export function Omnibox({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const everything = useMemo<Mention[]>(() => {
-    const out: Mention[] = sources.map((s) => ({ kind: 'source' as const, id: s.id, label: s.name, hint: 'Source' }));
+    const out: Mention[] = [...(extra ?? []), ...sources.map((s) => ({ kind: 'source' as const, id: s.id, label: s.name, hint: 'Source' }))];
     for (const n of nodes) {
       if (n.archived_at !== null) continue;
       if (n.type === 'conversation') {
@@ -62,10 +73,28 @@ export function Omnibox({
       out.push({ kind: n.type, id: n.id, label: n.title, hint: TYPE_LABEL[n.type].one });
     }
     return out;
-  }, [sources, nodes, conversations]);
+  }, [sources, nodes, conversations, extra]);
   const found = q === null ? [] : matchMentions(everything.filter((m) => !mentions.some((x) => x.id === m.id)), q, 7);
+  // "/" at the start: the commands, filtered by what follows it
+  const slashQ = /^\/([a-z]*)$/i.exec(text.trim())?.[1]?.toLowerCase() ?? null;
+  const commands = slashQ === null || !slash ? [] : slash.filter((c) => c.name.startsWith(slashQ)).slice(0, 9);
+  const [ci, setCi] = useState(0);
+  useEffect(() => setCi(0), [slashQ]);
+  const pick = (c: { name: string; now?: boolean }) => {
+    if (c.now) {
+      onAsk(`/${c.name}`, []);
+      setText('');
+      return;
+    }
+    setText(`/${c.name} `);
+    window.setTimeout(() => area.current?.focus(), 0);
+  };
 
   useEffect(() => setHi(0), [q]);
+  // pointed at something: ready to ask about it
+  useEffect(() => {
+    if (pointing) area.current?.focus();
+  }, [pointing]);
   // the line grows with what is written, to a few lines
   useEffect(() => {
     const el = area.current;
@@ -113,24 +142,47 @@ export function Omnibox({
   };
 
   return (
-    <div className="nl-omni nl-cv-ui" role="group" aria-label="Ask">
+    <div className="nl-omni nl-cv-ui" role="group" aria-label="Ask, or tell the workspace what to do">
+      {commands.length ? (
+        <ul className="nl-omni-found is-commands" role="listbox" aria-label="Commands">
+          {commands.map((c, k) => (
+            <li key={c.name} role="option" aria-selected={k === ci}>
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(c)} className={k === ci ? 'is-hi' : ''}>
+                <span className="nl-omni-label">/{c.name}</span>
+                <span className="nl-omni-kind">{c.hint}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {q !== null && found.length ? (
         <ul className="nl-omni-found" role="listbox" aria-label="Mention">
           {found.map((m, k) => (
             <li key={`${m.kind}-${m.id}`} role="option" aria-selected={k === hi}>
               <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => choose(m)} className={k === hi ? 'is-hi' : ''}>
-                <span className="nl-omni-kind">{KIND_WORD(m.kind)}</span>
+                <span className="nl-omni-kind">{KIND_WORD(m)}</span>
                 <span className="nl-omni-label">{m.label}</span>
               </button>
             </li>
           ))}
         </ul>
       ) : null}
-      {mentions.length ? (
+      {mentions.length || pointing ? (
         <div className="nl-omni-chips" aria-label="Attached">
+          {pointing ? (
+            <span className="nl-omni-chip is-about">
+              <span className="nl-omni-kind">About</span>
+              {pointing.label}
+              {onUnpoint ? (
+                <button type="button" aria-label="Not about this" onClick={onUnpoint}>
+                  ×
+                </button>
+              ) : null}
+            </span>
+          ) : null}
           {mentions.map((m) => (
             <span key={`${m.kind}-${m.id}`} className="nl-omni-chip">
-              <span className="nl-omni-kind">{KIND_WORD(m.kind)}</span>@{m.label}
+              <span className="nl-omni-kind">{KIND_WORD(m)}</span>@{m.label}
               <button type="button" aria-label={`Remove ${m.label}`} onClick={() => setMentions((all) => all.filter((x) => x.id !== m.id))}>
                 ×
               </button>
@@ -161,6 +213,12 @@ export function Omnibox({
             setQ(hit ? hit[2] : null);
           }}
           onKeyDown={(e) => {
+            if (commands.length) {
+              if (e.key === 'ArrowDown') return (e.preventDefault(), setCi((ci + 1) % commands.length));
+              if (e.key === 'ArrowUp') return (e.preventDefault(), setCi((ci - 1 + commands.length) % commands.length));
+              if (e.key === 'Enter' || e.key === 'Tab') return (e.preventDefault(), pick(commands[ci]));
+              if (e.key === 'Escape') return (e.preventDefault(), e.stopPropagation(), setText(''));
+            }
             if (q !== null && found.length) {
               if (e.key === 'ArrowDown') return (e.preventDefault(), setHi((hi + 1) % found.length));
               if (e.key === 'ArrowUp') return (e.preventDefault(), setHi((hi - 1 + found.length) % found.length));

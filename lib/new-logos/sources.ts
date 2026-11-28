@@ -369,7 +369,8 @@ export function usesOf(
 // ── finding things to mention ───────────────────────────────────────
 
 export interface Mentionable {
-  kind: 'source' | NodeRow['type'];
+  /** a source, a node, a component of this workspace (id: its component id) or a group (id: its group id) */
+  kind: 'source' | NodeRow['type'] | 'component' | 'group';
   id: string;
   label: string;
   hint: string;

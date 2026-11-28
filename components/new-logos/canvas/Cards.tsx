@@ -21,6 +21,7 @@ import { excerpt, exchangesOf, type Exchange } from '@/lib/new-logos/canvas';
 import { Prose } from '../Prose';
 import { Glyph, Menu, nodeHref, typeLabel, when } from '../ui';
 import { useNL } from '../state';
+import { RepPreview, useRepPreview } from '../represent/RepPreview';
 
 export function CardFrame({
   type,
@@ -431,6 +432,9 @@ export function ConversationCard({
   const exchanges = conv ? exchangesOf(conv.messages) : [];
   const last = exchanges[exchanges.length - 1];
   const title = conv ? displayTitle(conv.title) : 'Conversation unavailable';
+  // a conversation represented is shown by its picture, not its words
+  const rep = useRepPreview(conv?.id, conv?.updatedAt ?? 0);
+  const pictured = !!rep && rep.items.length > 0 && !streaming;
   return (
     <CardFrame
       type="conversation"
@@ -450,7 +454,16 @@ export function ConversationCard({
         ) : null
       }
     >
-      {!open ? (
+      {pictured ? (
+        <div className={`nl-card-body${open ? ' nl-cv-scroll' : ''}`}>
+          <RepPreview rep={rep!} max={open ? 8 : 3} />
+          {open && conv ? (
+            <Link className="nl-btn is-quiet is-small" href={`/new-logos/c/${encodeURIComponent(conv.id)}`}>
+              Open its canvas
+            </Link>
+          ) : null}
+        </div>
+      ) : !open ? (
         last ? (
           <div className="nl-card-summary">{excerpt(last.replies.map((r) => r.content).join(' ') || last.ask?.content || '', 180)}</div>
         ) : null

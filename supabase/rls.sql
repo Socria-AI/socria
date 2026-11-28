@@ -214,3 +214,6 @@ revoke all on nl_sources       from anon, authenticated;
 alter table nl_source_refs   enable row level security;
 alter table nl_source_refs   force row level security;
 revoke all on nl_source_refs   from anon, authenticated;
+alter table nl_representations enable row level security;
+alter table nl_representations force row level security;
+revoke all on nl_representations from anon, authenticated;

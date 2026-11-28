@@ -13,13 +13,25 @@ import type { StoredMessage } from './convo';
 
 // ── layout ───────────────────────────────────────────────────────────
 
-/** Where one object sits on a canvas, whether it is open, and what it was asked from (another object's ref). */
+/** Where one object sits on a canvas, whether it is open, what it was asked from (another object's ref), and the
+ *  spatial group it sits in. */
 export interface ItemLayout {
   x: number;
   y: number;
   open?: boolean;
   from?: string;
+  group?: string;
 }
+
+/** A spatial group: objects kept together (moved together, collapsed together) — presentation, never a semantic
+ *  relation. Named or not; inside another group or not; its place is where its members are. */
+export interface Group {
+  name?: string;
+  collapsed?: boolean;
+  parent?: string;
+}
+export const GROUP_ID_RE = /^g_[a-z0-9]{4,24}$/;
+export const GROUP_LIMITS = { groups: 300, depth: 8, name: 60 } as const;
 
 export interface View {
   x: number;
@@ -30,13 +42,14 @@ export interface View {
 export interface CanvasLayout {
   items: Record<string, ItemLayout>;
   view?: View;
+  groups?: Record<string, Group>;
 }
 
 export const EMPTY_LAYOUT: CanvasLayout = { items: {} };
 
-/** What an object on a canvas refers to: n:<node id>, x:<exchange key>, or s:<source id> (a source placed there: a
- *  reference to the library's record, never a copy). */
-export const REF_RE = /^(n|x|s):[A-Za-z0-9_-]{1,120}$/;
+/** What an object on a canvas refers to: n:<node id>, x:<exchange key>, s:<source id> (a source placed there: a
+ *  reference to the library's record, never a copy), or r:<item id> (an item of the conversation's representation). */
+export const REF_RE = /^(n|x|s|r):[A-Za-z0-9_-]{1,120}$/;
 /** A canvas's key: o:<objective node id>, c:<conversation id>, or a:<artifact node id> (an artifact's camera only:
  *  where its primitives sit is part of the artifact itself). */
 export const KEY_RE = /^(o|c|a):[A-Za-z0-9_-]{1,120}$/;
@@ -61,10 +74,41 @@ export function sanitizeLayout(raw: unknown): CanvasLayout {
     const it: ItemLayout = { x: Math.round(num(o.x, -CANVAS_LIMITS.coord, CANVAS_LIMITS.coord, 0)), y: Math.round(num(o.y, -CANVAS_LIMITS.coord, CANVAS_LIMITS.coord, 0)) };
     if (o.open === true) it.open = true;
     if (typeof o.from === 'string' && REF_RE.test(o.from) && o.from !== ref) it.from = o.from;
+    if (typeof o.group === 'string' && GROUP_ID_RE.test(o.group)) it.group = o.group;
     items[ref] = it;
     n++;
   }
-  const out: CanvasLayout = { items };
+  // groups: known ids, words in bounds, a parent that is a group, no group inside itself, never too deep
+  const gsrc = (r.groups && typeof r.groups === 'object' && !Array.isArray(r.groups) ? r.groups : {}) as Record<string, unknown>;
+  const groups: Record<string, Group> = {};
+  for (const [gid, v] of Object.entries(gsrc)) {
+    if (Object.keys(groups).length >= GROUP_LIMITS.groups) break;
+    if (!GROUP_ID_RE.test(gid) || !v || typeof v !== 'object') continue;
+    const o = v as Record<string, unknown>;
+    const g: Group = {};
+    const name = typeof o.name === 'string' ? o.name.replace(/\s+/g, ' ').trim().slice(0, GROUP_LIMITS.name) : '';
+    if (name) g.name = name;
+    if (o.collapsed === true) g.collapsed = true;
+    if (typeof o.parent === 'string' && GROUP_ID_RE.test(o.parent) && o.parent !== gid) g.parent = o.parent;
+    groups[gid] = g;
+  }
+  for (const [gid, g] of Object.entries(groups)) {
+    if (g.parent && !groups[g.parent]) delete g.parent;
+    // walk up: a loop, or a chain past the depth limit, is cut at this group
+    const seen = new Set([gid]);
+    let p = g.parent;
+    let depth = 0;
+    while (p) {
+      if (seen.has(p) || ++depth >= GROUP_LIMITS.depth) {
+        delete g.parent;
+        break;
+      }
+      seen.add(p);
+      p = groups[p]?.parent;
+    }
+  }
+  for (const it of Object.values(items)) if (it.group && !groups[it.group]) delete it.group;
+  const out: CanvasLayout = { items, ...(Object.keys(groups).length ? { groups } : {}) };
   const v = r.view as Record<string, unknown> | undefined;
   if (v && typeof v === 'object' && [v.x, v.y, v.k].every((x) => typeof x === 'number' && Number.isFinite(x))) {
     out.view = {
@@ -85,19 +129,65 @@ export function withItem(layout: CanvasLayout, ref: string, patch: Partial<ItemL
     const next = { ...(was ?? { x: 0, y: 0 }), ...patch };
     if (!next.open) delete next.open;
     if (!next.from) delete next.from;
+    if (!next.group) delete next.group;
     items[ref] = next;
   }
   return { ...layout, items };
 }
 
-/** Two layouts joined: everything either holds, `mine` winning where both place the same object. */
+/**
+ * A layout with one group set, or removed (`null`): a removed group's members and inner groups go up to its parent
+ * (ungrouping never deletes what was in it).
+ */
+export function withGroup(layout: CanvasLayout, gid: string, g: Group | null): CanvasLayout {
+  const groups = { ...(layout.groups ?? {}) };
+  if (g === null) {
+    const parent = groups[gid]?.parent;
+    delete groups[gid];
+    for (const [id, x] of Object.entries(groups))
+      if (x.parent === gid) {
+        const next: Group = { ...x };
+        if (parent) next.parent = parent;
+        else delete next.parent;
+        groups[id] = next;
+      }
+    const items = { ...layout.items };
+    for (const [ref, it] of Object.entries(items))
+      if (it.group === gid) {
+        const next = { ...it };
+        if (parent) next.group = parent;
+        else delete next.group;
+        items[ref] = next;
+      }
+    const out: CanvasLayout = { items };
+    if (layout.view) out.view = layout.view;
+    if (Object.keys(groups).length) out.groups = groups;
+    return out;
+  }
+  const clean: Group = {};
+  if (g.name) clean.name = g.name.slice(0, GROUP_LIMITS.name);
+  if (g.collapsed) clean.collapsed = true;
+  if (g.parent && g.parent !== gid) clean.parent = g.parent;
+  groups[gid] = clean;
+  return { ...layout, groups };
+}
+
+/** Two layouts joined: everything either holds, `mine` winning where both place the same object (or the same group,
+ *  `g:<id>` among what changed). */
 export function mergeLayouts(theirs: CanvasLayout, mine: CanvasLayout, changed: Set<string>): CanvasLayout {
   const items = { ...theirs.items };
+  const groups = { ...(theirs.groups ?? {}) };
   for (const ref of changed) {
+    if (ref.startsWith('g:')) {
+      const gid = ref.slice(2);
+      if (mine.groups?.[gid]) groups[gid] = mine.groups[gid];
+      else delete groups[gid];
+      continue;
+    }
     if (mine.items[ref]) items[ref] = mine.items[ref];
     else delete items[ref];
   }
-  return { items, ...(mine.view ? { view: mine.view } : theirs.view ? { view: theirs.view } : {}) };
+  return { items, ...(Object.keys(groups).length ? { groups } : {}), ...(mine.view ? { view: mine.view } : theirs.view ? { view: theirs.view } : {}) };
 }
 
 // ── exchanges ────────────────────────────────────────────────────────

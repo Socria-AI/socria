@@ -544,6 +544,362 @@ Before the migration they answer `{ setup: false }`, and the library says source
 Scanned pages that still need reading are shown as such. Reading them with vision from the library, as the main app
 can, is not wired in yet.
 
+## Representations: an answer is not a message
+
+On a conversation's canvas, what a person says is not answered with a message. It changes the conversation's
+**representation**: typed components joined by relations, revised turn by turn (`lib/new-logos/representation.ts`).
+The form follows the question:
+
+- "Why would she cheat on her boyfriend?" becomes the people involved, what the person said they saw, two to four
+  possibilities that would explain it, and the two or three open questions that would tell them apart;
+- a pricing question becomes a live model: variables, an equation, a plot and the number asked about;
+- a question with a plain answer becomes the question and one statement, and nothing else.
+
+### The components
+
+| Kind | What it is |
+|---|---|
+| question | what is being asked, as the person would say it |
+| statement | one concise claim: the answer, a supporting point, or a word of support. Its basis is said: well established, worked out here, from a source, or an interpretation |
+| hypothesis | a possibility, never a conclusion: open, more likely, less likely or ruled out, with the reason. No invented percentages |
+| observation | what was seen or said: by the person, in a document, or on record |
+| entity | a person or thing the problem involves |
+| unknown | missing information whose answer would change the picture, phrased as a question and answered in place |
+| caveat | a limit or risk that must stay visible (important, or a note) |
+| metric | one number that matters: written, or worked out from the model |
+| timeline, sequence | events in time (uncertain ones marked); steps in order |
+| document | a library source, at a passage |
+| equation, variable, plot, matrix, diagram, media | the interactive model: composition primitives (`lib/new-logos/primitives.ts`) sharing one scope of variables |
+
+**What is known stays apart from what is inferred.**
+
+- A relation is **established** (drawn solid) or **unverified** (drawn dashed), and the person can change either.
+- A hypothesis has a dashed outline and its standing in words.
+- What the person said is an observation of theirs. It is never upgraded to fact or dismissed.
+
+**Who made what is kept.**
+
+- The assistant may weigh the person's hypotheses and connect to them, but may not reword or remove anything the
+  person made.
+- Words the person rewrites become theirs.
+
+**The components are not identical cards** (`components/new-logos/represent/RepObject.tsx`). Each kind is drawn as
+what it is:
+
+- a question is set larger, an answer plainly, a hypothesis dashed with its standing;
+- an unknown has a box to answer it;
+- a metric is a number, a variable a slider, a plot a graph, a table a table;
+- a timeline is drawn in time order, a sequence as numbered steps.
+
+Reasoning (`detail`) appears only when a component is inspected.
+
+**Three levels of detail.**
+
+- **Canvas:** components are compact, relation labels appear only for what is selected, and far zoom shows less.
+- **Inspection** (`RepInspector.tsx`), when one component is selected:
+  - its standing, to edit or change;
+  - its reasoning and connections;
+  - where it is used;
+  - earlier wordings and what it cites;
+  - actions: ask about it, keep it in the workspace, remove it.
+- **Focus** (`RepFocus`): one component full size, for a model or a long timeline.
+
+**It evolves, and nothing is lost.**
+
+- A later turn revises what is there (update, status, answer, relate, merge) instead of adding another answer.
+- Earlier wordings stay readable (`was`).
+- Every change is a batch in the record's log, with the exact before-image of what it touched (`diff`), so any
+  change can be inspected and reversed.
+
+### One conversation, both ways
+
+The person's message is saved to the conversation before the representation is asked for. The turn, put into words
+from the components it changed (`recordOf`), is saved as the reply. So the existing interface reads the same
+conversation as an ordinary thread. There is one conversation, in the existing table; the components are kept beside
+it, keyed by the conversation, never as a second copy of its messages.
+
+- Turns made in the existing interface are taken into the representation at the next turn on the canvas.
+- Exchanges already taken in are not drawn again.
+- Before the migration (below), or when the representation cannot be set up, a conversation's canvas answers with
+  exchanges as before.
+
+## Workspaces and their components
+
+A **workspace** is either:
+
+- a conversation's space, `c:<conversation id>`; or
+- an objective's space, `o:<objective node id>`.
+
+Each workspace has one components document (`nl_representations`: `{ rep, log }`, compare-and-swap on a version)
+and one layout (`nl_canvases`, the same key).
+
+| Concern | Where it lives |
+|---|---|
+| What a component says | the document |
+| Where it sits, its group, whether it is open | the layout, as `r:<id>` |
+| How it is drawn | the renderer |
+| Why it says it | its `detail`, and the turn recorded in the conversation |
+
+**Server side** (`lib/new-logos/representation-service.ts`), every change goes through `applyRepOps`
+(`lib/new-logos/representation-ops.ts`):
+
+- the person's batches, from any surface;
+- the assistant's turns, which apply to a conversation's workspace only;
+- undo.
+
+A person's batch made from a stale copy is refused with the current state, and the page re-applies it to the newer
+state. An assistant turn or an undo is made again on the newer record.
+
+**Limits:** 120 components, 240 relations, 80 operations a batch, and a log of 40 batches or 900 kB, whichever comes
+first. Undo reaches as far back as the log does.
+
+**Synchronised, computational and independent.**
+
+- Model components share one scope of variables. Moving a slider moves every equation, plot, table and metric that
+  uses it, in dependency order.
+- **Keep in the workspace** turns a component into a node (knowledge, a question or a decision, with provenance):
+  - it goes into the workspace's objective (the objective whose space it is, or the one the conversation sits in),
+    or the top level when there is none;
+  - it is the canonical object, which other workspaces can show;
+  - it links back to the component;
+  - it carries its relations to decisions and the rest of the graph;
+  - keeping is one change: undoing it unlinks the component and archives the node, which is never deleted.
+- **Duplicate** and **another version** make independent copies. A copied model gets its own variable names, so
+  changing the copy never moves the original.
+
+## The operation engine
+
+Every way of changing a workspace reaches the same command and makes the same change:
+
+- the Smart Omnibox (plain English or a `/` command);
+- the floating action bar;
+- the context menu;
+- keyboard shortcuts;
+- a drag on the canvas;
+- the assistant.
+
+`lib/new-logos/engine/commands.ts` defines each operation once. A command says:
+
+- what it needs: nothing, one object, some, or two;
+- when it is offered, for the current selection;
+- its **plan**: one transaction.
+
+A plan has four parts, all optional:
+
+- **components:** representation operations, validated again on the server;
+- **layout:** positions and groups (`lib/new-logos/groups.ts` patches);
+- **nodes:** a new workspace, a rename, an archive, a connection;
+- **interface:** selection, focus, a filter, navigation, the library, inspection.
+
+It may also carry a question for the intelligence layer (an analytical transformation). Plans are pure and tested
+without a browser.
+
+| Command | What it does |
+|---|---|
+| create | a component of any kind, from words (`/table Price, Cost`, `/equation y = 2x + 1`, `/diagram A -> B -> C`) |
+| rename, set | rename a component, group or variable; set a variable to a value ("make growth 2%") |
+| move, organise | place things beside or below another; arrange what is loose into rows by kind |
+| select, focus, inspect, open | choose, bring into view, open the details, open a node or document |
+| group, ungroup, collapse, expand, enter | spatial groups (below) |
+| connect, disconnect | a relation of a named kind and standing. Asked which kind when none is named |
+| transform | show it another way, or make something new from it (below) |
+| filter | show only what relates to something; show everything again |
+| backlinks | where something is used |
+| duplicate, version | independent copies; a version under another assumption |
+| delete | remove components, or a group with what it holds; asks first when more than three things, a group, or anything kept in the workspace is affected (a kept node is archived, never deleted). A document is only taken off the canvas; the library keeps it |
+| compare | what is the same and what differs, for the intelligence layer |
+| find-source, library | find documents ("the PDF I uploaded yesterday") and place them |
+| new-workspace | make an objective and go there |
+| history, undo, redo | the record; undo one, several, or "everything I just did" |
+
+**The executor** (`components/new-logos/engine/useEngine.ts`) runs a plan as one change: layout, then components,
+then nodes, then the interface.
+
+- If a part fails, the parts already made are reversed, so a change happens whole or not at all.
+- Each change is recorded with how to reverse it and how to make it again.
+- **Undo and redo** walk that record. "Undo everything I just did" reverses the person's latest burst of changes.
+- The assistant's turns are recorded too, so undo reaches them.
+- A plan that needs a yes waits for one, and nothing is changed until then.
+
+**The assistant never changes stored state directly.** Its components arrive as operations and go through the same
+validation as the person's. Its `commands` (arranging, grouping, showing another way) are planned by the same
+registry against the workspace as it then is (`planFromModel`), and then run by the same executor.
+
+## The Smart Omnibox
+
+The Omnibox floats at the bottom centre. It is where everything can be said. It reads what is typed in this order
+(`interpret`):
+
+1. **A `/` command.** The menu opens as you type `/`, and offers only what applies to the selection.
+
+   | Command | Does |
+   |---|---|
+   | `/thought`, `/question`, `/text` | a thought of yours, a question, a line of text |
+   | `/table`, `/plot`, `/equation`, `/model` | a table (name its columns); a plot of y = …, or the selection drawn as one; an equation; a live model |
+   | `/timeline`, `/diagram` | a timeline (when: what; …), or the selected steps as one; a diagram (A -> B -> C) |
+   | `/document`, `/source` | place a document from the library; find or bring one in |
+   | `/group`, `/connect`, `/transform` | group the selection; connect the two selected; show the selection another way |
+   | `/undo` | undo the last change |
+
+2. **An instruction it can read without inference** (`lib/new-logos/engine/intent.ts`, deterministic rules). For
+   example:
+   - "group these and collapse them";
+   - "connect the price to revenue as causes";
+   - "turn this table into a bar chart";
+   - "make growth 2%";
+   - "hide everything unrelated to pricing";
+   - "where is the revenue model used?";
+   - "undo everything I just did";
+   - "find the PDF I uploaded yesterday";
+   - "create a new workspace for the grant application".
+
+   Compound instructions are planned in order, each against the state the last leaves ("them" is the new group), and
+   run as one change.
+3. **References resolved to persistent ids** (`lib/new-logos/engine/resolve.ts`):
+   - "this", "it", "these": the selection;
+   - `@` mentions: exact ids, chosen from a menu of every component, group, node, document and exchange here;
+   - names, matched only when one match is clearly best;
+   - kinds ("the plot", "the open questions");
+   - "everything related to X".
+
+   Renaming or moving an object never breaks a reference.
+4. **Unclear words are said to be unclear**, with the candidates to choose from, rather than guessed.
+5. **Anything else** goes to the intelligence layer: a question, a thought, or an instruction not read here.
+   - In a conversation it becomes a turn of the representation.
+   - In an objective's space it starts a conversation inside the objective, whose turn is represented there.
+
+What changed is said in a short note, with **Undo**, and with up to two alternative views when the assistant offers
+them.
+
+## Direct manipulation
+
+| Action | How |
+|---|---|
+| Select | click; shift-click or shift-drag a marquee for several; ⌘A for everything in the workspace |
+| Move | drag a component's top, or a group's label; several selected move together |
+| Connect | drag a handle onto another component, then choose the kind and the standing |
+| Act on the selection | the floating action bar, which shows only what applies (group, connect, transform, compare, focus, …) |
+| Context menu | right-click, or a long press on touch: the same actions, plus making something where you clicked |
+| Make something where you are | double-click the plane: ask, or place an observation, a possibility or an open question |
+| Shortcuts | ⌘Z undo; ⇧⌘Z or ⌘Y redo; ⌘G group; ⇧⌘G ungroup; ⌘D duplicate; Delete or Backspace remove; Escape clears a filter, then the selection (Ctrl in place of ⌘ elsewhere) |
+
+The canvas never rearranges what the person placed unless asked ("organise this"). New components go beside what
+they belong to (`placeRep`, `lib/new-logos/rep-layout.ts`), into free space.
+
+## Groups
+
+A group is presentation, held in the layout (`groups`, and each item's `group`). It says nothing about what its
+members mean to each other; that is what relations are for. Groups:
+
+- nest inside groups, up to eight deep;
+- can be named and renamed;
+- **collapse** into one small tile that says what it holds, and expand again;
+- **move whole**, every member keeping its place relative to the others;
+- **ungroup** without deleting anything: the members stay in place, in the group around it;
+- can be entered, which focuses on what they hold.
+
+A group has no position of its own: its frame is where its members are. Every group change is a layout patch with
+an exact inverse (`invertPatch`), so it is undone like any other change and saved with the canvas.
+
+## Transformations
+
+`lib/new-logos/engine/transforms.ts` keeps two different things apart.
+
+**A change of representation** shows the same information another way. It is deterministic, instant, lossless and
+reversible: the data is untouched and only the component's `view` changes. Only what the data allows is offered.
+
+| From | To |
+|---|---|
+| a table | a plot (two number columns), bars (one), or measures |
+| a plot of functions | the table of its values |
+| steps | a timeline, and back |
+| an equation in x | its graph |
+| a variable | a slider, or a number |
+
+**An analytical transformation** makes something new, which takes reasoning. It goes to the intelligence layer with
+the components named. The original is kept as it is, and what is made is tied to it as derived from it. Examples:
+
+- the quantities in some notes made into a model;
+- several thoughts mapped into how they relate;
+- a summary;
+- a comparison.
+
+## Relationships and backlinks
+
+- **Semantic relations** say what one component means to another: supports, contradicts, explains, causes, leads to,
+  part of, answers, depends on, derives from, refers to, about, relates. Each is established or unverified. A
+  label is shown only for what is selected.
+- **Computational relations** come from the model itself: an equation computed from a variable, a plot or metric
+  measured from it. They are drawn and listed without being stored as relations, so they are never stale.
+- **Synchronised relations** come from keeping a component as a node: the node can be shown in other workspaces and
+  related to decisions, and the component links to it.
+
+**Backlinks.** "Where is it used" is a section of the inspector. "Where is the revenue model used?" in the Omnibox
+opens it. It lists:
+
+- what depends on the component, what it supports or contradicts, and what derives from it;
+- what is computed from it;
+- the node it was kept as, where that node is shown, and what relies on it.
+
+## The representation intelligence
+
+`POST /api/new-logos/represent` reads a turn and returns operations, never prose. It reads:
+
+- the representation;
+- what was said before, including turns made in the existing interface;
+- what the person is pointing at;
+- the passages of their documents that bear on the turn.
+
+It answers with:
+
+- the updated record and what changed;
+- where the change sits;
+- up to two alternative views;
+- any workspace commands.
+
+**Gating.** It is gated like every route that asks a model for the person:
+
+- signed in;
+- rate-limited as a chat turn;
+- a new conversation counted as the chat route counts it;
+- the trial's tokens (Sleep Mode);
+- each call metered.
+
+The model is chosen by the existing router (`chooseAuxModel`; `OPENAI_MODEL_LOGOS_REPRESENT` overrides it) and
+answers in JSON within a deadline.
+
+**Reading the answer.**
+
+- It is read leniently (`represent-model.ts`): fences, trailing commas, a cut-off answer, synonyms.
+- It is then applied strictly (`applyRepOps`): unknown kinds, ids and fields are dropped and said.
+- An unreadable answer gets one more attempt, uncounted.
+- Nothing is saved from an answer that would leave the representation empty, and the result is checked by a dry run
+  before it is saved.
+
+**What the assistant is told** (`represent-prompt.ts`):
+
+- keep what is known apart from what is inferred;
+- motives and uncertain causes are hypotheses;
+- never put numbers on confidence;
+- never invent facts about real people;
+- keep consequential risk visible;
+- revise rather than repeat;
+- leave the person's words alone;
+- keep text to a sentence;
+- use a richer form only when it communicates better;
+- for distress, lead with plain support and never draw a diagram of it.
+
+These rules are also held in code where they can be.
+
+## Not yet built, deliberately
+
+- **Reusable environments.** A workspace's components and layout are keyed and versioned, so a saved environment
+  can become another key, without changing the model. Nothing creates or applies one yet.
+- **Layout history beyond the session.** Layout changes are saved with the canvas, but their undo record lasts for
+  the page's session. The components' history is persisted in the log.
+- **Turns into an objective's own components.** In an objective's space the assistant answers through a conversation
+  inside the objective. The objective's own components are changed by the person and by the commands they give.
+
 ## Server and storage
 
 The API routes:
@@ -560,16 +916,23 @@ The API routes:
 | `/api/new-logos/relations` | POST |
 | `/api/new-logos/relations/:id` | DELETE |
 | `/api/new-logos/context` | GET |
-| `/api/new-logos/canvas` | GET, PUT (one canvas's layout, or an artifact's camera: compare-and-swap on its version) |
+| `/api/new-logos/canvas` | GET, PUT (one canvas's layout, with its groups, or an artifact's camera: compare-and-swap on its version) |
+| `/api/new-logos/representations` | GET (a workspace's components and their log, by key `c:…` or `o:…`), POST (the person's batch of operations: compare-and-swap on the version; a stale batch is refused with the current state) |
+| `/api/new-logos/representations/undo` | POST (reverse one logged change, itself logged, so it can be redone) |
+| `/api/new-logos/represent` | POST (a conversation's turn, represented: gated and metered like a chat turn) |
 
 Every query is scoped with `.eq('user_id', userId)`, and the tables are walled by RLS like every other table.
 
-The tables are `nl_nodes`, `nl_relations`, `nl_node_versions` and `nl_canvases`, in `supabase/schema.sql` (additive
-only: four new tables, nothing altered) and walled in `supabase/rls.sql`.
+The tables are `nl_nodes`, `nl_relations`, `nl_node_versions`, `nl_sources`, `nl_source_refs`, `nl_canvases` and
+`nl_representations`, in `supabase/schema.sql` (additive only: new tables, nothing altered) and walled in
+`supabase/rls.sql`. Deleting an account removes the person's rows from all of them, and the account export includes
+each workspace's components (`workspaceRepresentations`).
 
 **To enable organisation on a database, run `supabase/schema.sql`, then `supabase/rls.sql`.** Both are idempotent.
 Until then, New Logos lists and continues every conversation, and shows a neutral notice that objectives and the other
-node types are not set up yet. The routes answer `{ setup: false }` and write nothing.
+node types are not set up yet. The routes answer `{ setup: false }` and write nothing. A database that has the earlier
+tables but not `nl_representations` keeps working as before: conversations answer with exchanges, and an objective's
+space shows its nodes, until the scripts are run again.
 
 The relaunch gate (`lib/takeover.ts`) treats `/new-logos` as part of the app. The gate is off unless switched on.
 
@@ -624,12 +987,36 @@ The relaunch gate (`lib/takeover.ts`) treats `/new-logos` as part of the app. Th
     the size limit, exact coalescing, and exact undo of every kind of batch;
   - server application with per-burst versions and a lost race re-applied;
   - what the assistant is told, inside the existing objective and focus contracts.
+- `test/new-logos-representation.test.mjs` (80 checks), representations:
+  - items and relations checked, with every field cleaned and limited;
+  - an interpersonal question represented with what is known kept apart from what is inferred;
+  - what the person made left alone by the assistant, and words the person rewrites becoming theirs;
+  - merging, revising and reversing exactly, including undo of an undo;
+  - the limits of a document, a batch and the log;
+  - the interactive model sharing one scope; a factual question kept small;
+  - the assistant's answer read leniently (fences, trailing commas, cut-off answers, bare arrays, synonyms).
+- `test/new-logos-represent-route.test.mjs` (58 checks), through the real routes with the fake database:
+  - signed out, and before the migration;
+  - a first turn becoming a representation and a record, not a reply; a second turn revising it;
+  - the person's own batches, races refused with the current state, and undo;
+  - an objective's workspace, and another account seeing nothing;
+  - turns made elsewhere, what is pointed at, and documents' passages taken in;
+  - answers that cannot be used leaving nothing saved;
+  - the same gates as every route that asks a model for the person.
+- `test/new-logos-engine.test.mjs` (95 checks), the operation engine:
+  - groups in the layout: nesting, collapse, move whole, ungroup without deleting, and exact inverses;
+  - plain English read deterministically, including compound instructions;
+  - references: the selection, mentions, names, kinds and "everything related to", with the unclear said so;
+  - what each instruction does in a workspace, and confirmation for what is destructive;
+  - the same operation however it is asked for (words, a slash command, the action bar, the assistant);
+  - slash commands; representations of the same information; placing what is new without moving what is placed.
 
 ## What comes next (deliberately not built)
 
 - autonomous agents and reasoning orchestration;
 - automatic objective breakdown;
-- the assistant creating and changing primitives (the operation system it will use is built and validated);
+- the assistant changing artifact nodes (it builds and revises the model components of a representation, through the
+  same validated operations, but an artifact kept as a node is changed only by the person);
 - arbitrary code execution inside artifacts (deliberately absent: the expression language is evaluated, never run);
 - fine-grained table operations (a table edit replaces its rows or columns as one change, so two people typing in
   different cells of the same table at the same moment keep the later edit);

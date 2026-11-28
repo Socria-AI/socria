@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { EMPTY_LAYOUT, mergeLayouts, sanitizeLayout, withItem, type CanvasLayout, type ItemLayout, type View } from '@/lib/new-logos/canvas';
+import { applyPatch, type LayoutPatch } from '@/lib/new-logos/groups';
 
 const LOCAL = (key: string) => `workspace.canvas.v1.${key}`;
 
@@ -31,6 +32,10 @@ export interface LayoutApi {
   setItem: (ref: string, patch: Partial<ItemLayout> | null) => void;
   setItems: (patches: Record<string, Partial<ItemLayout> | null>) => void;
   setView: (view: View) => void;
+  /** items and groups changed together (the operation engine's layout patches) */
+  apply: (patch: LayoutPatch) => void;
+  /** the layout as it is this moment (for working out a change's exact inverse) */
+  current: () => CanvasLayout;
 }
 
 export function useCanvasLayout(key: string | null): LayoutApi {
@@ -191,5 +196,17 @@ export function useCanvasLayout(key: string | null): LayoutApi {
     [scheduleSoon]
   );
 
-  return { layout, loaded, setItem, setItems, setView };
+  const apply = useCallback(
+    (patch: LayoutPatch) => {
+      latest.current = applyPatch(latest.current, patch);
+      for (const ref of Object.keys(patch.items ?? {})) changed.current.add(ref);
+      for (const gid of Object.keys(patch.groups ?? {})) changed.current.add(`g:${gid}`);
+      setLayout(latest.current);
+      schedule();
+    },
+    [schedule]
+  );
+  const current = useCallback(() => latest.current, []);
+
+  return { layout, loaded, setItem, setItems, setView, apply, current };
 }

@@ -24,3 +24,17 @@ export * as SrcOps from '../../lib/new-logos/source-ops';
 export { memorySourceStore } from '../../lib/new-logos/source-store';
 export { readPlain } from '../../lib/docs/plain';
 export { sanitizeSourceDoc } from '../../lib/docs/sanitize';
+// representations: a problem as typed items and relations that evolve, the operations that change them, and the
+// reading of what the assistant sends back
+export * as Rep from '../../lib/new-logos/representation';
+export * as RepOps from '../../lib/new-logos/representation-ops';
+export * as RepModel from '../../lib/new-logos/represent-model';
+// the unified operation engine: spatial groups, placement, commands, intent, references, transformations
+export * as Groups from '../../lib/new-logos/groups';
+export * as RepLayout from '../../lib/new-logos/rep-layout';
+export * as Cmd from '../../lib/new-logos/engine/commands';
+export * as Intent from '../../lib/new-logos/engine/intent';
+export * as Resolve from '../../lib/new-logos/engine/resolve';
+export * as Xf from '../../lib/new-logos/engine/transforms';
+export * as RepSvc from '../../lib/new-logos/representation-service';
+export { memoryRepresentationStore } from '../../lib/new-logos/representation-store';

@@ -9,10 +9,21 @@ import type { NodeType } from '@/lib/new-logos/model';
 import { STARTERS, STARTER_LABEL, type Starter } from '@/lib/new-logos/primitives';
 import { Glyph, typeLabel } from '../ui';
 
-export type Makeable = 'ask' | NodeType;
+/** an item of the representation made by the person, with no question to the assistant */
+export type RepMakeable = 'observation' | 'hypothesis' | 'unknown';
+export type Makeable = 'ask' | NodeType | RepMakeable;
+export const isRepMakeable = (t: Makeable): t is RepMakeable => t === 'observation' || t === 'hypothesis' || t === 'unknown';
+const REP_WORD: Record<RepMakeable, { label: string; mark: string }> = {
+  observation: { label: 'Known', mark: '●' },
+  hypothesis: { label: 'Possibility', mark: '◇' },
+  unknown: { label: 'Unknown', mark: '?' },
+};
 
 const PLACEHOLDER: Record<Makeable, string> = {
   ask: 'Ask the assistant anything',
+  observation: 'Something you know, or have seen',
+  hypothesis: 'A possibility: not established',
+  unknown: 'Something not known yet',
   objective: 'What do you want to accomplish, investigate or understand?',
   conversation: 'Start a conversation',
   question: 'What is unresolved?',
@@ -50,8 +61,8 @@ export function Creator({ screen, types, onSubmit, onClose }: { screen: { x: num
       <div className="nl-seg" role="group" aria-label="What to make">
         {types.map((t) => (
           <button key={t} type="button" aria-pressed={type === t} onClick={() => setType(t)}>
-            {t === 'ask' ? <span aria-hidden="true">?</span> : <Glyph type={t} size={13} />}
-            {t === 'ask' ? 'Ask' : typeLabel(t)}
+            {t === 'ask' ? <span aria-hidden="true">→</span> : isRepMakeable(t) ? <span aria-hidden="true">{REP_WORD[t].mark}</span> : <Glyph type={t} size={13} />}
+            {t === 'ask' ? 'Ask' : isRepMakeable(t) ? REP_WORD[t].label : typeLabel(t)}
           </button>
         ))}
       </div>
@@ -82,12 +93,12 @@ export function Creator({ screen, types, onSubmit, onClose }: { screen: { x: num
         </label>
       ) : null}
       <div className="nl-row" style={{ justifyContent: 'flex-end' }}>
-        <span className="nl-hint nl-grow">{type === 'ask' ? 'The answer appears here, on the canvas.' : type === 'artifact' ? 'Placed here; open it to compose.' : 'It is placed here.'}</span>
+        <span className="nl-hint nl-grow">{type === 'ask' ? 'The picture of it appears on the canvas.' : type === 'artifact' ? 'Placed here; open it to compose.' : isRepMakeable(type) ? 'Placed here, as yours.' : 'It is placed here.'}</span>
         <button type="button" className="nl-btn is-quiet is-small" onClick={onClose}>
           Cancel
         </button>
         <button type="button" className="nl-btn is-primary is-small" disabled={!text.trim()} onClick={go}>
-          {type === 'ask' ? 'Ask' : 'Create'}
+          {type === 'ask' ? 'Ask' : isRepMakeable(type) ? 'Add' : 'Create'}
         </button>
       </div>
     </div>

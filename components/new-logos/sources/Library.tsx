@@ -52,9 +52,17 @@ const canvasHref = (key: string) => (key.startsWith('o:') ? `/new-logos/w/${enco
 
 export function SourceLibrary() {
   const { nodes, conversations, say } = useNL();
-  const { setup, sources, refs, placements, pending, uploading, upload, adopt, rename, remove, openViewer, placer } = useSources();
+  const { setup, sources, refs, placements, pending, uploading, upload, adopt, rename, remove, openViewer, placer, libraryAsk } = useSources();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [since, setSince] = useState<number | null>(null);
+  // asked to open by a command ("find the document I uploaded yesterday"): open, looking for that
+  useEffect(() => {
+    if (!libraryAsk) return;
+    setOpen(true);
+    setQuery(libraryAsk.query ?? '');
+    setSince(libraryAsk.since ?? null);
+  }, [libraryAsk]);
   const [filter, setFilter] = useState<Filter>('all');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -93,6 +101,7 @@ export function SourceLibrary() {
 
   const q = query.trim().toLowerCase();
   const shown = sources.filter((s) => {
+    if (since !== null && (s.created_at ?? 0) < since) return false;
     if (q && !s.name.toLowerCase().includes(q) && !s.file_name.toLowerCase().includes(q)) return false;
     if (filter === 'document') return s.kind !== 'image';
     if (filter === 'image') return s.kind === 'image';

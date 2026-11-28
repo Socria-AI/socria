@@ -3195,3 +3195,934 @@ a.nl-list-row:hover {
   vertical-align: super;
   line-height: 0;
 }
+
+/* ── representations: components drawn by what they are (lib/new-logos/representation.ts) ──────────────────────
+ * Standing is carried by outline and marks, never colour alone: established solid, possible dashed, ruled out
+ * dotted and struck through; what the person said, a filled mark; what is missing, hollow. The canvas stays quiet:
+ * secondary words appear on selection, inspection holds the reasoning. */
+.nl-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.nl-r {
+  position: relative;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--nl-bg);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--nl-text);
+  cursor: grab;
+  transition: box-shadow 0.15s, opacity 0.2s;
+}
+.nl-r:active {
+  cursor: grabbing;
+}
+.nl-r-text {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.nl-r-title {
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--nl-muted);
+}
+.nl-r.is-question {
+  padding: 6px 8px;
+  /* the plane's own colour, so lines pass beneath the question rather than through its words */
+  background: var(--nl-bg);
+}
+.nl-r.is-question .nl-r-text {
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+.nl-r.is-question.is-pending .nl-r-text {
+  color: var(--nl-muted);
+}
+.nl-r.is-statement {
+  border-left: 2px solid var(--nl-text);
+  border-radius: 0 8px 8px 0;
+}
+.nl-r.is-statement.is-basis-interpretation {
+  border-left: 2px dashed var(--nl-faint);
+}
+.nl-r.is-statement.is-role-answer .nl-r-text {
+  font-size: 15.5px;
+  font-weight: 500;
+}
+.nl-r.is-statement.is-role-support {
+  border-left-color: var(--nl-line-strong);
+  border-left-style: solid;
+}
+.nl-r.is-hypothesis {
+  border: 1.5px dashed var(--nl-line-strong);
+  border-radius: 12px;
+}
+.nl-r.is-hypothesis.is-stronger {
+  border-color: var(--nl-text);
+}
+.nl-r.is-hypothesis.is-stronger .nl-r-text {
+  font-weight: 600;
+}
+.nl-r.is-hypothesis.is-weaker {
+  opacity: 0.62;
+}
+.nl-r.is-hypothesis.is-ruled_out {
+  border-style: dotted;
+  opacity: 0.45;
+}
+.nl-r.is-hypothesis.is-ruled_out .nl-r-text {
+  text-decoration: line-through;
+}
+.nl-r-standing {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--nl-muted);
+}
+.nl-r.is-observation {
+  border: 1px solid var(--nl-line-strong);
+  border-radius: 6px;
+  padding-left: 24px;
+}
+.nl-r.is-observation::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 16px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--nl-text);
+}
+.nl-r.is-entity {
+  display: inline-block;
+  padding: 5px 14px;
+  border: 1px solid var(--nl-text);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.nl-r.is-unknown {
+  border: 1px dashed var(--nl-line);
+  color: var(--nl-muted);
+}
+.nl-r.is-unknown.is-answered {
+  color: var(--nl-text);
+  border-style: solid;
+}
+.nl-r-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  margin-right: 7px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: 1px;
+}
+.nl-r-answer {
+  margin: 6px 0 0 24px;
+  color: var(--nl-text);
+  font-size: 13.5px;
+}
+.nl-r.is-caveat {
+  font-size: 13px;
+  color: var(--nl-muted);
+  background: transparent;
+}
+.nl-r.is-caveat.is-important {
+  color: var(--nl-text);
+  border-left: 2px solid var(--nl-text);
+  border-radius: 0 8px 8px 0;
+  background: var(--nl-bg);
+}
+.nl-r.is-metric {
+  border: 1px solid var(--nl-line);
+}
+.nl-r-value {
+  font-size: 27px;
+  font-weight: 600;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.nl-r-unit {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--nl-muted);
+}
+.nl-r-label {
+  font-size: 12px;
+  color: var(--nl-muted);
+}
+.nl-r-tl,
+.nl-r-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nl-r-tl li {
+  display: grid;
+  grid-template-columns: 78px 12px 1fr;
+  gap: 8px;
+  align-items: start;
+  padding: 3px 0;
+  position: relative;
+}
+.nl-r-when {
+  font-size: 12px;
+  color: var(--nl-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.nl-r-dot {
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--nl-text);
+  position: relative;
+}
+.nl-r-tl li:not(:last-child) .nl-r-dot::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 10px;
+  height: 30px;
+  border-left: 1px solid var(--nl-line-strong);
+}
+.nl-r-tl li.is-unsure .nl-r-dot {
+  background: var(--nl-bg);
+  border: 1.5px dashed var(--nl-text);
+}
+.nl-r-steps {
+  counter-reset: step;
+}
+.nl-r-steps li {
+  counter-increment: step;
+  position: relative;
+  padding: 3px 0 3px 26px;
+}
+.nl-r-steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--nl-line-strong);
+  border-radius: 50%;
+  font-size: 11px;
+  text-align: center;
+  line-height: 16px;
+  color: var(--nl-muted);
+}
+.nl-r-doc {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 5px 10px;
+  border: 1px solid var(--nl-line-strong);
+  border-radius: 6px;
+  background: var(--nl-surface);
+  font: inherit;
+  font-size: 13px;
+  color: var(--nl-text);
+  cursor: pointer;
+  text-align: left;
+}
+.nl-r-doc:hover {
+  border-color: var(--nl-text);
+}
+.nl-r-page {
+  color: var(--nl-muted);
+  font-size: 12px;
+}
+.nl-r.is-document {
+  padding: 4px;
+  background: transparent;
+}
+.nl-r.is-document .nl-r-text {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--nl-muted);
+}
+.nl-r-cite {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+  padding: 0 4px;
+  border: 1px solid var(--nl-line);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--nl-muted);
+  font-size: 10.5px;
+  vertical-align: 1px;
+  cursor: pointer;
+}
+.nl-r.is-equation,
+.nl-r.is-variable,
+.nl-r.is-plot,
+.nl-r.is-matrix,
+.nl-r.is-diagram,
+.nl-r.is-media {
+  border: 1px solid var(--nl-line);
+  background: var(--nl-surface);
+  cursor: default;
+}
+.nl-r.is-equation .nl-r-title,
+.nl-r.is-plot .nl-r-title,
+.nl-r.is-matrix .nl-r-title,
+.nl-r.is-diagram .nl-r-title {
+  cursor: grab;
+}
+.nl-r-prim.is-plot {
+  height: 270px;
+}
+.nl-r-prim.is-diagram {
+  height: 240px;
+}
+.nl-r-prim.is-media {
+  height: 230px;
+}
+.nl-r-prim.is-line {
+  margin-bottom: 6px;
+}
+.nl-r-kept {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--nl-text);
+  border-radius: 2px;
+}
+.nl-r-bars {
+  margin: 0;
+}
+.nl-r-bar {
+  display: grid;
+  grid-template-columns: minmax(60px, 34%) 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 2px 0;
+  font-size: 12.5px;
+}
+.nl-r-bar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nl-r-bar-track {
+  height: 10px;
+  background: var(--nl-sunk);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.nl-r-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--nl-text);
+}
+.nl-r-bar-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--nl-muted);
+}
+.nl-r-metrics {
+  display: grid;
+  gap: 10px;
+}
+.nl-r-mrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12px;
+  color: var(--nl-muted);
+}
+.nl-r-mrow b {
+  font-size: 16px;
+  color: var(--nl-text);
+  font-variant-numeric: tabular-nums;
+}
+.nl-r-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.nl-r-table th,
+.nl-r-table td {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--nl-line);
+  text-align: right;
+}
+.nl-r-table th:first-child,
+.nl-r-table td:first-child {
+  text-align: left;
+}
+.nl-cv-obj.is-rep.is-selected > .nl-r {
+  box-shadow: 0 0 0 2px var(--nl-focus);
+}
+.nl-cv-obj.is-multi > .nl-r,
+.nl-cv-obj.is-multi > .nl-card {
+  box-shadow: 0 0 0 2px var(--nl-focus), 0 0 0 5px var(--nl-sunk);
+}
+.nl-r.is-fresh {
+  animation: nl-fresh 2.6s ease-out;
+}
+@keyframes nl-fresh {
+  0% {
+    box-shadow: 0 0 0 4px var(--nl-line-strong);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.nl-rwork {
+  display: inline-block;
+  width: 26px;
+  height: 6px;
+  background: radial-gradient(circle, var(--nl-muted) 2px, transparent 2.5px) 0 0 / 9px 6px repeat-x;
+  animation: nl-work 1.1s linear infinite;
+  vertical-align: middle;
+}
+@keyframes nl-work {
+  to {
+    background-position: 9px 0;
+  }
+}
+.nl-cv-obj.is-dimmed {
+  opacity: 0.16;
+  pointer-events: none;
+  filter: grayscale(1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .nl-r.is-fresh,
+  .nl-rwork {
+    animation: none;
+  }
+}
+
+/* density by zoom: far out, only what each thing is; the details return as you come closer */
+.nl-cv.is-far .nl-r-standing,
+.nl-cv.is-far .nl-r-answer,
+.nl-cv.is-far .nl-r-cite,
+.nl-cv.is-far .nl-r-page,
+.nl-cv.is-far .nl-card-summary,
+.nl-cv.is-far .nl-cv-label {
+  display: none;
+}
+.nl-cv.is-farther .nl-r-text,
+.nl-cv.is-farther .nl-card-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── groups: frames behind their members, collapsed groups as one tile ── */
+.nl-cv-frame {
+  position: absolute;
+  border: 1px dashed var(--nl-line-strong);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--nl-text) 1.6%, transparent);
+  pointer-events: none;
+}
+.nl-cv-frame.is-selected {
+  border: 1.5px solid var(--nl-text);
+}
+.nl-cv-frame-label {
+  position: absolute;
+  left: 12px;
+  top: 5px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--nl-bg);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nl-muted);
+  cursor: grab;
+  pointer-events: auto;
+  user-select: none;
+}
+.nl-cv-frame-label:hover {
+  color: var(--nl-text);
+}
+.nl-cv-marquee {
+  position: absolute;
+  border: 1px solid var(--nl-text);
+  background: color-mix(in srgb, var(--nl-text) 5%, transparent);
+  pointer-events: none;
+}
+.nl-gtile {
+  padding: 10px 14px;
+  border: 1px solid var(--nl-line-strong);
+  border-radius: 12px;
+  background: var(--nl-surface);
+  box-shadow: 4px 4px 0 -1px var(--nl-surface), 4px 4px 0 0 var(--nl-line-strong), 8px 8px 0 -1px var(--nl-surface), 8px 8px 0 0 var(--nl-line);
+  cursor: grab;
+}
+.nl-gtile-name {
+  font-weight: 600;
+}
+.nl-gtile-what {
+  margin: 2px 0 6px;
+  font-size: 12.5px;
+  color: var(--nl-muted);
+}
+
+/* ── contextual actions: the bar over a selection, the menu at the pointer ── */
+.nl-actbar {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--nl-invert-bg);
+  color: var(--nl-invert-text);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+  font-size: 12.5px;
+  animation: nl-rise 0.12s ease-out;
+}
+.nl-actbar-count {
+  padding: 0 8px 0 6px;
+  opacity: 0.7;
+}
+.nl-actbar-btn {
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.nl-actbar-btn:hover,
+.nl-actbar-btn:focus-visible {
+  background: color-mix(in srgb, var(--nl-invert-text) 16%, transparent);
+  outline: none;
+}
+.nl-actbar-more {
+  position: relative;
+}
+.nl-actbar .nl-menu-pop {
+  top: calc(100% + 6px);
+  right: 0;
+  color: var(--nl-text);
+}
+.nl-menu-pop,
+.nl-ctxmenu {
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  padding: 4px;
+  border: 1px solid var(--nl-line-strong);
+  border-radius: 9px;
+  background: var(--nl-surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  z-index: 70;
+}
+.nl-menu-pop {
+  position: absolute;
+}
+.nl-ctxmenu {
+  position: fixed;
+  animation: nl-rise 0.1s ease-out;
+}
+.nl-menu-pop button,
+.nl-ctxmenu button {
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--nl-text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.nl-menu-pop button:hover,
+.nl-ctxmenu button:hover,
+.nl-menu-pop button:focus-visible,
+.nl-ctxmenu button:focus-visible {
+  background: var(--nl-sunk);
+  outline: none;
+}
+@keyframes nl-rise {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
+/* ── inspection: beside the item (a sheet on a phone) ── */
+.nl-ri {
+  position: fixed;
+  z-index: 55;
+  display: flex;
+  flex-direction: column;
+  max-height: min(72vh, 640px);
+  border: 1px solid var(--nl-line-strong);
+  border-radius: 12px;
+  background: var(--nl-surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+  animation: nl-rise 0.12s ease-out;
+}
+.nl-ri.is-sheet {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 62vh;
+  border-radius: 14px 14px 0 0;
+  border-bottom: 0;
+}
+.nl-ri-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 8px 4px 14px;
+}
+.nl-ri-kind {
+  font-size: 12px;
+  color: var(--nl-muted);
+}
+.nl-ri-body {
+  padding: 0 14px 10px;
+  overflow: auto;
+}
+.nl-ri-text {
+  margin: 0 0 6px;
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.nl-ri-edit {
+  margin-left: 6px;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--nl-faint);
+  cursor: pointer;
+  vertical-align: 1px;
+}
+.nl-ri-edit:hover {
+  color: var(--nl-text);
+}
+.nl-ri-detail {
+  margin: 0 0 8px;
+  font-size: 13.5px;
+  color: var(--nl-muted);
+  line-height: 1.5;
+}
+.nl-ri-sec {
+  padding: 8px 0 4px;
+  border-top: 1px solid var(--nl-line);
+}
+.nl-ri-sec.is-asked {
+  margin: 0 -14px;
+  padding: 8px 14px 6px;
+  background: var(--nl-sunk);
+}
+.nl-ri-h {
+  margin: 0 0 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nl-muted);
+}
+.nl-ri-link {
+  display: block;
+  text-align: left;
+  margin: 2px 0;
+}
+.nl-ri-rels {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nl-ri-rels li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 13px;
+}
+.nl-ri-rel {
+  flex: 1;
+}
+.nl-ri-standing {
+  padding: 1px 7px;
+  border: 1px solid var(--nl-text);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--nl-text);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.nl-ri-standing.is-unverified {
+  border-style: dashed;
+  color: var(--nl-muted);
+}
+.nl-ri-was {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12.5px;
+  color: var(--nl-muted);
+}
+.nl-ri-answer {
+  margin: 0 0 6px;
+  font-size: 13.5px;
+}
+.nl-ri-answerForm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+.nl-ri-who {
+  margin-top: 8px;
+}
+.nl-ri-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--nl-line);
+}
+.nl-ri-keep {
+  position: relative;
+}
+.nl-ri-keep .nl-menu-pop {
+  bottom: calc(100% + 4px);
+  left: 0;
+}
+.nl-seg.is-small button {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+/* ── what changed, what is happening, what is shown: one quiet line above the omnibox ── */
+.nl-rnote {
+  position: fixed;
+  left: 50%;
+  bottom: 96px;
+  z-index: 50;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  max-width: min(720px, calc(100vw - 24px));
+  padding: 6px 8px 6px 14px;
+  border: 1px solid var(--nl-line-strong);
+  border-radius: 999px;
+  background: var(--nl-surface);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+  font-size: 13px;
+  animation: nl-rise 0.14s ease-out;
+}
+.nl-rnote.is-failed {
+  border-color: var(--nl-text);
+}
+.nl-rnote-text {
+  flex: 1 1 auto;
+}
+.nl-rfilter {
+  position: fixed;
+  left: 50%;
+  top: 64px;
+  z-index: 40;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  padding: 4px 12px;
+  border: 1px solid var(--nl-line-strong);
+  border-radius: 999px;
+  background: var(--nl-surface);
+  font-size: 12.5px;
+}
+
+/* ── focus: one item alone, at full size ── */
+.nl-rfocus {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: color-mix(in srgb, var(--nl-bg) 88%, transparent);
+  backdrop-filter: blur(3px);
+  overflow: auto;
+}
+.nl-rfocus-card {
+  width: min(780px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 8px 18px 18px;
+  border: 1px solid var(--nl-line-strong);
+  border-radius: 14px;
+  background: var(--nl-surface);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.16);
+}
+.nl-rfocus-item {
+  margin: 6px 0 12px;
+  font-size: 1.1em;
+}
+.nl-rfocus-item.is-model .nl-r-prim.is-plot {
+  height: 380px;
+}
+.nl-rfocus-detail {
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+.nl-rfocus-rels {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13.5px;
+}
+.nl-rfocus-rels li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0;
+  border-top: 1px solid var(--nl-line);
+}
+
+/* ── history: every change, each reversible; the words in order ── */
+.nl-rhist {
+  padding: 4px 14px 14px;
+  overflow: auto;
+}
+.nl-rhist-log {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nl-rhist-log li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--nl-line);
+}
+.nl-rhist-log li.is-undone .nl-rhist-sum {
+  text-decoration: line-through;
+  color: var(--nl-muted);
+}
+.nl-rhist-sum {
+  font-size: 13.5px;
+}
+.nl-rhist-words {
+  margin-top: 12px;
+  font-size: 13px;
+}
+.nl-rhist-words ol {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.nl-rhist-words li {
+  padding: 6px 0;
+  border-top: 1px solid var(--nl-line);
+}
+
+/* ── the omnibox's commands and the thing it points at ── */
+.nl-omni-found.is-commands .nl-omni-label {
+  font-family: var(--nl-mono);
+  font-size: 12.5px;
+}
+.nl-omni-chip.is-about {
+  border-style: solid;
+  border-color: var(--nl-text);
+}
+
+/* ── quiet chrome: a card's handle, menu and toggle appear when wanted (always on touch screens) ── */
+.nl-cv-obj .nl-card-head .nl-card-grip,
+.nl-cv-obj .nl-card-head .nl-card-toggle,
+.nl-cv-obj .nl-card-head [aria-haspopup='menu'] {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.nl-cv-obj:hover .nl-card-head .nl-card-grip,
+.nl-cv-obj:hover .nl-card-head .nl-card-toggle,
+.nl-cv-obj:hover .nl-card-head [aria-haspopup='menu'],
+.nl-cv-obj:focus-within .nl-card-head .nl-card-grip,
+.nl-cv-obj:focus-within .nl-card-head .nl-card-toggle,
+.nl-cv-obj:focus-within .nl-card-head [aria-haspopup='menu'],
+.nl-cv-obj.is-selected .nl-card-head .nl-card-grip,
+.nl-cv-obj.is-selected .nl-card-head .nl-card-toggle,
+.nl-cv-obj.is-selected .nl-card-head [aria-haspopup='menu'] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .nl-cv-obj .nl-card-head .nl-card-grip,
+  .nl-cv-obj .nl-card-head .nl-card-toggle,
+  .nl-cv-obj .nl-card-head [aria-haspopup='menu'] {
+    opacity: 1;
+  }
+}
+.nl-card-kicker {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+
+@media (max-width: 640px) {
+  .nl-rnote {
+    bottom: 132px;
+    border-radius: 14px;
+  }
+  .nl-actbar {
+    flex-wrap: wrap;
+  }
+  .nl-r.is-question .nl-r-text {
+    font-size: 17px;
+  }
+}
+
+/* a conversation's representation, in small (inside another workspace) */
+.nl-rprev {
+  padding: 2px 0 4px;
+}
+.nl-rprev-q {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+.nl-rprev ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+.nl-rprev li {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+}
+.nl-rprev-kind {
+  flex: none;
+  min-width: 84px;
+  color: var(--nl-muted);
+  font-size: 12px;
+}
+.nl-rprev li.is-hypothesis span:last-child {
+  border-bottom: 1px dashed var(--nl-line-strong);
+}
+.nl-rprev li.is-ruled_out span:last-child {
+  text-decoration: line-through;
+  color: var(--nl-muted);
+}

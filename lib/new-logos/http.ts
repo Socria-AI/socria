@@ -10,6 +10,8 @@ import { auth } from '@clerk/nextjs/server';
 import { supabaseStore } from './store-supabase';
 import { supabaseSourceStore } from './source-store-supabase';
 import type { SourceStore } from './source-store';
+import { supabaseRepresentationStore } from './representation-store-supabase';
+import type { RepresentationStore } from './representation-store';
 import { NlSetupError, type NodeStore } from './store';
 import { statusOf, type Result } from './ops';
 
@@ -61,6 +63,22 @@ export async function withSources(fn: (store: SourceStore) => Promise<NextRespon
       );
     }
     console.error('[new-logos/sources]', e);
+    return NextResponse.json({ ok: false, error: 'Something went wrong on the server. Nothing was changed.', code: 'server' }, { status: 500 });
+  }
+}
+
+/** Run a handler with the representation store; the missing-table case and unexpected failures answered as withStore does. */
+export async function withRepresentations(fn: (store: RepresentationStore) => Promise<NextResponse>, write: boolean): Promise<NextResponse> {
+  try {
+    return await fn(supabaseRepresentationStore());
+  } catch (e) {
+    if (e instanceof NlSetupError) {
+      return NextResponse.json(
+        { ok: false, setup: false, error: 'Representations are not set up on this database yet.', code: 'setup' },
+        { status: write ? 503 : 200 }
+      );
+    }
+    console.error('[new-logos/representations]', e);
     return NextResponse.json({ ok: false, error: 'Something went wrong on the server. Nothing was changed.', code: 'server' }, { status: 500 });
   }
 }

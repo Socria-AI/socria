@@ -294,6 +294,11 @@ export async function GET(req: NextRequest) {
     .from('nl_source_refs').select('id, source_id, node_id, passage, quote, note, ground, origin, created_at').eq('user_id', userId).order('created_at', { ascending: true });
   const nlSourceRefsErr = missingTable(nlSourceRefsRaw) ? null : nlSourceRefsRaw;
   out.workspaceSourceReferences = nlSourceRefs ?? [];
+  // their workspaces' components (each component, relation and variable, and the log of changes)
+  const { data: nlReps, error: nlRepsRaw } = await db
+    .from('nl_representations').select('key, body, version, updated_at').eq('user_id', userId);
+  const nlRepsErr = missingTable(nlRepsRaw) ? null : nlRepsRaw;
+  out.workspaceRepresentations = nlReps ?? [];
 
   // Metacognitive Regulation's intervention ledger: which condition each turn
   // ran under, what MR decided, how it went and what its integrity checks
@@ -422,6 +427,7 @@ export async function GET(req: NextRequest) {
     ['workspaceCanvases', nlCanvasesErr],
     ['workspaceSources', nlSourcesErr],
     ['workspaceSourceReferences', nlSourceRefsErr],
+    ['workspaceRepresentations', nlRepsErr],
     ['mrLedger', mrLedgerErr],
     ['roomSeats', roomSeatsErr],
     ['rooms', roomsErr],

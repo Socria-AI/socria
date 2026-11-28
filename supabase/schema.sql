@@ -1406,3 +1406,18 @@ create table if not exists nl_canvases (
   updated_at bigint not null,
   primary key (user_id, key)
 );
+
+-- New Logos workspace components: what a workspace holds (a conversation's space, key c:<conversation id>, or an
+-- objective's, key o:<objective node id>) as typed components and the relations between them — questions,
+-- statements, possibilities, observations, people and things, open questions, caveats, measures, timelines, steps,
+-- documents, and interactive models — with the log that can reverse each change. One row per person and workspace;
+-- where components sit is the canvas layout (nl_canvases), and a conversation's messages stay in the conversations
+-- table, which the other interface reads. Additive; safe to re-run.
+create table if not exists nl_representations (
+  user_id text not null,
+  key text not null,
+  body jsonb not null default '{}'::jsonb,
+  version integer not null default 1,
+  updated_at bigint not null,
+  primary key (user_id, key)
+);
