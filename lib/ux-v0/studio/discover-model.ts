@@ -10,7 +10,7 @@
 // or skipped, never an aid already shown or already chosen, never losing what the person picked or wrote themselves.
 // Server-safe: no browser, no engine.
 
-import { FONTS } from '../fonts';
+import { FONTS, GRAPHIC_FONTS, knownFont } from '../fonts';
 import { AID_KINDS, MAX_ASKED, MAX_OPEN, choiceWords, moduleId, normalizeCreativeBrief, normalizeModule, BRIEF_FIELDS, type AidKind, type BriefField, type BriefModule, type CreativeBrief } from './brief';
 import type { StudioMode } from './schema';
 
@@ -115,7 +115,18 @@ let instructions: string | null = null;
 /** The same for every brief (cacheable). */
 export function discoverSystem(): string {
   if (instructions) return instructions;
-  const faces = FONTS.map((f) => `${f.name} (${f.kind}${f.displayOnly ? ', display only' : ''}; ${f.note})`).join('; ');
+  // every face a graphic can use, by kind and then alphabetically (no face first by habit); a website can load only
+  // the ones not marked "not for websites"
+  const site = new Set(FONTS.map((f) => f.name));
+  const faces = (['serif', 'sans', 'mono'] as const)
+    .map((k) =>
+      [...GRAPHIC_FONTS]
+        .filter((f) => f.kind === k)
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((f) => `${f.name} (${f.kind}${f.displayOnly ? ', display only' : ''}${site.has(f.name) ? '' : ', not for websites'}; ${f.note})`)
+        .join('; ')
+    )
+    .join('\n');
   instructions = [
     'You are the creative director at SocriaUX, a design studio. Someone has described a piece of design they want — a poster, a social post, a cover, a logo, a set of campaign pieces, a web page. SocriaUX shows them a spatial creative brief: their idea at the top, what is understood so far beside it, and a few considerations placed in it — each a question written for this work, sometimes with something to look at. You decide what that brief holds. Each time they change something — their idea, an answer, a pick, a skip, a line edited in place, a note in their own words — you see the brief as it stands and return it updated, the way an excellent human creative director would: understand what they are imagining, notice what is already clear, raise only what would genuinely change the work, help them find what they cannot easily put into words, and recognise when enough is known. A good first draft is often worth more than another question.',
     '',
@@ -208,8 +219,8 @@ const enumOf = (values: readonly string[]): Schema => ({ type: 'string', enum: [
 const str = (n: number): Schema => ({ type: 'string', maxLength: n });
 const strs = (n: number, len: number): Schema => ({ type: 'array', maxItems: n, items: str(len) });
 const hexS: Schema = { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' };
-const FACE = enumOf(FONTS.map((f) => f.name));
-const TEXT_FACE = enumOf(FONTS.filter((f) => !f.displayOnly).map((f) => f.name));
+const FACE = enumOf(GRAPHIC_FONTS.map((f) => f.name));
+const TEXT_FACE = enumOf(GRAPHIC_FONTS.filter((f) => !f.displayOnly).map((f) => f.name));
 
 export const PLAN_SCHEMA: Schema = object({
   note: str(200),
@@ -297,6 +308,13 @@ export function normalizePlan(v: unknown, c: SpaceContext): Plan | null {
     if (!openIds.has(m.id)) {
       if (c.asked + fresh >= MAX_ASKED) continue;
       fresh++;
+    }
+    // a website loads only its own faces: lettering or moods in a face it cannot load are not offered for one
+    if (m.aid && c.mode === 'website' && (m.aid.kind === 'type' || m.aid.kind === 'moods')) {
+      const ok = (o: { display: string; body?: string }) => !!knownFont(o.display) && (!o.body || !!knownFont(o.body));
+      const options = (m.aid.options as { display: string; body?: string }[]).filter(ok);
+      m.aid = options.length >= 2 ? ({ ...m.aid, options } as typeof m.aid) : null;
+      if (!m.aid) m.kind = 'text';
     }
     // an aid shown before, already chosen, or decided by a design system: the question stands, answered in words
     if (m.aid && taken(m.aid.kind, m.id)) {

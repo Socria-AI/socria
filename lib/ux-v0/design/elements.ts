@@ -190,31 +190,35 @@ export function applyHandEdit(html: string, e: HandEdit, parse: Parse): string |
   return body.innerHTML.trim();
 }
 
-/** The faces a fragment and the shared CSS name, as written in font-family declarations. */
+const GENERIC_FACE = /^(serif|sans-serif|monospace|cursive|fantasy|system-ui|ui-serif|ui-sans-serif|ui-monospace|emoji|math|inherit|initial|unset|revert|var\()/i;
+const faceName = (part: string) => part.trim().replace(/&quot;|&#39;|&apos;/g, '"').replace(/^['"]|['"]$/g, '').replace(/\s*!important$/, '').trim();
+
+/**
+ * The faces a fragment and the shared CSS name: in font-family declarations and attributes, in the font shorthand, and
+ * in custom properties that carry a face (--font-display: "Anton", sans-serif) — how shared styles and a brand's
+ * tokens name them, used through var(). Every name is returned, fallbacks included, in order of first appearance: the
+ * caller keeps those the library can serve (lib/ux-v0/design/frame.ts facesFor), so a long fallback list can never
+ * crowd a real face out.
+ */
 export function facesNamed(...css: string[]): string[] {
   const out = new Set<string>();
+  const add = (list: string) => {
+    for (const part of list.split(',')) {
+      const name = faceName(part);
+      if (name && !GENERIC_FACE.test(name)) out.add(name);
+    }
+  };
   for (const s of css) {
-    for (const m of s.matchAll(/font-family\s*:\s*([^;}"]+(?:"[^"]*"[^;}"]*)*)/gi)) {
-      for (const part of m[1].split(',')) {
-        const name = part.trim().replace(/^['"]|['"]$/g, '').replace(/\s*!important$/, '').trim();
-        if (name && !/^(serif|sans-serif|monospace|cursive|fantasy|system-ui|inherit|initial|unset|var\()/i.test(name)) out.add(name);
-      }
-    }
+    for (const m of s.matchAll(/font-family\s*:\s*((?:[^;}"]|"[^"]*")+)/gi)) add(m[1]);
     // an SVG attribute (font-family="…"), as a carried-over drawing writes it (lib/ux-v0/design/legacy.ts)
-    for (const m of s.matchAll(/font-family\s*=\s*(?:"([^"]*)"|'([^']*)')/gi)) {
-      for (const part of (m[1] ?? m[2] ?? '').replace(/&quot;|&#39;|&apos;/g, '"').split(',')) {
-        const name = part.trim().replace(/^['"]|['"]$/g, '').trim();
-        if (name && !/^(serif|sans-serif|monospace|cursive|fantasy|system-ui|inherit|initial|unset|var\()/i.test(name)) out.add(name);
-      }
-    }
-    for (const m of s.matchAll(/font\s*:[^;}]*?(?:\d+(?:px|pt|em|rem|%)\S*)\s+([^;}]+)/gi)) {
-      for (const part of m[1].split(',')) {
-        const name = part.trim().replace(/^['"]|['"]$/g, '').trim();
-        if (name && !/^(serif|sans-serif|monospace|var\()/i.test(name)) out.add(name);
-      }
+    for (const m of s.matchAll(/font-family\s*=\s*(?:"([^"]*)"|'([^']*)')/gi)) add(m[1] ?? m[2] ?? '');
+    for (const m of s.matchAll(/font\s*:[^;}]*?(?:\d+(?:px|pt|em|rem|%)\S*)\s+([^;}]+)/gi)) add(m[1]);
+    // a custom property named for type (--font-display, --type-body, --brand-face), or one whose value quotes a name
+    for (const m of s.matchAll(/(--[\w-]+)\s*:\s*([^;}]+)/g)) {
+      if (/font|family|face|type|typo/i.test(m[1]) || /["']/.test(m[2])) add(m[2]);
     }
   }
-  return [...out].slice(0, 12);
+  return [...out];
 }
 
 /** The words on an artboard, in order (for the model's summary of artboards it is not editing, and for search). */

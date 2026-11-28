@@ -1,0 +1,412 @@
+{
+ "designsPerCondition": 20,
+ "fonts": {
+  "before": {
+   "designs": 20,
+   "distinctFaces": 16,
+   "topFaces": [
+    "Cormorant Garamond \u00d77",
+    "Jost \u00d75",
+    "Instrument Serif \u00d74",
+    "IBM Plex Mono \u00d74",
+    "Inter \u00d73",
+    "Archivo Black \u00d72",
+    "Fredoka \u00d72",
+    "Anton \u00d72"
+   ],
+   "mostCommonShare": 0.35,
+   "kinds": {
+    "serif": 14,
+    "sans": 18,
+    "mono": 6
+   },
+   "displayKinds": {
+    "serif": 11,
+    "sans": 9
+   },
+   "withSmallTrackedLabels": 16,
+   "withHairlines": 10,
+   "monoForSmallPrint": 4,
+   "facesNotLoadedByOldLoader": 0,
+   "designsHitByOldLoader": [],
+   "facesNotLoadedNow": 0,
+   "unservedFaces": []
+  },
+  "round1": {
+   "designs": 20,
+   "distinctFaces": 21,
+   "topFaces": [
+    "IBM Plex Mono \u00d74",
+    "Geist Mono \u00d73",
+    "Space Mono \u00d73",
+    "Jost \u00d73",
+    "Familjen Grotesk \u00d72",
+    "Anton \u00d72",
+    "Fredoka \u00d72",
+    "Bodoni Moda \u00d72"
+   ],
+   "mostCommonShare": 0.2,
+   "kinds": {
+    "serif": 9,
+    "sans": 18,
+    "mono": 10
+   },
+   "displayKinds": {
+    "sans": 13,
+    "serif": 6,
+    "mono": 1
+   },
+   "withSmallTrackedLabels": 10,
+   "withHairlines": 4,
+   "monoForSmallPrint": 7,
+   "facesNotLoadedByOldLoader": 0,
+   "designsHitByOldLoader": [],
+   "facesNotLoadedNow": 0,
+   "unservedFaces": []
+  },
+  "round2": {
+   "designs": 20,
+   "distinctFaces": 16,
+   "topFaces": [
+    "IBM Plex Mono \u00d74",
+    "Anton \u00d74",
+    "Space Mono \u00d74",
+    "Fraunces \u00d74",
+    "Jost \u00d73",
+    "Instrument Sans \u00d72",
+    "Fredoka \u00d72",
+    "Bodoni Moda \u00d72"
+   ],
+   "mostCommonShare": 0.2,
+   "kinds": {
+    "serif": 9,
+    "sans": 17,
+    "mono": 9
+   },
+   "displayKinds": {
+    "sans": 12,
+    "serif": 7,
+    "mono": 1
+   },
+   "withSmallTrackedLabels": 14,
+   "withHairlines": 5,
+   "monoForSmallPrint": 5,
+   "facesNotLoadedByOldLoader": 0,
+   "designsHitByOldLoader": [],
+   "facesNotLoadedNow": 0,
+   "unservedFaces": []
+  }
+ },
+ "pictures": {
+  "before": {
+   "pictures": 20,
+   "groundClasses": {
+    "light cool / white": 2,
+    "dark": 8,
+    "coloured": 2,
+    "light warm neutral": 7,
+    "mid neutral": 1
+   },
+   "meanColourfulness": 46.6,
+   "meanLightness": 0.56,
+   "layoutSimilarityAcrossBriefs": 0.029,
+   "layoutSimilaritySameBrief": 0.094
+  },
+  "round1": {
+   "pictures": 20,
+   "groundClasses": {
+    "light cool / white": 1,
+    "mid neutral": 2,
+    "coloured": 5,
+    "dark": 11,
+    "light warm neutral": 1
+   },
+   "meanColourfulness": 66.1,
+   "meanLightness": 0.48,
+   "layoutSimilarityAcrossBriefs": 0.025,
+   "layoutSimilaritySameBrief": 0.047
+  },
+  "round2": {
+   "pictures": 20,
+   "groundClasses": {
+    "coloured": 8,
+    "dark": 3,
+    "light warm neutral": 4,
+    "light cool / white": 4,
+    "mid neutral": 1
+   },
+   "meanColourfulness": 71.1,
+   "meanLightness": 0.56,
+   "layoutSimilarityAcrossBriefs": 0.008,
+   "layoutSimilaritySameBrief": 0.09
+  }
+ },
+ "blind": {
+  "conditions": {
+   "before": {
+    "judged": 20,
+    "adherence": 4.65,
+    "craft": 3.95,
+    "distinctiveness": 3.05,
+    "generic": 2.95,
+    "motifs": {
+     "tracked-small-caps-labels": 15,
+     "hairline-rules": 14,
+     "refined-serif-display": 13,
+     "cream-ground": 10,
+     "dark-premium-ground": 9,
+     "literal-subject-icon": 6,
+     "arch-or-semicircle": 6,
+     "corner-label-pair": 4,
+     "sun-or-circle-disc": 4,
+     "foot-details-strip": 3,
+     "concentric-rings": 3,
+     "centred-stack": 3
+    }
+   },
+   "round1": {
+    "judged": 20,
+    "adherence": 4.55,
+    "craft": 3.8,
+    "distinctiveness": 3.25,
+    "generic": 2.7,
+    "motifs": {
+     "dark-premium-ground": 11,
+     "hairline-rules": 10,
+     "literal-subject-icon": 10,
+     "tracked-small-caps-labels": 8,
+     "refined-serif-display": 7,
+     "concentric-rings": 4,
+     "arch-or-semicircle": 3,
+     "centred-stack": 3,
+     "sun-or-circle-disc": 2,
+     "foot-details-strip": 2,
+     "corner-label-pair": 1,
+     "cream-ground": 1
+    }
+   },
+   "round2": {
+    "judged": 20,
+    "adherence": 4.55,
+    "craft": 3.8,
+    "distinctiveness": 3.45,
+    "generic": 2.45,
+    "motifs": {
+     "hairline-rules": 11,
+     "tracked-small-caps-labels": 11,
+     "literal-subject-icon": 8,
+     "refined-serif-display": 8,
+     "concentric-rings": 4,
+     "dark-premium-ground": 4,
+     "arch-or-semicircle": 4,
+     "sun-or-circle-disc": 3,
+     "corner-label-pair": 2,
+     "cream-ground": 2,
+     "foot-details-strip": 1
+    }
+   }
+  },
+  "perBrief": {
+   "V-architecture": {
+    "before": {
+     "adherence": 5.0,
+     "craft": 4.0,
+     "distinctiveness": 3.0,
+     "generic": 3.5
+    },
+    "round1": {
+     "adherence": 5.0,
+     "craft": 4.0,
+     "distinctiveness": 4.0,
+     "generic": 2.0
+    },
+    "round2": {
+     "adherence": 5.0,
+     "craft": 4.0,
+     "distinctiveness": 3.5,
+     "generic": 2.0
+    }
+   },
+   "V-brutalist": {
+    "before": {
+     "adherence": 5.0,
+     "craft": 3.5,
+     "distinctiveness": 3.5,
+     "generic": 2.0
+    },
+    "round1": {
+     "adherence": 5.0,
+     "craft": 4.0,
+     "distinctiveness": 3.5,
+     "generic": 2.0
+    },
+    "round2": {
+     "adherence": 5.0,
+     "craft": 3.5,
+     "distinctiveness": 3.5,
+     "generic": 2.0
+    }
+   },
+   "V-children": {
+    "before": {
+     "adherence": 5.0,
+     "craft": 4.0,
+     "distinctiveness": 3.0,
+     "generic": 3.0
+    },
+    "round1": {
+     "adherence": 5.0,
+     "craft": 3.5,
+     "distinctiveness": 3.0,
+     "generic": 2.5
+    },
+    "round2": {
+     "adherence": 5.0,
+     "craft": 4.0,
+     "distinctiveness": 3.5,
+     "generic": 2.0
+    }
+   },
+   "V-electronic": {
+    "before": {
+     "adherence": 5.0,
+     "craft": 4.0,
+     "distinctiveness": 3.0,
+     "generic": 3.0
+    },
+    "round1": {
+     "adherence": 5.0,
+     "craft": 3.5,
+     "distinctiveness": 3.0,
+     "generic": 3.0
+    },
+    "round2": {
+     "adherence": 5.0,
+     "craft": 4.0,
+     "distinctiveness": 3.5,
+     "generic": 2.5
+    }
+   },
+   "V-fashion": {
+    "before": {
+     "adherence": 4.0,
+     "craft": 3.5,
+     "distinctiveness": 2.5,
+     "generic": 3.5
+    },
+    "round1": {
+     "adherence": 4.0,
+     "craft": 3.5,
+     "distinctiveness": 2.5,
+     "generic": 3.5
+    },
+    "round2": {
+     "adherence": 4.0,
+     "craft": 3.5,
+     "distinctiveness": 3.5,
+     "generic": 2.5
+    }
+   },
+   "V-fintech": {
+    "before": {
+     "adherence": 5.0,
+     "craft": 4.0,
+     "distinctiveness": 2.5,
+     "generic": 2.5
+    },
+    "round1": {
+     "adherence": 5.0,
+     "craft": 4.0,
+     "distinctiveness": 3.0,
+     "generic": 3.0
+    },
+    "round2": {
+     "adherence": 5.0,
+     "craft": 4.0,
+     "distinctiveness": 3.5,
+     "generic": 2.5
+    }
+   },
+   "V-hospitality": {
+    "before": {
+     "adherence": 4.0,
+     "craft": 4.0,
+     "distinctiveness": 3.0,
+     "generic": 3.0
+    },
+    "round1": {
+     "adherence": 3.5,
+     "craft": 4.0,
+     "distinctiveness": 2.5,
+     "generic": 3.0
+    },
+    "round2": {
+     "adherence": 4.0,
+     "craft": 3.5,
+     "distinctiveness": 3.5,
+     "generic": 2.5
+    }
+   },
+   "V-law": {
+    "before": {
+     "adherence": 5.0,
+     "craft": 5.0,
+     "distinctiveness": 3.0,
+     "generic": 3.5
+    },
+    "round1": {
+     "adherence": 5.0,
+     "craft": 4.0,
+     "distinctiveness": 3.5,
+     "generic": 3.5
+    },
+    "round2": {
+     "adherence": 4.5,
+     "craft": 4.0,
+     "distinctiveness": 3.0,
+     "generic": 3.0
+    }
+   },
+   "V-literary": {
+    "before": {
+     "adherence": 4.0,
+     "craft": 3.5,
+     "distinctiveness": 3.0,
+     "generic": 3.5
+    },
+    "round1": {
+     "adherence": 4.0,
+     "craft": 4.0,
+     "distinctiveness": 4.0,
+     "generic": 2.0
+    },
+    "round2": {
+     "adherence": 4.0,
+     "craft": 4.0,
+     "distinctiveness": 3.0,
+     "generic": 3.5
+    }
+   },
+   "V-science": {
+    "before": {
+     "adherence": 4.5,
+     "craft": 4.0,
+     "distinctiveness": 4.0,
+     "generic": 2.0
+    },
+    "round1": {
+     "adherence": 4.0,
+     "craft": 3.5,
+     "distinctiveness": 3.5,
+     "generic": 2.5
+    },
+    "round2": {
+     "adherence": 4.0,
+     "craft": 3.5,
+     "distinctiveness": 4.0,
+     "generic": 2.0
+    }
+   }
+  }
+ }
+}

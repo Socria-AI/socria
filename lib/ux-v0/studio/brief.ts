@@ -11,7 +11,7 @@
 // (each a palette, a face and a line saying what it would look like). Everything here is held to its shape and size;
 // nothing in it is trusted to be a colour, a face or a length until it has been checked.
 
-import { FONTS } from '../fonts';
+import { GRAPHIC_FONTS } from '../fonts';
 
 export interface Palette {
   name: string;
@@ -94,7 +94,9 @@ const list = (v: unknown, n: number = BRIEF_LIMITS.list, len: number = BRIEF_LIM
 export const HEX = /^#[0-9a-f]{6}$/i;
 const hex = (v: unknown) => (typeof v === 'string' && HEX.test(v.trim()) ? v.trim().toLowerCase() : null);
 
-const FACE = new Map(FONTS.map((f) => [f.name.toLowerCase(), f]));
+// every face a graphic can use (the brief's lettering and moods are shown in them; a website's are held to its own
+// faces by lib/ux-v0/studio/discover-model.ts)
+const FACE = new Map(GRAPHIC_FONTS.map((f) => [f.name.toLowerCase(), f]));
 /** A face the library serves, by its exact name (any case); null otherwise. */
 export const faceNamed = (v: unknown) => (typeof v === 'string' ? FACE.get(v.trim().toLowerCase()) ?? null : null);
 const textFace = (v: unknown) => {

@@ -93,7 +93,7 @@ them" when edited) / "Avoid" / references. At most 4000 characters (the designer
 ### Visual considerations
 
 Only when seeing helps more than reading: **palettes** (3–4, ink checked at 4.5:1, a colour of their own beside them),
-**type** (2–3 pairings set in the real faces with the work's name, loaded and fitted before shown), **moods** (3–4
+**type** (2–3 pairings set in the real faces with the work's name, loaded and fitted before shown; drawn from all 144 graphics faces, a website's from the 78 it can load — see docs/SOCRIAUX-CONVERGENCE.md), **moods** (3–4
 readings of this brief, each its colours and a library face). No library of presets: every option is written for this
 brief and validated. The Visual considerations in the screenshots are the model's (scripted in the browser test).
 

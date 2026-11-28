@@ -18,6 +18,7 @@ import { artboardOf, commit, newId, type DesignDoc, type DesignState, type Desig
 import type { Parse } from './elements';
 import { parseAnswer, type Answer } from './protocol';
 import { requestTier } from './request';
+import { unservedFaces } from './frame';
 
 export interface WriteBody {
   mode: 'write' | 'look';
@@ -111,7 +112,7 @@ export async function runRequest(
   const person: DesignTurn = { id: newId('t'), role: 'person', text: r.words, at, ...(r.selection ? { selection: r.selection } : {}) };
   // measured facts and a picture of the selected artboard travel with a request about it
   const sel = artboardOf(s0.doc, r.selection?.artboard);
-  const measured = sel ? await b.measure(s0.doc, [sel.id]).catch(() => ({})) : {};
+  const measured = sel ? withFaces(await b.measure(s0.doc, [sel.id]).catch(() => ({})), s0.doc, [sel.id]) : {};
   const picture = sel && r.withPicture ? await b.picture(sel, s0.doc.tokens).catch(() => null) : null;
   let raw = '';
   let lastDraw = 0;
@@ -180,6 +181,17 @@ export async function runRequest(
   return { kind: 'done', state: { ...s1, turns: [...s1.turns, person, turn] }, turn, applied, looked, usage };
 }
 
+/** What was measured, with any face the artboard asks for that the library cannot serve (drawn in a fallback). */
+function withFaces(measured: Record<string, string[]>, doc: DesignDoc, ids: string[]): Record<string, string[]> {
+  const out = { ...measured };
+  for (const id of ids) {
+    const a = doc.artboards.find((x) => x.id === id);
+    const missing = a ? unservedFaces(a, doc.tokens) : [];
+    if (missing.length) out[id] = [...(out[id] ?? []), `not in the font library, so drawn in a fallback face: ${missing.join(', ')} — use a library face`];
+  }
+  return out;
+}
+
 async function lookOnce(
   doc: DesignDoc,
   ids: string[],
@@ -197,7 +209,7 @@ async function lookOnce(
     if (!p) return null;
     pictures.push(p);
   }
-  const measured = await b.measure(doc, ids).catch(() => ({}));
+  const measured = withFaces(await b.measure(doc, ids).catch(() => ({})), doc, ids);
   const sent = await t.send(bodyOf({ ...s, doc }, { words }, { mode: 'look', artboards: ids, pictures, made, measured }), () => {}, o.signal);
   if (!sent.ok) return null;
   const ans = parseAnswer(sent.text);
