@@ -13,6 +13,7 @@ import { frameDoc } from '@/lib/ux-v0/design/frame';
 import { artboardPixels, lookPicture, toDataUrl } from '@/lib/ux-v0/design/export';
 import { contrastFacts, contrastSaid, type TextBox } from '@/lib/ux-v0/design/contrast';
 import { brandFacts, brandSaid, logoFacts, type Allowed, type BrandBasis, type ImageBox } from '@/lib/ux-v0/design/brandcheck';
+import { layoutSignature, motionFacts, placementFacts, repeatedLayout, repetitionSaid, resolutionFacts } from '@/lib/ux-v0/design/production';
 import type { Bench, Sent, Transport, WriteBody } from '@/lib/ux-v0/design/flow';
 import { operationId, post } from '../api';
 
@@ -95,7 +96,7 @@ export function measureOffscreen(a: DesignArtboard, tokens: string, assets: Read
         ? m.imgs
             .filter((x: any) => x && typeof x.id === 'string' && /^e\d{1,6}$/.test(x.id))
             .slice(0, 30)
-            .map((x: any) => ({ id: x.id, nw: n(x.nw), nh: n(x.nh), w: n(x.w), h: n(x.h), fit: String(x.fit ?? '').slice(0, 20), filter: String(x.filter ?? '').slice(0, 80), opacity: typeof x.opacity === 'number' ? x.opacity : 1, blend: String(x.blend ?? '').slice(0, 20), tilt: x.tilt === true, clip: String(x.clip ?? '').slice(0, 40) }))
+            .map((x: any) => ({ id: x.id, nw: n(x.nw), nh: n(x.nh), w: n(x.w), h: n(x.h), fit: String(x.fit ?? '').slice(0, 20), filter: String(x.filter ?? '').slice(0, 80), opacity: typeof x.opacity === 'number' ? x.opacity : 1, blend: String(x.blend ?? '').slice(0, 20), tilt: x.tilt === true, clip: String(x.clip ?? '').slice(0, 40), vec: x.vec === true }))
         : [];
       finish({ issues, height: Number(m.height) || a.height, texts, images });
     };
@@ -144,6 +145,11 @@ export function browserBench(assets: () => Promise<Map<string, string>>, brand?:
           const low = px ? contrastFacts(m.texts, px) : [];
           if (low.length) out[id] = [...(out[id] ?? []), ...low.map(contrastSaid)];
         }
+        // against the place it is made for: a platform's interface, a sheet's trim, a picture's pixels, motion
+        if (m && !a.locked) {
+          const place = [...placementFacts(a, m.texts), ...resolutionFacts(a, m.images), ...motionFacts(a)];
+          if (place.length) out[id] = [...(out[id] ?? []), ...place];
+        }
         // against its brand: colours, faces, and the protected logo as it is drawn (a locked artboard is not re-judged)
         const ctx = brand?.();
         if (ctx && m && !a.locked) {
@@ -154,4 +160,20 @@ export function browserBench(assets: () => Promise<Map<string, string>>, brand?:
       return out;
     },
   };
+}
+
+/**
+ * Whether the slides of a deck (the artboards of one group, or all of one format) mostly arrange their words the same
+ * way — measured by drawing each; said about the deck, for a review. Nothing when they differ or are too few.
+ */
+export async function deckFact(doc: DesignDoc, of: DesignArtboard, assets: ReadonlyMap<string, string>): Promise<string | null> {
+  const slides = doc.artboards.filter((a) => (of.group ? a.group === of.group : a.format === of.format && a.format === 'presentation')).slice(0, 16);
+  if (slides.length < 4) return null;
+  const sig: Record<string, string[]> = {};
+  for (const a of slides) {
+    const m = await measureOffscreen(a, doc.tokens, assets, 3000);
+    if (m) sig[a.id] = layoutSignature(m.texts, a.width, a.height);
+  }
+  const r = repeatedLayout(sig);
+  return r ? repetitionSaid(r) : null;
 }

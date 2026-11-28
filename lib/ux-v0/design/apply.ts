@@ -255,6 +255,17 @@ export function applyAnswer(doc0: DesignDoc, answer: Answer, o: ApplyOptions): A
       }
     }
   }
+  // a link from one screen to another (data-go) names an artboard: one written in this answer is named by the id it
+  // was given here; one that leads nowhere is said
+  for (const a of artboards) {
+    if (!a.html.includes('data-go="') || a.locked) continue;
+    const next = a.html.replace(/\bdata-go="([^"]{1,60})"/g, (m, to: string) => (ids[to] ? `data-go="${ids[to]}"` : m));
+    if (next !== a.html && !(a.locks ?? []).length) a.html = next;
+    if (!o.partial) {
+      const nowhere = [...new Set([...a.html.matchAll(/\bdata-go="([^"]{1,60})"/g)].map((m) => m[1]).filter((to) => !artboards.some((x) => x.id === to)))];
+      if (nowhere.length && before.get(a.id) !== a.html) failed.push(`On “${a.name}”, a link leads to an artboard that is not there (${nowhere.slice(0, 3).join(', ')}).`);
+    }
+  }
   const touched = artboards.filter((a) => before.get(a.id) !== a.html).map((a) => a.id);
   // locks the designer recorded for the person: on elements that are really there, once each (a lock is never
   // taken off here — only the person unlocks)

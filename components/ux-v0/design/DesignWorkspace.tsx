@@ -54,7 +54,9 @@ import { SystemBadge } from '../systems/SystemBadge';
 import { useLinkedSystem } from '../systems/useLinkedSystem';
 import { FORMATS, formatOf, sizeLabel } from '@/lib/ux-v0/design/formats';
 import { frameDoc } from '@/lib/ux-v0/design/frame';
-import { artboardHtml, artboardPicture, artboardsPdf, artboardSvg, download, embeddedFonts, fileName } from '@/lib/ux-v0/design/export';
+import { artboardHtml, artboardPicture, artboardsPdf, artboardsPrintPdf, artboardSvg, artboardsZip, download, embeddedFonts, fileName, motionFrames, motionVideo, motionZip, videoType, walkthroughHtml } from '@/lib/ux-v0/design/export';
+import { moves } from '@/lib/ux-v0/design/production';
+import { carrying, changeWords, type Dependent } from '@/lib/ux-v0/design/dependents';
 import { facesFor } from '@/lib/ux-v0/design/frame';
 import { addUpload } from '../uploads';
 import { Canvas, fitView, type ElementPick, type FrameEvent, type View } from './Canvas';
@@ -317,6 +319,9 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent, onBran
     else if (st.memory.brief) void ask(firstRequest(st.kind), { selection: false });
   }, [ask, signedIn, startIntent, brandReady, companyReady]);
 
+  // words changed on one artboard that other artboards also carry: offered, never done for the person
+  const [follow, setFollow] = useState<{ from: string; to: string; deps: Dependent[] } | null>(null);
+
   // ── by hand ──
   const lastHand = useRef<{ key: string; at: number } | null>(null);
   const hand = useCallback(
@@ -337,6 +342,12 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent, onBran
         if (!c.ok) return refuse(`${c.broken[0][0].toUpperCase()}${c.broken[0].slice(1)} is protected. Unlock it to change it.`);
       }
       const doc = { ...st.doc, artboards: st.doc.artboards.map((x) => (x.id === artboard ? { ...x, html } : x)) };
+      if (e.op === 'text') {
+        // the same words elsewhere (a campaign's line across its formats): found and offered
+        const was = (elementFacts(a.html, e.id, parseHtml)?.text ?? '').trim();
+        const deps = was && was !== e.text.trim() && was.length < 200 ? carrying(st.doc, was, artboard, parseHtml) : [];
+        setFollow(deps.length ? { from: was, to: e.text.trim(), deps } : null);
+      }
       const key = `${artboard}:${e.id}:${e.op}${e.op === 'style' ? `:${Object.keys(e.props).join(',')}` : ''}`;
       const recent = lastHand.current && lastHand.current.key === key && Date.now() - lastHand.current.at < 1500 && st.versions[st.at]?.by === 'person';
       update((x) => (recent ? amend(x, doc) : commit(x, doc, `Edited on the canvas${pick && pick.id === e.id ? `: ${labelOf({ id: pick.id, tag: pick.tag, text: pick.text, classes: pick.classes, style: '' })}` : ''}`, 'person')));
@@ -476,14 +487,48 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent, onBran
 
   // ── export ──
   const [exporting, setExporting] = useState('');
-  const doExport = async (kind: 'png' | 'jpeg' | 'pdf' | 'svg' | 'html', ids?: string[]) => {
+  const [exportMenu, setExportMenu] = useState(false);
+  const doExport = async (kind: 'png' | 'jpeg' | 'pdf' | 'svg' | 'html' | 'zip' | 'walk' | 'print' | 'video' | 'frames' | 'css', ids?: string[]) => {
     const st = cur.current.design!;
     const boards = (ids ?? (sel.artboard ? [sel.artboard] : st.doc.artboards.map((a) => a.id))).map((id) => artboardOf(st.doc, id)).filter((a): a is DesignArtboard => !!a);
     if (!boards.length) return;
-    setExporting(`Exporting ${kind.toUpperCase()}…`);
+    setExportMenu(false);
+    setExporting(`Exporting ${kind === 'walk' ? 'HTML' : kind.toUpperCase()}…`);
     try {
       const map = await assetData(allAssets());
-      if (kind === 'pdf') {
+      if (kind === 'css') {
+        if (!st.doc.tokens.trim()) {
+          setExporting('');
+          return tell('This design has no shared styles to export: its colours and type are written on each artboard.');
+        }
+        download(new Blob([`/* ${project.name} — shared styles (the custom properties every artboard uses) */\n${st.doc.tokens}\n`], { type: 'text/css' }), `${fileName(project.name)}-tokens.css`);
+      } else if (kind === 'zip') {
+        const r = await artboardsZip(boards, st.doc.tokens, map, { onProgress: (d, of) => setExporting(`Drawing ${d} of ${of}…`) });
+        download(r.blob, `${fileName(project.name)}.zip`);
+        tell(`${r.names.length} PNG files in one ZIP, numbered in order.${r.fontsSubstituted ? ' A typeface could not be fetched and was drawn in a fallback.' : ''}`);
+      } else if (kind === 'walk') {
+        const proto = boards.some((a) => /\sdata-go="/.test(a.html));
+        download(new Blob([walkthroughHtml(boards, st.doc.tokens, map, { title: project.name, prototype: proto })], { type: 'text/html' }), `${fileName(project.name)}${proto ? '-prototype' : ''}.html`);
+        tell(proto ? 'One HTML file: a click-through of the designed screens (live text). It shows the design; it is not a working product.' : 'One HTML file that walks through every artboard with the arrow keys: live text, its typefaces linked.');
+      } else if (kind === 'print') {
+        const r = await artboardsPrintPdf(boards, st.doc.tokens, map, project.name);
+        download(r.blob, `${fileName(project.name)}-print.pdf`);
+        const p0 = r.pages[0];
+        tell(`Print PDF: ${r.pages.length} sheet${r.pages.length === 1 ? '' : 's'} with ${p0.bleedMm} mm bleed and crop marks, pictures at ${p0.ppi} pixels to the inch. Its colour is RGB — it is not a CMYK file and claims no print standard: a printer converts it, or tells you what they need.`);
+      } else if (kind === 'video' || kind === 'frames') {
+        const a = boards[0];
+        const ctl = new AbortController();
+        const m = await motionFrames(a, st.doc.tokens, map, { signal: ctl.signal, onProgress: (d, of) => setExporting(`Drawing frame ${d} of ${of}…`) });
+        if (kind === 'frames') {
+          download(await motionZip(m, a.name), `${fileName(a.name)}-frames.zip`);
+          tell(`${m.frames.length} PNG frames at ${m.fps} a second (${m.seconds} s), ${m.w} × ${m.h} px, in one ZIP.`);
+        } else {
+          setExporting(`Recording ${m.seconds} s…`);
+          const v = await motionVideo(m);
+          download(v.blob, `${fileName(a.name)}.${v.ext}`);
+          tell(`${v.ext === 'mp4' ? 'MP4 (H.264)' : 'WebM'} video: ${m.seconds} s at ${m.fps} frames a second, ${m.w} × ${m.h} px, no sound.${v.ext === 'webm' ? ' This browser records WebM; some editors and phones want MP4 — convert it, or export the frames.' : ''}`);
+        }
+      } else if (kind === 'pdf') {
         const r = await artboardsPdf(boards, st.doc.tokens, map, project.name);
         download(r.blob, `${fileName(project.name)}.pdf`);
       } else
@@ -585,6 +630,7 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent, onBran
     return out.size;
   }, [s.doc.artboards, assets]);
   const [history, setHistory] = useState(false);
+  const [guides, setGuides] = useState(false);
   const [comparing, setComparing] = useState<number | null>(null);
   const [presenting, setPresenting] = useState<number | null>(null);
   const shown = draftDoc ?? s.doc;
@@ -647,9 +693,49 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent, onBran
           <button type="button" className="dx-btn dx-ghost" onClick={() => setPresenting(0)} disabled={!count}>
             Present
           </button>
-          <button type="button" className="dx-btn" onClick={() => doExport('pdf', s.doc.artboards.map((a) => a.id))} disabled={!count || !!exporting}>
-            {exporting || 'Export PDF'}
+          <button type="button" className={`dx-btn dx-ghost${guides ? ' is-on' : ''}`} onClick={() => setGuides((g) => !g)} disabled={!count} aria-pressed={guides} title="Where a platform draws over the picture, a print sheet’s safe margin and bleed">
+            Guides
           </button>
+          <div className="dx-pop">
+            <button type="button" className="dx-btn" onClick={() => setExportMenu((m) => !m)} disabled={!count || !!exporting} aria-expanded={exportMenu}>
+              {exporting || 'Export'}
+            </button>
+            {exportMenu && (
+              <div className="dx-menu" role="menu" aria-label="Export everything">
+                {(() => {
+                  const all = s.doc.artboards.map((a) => a.id);
+                  const print = s.doc.artboards.filter((a) => a.medium === 'print').map((a) => a.id);
+                  const proto = s.doc.artboards.some((a) => /\sdata-go="/.test(a.html));
+                  return (
+                    <>
+                      <button type="button" role="menuitem" onClick={() => void doExport('pdf', all)}>
+                        <b>Export PDF</b>
+                        <small>Every artboard a page, at its exact size. Pages are pictures: their words cannot be selected or edited.</small>
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => void doExport('zip', all)}>
+                        <b>PNG files (ZIP)</b>
+                        <small>One picture each, numbered in order — a carousel’s slides, a campaign’s formats.</small>
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => void doExport('walk', all)}>
+                        <b>{proto ? 'Prototype (HTML)' : 'Walk-through (HTML)'}</b>
+                        <small>{proto ? 'One file: click through the designed screens. Not a working product.' : 'One file: every artboard with live text, arrow keys to move.'}</small>
+                      </button>
+                      {print.length > 0 && (
+                        <button type="button" role="menuitem" onClick={() => void doExport('print', print)}>
+                          <b>Print PDF</b>
+                          <small>The {print.length === 1 ? 'print sheet' : `${print.length} print sheets`} with bleed and crop marks. RGB — not a CMYK file.</small>
+                        </button>
+                      )}
+                      <button type="button" role="menuitem" onClick={() => void doExport('css', all)}>
+                        <b>Shared styles (CSS)</b>
+                        <small>The custom properties every artboard uses.</small>
+                      </button>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
         </div>
       </header>
       <div className="dx-body">
@@ -702,10 +788,41 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent, onBran
             onMenu={menu}
             comments={notesBy}
             control={control}
+            guides={guides}
           />
           {absentPictures > 0 && assets.size + absentPictures > 0 && (
             <div className="dx-warn" role="status">
               {absentPictures === 1 ? 'A picture this design uses is' : `${absentPictures} pictures this design uses are`} not in this browser, so {absentPictures === 1 ? 'it is' : 'they are'} drawn as nothing here. {company ? `Add ${absentPictures === 1 ? 'it' : 'them'} to ${company.name}’s library on this device.` : 'Add the file again to see it.'}
+            </div>
+          )}
+          {follow && (
+            <div className="dx-follow" role="status">
+              <p>
+                “{follow.from.slice(0, 60)}
+                {follow.from.length > 60 ? '…' : ''}” is also on {follow.deps.length === 1 ? `“${follow.deps[0].name}”` : `${follow.deps.length} other artboards`}
+                {follow.deps.some((d) => d.locked) ? ` (${follow.deps.filter((d) => d.locked).length} protected: ${follow.deps.filter((d) => d.locked).length === 1 ? 'it stays' : 'they stay'} as approved)` : ''}.
+              </p>
+              <div className="dx-row">
+                {follow.deps.some((d) => !d.locked) ? (
+                  <button
+                    type="button"
+                    className="dx-btn dx-primary"
+                    onClick={() => {
+                      const f = follow;
+                      setFollow(null);
+                      const r = changeWords(cur.current.design!.doc, f.deps, f.to, parseHtml);
+                      if (!r.changed.length) return;
+                      update((x) => commit(x, changeWords(x.doc, f.deps, f.to, parseHtml).doc, `Changed the same words on ${r.changed.length} other artboard${r.changed.length === 1 ? '' : 's'}`, 'person'));
+                      tell(`Changed on ${r.changed.join(', ')}.${r.left.length ? ` Left as approved: ${r.left.join(', ')}.` : ''}`);
+                    }}
+                  >
+                    Change {follow.deps.filter((d) => !d.locked).length === 1 ? 'it there' : 'them'} too
+                  </button>
+                ) : null}
+                <button type="button" className="dx-btn dx-ghost" onClick={() => setFollow(null)}>
+                  Leave {follow.deps.length === 1 ? 'it' : 'them'}
+                </button>
+              </div>
             </div>
           )}
           {notice && (
@@ -742,7 +859,28 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent, onBran
             onShow={(el) => sel.artboard && showElement(sel.artboard, el)}
             onReview={() => void review()}
             extra={
-              onBrand && s.doc.artboards.some((a) => a.state === 'approved') ? (
+              <>
+                {selArtboard?.medium === 'print' ? (
+                  <>
+                    <h4 className="dx-sub">Print</h4>
+                    <button type="button" className="dx-btn" disabled={!!exporting} onClick={() => void doExport('print')}>
+                      Print PDF with bleed and crop marks
+                    </button>
+                    <p className="dx-muted dx-small">What is designed to the edge is carried past the cut. The file is RGB: it is not CMYK and claims no print standard. Turn on Guides to see the safe margin.</p>
+                  </>
+                ) : null}
+                {selArtboard && moves(selArtboard) ? (
+                  <Motion
+                    key={selArtboard.id}
+                    a={selArtboard}
+                    busy={!!exporting}
+                    canRecord={videoType()}
+                    onTime={(t) => control.current?.(selArtboard.id, t === null ? { sx: 'play' } : { sx: 'time', t })}
+                    onLength={(secs) => update((x) => commit(x, { ...x.doc, artboards: x.doc.artboards.map((b) => (b.id === selArtboard.id ? { ...b, seconds: secs } : b)) }, `Set “${selArtboard.name}” to ${secs} s`, 'person'))}
+                    onExport={(k) => void doExport(k)}
+                  />
+                ) : null}
+                {onBrand && s.doc.artboards.some((a) => a.state === 'approved') ? (
                 <>
                   <h4 className="dx-sub">Make it the brand</h4>
                   <button
@@ -757,7 +895,8 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent, onBran
                   </button>
                   <p className="dx-muted dx-small">Its colours, typefaces and logo — never its compositions — become a draft in the Design System Manager. Nothing is the brand until you publish it there.</p>
                 </>
-              ) : null
+                ) : null}
+              </>
             }
           />
           {selArtboard && notes.some((c) => c.artboard === selArtboard.id) && (
@@ -844,8 +983,89 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent, onBran
   );
 }
 
+/** An artboard that moves: its length, a moment of it, and what it can be exported as (each said for what it is). */
+function Motion({ a, busy, canRecord, onTime, onLength, onExport }: { a: DesignArtboard; busy: boolean; canRecord: string | null; onTime: (t: number | null) => void; onLength: (seconds: number) => void; onExport: (k: 'video' | 'frames' | 'html') => void }) {
+  const length = a.seconds ?? 4;
+  const [t, setT] = useState(length);
+  return (
+    <>
+      <h4 className="dx-sub">Motion</h4>
+      <div className="dx-row">
+        <label className="dx-field dx-grow">
+          <span>
+            Moment — {t.toFixed(1)} s of {length} s
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={length}
+            step={0.1}
+            value={t}
+            aria-label="Moment"
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setT(v);
+              onTime(v);
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          className="dx-btn"
+          onClick={() => {
+            setT(0);
+            onTime(null);
+          }}
+        >
+          Play
+        </button>
+      </div>
+      <label className="dx-field dx-wide">
+        <span>Length (seconds)</span>
+        <input type="number" min={0.5} max={60} step={0.5} defaultValue={length} aria-label="Length in seconds" onBlur={(e) => Number(e.target.value) >= 0.5 && Number(e.target.value) !== length && onLength(Math.min(60, Math.round(Number(e.target.value) * 10) / 10))} />
+      </label>
+      <div className="dx-row">
+        <button type="button" className="dx-btn" disabled={busy || !canRecord} onClick={() => onExport('video')} title={canRecord ? undefined : 'This browser cannot record video'}>
+          Video ({canRecord ? (canRecord.startsWith('video/mp4') ? 'MP4' : 'WebM') : 'not here'})
+        </button>
+        <button type="button" className="dx-btn" disabled={busy} onClick={() => onExport('frames')}>
+          Frames (ZIP)
+        </button>
+        <button type="button" className="dx-btn" disabled={busy} onClick={() => onExport('html')}>
+          HTML
+        </button>
+      </div>
+      <p className="dx-muted dx-small">
+        The video is recorded in this browser from the design itself, frame by frame, with no sound{canRecord ? (canRecord.startsWith('video/mp4') ? '.' : ' — as WebM, which this browser records; MP4 and GIF are not made here.') : '. This browser cannot record one: export the frames, or the HTML, which plays as designed.'} What moves is the CSS on the artboard; animation inside an SVG (SMIL) is not drawn in exports.
+      </p>
+    </>
+  );
+}
+
 function Present({ doc, at, assets, nonce, onAt }: { doc: DesignDoc; at: number; assets: ReadonlyMap<string, string>; nonce: string; onAt: (i: number | null) => void }) {
   const a = doc.artboards[at];
+  const frame = useRef<HTMLIFrameElement>(null);
+  const proto = useMemo(() => doc.artboards.some((x) => /\sdata-go="/.test(x.html)), [doc.artboards]);
+  // a click on something that leads to another artboard (said by the frame it was clicked in, and only that frame)
+  useEffect(() => {
+    const on = (e: MessageEvent) => {
+      if (e.source !== frame.current?.contentWindow) return;
+      const m = e.data;
+      if (!m || typeof m !== 'object') return;
+      // (a key pressed while the keyboard is in the frame moves the presentation as it does outside it)
+      if (m.sx === 'key') {
+        if (m.key === 'Escape') onAt(null);
+        else if (m.key === 'ArrowRight' || m.key === ' ') onAt(Math.min(doc.artboards.length - 1, at + 1));
+        else if (m.key === 'ArrowLeft') onAt(Math.max(0, at - 1));
+        return;
+      }
+      if (m.sx !== 'go' || typeof m.to !== 'string') return;
+      const i = doc.artboards.findIndex((x) => x.id === m.to);
+      if (i >= 0) onAt(i);
+    };
+    window.addEventListener('message', on);
+    return () => window.removeEventListener('message', on);
+  }, [at, doc.artboards, onAt]);
   const [size, setSize] = useState({ w: typeof window !== 'undefined' ? window.innerWidth : 1200, h: typeof window !== 'undefined' ? window.innerHeight : 800 });
   useEffect(() => {
     const r = () => setSize({ w: window.innerWidth, h: window.innerHeight });
@@ -862,11 +1082,11 @@ function Present({ doc, at, assets, nonce, onAt }: { doc: DesignDoc; at: number;
     };
   }, [at, doc.artboards.length, onAt]);
   const k = Math.min((size.w - 80) / a.width, (size.h - 100) / a.height);
-  const page = useMemo(() => frameDoc(a, doc.tokens, { parse: parseHtml, nonce, assets, interactive: false }), [a, doc.tokens, nonce, assets]);
+  const page = useMemo(() => frameDoc(a, doc.tokens, { parse: parseHtml, nonce, assets, interactive: false, walk: true }), [a, doc.tokens, nonce, assets]);
   return (
     <div className="dx-present" role="dialog" aria-label="Presentation">
       <div className="dx-present-board" style={{ width: a.width * k, height: a.height * k }}>
-        <iframe title={a.name} sandbox="allow-scripts" srcDoc={page} style={{ width: a.width, height: a.height, transform: `scale(${k})`, transformOrigin: '0 0' }} />
+        <iframe ref={frame} title={a.name} sandbox="allow-scripts" srcDoc={page} style={{ width: a.width, height: a.height, transform: `scale(${k})`, transformOrigin: '0 0' }} />
       </div>
       <div className="dx-present-bar">
         <button type="button" onClick={() => onAt(Math.max(0, at - 1))} disabled={at === 0}>
@@ -878,9 +1098,15 @@ function Present({ doc, at, assets, nonce, onAt }: { doc: DesignDoc; at: number;
         <button type="button" onClick={() => onAt(Math.min(doc.artboards.length - 1, at + 1))} disabled={at === doc.artboards.length - 1}>
           →
         </button>
+        {moves(a) ? (
+          <button type="button" onClick={() => frame.current?.contentWindow?.postMessage({ sx: 'play' }, '*')}>
+            Play again
+          </button>
+        ) : null}
         <button type="button" onClick={() => onAt(null)}>
           Close
         </button>
+        {proto ? <em className="dx-present-note">A click-through of designed screens — not a working product.</em> : null}
       </div>
     </div>
   );

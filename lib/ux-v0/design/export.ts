@@ -12,7 +12,8 @@
 import { graphicFontStylesheet } from '../fonts';
 import type { DesignArtboard } from './doc';
 import { baseCss, facesFor, scopeCss, scopeFragment } from './frame';
-import { exportPixels, formatOf, pointsOf } from './formats';
+import { bleedMm, exportPixels, formatOf, pointsOf } from './formats';
+import { framePlan, freezeAt, freezeCss } from './motion';
 
 const fontCache = new Map<string, string>();
 
@@ -157,8 +158,25 @@ const enc = new TextEncoder();
 const pdfStr = (s: string) => `(${s.replace(/[\\()]/g, (c) => `\\${c}`).replace(/[^\x20-\x7e]/g, '?')})`;
 const f2 = (v: number) => (Math.round(v * 100) / 100).toString();
 
+export interface PdfPage {
+  jpeg: Uint8Array;
+  /** the picture's pixels */
+  px: number;
+  py: number;
+  /** the page, in points */
+  w: number;
+  h: number;
+  /** where the picture goes on the page (points, from the bottom-left); absent: it fills the page */
+  place?: { x: number; y: number; w: number; h: number };
+  /** drawing operators after the picture (crop marks) */
+  marks?: string;
+  /** where the sheet is cut, and how far the picture runs past it: [x0 y0 x1 y1] in points */
+  trimBox?: [number, number, number, number];
+  bleedBox?: [number, number, number, number];
+}
+
 /** A PDF whose pages are JPEG pictures, each at its exact size in points. */
-export function pdfFromPages(pages: readonly { jpeg: Uint8Array; px: number; py: number; w: number; h: number }[], title: string): Uint8Array {
+export function pdfFromPages(pages: readonly PdfPage[], title: string): Uint8Array {
   if (!pages.length) throw new Error('A PDF needs at least one page.');
   const chunks: Uint8Array[] = [];
   const offsets: number[] = [];
@@ -183,8 +201,10 @@ export function pdfFromPages(pages: readonly { jpeg: Uint8Array; px: number; py:
   obj(3, `<< /Title ${pdfStr(title)} /Producer (SocriaUX) /Creator (SocriaUX) >>`);
   pages.forEach((p, i) => {
     const id = pageIds[i];
-    obj(id, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${f2(p.w)} ${f2(p.h)}] /Resources << /XObject << /Im${i} ${id + 2} 0 R >> >> /Contents ${id + 1} 0 R >>`);
-    const content = `q ${f2(p.w)} 0 0 ${f2(p.h)} 0 0 cm /Im${i} Do Q`;
+    const box = (name: string, b?: [number, number, number, number]) => (b ? ` /${name} [${b.map(f2).join(' ')}]` : '');
+    obj(id, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${f2(p.w)} ${f2(p.h)}]${box('BleedBox', p.bleedBox)}${box('TrimBox', p.trimBox)} /Resources << /XObject << /Im${i} ${id + 2} 0 R >> >> /Contents ${id + 1} 0 R >>`);
+    const at = p.place ?? { x: 0, y: 0, w: p.w, h: p.h };
+    const content = `q ${f2(at.w)} 0 0 ${f2(at.h)} ${f2(at.x)} ${f2(at.y)} cm /Im${i} Do Q${p.marks ? `\n${p.marks}` : ''}`;
     obj(id + 1, `<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
     obj(id + 2, [enc.encode(`<< /Type /XObject /Subtype /Image /Width ${p.px} /Height ${p.py} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${p.jpeg.length} >>\nstream\n`), p.jpeg, enc.encode('\nendstream')]);
   });
@@ -246,3 +266,243 @@ export function download(blob: Blob, name: string) {
 }
 
 export const fileName = (s: string) => s.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'design';
+
+// ── many at once: a folder of pictures, a deck, a prototype ──
+
+/** Artboards as numbered pictures in one ZIP file (a carousel's slides, a campaign's formats). */
+export async function artboardsZip(boards: readonly DesignArtboard[], tokens: string, assets: ReadonlyMap<string, string>, o: { type?: 'image/png' | 'image/jpeg'; onProgress?: (done: number, of: number) => void } = {}): Promise<{ blob: Blob; names: string[]; fontsSubstituted: boolean }> {
+  const { default: JSZip } = await import('jszip');
+  const zip = new JSZip();
+  const type = o.type ?? 'image/png';
+  const names: string[] = [];
+  let subs = false;
+  const pad = String(boards.length).length;
+  for (let i = 0; i < boards.length; i++) {
+    const a = boards[i];
+    const p = await artboardPicture(a, tokens, assets, { type, scale: a.medium === 'print' ? 1 : 2, maxSide: 6000 });
+    subs ||= p.fontsSubstituted;
+    const name = `${String(i + 1).padStart(pad, '0')}-${fileName(a.name)}.${type === 'image/png' ? 'png' : 'jpg'}`;
+    names.push(name);
+    zip.file(name, await p.blob.arrayBuffer());
+    o.onProgress?.(i + 1, boards.length);
+  }
+  return { blob: await zip.generateAsync({ type: 'blob', compression: 'STORE' }), names, fontsSubstituted: subs };
+}
+
+const escAttr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+/**
+ * Artboards as one HTML file that is walked through: a deck (arrow keys, click) or a prototype (an element with
+ * data-go="<artboard id>" leads to that artboard). Every slide is its own document inside, exactly as designed —
+ * live text, its faces linked, its pictures inside. It is a walk-through of designed screens, not a working product.
+ */
+export function walkthroughHtml(boards: readonly DesignArtboard[], tokens: string, assets: ReadonlyMap<string, string>, o: { title: string; prototype?: boolean }): string {
+  const go = `<script>document.addEventListener('click',function(e){var n=e.target;while(n&&n.nodeType===1&&!n.getAttribute('data-go'))n=n.parentNode;if(n&&n.getAttribute){e.preventDefault();parent.postMessage({go:n.getAttribute('data-go')},'*')}else if(${o.prototype ? 'false' : 'true'}){parent.postMessage({next:true},'*')}});<\/script><style>[data-go]{cursor:pointer}</style>`;
+  const slides = boards.map((a) => {
+    // (the canvas's element ids are taken out of a single-artboard file; here data-go must survive, and it does)
+    const doc = artboardHtml({ ...a, medium: 'screen' }, tokens, assets).replace('</body>', `${go}</body>`);
+    return `<section data-id="${escAttr(a.id)}" data-w="${a.width}" data-h="${a.height}" aria-label="${escAttr(a.name)}" hidden><iframe title="${escAttr(a.name)}" width="${a.width}" height="${a.height}" srcdoc="${escAttr(doc)}"></iframe></section>`;
+  });
+  return [
+    '<!doctype html>',
+    '<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">',
+    `<title>${o.title.replace(/[<&]/g, '')}</title>`,
+    '<style>html,body{margin:0;height:100%;background:#111;overflow:hidden;font:13px/1.4 system-ui,sans-serif;color:#ddd}section{position:absolute;inset:0 0 34px 0;display:grid;place-items:center}section[hidden]{display:none}iframe{border:0;background:#fff;transform-origin:center center}footer{position:absolute;left:0;right:0;bottom:0;height:34px;display:flex;gap:14px;align-items:center;justify-content:center}button{font:inherit;color:#eee;background:none;border:1px solid #555;border-radius:6px;padding:3px 10px;cursor:pointer}</style>',
+    '</head><body>',
+    ...slides,
+    `<footer><button id="prev" aria-label="Previous">←</button><span id="where"></span><button id="next" aria-label="Next">→</button>${o.prototype ? '<span>A click-through of designed screens — not a working product.</span>' : ''}</footer>`,
+    `<script>(function(){var s=[].slice.call(document.querySelectorAll('section')),i=0;function fit(){s.forEach(function(x){var f=x.firstChild,w=+x.dataset.w,h=+x.dataset.h,k=Math.min((innerWidth-24)/w,(innerHeight-58)/h,1);f.style.transform='scale('+k+')'})}function show(n){i=Math.max(0,Math.min(s.length-1,n));s.forEach(function(x,j){x.hidden=j!==i});document.getElementById('where').textContent=s[i].getAttribute('aria-label')+' · '+(i+1)+' / '+s.length;location.hash=s[i].dataset.id}document.getElementById('prev').onclick=function(){show(i-1)};document.getElementById('next').onclick=function(){show(i+1)};addEventListener('keydown',function(e){if(e.key==='ArrowRight'||e.key===' ')show(i+1);if(e.key==='ArrowLeft')show(i-1)});addEventListener('message',function(e){var d=e.data||{};if(d.go){var n=s.findIndex(function(x){return x.dataset.id===d.go});if(n>=0)show(n)}else if(d.next)show(i+1)});addEventListener('resize',fit);fit();var h=location.hash.slice(1),at=s.findIndex(function(x){return x.dataset.id===h});show(at>=0?at:0)})();<\/script>`,
+    '</body></html>',
+  ].join('\n');
+}
+
+// ── print: a sheet with bleed and crop marks ──
+
+const MM_PT = 72 / 25.4;
+
+/** Crop marks at a trimmed sheet's four corners, outside the bleed (PDF drawing operators; points from the bottom-left). */
+export function cropMarks(trim: [number, number, number, number], bleed: number): string {
+  const [x0, y0, x1, y1] = trim;
+  const gap = bleed + 1 * MM_PT;
+  const len = 4 * MM_PT;
+  const lines: [number, number, number, number][] = [];
+  for (const x of [x0, x1]) {
+    lines.push([x, y0 - gap, x, y0 - gap - len], [x, y1 + gap, x, y1 + gap + len]);
+  }
+  for (const y of [y0, y1]) {
+    lines.push([x0 - gap, y, x0 - gap - len, y], [x1 + gap, y, x1 + gap + len, y]);
+  }
+  return `q 0.25 w 0 0 0 RG ${lines.map((l) => `${f2(l[0])} ${f2(l[1])} m ${f2(l[2])} ${f2(l[3])} l S`).join(' ')} Q`;
+}
+
+/** A print sheet's page: the picture with its bleed, on a page large enough for crop marks, with its trim and bleed boxes. */
+export function printPage(p: { jpeg: Uint8Array; px: number; py: number; trimW: number; trimH: number; bleed: number }): PdfPage {
+  const margin = p.bleed + 6 * MM_PT;
+  const trim: [number, number, number, number] = [margin, margin, margin + p.trimW, margin + p.trimH];
+  return {
+    jpeg: p.jpeg,
+    px: p.px,
+    py: p.py,
+    w: p.trimW + margin * 2,
+    h: p.trimH + margin * 2,
+    place: { x: margin - p.bleed, y: margin - p.bleed, w: p.trimW + p.bleed * 2, h: p.trimH + p.bleed * 2 },
+    trimBox: trim,
+    bleedBox: [trim[0] - p.bleed, trim[1] - p.bleed, trim[2] + p.bleed, trim[3] + p.bleed],
+    marks: cropMarks(trim, p.bleed),
+  };
+}
+
+/** A picture with its edges mirrored outward by `b` pixels on every side: bleed for what was designed to the edge. */
+async function withBleed(blob: Blob, w: number, h: number, b: number, quality = 0.93): Promise<{ blob: Blob; w: number; h: number }> {
+  const img = await createImageBitmap(blob);
+  const canvas = document.createElement('canvas');
+  canvas.width = w + b * 2;
+  canvas.height = h + b * 2;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('This browser cannot draw the picture.');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, b, b, w, h);
+  if (b > 0) {
+    const flip = (tx: number, ty: number, sx: number, sy: number, src: [number, number, number, number], dw: number, dh: number) => {
+      ctx.save();
+      ctx.translate(tx, ty);
+      ctx.scale(sx, sy);
+      ctx.drawImage(img, src[0], src[1], src[2], src[3], 0, 0, dw, dh);
+      ctx.restore();
+    };
+    flip(b, b, -1, 1, [0, 0, b, h], b, h); // left
+    flip(w + b * 2, b, -1, 1, [w - b, 0, b, h], b, h); // right
+    flip(b, b, 1, -1, [0, 0, w, b], w, b); // top
+    flip(b, h + b * 2, 1, -1, [0, h - b, w, b], w, b); // bottom
+    flip(b, b, -1, -1, [0, 0, b, b], b, b);
+    flip(w + b * 2, b, -1, -1, [w - b, 0, b, b], b, b);
+    flip(b, h + b * 2, -1, -1, [0, h - b, b, b], b, b);
+    flip(w + b * 2, h + b * 2, -1, -1, [w - b, h - b, b, b], b, b);
+  }
+  const out = await new Promise<Blob>((res, rej) => canvas.toBlob((x) => (x ? res(x) : rej(new Error('The picture could not be written.'))), 'image/jpeg', quality));
+  return { blob: out, w: canvas.width, h: canvas.height };
+}
+
+/**
+ * Print sheets as one PDF for a printer: each page the sheet with its bleed (the design's edges carried outward —
+ * what was designed to the edge runs past the cut), crop marks, and its trim and bleed boxes. The pictures are RGB:
+ * this is not a CMYK file and claims no print standard; a printer converts it, or says what they need.
+ */
+export async function artboardsPrintPdf(boards: readonly DesignArtboard[], tokens: string, assets: ReadonlyMap<string, string>, title: string): Promise<{ blob: Blob; fontsSubstituted: boolean; pages: { name: string; trimMm: [number, number]; bleedMm: number; ppi: number }[] }> {
+  const pages: PdfPage[] = [];
+  const said: { name: string; trimMm: [number, number]; bleedMm: number; ppi: number }[] = [];
+  let subs = false;
+  for (const a of boards) {
+    const f = formatOf(a.format);
+    // (a sheet that is not one of the print formats is given the usual 3 mm)
+    const mm = (f && bleedMm(f)) || 3;
+    const p = await artboardPicture(a, tokens, assets, { type: 'image/jpeg', maxSide: 6600, quality: 0.93 });
+    subs ||= p.fontsSubstituted;
+    const k = p.w / a.width;
+    const b = Math.round((mm / 25.4) * 96 * k);
+    const sheet = await withBleed(p.blob, p.w, p.h, b);
+    pages.push(printPage({ jpeg: new Uint8Array(await sheet.blob.arrayBuffer()), px: sheet.w, py: sheet.h, trimW: pointsOf(a.width), trimH: pointsOf(a.height), bleed: mm * MM_PT }));
+    said.push({ name: a.name, trimMm: [Math.round((a.width / 96) * 25.4), Math.round((a.height / 96) * 25.4)], bleedMm: mm, ppi: Math.round(k * 96) });
+  }
+  return { blob: new Blob([pdfFromPages(pages, title) as BlobPart], { type: 'application/pdf' }), fontsSubstituted: subs, pages: said };
+}
+
+// ── motion: frames, a video, a sequence ──
+
+export interface MotionFrames {
+  frames: ImageBitmap[];
+  fps: number;
+  w: number;
+  h: number;
+  seconds: number;
+}
+
+/** An artboard that moves, drawn moment by moment over its length (lib/ux-v0/design/motion.ts): the frames of an export. */
+export async function motionFrames(a: DesignArtboard, tokens: string, assets: ReadonlyMap<string, string>, o: { maxSide?: number; onProgress?: (done: number, of: number) => void; signal?: AbortSignal } = {}): Promise<MotionFrames> {
+  const seconds = a.seconds ?? 4;
+  const plan = framePlan(seconds);
+  const fonts = await embeddedFonts(facesFor(a, tokens).faces);
+  const k = Math.min(1, (o.maxSide ?? 1080) / Math.max(a.width, a.height));
+  // (even sizes: video encoders ask for them)
+  const w = Math.max(2, Math.round((a.width * k) / 2) * 2);
+  const h = Math.max(2, Math.round((a.height * k) / 2) * 2);
+  const frames: ImageBitmap[] = [];
+  for (let i = 0; i < plan.times.length; i++) {
+    if (o.signal?.aborted) throw new Error('Stopped.');
+    const t = plan.times[i];
+    const svg = artboardSvg({ ...a, html: freezeAt(a.html, t) }, freezeCss(tokens, t), { fontCss: fonts.css, assets, background: '#ffffff' });
+    const { canvas } = await drawn(svg, w, h, '#ffffff');
+    frames.push(await createImageBitmap(canvas));
+    o.onProgress?.(i + 1, plan.times.length);
+  }
+  return { frames, fps: plan.fps, w, h, seconds };
+}
+
+const VIDEO_TYPES = ['video/mp4;codecs=avc1.42E01E', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+
+/** The kind of video this browser can record, or null (then only frames can be exported). */
+export function videoType(): string | null {
+  if (typeof MediaRecorder === 'undefined') return null;
+  return VIDEO_TYPES.find((t) => MediaRecorder.isTypeSupported(t)) ?? null;
+}
+
+/**
+ * The frames as a video, recorded by the browser as they are played back at their own speed (so it takes as long as
+ * the video is long). What it is depends on the browser: MP4 (H.264) where it can record one, WebM otherwise — said
+ * in what is returned. No sound.
+ */
+export async function motionVideo(m: MotionFrames, o: { signal?: AbortSignal } = {}): Promise<{ blob: Blob; mime: string; ext: 'mp4' | 'webm' }> {
+  const mime = videoType();
+  if (!mime) throw new Error('This browser cannot record video. Export the frames instead.');
+  const canvas = document.createElement('canvas');
+  canvas.width = m.w;
+  canvas.height = m.h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('This browser cannot draw the frames.');
+  ctx.drawImage(m.frames[0], 0, 0);
+  const stream = canvas.captureStream(0);
+  const track = stream.getVideoTracks()[0] as MediaStreamTrack & { requestFrame?: () => void };
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: Math.min(16_000_000, Math.max(2_500_000, m.w * m.h * 6)) });
+  const chunks: Blob[] = [];
+  rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  const done = new Promise<void>((res, rej) => {
+    rec.onstop = () => res();
+    rec.onerror = () => rej(new Error('The video could not be recorded.'));
+  });
+  rec.start();
+  const step = 1000 / m.fps;
+  const t0 = performance.now();
+  for (let i = 0; i < m.frames.length; i++) {
+    if (o.signal?.aborted) break;
+    ctx.drawImage(m.frames[i], 0, 0);
+    track.requestFrame?.();
+    const wait = t0 + (i + 1) * step - performance.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  }
+  rec.stop();
+  await done;
+  stream.getTracks().forEach((t) => t.stop());
+  if (o.signal?.aborted) throw new Error('Stopped.');
+  const blob = new Blob(chunks, { type: mime.split(';')[0] });
+  if (!blob.size) throw new Error('The video came out empty.');
+  return { blob, mime, ext: mime.startsWith('video/mp4') ? 'mp4' : 'webm' };
+}
+
+/** The frames as numbered PNGs in one ZIP file (for an editor that assembles sequences). */
+export async function motionZip(m: MotionFrames, name: string): Promise<Blob> {
+  const { default: JSZip } = await import('jszip');
+  const zip = new JSZip();
+  const canvas = document.createElement('canvas');
+  canvas.width = m.w;
+  canvas.height = m.h;
+  const ctx = canvas.getContext('2d')!;
+  const pad = String(m.frames.length).length;
+  for (let i = 0; i < m.frames.length; i++) {
+    ctx.drawImage(m.frames[i], 0, 0);
+    const png = await new Promise<Blob>((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error('A frame could not be written.'))), 'image/png'));
+    zip.file(`${fileName(name)}-${String(i + 1).padStart(pad, '0')}.png`, await png.arrayBuffer());
+  }
+  zip.file('README.txt', `${name}\n${m.frames.length} frames at ${m.fps} frames a second (${m.seconds} s), ${m.w} × ${m.h} px.\n`);
+  return zip.generateAsync({ type: 'blob', compression: 'STORE' });
+}

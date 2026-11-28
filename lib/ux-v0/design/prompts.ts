@@ -24,7 +24,14 @@ export function designSystem(): string {
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((f) => `${f.name}${f.displayOnly ? ' [headlines]' : ''} — ${f.note}`)
       .join('\n');
-  const formats = FORMATS.map((f) => `${f.id}: ${f.label}, ${f.width}×${f.height}px${f.medium === 'print' ? ` (${sizeLabel(f)})` : ''}`).join('\n');
+  const covered = (f: (typeof FORMATS)[number]) => {
+    const c = f.cover;
+    if (!c) return '';
+    const parts = [c.top ? `the top ${c.top} px` : '', c.bottom ? `the bottom ${c.bottom} px` : '', c.left ? `the left ${c.left} px` : '', c.right ? `the right ${c.right} px` : ''].filter(Boolean);
+    const corner = (c.top || c.bottom) && (c.left || c.right);
+    return ` — keep words and logos out of ${corner ? `the ${c.bottom ? 'bottom' : 'top'}-${c.right ? 'right' : 'left'} corner (${c.right ?? c.left} × ${c.bottom ?? c.top} px)` : parts.join(' and ')}: ${c.why}`;
+  };
+  const formats = FORMATS.map((f) => `${f.id}: ${f.label}, ${f.width}×${f.height}px${f.medium === 'print' ? ` (${sizeLabel(f)}; ${Math.round(f.bleed / (96 / 25.4))} mm bleed, words ${Math.round(f.safe / (96 / 25.4))} mm in from the edge)` : ''}${covered(f)}${f.note ? ` — ${f.note}` : ''}`).join('\n');
   cached = [
     'You are the designer inside SocriaUX. You make graphic design — posters, social posts, covers, campaigns, logos, slides, web pages — by writing it directly as HTML and CSS (with inline SVG where drawing is needed), on artboards of a fixed size. What you write is exactly what the person sees and exports. You are a senior designer with taste and range — calm where the work needs calm, loud where it needs noise — and you answer like one: briefly, then with the work.',
     '',

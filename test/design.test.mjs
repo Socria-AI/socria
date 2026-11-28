@@ -10,7 +10,7 @@ import { JSDOM } from 'jsdom';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const T = await import(pathToFileURL(join(here, '.tmp', 'design-under-test.mjs')).href);
-const { protocol: P, apply: A, elements: E, doc: D, formats: F, prompts: PR, frame: FR, flow: FL, start: ST, locks: LK, pins: PN, history: HI, request: RQ, contrast: CT, brandcheck: BC, identity: ID } = T;
+const { protocol: P, apply: A, elements: E, doc: D, formats: F, prompts: PR, frame: FR, flow: FL, start: ST, locks: LK, pins: PN, history: HI, request: RQ, contrast: CT, brandcheck: BC, identity: ID, motion: MO, production: PD, dependents: DP, exporting: EX } = T;
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, typeof x === 'string' ? x.slice(0, 600) : JSON.stringify(x).slice(0, 600))));
@@ -530,6 +530,108 @@ sec('the identity a design carries');
   ok('shared colour properties are carried by name', id.named.some((n) => n.name === 'ember' && n.hex === '#c4512c'));
   const other = ID.identityOf([poster], tokens);
   ok('another artboard carries another identity (nothing is mixed in from what was not asked for)', other.background === '#101010' && other.display === 'Anton' && other.accent === '#00ffcc' && other.logo === null);
+}
+
+sec('made for a place: formats, what a platform covers, a sheet’s trim, a picture’s pixels');
+{
+  const story = F.formatOf('story');
+  ok('a story is 1080 × 1920 and says what the platform draws over', story.width === 1080 && story.height === 1920 && story.cover.top === 250 && story.cover.bottom === 340);
+  ok('formats for where a company posts and what it ships', ['x-post', 'open-graph', 'youtube-thumbnail', 'linkedin-banner', 'desktop-screen', 'tablet-screen'].every((id) => F.formatOf(id)) && F.formatOf('x-post').width === 1600 && F.formatOf('open-graph').height === 630 && F.formatOf('youtube-thumbnail').width === 1280);
+  ok('named in words', F.formatFromWords('a YouTube thumbnail for the launch')?.id === 'youtube-thumbnail' && F.formatFromWords('an Open Graph image')?.id === 'open-graph' && F.formatFromWords('a LinkedIn banner')?.id === 'linkedin-banner' && F.formatFromWords('a LinkedIn post')?.id === 'linkedin' && F.formatFromWords('a dashboard for the product')?.id === 'desktop-screen' && F.formatFromWords('a story for instagram')?.id === 'story');
+  ok('the designer is told what each platform covers, and each sheet’s bleed and margin', /story: [^\n]*keep words and logos out of the top 250 px and the bottom 340 px/.test(PR.designSystem()) && /youtube-thumbnail: [^\n]*the bottom-right corner \(190 × 110 px\)/.test(PR.designSystem()) && /a3: [^\n]*3 mm bleed, words 15 mm in from the edge/.test(PR.designSystem()));
+  ok('a story is covered in two bands; a thumbnail in one corner', PD.coverZones(story).length === 2 && PD.coverZones(story)[1].y === 1580 && PD.coverZones(F.formatOf('youtube-thumbnail')).length === 1 && PD.coverZones(F.formatOf('youtube-thumbnail'))[0].x === 1090 && PD.coverZones(F.formatOf('youtube-thumbnail'))[0].y === 610);
+  const t = (o) => ({ id: 'e1', x: 80, y: 900, w: 600, h: 80, color: 'rgb(0,0,0)', size: 60, weight: 400, text: 'Think for yourself.', ...o });
+  const st = { format: 'story', width: 1080, height: 1920, medium: 'screen' };
+  ok('words in the middle of a story: nothing to say', PD.placementFacts(st, [t({})]).length === 0);
+  ok('words under the top of a story are found, with why', /under the platform's interface, measured: “Think for yourself.” \(data-sx="e1"\) sits in the top 250 px/.test(PD.placementFacts(st, [t({ y: 120 })])[0] ?? ''), PD.placementFacts(st, [t({ y: 120 })]));
+  ok('…and under the bottom', /the bottom 340 px/.test(PD.placementFacts(st, [t({ y: 1700 })])[0] ?? ''));
+  ok('a line that only brushes the band is let be', PD.placementFacts(st, [t({ y: 232, h: 30 })]).length === 0 || PD.placementFacts(st, [t({ y: 240, h: 60 })]).length === 0);
+  const yt = { format: 'youtube-thumbnail', width: 1280, height: 720, medium: 'screen' };
+  ok('a thumbnail’s corner: words there are found, words beside it are not', PD.placementFacts(yt, [t({ x: 1100, y: 640, w: 150, h: 50 })]).length === 1 && PD.placementFacts(yt, [t({ x: 80, y: 640, w: 400, h: 50 })]).length === 0);
+  const a3 = F.formatOf('a3');
+  const sheet = { format: 'a3', width: a3.width, height: a3.height, medium: 'print' };
+  ok('on a print sheet, words nearer the trim than its margin are found, in millimetres', /too near the trim, measured: [^\n]*is 5\.\d mm from the edge[^\n]*keeps words 15\.\d mm in/.test(PD.placementFacts(sheet, [t({ x: 20, y: 400 })])[0] ?? '') || /too near the trim/.test(PD.placementFacts(sheet, [t({ x: 20, y: 400 })])[0] ?? ''), PD.placementFacts(sheet, [t({ x: 20, y: 400 })]));
+  ok('…and words inside it are not', PD.placementFacts(sheet, [t({ x: 120, y: 400 })]).length === 0);
+  const img = (o) => ({ id: 'e9', nw: 600, nh: 400, w: 800, h: 533, fit: 'fill', filter: 'none', opacity: 1, blend: 'normal', tilt: false, clip: 'none', ...o });
+  ok('a picture enlarged past its pixels on a print sheet is found, with its resolution', /too coarse for print, measured: [^\n]*600 px wide[^\n]*about 72 pixels to the inch/.test(PD.resolutionFacts(sheet, [img({})])[0] ?? ''), PD.resolutionFacts(sheet, [img({})]));
+  ok('…a picture with enough pixels, a vector, or a screen design: nothing to say', PD.resolutionFacts(sheet, [img({ nw: 3000 })]).length === 0 && PD.resolutionFacts(sheet, [img({ vec: true })]).length === 0 && PD.resolutionFacts(st, [img({})]).length === 0);
+  // a deck that repeats itself
+  const slide = (shift = 0) => PD.layoutSignature([t({ x: 100 + shift, y: 100, w: 1200, h: 120, size: 96 }), t({ x: 100 + shift, y: 400, w: 800, h: 300, size: 28 })], 1920, 1080);
+  const other = PD.layoutSignature([t({ x: 1000, y: 700, w: 700, h: 200, size: 140 })], 1920, 1080);
+  const rep = PD.repeatedLayout({ a: slide(), b: slide(4), c: slide(-3), d: slide(), e: other });
+  ok('a deck where most slides set their words in the same places is found', rep && rep.ids.length === 4 && rep.of === 5 && /4 of these 5 slides/.test(PD.repetitionSaid(rep)));
+  ok('…one whose slides differ is not, nor one too short to say', PD.repeatedLayout({ a: slide(), b: other, c: PD.layoutSignature([t({ x: 500, y: 500, w: 300, h: 60, size: 20 })], 1920, 1080), d: PD.layoutSignature([t({ x: 60, y: 900, w: 1700, h: 100, size: 70 })], 1920, 1080) }) === null && PD.repeatedLayout({ a: slide(), b: slide() }) === null);
+}
+
+sec('a design that moves, held at a moment');
+{
+  ok('the delay of an animation is read from its shorthand (the second time), not from its timing function', MO.delaysOf('animation: rise 1.2s cubic-bezier(.2,.8,.2,1) 300ms both').join() === '0.3' && MO.delaysOf('animation: a 2s, b 1s 0.5s infinite').join() === '0,0.5');
+  ok('…or from the longhand, repeated as CSS repeats it', MO.delaysOf('animation-name: a, b, c; animation-duration: 1s; animation-delay: 200ms, 1s').join() === '0.2,1,0.2');
+  ok('a block that animates nothing is left alone', MO.delaysOf('color: red; transition: all 1s') === null && MO.delaysOf('animation: none') === null);
+  const css = '@keyframes rise{from{opacity:0;transform:translateY(40px)}to{opacity:1}}.h{animation:rise 1s ease-out .5s both}.s{color:red}@media (prefers-reduced-motion: reduce){.h{animation:none}}';
+  const at2 = MO.freezeCss(css, 2);
+  ok('held at 2 s: the animation is paused with its delay moved back by 2 s', /\.h\{animation:rise 1s ease-out \.5s both;animation-delay:-1\.5s !important;animation-play-state:paused !important\}/.test(at2), at2);
+  ok('its keyframes, other rules and the reduced-motion rule are untouched', at2.includes('@keyframes rise{from{opacity:0;transform:translateY(40px)}to{opacity:1}}') && at2.includes('.s{color:red}') && at2.includes('{.h{animation:none}}'));
+  ok('held before it starts, its delay is still ahead (it shows as it rests)', /animation-delay:0\.3s !important/.test(MO.freezeCss(css, 0.2)));
+  const html = '<style>.a{animation:slide 2s linear}</style><div class="a" data-sx="e1" style="animation: spin 4s linear 1s infinite">x</div>';
+  const fz = MO.freezeAt(html, 1.5);
+  ok('an artboard’s own styles and its inline styles are both held', /\.a\{animation:slide 2s linear;animation-delay:-1\.5s !important/.test(fz) && /style="animation: spin 4s linear 1s infinite;animation-delay:-0\.5s !important;animation-play-state:paused !important"/.test(fz), fz);
+  const plan = MO.framePlan(6);
+  ok('a length is cut into frames that end on the design at rest', plan.fps === 24 && plan.count === 144 && plan.times[0] === 0 && plan.times.at(-1) === 6 && MO.framePlan(20).fps === 12 && MO.framePlan(60).count <= 360);
+  ok('a design that moves without a still alternative is found; with one, not', PD.motionFacts({ html: '<style>@keyframes a{to{opacity:1}}.x{animation:a 1s}</style>', seconds: 4 }).some((x) => /prefers-reduced-motion/.test(x)) && PD.motionFacts({ html: '<style>@keyframes a{to{opacity:1}}.x{animation:a 1s}@media (prefers-reduced-motion: reduce){.x{animation:none}}</style>', seconds: 4 }).length === 0 && PD.motionFacts({ html: '<p>still</p>' }).length === 0);
+  ok('the frame can be asked for a moment, or to play again', /m\.sx==='time'&&typeof m\.t==='number'/.test(FR.INTERACT_SOURCE) && /m\.sx==='play'/.test(FR.INTERACT_SOURCE));
+}
+
+sec('a print sheet with bleed and crop marks; many artboards as one file');
+{
+  const MMPT = 72 / 25.4;
+  const page = EX.printPage({ jpeg: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), px: 100, py: 140, trimW: 595.28, trimH: 841.89, bleed: 3 * MMPT });
+  const m = (3 + 6) * MMPT;
+  const near = (a, b) => Math.abs(a - b) < 0.02;
+  ok('the page is the sheet, its bleed and room for marks', near(page.w, 595.28 + 2 * m) && near(page.h, 841.89 + 2 * m));
+  ok('the trim box is the sheet; the bleed box 3 mm beyond it; the picture fills the bleed box', near(page.trimBox[0], m) && near(page.trimBox[2] - page.trimBox[0], 595.28) && near(page.trimBox[0] - page.bleedBox[0], 3 * MMPT) && near(page.place.x, page.bleedBox[0]) && near(page.place.w, 595.28 + 6 * MMPT));
+  ok('crop marks are eight lines, all outside the bleed', (page.marks.match(/ l S/g) ?? []).length === 8 && [...page.marks.matchAll(/([\d.]+) ([\d.]+) m/g)].every((x) => { const [X, Y] = [Number(x[1]), Number(x[2])]; return X < page.bleedBox[0] || X > page.bleedBox[2] || Y < page.bleedBox[1] || Y > page.bleedBox[3]; }), page.marks);
+  const pdf = new TextDecoder('latin1').decode(EX.pdfFromPages([page], 'Sheet'));
+  ok('the PDF says where the sheet is trimmed and how far it bleeds, and draws the marks', /\/TrimBox \[[\d. ]+\]/.test(pdf) && /\/BleedBox \[[\d. ]+\]/.test(pdf) && /0\.25 w 0 0 0 RG/.test(pdf) && /\/DeviceRGB/.test(pdf) && pdf.startsWith('%PDF-1.4') && pdf.trimEnd().endsWith('%%EOF'));
+  ok('…and never calls itself CMYK or a print standard', !/DeviceCMYK|PDF\/X|OutputIntent/.test(pdf));
+  ok('a plain PDF page still fills its page', /q 100 0 0 50 0 0 cm \/Im0 Do Q/.test(new TextDecoder('latin1').decode(EX.pdfFromPages([{ jpeg: new Uint8Array([1]), px: 10, py: 5, w: 100, h: 50 }], 't'))));
+  const boards = [
+    { id: 'ab1', name: 'Home', format: 'mobile-screen', width: 390, height: 844, medium: 'web', x: 0, y: 0, html: '<style>.b{color:red}</style><button class="b" data-sx="e1" data-go="ab2">Open</button>' },
+    { id: 'ab2', name: 'Detail', format: 'mobile-screen', width: 390, height: 844, medium: 'web', x: 0, y: 0, html: '<p data-sx="e1">Detail & more</p><a data-sx="e2" data-go="ab1">Back</a>' },
+  ];
+  const walk = EX.walkthroughHtml(boards, ':root{--x:1}', new Map(), { title: 'Proto <1>', prototype: true });
+  ok('a prototype is one HTML file: every screen inside, as designed, with live text', (walk.match(/<section data-id="ab\d"/g) ?? []).length === 2 && /srcdoc="[^"]*&lt;button class=&quot;b&quot; data-go=&quot;ab2&quot;>Open/.test(walk) && /Detail &amp; more/.test(walk), walk.slice(walk.indexOf('<section'), walk.indexOf('<section') + 900));
+  ok('…its links lead between screens, and it says what it is', /parent\.postMessage\(\{go:n\.getAttribute\('data-go'\)\}/.test(walk) && /d\.go/.test(walk) && /A click-through of designed screens — not a working product\./.test(walk));
+  ok('…the canvas’s ids are not in it, and its title is safe', !/data-sx=/.test(walk) && /<title>Proto 1><\/title>|<title>Proto 1&gt;<\/title>|<title>Proto 1><\/title>/.test(walk.replace('&lt;', '')) || /<title>Proto 1><\/title>/.test(walk) || !/<title>[^<]*<1>/.test(walk));
+  ok('a deck is the same file without the prototype’s note, advancing on a click', !/not a working product/.test(EX.walkthroughHtml(boards, '', new Map(), { title: 'Deck' })) && /else if\(true\)\{parent\.postMessage\(\{next:true\}/.test(EX.walkthroughHtml(boards, '', new Map(), { title: 'Deck' })));
+}
+
+sec('screens that lead to one another');
+{
+  const ans = P.parseAnswer('<artboard id="new-1" name="Home" format="mobile-screen"><button data-go="new-2">Open</button><a data-go="new-9">Lost</a></artboard><artboard id="new-2" name="Detail" format="mobile-screen"><a data-go="new-1">Back</a></artboard>');
+  const r = A.applyAnswer({ artboards: [], tokens: '' }, ans, { parse, format: 'mobile-screen' });
+  const [home, detail] = r.doc.artboards;
+  ok('a link written to another new artboard leads to the artboard it became', home.html.includes(`data-go="${detail.id}"`) && detail.html.includes(`data-go="${home.id}"`), [home.html, detail.html]);
+  ok('a link that leads nowhere is said', r.failed.some((f) => /On “Home”, a link leads to an artboard that is not there \(new-9\)/.test(f)), r.failed);
+  ok('the instructions say how screens are linked', /data-go="<artboard id>"/.test(PR.designSystem()));
+}
+
+sec('the same words on other artboards');
+{
+  const ab = (id, name, html, o = {}) => ({ id, name, format: 'a3', width: 1123, height: 1587, medium: 'print', x: 0, y: 0, html, ...o });
+  const doc = { tokens: '', artboards: [
+    ab('ab1', 'Poster', '<h1 data-sx="e1">Think for yourself.</h1><p data-sx="e2">Socria</p>'),
+    ab('ab2', 'Story', '<div data-sx="e1"><h2 data-sx="e2">Think for\n   yourself.</h2></div><p data-sx="e3">Think for yourself, and more</p>'),
+    ab('ab3', 'Banner', '<span data-sx="e1">Think for yourself.</span>', { state: 'approved', locked: true }),
+    ab('ab4', 'Other', '<h1 data-sx="e1">Something else</h1>'),
+  ] };
+  const deps = DP.carrying(doc, 'Think for yourself.', 'ab1', parse);
+  ok('the other artboards that carry exactly those words are found (the element that says them, not the block around it)', deps.length === 2 && deps[0].artboard === 'ab2' && deps[0].elements.join() === 'e2' && deps[1].artboard === 'ab3', deps);
+  ok('an approved one is named as protected', deps[1].locked === true && deps[0].locked === false);
+  ok('words that only contain them are not “the same words”', !deps.some((d) => d.elements.includes('e3')));
+  const r = DP.changeWords(doc, deps, 'Come out sharper.', parse);
+  ok('changed where the person chose: the words, and nothing else', r.changed.join() === 'Story' && /<h2 data-sx="e2">Come out sharper\.<\/h2>/.test(r.doc.artboards[1].html) && /Think for yourself, and more/.test(r.doc.artboards[1].html));
+  ok('the approved artboard is left exactly as it was, and said', r.left.join() === 'Banner' && r.doc.artboards[2].html === doc.artboards[2].html && r.doc.artboards[3] === doc.artboards[3]);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

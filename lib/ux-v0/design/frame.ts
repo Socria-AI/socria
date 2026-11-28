@@ -89,6 +89,8 @@ export interface FrameOptions {
   assets: ReadonlyMap<string, string>;
   /** the canvas may select and edit (false for thumbnails and the presentation) */
   interactive: boolean;
+  /** shown to be walked through (the presentation): a click on something that leads somewhere (data-go) is reported */
+  walk?: boolean;
 }
 
 /** The page an artboard's frame draws. */
@@ -98,11 +100,11 @@ export function frameDoc(a: DesignArtboard, tokens: string, o: FrameOptions): st
     fonts.href ? `<link rel="stylesheet" href="${fonts.href}">` : '',
     `<style>${baseCss(a.width, a.height)}</style>`,
     tokens ? `<style data-sx-tokens>${scopeCss(tokens)}</style>` : '',
-    o.interactive ? `<style>${CANVAS_CSS}</style>` : '',
+    o.interactive ? `<style>${CANVAS_CSS}</style>` : o.walk ? '<style>[data-go]{cursor:pointer}</style>' : '',
   ].join('\n');
   const html = `<!doctype html><html><head>${head}</head><body><div class="sx-root">${scopeFragment(a.html, o.assets)}</div></body></html>`;
   // (a <link> the model wrote was taken out when its answer was saved, elements.ts; this one is ours)
-  const built = buildSandboxDoc(html, { parse: o.parse, runScripts: false, nonce: o.nonce, inspector: o.interactive ? INTERACT_SOURCE : PASSIVE_SOURCE }).doc;
+  const built = buildSandboxDoc(html, { parse: o.parse, runScripts: false, nonce: o.nonce, inspector: o.interactive ? INTERACT_SOURCE : o.walk ? WALK_SOURCE : PASSIVE_SOURCE }).doc;
   return built;
 }
 
@@ -121,6 +123,32 @@ const PASSIVE_SOURCE = String.raw`(function(){
   var done=function(){post({sx:'ready',passive:true})};
   if(document.fonts&&document.fonts.ready){document.fonts.ready.then(done)}else{done()}
 })();`;
+
+/** How the frame is asked to show a moment of what moves, or to play it again (the canvas and the presentation). */
+const TIME_SOURCE = String.raw`
+  window.addEventListener('message',function(e){
+    if(e.source!==parent) return; var m=e.data; if(!m||typeof m!=='object'||!document.getAnimations) return;
+    var all=document.getAnimations();
+    if(m.sx==='time'&&typeof m.t==='number'){ for(var i=0;i<all.length;i++){ try{ all[i].pause(); all[i].currentTime=Math.max(0,m.t*1000); }catch(x){} } }
+    else if(m.sx==='play'){ for(var j=0;j<all.length;j++){ try{ all[j].currentTime=0; all[j].play(); }catch(x){} } }
+  });`;
+
+/**
+ * In the presentation: the faces are in; a click on an element that leads to another artboard (data-go, on it or
+ * around it) says where to. Nothing else is reported, and nothing can be changed.
+ */
+const WALK_SOURCE = String.raw`(function(){
+  var post=function(m){try{parent.postMessage(m,'*')}catch(e){}};
+  var done=function(){post({sx:'ready',passive:true})};
+  if(document.fonts&&document.fonts.ready){document.fonts.ready.then(done)}else{done()}
+  document.addEventListener('click',function(e){
+    var n=e.target; while(n&&n.nodeType===1&&!n.getAttribute('data-go')) n=n.parentNode;
+    if(n&&n.getAttribute){ e.preventDefault(); post({sx:'go',to:String(n.getAttribute('data-go')).slice(0,40)}); }
+  },true);
+  // (once it has been clicked the keyboard is here: the keys that move the presentation are passed back to it)
+  document.addEventListener('keydown',function(e){ var k=e.key; if(k==='Escape'||k==='ArrowRight'||k==='ArrowLeft'||k===' '){ e.preventDefault(); post({sx:'key',key:k,shift:false,mod:false}); } },true);
+  ${'__TIME__'}
+})();`.replace('__TIME__', TIME_SOURCE);
 
 /**
  * The canvas's own script in the frame: hover, select, edit text, drag; and what it measures (text cut off, things
@@ -207,9 +235,10 @@ export const INTERACT_SOURCE = String.raw`(function(){
     for(var k=0;k<ims.length&&k<30;k++){ var im=ims[k], ics=getComputedStyle(im), tr=ics.transform, tilt=false;
       if(tr&&tr!=='none'){ var mm=/matrix\(([^)]+)\)/.exec(tr); if(mm){ var pp=mm[1].split(','); tilt=Math.abs(parseFloat(pp[1]))>0.01||Math.abs(parseFloat(pp[2]))>0.01; } else tilt=true; }
       if(ics.rotate&&ics.rotate!=='none'&&parseFloat(ics.rotate)) tilt=true;
-      imgs.push({id:im.getAttribute('data-sx'),nw:im.naturalWidth,nh:im.naturalHeight,w:im.offsetWidth,h:im.offsetHeight,fit:ics.objectFit,filter:ics.filter,opacity:parseFloat(ics.opacity),blend:ics.mixBlendMode,tilt:tilt,clip:ics.clipPath}); }
+      imgs.push({id:im.getAttribute('data-sx'),nw:im.naturalWidth,nh:im.naturalHeight,w:im.offsetWidth,h:im.offsetHeight,fit:ics.objectFit,filter:ics.filter,opacity:parseFloat(ics.opacity),blend:ics.mixBlendMode,tilt:tilt,clip:ics.clipPath,vec:/^data:image\/svg/.test(im.currentSrc||im.src||'')}); }
     post({sx:'ready',issues:issues,height:root.scrollHeight,texts:texts,imgs:imgs});
   };
+  ${'__TIME__'}
   var measured=false;
   var go=function(){
     var once=function(){ if(measured) return; measured=true; setTimeout(measure,30); };
@@ -218,4 +247,4 @@ export const INTERACT_SOURCE = String.raw`(function(){
     if(!left) once(); else setTimeout(once,1500);
   };
   if(document.fonts&&document.fonts.ready){document.fonts.ready.then(go)}else{go()}
-})();`;
+})();`.replace('__TIME__', TIME_SOURCE);

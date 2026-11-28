@@ -112,6 +112,8 @@ export interface ImageBox {
   blend: string;
   tilt: boolean;
   clip: string;
+  /** a vector picture (it has no resolution to run out of) */
+  vec?: boolean;
 }
 
 /** The asset each <img> element of an artboard places, by element id. */

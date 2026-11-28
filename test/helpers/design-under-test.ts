@@ -27,3 +27,7 @@ export * as companyRead from '@/lib/ux-v0/company/read';
 export * as dsiAssets from '@/lib/ux-v0/dsi/assets';
 export * as brandcheck from '@/lib/ux-v0/design/brandcheck';
 export * as identity from '@/lib/ux-v0/design/identity';
+export * as motion from '@/lib/ux-v0/design/motion';
+export * as production from '@/lib/ux-v0/design/production';
+export * as dependents from '@/lib/ux-v0/design/dependents';
+export * as exporting from '@/lib/ux-v0/design/export';

@@ -10,6 +10,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { STATE_LABEL, type DesignArtboard, type DesignDoc } from '@/lib/ux-v0/design/doc';
 import { frameDoc } from '@/lib/ux-v0/design/frame';
 import { sizeLabel, formatOf } from '@/lib/ux-v0/design/formats';
+import { coverZones } from '@/lib/ux-v0/design/production';
 import { parseHtml } from './runtime';
 
 export interface ElementPick {
@@ -114,6 +115,8 @@ export interface CanvasProps {
   onMenu: (id: string, action: 'duplicate' | 'delete' | 'variations' | 'export') => void;
   /** dim everything but these (a comparison, a review): absent, nothing is dimmed */
   focus?: ReadonlySet<string> | null;
+  /** draw each format's guides over its artboard: where a platform covers it, a sheet's safe margin and bleed */
+  guides?: boolean;
   comments: Record<string, number>;
   /** set by the canvas: a message to one artboard's frame (select the parent, show an element) */
   control?: React.MutableRefObject<((artboard: string, msg: Record<string, unknown>) => void) | null>;
@@ -215,7 +218,8 @@ export function Canvas(p: CanvasProps) {
           const dim = !!p.focus && !p.focus.has(a.id);
           return (
             <div key={a.id} className={`dx-board${isSel ? ' is-sel' : ''}${p.writing.has(a.id) ? ' is-writing' : ''}${a.state ? ` is-${a.state}` : ''}${a.locked ? ' is-locked' : ''}${dim ? ' is-dim' : ''}`} data-artboard={a.id} style={{ left: a.x, top: a.y, width: a.width, height: a.height }}>
-              <div className="dx-label" style={{ transform: `scale(${1 / p.view.k})`, transformOrigin: 'left bottom' }}>
+              {/* (held to the artboard's own width on screen, so it never lies over its neighbour's) */}
+              <div className="dx-label" style={{ transform: `scale(${1 / p.view.k})`, transformOrigin: 'left bottom', maxWidth: Math.max(150, Math.round(a.width * p.view.k)) }}>
                 {renaming === a.id ? (
                   <input
                     autoFocus
@@ -259,6 +263,15 @@ export function Canvas(p: CanvasProps) {
                 )}
               </div>
               <ArtboardFrame key={bumps[a.id] ?? 0} a={a} tokens={p.doc.tokens} assets={p.assets} assetsKey={assetsKey} nonce={p.nonce} interactive={p.interactive && !panning} selectedElement={isSel ? p.selected.element : null} locks={(a.locks ?? []).map((l) => l.id).join(',')} lockAll={!!a.locked} register={register} />
+              {p.guides && f && a.width === f.width && a.height === f.height ? (
+                <div className="dx-guides" aria-hidden="true">
+                  {coverZones(f).map((z, i) => (
+                    <div key={i} className="dx-guide-cover" style={{ left: z.x, top: z.y, width: z.w, height: z.h }} title={f.cover?.why} />
+                  ))}
+                  {f.safe > 0 ? <div className="dx-guide-safe" style={{ inset: f.safe, borderWidth: Math.max(1, 1 / p.view.k) }} /> : null}
+                  {f.medium === 'print' && f.bleed > 0 ? <div className="dx-guide-bleed" style={{ inset: -f.bleed, borderWidth: Math.max(1, 1 / p.view.k) }} /> : null}
+                </div>
+              ) : null}
               {!p.interactive && !p.writing.has(a.id) && <div className="dx-shield" />}
             </div>
           );
