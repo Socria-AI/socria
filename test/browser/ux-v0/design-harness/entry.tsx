@@ -10,7 +10,7 @@ import { DesignWorkspace } from '@/components/ux-v0/design/DesignWorkspace';
 
 const cfg = (window as any).__HARNESS__ ?? {};
 const base = makeProject('create', cfg.name ?? 'Harness design');
-const project: DesignProject = cfg.project ?? { ...base, medium: 'design', design: emptyState(cfg.kind ?? 'poster', cfg.format ?? 'a3', cfg.brief ?? '') };
+const project: DesignProject = cfg.project ?? { ...base, medium: 'design', design: cfg.design ?? emptyState(cfg.kind ?? 'poster', cfg.format ?? 'a3', cfg.brief ?? '') };
 (window as any).__PROJECT_ID__ = project.id;
 createRoot(document.getElementById('root')!).render(<DesignWorkspace initial={project} signedIn={cfg.signedIn !== false} onExit={() => ((window as any).__EXITED__ = true)} startIntent={cfg.startIntent} />);
 

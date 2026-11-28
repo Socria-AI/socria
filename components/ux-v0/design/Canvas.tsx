@@ -7,7 +7,7 @@
 // only in the shapes expected, then handed to the workspace as edits by element id.
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { DesignArtboard, DesignDoc } from '@/lib/ux-v0/design/doc';
+import { STATE_LABEL, type DesignArtboard, type DesignDoc } from '@/lib/ux-v0/design/doc';
 import { frameDoc } from '@/lib/ux-v0/design/frame';
 import { sizeLabel, formatOf } from '@/lib/ux-v0/design/formats';
 import { parseHtml } from './runtime';
@@ -71,10 +71,13 @@ interface FrameProps {
   nonce: string;
   interactive: boolean;
   selectedElement: string | null;
+  /** what the person has protected on it: element ids (joined), or everything */
+  locks: string;
+  lockAll: boolean;
   register: (id: string, w: Window | null) => void;
 }
 
-const ArtboardFrame = memo(function ArtboardFrame({ a, tokens, assets, assetsKey, nonce, interactive, selectedElement, register }: FrameProps) {
+const ArtboardFrame = memo(function ArtboardFrame({ a, tokens, assets, assetsKey, nonce, interactive, selectedElement, locks, lockAll, register }: FrameProps) {
   const ref = useRef<HTMLIFrameElement>(null);
   // the page, made again only when what it draws changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,8 +91,9 @@ const ArtboardFrame = memo(function ArtboardFrame({ a, tokens, assets, assetsKey
     const w = ref.current?.contentWindow;
     if (!w) return;
     w.postMessage({ sx: 'mode', mode: interactive ? 'select' : 'none' }, '*');
+    w.postMessage({ sx: 'locks', ids: locks ? locks.split(',') : [], all: lockAll }, '*');
     w.postMessage({ sx: 'select', id: selectedElement, report: !!selectedElement }, '*');
-  }, [interactive, selectedElement]);
+  }, [interactive, selectedElement, locks, lockAll]);
   useEffect(tell, [tell]);
   return <iframe ref={ref} className="dx-frame" title={a.name} sandbox="allow-scripts" srcDoc={doc} width={a.width} height={a.height} onLoad={tell} style={{ width: a.width, height: a.height }} />;
 });
@@ -108,6 +112,8 @@ export interface CanvasProps {
   onFrame: (e: FrameEvent) => void;
   onRename: (id: string, name: string) => void;
   onMenu: (id: string, action: 'duplicate' | 'delete' | 'variations' | 'export') => void;
+  /** dim everything but these (a comparison, a review): absent, nothing is dimmed */
+  focus?: ReadonlySet<string> | null;
   comments: Record<string, number>;
   /** set by the canvas: a message to one artboard's frame (select the parent, show an element) */
   control?: React.MutableRefObject<((artboard: string, msg: Record<string, unknown>) => void) | null>;
@@ -129,6 +135,9 @@ export function Canvas(p: CanvasProps) {
   const windows = useRef(new Map<string, Window>());
   const [panning, setPanning] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
+  // a frame drawn again from the document (a drag or a retyping that was refused, or let go, leaves no trace)
+  const [bumps, setBumps] = useState<Record<string, number>>({});
+  const redraw = useCallback((id: string) => setBumps((b) => ({ ...b, [id]: (b[id] ?? 0) + 1 })), []);
   const assetsKey = useMemo(() => [...p.assets.keys()].sort().join(','), [p.assets]);
   const onFrame = useRef(p.onFrame);
   onFrame.current = p.onFrame;
@@ -137,12 +146,13 @@ export function Canvas(p: CanvasProps) {
     if (w) windows.current.set(id, w);
     else windows.current.delete(id);
   }, []);
-  if (p.control) p.control.current = (artboard, msg) => windows.current.get(artboard)?.postMessage(msg, '*');
+  if (p.control) p.control.current = (artboard, msg) => (msg.sx === 'redraw' ? redraw(artboard) : windows.current.get(artboard)?.postMessage(msg, '*'));
 
   useEffect(() => {
     const on = (e: MessageEvent) => {
       for (const [id, w] of windows.current) {
         if (e.source !== w) continue;
+        if (e.data && typeof e.data === 'object' && e.data.sx === 'redraw') return redraw(id);
         const ev = readMessage(id, e.data);
         if (ev) onFrame.current(ev);
         return;
@@ -150,7 +160,7 @@ export function Canvas(p: CanvasProps) {
     };
     window.addEventListener('message', on);
     return () => window.removeEventListener('message', on);
-  }, []);
+  }, [redraw]);
 
   // zoom about the pointer (ctrl or ⌘ with the wheel, or a pinch); pan with the wheel
   useEffect(() => {
@@ -202,8 +212,9 @@ export function Canvas(p: CanvasProps) {
         {p.doc.artboards.map((a) => {
           const isSel = p.selected.artboard === a.id;
           const f = formatOf(a.format);
+          const dim = !!p.focus && !p.focus.has(a.id);
           return (
-            <div key={a.id} className={`dx-board${isSel ? ' is-sel' : ''}${p.writing.has(a.id) ? ' is-writing' : ''}`} style={{ left: a.x, top: a.y, width: a.width, height: a.height }}>
+            <div key={a.id} className={`dx-board${isSel ? ' is-sel' : ''}${p.writing.has(a.id) ? ' is-writing' : ''}${a.state ? ` is-${a.state}` : ''}${a.locked ? ' is-locked' : ''}${dim ? ' is-dim' : ''}`} data-artboard={a.id} style={{ left: a.x, top: a.y, width: a.width, height: a.height }}>
               <div className="dx-label" style={{ transform: `scale(${1 / p.view.k})`, transformOrigin: 'left bottom' }}>
                 {renaming === a.id ? (
                   <input
@@ -225,6 +236,10 @@ export function Canvas(p: CanvasProps) {
                   </button>
                 )}
                 <span className="dx-label-size">{f ? sizeLabel(f) : `${a.width} × ${a.height}`}</span>
+                {a.state ? <span className={`dx-state is-${a.state}`}>{STATE_LABEL[a.state]}</span> : null}
+                {a.locked && a.state !== 'approved' ? <span className="dx-state is-lock">Locked</span> : null}
+                {!a.locked && a.locks?.length ? <span className="dx-label-note">{a.locks.length} protected</span> : null}
+                {a.seconds ? <span className="dx-label-note">{a.seconds} s</span> : null}
                 {p.comments[a.id] ? <span className="dx-label-note">{p.comments[a.id]} note{p.comments[a.id] === 1 ? '' : 's'}</span> : null}
                 {isSel && (
                   <span className="dx-label-acts">
@@ -237,13 +252,13 @@ export function Canvas(p: CanvasProps) {
                     <button type="button" onClick={() => p.onMenu(a.id, 'export')}>
                       Export
                     </button>
-                    <button type="button" onClick={() => p.onMenu(a.id, 'delete')} className="is-danger">
+                    <button type="button" onClick={() => p.onMenu(a.id, 'delete')} className="is-danger" disabled={!!a.locked} title={a.locked ? 'Unlock or reopen it first' : undefined}>
                       Delete
                     </button>
                   </span>
                 )}
               </div>
-              <ArtboardFrame a={a} tokens={p.doc.tokens} assets={p.assets} assetsKey={assetsKey} nonce={p.nonce} interactive={p.interactive && !panning} selectedElement={isSel ? p.selected.element : null} register={register} />
+              <ArtboardFrame key={bumps[a.id] ?? 0} a={a} tokens={p.doc.tokens} assets={p.assets} assetsKey={assetsKey} nonce={p.nonce} interactive={p.interactive && !panning} selectedElement={isSel ? p.selected.element : null} locks={(a.locks ?? []).map((l) => l.id).join(',')} lockAll={!!a.locked} register={register} />
               {!p.interactive && !p.writing.has(a.id) && <div className="dx-shield" />}
             </div>
           );

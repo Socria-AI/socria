@@ -336,7 +336,8 @@ export function normalizeDesignState(v: unknown): DesignState | null {
       const o = obj(x);
       const src = str(o.src, 2_000_000);
       if (!/^(upload:[\w-]{1,96}|data:image\/(png|jpeg|webp|gif|svg\+xml);base64,)/.test(src)) return null;
-      return { id: idOk(o.id, 'img'), name: str(o.name, 120) || 'image', src, width: Math.round(num(o.width, 1, 20000, 1000)), height: Math.round(num(o.height, 1, 20000, 1000)) };
+      const note = str(o.note, 300).trim();
+      return { id: idOk(o.id, 'img'), name: str(o.name, 120) || 'image', src, width: Math.round(num(o.width, 1, 20000, 1000)), height: Math.round(num(o.height, 1, 20000, 1000)), ...(note ? { note } : {}) };
     })
     .filter((x): x is DesignAsset => !!x);
   const doc = normalizeDoc(r.doc ?? versions.at(-1)?.doc);
@@ -435,9 +436,13 @@ export function keepVersion(s: DesignState, i: number, why: string): DesignState
 
 const mapArtboard = (doc: DesignDoc, id: string, fn: (a: DesignArtboard) => DesignArtboard): DesignDoc => ({ ...doc, artboards: doc.artboards.map((a) => (a.id === id ? fn(a) : a)) });
 
-/** Notes on the design that are not the design (states, locks): set on what is shown, with no new version. */
-export function annotate(s: DesignState, doc: DesignDoc): DesignState {
+/**
+ * Notes on the design that are not the design (states, locks): set on what is shown, with no new version — unless
+ * what is shown is a kept version (an approval), which is never rewritten: the note then makes a version of its own.
+ */
+export function annotate(s: DesignState, doc: DesignDoc, said = 'Changed what is protected', now = Date.now()): DesignState {
   if (s.at < 0 || !s.versions[s.at]) return { ...s, doc };
+  if (s.versions[s.at].kept) return commit(s, doc, said, 'person', now);
   const versions = [...s.versions];
   versions[s.at] = { ...versions[s.at], doc };
   return { ...s, doc, versions };
@@ -484,8 +489,10 @@ export function approveArtboard(s: DesignState, id: string, now = Date.now()): D
 }
 
 /** An approved (or locked) artboard opened again for changes — only ever by the person. */
-export function reopenArtboard(s: DesignState, id: string, state: ArtboardState = 'revision'): DesignState {
-  return annotate(s, withArtboardLock(withState(s.doc, id, state), id, false));
+export function reopenArtboard(s: DesignState, id: string, state: ArtboardState = 'revision', now = Date.now()): DesignState {
+  const a = artboardOf(s.doc, id);
+  if (!a) return s;
+  return annotate(s, withArtboardLock(withState(s.doc, id, state), id, false), `Reopened “${a.name}”`, now);
 }
 
 /** An artboard as it was in an earlier version, brought into what is shown (a new version; nothing else changes). */

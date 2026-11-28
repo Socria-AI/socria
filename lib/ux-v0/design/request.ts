@@ -29,6 +29,21 @@ const list = (v: unknown, n: number, len: number) => (Array.isArray(v) ? v : [])
 const obj = (v: unknown): Record<string, any> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, any>) : {});
 
 /** An artboard's words, for those the designer is told of in brief (tags stripped; no parser needed). */
+/**
+ * Whether the words ask for the designer's judgement of the work rather than a change to it ("review this", "what do
+ * you think of the typography?", "is it ready?"). A criticism the person makes themselves ("this looks generic") is
+ * not that: it is a change to make. Nothing is changed by a review (flow.ts runReview).
+ */
+export function wantsReview(words: string): boolean {
+  const w = String(words ?? '').trim().toLowerCase().replace(/[’`]/g, "'");
+  if (!w || w.length > 600) return false;
+  if (/^(?:(?:please|can you|could you|would you|now)\s+)*(?:review|critique|criticise|criticize|evaluate|assess|vet|audit|appraise|scrutini[sz]e)\b(?!\s+(?:section|page|card|panel|tab|screen|button|list|form|step)\b)/.test(w)) return true;
+  if (/\b(?:what do you (?:think|make) of|give (?:me |us )?(?:your |some |an? )?(?:honest |candid |critical )?(?:feedback|critique|opinion|thoughts|review)|your (?:honest |candid )?(?:opinion|critique|feedback|thoughts|verdict) on|any (?:feedback|thoughts|critique|criticism)\??|what(?:'s| is) (?:wrong|weak|not working|working|missing)\b|how (?:could|can|would|might) (?:this|it|we) (?:be (?:better|improved|stronger)|improve)\??$)/.test(w)) return true;
+  // a question about the work with nothing asked to be made or changed
+  if (/^(?:is|does|do|are) (?:this|it|the|these|our)\b[^.!]*\?$/.test(w) && !/\b(?:make|change|add|remove|replace|try|use|turn|set|move|redo|rewrite)\b/.test(w)) return true;
+  return false;
+}
+
 export const wordsOfHtml = (html: string) =>
   html
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')

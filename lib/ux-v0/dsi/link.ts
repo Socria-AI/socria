@@ -29,6 +29,8 @@ import type { SystemLink } from './link-schema';
 import type { SystemContent, TokenValue } from './schema';
 import { exportCss } from './exporters';
 import { commit as commitDesign } from '../design/doc';
+import { protectedUnder } from '../design/locks';
+import type { Parse } from '../design/elements';
 
 /** A system's tokens as a design's shared styles (lib/ux-v0/design/brand.ts gives the same to the designer). */
 export const designCss = (content: SystemContent) => exportCss(content).text.replace(/\/\*[\s\S]*?\*\//g, '').trim();
@@ -46,7 +48,8 @@ export interface ApplyReport {
   projectId: string;
   name: string;
   kind: ProjectKind;
-  outcome: 'applied' | 'updated' | 'unchanged' | 'pinned' | 'linked' | 'not-linked' | 'error';
+  /** 'held': nothing was applied, because it would have changed work the person approved or protected */
+  outcome: 'applied' | 'updated' | 'unchanged' | 'pinned' | 'linked' | 'not-linked' | 'held' | 'error';
   version: number;
   changed: SlotChange[];
   kept: { what: string; why: string }[];
@@ -287,7 +290,7 @@ const slotsOfMedium = (p: DesignProject) => (kindOfProject(p) === 'website' ? we
  * A project linked to a system and brought into it (see the head of this file). `pin` 'latest' follows each published
  * version; a number stays on that version until changed.
  */
-export function applySystem(p: DesignProject, rec: SystemRecord, opts: { pin?: number | 'latest'; mode?: string; overrides?: Record<string, TokenValue>; measure?: Measure; now?: number } = {}): { project: DesignProject; report: ApplyReport } {
+export function applySystem(p: DesignProject, rec: SystemRecord, opts: { pin?: number | 'latest'; mode?: string; overrides?: Record<string, TokenValue>; measure?: Measure; now?: number; parse?: Parse } = {}): { project: DesignProject; report: ApplyReport } {
   const kind = kindOfProject(p);
   const pin = opts.pin ?? p.systemLink?.pin ?? 'latest';
   const base = contentForLink(rec, pin);
@@ -335,6 +338,23 @@ export function applySystem(p: DesignProject, rec: SystemRecord, opts: { pin?: n
     const made = p.design.doc.artboards.length > 0;
     if (!ours) return { project, report: { ...report, outcome: 'linked', version, kept: [{ what: 'shared styles', why: 'changed in the design' }] as ApplyReport['kept'], summary: `Linked to ${label}. The design's shared styles were changed here, so they are kept; ask to bring them into the system.` } };
     if (tokens === css) return { project, report: { ...report, outcome: first ? 'linked' : 'unchanged', version, summary: first ? `Linked to ${label}: everything designed from now on is made within it.` : `Already on ${label}.` } };
+    // approved or protected work is never changed by a system's update: nothing is applied, and it is said which
+    // artboards hold it back (the person reopens them, or the project stays where it is)
+    const held = protectedUnder(p.design.doc, css, opts.parse);
+    if (held.length) {
+      const names = held.map((a) => `“${a.name}”`);
+      const list = names.length > 2 ? `${names.slice(0, 2).join(', ')} and ${names.length - 2} more` : names.join(' and ');
+      return {
+        project: p,
+        report: {
+          ...report,
+          outcome: 'held',
+          version: prev?.version ?? 0,
+          kept: held.map((a) => ({ what: a.name, why: a.state === 'approved' ? 'approved' : 'protected' })),
+          summary: `Not ${first ? 'applied' : 'updated'}: ${label} would change ${list}, which ${held.length === 1 ? 'is' : 'are'} ${held.every((a) => a.state === 'approved') ? 'approved' : 'approved or protected'}. Nothing was changed. Reopen ${held.length === 1 ? 'it' : 'them'} to bring ${held.length === 1 ? 'it' : 'them'} onto ${label}${prev ? `, or stay on v${prev.version}` : ''}.`,
+        },
+      };
+    }
     const design = commitDesign(p.design, { ...p.design.doc, tokens: css }, `Applied ${label}`, 'model', now);
     project = { ...project, design };
     return { project, report: { ...report, outcome: first ? 'applied' : 'updated', version, before: `Before ${label}`, summary: `${first ? 'Linked to' : 'Updated to'} ${label}: its colours and type are the design's shared styles${made ? ', so every artboard that uses them follows' : ''}.` } };
@@ -385,14 +405,14 @@ export function impactOn(p: DesignProject, rec: SystemRecord, content: SystemCon
 }
 
 /** The latest published version carried into a linked project (unless it is pinned elsewhere). */
-export function propagateTo(p: DesignProject, rec: SystemRecord, opts: { measure?: Measure; now?: number } = {}): { project: DesignProject; report: ApplyReport } {
+export function propagateTo(p: DesignProject, rec: SystemRecord, opts: { measure?: Measure; now?: number; parse?: Parse } = {}): { project: DesignProject; report: ApplyReport } {
   const link = p.systemLink;
   const latest = latestVersion(rec);
   const base: ApplyReport = { projectId: p.id, name: p.name, kind: kindOfProject(p), outcome: 'not-linked', version: latest?.n ?? 0, changed: [], kept: [], summary: 'Not linked to this system.' };
   if (!link || link.id !== rec.id || !latest) return { project: p, report: base };
   if (link.pin !== 'latest') return { project: p, report: { ...base, outcome: 'pinned', version: link.pin, summary: `Pinned to v${link.pin}${latest.n !== link.pin ? `; v${latest.n} is available` : ''}.` } };
   if (link.version === latest.n) return { project: p, report: { ...base, outcome: 'unchanged', summary: `Already on v${latest.n}.` } };
-  return applySystem(p, rec, { pin: 'latest', measure: opts.measure, now: opts.now });
+  return applySystem(p, rec, { pin: 'latest', measure: opts.measure, now: opts.now, parse: opts.parse });
 }
 
 /** The project put back as it was before an application or update (its saved version), and the link back on that version. */

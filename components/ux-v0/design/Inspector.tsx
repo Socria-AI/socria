@@ -4,10 +4,14 @@
 // What is shown is what the frame measured (computed styles); what is changed is written onto the element as inline
 // style by id (lib/ux-v0/design/elements.ts applyHandEdit), so it wins over the stylesheet and is exactly what the
 // next request's HTML shows the designer. No model is asked for anything here.
+//
+// It is also where the person's authority is exercised: an element or a whole artboard protected, an artboard's state
+// (exploration … approved), the typefaces and colours to stay with. What is protected cannot be changed here either
+// until it is unlocked — the controls are held, and say why.
 
 import { useEffect, useState } from 'react';
 import { GRAPHIC_FONTS } from '@/lib/ux-v0/fonts';
-import type { DesignArtboard } from '@/lib/ux-v0/design/doc';
+import { ARTBOARD_STATES, STATE_LABEL, isElementLocked, type ArtboardState, type DesignArtboard, type DesignPins } from '@/lib/ux-v0/design/doc';
 import { FORMATS, sizeLabel } from '@/lib/ux-v0/design/formats';
 import type { HandEdit } from '@/lib/ux-v0/design/elements';
 import type { ElementPick } from './Canvas';
@@ -53,9 +57,25 @@ export interface InspectorProps {
   onFormat: (format: string) => void;
   onExport: (kind: 'png' | 'jpeg' | 'pdf' | 'svg' | 'html') => void;
   onComment: (text: string) => void;
+  /** the person's authority (see the head of this file) */
+  pins?: DesignPins;
+  onState: (state: ArtboardState) => void;
+  onApprove: () => void;
+  onReopen: () => void;
+  onLockArtboard: (locked: boolean) => void;
+  onLockElement: (element: string, what: string | null) => void;
+  onKeep: (what: 'faces' | 'colours') => void;
+  onRelease: (what: 'faces' | 'colours') => void;
+  onShow: (element: string) => void;
+  onReview: () => void;
+  /** more of the artboard panel, from the workspace (print marks, motion, exports that belong to its kind) */
+  extra?: React.ReactNode;
+  busy?: boolean;
 }
 
-export function Inspector({ pick, artboard, onEdit, onParent, onAsk, onFormat, onExport, onComment }: InspectorProps) {
+const labelFor = (pick: ElementPick) => (pick.text ? `“${pick.text.slice(0, 40)}${pick.text.length > 40 ? '…' : ''}”` : pick.classes ? `the ${pick.tag} “${pick.classes.split(' ')[0]}”` : `the ${pick.tag}`);
+
+export function Inspector({ pick, artboard, onEdit, onParent, onAsk, onFormat, onExport, onComment, pins, onState, onApprove, onReopen, onLockArtboard, onLockElement, onKeep, onRelease, onShow, onReview, extra, busy }: InspectorProps) {
   const [text, setText] = useState(pick?.text ?? '');
   const [note, setNote] = useState('');
   useEffect(() => setText(pick?.text ?? ''), [pick?.id, pick?.text]);
@@ -73,9 +93,98 @@ export function Inspector({ pick, artboard, onEdit, onParent, onAsk, onFormat, o
         <p className="dx-muted">
           {artboard.width} × {artboard.height} px
         </p>
-        <label className="dx-field dx-wide">
+
+        <h4 className="dx-sub">Where it stands</h4>
+        {artboard.state === 'approved' ? (
+          <div className="dx-approved" data-state="approved">
+            <p>
+              <strong>Approved.</strong> It is locked: nothing on it changes, by hand or by the designer, until you reopen it. The approved version stays in the history whatever happens next.
+            </p>
+            <button type="button" className="dx-btn" onClick={onReopen}>
+              Reopen for changes
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="dx-row">
+              <label className="dx-field dx-grow">
+                <span>Status</span>
+                <select value={artboard.state ?? 'draft'} onChange={(e) => onState(e.target.value as ArtboardState)} aria-label="Status">
+                  {ARTBOARD_STATES.filter((x) => x !== 'approved').map((x) => (
+                    <option key={x} value={x}>
+                      {STATE_LABEL[x]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button type="button" className="dx-btn dx-primary dx-approve" onClick={onApprove} disabled={busy} title="Mark it approved, lock it, and keep this version for good">
+                Approve
+              </button>
+            </div>
+            <label className="dx-toggle">
+              <input type="checkbox" checked={!!artboard.locked} onChange={(e) => onLockArtboard(e.target.checked)} />
+              <span>Lock the whole artboard</span>
+            </label>
+          </>
+        )}
+        {artboard.locks?.length ? (
+          <>
+            <h4 className="dx-sub">Protected on it</h4>
+            <ul className="dx-locks">
+              {artboard.locks.map((l) => (
+                <li key={l.id}>
+                  <button type="button" className="dx-linkish" onClick={() => onShow(l.id)} title="Show it on the artboard">
+                    {l.what}
+                  </button>
+                  <button type="button" className="dx-btn dx-ghost dx-small" onClick={() => onLockElement(l.id, null)}>
+                    Unlock
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
+
+        <h4 className="dx-sub">Keep across the project</h4>
+        <div className="dx-row">
+          <button type="button" className="dx-btn" onClick={() => onKeep('faces')} title="Everything made after this is held to these typefaces">
+            Keep its typefaces
+          </button>
+          <button type="button" className="dx-btn" onClick={() => onKeep('colours')} title="Everything made after this is held to these colours, their tints and shades">
+            Keep its colours
+          </button>
+        </div>
+        {pins?.faces?.length ? (
+          <p className="dx-kept" data-kept="faces">
+            <span>Typefaces kept: {pins.faces.join(', ')}</span>
+            <button type="button" className="dx-btn dx-ghost dx-small" onClick={() => onRelease('faces')}>
+              Release
+            </button>
+          </p>
+        ) : null}
+        {pins?.colours?.length ? (
+          <p className="dx-kept" data-kept="colours">
+            <span className="dx-swatches" aria-label={`Colours kept: ${pins.colours.join(', ')}`}>
+              {pins.colours.map((c) => (
+                <i key={c} style={{ background: c }} title={c} />
+              ))}
+            </span>
+            <button type="button" className="dx-btn dx-ghost dx-small" onClick={() => onRelease('colours')}>
+              Release
+            </button>
+          </p>
+        ) : null}
+        <p className="dx-muted dx-small">What is kept is checked on everything made afterwards; anything outside it is said, never changed for you.</p>
+
+        <h4 className="dx-sub">Review</h4>
+        <button type="button" className="dx-btn" onClick={onReview} disabled={busy}>
+          Review this artboard
+        </button>
+        <p className="dx-muted dx-small">A critical look: what is happening on it and what it costs, sorted by kind. Nothing changes unless you apply a finding.</p>
+
+        <label className="dx-field dx-wide" style={{ marginTop: 18 }}>
           <span>Format</span>
-          <select value={artboard.format} onChange={(e) => onFormat(e.target.value)}>
+          <select value={artboard.format} disabled={!!artboard.locked} onChange={(e) => onFormat(e.target.value)}>
             {artboard.format === 'custom' && <option value="custom">Custom size</option>}
             {FORMATS.map((f) => (
               <option key={f.id} value={f.id}>
@@ -94,6 +203,7 @@ export function Inspector({ pick, artboard, onEdit, onParent, onAsk, onFormat, o
           ))}
         </div>
         <p className="dx-muted dx-small">PNG and PDF are drawn from the artboard itself, print at its resolution. SVG opens in browsers (its contents are HTML), not in vector editors.</p>
+        {extra}
       </aside>
     );
   }
@@ -101,6 +211,8 @@ export function Inspector({ pick, artboard, onEdit, onParent, onAsk, onFormat, o
   const set = (props: Record<string, string | null>) => onEdit({ op: 'style', id: pick.id, props });
   const face = firstFace(st['font-family'] ?? '');
   const hasText = pick.textual;
+  const ownLock = (artboard.locks ?? []).some((l) => l.id === pick.id);
+  const held = isElementLocked(artboard, pick.id);
   return (
     <aside className="dx-inspect" aria-label="Element">
       <div className="dx-pick">
@@ -116,7 +228,18 @@ export function Inspector({ pick, artboard, onEdit, onParent, onAsk, onFormat, o
         <button type="button" className="dx-btn dx-ghost" onClick={() => onAsk(pick.text ? `Change “${pick.text.slice(0, 40)}”: ` : 'Change this: ')}>
           Ask about this
         </button>
+        {!artboard.locked && (
+          <button type="button" className={`dx-btn${ownLock ? ' is-on' : ' dx-ghost'}`} aria-pressed={ownLock} onClick={() => onLockElement(pick.id, ownLock ? null : labelFor(pick))} title={ownLock ? 'Let it be changed again' : 'Protect it: the designer cannot change it, and neither can the canvas'}>
+            {ownLock ? 'Unlock' : 'Lock'}
+          </button>
+        )}
       </div>
+      {held && (
+        <p className="dx-held" role="note">
+          {artboard.locked ? (artboard.state === 'approved' ? 'This artboard is approved and locked. Reopen it to change anything on it.' : 'This artboard is locked. Unlock it to change anything on it.') : 'Protected: the designer cannot change it, and it cannot be changed here until you unlock it.'}
+        </p>
+      )}
+      <fieldset className="dx-fields" disabled={held}>
 
       {hasText && (
         <>
@@ -217,6 +340,8 @@ export function Inspector({ pick, artboard, onEdit, onParent, onAsk, onFormat, o
           Delete
         </button>
       </div>
+
+      </fieldset>
 
       <h4 className="dx-sub">Note</h4>
       <div className="dx-row">

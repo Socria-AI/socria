@@ -11,7 +11,7 @@
 // are matched by the element they belong to), so the check runs the same in the browser and in tests.
 
 import { parseCss, type CssRule } from '../dsi/css-parse';
-import type { DesignArtboard } from './doc';
+import type { DesignArtboard, DesignDoc } from './doc';
 import type { Parse } from './elements';
 import { scopeCss } from './frame';
 
@@ -191,4 +191,27 @@ export function usesVars(html: string, vars: ReadonlySet<string>, tokens = ''): 
     return false;
   };
   return walk(html);
+}
+
+/**
+ * The protected artboards (locked whole, or holding locked elements) that new shared styles would change — for a
+ * design system's update, which must never reach approved work unasked (lib/ux-v0/dsi/link.ts). Exact with a parser;
+ * without one (on the server) it is held to be changed whenever it uses a custom property whose value differs, or
+ * the shared styles hold anything but custom properties.
+ */
+export function protectedUnder(doc: DesignDoc, tokensAfter: string, parse?: Parse): DesignArtboard[] {
+  if (doc.tokens === tokensAfter) return [];
+  const guarded = doc.artboards.filter((a) => a.locked || a.locks?.length);
+  if (!guarded.length) return [];
+  if (parse) {
+    return guarded.filter((a) => (a.locked ? sharedPrint(a.html, doc.tokens, parse) !== sharedPrint(a.html, tokensAfter, parse) : !checkLocks(a, a.html, doc.tokens, tokensAfter, parse).ok));
+  }
+  const changed = changedVars(doc.tokens, tokensAfter);
+  const plain = (css: string) =>
+    parseCss(scopeCss(css))
+      .rules.map((r) => ruleText(r, r.decls.filter((d) => !d.prop.startsWith('--'))))
+      .filter((t) => !/\{\}$/.test(t))
+      .join('|');
+  const rulesDiffer = plain(doc.tokens) !== plain(tokensAfter);
+  return guarded.filter((a) => rulesDiffer || usesVars(a.html, changed, doc.tokens) || usesVars(a.html, changed, tokensAfter));
 }

@@ -10,6 +10,9 @@ import type { DesignProject } from '@/lib/ux-v0/types';
 import type { LinkedSystem } from './useLinkedSystem';
 import './systems.css';
 
+// (approved or protected artboards are checked exactly against a system's new styles: lib/ux-v0/design/locks.ts)
+const parse = (html: string) => new DOMParser().parseFromString(html, 'text/html');
+
 export function SystemBadge({ project, linked, fidelity, onApply }: { project: DesignProject; linked: LinkedSystem | null; fidelity?: { score: number; findings: number } | null; onApply: (fn: (p: DesignProject) => { project: DesignProject; say: string }) => void }) {
   const [open, setOpen] = useState(false);
   const [list, setList] = useState<SystemRecord[] | null>(null);
@@ -47,7 +50,7 @@ export function SystemBadge({ project, linked, fidelity, onApply }: { project: D
                   onClick={() => {
                     setOpen(false);
                     onApply((p) => {
-                      const r = propagateTo(p, linked.rec);
+                      const r = propagateTo(p, linked.rec, { parse });
                       return { project: r.project, say: r.report.summary };
                     });
                   }}
@@ -73,7 +76,7 @@ export function SystemBadge({ project, linked, fidelity, onApply }: { project: D
                   onClick={() => {
                     setOpen(false);
                     onApply((p) => {
-                      const a = applySystem(p, r);
+                      const a = applySystem(p, r, { parse });
                       return { project: a.project, say: `${a.report.summary} The composition stays this project’s.` };
                     });
                   }}

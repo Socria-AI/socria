@@ -10,7 +10,8 @@ import { getArtifact } from '@/lib/ux-v0/store';
 import { makeNonce } from '@/lib/ux-v0/sandbox';
 import type { DesignArtboard, DesignAsset, DesignDoc } from '@/lib/ux-v0/design/doc';
 import { frameDoc } from '@/lib/ux-v0/design/frame';
-import { lookPicture, toDataUrl } from '@/lib/ux-v0/design/export';
+import { artboardPixels, lookPicture, toDataUrl } from '@/lib/ux-v0/design/export';
+import { contrastFacts, contrastSaid, type TextBox } from '@/lib/ux-v0/design/contrast';
 import type { Bench, Sent, Transport, WriteBody } from '@/lib/ux-v0/design/flow';
 import { operationId, post } from '../api';
 
@@ -61,7 +62,7 @@ export async function assetData(assets: readonly DesignAsset[]): Promise<Map<str
 }
 
 /** An artboard drawn in a hidden frame and measured by its own script; nothing when it does not answer in time. */
-export function measureOffscreen(a: DesignArtboard, tokens: string, assets: ReadonlyMap<string, string>, timeoutMs = 4000): Promise<{ issues: { id: string; kind: string; text: string }[]; height: number } | null> {
+export function measureOffscreen(a: DesignArtboard, tokens: string, assets: ReadonlyMap<string, string>, timeoutMs = 4000): Promise<{ issues: { id: string; kind: string; text: string }[]; height: number; texts: TextBox[] } | null> {
   return new Promise((resolve) => {
     const f = document.createElement('iframe');
     f.setAttribute('sandbox', 'allow-scripts');
@@ -69,7 +70,7 @@ export function measureOffscreen(a: DesignArtboard, tokens: string, assets: Read
     f.tabIndex = -1;
     f.style.cssText = `position:fixed;left:-${a.width + 100}px;top:0;width:${a.width}px;height:${a.height}px;border:0;visibility:hidden;pointer-events:none`;
     let done = false;
-    const finish = (v: { issues: { id: string; kind: string; text: string }[]; height: number } | null) => {
+    const finish = (v: { issues: { id: string; kind: string; text: string }[]; height: number; texts: TextBox[] } | null) => {
       if (done) return;
       done = true;
       window.removeEventListener('message', on);
@@ -82,7 +83,14 @@ export function measureOffscreen(a: DesignArtboard, tokens: string, assets: Read
       const m = e.data;
       if (!m || typeof m !== 'object' || m.sx !== 'ready' || m.passive) return;
       const issues = Array.isArray(m.issues) ? m.issues.filter((x: any) => x && typeof x.id === 'string' && typeof x.kind === 'string').slice(0, 20).map((x: any) => ({ id: String(x.id).slice(0, 12), kind: String(x.kind).slice(0, 12), text: String(x.text ?? '').slice(0, 60) })) : [];
-      finish({ issues, height: Number(m.height) || a.height });
+      const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+      const texts: TextBox[] = Array.isArray(m.texts)
+        ? m.texts
+            .filter((x: any) => x && typeof x.id === 'string' && /^e\d{1,6}$/.test(x.id) && typeof x.color === 'string')
+            .slice(0, 40)
+            .map((x: any) => ({ id: x.id, x: n(x.x), y: n(x.y), w: n(x.w), h: n(x.h), color: String(x.color).slice(0, 60), size: n(x.size), weight: n(x.weight) || 400, text: String(x.text ?? '').slice(0, 60) }))
+        : [];
+      finish({ issues, height: Number(m.height) || a.height, texts });
     };
     const timer = setTimeout(() => finish(null), timeoutMs);
     window.addEventListener('message', on);
@@ -110,6 +118,12 @@ export function browserBench(assets: () => Promise<Map<string, string>>): Bench 
         if (!a) continue;
         const m = await measureOffscreen(a, doc.tokens, map);
         if (m?.issues.length) out[id] = issuesSaid(m.issues);
+        // the contrast of its words, measured on the picture (a still sheet: one that moves is measured as it rests)
+        if (m?.texts.length) {
+          const px = await artboardPixels(a, doc.tokens, map);
+          const low = px ? contrastFacts(m.texts, px) : [];
+          if (low.length) out[id] = [...(out[id] ?? []), ...low.map(contrastSaid)];
+        }
       }
       return out;
     },

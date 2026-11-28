@@ -20,3 +20,4 @@ export * as fonts from '@/lib/ux-v0/fonts';
 export * as locks from '@/lib/ux-v0/design/locks';
 export * as pins from '@/lib/ux-v0/design/pins';
 export * as history from '@/lib/ux-v0/design/history';
+export * as contrast from '@/lib/ux-v0/design/contrast';
