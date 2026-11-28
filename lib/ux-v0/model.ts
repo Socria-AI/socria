@@ -351,7 +351,7 @@ export const MAX_TOKENS: Record<CallKind, number> = {
   'design-write': 16000,
   'design-look': 4000,
   'graphic-review': 2600,
-  'studio-questions': 2400,
+  'studio-questions': 3600,
   image: 0,
 };
 

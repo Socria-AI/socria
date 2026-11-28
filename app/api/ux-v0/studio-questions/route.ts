@@ -1,15 +1,16 @@
 // app/api/ux-v0/studio-questions/route.ts
-// POST { context, images? } → { decision } — the next turn of creative discovery, decided by the question model.
+// POST { context, images? } → { plan } — the spatial creative brief updated, by the question model.
 //
-// The browser sends the conversation as it stands (lib/ux-v0/studio/discover.ts discoverContextOf: every turn in words,
-// the brief so far, how many questions were asked, which aids were shown) and, when the person brought pictures, up to
-// two of them, so they are actually looked at. The model answers under a strict schema (lib/ux-v0/studio/discover-
-// model.ts): one question — written for this work, with a palette, type or mood aid only when seeing would help — or
-// "make it", and the brief, updated in the person's own words. normalizeDecision holds it to shape and to the
-// conversation's rules again. Nothing is stored here.
+// The browser sends the brief as it stands (lib/ux-v0/studio/discover.ts spaceContextOf: their idea, each
+// consideration with its status and answer, their notes, what changed last, the creative brief so far, which aids were
+// shown) and, when the person brought pictures, up to two of them, so they are actually looked at. The model answers
+// under a strict schema (lib/ux-v0/studio/discover-model.ts): the considerations worth showing now — each a question
+// written for this work, sometimes with palettes, pairings of faces or moods — a short line on what it took from the
+// change, whether anything essential is missing, and the brief in the person's own words. normalizePlan holds it to
+// shape and to the brief's rules again. Nothing is stored here.
 //
-// When the model cannot be reached the browser's own reader decides (discover.ts readerDecision), so a conversation
-// never waits on this route answering.
+// When the model cannot be reached the browser's own reader plans (discover.ts readerPlan), so the brief never waits
+// on this route answering.
 
 import { NextRequest } from 'next/server';
 import { withMeter } from '@/lib/token-meter';
@@ -17,7 +18,7 @@ import { formatFor } from '@/lib/ux-v0/schemas';
 import { MAX_TOKENS } from '@/lib/ux-v0/model';
 import { bad, imageDataUrl, projectIdOf, readBodyPrinted } from '@/lib/ux-v0/route-kit';
 import { admit, refuse, runStage } from '@/lib/ux-v0/stage-server';
-import { discoverSystem, discoverUser, normalizeDecision, normalizeDiscoverContext } from '@/lib/ux-v0/studio/discover-model';
+import { discoverSystem, discoverUser, normalizePlan, normalizeSpaceContext } from '@/lib/ux-v0/studio/discover-model';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -28,9 +29,9 @@ export const POST = withMeter(async function POST(req: NextRequest) {
   if (!a.ok) return a.res;
 
   const { body, print } = await readBodyPrinted(req, 1_500_000);
-  if (!body) return refuse(req, bad('The conversation is needed.'));
-  const context = normalizeDiscoverContext(body.context);
-  if (!context) return refuse(req, bad('The conversation is needed.'));
+  if (!body) return refuse(req, bad('The brief is needed.'));
+  const context = normalizeSpaceContext(body.context);
+  if (!context) return refuse(req, bad('The brief is needed.'));
   const images = (Array.isArray(body.images) ? body.images : [])
     .slice(0, 2)
     .map((v: unknown) => imageDataUrl(v, 600_000))
@@ -50,9 +51,9 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       ...(images.length ? { images: images.map((url) => ({ url, detail: 'low' as const })), extraChars: 3000 * images.length } : {}),
     },
     finish: (asked) => {
-      const decision = normalizeDecision(asked.json, context);
-      if (!decision) return { status: 422, body: { error: 'The answer came back in a shape SocriaUX cannot use.', unreadable: true } };
-      return { body: { decision } };
+      const plan = normalizePlan(asked.json, context);
+      if (!plan) return { status: 422, body: { error: 'The answer came back in a shape SocriaUX cannot use.', unreadable: true } };
+      return { body: { plan } };
     },
   });
 });

@@ -10,7 +10,8 @@ import { holdFile, heldFile } from './held';
 import { makeProject, normalizeRef, type DesignProject, type MoodboardRef } from '@/lib/ux-v0/types';
 import { emptyStudio, said, studioId, type StudioAttachment, type StudioMode, type StudioState } from '@/lib/ux-v0/studio/schema';
 import { makeItNow, opening, seedFromWords, switchKind } from '@/lib/ux-v0/studio/director';
-import { applyDecision, isCreative, makeNow, wantsMake } from '@/lib/ux-v0/studio/discover';
+import { isCreative, personWordsOf, startMaking, wantsMake } from '@/lib/ux-v0/studio/discover';
+import { emptySpace } from '@/lib/ux-v0/studio/brief';
 import { systemChosen, websiteSystems } from '@/lib/ux-v0/studio/options';
 import { attachmentKindOf } from '@/lib/ux-v0/studio/intent';
 import { readFacts } from '@/lib/ux-v0/studio/facts';
@@ -66,9 +67,10 @@ export function conversationProject(mode: StudioMode, prompt: string, opts: { mo
   let st = emptyStudio(mode, prompt, { modeBy: opts.modeBy, attachments: opts.attachments, now, ...(opts.systemId && mode !== 'critique' && mode !== 'system' ? { systemId: opts.systemId } : {}) });
   st = said(st, { from: 'person', kind: 'prompt', text: prompt || (opts.attachments.length ? `These: ${opts.attachments.map((a) => a.name).join(', ')}` : `A ${modeInfo(mode).label.toLowerCase()}`), attachments: opts.attachments.map((a) => a.id), at: now });
   if (isCreative(mode)) {
-    // a graphic, a logo, a campaign, a website: SocriaUX's first turn is taken in the conversation (it may ask, or make
-    // it); words that hand it over ("surprise me, just make something") are made at once
-    if (wantsMake(prompt)) st = applyDecision(st, makeNow(st), now);
+    // a graphic, a logo, a campaign, a website: a spatial brief opens on the idea (the model fills it in as soon as it
+    // opens); words that hand it over ("surprise me, just make something") are made at once
+    st = { ...st, space: emptySpace() };
+    if (wantsMake(prompt)) st = startMaking(st, now);
   } else {
     // a critique or an import: what it needs (the file), then straight to it
     st = opening(st, { hasSystem: !!st.systemId, ...(opts.systemName ? { systemName: opts.systemName } : {}) }, now);
@@ -137,7 +139,7 @@ export function startFrom(p: DesignProject, st0: StudioState, opts: { systems: r
     // the website engine reads its decisions from words: everything the person said in discovery, with what is still
     // open left as marked gaps it fills in
     if (st.brief) {
-      const words = st.transcript.filter((m) => m.from === 'person' && m.text.trim()).map((m) => m.text.trim()).join(' — ');
+      const words = personWordsOf(st).join(' — ');
       st = makeItNow(seedFromWords({ ...st, prompt: words.slice(0, 2000) }, now), now);
     }
     // the looks shown in the conversation; when none were drawn (made at once), drawn here the same way

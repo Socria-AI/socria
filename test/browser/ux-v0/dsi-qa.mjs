@@ -136,19 +136,23 @@ ok('v2 published after review', rec?.versions.length === 2);
 // ── 5, 7, 9: a graphic in the system ──
 await tab('Usage');
 await page.getByRole('button', { name: 'New graphic in it' }).click();
-// a conversation like any other, the system already chosen: only what the work cannot be made without is asked (never
-// its colours, lettering or mood — the system decides those), then it is composed at once in the system's identity
-const say = async (words) => {
-  await page.waitForSelector('#sd-reply', { timeout: 15000 });
-  await page.fill('#sd-reply', words);
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(700);
-};
-await page.waitForSelector('.sd-chat', { timeout: 15000 });
-if (/What will it be/.test(await page.locator('.sd-msg.is-socria .sd-said').last().innerText())) await say('A poster');
-await say('Slow coffee, early mornings');
+// a spatial brief like any other, the system already chosen: only what the work cannot be made without is raised
+// (never its colours, lettering or mood — the system decides those), then Generate composes it in the system's identity
+await page.waitForSelector('.sbx', { timeout: 15000 });
+await page.waitForTimeout(900);
+if (await page.locator('.sbx-q[data-module="what"]').count()) {
+  await page.locator('.sbx-option').filter({ hasText: 'A poster or a post' }).click();
+  await page.waitForTimeout(900);
+}
+if (await page.locator('#sbx-a-purpose').count()) {
+  await page.fill('#sbx-a-purpose', 'Slow coffee, early mornings');
+  await page.press('#sbx-a-purpose', 'Enter');
+  await page.waitForTimeout(900);
+}
+const inBrief = (await idb('socria-ux-v0', 'projects', new URL(page.url()).searchParams.get('p')))?.studio;
+await page.locator('.sbx-go').click();
 await page.waitForSelector('.dx', { timeout: 30000 });
-ok('a new graphic is made linked to the system, with no visual question asked (its badge says so)', /Halden v2/.test(await page.locator('.ds-sysbadge').innerText()) && !(await idb('socria-ux-v0', 'projects', new URL(page.url()).searchParams.get('p')))?.studio?.discovery?.asked?.some((d) => ['vibe', 'colour', 'type'].includes(d)));
+ok('a new graphic is made linked to the system, with no visual consideration shown (its badge says so)', /Halden v2/.test(await page.locator('.ds-sysbadge').innerText()) && !!inBrief?.systemId && !(inBrief?.space?.shown ?? []).length && !(inBrief?.space?.modules ?? []).some((m) => m.aid), JSON.stringify({ system: inBrief?.systemId, shown: inBrief?.space?.shown }));
 await shot('composed-in-system');
 await page.waitForTimeout(1200);
 const gpid = new URL(page.url()).searchParams.get('p');
@@ -273,11 +277,15 @@ await page.goto(`${BASE}/ux-v0?ds=${rec.id}`, { waitUntil: 'networkidle' });
 await page.waitForSelector('.ds-sys-name');
 await tab('Usage');
 await page.getByRole('button', { name: 'New board in it' }).click();
-await page.waitForSelector('.sd-chat', { timeout: 15000 });
-await say('one poster and one Instagram post');
-// its words, only if they are asked for (what the pieces are is enough to make it: the words can be stand-ins)
-await page.waitForSelector('#sd-reply, .dx', { timeout: 15000 });
-if (!(await page.locator('.dx').count())) await say('“Slow coffee, early mornings”, “Roasted in Halden”');
+// the spatial brief: what the pieces are, said where it is asked (or as a note), then Generate — the words can be
+// stand-ins, so nothing more is needed
+await page.waitForSelector('.sbx', { timeout: 15000 });
+await page.waitForTimeout(900);
+const pieces = (await page.locator('#sbx-a-purpose').count()) ? '#sbx-a-purpose' : '#sbx-say';
+await page.fill(pieces, 'one poster and one Instagram post');
+await page.press(pieces, 'Enter');
+await page.waitForTimeout(900);
+await page.locator('.sbx-go').click();
 await page.waitForSelector('.dx', { timeout: 30000 });
 ok('a new board is made linked to the system (its badge says so), at once in an expression of its identity (no systems to choose from)', /Halden v4/.test(await page.locator('.ds-sysbadge').innerText()));
 const bpid = new URL(page.url()).searchParams.get('p');

@@ -1,22 +1,22 @@
-// test/browser/ux-v0/studio-qa.mjs — SocriaUX in the built app, driven as a person would: a conversation with a
-// creative director, from the first sentence to the work being made.
+// test/browser/ux-v0/studio-qa.mjs — the spatial creative brief in the built app, driven as a person would: an idea,
+// the brief that forms around it, the person shaping it in place, and the work made from it.
 //
-//   the home        one composer; words read live; "I'll ask what it is" when the words settle nothing
-//   the model       the questions route scripted (lib/ux-v0/studio/discover-model.ts decisions): one question at a
-//                   time in its own words, with what it read (the whole conversation, the questions so far, the aids
-//                   shown, what was just picked); "make" makes the work at once — no approval, no directions to choose
-//   aids            moods, palettes and lettering only when the model shows them: real colours (ink readable on its
-//                   ground), real faces from the font library (loaded before they are shown); picked, or answered in
-//                   the person's own words; a pick reaches the designer's brief as taste
-//   freedom         "Skip" under every question (the model settles that point and moves on), "Surprise me" and
-//                   "You decide." make the work at once (no model call); a colour of their own from the colour picker,
-//                   written into the reply; a suggested reply tapped; the kind of work changed by what was said; a
-//                   reload keeps the waiting question and its aid
-//   signed out      the real answer here: the reader decides (what it is, a logo's name, what a poster is for), at
-//                   most two questions, never a headline asked for; a detailed request is made at once
-//   references      websites the person names, read through the server's guarded reader (recorded here) before
-//                   SocriaUX answers, and handed to the model as what was read
-//   and             a phone's width, no generation route called, no outside host reached, no page errors
+//   the home        one composer; words read live
+//   no chat         no message bubbles, no transcript: the idea at the top (editable), what is understood beside it,
+//                   the considerations open now placed in the working area, one short line from SocriaUX
+//   the model       the questions route scripted with plans (lib/ux-v0/studio/discover-model.ts): what it is sent (the
+//                   idea, every consideration with its status and answer, notes, the latest change, the brief); what it
+//                   returns lands in place — kept, retired, added — without rebuilding the page
+//   tests 1–9       a vague poster (the most relevant opening consideration); a detailed brief (nothing to answer,
+//                   Generate at once); colour (real swatches, a colour of their own, a pick whose colours are changed in
+//                   place); lettering (real faces, loaded and fitted); a dreamy cloud poster (atmospheres for it); an
+//                   unusual answer in words; playful changed to sophisticated (superseded preference gone, the rest
+//                   kept); Generate before answering anything; a logo, a website and a campaign each shaped differently
+//   in place        the idea edited, a line of what is understood rewritten (theirs from then on), a pick taken back, a
+//                   settled consideration changed again, SocriaUX's reading kept or turned down, a note taken back
+//   signed out      the reader's own brief (what it is, a logo's name, what it is for) — and Generate always works
+//   and             a reload keeps the brief; a phone's width with Generate docked; no generation route called, no
+//                   outside host reached, no page errors
 // Every outcome is read back from the browser's own store (IndexedDB) as well as from the page.
 //
 //   UXV0_FORWARD=1 UXV0_BASE=http://127.0.0.1:3100 node test/browser/ux-v0/studio-qa.mjs
@@ -28,7 +28,6 @@ const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok  ', n)) : (fail++, 
 const errors = [];
 const modelCalls = [];
 const questionCalls = [];
-const events = [];
 const outside = new Set();
 const read = [];
 const b = await chromium.launch();
@@ -42,7 +41,7 @@ page.on('request', (r) => {
   if (u.origin !== new URL(BASE).origin && /^https?:$/.test(u.protocol)) outside.add(u.host);
 });
 
-// the server's reader, recorded: what /api/ux-v0/reference answers for a site it can read, and for one it cannot
+// the server's reader, recorded
 const LARKFIELD = {
   read: { url: 'https://larkfield.studio/', host: 'larkfield.studio', title: 'Larkfield Bakery', description: 'Sourdough, baked at dawn.', colours: ['#f6f1e7', '#2b2118', '#b4532a', '#e7dccb'], ground: '#f6f1e7', ink: '#2b2118', accent: '#b4532a', fonts: ['Fraunces', 'Inter'], notes: ['a light ground', 'a warm accent', 'serif headings'] },
   preview: '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'"><style>body{margin:0;background:#f6f1e7;color:#2b2118;font:20px Georgia,serif}h1{font-size:96px;margin:120px 80px 0}</style></head><body><h1>Larkfield Bakery</h1></body></html>',
@@ -50,29 +49,32 @@ const LARKFIELD = {
 await ctx.route('**/api/ux-v0/reference', async (route) => {
   const { url } = JSON.parse(route.request().postData() || '{}');
   read.push(url);
-  events.push(`read:${url}`);
   if (/larkfield/.test(url)) return route.fulfill({ json: LARKFIELD });
   return route.fulfill({ status: 422, json: { error: 'The site did not answer.' } });
 });
 
-// the questions route, scripted: signed out by default (as it really is here, with placeholder keys); where a scenario
-// asks, the model's decisions in turn, exactly in the shape the route sends them
-let model = { mode: 'signed-out', answers: [], delay: 0 };
+// the questions route, scripted with plans: signed out by default (as it really is here); where a scenario asks, the
+// model's plans in turn, in the shape the route sends them
+let model = { mode: 'signed-out', plans: [], delay: 0 };
 await ctx.route('**/api/ux-v0/studio-questions', async (route) => {
   const body = JSON.parse(route.request().postData() || '{}');
   questionCalls.push(body.context ?? null);
-  events.push('question');
   if (model.mode === 'signed-out') return route.fulfill({ status: 401, json: { error: 'Sign in to use SocriaUX’s reasoning.', signIn: true } });
-  const next = model.answers.shift();
+  const next = model.plans.shift();
   if (model.delay) await new Promise((r) => setTimeout(r, model.delay));
-  if (!next) return route.fulfill({ status: 503, json: { error: 'No scripted answer.' } });
-  return route.fulfill({ json: { decision: next } });
+  if (!next) return route.fulfill({ status: 503, json: { error: 'No scripted plan.' } });
+  // as the real route does: what they picked comes back in the brief unless the plan let it go (brief.clear)
+  const had = body.context?.brief?.chosen ?? {};
+  const let_ = new Set(next.brief?.clear ?? []);
+  next.brief = { ...next.brief, chosen: { ...Object.fromEntries(Object.entries(had).filter(([k]) => !let_.has(k))), ...(next.brief?.chosen ?? {}) } };
+  delete next.brief.clear;
+  return route.fulfill({ json: { plan: next } });
 });
 const brief = (over = {}) => ({ kind: '', purpose: '', audience: '', content: '', feel: '', explicit: [], implied: [], tentative: [], avoid: [], references: [], open: [], chosen: {}, ...over });
-const ask = (text, o = {}) => ({ action: 'ask', say: o.say ?? '', ask: { text, aid: o.aid ?? null, suggestions: o.suggestions ?? [] }, brief: brief(o.brief), mode: o.mode ?? null, by: 'model' });
-const make = (say, o = {}) => ({ action: 'make', say, ask: null, brief: brief(o.brief), mode: o.mode ?? null, by: 'model' });
+const mod = (id, topic, question, o = {}) => ({ id, topic, question, kind: o.kind ?? (o.aid ? o.aid.kind : o.options ? 'choice' : 'text'), lead: !!o.lead, options: o.options ?? [], placeholder: o.placeholder ?? '', aid: o.aid ?? null, status: 'open', answer: null });
+const plan = (o = {}) => ({ note: o.note ?? '', ready: !!o.ready, modules: o.modules ?? [], answers: o.answers ?? [], retire: o.retire ?? [], brief: brief(o.brief), mode: o.mode ?? null, by: 'model' });
 
-// the designer's route, scripted (no model here; signed out it is never reached)
+// the designer's route (signed out it is never reached)
 const designCalls = [];
 await ctx.route('**/api/ux-v0/design', async (route) => {
   designCalls.push(JSON.parse(route.request().postData() || '{}'));
@@ -102,17 +104,13 @@ const until = async (fn, ms = 12000) => {
   while (Date.now() - t0 < ms) {
     v = await fn();
     if (v) return v;
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(150);
   }
   return v;
 };
 const pid = () => new URL(page.url()).searchParams.get('p');
 const project = async () => (pid() ? idb('socria-ux-v0', 'projects', pid()) : null);
-const started = () =>
-  until(async () => {
-    const x = await project();
-    return x?.studio?.status === 'started' ? x : null;
-  }, 30000);
+const studio = async () => (await project())?.studio ?? null;
 const COMPOSER = 'textarea[aria-label="What do you want to make?"]';
 const goHome = async () => {
   await page.goto(BASE + '/ux-v0', { waitUntil: 'networkidle' });
@@ -120,148 +118,145 @@ const goHome = async () => {
 };
 const begin = async (words) => {
   await page.fill(COMPOSER, words);
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(250);
   await page.getByRole('button', { name: 'Begin' }).click();
-  await page.waitForSelector('.sd-chat, .dx, .v0-work', { timeout: 20000 });
-  await page.waitForTimeout(400);
+  await page.waitForSelector('.sbx, .dx, .v0-work', { timeout: 20000 });
 };
-const reply = async (words) => {
-  await page.fill('#sd-reply', words);
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(500);
+/** The brief has taken the model's (or the reader's) latest plan. */
+const settled = (calls) => until(async () => (questionCalls.length >= calls && !(await page.locator('.sbx-line.is-thinking').count()) && (await studio())?.space?.stale === false ? true : null), 15000);
+const lastCall = () => questionCalls.at(-1);
+/** A change the person makes, then the plan it asks for: waits for that request, not for what was stored before it. */
+const then = async (fn) => {
+  const n = questionCalls.length;
+  await fn();
+  await settled(n + 1);
 };
-const said = () => page.locator('.sd-msg.is-socria .sd-said').allInnerTexts();
-const lastSaid = async () => (await said()).filter((t) => t.trim()).at(-1) ?? '';
-const asked = async () => ((await project())?.studio?.transcript ?? []).filter((m) => m.from === 'socria' && m.kind === 'question');
-const waitAsked = (n) => until(async () => ((await asked()).length >= n && !(await page.locator('.sd-typing').count()) ? true : null), 15000);
 const designed = () => page.waitForSelector('.dx', { timeout: 30000 });
 const designBrief = async () => (await until(async () => ((await project())?.medium === 'design' ? project() : null), 20000))?.design?.memory?.brief ?? '';
+const noChat = async () => (await page.locator('.sd-bubble, .sd-msg, .sd-transcript, .sd-chat').count()) === 0;
+const answerIn = async (id, words) => {
+  await page.fill(`#sbx-a-${id}`, words);
+  await page.press(`#sbx-a-${id}`, 'Enter');
+};
 
 console.log('=== the home ===');
 await goHome();
 ok('one composer, with Begin', (await page.locator(COMPOSER).count()) === 1 && (await page.getByRole('button', { name: 'Begin' }).count()) === 1);
-ok('no image library named anywhere', !/openverse|image librar/i.test(await page.locator('body').innerText()));
-await page.fill(COMPOSER, 'something for my bakery');
-await page.waitForTimeout(700);
-ok('words that settle nothing: “I’ll ask what it is”, never a guess or a menu of kinds', /I’ll ask what it is/.test(await page.locator('.sd-reading').innerText()), await page.locator('.sd-reading').innerText());
 await shot('01-home');
 
-console.log('\n=== signed out: a detailed request is made at once ===');
-await begin('A bold, experimental poster for “Field Lines”, “Code that draws”, 12–30 June 2027, Lisbon, in the style of a Swiss poster');
-await designed();
-let p = await started();
-ok('the design workspace, with nothing asked and no directions to choose (signed out: it asks to sign in, sends nothing)', p?.medium === 'design' && (await asked()).length === 0 && designCalls.length === 0 && /Sign in/.test((await page.locator('.dx-chat textarea').getAttribute('placeholder')) ?? ''), JSON.stringify(p?.studio?.transcript?.map((m) => [m.kind, m.text.slice(0, 60)])));
-ok('…the model was asked first and refused (signed out), and the reader decided', questionCalls.length === 1 && p.studio.transcript.some((m) => m.stage === 'making'));
-ok('…the brief the designer reads: their words exactly, the form from the sentence', /“A bold, experimental poster for “Field Lines”/.test(p.design.memory.brief) && /Field Lines/.test(p.design.memory.brief) && p.design.kind === 'poster', p.design.memory.brief.slice(0, 400));
-await shot('02-detailed-made');
-
-console.log('\n=== the model: a vague poster, one question at a time ===');
+console.log('\n=== test 1: a vague poster — a spatial brief, not a conversation ===');
 const MOODS = {
   kind: 'moods',
   sample: 'Subsonic',
   options: [
     { name: 'Strobe chaos', note: 'Layered, jittering type over black, one acid colour cutting through.', colours: ['#0b0b0d', '#f1efe9', '#c6ff3d', '#6b5cff'], display: 'Unbounded' },
-    { name: 'Gallery at 3am', note: 'Strict grid, small precise type, the chaos held in one torn image.', colours: ['#efece6', '#141414', '#e8432e', '#9a968e'], display: 'Instrument Serif' },
+    { name: 'Gallery at 3am', note: 'A strict grid, small precise type, the chaos held in one torn image.', colours: ['#efece6', '#141414', '#e8432e', '#9a968e'], display: 'Instrument Serif' },
     { name: 'Xerox rave', note: 'Photocopied grain, blunt condensed capitals, a hit of fluoro.', colours: ['#f0e9dc', '#111111', '#ff3d7f', '#2d2d2d'], display: 'Anton' },
   ],
 };
 model = {
   mode: 'scripted',
-  delay: 1200,
-  answers: [
-    ask('What’s the poster for?', { brief: { kind: 'poster' } }),
-    ask('Should it feel closer to the noise of the night, or to the people who go?', { say: 'An underground night, then.', aid: MOODS, brief: { kind: 'poster', purpose: 'An underground electronic music event' } }),
-    make('Strobe chaos it is — making it now.', { brief: { kind: 'poster', purpose: 'An underground electronic music event', feel: 'chaotic but sophisticated' } }),
+  delay: 700,
+  plans: [
+    plan({ modules: [mod('purpose', 'What it is for', 'What’s the poster for?', { lead: true, placeholder: 'A club night we’re throwing in March' })], brief: { kind: 'poster' } }),
+    plan({ note: 'An underground night — how it feels is most of it.', modules: [mod('atmosphere', 'Atmosphere', 'Should it carry the noise of the night, or the people who go?', { lead: true, aid: MOODS })], brief: { kind: 'poster', purpose: 'An underground electronic music event', tentative: ['Night-time, warehouse culture'] } }),
+    plan({ note: 'Strobe chaos — controlled, though.', ready: true, brief: { kind: 'poster', purpose: 'An underground electronic music event', feel: 'chaotic but sophisticated', tentative: ['Night-time, warehouse culture'] } }),
   ],
 };
 await goHome();
 await begin('Make me a poster.');
-ok('while the model thinks, SocriaUX is shown thinking', (await page.locator('.sd-typing').count()) === 1);
-await waitAsked(1);
-ok('the model’s own question, alone — no aid, no tap-replies, no form', (await lastSaid()) === 'What’s the poster for?' && (await page.locator('.sd-aid, .sd-suggestion').count()) === 0, await lastSaid());
-ok('…asked with the conversation as it stands: the person’s words, nothing asked yet', questionCalls.at(-1)?.conversation?.[0]?.text === 'Make me a poster.' && questionCalls.at(-1)?.asked === 0 && questionCalls.at(-1)?.mode === 'graphic', JSON.stringify(questionCalls.at(-1)));
-ok('under the question, never required: “Skip” and “Surprise me” (the composer’s “Make it now” steps aside while they show)', (await page.locator('.sd-qacts .sd-chip').allInnerTexts()).join('|') === 'Skip|Surprise me' && (await page.locator('.sd-make').count()) === 0, (await page.locator('.sd-qacts .sd-chip').allInnerTexts()).join('|'));
-await reply('An underground electronic music event.');
-await waitAsked(2);
+ok('while the brief is first read, SocriaUX says it is reading it (no typing bubbles)', (await page.locator('.sbx-line.is-thinking').count()) === 1 && (await noChat()));
+await settled(1);
+ok('the idea at the top, as written and editable; the most relevant opening consideration placed in the brief', (await page.locator('.sbx-prompt').inputValue()) === 'Make me a poster.' && (await page.locator('.sbx-q.is-lead .sbx-question').innerText()) === 'What’s the poster for?' && (await page.locator('#sbx-a-purpose').getAttribute('placeholder')) === 'A club night we’re throwing in March', await page.locator('.sbx-q').allInnerTexts());
+ok('no chat anywhere: no bubbles, no transcript, no message list', await noChat());
+ok('Generate is there from the first moment', (await page.locator('.sbx-go').isVisible()) && !(await page.locator('.sbx-go').isDisabled()));
+ok('the model was sent the brief as it stands: the idea, no considerations yet, “opened the brief”', lastCall()?.prompt === 'Make me a poster.' && lastCall()?.modules?.length === 0 && /opened the brief/.test(lastCall()?.change ?? '') && lastCall()?.mode === 'graphic', JSON.stringify(lastCall()));
+await shot('02-vague-opening');
+await answerIn('purpose', 'An underground electronic music event.');
+await page.waitForTimeout(150);
+ok('answered where it stands: settled at once in what is understood, before the model replies', /An underground electronic music event/.test(await page.locator('.sbx-settled').innerText()) && (await page.locator('.sbx-q.is-lead').count()) === 0, await page.locator('.sbx-known').innerText());
+await settled(2);
 await page.waitForSelector('.sd-dq-grid.is-moods.is-ready', { timeout: 15000 }).catch(() => null);
-await page.waitForTimeout(500);
-const moodFaces = await page.locator('.sd-aid-mood-w').evaluateAll((els) => els.map((e) => getComputedStyle(e).fontFamily.split(',')[0].replace(/"/g, '').trim()));
-const moodLoaded = await page.evaluate((fs) => fs.map((f) => document.fonts.check(`40px "${f}"`)), moodFaces);
-ok('the reply carried forward, then the next question with moods to look at: each in its own colours and face, set in the work’s word', /^An underground night, then\. Should it feel closer/.test(await lastSaid()) && (await page.locator('.sd-aid .sd-dq-card').count()) === 3 && (await page.locator('.sd-aid-mood-w').first().textContent()) === 'Subsonic' && moodLoaded.filter(Boolean).length >= 2, JSON.stringify({ s: await lastSaid(), moodFaces, moodLoaded }));
-const moodFit = await page.locator('.sd-aid-mood-w').evaluateAll((els) => els.map((e) => [e.scrollWidth, e.clientWidth]));
-ok('…each sample fits its card in its own face — made smaller, never broken inside a word', moodFit.every(([sw, cw]) => cw > 0 && sw <= cw + 1), JSON.stringify(moodFit));
-ok('…the person can pick, or just write: the reply says so, and asks nothing to be filled in', /Pick one, or just write/.test(await page.locator('.sd-aid-hint').innerText()) && /Pick one, combine them/.test((await page.locator('#sd-reply').getAttribute('placeholder')) ?? ''));
-ok('…the model read the whole conversation, with one question asked so far', questionCalls.at(-1)?.conversation?.map((m) => m.who).join() === 'person,socria,person' && questionCalls.at(-1)?.asked === 1 && questionCalls.at(-1)?.brief?.kind === 'poster', JSON.stringify(questionCalls.at(-1)));
-await shot('03-moods');
+await page.waitForTimeout(400);
+ok('the model told what changed and what holds now (the answer, its status)', /answered “What it is for”/.test(lastCall()?.change ?? '') && lastCall()?.modules?.[0]?.status === 'answered' && lastCall()?.modules?.[0]?.answer === 'An underground electronic music event.', JSON.stringify(lastCall()?.modules));
+ok('then the next most valuable consideration, with atmospheres to look at for this night — and SocriaUX’s line on what it took', (await page.locator('.sbx-q.is-lead .sbx-question').innerText()).startsWith('Should it carry the noise') && (await page.locator('.sbx-q.is-lead .sd-dq-card').count()) === 3 && /how it feels is most of it/.test(await page.locator('.sbx-line').innerText()), await page.locator('.sbx-line').innerText());
+ok('SocriaUX’s reading shown as its reading, not as theirs', /Night-time, warehouse culture/.test(await page.locator('.sbx-guess').innerText()));
+await shot('03-vague-atmosphere');
 const callsBefore = questionCalls.length;
 await page.reload({ waitUntil: 'networkidle' });
-await page.waitForSelector('.sd-aid .sd-dq-card', { timeout: 15000 });
-await page.waitForTimeout(600);
-ok('a reload: the question waits where it was, with the same moods, and the model is not asked again', (await page.locator('.sd-aid .sd-dq-name').allInnerTexts()).join('|') === 'Strobe chaos|Gallery at 3am|Xerox rave' && questionCalls.length === callsBefore, `${questionCalls.length} vs ${callsBefore}`);
-model.answers = [make('Strobe chaos it is — making it now.', { brief: { kind: 'poster', purpose: 'An underground electronic music event', feel: 'chaotic but sophisticated' } })];
-await page.locator('.sd-aid .sd-dq-card').first().click();
+await page.waitForSelector('.sbx-q.is-lead .sd-dq-card', { timeout: 15000 });
+await page.waitForTimeout(500);
+ok('a reload: the brief exactly where it was — the same consideration, the same atmospheres — and the model not asked again', (await page.locator('.sbx-q.is-lead .sd-dq-name').allInnerTexts()).join('|') === 'Strobe chaos|Gallery at 3am|Xerox rave' && questionCalls.length === callsBefore, `${questionCalls.length} vs ${callsBefore}`);
+await page.locator('.sbx-q.is-lead .sd-dq-card').first().click();
+await page.waitForTimeout(150);
+ok('an atmosphere picked: shown at once among the decisions, in its own colours and face', /Strobe chaos/.test(await page.locator('.sbx-picks').innerText()) && (await page.locator('.sbx-pick-mood').count()) === 1);
+await settled(3);
+ok('…and the model told it was just picked (so it is kept, whatever it returns)', JSON.stringify(lastCall()?.justPicked) === '["mood"]' && lastCall()?.brief?.chosen?.mood?.name === 'Strobe chaos', JSON.stringify(lastCall()?.justPicked));
+ok('nothing left open: the brief says so, and offers to make it', /Nothing is waiting on you/.test(await page.locator('.sbx-open').innerText()) && (await page.locator('.sbx-go-big').count()) === 1);
+await shot('04-vague-ready');
+await page.locator('.sbx-go').click();
 await designed();
-p = await started();
-const c3 = questionCalls.at(-1);
-ok('a mood picked: said as the person’s reply, and the model told it was just picked (and not to show moods again)', /^This one: Strobe chaos/.test(p.studio.transcript.filter((m) => m.from === 'person').at(-1)?.text ?? '') && JSON.stringify(c3?.justPicked) === '["mood"]' && c3?.shown?.includes('moods') && c3?.brief?.chosen?.mood?.name === 'Strobe chaos', JSON.stringify(c3));
 const db1 = await designBrief();
-ok('the model says make: the design workspace at once, no approval — the brief in their words, the conversation, and the pick as taste (kept even though the model’s brief left it out)', p.medium === 'design' && /In their words: “Make me a poster\.”/.test(db1) && /An underground electronic music event/.test(db1) && /Mood they picked \(Strobe chaos\)/.test(db1) && /stand-in words/.test(db1), db1);
-await shot('04-made-from-mood');
+ok('Generate: the design workspace at once — the brief in their words, what they settled, the pick as taste', /In their words: “Make me a poster\.”/.test(db1) && /What it is for \(“What’s the poster for\?”\): An underground electronic music event/.test(db1) && /Mood they picked \(Strobe chaos\)/.test(db1) && /left to SocriaUX’s judgement/.test(db1), db1);
 
-console.log('\n=== palettes, answered in words ===');
+console.log('\n=== test 2: a detailed brief — generate at once ===');
+model = { mode: 'scripted', delay: 0, plans: [plan({ note: 'Brutalist, black and cream, oversized condensed type — enough to make it.', ready: true, brief: { kind: 'poster', purpose: 'An architecture exhibition', feel: 'brutalist, editorial', explicit: ['black and cream', 'oversized condensed typography'] } })] };
+await goHome();
+await begin('Create a black-and-cream brutalist poster with oversized condensed typography for an architecture exhibition.');
+await settled(questionCalls.length);
+const facts2 = await page.locator('.sbx-facts textarea').evaluateAll((els) => els.map((e) => e.value).join(' | '));
+ok('nothing to answer: no considerations, what was understood laid out (their asks as theirs), Generate offered', (await page.locator('.sbx-q').count()) === 0 && /Nothing is waiting on you/.test(await page.locator('.sbx-open').innerText()) && /brutalist, editorial/.test(facts2) && /black and cream/.test(await page.locator('.sbx-asked').innerText()), facts2 + ' // ' + (await page.locator('.sbx-main').innerText()));
+await shot('05-detailed');
+await page.locator('.sbx-go-big').click();
+await designed();
+ok('…made from it at once', /brutalist/.test(await designBrief()));
+
+console.log('\n=== test 3: colour — swatches, a colour of their own, colours changed in place ===');
 const PALETTES = {
   kind: 'palettes',
-  sample: null,
   options: [
     { name: 'Fresh greenhouse', note: 'Leaf green on warm paper, a sunny yellow', colours: ['#f4f1e4', '#1f3a2b', '#3f8f4f', '#e9b949'] },
     { name: 'Potting shed', note: 'Terracotta and sage on kraft', colours: ['#efe3d0', '#3b2a20', '#b5542f', '#7a8c5a'] },
     { name: 'Blossom morning', note: 'Petal pink with a fresh green', colours: ['#fbeef0', '#3a1f2b', '#d6477a', '#8fb98a'] },
   ],
 };
-model = {
-  mode: 'scripted',
-  delay: 0,
-  answers: [
-    ask('Which of these feels closest to your nursery?', { aid: PALETTES, brief: { kind: 'poster', purpose: 'Spring plant sale at the nursery' } }),
-    make('Potting shed with a brighter green — making it now.', { brief: { kind: 'poster', purpose: 'Spring plant sale at the nursery', explicit: ['Potting shed colours, with a brighter green accent: #3fa34d'] } }),
-  ],
-};
+model = { mode: 'scripted', delay: 0, plans: [plan({ modules: [mod('colour', 'Colour', 'Which of these feels most like your nursery?', { lead: true, aid: PALETTES })], brief: { kind: 'poster', purpose: 'The spring plant sale at the nursery' } }), plan({ note: 'Potting shed, then — warm and earthy.', ready: true, brief: { kind: 'poster', purpose: 'The spring plant sale at the nursery' } }), plan({ note: 'A brighter green it is.', ready: true, brief: { kind: 'poster', purpose: 'The spring plant sale at the nursery' } })] };
 await goHome();
 await begin('A poster for the spring plant sale at our nursery. Honestly I have no idea what colours to use.');
-await waitAsked(1);
+await settled(questionCalls.length);
 await page.waitForSelector('.sd-dq-pal', { timeout: 15000 });
 const contrasts = await page.locator('.sd-dq-pal').evaluateAll((els) =>
   els.map((e) => {
     const rgb = (s) => s.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number);
-    const lum = ([r, g, b]) => [r, g, b].map((v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+    const lum = ([r, g, b2]) => [r, g, b2].map((v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
     const cs = getComputedStyle(e);
-    const [a, b2] = [lum(rgb(cs.backgroundColor)), lum(rgb(cs.color))];
-    return (Math.max(a, b2) + 0.05) / (Math.min(a, b2) + 0.05);
+    const [x, y] = [lum(rgb(cs.backgroundColor)), lum(rgb(cs.color))];
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
   }),
 );
-ok('palettes to look at: each its real colours, its hex codes, and “Aa” in its ink on its ground — readable (4.5:1 or better)', contrasts.length === 3 && contrasts.every((x) => x >= 4.5) && (await page.locator('.sd-dq-hex').first().innerText()).includes('#f4f1e4'), JSON.stringify(contrasts));
-ok('…and the reply invites mixing or naming colours (hex codes are fine)', /hex codes are fine/.test(await page.locator('.sd-aid-hint').innerText()) && /name your own colours/.test((await page.locator('#sd-reply').getAttribute('placeholder')) ?? ''));
-ok('…and a colour of their own, from the system’s colour picker', (await page.locator('.sd-aid-own input[type="color"]').count()) === 1);
+ok('palettes as real swatches, each with its ink readable on its ground, and a colour of their own beside them', contrasts.length === 3 && contrasts.every((x) => x >= 4.5) && (await page.locator('.sd-aid-own input[type="color"]').count()) === 1, JSON.stringify(contrasts));
 await page.locator('.sd-aid-own input[type="color"]').evaluate((el) => {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, '#3fa34d');
   el.dispatchEvent(new Event('input', { bubbles: true }));
   el.dispatchEvent(new Event('change', { bubbles: true }));
 });
 await page.waitForTimeout(200);
-ok('…picked: written into the reply (not sent), to say more around it', (await page.locator('#sd-reply').inputValue()) === '#3fa34d' && (await asked()).length === 1, await page.locator('#sd-reply').inputValue());
-await shot('05-palettes');
-await page.locator('#sd-reply').focus();
-await page.keyboard.press('Home');
-await page.keyboard.type('The second one, but with a brighter green accent like ');
-await page.keyboard.press('Enter');
-await page.waitForTimeout(500);
-await designed();
-const c4 = questionCalls.at(-1);
-ok('answered in words instead of a pick: the model reads their words as said, and nothing counts as picked', c4?.conversation?.at(-1)?.text === 'The second one, but with a brighter green accent like #3fa34d' && JSON.stringify(c4?.justPicked) === '[]', JSON.stringify(c4));
-const db2 = await designBrief();
-ok('…made at once; the brief carries their colour words exactly', /#3fa34d/.test(db2) && !/Colours they picked/.test(db2), db2);
+ok('…a colour of their own goes into the answer, to say more around it', (await page.locator('#sbx-a-colour').inputValue()) === '#3fa34d', await page.locator('#sbx-a-colour').inputValue());
+await shot('06-colour');
+await then(() => page.locator('.sd-dq-card').filter({ hasText: 'Potting shed' }).click());
+ok('a palette picked: its colours among the decisions, each one changeable', (await page.locator('.sbx-sw').count()) === 4 && /Potting shed/.test(await page.locator('.sbx-picks').innerText()));
+const before3 = questionCalls.length;
+await page.locator('.sbx-sw input[type="color"]').nth(2).evaluate((el) => {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, '#3fa34d');
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+});
+await settled(before3 + 1);
+let s3 = await studio();
+ok('…its accent changed in place: the brief holds their colours, marked as theirs, and the model is told', s3.brief.chosen.palette.colours[2] === '#3fa34d' && s3.brief.chosen.palette.edited === true && /changed a colour of their palette to #3fa34d/.test(lastCall()?.change ?? ''), JSON.stringify(s3.brief.chosen.palette));
+await shot('07-colour-edited');
 
-console.log('\n=== lettering in real faces; a suggested reply; “You decide.” ===');
+console.log('\n=== test 4: lettering — real faces, compared in place ===');
 const TYPE = {
   kind: 'type',
   sample: 'Kerning Club',
@@ -271,147 +266,183 @@ const TYPE = {
     { name: 'Gallery quirk', note: 'Wide and odd, with a typewriter beside it', display: 'Syne', body: 'DM Mono' },
   ],
 };
-model = {
-  mode: 'scripted',
-  delay: 0,
-  answers: [
-    ask('Which of these sounds most like Kerning Club?', { say: 'Expressive lettering, and the font choosing is on me.', aid: TYPE, brief: { kind: 'type-led poster', content: 'Kerning Club' } }),
-    ask('Should the letters behave, or break the rules a little?', { say: 'Loud and inky.', suggestions: ['Break the rules', 'Keep it tidy'], brief: { kind: 'type-led poster', content: 'Kerning Club' } }),
-  ],
-};
+model = { mode: 'scripted', delay: 0, plans: [plan({ modules: [mod('lettering', 'Lettering', 'Which of these sounds most like Kerning Club?', { lead: true, aid: TYPE })], brief: { kind: 'type-led poster', content: 'Kerning Club' } })] };
 await goHome();
 await begin('A type-led poster for a typography conference called “Kerning Club”. I want the lettering to be really expressive, but I don’t know fonts at all.');
-await waitAsked(1);
+await settled(questionCalls.length);
 await page.waitForSelector('.sd-dq-list.is-faces.is-ready', { timeout: 15000 }).catch(() => null);
-await page.waitForTimeout(600);
+await page.waitForTimeout(500);
 const specFaces = await page.locator('.sd-dq-spec').evaluateAll((els) => els.map((e) => getComputedStyle(e).fontFamily.split(',')[0].replace(/"/g, '').trim()));
 const specLoaded = await page.evaluate((fs) => fs.map((f) => document.fonts.check(`40px "${f}"`)), specFaces);
-ok('lettering to look at: “Kerning Club” set in each pairing’s real face from the library, loaded before it is shown', (await page.locator('.sd-dq-card.is-face').count()) === 3 && (await page.locator('.sd-dq-spec').first().textContent()) === 'Kerning Club' && specFaces.join('|') === 'Dela Gothic One|Bodoni Moda|Syne' && specLoaded.every(Boolean), JSON.stringify({ specFaces, specLoaded }));
-const specFit = await page.locator('.sd-dq-spec').evaluateAll((els) => els.map((e) => [e.scrollWidth, e.clientWidth]));
-ok('…each specimen fits its card', specFit.every(([sw, cw]) => cw > 0 && sw <= cw + 1), JSON.stringify(specFit));
-await shot('06-type');
-await page.locator('.sd-dq-card.is-face').first().click();
-await waitAsked(2);
-await page.waitForSelector('.sd-suggestion', { timeout: 10000 });
-ok('a pick, then a question with short replies to tap (the aid gone, the pick kept)', (await page.locator('.sd-suggestion').allInnerTexts()).join('|') === 'Break the rules|Keep it tidy' && (await page.locator('.sd-aid').count()) === 0 && (await project()).studio.brief?.chosen?.type?.name === 'Loud and inky', JSON.stringify((await project()).studio.brief?.chosen));
-const callsAtDecide = questionCalls.length;
-await reply('You decide.');
-await designed();
-const db3 = await designBrief();
-ok('“You decide.”: made at once — no model call — with the lettering they picked in the brief', questionCalls.length === callsAtDecide && /Lettering they picked \(Loud and inky\): Dela Gothic One for display, Space Grotesk for text/.test(db3) && /Kerning Club/.test(db3) && /left to SocriaUX’s judgement/.test(db3), db3);
+const specFit = await page.locator('.sd-dq-spec').evaluateAll((els) => els.map((e) => e.scrollWidth <= e.clientWidth + 1 && e.clientWidth > 0));
+ok('“Kerning Club” set in each pairing’s real face from the library — loaded, and fitted to its space', specFaces.join('|') === 'Dela Gothic One|Bodoni Moda|Syne' && specLoaded.every(Boolean) && specFit.every(Boolean), JSON.stringify({ specFaces, specLoaded, specFit }));
+await shot('08-type');
 
-console.log('\n=== a question skipped ===');
+console.log('\n=== test 5: a dreamy cloud poster — atmospheres for it, not presets ===');
+const CLOUDS = {
+  kind: 'moods',
+  sample: 'Cumulus',
+  options: [
+    { name: 'Ethereal', note: 'Soft white on pale sky, airy lettering, lots of space.', colours: ['#eef3f8', '#24324a', '#9bb7d4', '#f6e7d8'], display: 'Cormorant Garamond' },
+    { name: 'Storm light', note: 'Bruised greys, a thin seam of gold, heavy and dramatic.', colours: ['#2a2d34', '#f2efe6', '#d4a548', '#5b6270'], display: 'Bodoni Moda' },
+    { name: 'Vapour', note: 'Abstract, futuristic: gradients of cold blue, precise sans.', colours: ['#0e1a2b', '#e8f1ff', '#6fb3ff', '#3b4d66'], display: 'Unbounded' },
+  ],
+};
+model = { mode: 'scripted', delay: 0, plans: [plan({ modules: [mod('cloud', 'Atmosphere', 'Which kind of cloud is it?', { lead: true, aid: CLOUDS })], brief: { kind: 'poster', feel: 'dreamy' } })] };
+await goHome();
+await begin('I want a dreamy cloud-themed poster.');
+await settled(questionCalls.length);
+await page.waitForSelector('.sd-dq-grid.is-moods.is-ready', { timeout: 15000 }).catch(() => null);
+ok('three readings of a cloud for this poster, each in its own colours and face', (await page.locator('.sbx-q.is-lead .sd-dq-name').allInnerTexts()).join('|') === 'Ethereal|Storm light|Vapour' && (await page.locator('.sd-aid-mood-w').first().textContent()) === 'Cumulus');
+await shot('09-clouds');
+
+console.log('\n=== tests 6 and 7: an unusual answer in words; playful changed to sophisticated ===');
 model = {
   mode: 'scripted',
   delay: 0,
-  answers: [
-    ask('Should it feel like a studio you wander into, or an event you plan for?', { aid: MOODS, brief: { kind: 'poster', purpose: 'Open studio weekend' } }),
-    make('I’ll settle the feel myself — making it now.', { brief: { kind: 'poster', purpose: 'Open studio weekend' } }),
+  plans: [
+    plan({ modules: [mod('feeling', 'The feeling', 'What should a child feel walking past it?', { lead: true, placeholder: 'Like they found a secret door' })], brief: { kind: 'poster', purpose: 'A children’s book fair', feel: 'playful', explicit: ['playful'], tentative: ['Bright primary colours'] } }),
+    plan({ note: 'Old library adventure, then — wonder over noise.', ready: true, brief: { kind: 'poster', purpose: 'A children’s book fair', feel: 'like the moment in an old library when a book falls open on a map', explicit: ['playful'], tentative: ['Bright primary colours', 'Antique map textures'] } }),
+    plan({ note: 'Sophisticated and editorial — the playfulness goes.', ready: true, answers: [{ id: 'feeling', text: 'Wonder, but grown-up: sophisticated and editorial' }], brief: { kind: 'poster', purpose: 'A children’s book fair', feel: 'sophisticated and editorial', explicit: ['sophisticated and editorial'], avoid: ['playful'], tentative: ['Antique map textures'] } }),
   ],
 };
 await goHome();
-await begin('A poster for our open studio weekend');
-await waitAsked(1);
-await page.locator('.sd-qacts .sd-chip').filter({ hasText: 'Skip' }).click();
-await designed();
-p = await started();
-ok('“Skip”: said as the person’s reply, the model told so (it settles that point and moves on), nothing picked', p.studio.transcript.filter((m) => m.from === 'person').at(-1)?.text === 'Skip' && questionCalls.at(-1)?.conversation?.at(-1)?.text === 'Skip' && !p.studio.brief?.chosen?.mood, JSON.stringify(questionCalls.at(-1)?.conversation?.slice(-2)));
-const db6 = await designBrief();
-ok('…and made: the skipped question left to SocriaUX, “Skip” never read as what it is about', /Open studio weekend/.test(db6) && !/What it is for: Skip/.test(db6), db6);
+await begin('A playful poster for a children’s book fair');
+await settled(questionCalls.length);
+const unusual = 'Like the moment in an old library when a book falls open on a map you weren’t looking for';
+await then(() => answerIn('feeling', unusual));
+const facts6 = await page.locator('.sbx-facts textarea').evaluateAll((els) => els.map((e) => e.value).join(' | '));
+ok('test 6 — an unusual answer in their words: sent as they wrote it, and the brief takes its meaning', lastCall()?.modules?.find((m) => m.id === 'feeling')?.answer === unusual && /book falls open on a map/.test(facts6), facts6);
+await then(async () => {
+  await page.fill('#sbx-say', 'Actually, make it sophisticated and editorial instead.');
+  await page.press('#sbx-say', 'Enter');
+});
+s3 = await studio();
+const known7 = await page.locator('.sbx-known').innerText();
+ok('test 7 — the change of mind as a note: the model sees it as the latest change', /added a note: Actually, make it sophisticated and editorial instead/.test(lastCall()?.change ?? '') && lastCall()?.notes?.at(-1) === 'Actually, make it sophisticated and editorial instead.', JSON.stringify(lastCall()?.notes));
+ok('…the superseded preference gone (playful kept out), the answer it overrode rewritten, the rest kept', s3.brief.feel === 'sophisticated and editorial' && s3.brief.avoid.includes('playful') && s3.space.modules.find((m) => m.id === 'feeling').answer.text === 'Wonder, but grown-up: sophisticated and editorial' && s3.brief.purpose === 'A children’s book fair' && /Keep out/.test(known7) && /Your notes/.test(known7), JSON.stringify({ feel: s3.brief.feel, avoid: s3.brief.avoid }));
+await shot('10-changed-mind');
 
-console.log('\n=== the work turns out to be another kind ===');
+console.log('\n=== in place: a guess, the idea, a line of the brief, a note, a settled answer ===');
+let n = questionCalls.length;
+const after7 = { kind: 'poster', purpose: 'A children’s book fair', feel: 'sophisticated and editorial', avoid: ['playful', 'Antique map textures'] };
+model = { mode: 'scripted', delay: 0, plans: [0, 1, 2, 3, 4, 5].map(() => plan({ ready: true, brief: after7 })) };
+await page.getByRole('button', { name: 'Not this: Antique map textures' }).click();
+await page.waitForTimeout(100);
+const shownAtOnce = !/Antique map textures/.test((await page.locator('.sbx-guess').innerText().catch(() => '')) || '') && /Antique map textures/.test(await page.locator('.sbx-avoid').innerText());
+s3 = await until(async () => { const x = await studio(); return x && !x.brief.tentative.includes('Antique map textures') ? x : null; }, 4000);
+ok('SocriaUX’s reading turned down: gone from its reading at once (on the page, then kept), kept out', shownAtOnce && !s3.brief.tentative.includes('Antique map textures') && s3.brief.avoid.includes('Antique map textures'), JSON.stringify(s3.brief));
+await settled(n + 1);
+ok('…and the model told', /turned down SocriaUX’s reading: Antique map textures/.test(lastCall()?.change ?? ''), lastCall()?.change);
+n = questionCalls.length;
+await page.locator('.sbx-prompt').fill('An editorial poster for the city children’s book fair, 12 May');
+await page.locator('.sbx-prompt').blur();
+await settled(n + 1);
+ok('the idea edited in place: kept, and the model told', (await studio()).prompt === 'An editorial poster for the city children’s book fair, 12 May' && lastCall()?.prompt === 'An editorial poster for the city children’s book fair, 12 May' && /edited their idea/.test(lastCall()?.change ?? ''), lastCall()?.change);
+n = questionCalls.length;
+const purpose = page.locator('.sbx-fact').filter({ hasText: 'What it is for' }).locator('.sbx-edit');
+await purpose.fill('The city children’s book fair, for families');
+await purpose.press('Enter');
+await settled(n + 1);
+s3 = await studio();
+ok('a line of what is understood rewritten in place: theirs from then on (marked, and kept over the model’s reading)', s3.brief.purpose === 'The city children’s book fair, for families' && s3.space.own.includes('purpose') && /yours/.test(await page.locator('.sbx-fact').filter({ hasText: 'What it is for' }).innerText()) && lastCall()?.own?.includes('purpose'), JSON.stringify({ purpose: s3.brief.purpose, own: s3.space.own }));
+n = questionCalls.length;
+await page.getByRole('button', { name: /^Take back: Actually/ }).click();
+await settled(n + 1);
+ok('a note taken back', (await studio()).space.notes.length === 0 && /took back their note/.test(lastCall()?.change ?? ''));
+await page.getByRole('button', { name: 'Change “The feeling”' }).click();
+await page.waitForTimeout(200);
+const reopened = await until(async () => ((await studio())?.space?.modules?.find((m) => m.id === 'feeling')?.status === 'open' ? true : null), 4000);
+ok('a settled consideration changed again: open where it was, its answer cleared', (await page.locator('.sbx-q[data-module="feeling"]').count()) === 1 && !!reopened, String(await page.locator('.sbx-q[data-module="feeling"]').count()));
+await shot('11-in-place');
+
+console.log('\n=== test 8: Generate before answering anything ===');
+model = { mode: 'scripted', delay: 1500, plans: [plan({ modules: [mod('purpose', 'What it is for', 'What’s the poster for?', { lead: true })], brief: { kind: 'poster' } })] };
+await goHome();
+await begin('A poster');
+await page.locator('.sbx-go').click();
+await designed();
+ok('Generate while SocriaUX is still reading the idea: never blocked — the workspace opens with stand-in words', /stand-in words/.test(await designBrief()) && (await page.locator('.dx').count()) === 1);
+
+console.log('\n=== test 9: a logo, a website and a campaign — each brief shaped by its work ===');
 model = {
   mode: 'scripted',
   delay: 0,
-  answers: [
-    ask('Is it the one poster, or a few pieces that go together?', { brief: { kind: 'poster', content: 'Pasture' } }),
-    make('A small campaign, then — posters and posts, one idea across them.', { mode: 'board', brief: { kind: 'launch campaign', content: 'Pasture', explicit: ['A few posters and Instagram posts'] } }),
+  plans: [
+    plan({ modules: [mod('statement', 'Character', 'Should the name make a statement, or let the fragrance speak?', { lead: true, options: ['Make a statement', 'Quiet and assured', 'Somewhere strange'] }), mod('name', 'The name', 'What’s it called?', { placeholder: 'Velour' })], brief: { kind: 'logo', purpose: 'A small fragrance house' } }),
+    plan({ modules: [mod('do', 'What people do there', 'What should people be able to do on it?', { lead: true, options: ['Book a class', 'Buy pieces', 'Visit the studio'] })], brief: { kind: 'website', purpose: 'A pottery studio' } }),
+    plan({ modules: [mod('pieces', 'The pieces', 'Which pieces does the launch need?', { lead: true, placeholder: 'A few posters and some Instagram posts' }), mod('voice', 'Voice', 'How cheeky can it be?', { options: ['Very', 'A wink', 'Not at all'] })], brief: { kind: 'launch campaign', purpose: 'Pasture oat milk launch' } }),
   ],
 };
-await goHome();
-await begin('A poster for Pasture, our new oat milk');
-await waitAsked(1);
-await reply('Actually a few posters and some Instagram posts');
-await designed();
-p = await started();
-ok('said in a reply, decided by the model: a campaign, made as one (the conversation’s kind follows)', p?.studio?.mode === 'board' && p.design?.kind === 'campaign', JSON.stringify({ mode: p?.studio?.mode, kind: p?.design?.kind }));
+const shapes = {};
+for (const [id, words] of [
+  ['logo', 'A logo for a small fragrance house'],
+  ['website', 'A website for my pottery studio'],
+  ['campaign', 'A launch campaign for our oat milk brand'],
+]) {
+  await goHome();
+  await begin(words);
+  await settled(questionCalls.length);
+  shapes[id] = { kind: await page.locator('.sbx-main').getAttribute('data-kind'), shape: await page.locator('.sbx-main').getAttribute('data-shape'), qs: await page.locator('.sbx-question').allInnerTexts(), open: await page.locator('.sbx-q').count() };
+  await shot(`12-${id}`);
+}
+ok('a logo: its character raised first as readings to choose, its name beside it', shapes.logo.kind === 'logo' && shapes.logo.shape === 'choice' && shapes.logo.open === 2 && /make a statement/.test(shapes.logo.qs[0]), JSON.stringify(shapes.logo));
+ok('a website: what people do there, alone', shapes.website.kind === 'website' && shapes.website.open === 1 && /able to do on it/.test(shapes.website.qs[0]), JSON.stringify(shapes.website));
+ok('a campaign: its pieces in words, its voice beside — three different briefs, not one form', shapes.campaign.kind === 'board' && shapes.campaign.shape === 'words' && shapes.campaign.open === 2 && JSON.stringify(shapes.logo.qs) !== JSON.stringify(shapes.campaign.qs), JSON.stringify(shapes.campaign));
 
-console.log('\n=== websites to learn from, read before SocriaUX answers ===');
-model = {
-  mode: 'scripted',
-  delay: 0,
-  answers: [
-    ask('What should people be able to do on it?', { suggestions: ['Book a session', 'See the work', 'Get in touch'], brief: { kind: 'website', content: 'Mira Studio' } }),
-    ask('Larkfield’s warmth, then. Is booking the main thing people come for?', { brief: { kind: 'website', content: 'Mira Studio', references: ['larkfield.studio'] } }),
-  ],
-};
-await goHome();
-await begin('A website for “Mira Studio”');
-await waitAsked(1);
-ok('a website: the model’s question, with tap-replies that answer it', /What should people be able to do on it/.test(await lastSaid()) && (await page.locator('.sd-suggestion').count()) === 3, await lastSaid());
-events.length = 0;
-await reply('something like larkfield.studio, or like nowhere.design');
-await waitAsked(2);
-await page.waitForSelector('.sd-refcard', { timeout: 10000 });
-const order = events.join(' ');
-ok('both sites asked of the server’s reader, nothing fetched from the browser, and both before the model was asked', /read:.*larkfield.*read:.*nowhere.*question/.test(order) && ![...outside].some((h) => /larkfield|nowhere/.test(h)), order);
-ok('…the model was handed what was read', /larkfield\.studio.*#f6f1e7.*Fraunces/.test(questionCalls.at(-1)?.sites?.[0] ?? ''), JSON.stringify(questionCalls.at(-1)?.sites));
-ok('…what was read shown in the conversation; the one that could not be read said plainly', (await page.locator('.sd-refcard iframe[sandbox=""]').count()) === 1 && (await said()).some((t) => /I couldn’t read nowhere\.design/.test(t)), JSON.stringify((await said()).slice(-3)));
-await shot('07-references');
-
-console.log('\n=== signed out: the reader asks what it must, and makes ===');
-model = { mode: 'signed-out', answers: [], delay: 0 };
+console.log('\n=== signed out: the reader’s brief, and Generate always works ===');
+model = { mode: 'signed-out', plans: [], delay: 0 };
 await goHome();
 await begin('something for my bakery');
-await waitAsked(1);
-ok('what it is, when nothing says: one question, with kinds to tap', /What are you making/.test(await lastSaid()) && (await page.locator('.sd-suggestion').allInnerTexts()).includes('A logo'), await lastSaid());
-await page.locator('.sd-suggestion').filter({ hasText: 'A logo' }).click();
-await waitAsked(2);
-ok('a logo, then: its name (the model is not asked again while it cannot answer)', /What’s it called/.test(await lastSaid()) && questionCalls.filter(Boolean).length >= 1, await lastSaid());
-await reply('It’s called Halden');
+await settled(questionCalls.length);
+ok('what it is, when nothing says: readings to choose', (await page.locator('.sbx-q.is-lead .sbx-question').innerText()) === 'What are you making?' && (await page.locator('.sbx-option').allInnerTexts()).join('|') === 'A poster or a post|A logo|A website|A campaign', await page.locator('.sbx-q').allInnerTexts());
+await then(() => page.locator('.sbx-option').filter({ hasText: 'A logo' }).click());
+ok('a logo, then: its name (the brief becomes a logo’s)', (await page.locator('.sbx-q.is-lead .sbx-question').innerText()) === 'What’s it called?' && (await studio()).mode === 'logo', await page.locator('.sbx-q').allInnerTexts());
+await then(() => answerIn('name', 'Halden'));
+await page.locator('.sbx-go-big, .sbx-go').first().click();
 await designed();
-p = await started();
-const db4 = await designBrief();
-ok('two questions at most: the logo begun on a logo sheet, its name in the brief', p.design?.kind === 'logo' && p.design.format === 'logo-sheet' && /Halden/.test(db4) && (await asked()).length === 2, db4);
-await goHome();
-await begin('Make me a poster.');
-await waitAsked(1);
-ok('a vague poster, signed out: what it is for (never its headline)', /What’s the poster for\?/.test(await lastSaid()) && !/headline|say\b/i.test(await lastSaid()), await lastSaid());
-const callsAtSurprise = questionCalls.length;
-await page.locator('.sd-qacts .sd-chip').filter({ hasText: 'Surprise me' }).click();
-await designed();
-const db5 = await designBrief();
-ok('“Surprise me”: made at once with no model call, what was not said left to SocriaUX and the words written as stand-ins', questionCalls.length === callsAtSurprise && /left to SocriaUX’s judgement/.test(db5) && /stand-in words/.test(db5), db5);
+const p9 = await project();
+ok('made: a logo sheet, its name in the brief', p9.design?.kind === 'logo' && p9.design.format === 'logo-sheet' && /Halden/.test(p9.design.memory.brief), JSON.stringify(p9.design?.memory?.brief).slice(0, 300));
 await goHome();
 await begin('A website for my pottery studio');
-p = await started();
-ok('a website with what it is about, signed out: made at once', p?.mode === 'create' && p.specs?.length > 0 && (await asked()).length === 0, JSON.stringify(p?.studio?.transcript?.map((m) => m.text.slice(0, 60))));
-await page.waitForTimeout(800);
-await shot('08-website-made');
-// its checks say which look it is in, and that it changes in words — never a set of directions to choose from
-await page.locator('button, [role="tab"]').filter({ hasText: /^(Checks|Checking…)$/ }).first().click().catch(() => null);
-await page.waitForTimeout(1500);
-const rail = (await page.locator('.v0-rail-body').innerText().catch(() => '')) ?? '';
-ok('the website’s look is changed in words: no “Choose a different direction”, no directions to explore', /The direction it follows/.test(rail) && /say so in your own words/.test(rail) && !/Choose a different direction|Explore directions/.test(await page.locator('body').innerText()), rail.slice(0, 400));
+await settled(questionCalls.length);
+ok('a website whose subject is said, signed out: nothing to answer', (await page.locator('.sbx-q').count()) === 0, await page.locator('.sbx-main').innerText());
+await page.locator('.sbx-go').click();
+const pw = await until(async () => ((await project())?.studio?.status === 'started' ? project() : null), 30000);
+ok('…and Generate makes the website', pw?.mode === 'create' && pw.specs?.length > 0);
+
+console.log('\n=== references read into the brief ===');
+model = { mode: 'scripted', delay: 0, plans: [plan({ modules: [mod('do', 'What people do there', 'What should people be able to do on it?', { lead: true })], brief: { kind: 'website', content: 'Mira Studio' } }), plan({ ready: true, brief: { kind: 'website', content: 'Mira Studio', references: ['larkfield.studio'] } })] };
+await goHome();
+await begin('A website for “Mira Studio”');
+await settled(questionCalls.length);
+await then(async () => {
+  await page.fill('#sbx-say', 'something like larkfield.studio, or like nowhere.design');
+  await page.press('#sbx-say', 'Enter');
+});
+await page.waitForSelector('.sd-refcard', { timeout: 10000 });
+ok('sites named in a note: read by the server’s reader (nothing fetched from the browser), shown among the references, the one that failed said plainly', read.some((u) => /larkfield/.test(u)) && read.some((u) => /nowhere/.test(u)) && ![...outside].some((h) => /larkfield|nowhere/.test(h)) && (await page.locator('.sbx-refs .sd-refcard').count()) === 1 && /Couldn’t read nowhere\.design/.test(await page.locator('.sbx-refs').innerText()), await page.locator('.sbx-refs').innerText());
+ok('…and handed to the model as read', /larkfield\.studio.*#f6f1e7/.test(lastCall()?.sites?.[0] ?? ''), JSON.stringify(lastCall()?.sites));
+await shot('13-references');
 
 console.log('\n=== a phone ===');
 await page.setViewportSize({ width: 390, height: 844 });
-model = { mode: 'scripted', delay: 0, answers: [ask('Which of these feels closest to your nursery?', { aid: PALETTES, brief: { kind: 'poster' } })] };
+model = { mode: 'scripted', delay: 0, plans: [plan({ modules: [mod('colour', 'Colour', 'Which of these feels most like your nursery?', { lead: true, aid: PALETTES })], brief: { kind: 'poster', purpose: 'A spring fair' } })] };
 await goHome();
 await begin('A poster for the spring fair at our nursery, no idea about colours');
-await waitAsked(1);
+await settled(questionCalls.length);
 await page.waitForSelector('.sd-dq-pal', { timeout: 15000 });
 await page.waitForTimeout(400);
 const fit = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);
-ok('the conversation and its palettes fit a phone, no sideways scrolling', fit[0] <= fit[1], JSON.stringify(fit));
-const comp = await page.locator('.sd-chat-composer').boundingBox();
-ok('…the reply at the foot, within the screen', comp && comp.y + comp.height <= 844 + 1 && comp.x >= 0, JSON.stringify(comp));
-await shot('09-phone');
+ok('the brief fits a phone, no sideways scrolling', fit[0] <= fit[1], JSON.stringify(fit));
+const dock = await page.locator('.sbx-dock').boundingBox();
+ok('…Generate docked at the foot, always in reach', !!dock && dock.y + dock.height <= 844 + 1 && (await page.locator('.sbx-dock button').isVisible()), JSON.stringify(dock));
+await shot('14-phone');
 
 console.log('\n=== and ===');
-ok('no generation route was called, and the designer was never reached (signed out)', modelCalls.length === 0 && designCalls.length === 0, modelCalls.join(' '));
+ok('no generation route called, and the designer never reached (signed out)', modelCalls.length === 0 && designCalls.length === 0, modelCalls.join(' '));
 const hosts = [...outside].filter((h) => !/^fonts\.(googleapis|gstatic)\.com$/.test(h) && !/clerk/.test(h));
-ok('no outside host reached from the browser beyond its fonts and sign-in (the sites read were read by the server)', !hosts.length, [...outside].join(' '));
+ok('no outside host reached from the browser beyond its fonts and sign-in', !hosts.length, [...outside].join(' '));
 ok('no page errors', errors.length === 0, errors.join(' | '));
 
 await b.close();
