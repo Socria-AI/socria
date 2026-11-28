@@ -31,7 +31,7 @@ export interface WriteBody {
   memory: DesignState['memory'];
   turns: DesignTurn[];
   comments: DesignState['comments'];
-  assets: { id: string; name: string; width: number; height: number }[];
+  assets: { id: string; name: string; width: number; height: number; note?: string }[];
   selection?: DesignTurn['selection'];
   answering?: { text: string; options: string[] } | null;
   system?: { name: string; rules: string[] } | null;
@@ -71,8 +71,8 @@ export interface Request {
   noLook?: boolean;
   /** the company the project belongs to, as the designer is told of it */
   company?: unknown;
-  /** pictures the project may use beyond its own (the company's library), told to the designer */
-  library?: { id: string; name: string; width: number; height: number }[];
+  /** pictures the project may use beyond its own (the company's library), told to the designer with how each may be used */
+  library?: { id: string; name: string; width: number; height: number; note?: string }[];
 }
 
 export type Outcome =
@@ -102,7 +102,7 @@ function bodyOf(s: DesignState, r: Request, extra: Partial<WriteBody> = {}): Wri
     memory: s.memory,
     turns: s.turns.slice(-12),
     comments: s.comments.filter((c) => !c.resolved).slice(-20),
-    assets: [...s.assets.map((a) => ({ id: a.id, name: a.name, width: a.width, height: a.height })), ...(r.library ?? [])].slice(0, 40),
+    assets: [...s.assets.map((a) => ({ id: a.id, name: a.name, width: a.width, height: a.height, ...(a.note ? { note: a.note } : {}) })), ...(r.library ?? []).filter((l) => !s.assets.some((a) => a.id === l.id)).map((l) => ({ id: l.id, name: l.name, width: l.width, height: l.height, ...(l.note ? { note: l.note } : {}) }))].slice(0, 40),
     selection: r.selection ?? null,
     answering: r.answering ?? null,
     system: r.system ?? null,

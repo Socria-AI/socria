@@ -30,6 +30,7 @@ import type { MasterDesignSystem } from '@/lib/ux-v0/boards/system';
 import { DesignWorkspace } from './design/DesignWorkspace';
 import { openLegacy } from './design/legacy-open';
 import { SystemsApp } from './systems/SystemsApp';
+import { CompanyApp } from './company/CompanyApp';
 import type { SystemRecord } from '@/lib/ux-v0/dsi/registry';
 import { listSystems } from '@/lib/ux-v0/dsi/store';
 import '@/components/brand/socria-brand.css';
@@ -52,6 +53,13 @@ const systemsFromUrl = (): string | null => {
   if (typeof window === 'undefined') return null;
   const v = new URLSearchParams(window.location.search).get('ds');
   return v === '1' ? '' : v && /^dsys_[\w-]{4,64}$/.test(v) ? v : null;
+};
+
+/** The company page in the address: ?company=1 (the one chosen in this browser) or ?company=<id>. */
+const companyFromUrl = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  const v = new URLSearchParams(window.location.search).get('company');
+  return v === '1' ? '' : v && /^co_[\w-]{4,64}$/.test(v) ? v : null;
 };
 
 /**
@@ -80,6 +88,8 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
   const [ready, setReady] = useState(false);
   // the Design System Manager: null closed, '' the list, an id that system
   const [systems, setSystems] = useState<string | null>(null);
+  // the company page: null closed, '' the company chosen in this browser, an id that company
+  const [company, setCompany] = useState<string | null>(null);
   // everything made, in its own view (the home is one question)
   const [work, setWork] = useState(false);
   // the home's plates show imported pages in the same sealed frames as the workspace
@@ -130,13 +140,16 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
     void refreshSystems();
     const id = idFromUrl();
     const ds = systemsFromUrl();
-    if (ds !== null) setSystems(ds);
+    const co = companyFromUrl();
+    if (co !== null) setCompany(co);
+    else if (ds !== null) setSystems(ds);
     else if (id) openById(id, false);
     else if (workFromUrl()) setWork(true);
     const onPop = () => {
       const pid = idFromUrl();
       const sid = systemsFromUrl();
       setWork(workFromUrl());
+      setCompany(companyFromUrl());
       if (sid !== null) {
         setOpen(null);
         setSystems(sid);
@@ -176,9 +189,16 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
     passage(() => setOpen({ p, ...(file ? { file } : {}), ...(intent ? { intent } : {}) }));
     window.history.pushState(null, '', `/ux-v0?p=${encodeURIComponent(p.id)}`);
   };
+  const toCompany = (id = '') => {
+    setOpen(null);
+    setSystems(null);
+    passage(() => setCompany(id));
+    window.history.pushState(null, '', `/ux-v0?company=${id || '1'}`);
+  };
   const toSystems = (ask?: (WizardStart & { next?: string }) | null) => {
     setStartImport(ask ?? null);
     setOpen(null);
+    setCompany(null);
     passage(() => setSystems(''));
     window.history.pushState(null, '', '/ux-v0?ds=1');
   };
@@ -273,6 +293,29 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
     refresh();
   };
 
+  if (company !== null && !open) {
+    return (
+      <CompanyApp
+        signedIn={signedIn}
+        initialId={company || null}
+        onExit={() => {
+          passage(() => setCompany(null));
+          refresh();
+          window.history.pushState(null, '', '/ux-v0');
+        }}
+        onOpenProject={(id) => {
+          setCompany(null);
+          void openById(id);
+        }}
+        onOpenSystems={(id) => {
+          setCompany(null);
+          passage(() => setSystems(id ?? ''));
+          window.history.pushState(null, '', `/ux-v0?ds=${id || '1'}`);
+        }}
+      />
+    );
+  }
+
   if (systems !== null && !open) {
     return (
       <SystemsApp
@@ -363,7 +406,7 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
   const local = new Set(list.map((x) => x.id));
   const elsewhere = remote.filter((r) => !local.has(r.id));
 
-  if (work) return <YourWork signedIn={signedIn} ready={ready} list={list} elsewhere={elsewhere} nonce={nonce} onOpen={(id) => openById(id)} onDelete={remove} onNew={home} onSystems={() => toSystems(null)} />;
+  if (work) return <YourWork signedIn={signedIn} ready={ready} list={list} elsewhere={elsewhere} nonce={nonce} onOpen={(id) => openById(id)} onDelete={remove} onNew={home} onSystems={() => toSystems(null)} onCompany={() => toCompany()} />;
 
   return (
     <StudioHome
@@ -375,6 +418,7 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
       onSystem={(id) => setHomeSystem(id)}
       onBegin={beginStudio}
       onSystems={() => toSystems(null)}
+      onCompany={() => toCompany()}
       onWork={toWork}
       onOpen={(id) => openById(id)}
     />

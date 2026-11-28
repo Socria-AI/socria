@@ -46,6 +46,9 @@ import { mergePins, pinsFrom } from '@/lib/ux-v0/design/pins';
 import { wantsReview } from '@/lib/ux-v0/design/request';
 import { firstRequest } from '@/lib/ux-v0/design/start';
 import { brandForDesign, type BrandForDesign } from '@/lib/ux-v0/design/brand';
+import { getCompany } from '@/lib/ux-v0/company/store';
+import { companyTold, libraryFor, libraryPictures, missingFor } from '@/lib/ux-v0/company/told';
+import type { Company } from '@/lib/ux-v0/company/schema';
 import { SystemBadge } from '../systems/SystemBadge';
 import { useLinkedSystem } from '../systems/useLinkedSystem';
 import { FORMATS, formatOf, sizeLabel } from '@/lib/ux-v0/design/formats';
@@ -87,17 +90,56 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
   const update = useCallback((fn: (st: DesignState) => DesignState) => setProject((p) => ({ ...p, design: fn(p.design!), updatedAt: Date.now() })), []);
 
   // ── pictures and the brand ──
-  const assetsKey = s.assets.map((a) => a.id).join(',');
-  const [assets, setAssets] = useState<Map<string, string>>(new Map());
+  // the project's own, the brand's approved ones, and its company's library: all placed as asset:<id>
+  const [brand, setBrand] = useState<BrandForDesign | null>(null);
+  const [company, setCompany] = useState<Company | null>(null);
+  // (the first request waits for the company too, so the first design is made within it)
+  const [companyReady, setCompanyReady] = useState(!initial.companyId);
   useEffect(() => {
     let live = true;
-    void assetData(cur.current.design!.assets).then((m) => live && setAssets(m));
+    void getCompany(project.companyId)
+      .catch(() => null)
+      .then((c) => {
+        if (!live) return;
+        setCompany(c);
+        setCompanyReady(true);
+      });
     return () => {
       live = false;
     };
-  }, [assetsKey]);
-  const assetsNow = useCallback(() => assetData(cur.current.design!.assets), []);
-  const [brand, setBrand] = useState<BrandForDesign | null>(null);
+  }, [project.companyId]);
+  const shared = useMemo(() => {
+    const m = new Map<string, DesignAsset>();
+    for (const a of [...(brand?.pictures ?? []), ...(company ? libraryPictures(company) : [])]) if (!m.has(a.id)) m.set(a.id, a);
+    return [...m.values()];
+  }, [brand, company]);
+  const sharedRef = useRef(shared);
+  sharedRef.current = shared;
+  const allAssets = useCallback(() => {
+    const own = cur.current.design!.assets;
+    return [...own, ...sharedRef.current.filter((x) => !own.some((a) => a.id === x.id))];
+  }, []);
+  const assetsKey = `${s.assets.map((a) => a.id).join(',')}|${shared.map((a) => a.id).join(',')}`;
+  const [assets, setAssets] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    let live = true;
+    void assetData(allAssets()).then((m) => live && setAssets(m));
+    return () => {
+      live = false;
+    };
+  }, [assetsKey, allAssets]);
+  const assetsNow = useCallback(() => assetData(allAssets()), [allAssets]);
+  /** What a request is told beyond the project: its company, and the pictures of the brand and the library it may use. */
+  const beyond = useCallback(
+    (words: string) => {
+      const lib = new Map<string, { id: string; name: string; width: number; height: number; note?: string }>();
+      for (const a of [...(brand?.pictures ?? []), ...(company ? libraryFor(company, words) : [])]) if (!lib.has(a.id)) lib.set(a.id, { id: a.id, name: a.name, width: a.width, height: a.height, note: a.note });
+      const absent = company ? missingFor(company, words) : [];
+      const told = company ? companyTold(company) : null;
+      return { company: told ? { ...told, missing: [...new Set([...absent, ...told.missing])] } : undefined, library: [...lib.values()], absent };
+    },
+    [brand, company]
+  );
   // the first request waits for the system a project is built in, so the first design is made in it
   const [brandReady, setBrandReady] = useState(!initial.systemLink);
   const linked = useLinkedSystem(project.systemLink);
@@ -178,7 +220,8 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
       const ctl = new AbortController();
       abort.current = ctl;
       setBusy({ phase: 'reviewing', say: '', started: Date.now() });
-      const out = await runReview(st, { words, artboards: ids, system: brand ? { name: brand.name, rules: brand.rules } : null }, transport, bench, { signal: ctl.signal });
+      const more = beyond(words);
+      const out = await runReview(st, { words, artboards: ids, system: brand ? { name: brand.name, rules: brand.rules } : null, company: more.company, library: more.library }, transport, bench, { signal: ctl.signal });
       abort.current = null;
       setBusy(null);
       if (out.kind === 'failed') {
@@ -188,7 +231,7 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
       }
       update((x) => ({ ...x, turns: [...x.turns, ...out.state.turns.slice(st.turns.length)] }));
     },
-    [bench, brand, sel.artboard, transport, update]
+    [bench, beyond, brand, sel.artboard, transport, update]
   );
 
   const ask = useCallback(
@@ -214,7 +257,10 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
       const pending = { id: newId('t'), role: 'person' as const, text: words, at: Date.now(), ...(selection ? { selection } : {}) };
       update((x) => ({ ...x, turns: [...x.turns, pending] }));
       const before = { ...st };
-      const out = await runRequest(before, { words, selection, answering, system: brand ? { name: brand.name, rules: brand.rules } : null, withPicture: !!selection && (o.picture ?? looky) }, transport, bench, {
+      const more = beyond(words);
+      // what was asked for that the company does not have: said at once, and told to the designer so nothing stands in
+      if (more.absent.length) tell(`Not in ${company?.name ?? 'the company'}’s library: ${more.absent.join('; ')}. The designer is told not to invent it.`);
+      const out = await runRequest(before, { words, selection, answering, system: brand ? { name: brand.name, rules: brand.rules } : null, withPicture: !!selection && (o.picture ?? looky), company: more.company, library: more.library }, transport, bench, {
         parse: parseHtml,
         signal: ctl.signal,
         onDraft: (doc, ans) => {
@@ -250,19 +296,19 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
       // a finding is applied when something was really changed for it
       if (o.finding && out.kind === 'done' && (out.applied.touched.length || out.applied.tokensChanged)) update((x) => markFinding(x, o.finding!, 'applied'));
     },
-    [bench, brand, pick, review, sel.artboard, sel.element, transport, update]
+    [bench, beyond, brand, company, pick, review, sel.artboard, sel.element, tell, transport, update]
   );
 
   // the first design is asked for the moment a project begun in conversation opens
   const started = useRef(false);
   useEffect(() => {
-    if (started.current || !signedIn || !brandReady) return;
+    if (started.current || !signedIn || !brandReady || !companyReady) return;
     const st = cur.current.design!;
     if (st.doc.artboards.length || st.turns.length) return;
     started.current = true;
     if (startIntent?.trim()) void ask(startIntent.trim(), { selection: false });
     else if (st.memory.brief) void ask(firstRequest(st.kind), { selection: false });
-  }, [ask, signedIn, startIntent, brandReady]);
+  }, [ask, signedIn, startIntent, brandReady, companyReady]);
 
   // ── by hand ──
   const lastHand = useRef<{ key: string; at: number } | null>(null);
@@ -429,7 +475,7 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
     if (!boards.length) return;
     setExporting(`Exporting ${kind.toUpperCase()}…`);
     try {
-      const map = await assetData(st.assets);
+      const map = await assetData(allAssets());
       if (kind === 'pdf') {
         const r = await artboardsPdf(boards, st.doc.tokens, map, project.name);
         download(r.blob, `${fileName(project.name)}.pdf`);
@@ -499,6 +545,12 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
   const notesBy = useMemo(() => notes.reduce<Record<string, number>>((m, c) => ((m[c.artboard] = (m[c.artboard] ?? 0) + 1), m), {}), [notes]);
 
   // ── versions, presenting ──
+  // pictures the design places that this browser does not hold (a library kept on another device): said, not hidden
+  const absentPictures = useMemo(() => {
+    const out = new Set<string>();
+    for (const a of s.doc.artboards) for (const m of a.html.matchAll(/asset:([A-Za-z0-9_-]{1,40})/g)) if (!assets.has(m[1])) out.add(m[1]);
+    return out.size;
+  }, [s.doc.artboards, assets]);
   const [history, setHistory] = useState(false);
   const [comparing, setComparing] = useState<number | null>(null);
   const [presenting, setPresenting] = useState<number | null>(null);
@@ -516,6 +568,11 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
         </button>
         <input className="dx-name" value={project.name} onChange={(e) => setProject((p) => ({ ...p, name: e.target.value.slice(0, 80), updatedAt: Date.now() }))} aria-label="Design name" />
         <div className="dx-head-r">
+          {company && (
+            <a className="dx-badge" href={`/ux-v0?company=${company.id}`} title={`Made for ${company.name}: designed within its identity, with its library. Nothing here changes the company.`}>
+              For {company.name}
+            </a>
+          )}
           <SystemBadge
             project={project}
             linked={linked}
@@ -613,6 +670,11 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
             comments={notesBy}
             control={control}
           />
+          {absentPictures > 0 && assets.size + absentPictures > 0 && (
+            <div className="dx-warn" role="status">
+              {absentPictures === 1 ? 'A picture this design uses is' : `${absentPictures} pictures this design uses are`} not in this browser, so {absentPictures === 1 ? 'it is' : 'they are'} drawn as nothing here. {company ? `Add ${absentPictures === 1 ? 'it' : 'them'} to ${company.name}’s library on this device.` : 'Add the file again to see it.'}
+            </div>
+          )}
           {notice && (
             <div className="dx-toast" role="status">
               {notice}

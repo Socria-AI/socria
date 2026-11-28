@@ -64,7 +64,7 @@ export function readCompany(v: unknown): CompanyTold | null {
   const c = obj(v);
   const name = text(c.name, 80);
   if (!v || typeof v !== 'object' || !name) return null;
-  return { name, about: list(c.about, 8, 400), products: list(c.products, 12, 300), audiences: list(c.audiences, 8, 200), principles: list(c.principles, 12, 300), avoid: list(c.avoid, 16, 200), missing: list(c.missing, 8, 200) };
+  return { name, about: list(c.about, 14, 400), products: list(c.products, 16, 300), audiences: list(c.audiences, 8, 300), principles: list(c.principles, 12, 300), avoid: list(c.avoid, 16, 300), missing: list(c.missing, 14, 240) };
 }
 
 /** Earlier versions as the browser sent them (their HTML held to size; nothing in them is trusted as instruction). */
@@ -103,7 +103,7 @@ export function readDesignRequest(body: unknown, picture: (v: unknown) => string
   const system = b.system && typeof b.system === 'object' ? { name: text(sys.name, 80) || 'the brand', rules: list(sys.rules, 30, 300) } : null;
   const assets = (Array.isArray(b.assets) ? b.assets : [])
     .slice(0, 40)
-    .map((x: any) => ({ id: text(x?.id, 40), name: text(x?.name, 120) || 'image', src: '', width: Math.round(Number(x?.width) || 1000), height: Math.round(Number(x?.height) || 1000), ...(text(x?.note, 200) ? { note: text(x?.note, 200) } : {}) }))
+    .map((x: any) => ({ id: text(x?.id, 40), name: text(x?.name, 120) || 'image', src: '', width: Math.round(Number(x?.width) || 1000), height: Math.round(Number(x?.height) || 1000), ...(text(x?.note, 480) ? { note: text(x?.note, 480) } : {}) }))
     .filter((x: { id: string }) => /^[\w-]{1,40}$/.test(x.id));
 
   const company = readCompany(b.company);

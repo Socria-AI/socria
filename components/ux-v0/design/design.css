@@ -786,6 +786,23 @@
 .dx-fields:disabled {
   opacity: 0.5;
 }
+.dx-warn {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: 12px;
+  z-index: 14;
+  background: #f8efdc;
+  border-left: 3px solid #b7791f;
+  color: #5c4010;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+a.dx-badge {
+  text-decoration: none;
+  white-space: nowrap;
+}
 .dx-toast {
   position: absolute;
   left: 50%;

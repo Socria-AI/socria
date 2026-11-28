@@ -550,6 +550,8 @@ export interface DesignProject {
   legacy?: { medium: 'graphic' | 'board'; data: unknown; at: number };
   /** the registry design system it is built in (lib/ux-v0/dsi): which version, pinned or following, and its overrides */
   systemLink?: SystemLink;
+  /** the company it is made for (lib/ux-v0/company): designed within it, never changing it */
+  companyId?: string;
   /** the studio conversation it was begun in (lib/ux-v0/studio): what was asked for, every decision since, the
    * conversation itself; read by the workspace the work continues in */
   studio?: StudioState;
@@ -591,6 +593,8 @@ export interface ProjectSummary {
   studies: string[];
   /** begun in the studio: its kind, and whether it is still in conversation */
   studio?: { mode: StudioState['mode']; status: StudioState['status'] };
+  /** the company it is made for */
+  companyId?: string;
 }
 
 // ── normalisers ──────────────────────────────────────────────────────
@@ -1149,6 +1153,7 @@ export function normalizeProject(v: unknown, opts: { forSync?: boolean } = {}): 
     ...((bd) => (bd ? { board: bd } : {}))(r.medium === 'board' ? normalizeBoard(r.board) : null),
     ...((l) => (r.medium === 'design' && (l.medium === 'graphic' || l.medium === 'board') && l.data && typeof l.data === 'object' ? { legacy: { medium: l.medium as 'graphic' | 'board', data: l.data, at: Number.isFinite(l.at) ? Number(l.at) : 0 } } : {}))(obj(r.legacy)),
     ...((ln) => (ln ? { systemLink: ln } : {}))(normalizeSystemLink(r.systemLink)),
+    ...(typeof r.companyId === 'string' && /^co_[A-Za-z0-9_-]{4,64}$/.test(r.companyId) ? { companyId: r.companyId } : {}),
     ...((st) => (st ? { studio: st } : {}))(normalizeStudio(r.studio)),
     artifact: normalizeArtifact(r.artifact),
     cards,
@@ -1221,6 +1226,7 @@ export function summarize(p: DesignProject): ProjectSummary {
     id: p.id,
     name: p.name,
     mode: p.mode,
+    ...(p.companyId ? { companyId: p.companyId } : {}),
     ...(p.medium === 'graphic' ? { graphic: g?.brief?.kind ?? 'graphic' } : ds ? { graphic: ds.kind } : {}),
     ...(bd ? { board: bd.materials.length } : {}),
     intent: p.intent.slice(0, 160),
