@@ -11,9 +11,14 @@
 // The shape is the one the existing chat endpoint already accepts as `objective` (lib/logos6/objective.ts
 // sanitizeObjectiveTurn), so no change to the assistant is needed: it is re-sanitised there like every other field.
 // Decisions the person has not accepted are never given as decided — they are listed as undecided questions.
+// Artifacts are said by what they hold and their shared values now (from the composition's structure, never a
+// picture of it); the full description of one goes with a question asked about it (Point & Ask: compose.ts).
 
 import { ancestorsOf, indexNodes } from './ops';
 import type { NodeRow, RelationRow } from './model';
+import { sanitizeComposition } from './primitives';
+import { describeComposition, evaluateScope, summarize } from './compose';
+import { formatNumber } from './expr';
 
 export interface ContextTurn {
   objective: {
@@ -48,6 +53,22 @@ function knowledgeLine(n: NodeRow): string {
   const o = n.provenance?.origin;
   const from = o === 'ai' ? ' (AI-generated)' : o === 'external' ? ` (source: ${n.provenance.source?.label || 'external'})` : ' (their own)';
   return cut(n.title, 70) + from;
+}
+
+/** What an artifact is, in a line: its title, what it is made of, and its shared values now. */
+export function artifactLine(n: NodeRow): string {
+  const c = sanitizeComposition(n.content);
+  const vars = c.variables.slice(0, 4).map((v) => `${v.name} = ${v.kind === 'boolean' ? (v.value ? 'on' : 'off') : formatNumber(v.value)}`);
+  return `${n.title} (${summarize(c).toLowerCase()}${vars.length ? `; ${vars.join(', ')}` : ''})`;
+}
+
+/**
+ * What the assistant is told about an artifact a question is asked about (its "this"): what it is made of, then its
+ * shared values and each primitive's state in reading order — from the composition's structure, not a picture.
+ */
+export function artifactFacts(n: NodeRow, max = 12): string[] {
+  const c = sanitizeComposition(n.content);
+  return [`An artifact made of ${summarize(c).toLowerCase()}`, ...describeComposition(c, evaluateScope(c), max - 1)];
 }
 
 /**
@@ -113,7 +134,7 @@ export function contextFor(nodes: NodeRow[], relations: RelationRow[], conversat
         .map((q) => cut(str(q.content?.resolution) ? `${q.title} — ${str(q.content.resolution)}` : q.title, 90))
         .slice(0, 6),
       sources: of('knowledge').filter((k) => k.state !== 'superseded').map(knowledgeLine).slice(0, 10),
-      artifacts: of('artifact').map((a) => cut(a.title, 90)).slice(0, 8),
+      artifacts: of('artifact').map((a) => cut(artifactLine(a), 90)).slice(0, 8),
       quizzes: [],
       threads: [],
       recent: [],

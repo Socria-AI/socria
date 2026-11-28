@@ -1,6 +1,7 @@
 'use client';
 // components/new-logos/NodeView.tsx — one node, opened. An objective opens as its own matrix (with its outcome and
-// description above it); a question, a piece of knowledge, a decision or an artifact opens in its editor. Beside each:
+// description above it); a question, a piece of knowledge or a decision opens in its editor; an artifact shows its
+// composition live, with the way to its own canvas where it is composed. Beside each:
 // what it is related to, where it came from, and its history.
 //
 // Edits save as they are made (on leaving a field, or a moment after typing stops in a long text), against the node's
@@ -10,7 +11,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ARTIFACT_SUBTYPES,
   KNOWLEDGE_KINDS,
   RELATION_KINDS,
   RELATION_LABEL,
@@ -21,8 +21,10 @@ import {
 } from '@/lib/new-logos/model';
 import { ancestorsOf, indexNodes } from '@/lib/new-logos/ops';
 import { useNL } from './state';
+import { sanitizeComposition } from '@/lib/new-logos/primitives';
+import { summarize } from '@/lib/new-logos/compose';
+import { Surface } from './primitives/Surface';
 import { Matrix, ObjectivePicker, cap, origin } from './Matrix';
-import { Prose } from './Prose';
 import { ConfirmDialog, Crumbs, Dialog, Glyph, InlineText, Menu, nodeHref, nodeTitle, typeLabel, when } from './ui';
 
 type Json = Record<string, unknown>;
@@ -587,39 +589,22 @@ function DecisionBody({ node }: { node: NodeRow }) {
 }
 
 function ArtifactBody({ node }: { node: NodeRow }) {
-  const save = useSaver(node);
-  const [preview, setPreview] = useState(false);
-  const archived = node.archived_at !== null;
-  const body = String(node.content.body ?? '');
+  const comp = sanitizeComposition(node.content);
   return (
     <div className="nl-form">
       <div className="nl-row">
-        <select className="nl-select" style={{ width: 'auto' }} value={String(node.content.subtype ?? 'document')} disabled={archived} onChange={(e) => void save({ content: { subtype: e.target.value } })} aria-label="Artifact type">
-          {ARTIFACT_SUBTYPES.map((s) => (
-            <option key={s.id} value={s.id} disabled={!s.available}>
-              {s.label}
-              {s.available ? '' : ' (not available yet)'}
-            </option>
-          ))}
-        </select>
-        <span className="nl-grow" />
-        <div className="nl-seg" role="group" aria-label="View">
-          <button type="button" aria-pressed={!preview} onClick={() => setPreview(false)}>
-            Edit
-          </button>
-          <button type="button" aria-pressed={preview} onClick={() => setPreview(true)}>
-            Preview
-          </button>
-        </div>
+        <span className="nl-hint nl-grow">
+          {summarize(comp)}
+          {comp.variables.length ? ` · shared variables: ${comp.variables.map((v) => v.name).join(', ')}` : ''}
+        </span>
+        <Link className="nl-btn is-primary" href={`/new-logos/a/${encodeURIComponent(node.id)}`}>
+          Open the artifact
+        </Link>
       </div>
-      {preview ? (
-        <div className="nl-tile" style={{ padding: 20, minHeight: 420 }}>
-          {body.trim() ? <Prose text={body} /> : <p className="nl-hint">Nothing written yet.</p>}
-        </div>
-      ) : (
-        <TextArea label="Document" value={body} rows={20} mono debounce={1200} placeholder={'# Heading\n\nWrite in plain text or Markdown. Maths in $…$ or $$…$$.'} onSave={(v) => void save({ content: { body: v } })} />
-      )}
-      <p className="nl-hint">Saved as you type. Earlier versions are kept under History.</p>
+      <div className="nl-tile nl-art-preview">
+        <Surface node={node} />
+      </div>
+      <p className="nl-hint">Controls, tables and text work here too. Open the artifact to arrange it and to add or remove primitives. Earlier versions are kept under History.</p>
     </div>
   );
 }

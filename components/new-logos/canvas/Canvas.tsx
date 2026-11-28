@@ -5,7 +5,8 @@
 // pointer; the wheel or a two-finger scroll pans; keys pan, zoom and fit), objects placed in plane coordinates and
 // moved by dragging their handle (a press that does not move is a click), connections drawn between objects'
 // measured edges with their meaning in words, a handle to drag from one object to another to connect them, and a
-// double-click on the empty plane to make something there. What the objects ARE, and what a connection means, is the
+// double-click on the empty plane to make something there. An object may have a fixed size and a handle to resize it
+// by (an artifact's primitives). What the objects ARE, and what a connection means, is the
 // workspace's business: this is presentation and direct manipulation, nothing more.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -13,8 +14,12 @@ import { CANVAS_LIMITS, DEFAULT_SIZE, connector, fitView, type Box, type CanvasL
 
 export interface CanvasObject {
   ref: string;
-  /** width in plane units (height follows the content) */
+  /** width in plane units */
   width: number;
+  /** height in plane units; without it the height follows the content */
+  height?: number;
+  /** offers a handle ([data-resize]) to resize it by */
+  resizable?: boolean;
   /** read aloud for the object */
   label: string;
   /** offers a handle to drag a connection from */
@@ -44,6 +49,10 @@ export interface CanvasProps {
   /** a double-click (or the add button) on the empty plane, at a plane point and a screen point */
   onCreateAt?: (at: { x: number; y: number }, screen: { x: number; y: number }) => void;
   onConnect?: (from: string, to: string) => void;
+  /** an object resized by its handle, to a size in plane units */
+  onResize?: (ref: string, w: number, h: number) => void;
+  /** a file dropped on the plane, at a plane point */
+  onDropFiles?: (files: File[], at: { x: number; y: number }) => void;
   /** centre the camera on this object (changes of `nonce` repeat it) */
   focus?: { ref: string; nonce: number } | null;
   empty?: ReactNode;
@@ -69,9 +78,10 @@ export function Canvas(p: CanvasProps) {
   viewRef.current = view;
   const [sizes, setSizes] = useState<Record<string, { w: number; h: number }>>({});
   const [drag, setDrag] = useState<{ ref: string; x: number; y: number } | null>(null);
+  const [resizing, setResizing] = useState<{ ref: string; w: number; h: number } | null>(null);
   const [linking, setLinking] = useState<{ from: string; x: number; y: number } | null>(null);
   const [hoverTarget, setHoverTarget] = useState<string | null>(null);
-  const gesture = useRef<{ kind: 'pan' | 'drag' | 'link' | 'pinch'; [k: string]: unknown } | null>(null);
+  const gesture = useRef<{ kind: 'pan' | 'drag' | 'link' | 'pinch' | 'resize'; [k: string]: unknown } | null>(null);
   const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
   const viewTimer = useRef<number | null>(null);
   const onViewRef = useRef(p.onView);
@@ -87,10 +97,13 @@ export function Canvas(p: CanvasProps) {
     (ref: string): Box | null => {
       const it = drag?.ref === ref ? { x: drag.x, y: drag.y } : p.layout.items[ref];
       if (!it) return null;
-      const s = sizes[ref] ?? { w: p.objects.find((o) => o.ref === ref)?.width ?? DEFAULT_SIZE.w, h: DEFAULT_SIZE.h };
+      if (resizing?.ref === ref) return { x: it.x, y: it.y, w: resizing.w, h: resizing.h };
+      const o = p.objects.find((x) => x.ref === ref);
+      if (o?.height) return { x: it.x, y: it.y, w: o.width, h: o.height };
+      const s = sizes[ref] ?? { w: o?.width ?? DEFAULT_SIZE.w, h: DEFAULT_SIZE.h };
       return { x: it.x, y: it.y, w: s.w, h: s.h };
     },
-    [drag, p.layout.items, sizes, p.objects]
+    [drag, resizing, p.layout.items, sizes, p.objects]
   );
 
   // the first view: the saved one, or everything fitted once the objects have a size
@@ -214,8 +227,18 @@ export function Canvas(p: CanvasProps) {
       hostRef.current?.setPointerCapture(e.pointerId);
       return;
     }
-    const handle = t.closest<HTMLElement>('[data-drag]');
+    const grip = t.closest<HTMLElement>('[data-resize]');
     const obj = t.closest<HTMLElement>('[data-ref]');
+    if (grip && obj && p.onResize) {
+      const ref = obj.dataset.ref as string;
+      const o = p.objects.find((x) => x.ref === ref);
+      const at = toPlane(e.clientX, e.clientY);
+      gesture.current = { kind: 'resize', ref, sx: at.x, sy: at.y, w0: o?.width ?? obj.offsetWidth, h0: o?.height ?? obj.offsetHeight };
+      hostRef.current?.setPointerCapture(e.pointerId);
+      e.preventDefault();
+      return;
+    }
+    const handle = t.closest<HTMLElement>('[data-drag]');
     if (obj && handle && !t.closest(INTERACTIVE)) {
       const ref = obj.dataset.ref as string;
       const it = p.layout.items[ref] ?? { x: 0, y: 0 };
@@ -266,6 +289,11 @@ export function Canvas(p: CanvasProps) {
       setDrag({ ref: g.ref as string, x: Math.round(at.x - (g.dx as number)), y: Math.round(at.y - (g.dy as number)) });
       return;
     }
+    if (g.kind === 'resize') {
+      const at = toPlane(e.clientX, e.clientY);
+      setResizing({ ref: g.ref as string, w: Math.max(120, Math.round((g.w0 as number) + at.x - (g.sx as number))), h: Math.max(48, Math.round((g.h0 as number) + at.y - (g.sy as number))) });
+      return;
+    }
     if (g.kind === 'link') {
       const at = toPlane(e.clientX, e.clientY);
       setLinking({ from: g.from as string, ...at });
@@ -301,6 +329,12 @@ export function Canvas(p: CanvasProps) {
       }
       setDrag(null);
       p.onSelect(ref);
+      return;
+    }
+    if (g.kind === 'resize') {
+      const r = resizing;
+      setResizing(null);
+      if (r && r.ref === g.ref) p.onResize?.(r.ref, r.w, r.h);
       return;
     }
     if (g.kind === 'link') {
@@ -372,6 +406,17 @@ export function Canvas(p: CanvasProps) {
       onPointerCancel={onPointerUp}
       onDoubleClick={onDoubleClick}
       onKeyDown={onKeyDown}
+      onDragOver={p.onDropFiles ? (e) => e.dataTransfer.types.includes('Files') && e.preventDefault() : undefined}
+      onDrop={
+        p.onDropFiles
+          ? (e) => {
+              const files = [...e.dataTransfer.files];
+              if (!files.length) return;
+              e.preventDefault();
+              p.onDropFiles?.(files, toPlane(e.clientX, e.clientY));
+            }
+          : undefined
+      }
       style={{ backgroundPosition: `${v.x}px ${v.y}px`, backgroundSize: `${24 * v.k}px ${24 * v.k}px` }}
     >
       <div className="nl-cv-plane" style={{ transform: `translate(${v.x}px, ${v.y}px) scale(${v.k})` }}>
@@ -403,11 +448,15 @@ export function Canvas(p: CanvasProps) {
               role="group"
               aria-label={o.label}
               className={`nl-cv-obj${o.className ? ` ${o.className}` : ''}${p.selected === o.ref ? ' is-selected' : ''}${drag?.ref === o.ref ? ' is-dragging' : ''}${hoverTarget === o.ref ? ' is-target' : ''}`}
-              style={{ left: it.x, top: it.y, width: o.width }}
+              style={{ left: it.x, top: it.y, width: resizing?.ref === o.ref ? resizing.w : o.width, ...(o.height || resizing?.ref === o.ref ? { height: resizing?.ref === o.ref ? resizing.h : o.height } : {}) }}
               onFocus={() => p.selected !== o.ref && p.onSelect(o.ref)}
             >
               {o.content}
               {o.connectable && p.onConnect ? <span className="nl-cv-connect" data-connect={o.ref} title="Drag to another object to connect them" aria-hidden="true" /> : null}
+              {o.resizable && p.onResize && p.selected === o.ref ? (
+                // the same size on screen at any zoom, so it can always be taken hold of
+                <span className="nl-cv-resize" data-resize title="Drag to resize" aria-hidden="true" style={{ transform: `scale(${Math.min(4, Math.max(1, 1 / v.k))})` }} />
+              ) : null}
             </div>
           );
         })}

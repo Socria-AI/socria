@@ -17,6 +17,11 @@
 //
 // Pure: no I/O, safe on the server and in the browser.
 
+import { cleanText, cleanUrl } from './clean';
+import { sanitizeComposition } from './primitives';
+
+export { cleanText, cleanUrl };
+
 export const NODE_TYPES = ['objective', 'conversation', 'question', 'knowledge', 'decision', 'artifact'] as const;
 export type NodeType = (typeof NODE_TYPES)[number];
 export const isNodeType = (v: unknown): v is NodeType => typeof v === 'string' && (NODE_TYPES as readonly string[]).includes(v);
@@ -86,27 +91,10 @@ export const RELATION_LABEL: Record<RelationKind, string> = {
 };
 
 /**
- * Artifact subtypes. The architecture holds many; the first release renders one. A subtype that is not available is
- * listed (so the shape is visible) but cannot be created.
+ * An artifact is a COMPOSITION of visual primitives (text, equations, controls, plots, tables, relationship graphs,
+ * diagrams, media) and the shared variables they read: lib/new-logos/primitives.ts says what each holds, compose.ts
+ * how they depend on one another, artifact-ops.ts how they are changed. The node keeps the composition as its content.
  */
-export const ARTIFACT_SUBTYPES = [
-  { id: 'document', label: 'Document', available: true },
-  { id: 'table', label: 'Table', available: false },
-  { id: 'diagram', label: 'Diagram', available: false },
-  { id: 'visualization', label: 'Visualisation', available: false },
-  { id: 'model', label: 'Mathematical model', available: false },
-  { id: 'simulation', label: 'Simulation', available: false },
-  { id: 'calculator', label: 'Calculator', available: false },
-  { id: 'dataset', label: 'Dataset', available: false },
-  { id: 'code', label: 'Code', available: false },
-  { id: 'prototype', label: 'Prototype', available: false },
-  { id: 'design', label: 'Design', available: false },
-  { id: 'structure', label: 'Structural representation', available: false },
-] as const;
-export type ArtifactSubtype = (typeof ARTIFACT_SUBTYPES)[number]['id'];
-export const availableSubtype = (v: unknown): v is ArtifactSubtype =>
-  ARTIFACT_SUBTYPES.some((s) => s.id === v && s.available);
-
 export const KNOWLEDGE_KINDS = ['finding', 'evidence', 'observation', 'research', 'understanding'] as const;
 export type KnowledgeKind = (typeof KNOWLEDGE_KINDS)[number];
 
@@ -177,29 +165,8 @@ export interface VersionRow {
 
 // ── cleaning ─────────────────────────────────────────────────────────
 
-/** A string, trimmed of control characters and capped; anything else is ''. */
-export function cleanText(v: unknown, max: number, opts: { multiline?: boolean } = {}): string {
-  if (typeof v !== 'string') return '';
-  // eslint-disable-next-line no-control-regex
-  let s = v.replace(opts.multiline ? /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g : /[\u0000-\u001F\u007F]+/g, opts.multiline ? '' : ' ');
-  if (!opts.multiline) s = s.replace(/\s+/g, ' ').trim();
-  return s.length > max ? s.slice(0, max) : s;
-}
-
 const cleanList = (v: unknown): string[] =>
   Array.isArray(v) ? v.map((x) => cleanText(x, LIMITS.item)).filter(Boolean).slice(0, LIMITS.items) : [];
-
-/** http(s) only: never a script address. */
-export function cleanUrl(v: unknown): string | undefined {
-  const s = cleanText(v, LIMITS.url);
-  if (!s) return undefined;
-  try {
-    const u = new URL(s);
-    return u.protocol === 'http:' || u.protocol === 'https:' ? u.toString() : undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 /** An id this system made, or a canonical conversation id: letters, digits, _ and -, and not too long. */
 export const cleanId = (v: unknown): string | null => (typeof v === 'string' && /^[A-Za-z0-9_-]{1,120}$/.test(v) ? v : null);
@@ -246,10 +213,9 @@ export function sanitizeContent(type: NodeType, raw: unknown): Record<string, un
         alternatives: cleanList(r.alternatives),
         uncertainties: cleanList(r.uncertainties),
       };
-    case 'artifact': {
-      const subtype = availableSubtype(r.subtype) ? r.subtype : 'document';
-      return { subtype, format: 'markdown', body: cleanText(r.body, LIMITS.document, { multiline: true }) };
-    }
+    case 'artifact':
+      // a composition; a Markdown document from before compositions is read as one text primitive
+      return sanitizeComposition(r) as unknown as Record<string, unknown>;
   }
 }
 

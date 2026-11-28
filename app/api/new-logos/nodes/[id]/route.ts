@@ -2,10 +2,12 @@
 // GET    /api/new-logos/nodes/:id → the node and its kept versions
 // PATCH  /api/new-logos/nodes/:id → one action: update | move | reorder | archive | restore | accept | reject | reopen | restore-version
 // DELETE /api/new-logos/nodes/:id → delete for good (archived and empty only; a conversation node at any time —
-//                                   the conversation itself is never touched)
+//                                   the conversation itself is never touched). An artifact's pictures that nothing
+//                                   else shows are released with it.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { body, reply, signedIn, unauthorized, withStore } from '@/lib/new-logos/http';
+import { releaseArtifactMedia } from '@/lib/new-logos/media-store';
 import { cleanId } from '@/lib/new-logos/model';
 import {
   archiveNode,
@@ -67,5 +69,12 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 export async function DELETE(_req: NextRequest, { params }: Ctx) {
   const userId = signedIn();
   if (!userId) return unauthorized();
-  return withStore(async (store) => reply(await deleteNode(store, userId, params.id), 'deleted'), true);
+  return withStore(async (store) => {
+    const id = cleanId(params.id);
+    const before = id ? (await store.nodes(userId)).find((n) => n.id === id) : undefined;
+    const versions = before?.type === 'artifact' ? await store.versions(userId, before.id) : [];
+    const r = await deleteNode(store, userId, params.id);
+    if (r.ok && before?.type === 'artifact') await releaseArtifactMedia(store, userId, before, versions);
+    return reply(r, 'deleted');
+  }, true);
 }

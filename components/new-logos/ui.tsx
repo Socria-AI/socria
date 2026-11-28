@@ -77,6 +77,8 @@ export function nodeTitle(n: NodeRow, conversations: Map<string, Conversation>):
 
 export function nodeHref(n: NodeRow): string {
   if (n.type === 'conversation' && n.conversation_id) return `/new-logos/c/${encodeURIComponent(n.conversation_id)}`;
+  // an artifact is its composition: it opens on its own canvas (its details are a link from there)
+  if (n.type === 'artifact') return `/new-logos/a/${encodeURIComponent(n.id)}`;
   return `/new-logos/n/${encodeURIComponent(n.id)}`;
 }
 

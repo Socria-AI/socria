@@ -12,7 +12,9 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
-import { ARTIFACT_SUBTYPES, NODE_TYPES, TYPE_LABEL, type NodeRow, type NodeType } from '@/lib/new-logos/model';
+import { NODE_TYPES, TYPE_LABEL, type NodeRow, type NodeType } from '@/lib/new-logos/model';
+import { STARTERS, STARTER_LABEL, sanitizeComposition, starterComposition, type Starter } from '@/lib/new-logos/primitives';
+import { summarize } from '@/lib/new-logos/compose';
 import { childrenOf, indexNodes, isWithin } from '@/lib/new-logos/ops';
 import { displayTitle, type Conversation } from '@/lib/new-logos/convo';
 import { useNL } from './state';
@@ -123,8 +125,16 @@ function meta(n: NodeRow, kids: NodeRow[], conv: Conversation | undefined): stri
     case 'decision':
       return [n.state === 'accepted' ? 'Accepted by you' : cap(n.state), ...(n.provenance.origin === 'ai' ? ['Proposed by the assistant'] : [])];
     case 'artifact':
-      return [ARTIFACT_SUBTYPES.find((s) => s.id === n.content.subtype)?.label ?? 'Document', cap(n.state)];
+      return [summarize(sanitizeComposition(n.content)), cap(n.state)];
   }
+}
+
+/** An artifact's tile, in words: the first line of its text, or its description. */
+function artifactTileText(n: NodeRow): string {
+  const c = sanitizeComposition(n.content);
+  const text = c.primitives.find((p) => p.type === 'text' && p.data.body.trim());
+  const first = text && text.type === 'text' ? text.data.body.split('\n').find((l) => l.trim()) ?? '' : '';
+  return first.replace(/\{\{[^}]*\}\}/g, '…').replace(/^#+\s*/, '') || n.description;
 }
 
 export const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1).replace(/_/g, ' ') : s);
@@ -175,7 +185,7 @@ function Tile({
         },
       }
     : {};
-  const body = node.type === 'artifact' ? String(node.content.body ?? '').split('\n').find((l) => l.trim()) : node.type === 'knowledge' ? String(node.content.body ?? '') : node.description;
+  const body = node.type === 'artifact' ? artifactTileText(node) : node.type === 'knowledge' ? String(node.content.body ?? '') : node.description;
   return (
     <div
       className={`nl-tile is-${node.type}${over ? ' is-drop' : ''}${dragging === node.id ? ' is-dragging' : ''}${node.type === 'conversation' && !conv ? ' is-unavailable' : ''}`}
@@ -265,6 +275,7 @@ function CreateForm({ parentId, onClose }: { parentId: string | null; onClose: (
   const { createNode, setup, say } = useNL();
   const router = useRouter();
   const [type, setType] = useState<NodeType>('objective');
+  const [starter, setStarter] = useState<Starter>('text');
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -275,7 +286,7 @@ function CreateForm({ parentId, onClose }: { parentId: string | null; onClose: (
       return;
     }
     setBusy(true);
-    const r = await createNode({ type, title, parentId, ...(type === 'artifact' ? { content: { subtype: 'document', body: '' } } : {}) });
+    const r = await createNode({ type, title, parentId, ...(type === 'artifact' ? { content: starterComposition(starter) } : {}) });
     setBusy(false);
     if (!r.ok || !r.node) return say(r.error ?? 'Could not create it.');
     onClose();
@@ -322,6 +333,15 @@ function CreateForm({ parentId, onClose }: { parentId: string | null; onClose: (
             aria-label={`${typeLabel(type)} title`}
             style={{ minWidth: 220 }}
           />
+          {type === 'artifact' ? (
+            <select className="nl-select" style={{ width: 'auto' }} value={starter} onChange={(e) => setStarter(e.target.value as Starter)} aria-label="What the artifact begins with">
+              {STARTERS.map((k) => (
+                <option key={k} value={k}>
+                  Begin with: {STARTER_LABEL[k]}
+                </option>
+              ))}
+            </select>
+          ) : null}
           <button type="submit" className="nl-btn is-primary" disabled={busy || !title.trim()}>
             Create
           </button>

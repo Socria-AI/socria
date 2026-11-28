@@ -15,6 +15,11 @@
 //   accept action does, and it records when (provenance.approvedAt). An AI-proposed decision therefore can never
 //   appear as an approved one without the person's act.
 //
+//   AN ARTIFACT CHANGES BY OPERATIONS. Its content is a composition of primitives (lib/new-logos/primitives.ts),
+//   changed through the validated operation vocabulary (artifact-ops.ts) applied to whatever is stored when the batch
+//   arrives — so concurrent edits to different primitives both land. A burst of such edits keeps one version (the state
+//   before the burst), not one per slider movement.
+//
 //   EDITS ARE VERSIONED. Each change to what a node says (title, description, content, state, parent) keeps the
 //   previous state as a version, the last LIMITS.versionsKept of them. Writes are compare-and-swap on the node's
 //   version, so an edit made from a stale copy is refused ("conflict") instead of overwriting a newer one.
@@ -39,6 +44,8 @@ import {
   type VersionRow,
 } from './model';
 import type { NodeStore } from './store';
+import { applyOps, parseOps } from './artifact-ops';
+import { mediaIdsOf, sanitizeComposition } from './primitives';
 
 export type NlErrorCode =
   | 'invalid'
@@ -278,6 +285,42 @@ export async function updateNode(store: NodeStore, userId: string, id: unknown, 
   }
   if (!Object.keys(patch).length) return done(node);
   return commit(store, node, expected, patch, now, true);
+}
+
+/** How long an artifact must be left alone before its next operation keeps a version of what it was. */
+export const OPS_VERSION_QUIET_MS = 60_000;
+
+/**
+ * Apply a batch of operations to an artifact's composition. The batch is applied to what is stored NOW (re-read and
+ * re-applied if another write lands in between), never to a copy the browser held, so it needs no version from the
+ * caller. Operations whose target is already gone are skipped and listed.
+ */
+export async function applyArtifactOps(store: NodeStore, userId: string, id: unknown, rawOps: unknown, now: number): Promise<Result<{ node: NodeRow; skipped: number[] }>> {
+  const parsed = parseOps(rawOps);
+  if (!parsed.ok) return fail('invalid', parsed.error);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const got = await load(store, userId, id);
+    if (!got.ok) return got;
+    const { node } = got.value;
+    if (node.type !== 'artifact') return fail('invalid', 'Only an artifact holds primitives.');
+    if (node.archived_at !== null) return fail('archived', 'Archived nodes cannot be edited. Restore it first.');
+    const current = sanitizeComposition(node.content);
+    const r = applyOps(current, parsed.ops);
+    if (!r.ok) return fail(r.code === 'limit' ? 'limit' : 'invalid', r.error ?? 'Those changes cannot be made.');
+    if (same(r.comp, current) && same(current, node.content)) return done({ node, skipped: r.skipped });
+    const res = await commit(store, node, node.version, { content: r.comp as unknown as Record<string, unknown> }, now, now - node.updated_at > OPS_VERSION_QUIET_MS);
+    if (res.ok) return done({ node: res.value, skipped: r.skipped });
+    // another write landed between reading and writing: read again and apply to that
+  }
+  return fail('conflict', 'This artifact is being changed quickly somewhere else. Try again in a moment.');
+}
+
+/** Every uploaded picture a node's content, or any of its kept versions, shows. */
+export function nodeMediaIds(node: NodeRow, versions: readonly VersionRow[] = []): string[] {
+  if (node.type !== 'artifact') return [];
+  const ids = new Set(mediaIdsOf(sanitizeComposition(node.content)));
+  for (const v of versions) for (const m of mediaIdsOf(sanitizeComposition(v.snapshot?.content))) ids.add(m);
+  return [...ids];
 }
 
 export async function moveNode(store: NodeStore, userId: string, id: unknown, parent: unknown, version: unknown, now: number): Promise<Result<NodeRow>> {

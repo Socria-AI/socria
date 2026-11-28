@@ -15,6 +15,8 @@ import { childrenOf } from '@/lib/new-logos/ops';
 import { displayTitle, newConversationId, titleFromMessage } from '@/lib/new-logos/convo';
 import { DEFAULT_SIZE, excerpt, factLines, nodeRef, placeMissing, placeNear } from '@/lib/new-logos/canvas';
 import { useNL } from './state';
+import { starterComposition, type Starter } from '@/lib/new-logos/primitives';
+import { artifactFacts } from '@/lib/new-logos/context';
 import { askMessage, reply, saveAsk, type About } from './ask';
 import { Canvas, type CanvasLine, type CanvasObject } from './canvas/Canvas';
 import { CardFrame, ConversationCard, NodeCard } from './canvas/Cards';
@@ -23,7 +25,7 @@ import { ConnectChooser, WorkspaceFrame } from './canvas/Frame';
 import { useCanvasLayout } from './canvas/useLayout';
 import { Crumbs, InlineText, typeLabel } from './ui';
 
-const W = { closed: 290, open: 440, doc: 540, conv: 480 };
+const W = { closed: 290, open: 440, doc: 620, conv: 480 };
 
 export function ObjectiveCanvas({ id }: { id: string }) {
   const { loaded, nodes, relations, conversations, setup, appendTurns, createNode, link, nodeAction, say } = useNL();
@@ -86,7 +88,7 @@ export function ObjectiveCanvas({ id }: { id: string }) {
     return {
       label: n.type === 'conversation' ? displayTitle(conversations.get(n.conversation_id ?? '')?.title) : n.title,
       of: `the objective “${objective?.title ?? ''}”`,
-      lines: [`A ${typeLabel(n.type).toLowerCase()}${n.type === 'decision' || n.type === 'question' ? ` (${n.state})` : ''}`, ...factLines(String(c.body ?? c.rationale ?? c.outcome ?? n.description ?? ''), 6)],
+      lines: n.type === 'artifact' ? artifactFacts(n) : [`A ${typeLabel(n.type).toLowerCase()}${n.type === 'decision' || n.type === 'question' ? ` (${n.state})` : ''}`, ...factLines(String(c.body ?? c.rationale ?? c.outcome ?? n.description ?? ''), 6)],
     };
   };
 
@@ -150,10 +152,10 @@ export function ObjectiveCanvas({ id }: { id: string }) {
     if (!res.ok) setNotes((n) => ({ ...n, [convId]: res.note }));
   }
 
-  async function createAt(type: Makeable, text: string, at: { x: number; y: number }) {
+  async function createAt(type: Makeable, text: string, at: { x: number; y: number }, starter: Starter = 'text') {
     setCreator(null);
     if (type === 'ask') return void askNew(text, { at });
-    const r = await createNode({ type, title: text, parentId: id, ...(type === 'artifact' ? { content: { subtype: 'document', body: '' } } : {}) });
+    const r = await createNode({ type, title: text, parentId: id, ...(type === 'artifact' ? { content: starterComposition(starter) } : {}) });
     if (!r.ok || !r.node) return say(r.error ?? null);
     L.setItem(nodeRef(r.node.id), { ...placeNear(layout, at, { w: type === 'artifact' ? W.doc : W.open, h: 360 }, sizeOf), open: type !== 'objective' });
   }
@@ -278,7 +280,7 @@ export function ObjectiveCanvas({ id }: { id: string }) {
           Loading…
         </p>
       )}
-      {creator ? <Creator screen={creator.screen} types={['ask', 'question', 'knowledge', 'decision', 'artifact', 'objective']} onClose={() => setCreator(null)} onSubmit={(t, text) => void createAt(t, text, creator.at)} /> : null}
+      {creator ? <Creator screen={creator.screen} types={['ask', 'question', 'knowledge', 'decision', 'artifact', 'objective']} onClose={() => setCreator(null)} onSubmit={(t, text, starter) => void createAt(t, text, creator.at, starter)} /> : null}
       {connecting ? (
         <ConnectChooser
           screen={connecting.screen}

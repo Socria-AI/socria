@@ -8,7 +8,9 @@
 //     between, the turns of both are kept;
 //   • placing a conversation in an objective, or removing that placement, never touches its messages or its row;
 //   • one account cannot see, place, edit or be told about another's conversations or nodes;
-//   • before the migration has run, organisation answers { setup: false } and conversations keep working.
+//   • before the migration has run, organisation answers { setup: false } and conversations keep working;
+//   • an artifact's composition changes only through validated operations, applied to what is stored, owner-scoped;
+//   • the artifact picture routes refuse what is not theirs to keep or show.
 
 import { build } from 'esbuild';
 import { mkdirSync, rmSync } from 'node:fs';
@@ -44,6 +46,9 @@ const ROUTES = [
   ['rel', 'app/api/new-logos/relations/[id]/route.ts'],
   ['ctx', 'app/api/new-logos/context/route.ts'],
   ['canvas', 'app/api/new-logos/canvas/route.ts'],
+  ['ops', 'app/api/new-logos/nodes/[id]/ops/route.ts'],
+  ['media', 'app/api/new-logos/media/route.ts'],
+  ['mediaOne', 'app/api/new-logos/media/[id]/route.ts'],
   ['helpers', 'lib/new-logos/convo.ts'],
 ];
 for (const [name, file] of ROUTES) {
@@ -257,6 +262,69 @@ console.log('\n=== canvas layouts: presentation, owner-scoped, versioned ===');
   const pw = await putL({ key: 'o:n_whatever', version: 0, layout: { items: {} } });
   ok('before the migration: setup:false, and nothing written (the page keeps it in the browser)', g.status === 200 && g.json.setup === false && pw.status === 503);
   db.absent.delete('nl_canvases');
+}
+
+console.log('\n=== artifacts: compositions changed by operations ===');
+{
+  as('una');
+  const ops = (id, body) => call(R.ops.POST, 'POST', `/api/new-logos/nodes/${id}/ops`, body, { id });
+  const made = await create({
+    type: 'artifact',
+    title: 'Pricing model',
+    content: {
+      primitives: [{ id: 'p_eqrev', type: 'equation', x: 0, y: 0, data: { name: 'revenue', params: [], expr: 'price * quantity' } }],
+      variables: [{ name: 'price', value: 12, min: 0, max: 50 }, { name: 'quantity', value: 100, min: 0, max: 500 }],
+    },
+  });
+  ok('an artifact is made with its composition, checked', made.status === 200 && made.json.node.content.subtype === 'composition' && made.json.node.content.primitives[0].id === 'p_eqrev' && made.json.node.content.variables.length === 2);
+  const art = made.json.node;
+  const r1 = await ops(art.id, { ops: [{ op: 'var.set', name: 'price', value: 20 }, { op: 'add', primitive: { id: 'p_ctlprice', type: 'control', x: 0, y: 140, data: { variable: 'price' } } }] });
+  ok('a batch of operations is applied and stored', r1.status === 200 && r1.json.node.version === art.version + 1 && db.rows('nl_nodes').find((n) => n.id === art.id).content.variables.find((v) => v.name === 'price').value === 20);
+  const r2 = await ops(art.id, { ops: [{ op: 'move', id: 'p_eqrev', x: 300, y: 10 }] });
+  const r3 = await ops(art.id, { ops: [{ op: 'var.set', name: 'quantity', value: 250 }] });
+  const stored = db.rows('nl_nodes').find((n) => n.id === art.id).content;
+  ok('two batches from different places both land, with no version from the browser', r2.status === 200 && r3.status === 200 && stored.primitives.find((p) => p.id === 'p_eqrev').x === 300 && stored.variables.find((v) => v.name === 'quantity').value === 250);
+  const again = await ops(art.id, { ops: [{ op: 'add', primitive: { id: 'p_ctlprice', type: 'control', x: 999, y: 999, data: { variable: 'price' } } }] });
+  ok('a batch sent twice does nothing the second time (skipped, not duplicated)', again.status === 200 && again.json.skipped.join() === '0' && db.rows('nl_nodes').find((n) => n.id === art.id).content.primitives.filter((p) => p.id === 'p_ctlprice').length === 1);
+  const gone = await ops(art.id, { ops: [{ op: 'remove', id: 'p_nothere' }] });
+  ok('an operation on something already gone is skipped and said', gone.status === 200 && gone.json.skipped.join() === '0');
+  const before = JSON.stringify(db.rows('nl_nodes').find((n) => n.id === art.id));
+  const bad = await ops(art.id, { ops: [{ op: 'var.set', name: 'price', value: 1 }, { op: 'teleport', id: 'p_eqrev' }] });
+  ok('a malformed batch is refused whole (400), nothing changed', bad.status === 400 && JSON.stringify(db.rows('nl_nodes').find((n) => n.id === art.id)) === before);
+  const reserved = await ops(art.id, { ops: [{ op: 'var.add', variable: { name: 'sin', value: 1 } }] });
+  ok('a variable named like a function is refused', reserved.status === 400);
+  const huge = await ops(art.id, { ops: [{ op: 'add', primitive: { type: 'text', data: { body: 'x'.repeat(19_000) } } }] });
+  const huger = await call(R.ops.POST, 'POST', `/api/new-logos/nodes/${art.id}/ops`, { ops: Array.from({ length: 30 }, () => ({ op: 'add', primitive: { type: 'text', data: { body: 'y'.repeat(19_000) } } })) }, { id: art.id });
+  ok('a batch that would make the artifact too large is refused', huge.status === 200 && huger.status === 413);
+  const notArt = await ops(obj.id, { ops: [{ op: 'var.set', name: 'x', value: 1 }] });
+  ok('only an artifact takes operations', notArt.status === 400);
+  as('vic');
+  const theirs = await ops(art.id, { ops: [{ op: 'var.set', name: 'price', value: 0 }] });
+  ok("another account cannot change it (404)", theirs.status === 404 && db.rows('nl_nodes').find((n) => n.id === art.id).content.variables.find((v) => v.name === 'price').value === 20);
+  as(null);
+  ok('signed out: 401', (await ops(art.id, { ops: [{ op: 'var.set', name: 'price', value: 0 }] })).status === 401);
+  as('una');
+  const arch = await patch(art.id, { action: 'archive', version: db.rows('nl_nodes').find((n) => n.id === art.id).version });
+  const onArchived = await ops(art.id, { ops: [{ op: 'var.set', name: 'price', value: 3 }] });
+  ok('an archived artifact is not changed', arch.status === 200 && onArchived.status === 409);
+  db.absent.add('nl_nodes');
+  const noTables = await ops(art.id, { ops: [{ op: 'var.set', name: 'price', value: 3 }] });
+  ok('before the migration: setup:false (503), nothing written', noTables.status === 503 && noTables.json.setup === false);
+  db.absent.delete('nl_nodes');
+
+  // pictures
+  const up = (headers, body) => R.media.POST(new NextRequest('http://localhost/api/new-logos/media', { method: 'POST', headers, body }));
+  as(null);
+  ok('a picture from someone signed out is refused (401)', (await up({ 'x-media-id': 'a'.repeat(32) }, new Uint8Array([1, 2, 3]))).status === 401);
+  as('una');
+  ok('a picture without a proper id is refused (400)', (await up({ 'x-media-id': 'not-an-id' }, new Uint8Array([1, 2, 3]))).status === 400);
+  const html = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+  ok('what is not a PNG, JPEG, GIF or WebP is refused, whatever it claims (415)', (await up({ 'x-media-id': 'b'.repeat(32), 'content-type': 'image/png' }, html)).status === 415);
+  const read = await R.mediaOne.GET(new NextRequest('http://localhost/api/new-logos/media/zz'), { params: { id: 'zz' } });
+  ok('a picture is read only by a proper id', read.status === 400);
+  as(null);
+  const readOut = await R.mediaOne.GET(new NextRequest(`http://localhost/api/new-logos/media/${'c'.repeat(32)}`), { params: { id: 'c'.repeat(32) } });
+  ok('signed out, no picture is shown (401)', readOut.status === 401);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

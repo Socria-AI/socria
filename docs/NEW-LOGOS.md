@@ -56,15 +56,14 @@ internal paths it calls (such as `/api/logos/chat`) are identifiers, not interfa
 | Question | resolution | open, exploring, resolved, dropped |
 | Knowledge | body, kind (finding, evidence, observation, research, understanding) | current, disputed, superseded |
 | Decision | rationale, alternatives, uncertainties | proposed, **accepted**, rejected, superseded |
-| Artifact | subtype, format, body | draft, ready |
+| Artifact | a composition: primitives and the shared variables they read | draft, ready |
 
 **Provenance** records `origin` as human, AI or external. It can also record the source (label and address), the
 conversation and message a node was taken from, and `approvedAt` for decisions.
 
-**Artifacts** have a subtype registry: document, table, diagram, visualisation, mathematical model, simulation,
-calculator, dataset, code, prototype, design, structural representation. The first release renders and edits
-**documents** (Markdown with maths). The other subtypes are listed but cannot be created yet. An artifact is a node of
-its own: it exists apart from the conversation it came from, and other nodes can reference it.
+**Artifacts** are compositions of visual primitives: text, equations, controls, plots, tables, relationship graphs,
+diagrams and media, with shared variables connecting them. See [Primitives and artifacts](#primitives-and-artifacts).
+An artifact is a node of its own. It exists apart from any conversation and other nodes can reference it.
 
 ### Containment and relations are separate
 
@@ -203,7 +202,7 @@ spatial canvas; none of its components or styling are reused.
   - a question's state and resolution;
   - a decision's rationale, with Accept, Reject or Reopen;
   - knowledge you can edit;
-  - a document artifact, written and previewed on the canvas;
+  - an artifact, live: its controls move, its tables take typing, its text is written in place;
   - for a conversation on an objective's canvas, its latest exchanges and a box to continue it.
 - **Relationships.**
   - Drag an object's handle onto another object, then choose what the connection means.
@@ -211,7 +210,8 @@ spatial canvas; none of its components or styling are reused.
   - Lines are labelled in words and also differ by pattern, not only colour: solid for a relation, dashed for "asked
     about", dotted for "kept as".
 - **Making things where you are.** Double-click the empty plane, or press **Add**, to ask the assistant or to place a
-  question, knowledge, a decision, a document or (on an objective) a sub-objective at that point.
+  question, knowledge, a decision, an artifact (begun from a primitive or a small model) or, on an objective, a
+  sub-objective at that point.
 - **Asking in context.** Any object can be asked about:
   - The question goes to the existing chat endpoint with the object as "this". It uses the existing Point & Ask
     contract: the `focus` brief for the current turn, and `about` kept on the message.
@@ -247,7 +247,8 @@ Choosing one brings it into view.
 - Each exchange is an object.
 - Asking from an exchange or a node puts the new exchange beside it.
 - Asking from the empty plane puts it where you clicked.
-- What you keep from an exchange (knowledge, a question, a decision, a document) appears beside it, with provenance.
+- What you keep from an exchange (knowledge, a question, a decision, an artifact) appears beside it, with provenance.
+  A reply kept as an artifact becomes a text primitive in a new composition.
 - A new conversation opens as an empty canvas, ready to ask.
 
 **An objective's canvas** (`ObjectiveCanvas.tsx`, `/new-logos/w/:id`).
@@ -258,6 +259,163 @@ Choosing one brings it into view.
 - Asking from an object starts a conversation about that object, beside it.
 - A conversation's own card continues that conversation.
 
+## Primitives and artifacts
+
+An artifact is not a document of generated HTML. It is a **composition**: native, structured primitives that a person
+works on directly, and the **shared variables** that connect them. In an economic model, for example, the equations,
+the plot, the table and the sliders all read the same price and quantity. Moving the price slider updates every one
+of them, with no message to the assistant.
+
+### The primitives (`lib/new-logos/primitives.ts`)
+
+| Primitive | What it holds | Worked on in place |
+|---|---|---|
+| Text | Markdown with maths; plain, note, callout or annotation (an annotation points at another primitive); `{{expression}}` is a live value | double-click or Edit to write |
+| Equation | a definition (`revenue = price * quantity`), a function (`f(x) = a x^2 + b`) or a bare expression | click to edit the line; a name nobody defines can be made a variable, with a control, in one step |
+| Control | a slider, number field, toggle or choice, bound to a shared variable | move it |
+| Plot | x and y ranges (y fitted or fixed), functions of x, data series read from a table, points worked out from the variables | functions and points written in the legend; hover reads every function's value |
+| Table | text, number and formula columns; rows | type in cells (Enter moves down); add and remove rows and columns |
+| Relationship graph | labelled concepts, and typed relationships that may be directed | double-click to add, drag to move, drag from a concept's circle to connect, label and direct relationships; Arrange lays it out |
+| Diagram | boxes, rounded steps, ellipses, decisions and free labels; connectors with arrows and dash patterns | as the graph, plus resizing shapes and changing their kind |
+| Media | an uploaded image (kept privately under the account) or one by address, with description, caption and source | choose, drop or paste an image, or give its address |
+
+Every primitive has:
+
+- a **persistent identity**, an id unique in its artifact;
+- **structured, serialisable content**: plain JSON, checked by its type's sanitiser (unknown fields dropped, limits
+  held, script and data addresses refused);
+- a **place and size** on the artifact's plane, and an optional label;
+- **references** to other primitives (a plot's table, an annotation's subject), dropped if the target is removed.
+
+The data is never the drawing. Renderers in `components/new-logos/primitives/` draw each primitive from its data, and
+the same renderer serves every place it appears. Equations are drawn by KaTeX from LaTeX written from the expression's
+parsed structure. No markup is ever stored.
+
+### Shared state and reactivity (`lib/new-logos/expr.ts`, `compose.ts`)
+
+**One small expression language** serves equations, plotted functions, table formulas and live values in text. It
+has:
+
+- numbers, names and the operators `+ − × ÷ ^ %`;
+- comparisons, where true is 1;
+- brackets, and implicit multiplication (`2x`, `3(x+1)`);
+- a fixed set of functions, and the constants π, e and τ.
+
+Expressions are **parsed into a tree and evaluated by walking it**. There is no `eval`, no `Function`, and no property
+access. Lookup tables have no prototype, and names that JavaScript objects already have (`constructor`, `__proto__`)
+cannot be given to anything. A name reaches a number or nothing.
+
+Every evaluation has a step budget, so functions calling functions stop at once with "Too much work to work out"
+rather than freezing the page.
+
+Implicit multiplication works at the level of ×. So `2x^2` is 2·x², `x^2y` is x²·y, and `1/2x` is (1/2)·x.
+
+**The scope** is the variables plus every equation's definition, worked out in dependency order. If a definition
+depends on itself, uses a name nobody defines, or takes a variable's name, that equation shows the error in words and
+everything else still works.
+
+Plots, formulas and live text are evaluated against the scope when drawn. Changing a variable therefore changes
+every dependent primitive at once. There are no subscriptions to keep: the dependency is in the data, in the names
+each expression reads.
+
+The same reading of names gives the **references between primitives** (`linksOf`):
+
+- a control *moves* what reads its variable;
+- an equation *gives* its definition to what uses it;
+- a table supplies a plot's data;
+- an annotation points at its subject.
+
+### One operation system (`lib/new-logos/artifact-ops.ts`)
+
+Every change to a composition is a batch of operations from one vocabulary:
+
+- for primitives: `add`, `update`, `move`, `resize`, `remove`, `duplicate`, `order`;
+- for variables: `var.add`, `var.set`, `var.update`, `var.rename`, `var.remove`.
+
+The same pure `applyOps` runs in two places: in the browser for an immediate result, and on the server
+(`POST /api/new-logos/nodes/:id/ops`, `applyArtifactOps`) against the stored composition, which is the truth.
+
+- **Validated.** A malformed batch is refused whole. A batch that would make the artifact too large changes nothing.
+  Variable names are checked.
+- **Concurrent edits both land.** An operation names what it changes, so a batch is applied to whatever is stored
+  when it arrives, and needs no version from the browser. On a lost compare-and-swap it is re-read and re-applied.
+- **Safe to retry.** An operation whose target is already gone is skipped and reported. Adding something that already
+  exists is skipped, so a batch sent twice changes nothing the second time.
+- **Renaming rewrites.** `var.rename` rewrites every use in equations, plots, table formulas, live text and controls.
+  It leaves alone a function parameter or table column of the same name, which are different things there.
+  A rename is refused if the new name would change what something says: a plot's `x`, a function's parameter, or a
+  table column of that name.
+- **A value is only a value.** `var.set` changes the value. A range changes only by `var.update`: a number typed past
+  the range is sent as one `var.update` that widens it. So coalescing a run of values is exact.
+- **Clearing is `null`.** A field is cleared by sending `null`, which survives being sent as JSON; `undefined` would
+  be dropped.
+- **Undoable.** Every operation has an exact inverse (`inverseBatch`). Undo and redo (⌘/Ctrl+Z) send the inverse as an
+  ordinary batch. A held slider or a drag is one step.
+- **Few requests.** The browser coalesces rapid changes before sending (`coalesce`). A slider moved through forty
+  values is one operation.
+- **Optimistic but honest.** Until the server answers, what is shown is the stored composition with the unanswered
+  operations on top. A refused operation stops being shown.
+  - A background refresh never takes back an edit that is still on its way.
+  - An answer older than a version this page has already seen is never shown over a newer one.
+- **Reliable delivery.** Batches are split to fit the server's limits, so edits gathered while offline are never
+  refused for their number.
+  - Only transient failures are retried: no answer, a server error, a write that kept losing a race.
+  - On leaving the page, what is waiting is sent at once and also stays waiting, so a page restored from the browser's
+    back-forward cache sends it again. Every operation is idempotent, so the second delivery changes nothing.
+- **Versioned per burst.** The first operation after a minute of quiet keeps a version (the state before the burst),
+  so history holds editing sessions rather than every slider position.
+
+People edit primitives directly, without the assistant. The assistant is meant to use **the same vocabulary**: it
+will propose operations, checked the same way. Generating artifacts with the assistant is deliberately not built yet.
+
+### Where an artifact appears
+
+- **Its own canvas** (`ArtifactCanvas.tsx`, `/new-logos/a/:id`). The primitives are objects on the spatial canvas:
+  - select by clicking; move by the head; resize by the corner;
+  - duplicate with ⌘/Ctrl+D; remove with Delete, with Undo offered;
+  - a floating panel holds the selected primitive's properties, and another holds the shared variables;
+  - references are drawn as faint lines, named when one end is selected;
+  - double-click or **Add** to put a primitive down; drop or paste an image to add media.
+
+  Where primitives sit is part of the artifact. Only the camera is a layout (`a:<id>` in `nl_canvases`).
+- **The matrix.** An artifact is an artifact node, described by what it holds. Its tile opens its canvas, and its
+  details page shows it live, with relations, provenance and history.
+- **Other canvases.** On a conversation's or an objective's canvas, an open artifact card shows the composition live,
+  scaled to fit (`Surface.tsx`). Its controls, tables and text work there, through the same operations. Arranging
+  is done on its own canvas.
+- **Starting points.** An artifact can begin as text, a single primitive, an empty plane, or a small model: two
+  sliders, a function, its plot with a moving point, and a note with a live value.
+
+### What the assistant is told
+
+The assistant is told the artifact's structured state, never a screenshot.
+
+- **Asking about an artifact** (Point & Ask) sends its state as the focus brief (`artifactFacts`):
+  - what it is made of;
+  - the shared variables and their values;
+  - each primitive's state in reading order: an equation and its value, a slider and its range, a plot's functions
+    and computed points, a table's columns and first rows, a graph's relationships, an image's caption and source.
+- **The objective context** lists each artifact in the objective by what it holds and its values now (`artifactLine`).
+
+Both stay inside the existing chat contracts: twelve lines of at most 220 characters for the focus, and ninety
+characters per artifact for the objective.
+
+### Storage
+
+**No new tables.** A composition is the artifact node's `content` in `nl_nodes`, versioned like every node.
+
+**Uploaded images** go to the account's existing private picture storage, through neutral routes
+(`/api/new-logos/media`). That storage keys each folder by a digest of the account, never its id. It is already
+emptied by account deletion and listed by the export. An image is checked from its bytes (PNG, JPEG, GIF or WebP, 4 MB
+at most) and served only to its owner.
+
+When an artifact is deleted for good, the pictures only it showed, in its content or its kept versions, are removed.
+If any doubt remains, the picture is kept.
+
+Content written before compositions existed (a Markdown document) is read as one text primitive, so nothing is lost
+or needs migrating. It keeps up to 100,000 characters, as before, and its `{{…}}` stay as written rather than becoming
+live values.
+
 ## Server and storage
 
 The API routes:
@@ -266,10 +424,12 @@ The API routes:
 |---|---|
 | `/api/new-logos/nodes` | GET, POST |
 | `/api/new-logos/nodes/:id` | GET (with versions), PATCH (update, move, reorder, archive, restore, accept, reject, reopen, restore-version), DELETE |
+| `/api/new-logos/nodes/:id/ops` | POST (a batch of artifact operations, applied to what is stored) |
+| `/api/new-logos/media`, `/api/new-logos/media/:id` | POST (an image for a media primitive), GET (the owner's own image) |
 | `/api/new-logos/relations` | POST |
 | `/api/new-logos/relations/:id` | DELETE |
 | `/api/new-logos/context` | GET |
-| `/api/new-logos/canvas` | GET, PUT (one canvas's layout: compare-and-swap on its version) |
+| `/api/new-logos/canvas` | GET, PUT (one canvas's layout, or an artifact's camera: compare-and-swap on its version) |
 
 Every query is scoped with `.eq('user_id', userId)`, and the tables are walled by RLS like every other table.
 
@@ -296,12 +456,12 @@ The relaunch gate (`lib/takeover.ts`) treats `/new-logos` as part of the app. Th
   - the context package against the existing objective contract;
   - conversation helpers that never drop a column from a save;
   - the relaunch gate.
-- `test/new-logos-canvas.test.mjs` (35 checks), the spatial layer:
+- `test/new-logos-canvas.test.mjs` (37 checks), the spatial layer:
   - exchanges from messages, with the messages left unchanged;
   - layouts cleaned, placement that never overlaps or moves what is placed;
   - fitting and connectors;
   - an ask from an object meeting the existing Point & Ask contracts.
-- `test/new-logos-e2e.test.mjs` (60 checks), through the real routes (the new ones and the existing conversations
+- `test/new-logos-e2e.test.mjs` (78 checks), through the real routes (the new ones and the existing conversations
   route) with the fake database and fake accounts:
   - before the migration;
   - signed out;
@@ -309,14 +469,30 @@ The relaunch gate (`lib/takeover.ts`) treats `/new-logos` as part of the app. Th
   - placement and context;
   - removal never deleting;
   - another account seeing nothing;
-  - canvas layouts: versioned, cleaned, owner-scoped, never touching a conversation.
+  - canvas layouts: versioned, cleaned, owner-scoped, never touching a conversation;
+  - artifact operations: applied to what is stored, concurrent batches both landing, retries skipped, malformed and
+    oversized batches refused whole, owner-scoped, archived artifacts unchanged;
+  - the picture routes refusing the signed-out, bad ids, and anything that is not an image whatever it claims.
+- `test/new-logos-primitives.test.mjs` (110 checks), primitives and artifacts:
+  - the expression language: precedence, implicit multiplication, errors in words, no way to reach anything but
+    numbers;
+  - every primitive's checks and limits;
+  - shared state in dependency order, with cycles and unknown names said on their equation;
+  - tables, plots and live text reading one scope, so a variable change reaches all of them;
+  - references;
+  - the operation vocabulary, including rename (and refusing a rename that would be captured), clearing by `null`,
+    the size limit, exact coalescing, and exact undo of every kind of batch;
+  - server application with per-burst versions and a lost race re-applied;
+  - what the assistant is told, inside the existing objective and focus contracts.
 
 ## What comes next (deliberately not built)
 
 - autonomous agents and reasoning orchestration;
 - automatic objective breakdown;
-- generating advanced artifacts;
-- artifact renderers beyond documents;
+- the assistant creating and changing primitives (the operation system it will use is built and validated);
+- arbitrary code execution inside artifacts (deliberately absent: the expression language is evaluated, never run);
+- fine-grained table operations (a table edit replaces its rows or columns as one change, so two people typing in
+  different cells of the same table at the same moment keep the later edit);
 - semantic retrieval;
 - collaboration on nodes.
 

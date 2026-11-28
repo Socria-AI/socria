@@ -12,3 +12,9 @@ export * as Canvas from '../../lib/new-logos/canvas';
 export { askMessage } from '../../components/new-logos/ask';
 export { sanitizeFocus, focusBlock } from '../../lib/workspace/focus';
 export { cleanAboutRef, aboutLine } from '../../lib/chat-thread';
+// visual primitives and composable artifacts: the expression language, the primitive model, shared state, operations
+export * as Expr from '../../lib/new-logos/expr';
+export * as Prim from '../../lib/new-logos/primitives';
+export * as Compose from '../../lib/new-logos/compose';
+export * as AOps from '../../lib/new-logos/artifact-ops';
+export { readEquationLine, equationLine } from '../../components/new-logos/primitives/Equation';

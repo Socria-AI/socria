@@ -4,12 +4,15 @@
 // Every object shares one frame: a handle to move it by (its top bar), what kind of thing it is (glyph and word, never
 // colour alone), its title, and a control to open or close it. Closed, an object is a compact summary; open, it is the
 // thing itself, worked on in place: an exchange's whole reply, a question's resolution, a decision to accept, a
-// document to write and preview. Any object can be asked about — the question goes to the assistant with the object
+// composed artifact, live (its controls move, its tables take typing). Any object can be asked about — the question goes to the assistant with the object
 // as its "this", and the answer appears beside it.
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ARTIFACT_SUBTYPES, KNOWLEDGE_KINDS, STATES, type NodeRow, type NodeType } from '@/lib/new-logos/model';
+import { KNOWLEDGE_KINDS, STATES, type NodeRow, type NodeType } from '@/lib/new-logos/model';
+import { sanitizeComposition } from '@/lib/new-logos/primitives';
+import { summarize } from '@/lib/new-logos/compose';
+import { Surface } from '../primitives/Surface';
 import { displayTitle, type Conversation } from '@/lib/new-logos/convo';
 import { excerpt, exchangesOf, type Exchange } from '@/lib/new-logos/canvas';
 import { Prose } from '../Prose';
@@ -124,6 +127,13 @@ export function EditText({ value, onSave, label, placeholder, rows = 3, mono, de
 
 const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
+/** A closed artifact in a few words: its first words of text, or what it is made of. */
+function artifactExcerpt(n: NodeRow): string {
+  const c = sanitizeComposition(n.content);
+  const text = c.primitives.find((p) => p.type === 'text' && p.data.body.trim());
+  return text && text.type === 'text' ? excerpt(text.data.body.replace(/\{\{[^}]*\}\}/g, '…'), 160) : n.description ? excerpt(n.description, 160) : summarize(c);
+}
+
 // ── an exchange: a person's turn and the replies to it ──
 
 export function ExchangeCard({
@@ -229,7 +239,6 @@ export function NodeCard({
 }) {
   const { nodeAction, nodes, say } = useNL();
   const [asking, setAsking] = useState(false);
-  const [preview, setPreview] = useState(false);
   const saveRef = useRef(nodeAction);
   saveRef.current = nodeAction;
   const save = async (fields: Record<string, unknown>) => {
@@ -252,7 +261,7 @@ export function NodeCard({
         : node.type === 'knowledge'
           ? `Knowledge · ${origin}`
           : node.type === 'artifact'
-            ? `${ARTIFACT_SUBTYPES.find((s) => s.id === c.subtype)?.label ?? 'Document'}`
+            ? `Artifact · ${summarize(sanitizeComposition(c)).toLowerCase()}`
             : node.type === 'objective'
               ? `Objective · ${kids} inside`
               : typeLabel(node.type);
@@ -274,7 +283,7 @@ export function NodeCard({
                 </button>
               ) : null}
               <Link href={nodeHref(node)} role="menuitem" className="nl-menu-link" onClick={close}>
-                Open details
+                {node.type === 'artifact' ? 'Open the artifact' : 'Open details'}
               </Link>
               {node.type === 'objective' ? (
                 <Link href={`/new-logos/w/${encodeURIComponent(node.id)}`} role="menuitem" className="nl-menu-link" onClick={close}>
@@ -288,7 +297,7 @@ export function NodeCard({
     >
       {!open ? (
         node.type === 'artifact' ? (
-          <div className="nl-card-summary">{excerpt(body, 160) || 'Empty document'}</div>
+          <div className="nl-card-summary">{artifactExcerpt(node) || 'Open it to see it.'}</div>
         ) : node.type === 'knowledge' ? (
           <div className="nl-card-summary">{excerpt(body, 160)}</div>
         ) : node.type === 'decision' && c.rationale ? (
@@ -348,22 +357,13 @@ export function NodeCard({
           ) : null}
           {node.type === 'artifact' ? (
             <>
+              <Surface node={node} />
               <div className="nl-row">
-                <span className="nl-hint nl-grow">{preview ? 'Preview' : 'Markdown; maths in $…$'}</span>
-                <div className="nl-seg" role="group" aria-label="View">
-                  <button type="button" aria-pressed={!preview} onClick={() => setPreview(false)}>
-                    Edit
-                  </button>
-                  <button type="button" aria-pressed={preview} onClick={() => setPreview(true)}>
-                    Preview
-                  </button>
-                </div>
+                <Link className="nl-btn is-small" href={nodeHref(node)}>
+                  Open the artifact
+                </Link>
+                <span className="nl-hint">to arrange, add or remove what it holds</span>
               </div>
-              {preview ? (
-                <div className="nl-card-doc nl-cv-scroll">{body.trim() ? <Prose text={body} /> : <p className="nl-hint">Nothing written yet.</p>}</div>
-              ) : (
-                <EditText label="Document" value={body} rows={14} mono placeholder="# Heading" onSave={(v) => void save({ content: { body: v } })} />
-              )}
             </>
           ) : null}
           {node.type === 'objective' ? (

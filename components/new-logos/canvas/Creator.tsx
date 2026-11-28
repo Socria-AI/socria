@@ -1,10 +1,12 @@
 'use client';
 // components/new-logos/canvas/Creator.tsx — making something at a place on the canvas: a question to the assistant,
-// or a node of one's own (a question, knowledge, a decision, an artifact, an objective). Opened by a double-click on
+// or a node of one's own (a question, knowledge, a decision, an artifact — begun from a primitive or a small model —
+// an objective). Opened by a double-click on
 // the empty plane or the Add button; it appears where it was asked for, and what it makes appears there too.
 
 import { useEffect, useRef, useState } from 'react';
 import type { NodeType } from '@/lib/new-logos/model';
+import { STARTERS, STARTER_LABEL, type Starter } from '@/lib/new-logos/primitives';
 import { Glyph, typeLabel } from '../ui';
 
 export type Makeable = 'ask' | NodeType;
@@ -16,11 +18,12 @@ const PLACEHOLDER: Record<Makeable, string> = {
   question: 'What is unresolved?',
   knowledge: 'What do you know, or have found?',
   decision: 'What is being decided?',
-  artifact: 'What is this document?',
+  artifact: 'What is this artifact called?',
 };
 
-export function Creator({ screen, types, onSubmit, onClose }: { screen: { x: number; y: number }; types: Makeable[]; onSubmit: (type: Makeable, text: string) => void; onClose: () => void }) {
+export function Creator({ screen, types, onSubmit, onClose }: { screen: { x: number; y: number }; types: Makeable[]; onSubmit: (type: Makeable, text: string, starter?: Starter) => void; onClose: () => void }) {
   const [type, setType] = useState<Makeable>(types[0]);
+  const [starter, setStarter] = useState<Starter>('text');
   const [text, setText] = useState('');
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -40,7 +43,7 @@ export function Creator({ screen, types, onSubmit, onClose }: { screen: { x: num
   const top = typeof window === 'undefined' ? screen.y : Math.max(60, Math.min(screen.y - 20, window.innerHeight - 240));
   const go = () => {
     const t = text.trim();
-    if (t) onSubmit(type, t);
+    if (t) onSubmit(type, t, type === 'artifact' ? starter : undefined);
   };
   return (
     <div ref={ref} className="nl-creator nl-cv-ui" style={{ left, top, width: `min(${w}px, calc(100vw - 24px))` }} role="dialog" aria-label="Make something here">
@@ -66,8 +69,20 @@ export function Creator({ screen, types, onSubmit, onClose }: { screen: { x: num
           }
         }}
       />
+      {type === 'artifact' ? (
+        <label className="nl-row nl-hint">
+          <span>Begin with</span>
+          <select className="nl-select" style={{ width: 'auto' }} value={starter} onChange={(e) => setStarter(e.target.value as Starter)} aria-label="What the artifact begins with">
+            {STARTERS.map((k) => (
+              <option key={k} value={k}>
+                {STARTER_LABEL[k]}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       <div className="nl-row" style={{ justifyContent: 'flex-end' }}>
-        <span className="nl-hint nl-grow">{type === 'ask' ? 'The answer appears here, on the canvas.' : 'It is placed here.'}</span>
+        <span className="nl-hint nl-grow">{type === 'ask' ? 'The answer appears here, on the canvas.' : type === 'artifact' ? 'Placed here; open it to compose.' : 'It is placed here.'}</span>
         <button type="button" className="nl-btn is-quiet is-small" onClick={onClose}>
           Cancel
         </button>

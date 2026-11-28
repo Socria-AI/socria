@@ -15,6 +15,8 @@ import { RELATION_LABEL, type NodeRow, type NodeType, type RelationKind } from '
 import { displayTitle, newConversationId, placementOf, titleFromMessage, type StoredMessage } from '@/lib/new-logos/convo';
 import { DEFAULT_SIZE, exchangeRef, exchangesOf, excerpt, factLines, nodeRef, placeMissing, placeNear, type Exchange } from '@/lib/new-logos/canvas';
 import { useNL } from './state';
+import { starterComposition, type Starter } from '@/lib/new-logos/primitives';
+import { artifactFacts } from '@/lib/new-logos/context';
 import { askMessage, reply, saveAsk, type About } from './ask';
 import { Canvas, type CanvasLine, type CanvasObject } from './canvas/Canvas';
 import { ExchangeCard, NodeCard } from './canvas/Cards';
@@ -24,7 +26,7 @@ import { useCanvasLayout } from './canvas/useLayout';
 import { ObjectivePicker } from './Matrix';
 import { Crumbs, InlineText, typeLabel, when } from './ui';
 
-const W = { exchange: 320, exchangeOpen: 480, node: 280, nodeOpen: 420, docOpen: 540 };
+const W = { exchange: 320, exchangeOpen: 480, node: 280, nodeOpen: 420, docOpen: 620 };
 
 export function ConversationCanvas({ id }: { id: string }) {
   const nl = useNL();
@@ -175,7 +177,7 @@ export function ConversationCanvas({ id }: { id: string }) {
       title: excerpt(text, 120) || typeLabel(type),
       parentId: container?.id ?? null,
       provenance: { origin: which === 'reply' ? 'ai' : 'human', conversationId: convId, ...(m.id ? { messageId: m.id } : {}) },
-      ...(type === 'knowledge' ? { content: { body: text, kind: 'finding' } } : type === 'artifact' ? { content: { subtype: 'document', body: text } } : type === 'decision' ? { content: { rationale: text } } : { description: text }),
+      ...(type === 'knowledge' ? { content: { body: text, kind: 'finding' } } : type === 'artifact' ? { content: starterComposition('text', text) } : type === 'decision' ? { content: { rationale: text } } : { description: text }),
     });
     if (!r.ok || !r.node) return say(r.error ?? null);
     const ref = nodeRef(r.node.id);
@@ -185,12 +187,12 @@ export function ConversationCanvas({ id }: { id: string }) {
     say(`Kept as ${typeLabel(type).toLowerCase()}${type === 'decision' && which === 'reply' ? ', a proposal until you accept it' : ''}.`);
   }
 
-  async function createAt(type: Makeable, text: string, at: { x: number; y: number }) {
+  async function createAt(type: Makeable, text: string, at: { x: number; y: number }, starter: Starter = 'text') {
     setCreator(null);
     if (type === 'ask') return void ask(text, { at });
     if (setup === false) return say('Questions, knowledge, decisions and artifacts are not available until their storage is set up.');
     if (!created && !conv) return say('Ask something first: the conversation begins with its first question.');
-    const r = await createNode({ type, title: text, parentId: container?.id ?? null, provenance: { origin: 'human', conversationId: convId }, ...(type === 'artifact' ? { content: { subtype: 'document', body: '' } } : {}) });
+    const r = await createNode({ type, title: text, parentId: container?.id ?? null, provenance: { origin: 'human', conversationId: convId }, ...(type === 'artifact' ? { content: starterComposition(starter) } : {}) });
     if (!r.ok || !r.node) return say(r.error ?? null);
     L.setItem(nodeRef(r.node.id), { ...placeNear(layout, at, { w: type === 'artifact' ? W.docOpen : W.nodeOpen, h: 360 }, sizeOf), open: true });
     if (live) await link(r.node.id, live.id, 'derived_from');
@@ -200,7 +202,7 @@ export function ConversationCanvas({ id }: { id: string }) {
   const aboutNode = (n: NodeRow): About => ({
     label: n.title,
     of: `the conversation “${title}”`,
-    lines: [`A ${typeLabel(n.type).toLowerCase()}${n.type === 'decision' ? ` (${n.state})` : n.type === 'question' ? ` (${n.state})` : ''}`, ...factLines(String((n.content as Record<string, unknown>).body ?? (n.content as Record<string, unknown>).rationale ?? n.description ?? ''), 6)],
+    lines: n.type === 'artifact' ? artifactFacts(n) : [`A ${typeLabel(n.type).toLowerCase()}${n.type === 'decision' ? ` (${n.state})` : n.type === 'question' ? ` (${n.state})` : ''}`, ...factLines(String((n.content as Record<string, unknown>).body ?? (n.content as Record<string, unknown>).rationale ?? n.description ?? ''), 6)],
   });
 
   // ── what is drawn ──
@@ -370,7 +372,7 @@ export function ConversationCanvas({ id }: { id: string }) {
           Loading…
         </p>
       )}
-      {creator ? <Creator screen={creator.screen} types={setup === false || !created ? ['ask'] : ['ask', 'question', 'knowledge', 'decision', 'artifact']} onClose={() => setCreator(null)} onSubmit={(t, text) => void createAt(t, text, creator.at)} /> : null}
+      {creator ? <Creator screen={creator.screen} types={setup === false || !created ? ['ask'] : ['ask', 'question', 'knowledge', 'decision', 'artifact']} onClose={() => setCreator(null)} onSubmit={(t, text, starter) => void createAt(t, text, creator.at, starter)} /> : null}
       {connecting ? (
         <ConnectChooser
           screen={connecting.screen}

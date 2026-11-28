@@ -44,7 +44,7 @@ console.log('=== one shape, six types ===');
   ok('knowledge keeps its body and kind, drops unknown fields', k.content.body === 'Line one\nLine two' && k.content.kind === 'evidence' && !('stray' in k.content));
   ok('external provenance kept, a script address refused', k.provenance.origin === 'external' && k.provenance.source.label === 'Bulletin' && !k.provenance.source.url);
   const art = await make({ type: 'artifact', title: 'Notes', content: { subtype: 'simulation', body: '# Hi' } });
-  ok('an artifact subtype not yet available becomes a document', art.content.subtype === 'document' && art.content.body === '# Hi');
+  ok('a Markdown document (from before compositions) becomes a composition of one text primitive', art.content.subtype === 'composition' && art.content.primitives.length === 1 && art.content.primitives[0].type === 'text' && art.content.primitives[0].data.body === '# Hi' && !('body' in art.content));
   const untitled = await make({ type: 'objective' });
   ok('an empty title becomes "Untitled objective"', untitled.title === 'Untitled objective');
   ok('every node starts at version 1 with provenance', [q, k, art].every((n) => n.version === 1 && n.provenance.origin));
@@ -165,7 +165,8 @@ console.log('\n=== decisions: the person accepts, nothing else does ===');
 
 console.log('\n=== versions and stale edits ===');
 {
-  const art = await make({ type: 'artifact', title: 'Draft', content: { body: 'one' } });
+  // versioning is the same for every type; knowledge keeps its words in content.body
+  const art = await make({ type: 'knowledge', title: 'Draft', content: { body: 'one' } });
   const v2 = await X.updateNode(store, A, art.id, { version: 1, content: { body: 'two' } }, now());
   const v3 = await X.updateNode(store, A, art.id, { version: v2.value.version, title: 'Draft B', content: { body: 'three' } }, now());
   ok('each edit bumps the version', v3.ok && v3.value.version === 3);

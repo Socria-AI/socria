@@ -36,8 +36,9 @@ export const EMPTY_LAYOUT: CanvasLayout = { items: {} };
 
 /** What an object on a canvas refers to: n:<node id> or x:<exchange key>. */
 export const REF_RE = /^(n|x):[A-Za-z0-9_-]{1,120}$/;
-/** A canvas's key: o:<objective node id> or c:<conversation id>. */
-export const KEY_RE = /^(o|c):[A-Za-z0-9_-]{1,120}$/;
+/** A canvas's key: o:<objective node id>, c:<conversation id>, or a:<artifact node id> (an artifact's camera only:
+ *  where its primitives sit is part of the artifact itself). */
+export const KEY_RE = /^(o|c|a):[A-Za-z0-9_-]{1,120}$/;
 
 export const CANVAS_LIMITS = { items: 3000, coord: 1_000_000, minZoom: 0.15, maxZoom: 3 } as const;
 
