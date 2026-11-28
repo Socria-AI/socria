@@ -1,12 +1,15 @@
 // lib/ux-v0/dsi/project-extract.ts — a design system drawn out of work already made in SocriaUX: a website (its
 // attached design system, or its approved direction and current design), a graphic (its tokens, its direction's type
-// habits, its approved logo) or a board (its Master Design System, with its logo, constraints, motifs and imagery).
+// habits, its approved logo), a board (its Master Design System, with its logo, constraints, motifs and imagery) or a
+// design written as artboards (the identity its approved artboards carry: ground, ink, accent, palette, faces, and a
+// logo drawn on an approved logo artboard — lib/ux-v0/design/identity.ts).
 //
 // What the designer approved there (an approved direction, an approved logo, a board's system) is carried as
 // approved; values the project merely holds are imported with the project as their source. A logo concept SocriaUX
 // generated and the designer approved becomes an approved, protected asset (its SVG drawn from the concept); one only
 // selected stays unapproved.
 
+import { identityOf } from '../design/identity';
 import { svgFile } from '../graphics/export';
 import { conceptOfMark } from '../graphics/logo/link';
 import { logoDoc } from '../graphics/logo/build';
@@ -24,7 +27,7 @@ async function logoAsset(svg: string, name: string, approved: boolean, src: Sour
 }
 
 /** A design system from one SocriaUX project (see the head of this file). */
-export async function extractFromProject(p: DesignProject, opts: { now?: number } = {}): Promise<ImportResult> {
+export async function extractFromProject(p: DesignProject, opts: { now?: number; artboards?: readonly string[] } = {}): Promise<ImportResult> {
   const now = opts.now ?? Date.now();
   const issues: ImportIssue[] = [];
   const notes = new Set<string>();
@@ -41,7 +44,46 @@ export async function extractFromProject(p: DesignProject, opts: { now?: number 
     if (content.tokens['font.family.display']) content.roles.display = { path: 'font.family.display', status: 'confirmed', confidence: 1, why: 'its display face' };
     if (content.tokens['font.family.body']) content.roles.body = { path: 'font.family.body', status: 'confirmed', confidence: 1, why: 'its text face' };
   };
-  if (p.medium === 'board' && p.board?.system) {
+  if (p.medium === 'design' && p.design) {
+    // an identity explored as real work: drawn from the artboards the person approved (or those named), never from
+    // everything on the canvas — an exploration holds directions that were turned down
+    const all = p.design.doc.artboards;
+    const named = opts.artboards?.length ? all.filter((a) => opts.artboards!.includes(a.id)) : [];
+    const approved = all.filter((a) => a.state === 'approved');
+    const from = named.length ? named : approved;
+    if (!from.length) {
+      issues.push({ severity: 'error', message: all.length ? `Nothing in ${p.name || 'that project'} is approved yet. Approve the artboards that carry the identity (or choose them), and it is drawn from those alone.` : `${p.name || 'That project'} has no artboards yet.` });
+    } else {
+      const carried: Token['provenance']['status'] = from.every((a) => a.state === 'approved') ? 'confirmed' : 'imported';
+      const id = identityOf(from, p.design.doc.tokens);
+      if (id.background) put('color.background', 'color', id.background, carried);
+      if (id.text) put('color.text', 'color', id.text, carried);
+      if (id.accent) put('color.accent', 'color', id.accent, carried);
+      const taken = new Set([id.background, id.text, id.accent]);
+      for (const n of id.named) if (!taken.has(n.hex)) put(`color.palette.${n.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'colour'}`, 'color', n.hex, carried);
+      const namedHex = new Set(id.named.map((n) => n.hex));
+      id.palette.filter((c) => !namedHex.has(c)).forEach((c, i) => put(`color.palette.${i + 1}`, 'color', c, carried));
+      if (id.display) put('font.family.display', 'fontFamily', id.display, carried);
+      if (id.body) put('font.family.body', 'fontFamily', id.body, carried);
+      id.faces.forEach((f, i) => put(`font.family.extra-${i + 1}`, 'fontFamily', f, 'imported'));
+      const logoBoard = from.find((a) => a.name === id.logo?.from);
+      if (id.logo) {
+        const a = await logoAsset(id.logo.svg, p.name || 'Brand', logoBoard?.state === 'approved', { ...src, property: `${p.id}:${logoBoard?.id ?? 'logo'}` });
+        if (a) content.assets.push(a);
+        else notes.add(`The logo on “${id.logo.from}” could not be read as an SVG drawing; it is not carried.`);
+      }
+      // what the person said to keep is the firmest part of it; what was merely decided in the project is offered,
+      // not assumed (it waits in the system as inferred until confirmed there)
+      const pins = p.design.memory.pins;
+      if (pins?.faces?.length) intel('typography', `Set in ${pins.faces.join(' and ')} only`, 'confirmed', 'soft');
+      if (pins?.colours?.length) intel('colour', `Held to these colours, their tints and shades: ${pins.colours.join(', ')}`, 'confirmed', 'soft');
+      for (const d of p.design.memory.decisions.slice(0, 8)) intel('other', d, 'inferred', 'none');
+      for (const r of p.design.memory.rejected.slice(0, 6)) intel('restriction', `Turned down: ${r}`, 'inferred', 'none');
+      if (p.design.memory.brief) content.identity.description = p.design.memory.brief.slice(0, 400);
+      notes.add(`From ${p.name}: the identity carried by ${from.length === 1 ? `“${from[0].name}”` : `${from.length} artboards`}${carried === 'confirmed' ? ' you approved' : ' (not approved: nothing is carried as approved)'} — colours, faces${id.logo ? ' and the logo' : ''}; never the compositions.`);
+      if (all.length > from.length) notes.add(`${all.length - from.length} other artboard${all.length - from.length === 1 ? ' was' : 's were'} left out.`);
+    }
+  } else if (p.medium === 'board' && p.board?.system) {
     const s = p.board.system;
     content.identity = { name: s.name, description: s.direction.concept ?? s.direction.language ?? '' };
     for (const r of ROLES) put(`color.${r}`, 'color', s.tokens.colors[r]);

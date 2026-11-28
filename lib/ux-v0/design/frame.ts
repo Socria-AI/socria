@@ -202,8 +202,20 @@ export const INTERACT_SOURCE = String.raw`(function(){
       // words meant to be read, with where they sit and what they are set in: their contrast is measured on the picture
       if(own&&texts.length<40&&!(el.closest&&el.closest('[aria-hidden="true"]'))){ var cs=getComputedStyle(el); if(cs.visibility!=='hidden'&&parseFloat(cs.opacity)>0.9) texts.push({id:el.getAttribute('data-sx'),x:r.left-rr.left,y:r.top-rr.top,w:r.width,h:r.height,color:cs.color,size:parseFloat(cs.fontSize)||0,weight:parseInt(cs.fontWeight,10)||400,text:txt.slice(0,60)}); }
     }
-    post({sx:'ready',issues:issues,height:root.scrollHeight,texts:texts});
+    // every picture as it is drawn: its own size and the box it is given, and what is done to it (a protected logo is checked on these)
+    var imgs=[], ims=root.querySelectorAll('img[data-sx]');
+    for(var k=0;k<ims.length&&k<30;k++){ var im=ims[k], ics=getComputedStyle(im), tr=ics.transform, tilt=false;
+      if(tr&&tr!=='none'){ var mm=/matrix\(([^)]+)\)/.exec(tr); if(mm){ var pp=mm[1].split(','); tilt=Math.abs(parseFloat(pp[1]))>0.01||Math.abs(parseFloat(pp[2]))>0.01; } else tilt=true; }
+      if(ics.rotate&&ics.rotate!=='none'&&parseFloat(ics.rotate)) tilt=true;
+      imgs.push({id:im.getAttribute('data-sx'),nw:im.naturalWidth,nh:im.naturalHeight,w:im.offsetWidth,h:im.offsetHeight,fit:ics.objectFit,filter:ics.filter,opacity:parseFloat(ics.opacity),blend:ics.mixBlendMode,tilt:tilt,clip:ics.clipPath}); }
+    post({sx:'ready',issues:issues,height:root.scrollHeight,texts:texts,imgs:imgs});
   };
-  var go=function(){ setTimeout(measure,30); };
+  var measured=false;
+  var go=function(){
+    var once=function(){ if(measured) return; measured=true; setTimeout(measure,30); };
+    var left=0, all=root.querySelectorAll('img');
+    for(var q=0;q<all.length;q++){ if(!all[q].complete){ left++; var d=function(){ if(--left<=0) once(); }; all[q].addEventListener('load',d); all[q].addEventListener('error',d); } }
+    if(!left) once(); else setTimeout(once,1500);
+  };
   if(document.fonts&&document.fonts.ready){document.fonts.ready.then(go)}else{go()}
 })();`;

@@ -14,6 +14,7 @@ import { GRAPHIC_FONTS } from '@/lib/ux-v0/fonts';
 import { ARTBOARD_STATES, STATE_LABEL, isElementLocked, type ArtboardState, type DesignArtboard, type DesignPins } from '@/lib/ux-v0/design/doc';
 import { FORMATS, sizeLabel } from '@/lib/ux-v0/design/formats';
 import type { HandEdit } from '@/lib/ux-v0/design/elements';
+import type { BrandFact } from '@/lib/ux-v0/design/brandcheck';
 import type { ElementPick } from './Canvas';
 
 const firstFace = (v: string) => (v.split(',')[0] ?? '').trim().replace(/^['"]|['"]$/g, '');
@@ -68,6 +69,8 @@ export interface InspectorProps {
   onRelease: (what: 'faces' | 'colours') => void;
   onShow: (element: string) => void;
   onReview: () => void;
+  /** the artboard against its brand, as checked (requirements apart from principles), and what was allowed here */
+  brand?: { name: string; facts: BrandFact[]; allowed?: DesignPins; onAllow: (what: 'faces' | 'colours', value: string, on: boolean) => void } | null;
   /** more of the artboard panel, from the workspace (print marks, motion, exports that belong to its kind) */
   extra?: React.ReactNode;
   busy?: boolean;
@@ -75,7 +78,7 @@ export interface InspectorProps {
 
 const labelFor = (pick: ElementPick) => (pick.text ? `“${pick.text.slice(0, 40)}${pick.text.length > 40 ? '…' : ''}”` : pick.classes ? `the ${pick.tag} “${pick.classes.split(' ')[0]}”` : `the ${pick.tag}`);
 
-export function Inspector({ pick, artboard, onEdit, onParent, onAsk, onFormat, onExport, onComment, pins, onState, onApprove, onReopen, onLockArtboard, onLockElement, onKeep, onRelease, onShow, onReview, extra, busy }: InspectorProps) {
+export function Inspector({ pick, artboard, onEdit, onParent, onAsk, onFormat, onExport, onComment, pins, onState, onApprove, onReopen, onLockArtboard, onLockElement, onKeep, onRelease, onShow, onReview, extra, busy, brand }: InspectorProps) {
   const [text, setText] = useState(pick?.text ?? '');
   const [note, setNote] = useState('');
   useEffect(() => setText(pick?.text ?? ''), [pick?.id, pick?.text]);
@@ -175,6 +178,40 @@ export function Inspector({ pick, artboard, onEdit, onParent, onAsk, onFormat, o
           </p>
         ) : null}
         <p className="dx-muted dx-small">What is kept is checked on everything made afterwards; anything outside it is said, never changed for you.</p>
+
+        {brand ? (
+          <>
+            <h4 className="dx-sub">Against {brand.name}</h4>
+            {!brand.facts.length ? <p className="dx-muted dx-small" data-brand="within">Within the brand: its colours, its typefaces and its logo as it is.</p> : null}
+            <ul className="dx-brand">
+              {brand.facts.map((f, i) => (
+                <li key={`${f.about}${f.value}${i}`} className={`is-${f.level}`} data-brand={f.about}>
+                  <span className="dx-brand-level">{f.level === 'requirement' ? 'Requirement' : 'Principle'}</span>
+                  <p>{f.text[0].toUpperCase() + f.text.slice(1)}.</p>
+                  {f.about !== 'logo' ? (
+                    <button type="button" className="dx-btn dx-ghost dx-small" onClick={() => brand.onAllow(f.about === 'face' ? 'faces' : 'colours', f.value, true)} title="An exception for this project; the brand itself does not change">
+                      Allow in this project
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+            {brand.allowed?.faces?.length || brand.allowed?.colours?.length ? (
+              <p className="dx-kept" data-kept="allowed">
+                <span>
+                  Allowed here:{' '}
+                  {[...(brand.allowed.faces ?? []).map((v) => ['faces', v] as const), ...(brand.allowed.colours ?? []).map((v) => ['colours', v] as const)].map(([what, v]) => (
+                    <button key={v} type="button" className="dx-chiplet" onClick={() => brand.onAllow(what, v, false)} title="Stop allowing it">
+                      {what === 'colours' ? <i style={{ background: v }} /> : null}
+                      {v} ×
+                    </button>
+                  ))}
+                </span>
+              </p>
+            ) : null}
+            <p className="dx-muted dx-small">A requirement is the brand’s rule; a principle is its habit, and a departure from it is yours to make. Nothing is changed for you.</p>
+          </>
+        ) : null}
 
         <h4 className="dx-sub">Review</h4>
         <button type="button" className="dx-btn" onClick={onReview} disabled={busy}>

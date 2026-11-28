@@ -37,6 +37,8 @@ export interface Applied {
   locked: { artboard: string; element: string; what: string }[];
   /** typography or colour to keep from an artboard (<keep>): the project's pins are set from them by the caller */
   keep: { what: 'faces' | 'colours'; artboard: string }[];
+  /** what the person authorized beyond the brand, for this project (<allow>) */
+  allow: { what: 'faces' | 'colours'; value: string }[];
   /** what a review found (<finding>), on artboards that exist */
   findings: { type: string; artboard: string; element: string | null; text: string; fix: string }[];
 }
@@ -100,6 +102,7 @@ export function applyAnswer(doc0: DesignDoc, answer: Answer, o: ApplyOptions): A
   const removed: string[] = [];
   const lockAsked: { artboard: string; element: string; what: string }[] = [];
   const keep: Applied['keep'] = [];
+  const allow: Applied['allow'] = [];
   const findings: Applied['findings'] = [];
   let question: Applied['question'] = null;
   const real = (id: string) => ids[id] ?? id;
@@ -210,6 +213,9 @@ export function applyAnswer(doc0: DesignDoc, answer: Answer, o: ApplyOptions): A
       case 'lock':
         lockAsked.push({ artboard: b.artboard, element: b.element, what: b.what });
         break;
+      case 'allow':
+        if (allow.length < 8) allow.push({ what: b.what, value: b.value });
+        break;
       case 'keep':
         keep.push({ what: b.what, artboard: b.artboard });
         break;
@@ -265,7 +271,7 @@ export function applyAnswer(doc0: DesignDoc, answer: Answer, o: ApplyOptions): A
       locked.push({ artboard: a.id, element: l.element, what: l.what });
     }
   }
-  return { doc: { artboards, tokens }, touched, made, removed, tokensChanged: tokens !== doc0.tokens, failed, remember, question, ids, locked, keep: keep.map((k) => ({ ...k, artboard: real(k.artboard) })), findings };
+  return { doc: { artboards, tokens }, touched, made, removed, tokensChanged: tokens !== doc0.tokens, failed, remember, question, ids, locked, keep: keep.map((k) => ({ ...k, artboard: real(k.artboard) })), allow, findings };
 }
 
 /** What changed, in a sentence, from what really changed (never from what was meant to). */

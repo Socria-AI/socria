@@ -8,6 +8,7 @@
 import { assetHref } from '../dsi/assets';
 import { contentForLink, designCss } from '../dsi/link';
 import type { DesignAsset } from './doc';
+import { brandBasis, type BrandBasis } from './brandcheck';
 import type { SystemRecord } from '../dsi/registry';
 import type { SystemLink } from '../dsi/link-schema';
 
@@ -17,6 +18,10 @@ export interface BrandForDesign {
   rules: string[];
   /** the system's approved pictures a design can place as they are (its logos first), each with how it may be used */
   pictures: (DesignAsset & { note: string })[];
+  /** what a design is checked against: its colours and faces, and how firmly each holds (brandcheck.ts) */
+  basis: BrandBasis;
+  /** the pictures among them that are protected logos (their ids on a design) */
+  protected: string[];
 }
 
 /** The linked system's version as tokens, rules and pictures, or null when it has nothing published. */
@@ -52,5 +57,5 @@ export function brandForDesign(rec: SystemRecord, link: SystemLink | undefined):
   if (pictures.some((p) => /'s logo/.test(p.note))) rules.push('The brand has an approved logo, given with the pictures: where a logo goes, place that picture exactly as it is. Never redraw or imitate it, and never set the name in type as a stand-in for it.');
   else if (logos.length) rules.push(`The brand has a logo (${logos.map((l) => l.name).slice(0, 3).join(', ')}) that cannot be placed here: set the brand's name as text where the logo goes, never redraw or imitate the logo.`);
   rules.push('Use the shared custom properties for colour and type rather than other values, unless the person asks for something the system does not have.');
-  return { name: rec.name, css, rules, pictures };
+  return { name: rec.name, css, rules, pictures, basis: brandBasis(rec.name, content), protected: pictures.filter((p) => /APPROVED AND PROTECTED/.test(p.note)).map((p) => p.id) };
 }

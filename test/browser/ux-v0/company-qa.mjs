@@ -177,6 +177,62 @@ const kept = await page.evaluate(() => new Promise((res) => { const r = indexedD
 ok('the project keeps whom it is for; the company was not changed by it', kept?.companyId === co.id && JSON.stringify((await companyOf()).facts) === JSON.stringify(co.facts));
 ok('no errors in the workspace', errors.length === 0, errors);
 
+console.log('\n=== against the brand: a design system made from Socria’s own stylesheet and logo ===');
+{
+  // the brand as a person would make it: the app's root stylesheet imported, its two faces named, the logo approved, published
+  const { pathToFileURL } = await import('node:url');
+  const D = await import(pathToFileURL(join(ROOT, 'test/.tmp/dsi-under-test.mjs')).href);
+  const imported = D.importCss([{ name: 'globals.css', text: readFileSync(join(ROOT, 'app/globals.css'), 'utf8') }], { ref: 'app/globals.css' });
+  const content = D.analyzeBrand(imported.content);
+  const like = Object.values(content.tokens)[0];
+  for (const [path, value] of [['font.family.display', 'Instrument Serif'], ['font.family.body', 'Inter']]) content.tokens[path] = { path, type: 'fontFamily', value, provenance: { ...like.provenance, status: 'confirmed' } };
+  const logo = await D.importAsset({ name: 'socria-logo.png', bytes: new Uint8Array(readFileSync(join(ROOT, 'public/socria-logo.png'))) }, { approved: true });
+  content.assets.push(logo.asset);
+  content.identity.name = 'Socria';
+  let rec = D.newRecord(content);
+  rec = D.publish(rec, { confirm: true }).record;
+  ok('Socria’s root stylesheet is read as a system: its real colours, and the logo approved and protected', Object.values(rec.draft.tokens).filter((t) => t.type === 'color').length > 20 && rec.published === 1 && rec.draft.assets[0].protected === true && logo.asset.hash === logoItem.asset.hash, imported.issues?.[0]);
+  await page.evaluate((r) => new Promise((res, rej) => { const q = indexedDB.open('socria-ux-v0-systems', 1); q.onupgradeneeded = () => q.result.createObjectStore('systems', { keyPath: 'id' }); q.onsuccess = () => { const t = q.result.transaction('systems', 'readwrite'); t.objectStore('systems').put(r); t.oncomplete = () => res(true); t.onerror = () => rej(t.error); }; q.onerror = () => rej(q.error); }), JSON.parse(JSON.stringify(rec)));
+  const n0 = requests.length;
+  answer = (body) => {
+    if (body.mode === 'look') return '<say>Seen.</say><ok/>';
+    if (body.mode === 'review') return '<say>The logo is the one thing that is wrong here by rule.</say><ok/>';
+    if (!body.doc.artboards.length) return `<say>A loud one.</say><artboard id="new-1" name="Loud" format="instagram-square"><style>.sx-root{background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif}.logo{position:absolute;left:80px;top:80px;width:440px;height:220px}h1{position:absolute;left:80px;bottom:160px;margin:0;font:400 150px/1 'Anton',sans-serif;color:#ff2a6d}p{position:absolute;left:80px;bottom:90px;margin:0;font:400 34px/1.2 'Instrument Serif',serif;color:var(--moss)}</style><img class="logo" src="asset:${LOGO_ID}" alt="Socria"><h1>Think.</h1><p>For yourself.</p></artboard>`;
+    return '<say>Noted.</say><ok/>';
+  };
+  cfg = { brief: 'A loud square post.', kind: 'social post', format: 'instagram-square', companyId: co.id, systemLink: { id: rec.id, name: rec.name, pin: 'latest', version: 1, overrides: {}, applied: {}, at: Date.now() } };
+  await page.goto(`${ORIGIN}/`);
+  await page.waitForSelector('.dx-board iframe', { timeout: 20000 });
+  await page.waitForFunction(() => !document.querySelector('.dx-phase'), null, { timeout: 30000 });
+  await settle(1800);
+  const w = requests.slice(n0).find((r) => r.mode === 'write');
+  ok('the first request is told the brand’s rule about its logo, and given the logo once (the brand’s and the library’s are the same file)', w?.system?.rules.some((x) => /approved logo, given with the pictures/.test(x)) && w.assets.filter((x) => x.id === LOGO_ID).length === 1, [w?.system?.rules.slice(-2), w?.assets.map((x) => x.id)]);
+  const lk = requests.slice(n0).find((r) => r.mode === 'look');
+  const facts = Object.values(lk?.measured ?? {}).flat();
+  ok('the look is told, as measured, that the protected logo is stretched — a requirement', facts.some((x) => /^brand requirement, checked: the protected logo \(data-sx="e\d+"\) is drawn stretched: 440×220 against its own 1080×1080/.test(x)), facts);
+  ok('…and that a colour and a face are outside the brand — principles, a departure being a choice', facts.some((x) => /^brand principle \(a departure is a choice, not a defect\), checked: uses #ff2a6d/.test(x)) && facts.some((x) => /^brand principle[^:]*: set in Anton, which is not one of Socria's typefaces \([^)]*Instrument Serif[^)]*Inter[^)]*\)/.test(x)), facts);
+  ok('the brand’s own colours and faces raise nothing', !facts.some((x) => /Instrument Serif, which is not|uses #354620|uses #f5f3eb/i.test(x)));
+  await page.locator('.dx-label-name').first().click();
+  await page.waitForSelector('.dx-brand li', { timeout: 8000 });
+  await settle(600);
+  const shown = await page.locator('.dx-brand li').evaluateAll((els) => els.map((e) => [e.getAttribute('data-brand'), e.className, e.textContent.slice(0, 80)]));
+  ok('the inspector shows the same, requirement apart from principle', shown.some((x) => x[0] === 'logo' && /is-requirement/.test(x[1])) && shown.some((x) => x[0] === 'colour' && /is-principle/.test(x[1])) && shown.some((x) => x[0] === 'face' && /is-principle/.test(x[1])), shown);
+  ok('a requirement about the logo cannot be waved through; a principle can be allowed for this project', (await page.locator('.dx-brand li[data-brand="logo"] button').count()) === 0 && (await page.locator('.dx-brand li[data-brand="colour"] button:text-is("Allow in this project")').count()) === 1);
+  await page.screenshot({ path: `${OUT}3-against-the-brand.png` });
+  await page.locator('.dx-brand li[data-brand="colour"] button').click();
+  await settle(1200);
+  const st = await page.evaluate(() => new Promise((res) => { const r = indexedDB.open('socria-ux-v0', 1); r.onsuccess = () => { const g = r.result.transaction('projects', 'readonly').objectStore('projects').get(window.__PROJECT_ID__); g.onsuccess = () => res(g.result?.design ?? null); }; }));
+  ok('allowed: kept as an exception of this project, and no longer reported', st.memory.allowed?.colours?.join() === '#ff2a6d' && (await page.locator('.dx-brand li[data-brand="colour"]').count()) === 0 && /#ff2a6d/.test((await page.locator('[data-kept="allowed"]').textContent()) ?? ''), st.memory);
+  ok('…the brand itself is unchanged', await page.evaluate((id) => new Promise((res) => { const q = indexedDB.open('socria-ux-v0-systems', 1); q.onsuccess = () => { const g = q.result.transaction('systems', 'readonly').objectStore('systems').get(id); g.onsuccess = () => res(JSON.stringify(g.result.draft.tokens).includes('ff2a6d') === false && g.result.published === 1); }; }), rec.id));
+  await page.locator('.dx-quick button:text-is("Review")').click();
+  await settle(300);
+  await page.waitForFunction(() => !document.querySelector('.dx-phase'), null, { timeout: 30000 });
+  const rv = requests.filter((r) => r.mode === 'review').at(-1);
+  const rfacts = Object.values(rv?.measured ?? {}).flat();
+  ok('a review is given the same checks, without the exception the person allowed, and told what is allowed', rfacts.some((x) => /protected logo/.test(x)) && !rfacts.some((x) => /#ff2a6d/.test(x)) && rv.memory.allowed?.colours?.[0] === '#ff2a6d', rfacts);
+  ok('no errors with a brand linked', errors.length === 0, errors);
+}
+
 console.log(`\ncompany-qa: ${pass} passed, ${fail} failed · screenshots in ${OUT}`);
 await b.close();
 process.exit(fail ? 1 : 0);

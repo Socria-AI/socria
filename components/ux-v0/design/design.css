@@ -818,6 +818,57 @@ a.dx-badge {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
 }
 
+/* ── against the brand ── */
+.dx-brand {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dx-brand li {
+  background: #fff;
+  border: 1px solid var(--dx-rule);
+  border-left: 3px solid var(--dx-ink-45);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 12.5px;
+}
+.dx-brand li.is-requirement {
+  border-left-color: #a3341f;
+}
+.dx-brand li p {
+  margin: 2px 0 6px;
+}
+.dx-brand-level {
+  font: 600 10px/1 inherit;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dx-ink-45);
+}
+.dx-brand li.is-requirement .dx-brand-level {
+  color: #a3341f;
+}
+.dx-chiplet {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--dx-rule);
+  background: #fff;
+  border-radius: 999px;
+  padding: 1px 8px;
+  margin: 0 4px 4px 0;
+  font-size: 12px;
+  cursor: pointer;
+}
+.dx-chiplet i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
 /* ── a review's findings ── */
 .dx-findings {
   margin-top: 10px;

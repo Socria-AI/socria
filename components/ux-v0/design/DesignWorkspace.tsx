@@ -47,7 +47,8 @@ import { wantsReview } from '@/lib/ux-v0/design/request';
 import { firstRequest } from '@/lib/ux-v0/design/start';
 import { brandForDesign, type BrandForDesign } from '@/lib/ux-v0/design/brand';
 import { getCompany } from '@/lib/ux-v0/company/store';
-import { companyTold, libraryFor, libraryPictures, missingFor } from '@/lib/ux-v0/company/told';
+import { companyTold, libraryAssetId, libraryFor, libraryPictures, missingFor } from '@/lib/ux-v0/company/told';
+import type { BrandFact } from '@/lib/ux-v0/design/brandcheck';
 import type { Company } from '@/lib/ux-v0/company/schema';
 import { SystemBadge } from '../systems/SystemBadge';
 import { useLinkedSystem } from '../systems/useLinkedSystem';
@@ -60,14 +61,14 @@ import { Canvas, fitView, type ElementPick, type FrameEvent, type View } from '.
 import { Inspector } from './Inspector';
 import { Chat } from './Chat';
 import { CompareModal, HistoryPanel } from './Versions';
-import { assetData, browserBench, parseHtml, routeTransport } from './runtime';
+import { assetData, brandOf, browserBench, parseHtml, routeTransport, type BrandContext } from './runtime';
 import './design.css';
 
 type Busy = { phase: 'writing' | 'looking' | 'fixing' | 'reviewing'; say: string; started: number } | null;
 
 const withDesign = (p: DesignProject): DesignProject => (p.design ? p : { ...p, medium: 'design', design: emptyState('graphic', undefined, p.intent ?? '') });
 
-export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { initial: DesignProject; signedIn: boolean; onExit: () => void; startIntent?: string }) {
+export function DesignWorkspace({ initial, signedIn, onExit, startIntent, onBrand }: { initial: DesignProject; signedIn: boolean; onExit: () => void; startIntent?: string; /** draw a design system out of what is approved here (the Design System Manager's import, from this project) */ onBrand?: () => void }) {
   const [project, setProject] = useState(() => withDesign(initial));
   const s = project.design!;
   const cur = useRef(project);
@@ -195,7 +196,13 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
   const [draft, setDraft] = useState('');
   const abort = useRef<AbortController | null>(null);
   const transport = useMemo(() => routeTransport(project.id), [project.id]);
-  const bench = useMemo(() => browserBench(assetsNow), [assetsNow]);
+  // what every artboard is checked against: the brand's colours and faces, its protected logos, what was allowed here
+  const brandCtx = useRef<BrandContext | null>(null);
+  brandCtx.current = useMemo(
+    () => ({ basis: brand?.basis ?? null, protectedIds: new Set([...(brand?.protected ?? []), ...(company ? company.library.filter((i) => i.asset.protected).map(libraryAssetId) : [])]), allowed: s.memory.allowed }),
+    [brand, company, s.memory.allowed]
+  );
+  const bench = useMemo(() => browserBench(assetsNow, () => brandCtx.current), [assetsNow]);
 
   // something said about what just happened on the canvas (a protected thing left alone), gone after a moment
   const [notice, setNotice] = useState<string | null>(null);
@@ -536,6 +543,32 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
     void ask(f.fix, { target: { artboard: f.artboard, element: f.element }, finding: f.id });
   };
 
+  // what the selected artboard does against its brand, as it stands (shown in the inspector; nothing is changed)
+  const [brandNow, setBrandNow] = useState<BrandFact[]>([]);
+  const selHtml = artboardOf(s.doc, sel.artboard)?.html ?? '';
+  useEffect(() => {
+    const a = artboardOf(cur.current.design!.doc, sel.artboard);
+    const ctx = brandCtx.current;
+    if (!a || !ctx || (!ctx.basis && !ctx.protectedIds.size)) return setBrandNow([]);
+    let live = true;
+    const t = setTimeout(() => void assetsNow().then((map) => brandOf(a, cur.current.design!.doc.tokens, map, ctx)).then((f) => live && setBrandNow(f)), 350);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [sel.artboard, selHtml, s.doc.tokens, brand, company, s.memory.allowed, assetsNow]);
+  const allow = (what: 'faces' | 'colours', value: string, on: boolean) =>
+    update((x) => {
+      const had = x.memory.allowed?.[what] ?? [];
+      const next = on ? [...had.filter((v) => v.toLowerCase() !== value.toLowerCase()), value].slice(-12) : had.filter((v) => v.toLowerCase() !== value.toLowerCase());
+      const allowed = { ...(x.memory.allowed ?? {}), [what]: next };
+      if (!allowed.faces?.length) delete allowed.faces;
+      if (!allowed.colours?.length) delete allowed.colours;
+      const { allowed: _a, ...memory } = x.memory;
+      void _a;
+      return { ...x, memory: Object.keys(allowed).length ? { ...memory, allowed } : memory };
+    });
+
   // ── comments ──
   const comment = (text: string) => {
     if (!sel.artboard) return;
@@ -697,6 +730,7 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
             onExport={(k) => void doExport(k)}
             onComment={comment}
             pins={s.memory.pins}
+            brand={brand || brandCtx.current?.protectedIds.size ? { name: brand?.name ?? company?.name ?? 'the brand', facts: brandNow, allowed: s.memory.allowed, onAllow: allow } : null}
             busy={!!busy}
             onState={(st) => sel.artboard && setState(sel.artboard, st)}
             onApprove={() => sel.artboard && approve(sel.artboard)}
@@ -707,6 +741,24 @@ export function DesignWorkspace({ initial, signedIn, onExit, startIntent }: { in
             onRelease={release}
             onShow={(el) => sel.artboard && showElement(sel.artboard, el)}
             onReview={() => void review()}
+            extra={
+              onBrand && s.doc.artboards.some((a) => a.state === 'approved') ? (
+                <>
+                  <h4 className="dx-sub">Make it the brand</h4>
+                  <button
+                    type="button"
+                    className="dx-btn"
+                    onClick={async () => {
+                      await putProject(cur.current);
+                      onBrand();
+                    }}
+                  >
+                    Draw a design system from what is approved
+                  </button>
+                  <p className="dx-muted dx-small">Its colours, typefaces and logo — never its compositions — become a draft in the Design System Manager. Nothing is the brand until you publish it there.</p>
+                </>
+              ) : null
+            }
           />
           {selArtboard && notes.some((c) => c.artboard === selArtboard.id) && (
             <div className="dx-notes">

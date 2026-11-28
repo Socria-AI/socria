@@ -25,3 +25,5 @@ export * as company from '@/lib/ux-v0/company/schema';
 export * as companyTold from '@/lib/ux-v0/company/told';
 export * as companyRead from '@/lib/ux-v0/company/read';
 export * as dsiAssets from '@/lib/ux-v0/dsi/assets';
+export * as brandcheck from '@/lib/ux-v0/design/brandcheck';
+export * as identity from '@/lib/ux-v0/design/identity';

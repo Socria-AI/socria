@@ -177,6 +177,12 @@ export async function runRequest(
     if (a) memory = { ...memory, pins: mergePins(memory.pins, pinsFrom(a, applied.doc.tokens, k.what)) };
   }
 
+  // an exception to the brand the person authorized: held for this project, and no longer reported
+  for (const x of applied.allow) {
+    const had = memory.allowed?.[x.what] ?? [];
+    if (!had.some((v) => v.toLowerCase() === x.value.toLowerCase())) memory = { ...memory, allowed: { ...(memory.allowed ?? {}), [x.what]: [...had, x.value].slice(-12) } };
+  }
+
   // a question, and nothing made: asked as a question
   if (applied.question && !applied.touched.length && !applied.removed.length && !applied.tokensChanged) {
     const turn: DesignTurn = { id: newId('t'), role: 'designer', text: [answer.say, applied.question.text].filter(Boolean).join('\n\n'), at: at + 1, options: applied.question.options };
@@ -206,7 +212,7 @@ export async function runRequest(
   const offPins = Object.entries(pinFacts(doc, [...new Set([...applied.touched, ...applied.made])], memory.pins)).map(([id, notes]) => `“${artboardOf(doc, id)?.name ?? 'An artboard'}” is ${notes.join('; and ')}.`);
   const failed = [...applied.failed, ...(looked?.failed ?? []), ...offPins];
   const designChanged = applied.touched.length > 0 || applied.removed.length > 0 || applied.tokensChanged;
-  const noted = applied.locked.length > 0 || applied.keep.length > 0;
+  const noted = applied.locked.length > 0 || applied.keep.length > 0 || applied.allow.length > 0;
   const said = designChanged || noted ? answer.say || changed : `${answer.say ? `${answer.say}\n\n` : ''}Nothing on the design changed.`;
   // (a lock or a kept decision alone is a note on the design, not a new version of it)
   const s1 = designChanged ? commit({ ...s0, memory }, doc, r.words, 'model', at + 2) : applied.locked.length ? annotate({ ...s0, memory }, doc) : { ...s0, memory };

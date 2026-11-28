@@ -43,3 +43,7 @@ export { normalizeSpec } from '@/lib/ux-v0/spec';
 export { snapToPalette, respectClearSpace, clearSpaceIntruders, preferPaletteInk } from '@/lib/ux-v0/graphics/brandguard';
 export { checkDoc, refineDoc } from '@/lib/ux-v0/graphics/check';
 export { approxMeasure } from '@/lib/ux-v0/graphics/text';
+export * as family from '@/lib/ux-v0/dsi/family';
+export { applySync, syncDiff } from '@/lib/ux-v0/dsi/sync';
+export { brandBasis } from '@/lib/ux-v0/design/brandcheck';
+export { brandForDesign } from '@/lib/ux-v0/design/brand';

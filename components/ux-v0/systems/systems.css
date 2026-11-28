@@ -785,3 +785,24 @@
   margin: 6px 0;
   padding-left: 18px;
 }
+
+/* a system's family: what it was made from, what was made from it (lib/ux-v0/dsi/family.ts) */
+.ds-changes {
+  list-style: none;
+  margin: 6px 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 13px;
+}
+.ds-changes li {
+  padding: 4px 8px;
+  border-left: 2px solid var(--sb-rule, rgba(28, 27, 24, 0.14));
+}
+.ds-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}

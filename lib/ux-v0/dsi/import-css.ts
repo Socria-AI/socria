@@ -117,6 +117,42 @@ export function importCss(files: readonly ImportFile[], opts: { now?: number; re
       }
     }
   }
+  // a colour kept as its three channels so it can be given an alpha (--ink-rgb: 31, 31, 31; rgba(var(--ink-rgb), .6))
+  // is not a token of its own: it is written into the colours that use it, which then stand as colours
+  const channels = new Map<string, string>();
+  for (const [name, e] of vars) {
+    const v = e.base?.decl.value.trim() ?? '';
+    if (/^\d{1,3}\s*[, ]\s*\d{1,3}\s*[, ]\s*\d{1,3}$/.test(v) && !e.modes.size) channels.set(name, v);
+  }
+  if (channels.size) {
+    const inline = (d: Def) => {
+      d.decl = { ...d.decl, value: d.decl.value.replace(/var\(\s*(--[\w-]+)\s*\)/g, (m, n: string) => channels.get(n) ?? m) };
+    };
+    for (const [name, e] of vars) {
+      if (channels.has(name)) continue;
+      if (e.base) inline(e.base);
+      for (const d of e.modes.values()) inline(d);
+    }
+    for (const name of channels.keys()) vars.delete(name);
+    notes.add(`${channels.size} variable${channels.size === 1 ? '' : 's'} holding a colour’s three channels (${[...channels.keys()].slice(0, 3).join(', ')}${channels.size > 3 ? '…' : ''}) ${channels.size === 1 ? 'was' : 'were'} written into the colours that use ${channels.size === 1 ? 'it' : 'them'}.`);
+  }
+  // a reference to a variable that is set nowhere in what was imported, with a fallback: read as a browser would
+  // read it here, with the fallback (var(--ink-rgb, 31, 31, 31) where --ink-rgb only exists in another theme's file)
+  const absent = new Set<string>();
+  for (const e of vars.values()) {
+    for (const d of [e.base, ...e.modes.values()]) {
+      if (!d || !d.decl.value.includes('var(')) continue;
+      d.decl = {
+        ...d.decl,
+        value: d.decl.value.replace(/var\(\s*(--[\w-]+)\s*,\s*([^()]*)\)/g, (m, n: string, fb: string) => {
+          if (vars.has(n) || typed.has(n)) return m;
+          absent.add(n);
+          return fb.trim();
+        }),
+      };
+    }
+  }
+  if (absent.size) notes.add(`${absent.size} variable${absent.size === 1 ? ' is' : 's are'} referred to but set nowhere in what was imported (${[...absent].slice(0, 4).join(', ')}${absent.size > 4 ? '…' : ''}): read with ${absent.size === 1 ? 'its fallback' : 'their fallbacks'}, as a browser would.`);
   // @property initial values stand for variables never set
   for (const [name, t] of typed) if (!vars.has(name) && t.initial) vars.set(name, { base: { decl: { prop: name, value: t.initial, important: false, line: 0 }, file: '@property', selector: '@property' }, modes: new Map() });
   if (!vars.size) {

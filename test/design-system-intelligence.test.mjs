@@ -525,5 +525,75 @@ sec('a design in the system: its shared styles are the system’s, and follow ne
   ok('styles changed in the design are kept, and said', pr3.project.design.doc.tokens === ':root{--color-text:#ff0066}' && pr3.report.kept.length === 1 && /kept/.test(pr3.report.summary), J(pr3.report));
 }
 
+sec('an identity explored as real work becomes a draft only from what was approved');
+{
+  const tokensCss = ':root{--paper:#efe9dc;--ink:#1c1a17;--ember:#c4512c}';
+  const logoBoard = { id: 'a1', name: 'Northlight logo', format: 'logo-sheet', width: 1600, height: 1000, medium: 'screen', x: 0, y: 0, html: `<style>.sx-root{background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif}.w{font:600 220px/1 'Fraunces',serif}.dot{fill:var(--ember)}</style><svg data-sx="e1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle class="dot" cx="50" cy="50" r="40"/></svg><div class="w" data-sx="e2">Northlight</div>` };
+  const rejected = { id: 'a2', name: 'Direction B', format: 'a3', width: 1123, height: 1587, medium: 'print', x: 0, y: 0, html: `<style>.sx-root{background:#101010;color:#fafafa}h1{font:400 180px/1 'Anton',sans-serif;color:#00ffcc}</style><h1 data-sx="e1">Loud</h1>` };
+  const mk = (artboards, memory = {}) => ({ ...D.makeProject('create', 'Northlight identity', 1), medium: 'design', design: { v: 1, doc: { artboards, tokens: tokensCss }, versions: [], at: -1, turns: [], memory: { brief: 'An identity for a practice that reads buildings.', decisions: ['The mark is a single filled circle.'], rejected: ['Neon on black'], ...memory }, comments: [], assets: [], kind: 'identity', format: 'logo-sheet' } });
+  const none = await D.extractFromProject(mk([logoBoard, rejected]), { now: 600 });
+  ok('with nothing approved, nothing is drawn out — and it says what to do', none.issues.some((i) => i.severity === 'error' && /Nothing in Northlight identity is approved yet/.test(i.message)), none.issues);
+  const got = await D.extractFromProject(mk([{ ...logoBoard, state: 'approved', locked: true }, rejected], { pins: { faces: ['Fraunces', 'Inter'] } }), { now: 601 });
+  const tk = got.content.tokens;
+  ok('from the approved artboard alone: its ground, ink, accent and faces, carried as confirmed', tk['color.background']?.value === '#efe9dc' && tk['color.text']?.value === '#1c1a17' && tk['color.accent']?.value === '#c4512c' && tk['font.family.display']?.value === 'Fraunces' && tk['font.family.body']?.value === 'Inter' && tk['color.accent'].provenance.status === 'confirmed', Object.fromEntries(Object.entries(tk).map(([k, v]) => [k, v.value])));
+  ok('nothing of the direction that was not approved is carried', !JSON.stringify(got.content.tokens).includes('00ffcc') && !JSON.stringify(got.content.tokens).includes('Anton'));
+  ok('the approved logo is carried as an approved, protected asset, drawn from the artboard', got.content.assets.length === 1 && got.content.assets[0].kind === 'logo' && got.content.assets[0].approved && got.content.assets[0].protected && /<circle/.test(got.content.assets[0].svg));
+  ok('what the person said to keep is a confirmed statement; what the project merely decided waits as inferred', got.content.intelligence.some((i) => /Set in Fraunces and Inter only/.test(i.statement) && i.status === 'confirmed') && got.content.intelligence.some((i) => /single filled circle/.test(i.statement) && i.status === 'inferred' && i.enforce === 'none'));
+  ok('it is a draft to review and publish, never published by being drawn out', D.newRecord(got.content, { now: 602 }).published === 0);
+  const chosen = await D.extractFromProject(mk([logoBoard, rejected]), { now: 603, artboards: ['a2'] });
+  ok('artboards chosen by hand are drawn from as they are — and nothing is carried as approved', chosen.content.tokens['font.family.display']?.value === 'Anton' && chosen.content.tokens['font.family.display'].provenance.status === 'imported' && [...chosen.notes].some((n) => /not approved: nothing is carried as approved/.test(n)), [...chosen.notes]);
+}
+
+sec('a family of systems: a product within the brand, an experiment beside it — nothing moves on its own');
+{
+  const F = D.family;
+  let brand = D.newRecord(D.analyzeBrand({ ...pc }), { now: 700 });
+  ok('a product system cannot be made within a brand that has published nothing', 'error' in F.deriveSystem(brand, { name: 'Atlas', relation: 'product', now: 701 }) && /publish it first/.test(F.deriveSystem(brand, { name: 'Atlas', relation: 'product', now: 701 }).error));
+  brand = D.publish(brand, { now: 702, confirm: true }).record;
+  const made = F.deriveSystem(brand, { name: 'Atlas', relation: 'product', now: 703 });
+  let atlas = made.record;
+  ok('a product system is made from the published brand: the same tokens, its own name, nothing published', atlas && atlas.id !== brand.id && atlas.name === 'Atlas' && atlas.published === 0 && JSON.stringify(Object.keys(atlas.draft.tokens)) === JSON.stringify(Object.keys(D.publishedContent(brand).tokens)));
+  const rel = F.parentageOf(atlas);
+  ok('…and remembers what it was made from', rel.id === brand.id && rel.relation === 'product' && rel.version === 1 && F.childrenOf([brand, atlas], brand.id).length === 1 && F.parentageOf(brand) === null);
+  ok('nothing is its own yet', F.ownChanges(atlas).length === 0);
+  // the product changes one thing
+  const colourPath = Object.values(atlas.draft.tokens).find((t) => t.type === 'color').path;
+  const otherPath = Object.values(atlas.draft.tokens).filter((t) => t.type === 'color')[1].path;
+  atlas = D.updateDraft(atlas, D.setToken(atlas.draft, colourPath, { value: '#0a5cff' }).content, 'Atlas blue');
+  ok('what the product changes is its own, and only that', F.ownChanges(atlas).length === 1 && F.ownChanges(atlas)[0].key === colourPath, F.ownChanges(atlas));
+  ok('the brand is not changed by its product', D.publishedContent(brand).tokens[colourPath].value !== '#0a5cff' && brand.draft.tokens[colourPath].value !== '#0a5cff');
+  // the brand moves on: both the token the product changed, and one it did not
+  let next = D.updateDraft(brand, D.setToken(D.setToken(brand.draft, colourPath, { value: '#111111' }).content, otherPath, { value: '#222222' }).content, 'new brand colours');
+  ok('a brand draft is not yet anything to the product', !F.parentAhead(atlas, next));
+  next = D.publish(next, { now: 710, confirm: true }).record;
+  ok('a newly published brand is ahead of the product — and the product has not changed', F.parentAhead(atlas, next) && atlas.draft.tokens[otherPath].value !== '#222222');
+  const checked = F.checkParent(atlas, next, 711);
+  ok('checking finds the update and keeps it waiting; the draft is untouched', checked.changed && checked.record.sync.pending && checked.record.draft.tokens[otherPath].value === atlas.draft.tokens[otherPath].value);
+  ok('what the product never touched can simply come in; what it made its own is a decision', checked.diff.incoming.some((i) => i.key === otherPath) && checked.diff.conflicts.some((c) => c.key === colourPath && c.suggested === 'local'), { in: checked.diff.incoming.map((i) => i.key), cf: checked.diff.conflicts.map((c) => [c.key, c.suggested]) });
+  const brought = D.applySync(checked.record, checked.record.sync.pending.content, { [`token:${colourPath}`]: 'override' }, { upstreamId: checked.record.sync.pending.upstream, now: 712 });
+  ok('brought in by choice: the brand’s change arrives in the draft, the product’s colour stays its deliberate override', brought.record.draft.tokens[otherPath].value === '#222222' && brought.record.draft.tokens[colourPath].value === '#0a5cff' && !brought.record.sync.pending && F.parentageOf(brought.record).version === 2 && brought.record.published === 0);
+  ok('…and it is no longer behind', !F.parentAhead(brought.record, next));
+
+  // an experiment: rethought beside the brand, brought back only by the person, and only as a draft
+  const ex = F.deriveSystem(next, { name: 'Warmer', relation: 'experiment', now: 720 });
+  let warm = ex.record;
+  ok('an experiment starts from the system as it stands', F.parentageOf(warm).relation === 'experiment' && F.experimentAgainst(warm, next).length === 0);
+  warm = D.updateDraft(warm, D.setToken(warm.draft, otherPath, { value: '#b5532a' }).content, 'a warmer second colour');
+  ok('it is compared with where it came from', F.experimentAgainst(warm, next).length === 1 && F.experimentAgainst(warm, next)[0].key === otherPath);
+  ok('the brand is untouched by the experiment', next.draft.tokens[otherPath].value === '#222222' && D.publishedContent(next).tokens[otherPath].value === '#222222');
+  const pr = F.promote(warm, next, {}, { now: 721 });
+  ok('brought back, it lands in the brand’s draft — the published version is not changed', pr.record && pr.record.draft.tokens[otherPath].value === '#b5532a' && D.publishedContent(pr.record).tokens[otherPath].value === '#222222' && pr.record.published === 2 && pr.record.name === next.name, pr.error ?? pr.record?.draft.tokens[otherPath]);
+  ok('…and publishing is still its own, explicit step', D.publish(pr.record, { now: 722 }).error !== undefined || D.publish(pr.record, { now: 722, confirm: true }).record.published === 3);
+  ok('an experiment cannot be brought into a system it was not made from', 'error' in F.promote(warm, atlas));
+  ok('a child kept and read back keeps its family', F.parentageOf(D.normalizeRecord(JSON.parse(JSON.stringify(brought.record)))).id === brand.id);
+
+  // what a design is held to, from a system
+  const basis = D.brandBasis(next.name, D.publishedContent(next));
+  ok('a system’s colours and faces are what a design is checked against, with the logo’s smallest size', basis.palette.includes('#222222') && basis.faces.includes('Fraunces') && basis.logoMinPx === 24, J(basis));
+  ok('what the brand states as a hard rule is a requirement; what it only has, a principle', basis.colour === 'requirement' && basis.face === 'principle', J(basis));
+  const relaxed = { ...D.publishedContent(next), intelligence: D.publishedContent(next).intelligence.map((i) => ({ ...i, enforce: i.enforce === 'hard' ? 'soft' : i.enforce })) };
+  ok('…and with no hard rule about colour, a colour outside it is a principle too', D.brandBasis('x', relaxed).colour === 'principle');
+}
+
 console.log(`\ndesign-system-intelligence: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

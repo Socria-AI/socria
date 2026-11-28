@@ -366,6 +366,7 @@ export function V0App({ signedIn }: { signedIn: boolean }) {
           refresh();
           window.history.pushState(null, '', '/ux-v0');
         }}
+        onBrand={() => toSystems({ kind: 'project', files: [], url: '', projectId: open.p.id, parts: [] })}
       />
     );
   }

@@ -12,6 +12,7 @@ import type { DesignArtboard, DesignAsset, DesignDoc } from '@/lib/ux-v0/design/
 import { frameDoc } from '@/lib/ux-v0/design/frame';
 import { artboardPixels, lookPicture, toDataUrl } from '@/lib/ux-v0/design/export';
 import { contrastFacts, contrastSaid, type TextBox } from '@/lib/ux-v0/design/contrast';
+import { brandFacts, brandSaid, logoFacts, type Allowed, type BrandBasis, type ImageBox } from '@/lib/ux-v0/design/brandcheck';
 import type { Bench, Sent, Transport, WriteBody } from '@/lib/ux-v0/design/flow';
 import { operationId, post } from '../api';
 
@@ -62,7 +63,7 @@ export async function assetData(assets: readonly DesignAsset[]): Promise<Map<str
 }
 
 /** An artboard drawn in a hidden frame and measured by its own script; nothing when it does not answer in time. */
-export function measureOffscreen(a: DesignArtboard, tokens: string, assets: ReadonlyMap<string, string>, timeoutMs = 4000): Promise<{ issues: { id: string; kind: string; text: string }[]; height: number; texts: TextBox[] } | null> {
+export function measureOffscreen(a: DesignArtboard, tokens: string, assets: ReadonlyMap<string, string>, timeoutMs = 4000): Promise<{ issues: { id: string; kind: string; text: string }[]; height: number; texts: TextBox[]; images: ImageBox[] } | null> {
   return new Promise((resolve) => {
     const f = document.createElement('iframe');
     f.setAttribute('sandbox', 'allow-scripts');
@@ -70,7 +71,7 @@ export function measureOffscreen(a: DesignArtboard, tokens: string, assets: Read
     f.tabIndex = -1;
     f.style.cssText = `position:fixed;left:-${a.width + 100}px;top:0;width:${a.width}px;height:${a.height}px;border:0;visibility:hidden;pointer-events:none`;
     let done = false;
-    const finish = (v: { issues: { id: string; kind: string; text: string }[]; height: number; texts: TextBox[] } | null) => {
+    const finish = (v: { issues: { id: string; kind: string; text: string }[]; height: number; texts: TextBox[]; images: ImageBox[] } | null) => {
       if (done) return;
       done = true;
       window.removeEventListener('message', on);
@@ -90,7 +91,13 @@ export function measureOffscreen(a: DesignArtboard, tokens: string, assets: Read
             .slice(0, 40)
             .map((x: any) => ({ id: x.id, x: n(x.x), y: n(x.y), w: n(x.w), h: n(x.h), color: String(x.color).slice(0, 60), size: n(x.size), weight: n(x.weight) || 400, text: String(x.text ?? '').slice(0, 60) }))
         : [];
-      finish({ issues, height: Number(m.height) || a.height, texts });
+      const images: ImageBox[] = Array.isArray(m.imgs)
+        ? m.imgs
+            .filter((x: any) => x && typeof x.id === 'string' && /^e\d{1,6}$/.test(x.id))
+            .slice(0, 30)
+            .map((x: any) => ({ id: x.id, nw: n(x.nw), nh: n(x.nh), w: n(x.w), h: n(x.h), fit: String(x.fit ?? '').slice(0, 20), filter: String(x.filter ?? '').slice(0, 80), opacity: typeof x.opacity === 'number' ? x.opacity : 1, blend: String(x.blend ?? '').slice(0, 20), tilt: x.tilt === true, clip: String(x.clip ?? '').slice(0, 40) }))
+        : [];
+      finish({ issues, height: Number(m.height) || a.height, texts, images });
     };
     const timer = setTimeout(() => finish(null), timeoutMs);
     window.addEventListener('message', on);
@@ -104,8 +111,21 @@ export function issuesSaid(issues: { id: string; kind: string; text: string }[])
   return issues.slice(0, 10).map((i) => (i.kind === 'cut' ? `words cut off in data-sx="${i.id}" (“${i.text}”)` : `words outside the artboard in data-sx="${i.id}" (“${i.text}”)`));
 }
 
+/** What a design is checked against beyond itself: its brand, its protected logos, what the person allowed. */
+export interface BrandContext {
+  basis: BrandBasis | null;
+  protectedIds: ReadonlySet<string>;
+  allowed: Allowed | undefined;
+}
+
+/** What an artboard does against its brand, as checked and as measured (lib/ux-v0/design/brandcheck.ts). */
+export async function brandOf(a: DesignArtboard, tokens: string, assets: ReadonlyMap<string, string>, ctx: BrandContext, images?: ImageBox[]) {
+  const imgs = images ?? (ctx.protectedIds.size && /asset:/.test(a.html) ? (await measureOffscreen(a, tokens, assets))?.images ?? [] : []);
+  return [...logoFacts(imgs, a.html, ctx.protectedIds, ctx.basis), ...brandFacts(a, tokens, ctx.basis, ctx.allowed)];
+}
+
 /** The browser's bench for the flow: pictures and measures of artboards. */
-export function browserBench(assets: () => Promise<Map<string, string>>): Bench {
+export function browserBench(assets: () => Promise<Map<string, string>>, brand?: () => BrandContext | null): Bench {
   return {
     async picture(a: DesignArtboard, tokens: string) {
       return lookPicture(a, tokens, await assets());
@@ -123,6 +143,12 @@ export function browserBench(assets: () => Promise<Map<string, string>>): Bench 
           const px = await artboardPixels(a, doc.tokens, map);
           const low = px ? contrastFacts(m.texts, px) : [];
           if (low.length) out[id] = [...(out[id] ?? []), ...low.map(contrastSaid)];
+        }
+        // against its brand: colours, faces, and the protected logo as it is drawn (a locked artboard is not re-judged)
+        const ctx = brand?.();
+        if (ctx && m && !a.locked) {
+          const off = await brandOf(a, doc.tokens, map, ctx, m.images);
+          if (off.length) out[id] = [...(out[id] ?? []), ...off.slice(0, 8).map(brandSaid)];
         }
       }
       return out;

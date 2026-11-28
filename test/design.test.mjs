@@ -10,7 +10,7 @@ import { JSDOM } from 'jsdom';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const T = await import(pathToFileURL(join(here, '.tmp', 'design-under-test.mjs')).href);
-const { protocol: P, apply: A, elements: E, doc: D, formats: F, prompts: PR, frame: FR, flow: FL, start: ST, locks: LK, pins: PN, history: HI, request: RQ, contrast: CT } = T;
+const { protocol: P, apply: A, elements: E, doc: D, formats: F, prompts: PR, frame: FR, flow: FL, start: ST, locks: LK, pins: PN, history: HI, request: RQ, contrast: CT, brandcheck: BC, identity: ID } = T;
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, typeof x === 'string' ? x.slice(0, 600) : JSON.stringify(x).slice(0, 600))));
@@ -475,6 +475,61 @@ sec('contrast, measured on the picture');
   ok('a translucent colour is not guessed at', CT.contrastFacts(t('rgba(0, 0, 0, 0.4)'), picture([255, 255, 255], [150, 150, 150], box)).length === 0);
   ok('it is said as a measurement, with the element and what it needs', /measured/.test(CT.contrastSaid(grey[0])) && /data-sx="e1"/.test(CT.contrastSaid(grey[0])) && /4\.5:1/.test(CT.contrastSaid(grey[0])));
   ok('the frame reports where words are and what they are set in, leaving out decoration', /texts\.push\(\{id:/.test(FR.INTERACT_SOURCE) && /aria-hidden="true"/.test(FR.INTERACT_SOURCE));
+}
+
+sec('against the brand: requirements apart from principles, and what the person allowed');
+{
+  const basis = { name: 'Northlight', palette: ['#efe9dc', '#1c1a17', '#c4512c'], faces: ['Fraunces', 'Inter'], colour: 'principle', face: 'requirement', logoMinPx: 48 };
+  const on = (css, body = '') => ({ html: `<style>${css}</style>${body}` });
+  const within = on(".sx-root{background:#efe9dc;color:#1c1a17;font-family:'Inter',sans-serif}h1{font-family:Fraunces,serif;color:#c4512c}.t{color:#e08b6f}");
+  ok('its own colours (and their tints), its own faces: nothing to say', BC.brandFacts(within, '', basis, undefined).length === 0, BC.brandFacts(within, '', basis, undefined));
+  const off = on(".sx-root{background:#efe9dc;color:#1c1a17}h1{font-family:'Anton',sans-serif;color:#2f6bff}");
+  const facts = BC.brandFacts(off, '', basis, undefined);
+  ok('a face outside the brand is a requirement here (the brand says so); a colour outside it a principle', facts.length === 2 && facts.find((f) => f.about === 'face')?.level === 'requirement' && facts.find((f) => f.about === 'face').value === 'Anton' && facts.find((f) => f.about === 'colour')?.level === 'principle' && facts.find((f) => f.about === 'colour').value === '#2f6bff', facts);
+  ok('each is said for what it is: a rule, or a habit a design may depart from', /^brand requirement, checked: set in Anton, which is not one of Northlight's typefaces/.test(BC.brandSaid(facts.find((f) => f.about === 'face'))) && /^brand principle \(a departure is a choice, not a defect\), checked: uses #2f6bff/.test(BC.brandSaid(facts.find((f) => f.about === 'colour'))));
+  ok('what the person allowed for this project is not reported', BC.brandFacts(off, '', basis, { faces: ['anton'], colours: ['#2f6bff'] }).length === 0);
+  ok('a colour reaching the artboard through a shared custom property is read too', BC.brandFacts(on('h1{color:var(--hot)}'), ':root{--hot:#ff00aa}', basis, undefined)[0]?.value === '#ff00aa');
+  ok('no brand, nothing checked', BC.brandFacts(off, '', null, undefined).length === 0);
+
+  // the protected logo as drawn
+  const html = '<img data-sx="e1" src="asset:lib-aaaabbbbcccc" alt="Northlight"><img data-sx="e2" src="asset:mine" alt="">';
+  const box = (o = {}) => ({ id: 'e1', nw: 1000, nh: 500, w: 200, h: 100, fit: 'fill', filter: 'none', opacity: 1, blend: 'normal', tilt: false, clip: 'none', ...o });
+  const prot = new Set(['lib-aaaabbbbcccc']);
+  ok('a protected logo at its own proportions, untouched: nothing to say', BC.logoFacts([box()], html, prot, basis).length === 0);
+  const texts = (o) => BC.logoFacts([box(o)], html, prot, basis).map((f) => f.text).join(' | ');
+  ok('stretched is found, with the numbers', /drawn stretched: 300×100 against its own 1000×500/.test(texts({ w: 300 })));
+  ok('cropped by its box is found', /cropped by its box/.test(texts({ w: 100, h: 100, fit: 'cover' })));
+  ok('…but a box that only letterboxes it (contain) is fine', texts({ w: 100, h: 100, fit: 'contain' }) === '');
+  ok('a filter, a blend, opacity, a tilt and a clip are each found', /has a filter on it/.test(texts({ filter: 'grayscale(1)' })) && /blended/.test(texts({ blend: 'multiply' })) && /at 60% opacity/.test(texts({ opacity: 0.6 })) && /tilted or skewed/.test(texts({ tilt: true })) && /clip path/.test(texts({ clip: 'circle(50%)' })));
+  ok('too small against the brand’s minimum is found', /40 px on its shorter side, below the brand's minimum of 48 px/.test(texts({ w: 80, h: 40 })));
+  ok('every one of them is a requirement', BC.logoFacts([box({ w: 300, filter: 'blur(2px)' })], html, prot, basis).every((f) => f.level === 'requirement' && f.about === 'logo'));
+  ok('a picture that is not a protected logo is the designer’s to treat', BC.logoFacts([box({ id: 'e2', w: 300, filter: 'blur(2px)' })], html, prot, basis).length === 0);
+  ok('the frame measures every picture as drawn, once it has loaded', /imgs\.push\(\{id:im\.getAttribute\('data-sx'\),nw:im\.naturalWidth/.test(FR.INTERACT_SOURCE) && /addEventListener\('load',d\)/.test(FR.INTERACT_SOURCE));
+
+  // an exception, authorized in words
+  const ans = P.parseAnswer('<say>The red is allowed here.</say><allow what="colour" value="#D0312D"/><allow what="typeface" value="Anton"/><allow what="colour" value="red"/>');
+  ok('an authorized exception is read (a colour must be a colour)', ans.blocks.length === 2 && ans.blocks[0].kind === 'allow' && ans.blocks[0].what === 'colours' && ans.blocks[0].value === '#d0312d' && ans.blocks[1].what === 'faces' && ans.blocks[1].value === 'Anton', ans.blocks);
+  const s0 = D.commit(D.emptyState('poster', 'a3', ''), { artboards: [{ id: 'ab1', name: 'P', format: 'a3', width: 1123, height: 1587, medium: 'print', html: '<p data-sx="e1">x</p>', x: 0, y: 0 }], tokens: '' }, 'first', 'model', NOW);
+  const out = await FL.runRequest(s0, { words: 'For this campaign you may use the red #d0312d.' }, { send: async () => ({ ok: true, text: '<say>Noted: the red is allowed in this project.</say><allow what="colour" value="#d0312d"/>', model: null, usage: null }) }, { picture: async () => null, measure: async () => ({}) }, { parse, now: NOW + 1 });
+  ok('…and held for the project, without a new version of the design', out.kind === 'done' && out.state.memory.allowed?.colours?.join() === '#d0312d' && out.state.versions.length === 1 && !/Nothing on the design changed/.test(out.turn.text), out.kind === 'done' ? [out.state.memory, out.turn.text] : out);
+  const told = RQ.readDesignRequest({ words: 'Another', doc: out.state.doc, kind: 'poster', format: 'a3', memory: out.state.memory, turns: [], comments: [] }, () => null);
+  ok('…told to the designer as an exception, not as the brand', told.ok && /Allowed in this project beyond the brand \(the person authorized it; an exception, not the brand\): #d0312d/.test(told.user));
+  ok('…and kept with the project', D.normalizeDesignState(JSON.parse(JSON.stringify(out.state))).memory.allowed.colours[0] === '#d0312d');
+  ok('the instructions say an exception is only ever the person’s', /<allow what="colour"/.test(PR.designSystem()) && /never record one on your own judgement/.test(PR.designSystem()));
+}
+
+sec('the identity a design carries');
+{
+  const logoBoard = { id: 'ab1', name: 'Northlight logo', format: 'logo-sheet', width: 1600, height: 1000, medium: 'screen', x: 0, y: 0, state: 'approved', html: `<style>.sx-root{background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif}.w{font:600 220px/1 'Fraunces',serif;color:var(--ink)}.dot{fill:var(--ember)}</style><svg data-sx="e1" viewBox="0 0 100 100"><circle class="dot" cx="50" cy="50" r="40"/></svg><div class="w" data-sx="e2">Northlight</div>` };
+  const poster = { id: 'ab2', name: 'Poster', format: 'a3', width: 1123, height: 1587, medium: 'print', x: 0, y: 0, html: `<style>.sx-root{background:#101010;color:#fafafa}h1{font:400 180px/1 'Anton',sans-serif;color:#00ffcc}</style><h1 data-sx="e1">Loud</h1>` };
+  const tokens = ':root{--paper:#efe9dc;--ink:#1c1a17;--ember:#c4512c}';
+  const id = ID.identityOf([logoBoard], tokens);
+  ok('ground, ink and accent are read from the artboard, through the shared properties', id.background === '#efe9dc' && id.text === '#1c1a17' && id.accent === '#c4512c', id);
+  ok('the face of the largest words is the display face; the root’s the text face', id.display === 'Fraunces' && id.body === 'Inter', id);
+  ok('the logo’s drawing is taken from the logo artboard, without the canvas’s ids', id.logo && /<svg viewBox="0 0 100 100"><circle class="dot"/.test(id.logo.svg) && id.logo.from === 'Northlight logo', id.logo);
+  ok('shared colour properties are carried by name', id.named.some((n) => n.name === 'ember' && n.hex === '#c4512c'));
+  const other = ID.identityOf([poster], tokens);
+  ok('another artboard carries another identity (nothing is mixed in from what was not asked for)', other.background === '#101010' && other.display === 'Anton' && other.accent === '#00ffcc' && other.logo === null);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -130,6 +130,8 @@ export interface DesignMemory {
   rejected: string[];
   /** kept typography and colour, enforced by check */
   pins?: DesignPins;
+  /** what the person allowed beyond the brand, for this project only (an exception, never a change to the brand) */
+  allowed?: DesignPins;
 }
 
 /** One thing a review found: what is happening, where, of what kind — and what could be done, if the person wants. */
@@ -350,7 +352,8 @@ export function normalizeDesignState(v: unknown): DesignState | null {
     turns,
     memory: { brief: str(m.brief, 4000), decisions: list(m.decisions, 30, 300), rejected: list(m.rejected, 30, 300), ...((() => {
       const pins = normalizePins(m.pins);
-      return pins ? { pins } : {};
+      const allowed = normalizePins(m.allowed);
+      return { ...(pins ? { pins } : {}), ...(allowed ? { allowed } : {}) };
     })()) },
     comments,
     assets,

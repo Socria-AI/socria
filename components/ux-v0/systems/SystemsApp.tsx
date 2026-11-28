@@ -18,8 +18,9 @@ import { applySystem, impactOn, propagateTo, setPin, undoApply, unlinkSystem, ty
 import { archiveRecord, compareVersions, discardDraft, draftChanges, duplicateRecord, logged, newRecord, publish, publishedContent, renameRecord, rollback, setDefault, updateDraft, type SystemRecord } from '@/lib/ux-v0/dsi/registry';
 import { emptyContent, normalizeContent, PRODUCT_ROLES, ROLE_LABEL, TOKEN_TYPES, type IntelItem, type OverrideLevel, type ProductRole, type SystemContent, type TokenType, type TokenValue } from '@/lib/ux-v0/dsi/schema';
 import { applySync, contentId, recordCheck, syncDiff, syncDue, type SyncChoice } from '@/lib/ux-v0/dsi/sync';
+import { RELATION_LABEL, checkParent, childrenOf, deriveSystem, experimentAgainst, ownChanges, parentAhead, parentageOf, promote, type Relation } from '@/lib/ux-v0/dsi/family';
 import { addToken, blocking, canOverride, isAlias, removeToken, renameToken, resolveToken, setToken, validate } from '@/lib/ux-v0/dsi/tokens';
-import { deleteSystem, listSystems, pullSystems, pushSystem, putSystem, removeFromAccount } from '@/lib/ux-v0/dsi/store';
+import { deleteSystem, listSystems, pullSystems, pushSystem, putSystem, removeFromAccount, getSystem } from '@/lib/ux-v0/dsi/store';
 import { getProject, listProjects, putProject } from '@/lib/ux-v0/store';
 import type { DesignProject, ProjectSummary } from '@/lib/ux-v0/types';
 import { AssetThumb, ImportWizard, type WizardStart } from './ImportWizard';
@@ -257,7 +258,7 @@ type Save = (rec: SystemRecord, say?: string) => Promise<void>;
 
 // ── overview ──
 
-function Overview({ rec, save, records, onAll, onImportInto, onDeleted }: { rec: SystemRecord; save: Save; records: SystemRecord[]; onSelect: (id: string) => void; onAll: (rs: SystemRecord[]) => Promise<unknown>; onImportInto: () => void; onDeleted: () => void }) {
+function Overview({ rec, save, records, onSelect, onAll, onImportInto, onDeleted }: { rec: SystemRecord; save: Save; records: SystemRecord[]; onSelect: (id: string) => void; onAll: (rs: SystemRecord[]) => Promise<unknown>; onImportInto: () => void; onDeleted: () => void }) {
   const c = rec.draft;
   const issues = useMemo(() => validate(c), [c]);
   const changes = useMemo(() => draftChanges(rec), [rec]);
@@ -280,8 +281,86 @@ function Overview({ rec, save, records, onAll, onImportInto, onDeleted }: { rec:
     setReview(false);
     await save(r.record, `Published v${r.record.published}. Projects that follow the latest version can be updated from Usage.`);
   };
+  // its family: what it was made from, and what was made from it (lib/ux-v0/dsi/family.ts)
+  const parentage = parentageOf(rec);
+  const parent = parentage ? records.find((r) => r.id === parentage.id) ?? null : null;
+  const children = childrenOf(records, rec.id);
+  const own = parentage ? ownChanges(rec) : [];
+  const ahead = parentage ? parentAhead(rec, parent) : false;
   return (
     <div className="ds-overview">
+      {(parentage || children.length > 0) && (
+        <section className="ds-card" aria-label="Family">
+          <h2 className="sb-label">Family</h2>
+          {parentage && (
+            <>
+              <p className="ds-note">
+                <strong>{RELATION_LABEL[parentage.relation]}</strong> made from{' '}
+                {parent ? (
+                  <button type="button" className="sb-link" onClick={() => onSelect(parent.id)}>
+                    {parent.name}
+                  </button>
+                ) : (
+                  'a system that is not in this browser'
+                )}
+                {parentage.relation === 'experiment' ? ' as it stood' : parentage.version ? ` v${parentage.version}` : ''}. {own.length ? `${own.length} thing${own.length === 1 ? ' is' : 's are'} its own; the rest is ${parent?.name ?? 'its parent'}’s.` : `Nothing is changed yet: it is ${parent?.name ?? 'its parent'} as it was.`}
+              </p>
+              {own.length > 0 && (
+                <ul className="ds-changes" data-own>
+                  {own.slice(0, 12).map((ch, i) => (
+                    <li key={i}>{ch.summary}</li>
+                  ))}
+                </ul>
+              )}
+              {ahead && parent && (
+                <p className="ds-notice" role="status">
+                  {parentage.relation === 'experiment' ? `${parent.name} has changed since this experiment was branched.` : `${parent.name} v${parent.published} is published; this was made from v${parentage.version}.`} Nothing here has changed. Bring it in from the Sync tab: what this system changed stays its own.
+                </p>
+              )}
+              {parentage.relation === 'experiment' && parent && (
+                <div className="ds-row">
+                  <button
+                    type="button"
+                    className="sb-btn is-primary"
+                    disabled={!experimentAgainst(rec, parent).length}
+                    onClick={async () => {
+                      const n = experimentAgainst(rec, parent).length;
+                      if (!window.confirm(`Bring ${n} change${n === 1 ? '' : 's'} from “${rec.name}” into the draft of ${parent.name}? Nothing is published: ${parent.name} v${parent.published || 0} stays as it is until you publish its draft.`)) return;
+                      const r = promote(rec, parent);
+                      if ('error' in r) return setMsg(r.error);
+                      await save(r.record, `Brought into the draft of ${parent.name}. Review and publish it there.`);
+                      onSelect(parent.id);
+                    }}
+                  >
+                    Bring it into {parent.name}’s draft
+                  </button>
+                  <span className="ds-note">{experimentAgainst(rec, parent).length} difference{experimentAgainst(rec, parent).length === 1 ? '' : 's'} from {parent.name} as it is now.</span>
+                </div>
+              )}
+            </>
+          )}
+          {children.length > 0 && (
+            <>
+              <p className="ds-note">Made from {rec.name}:</p>
+              <ul className="ds-changes" data-children>
+                {children.map((ch) => {
+                  const rel = parentageOf(ch)!;
+                  return (
+                    <li key={ch.id}>
+                      <button type="button" className="sb-link" onClick={() => onSelect(ch.id)}>
+                        {ch.name}
+                      </button>{' '}
+                      — {RELATION_LABEL[rel.relation].toLowerCase()}
+                      {rel.relation !== 'experiment' ? `, on v${rel.version}` : ''}
+                      {parentAhead(ch, rec) ? ' · a newer version is waiting there (nothing moves until it is brought in)' : ''}
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+        </section>
+      )}
       <section className="ds-card">
         <h2 className="sb-label">Identity</h2>
         <label className="ds-field">
@@ -360,6 +439,24 @@ function Overview({ rec, save, records, onAll, onImportInto, onDeleted }: { rec:
           <button type="button" className="sb-btn" onClick={() => save(duplicateRecord(rec), 'Duplicated.')}>
             Duplicate
           </button>
+          {(['product', 'campaign', 'experiment'] as Relation[]).map((relation) => (
+            <button
+              key={relation}
+              type="button"
+              className="sb-btn"
+              title={relation === 'experiment' ? 'A copy to rethink freely. It reaches this system only if you bring it back, and then only as a draft.' : `A system of its own within ${rec.name}: what it does not change stays ${rec.name}’s, and a new version of ${rec.name} waits to be brought in.`}
+              onClick={async () => {
+                const name = window.prompt(relation === 'experiment' ? `Name the experiment (a copy of ${rec.name} to rethink)` : `Name the ${relation}’s system (made within ${rec.name})`);
+                if (!name?.trim()) return;
+                const d = deriveSystem(rec, { name, relation });
+                if ('error' in d) return void save(rec, d.error);
+                await save(d.record, `${RELATION_LABEL[relation]} “${d.record.name}” made from ${rec.name}.`);
+                onSelect(d.record.id);
+              }}
+            >
+              {relation === 'experiment' ? 'Branch an experiment' : `Make a ${relation} system`}
+            </button>
+          ))}
           <button type="button" className="sb-btn" onClick={() => onAll(setDefault(records, rec.isDefault ? null : rec.id))}>
             {rec.isDefault ? 'Not the workspace default' : 'Make it the workspace default'}
           </button>
@@ -1174,6 +1271,14 @@ async function readSource(rec: SystemRecord, files: File[] | null, token?: strin
   const src = rec.sync.source;
   if (!src) return { ok: false, error: 'This system has no source to sync with.' };
   try {
+    if (src.kind === 'socriaux') {
+      // made from another system here: its parent's published version (an experiment: its origin as it stands)
+      const parent = await getSystem(src.ref);
+      const r = checkParent(rec, parent);
+      const content = parent ? (parentageOf(rec)?.relation === 'experiment' ? parent.draft : publishedContent(parent)) : null;
+      if (!parent || !content) return { ok: false, error: r.error ?? 'The system it was made from has no published version.' };
+      return { ok: true, upstreamId: parentageOf(rec)?.relation === 'experiment' ? `draft@${parent.updatedAt}` : `v${parent.published}`, content: JSON.parse(JSON.stringify(content)) };
+    }
     if (src.kind === 'github') {
       const res = await fetch('/api/ux-v0/design-system', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: src.ref, raw: true }) });
       const j = await res.json();

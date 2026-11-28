@@ -14,6 +14,8 @@
 //   <ok/>                                                                    (a look that found nothing to fix)
 //   <lock artboard="ab123" element="e12">the headline</lock>                  (the person said to keep it as it is)
 //   <keep what="typography" artboard="ab123"/>   <keep what="colours" artboard="ab123"/>
+//   <allow what="colour" value="#d0312d"/>   <allow what="typeface" value="Anton"/>   (an exception to the brand
+//   the person authorized, for this project)
 //   <finding kind="communication" artboard="ab123" element="e12">what is happening<fix>what would address it</fix></finding>
 //
 // The parser reads the whole text so far every time it is called: while the answer streams, an artboard that is still
@@ -50,6 +52,7 @@ export type Block =
   | { kind: 'question'; text: string; options: string[] }
   | { kind: 'lock'; artboard: string; element: string; what: string }
   | { kind: 'keep'; what: 'faces' | 'colours'; artboard: string }
+  | { kind: 'allow'; what: 'faces' | 'colours'; value: string }
   | { kind: 'finding'; type: string; artboard: string; element: string | null; text: string; fix: string };
 
 export interface Answer {
@@ -61,7 +64,7 @@ export interface Answer {
   open: boolean;
 }
 
-const TAGS = ['say', 'artboard', 'edit', 'remove', 'tokens', 'remember', 'question', 'ok', 'lock', 'keep', 'finding'] as const;
+const TAGS = ['say', 'artboard', 'edit', 'remove', 'tokens', 'remember', 'question', 'ok', 'lock', 'keep', 'allow', 'finding'] as const;
 type Tag = (typeof TAGS)[number];
 const OPEN_RE = new RegExp(`<(${TAGS.join('|')})\\b([^>]*?)(/?)>`, 'gi');
 
@@ -118,6 +121,14 @@ export function parseAnswer(raw: string): Answer {
       // tolerate <remove artboard="x"></remove>
       const close = src.indexOf('</remove>', start);
       at = !selfClosing && close >= 0 && close - start < 40 ? close + 9 : start;
+      continue;
+    }
+    if (tag === 'allow') {
+      const what = /typ|font|face|letter/i.test(a.what ?? '') ? 'faces' : /colou?r|palette/i.test(a.what ?? '') ? 'colours' : null;
+      const value = (a.value ?? '').trim().slice(0, 60);
+      if (what && value && (what === 'faces' || /^#[0-9a-f]{6}$/i.test(value))) blocks.push({ kind: 'allow', what, value: what === 'colours' ? value.toLowerCase() : value });
+      const close = src.indexOf('</allow>', start);
+      at = !selfClosing && close >= 0 && close - start < 40 ? close + 8 : start;
       continue;
     }
     if (tag === 'keep') {
