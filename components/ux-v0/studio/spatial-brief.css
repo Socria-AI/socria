@@ -1,0 +1,693 @@
+/* components/ux-v0/studio/spatial-brief.css — the spatial creative brief (./SpatialBrief.tsx). The project is the
+ * subject: the idea set large in the Socria voice (Instrument Serif), what is open beside what is understood, hairline
+ * rules instead of boxes, labels in sentence case, controls in Inter and only where they act. Nothing bounces; motion
+ * stops for those who ask for less. Prefix: sbx-. */
+
+.v0.sbx {
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--sd-paper);
+}
+.sbx-main {
+  display: grid;
+  align-content: start;
+  gap: clamp(28px, 4vw, 52px);
+  width: 100%;
+  max-width: 1380px;
+  margin: 0 auto;
+  padding: clamp(28px, 5vw, 64px) clamp(16px, 5vw, 72px) 96px;
+  overflow-y: auto;
+}
+
+/* ── the idea ── */
+.sbx-idea {
+  max-width: 1040px;
+}
+.sbx-prompt {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0 0 6px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--sd-ink);
+  font: 400 clamp(34px, 4.6vw, 64px) / 1.04 var(--sd-serif);
+  letter-spacing: -0.01em;
+  resize: none;
+  overflow: hidden;
+  transition: border-color 0.2s var(--sd-ease);
+}
+.sbx-prompt:hover:not(:disabled) {
+  border-bottom-color: var(--sd-line-2);
+}
+.sbx-prompt:focus {
+  outline: none;
+  border-bottom-color: var(--sd-ink);
+}
+.sbx-line {
+  min-height: 1.45em;
+  margin: 14px 0 0;
+  color: var(--sd-moss-700);
+  font: italic 400 20px/1.45 var(--sd-serif);
+}
+.sbx-line.is-thinking {
+  color: var(--sd-ink-45);
+}
+.sbx-error {
+  margin: 10px 0 0;
+  color: var(--sd-rust);
+  font-size: 14px;
+}
+
+/* ── the working area: what is open, beside what is understood ── */
+.sbx-work {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
+  gap: clamp(32px, 5vw, 88px);
+  align-items: start;
+}
+.sbx-main[data-shape='words'] .sbx-work,
+.sbx-main[data-shape='choice'] .sbx-work {
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 1fr);
+}
+/* nothing open: the brief itself is the page — the line and Generate above it, what is understood across the width */
+.sbx-main[data-shape='settled'] .sbx-work {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 40px;
+}
+.sbx-main[data-shape='settled'] .sbx-known {
+  position: static;
+  padding-left: 0;
+  border-left: 0;
+  columns: 2 300px;
+  column-gap: clamp(32px, 5vw, 88px);
+}
+.sbx-main[data-shape='settled'] .sbx-known-h {
+  column-span: all;
+}
+.sbx-main[data-shape='settled'] .sbx-known > :not(.sbx-facts),
+.sbx-main[data-shape='settled'] .sbx-fact {
+  break-inside: avoid;
+}
+
+/* a consideration: a rule, its place, its question, then what answers it — no box */
+.sbx-q {
+  min-width: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--sd-ink);
+  animation: sbx-in 0.5s var(--sd-ease) both;
+}
+.sbx-topic {
+  margin: 0 0 10px;
+  color: var(--sd-ink-45);
+  font: 500 13px/1.2 var(--sd-sans);
+}
+.sbx-question {
+  max-width: 30ch;
+  margin: 0 0 22px;
+  color: var(--sd-ink);
+  font: 400 24px/1.18 var(--sd-serif);
+}
+.sbx-q.is-lead .sbx-question {
+  font-size: clamp(28px, 2.8vw, 40px);
+  line-height: 1.1;
+}
+.sbx-more {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 36px clamp(24px, 3vw, 48px);
+  margin-top: 52px;
+}
+.sbx-more .sbx-q {
+  border-top-color: var(--sd-line-2);
+}
+
+/* a choice: its readings as lines to choose, not pills */
+.sbx-options {
+  display: grid;
+  margin: 0 0 18px;
+  border-top: 1px solid var(--sd-line);
+}
+.sbx-option {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 14px 2px;
+  border: 0;
+  border-bottom: 1px solid var(--sd-line);
+  background: transparent;
+  color: var(--sd-ink);
+  font: 400 21px/1.25 var(--sd-serif);
+  text-align: left;
+  cursor: pointer;
+  animation: sbx-in 0.45s calc(var(--i, 0) * 40ms) var(--sd-ease) both;
+  transition:
+    color 0.2s var(--sd-ease),
+    padding 0.3s var(--sd-ease);
+}
+.sbx-option::after {
+  content: '→';
+  color: var(--sd-ink-25);
+  font-family: var(--sd-sans);
+  font-size: 15px;
+  transition: color 0.2s var(--sd-ease);
+}
+.sbx-option:hover:not(:disabled) {
+  padding-left: 8px;
+  color: var(--sd-moss-700);
+}
+.sbx-option:hover:not(:disabled)::after {
+  color: var(--sd-moss);
+}
+
+/* an answer in words, where the question stands */
+.sbx-words {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 620px;
+  margin: 18px 0 0;
+  border-bottom: 1px solid var(--sd-ink-25);
+  transition: border-color 0.2s var(--sd-ease);
+}
+.sbx-words:focus-within {
+  border-bottom-color: var(--sd-moss);
+  box-shadow: 0 1px 0 var(--sd-moss);
+}
+.sbx-words input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 0;
+  border: 0;
+  background: transparent;
+  color: var(--sd-ink);
+  font: 400 16.5px/1.4 var(--sd-sans);
+}
+.sbx-words input:focus {
+  outline: none;
+}
+.sbx-words input::placeholder,
+.sbx-say-in input::placeholder {
+  color: var(--sd-ink-45);
+}
+.sbx-send {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--sd-ink-70);
+  cursor: pointer;
+}
+.sbx-send:not(:disabled):hover {
+  background: var(--sd-moss-50);
+  color: var(--sd-ink);
+}
+.sbx-send:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.sbx-send.is-dark:not(:disabled) {
+  background: var(--sd-ink);
+  color: var(--sd-white);
+}
+.sbx-skip,
+.sbx-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sd-ink-45);
+  font: 500 13px/1.4 var(--sd-sans);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition:
+    color 0.2s var(--sd-ease),
+    text-decoration-color 0.2s var(--sd-ease);
+}
+.sbx-skip {
+  margin-top: 14px;
+}
+.sbx-skip:hover:not(:disabled),
+.sbx-link:hover:not(:disabled) {
+  color: var(--sd-ink);
+  text-decoration-color: currentColor;
+}
+
+/* what a visual consideration shows: the swatches, the faces and the moods themselves, without boxes around them */
+.sbx .sd-aid {
+  margin: 0;
+}
+.sbx .sd-dq-grid {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 22px 16px;
+}
+.sbx .sd-dq-list.is-faces {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 22px 18px;
+}
+.sbx .sd-dq-card {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  gap: 8px;
+}
+.sbx button.sd-dq-card:hover {
+  box-shadow: none;
+  transform: none;
+}
+.sbx button.sd-dq-card:hover .sd-dq-pal,
+.sbx button.sd-dq-card:hover .sd-aid-mood {
+  transform: translateY(-3px);
+}
+.sbx .sd-dq-pal,
+.sbx .sd-aid-mood {
+  border-radius: 3px;
+  transition: transform 0.35s var(--sd-ease);
+}
+.sbx .sd-dq-card.is-face {
+  padding: 16px 0 0;
+  border-top: 1px solid var(--sd-line-2);
+}
+.sbx .sd-dq-name,
+.sbx .sd-dq-note,
+.sbx .sd-dq-hex {
+  padding: 0;
+}
+.sbx .sd-aid-own {
+  border: 1px dashed var(--sd-line-2);
+  padding: 10px;
+}
+.sbx .sd-aid-hint {
+  margin-top: 16px;
+}
+
+/* ── what is understood ── */
+.sbx-known {
+  position: sticky;
+  top: 0;
+  min-width: 0;
+  padding-left: clamp(0px, 2.4vw, 32px);
+  border-left: 1px solid var(--sd-line);
+}
+.sbx-known-h {
+  margin: 0 0 14px;
+  color: var(--sd-ink);
+  font: 400 23px/1.2 var(--sd-serif);
+}
+.sbx-facts {
+  margin: 0;
+}
+.sbx-fact {
+  padding: 11px 0 12px;
+  border-top: 1px solid var(--sd-line);
+}
+.sbx-fact dt {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--sd-ink-45);
+  font: 500 12.5px/1.3 var(--sd-sans);
+}
+.sbx-mine {
+  color: var(--sd-moss);
+  font: italic 400 14px/1 var(--sd-serif);
+}
+.sbx-fact dd {
+  margin: 4px 0 0;
+}
+.sbx-edit {
+  display: block;
+  width: 100%;
+  margin: 0 -6px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--sd-ink);
+  font: 400 15.5px/1.45 var(--sd-sans);
+  resize: none;
+  overflow: hidden;
+  transition: background-color 0.2s var(--sd-ease);
+}
+.sbx-edit:hover:not(:disabled) {
+  background: rgba(32, 32, 27, 0.04);
+}
+.sbx-edit:focus {
+  outline: none;
+  background: var(--sd-white);
+  box-shadow: inset 0 0 0 1px var(--sd-line-2);
+}
+
+.sbx-picks {
+  display: grid;
+  gap: 18px;
+  margin: 18px 0 0;
+}
+.sbx-pick-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.sbx-pick-k {
+  color: var(--sd-ink-45);
+  font: 500 12.5px/1.3 var(--sd-sans);
+}
+.sbx-pick-n {
+  flex: 1;
+  min-width: 0;
+  font: 400 18px/1.2 var(--sd-serif);
+}
+.sbx-sws {
+  display: flex;
+  height: 46px;
+}
+.sbx-sw {
+  position: relative;
+  flex: 1;
+  cursor: pointer;
+  transition: flex-grow 0.35s var(--sd-ease);
+}
+.sbx-sw:first-child {
+  flex: 2;
+}
+.sbx-sw:hover {
+  flex-grow: 2.4;
+}
+.sbx-sw input[type='color'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.sbx-sw:focus-within {
+  outline: 2px solid var(--sd-ink);
+  outline-offset: 2px;
+  z-index: 1;
+}
+.sbx-pick-hex {
+  margin: 6px 0 0;
+  color: var(--sd-ink-45);
+  font: 500 11.5px/1.3 var(--sd-sans);
+  font-variant-numeric: tabular-nums;
+}
+.sbx-warn {
+  margin: 4px 0 0;
+  color: var(--sd-rust);
+  font-size: 12.5px;
+}
+.sbx-pick-spec {
+  margin: 4px 0 6px;
+  overflow-wrap: normal;
+  font-size: 40px;
+  line-height: 1.02;
+}
+.sbx-pick-body {
+  margin: 0;
+  color: var(--sd-ink-70);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.sbx-pick-mood {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 92px;
+  margin-bottom: 8px;
+  padding: 12px 14px;
+  border-radius: 3px;
+  font-size: 28px;
+  line-height: 1;
+}
+.sbx-pick-bar {
+  width: 56px;
+  height: 6px;
+}
+
+.sbx-settled,
+.sbx-asked,
+.sbx-guess,
+.sbx-avoid,
+.sbx-notes,
+.sbx-pics {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sbx-settled {
+  margin-top: 18px;
+}
+.sbx-settled li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 14px;
+  align-items: baseline;
+  padding: 10px 0;
+  border-top: 1px solid var(--sd-line);
+}
+.sbx-settled-t {
+  grid-column: 1;
+  color: var(--sd-ink-45);
+  font: 500 12.5px/1.3 var(--sd-sans);
+}
+.sbx-settled-a {
+  grid-column: 1;
+  color: var(--sd-ink);
+  font-size: 15px;
+  line-height: 1.4;
+}
+.sbx-settled-a.is-left {
+  color: var(--sd-ink-45);
+  font-style: italic;
+}
+.sbx-settled .sbx-link {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+.sbx-group {
+  margin-top: 22px;
+}
+.sbx-group-h {
+  margin: 0 0 6px;
+  color: var(--sd-ink-45);
+  font: 500 12.5px/1.3 var(--sd-sans);
+}
+.sbx-asked li,
+.sbx-guess li,
+.sbx-avoid li,
+.sbx-notes li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 0;
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+.sbx-guess li > span,
+.sbx-avoid li > span,
+.sbx-notes li > span {
+  flex: 1;
+  min-width: 0;
+}
+.sbx-guess li > span {
+  color: var(--sd-ink-70);
+  font: italic 400 16.5px/1.35 var(--sd-serif);
+}
+.sbx-avoid li > span {
+  text-decoration: line-through;
+  text-decoration-color: var(--sd-ink-25);
+}
+.sbx-x {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--sd-ink-45);
+  cursor: pointer;
+}
+.sbx-x:hover:not(:disabled) {
+  background: rgba(32, 32, 27, 0.06);
+  color: var(--sd-ink);
+}
+.sbx-pics li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 13.5px;
+}
+.sbx-pic-n {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sbx-pic-sw {
+  display: flex;
+}
+.sbx-pic-sw i {
+  width: 12px;
+  height: 12px;
+}
+.sbx-refs .sd-refcard {
+  margin-top: 10px;
+}
+.sbx-quiet {
+  margin: 8px 0 0;
+  color: var(--sd-ink-45);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.sbx-quiet.is-notice {
+  color: var(--sd-rust);
+}
+
+/* nothing open: one line and Generate, side by side */
+.sbx-open.is-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 32px;
+  padding-top: 18px;
+  border-top: 1px solid var(--sd-ink);
+}
+.sbx-ready {
+  margin: 0;
+  font: 400 clamp(24px, 2.4vw, 32px) / 1.2 var(--sd-serif);
+}
+.sbx-go-big {
+  min-height: 46px;
+  padding: 0 22px;
+  font-size: 15px;
+}
+
+/* ── anything else, in their own words ── */
+.sbx-say {
+  max-width: 1040px;
+}
+.sbx-say-k {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--sd-ink-45);
+  font: 500 13px/1.3 var(--sd-sans);
+}
+.sbx-say-in {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--sd-ink-25);
+  transition: border-color 0.2s var(--sd-ease);
+}
+.sbx-say-in:focus-within {
+  border-bottom-color: var(--sd-moss);
+  box-shadow: 0 1px 0 var(--sd-moss);
+}
+.sbx-say-in input:not([type='file']) {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 0;
+  border: 0;
+  background: transparent;
+  color: var(--sd-ink);
+  font: 400 17px/1.4 var(--sd-sans);
+}
+.sbx-say-in input:focus {
+  outline: none;
+}
+
+/* Generate, always reachable: in the header, and docked at the foot on a phone */
+.sbx-go {
+  min-height: 36px;
+  padding: 0 18px;
+}
+.sbx-dock {
+  display: none;
+}
+
+.sbx :is(button, input, textarea, label):focus-visible {
+  outline: 2px solid var(--sd-moss);
+  outline-offset: 2px;
+}
+/* a line to write on shows focus on its own rule (above), not in a box */
+.sbx :is(.sbx-words, .sbx-say-in) input:not([type='file']):focus-visible {
+  outline: none;
+}
+
+@keyframes sbx-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .sbx-main {
+    padding-bottom: 116px;
+  }
+  .sbx-work,
+  .sbx-main[data-shape] .sbx-work {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sbx-known {
+    position: static;
+    padding: 20px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--sd-line);
+  }
+  .sbx-more {
+    grid-template-columns: minmax(0, 1fr);
+    margin-top: 36px;
+  }
+  .sbx-go {
+    display: none;
+  }
+  .sbx-dock {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 30;
+    display: block;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--sd-line);
+    background: var(--sd-paper);
+  }
+  .sbx-head .sd-save {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sbx-q,
+  .sbx-option {
+    animation: none;
+  }
+  .sbx-option,
+  .sbx-sw,
+  .sbx .sd-dq-pal,
+  .sbx .sd-aid-mood {
+    transition: none;
+  }
+}

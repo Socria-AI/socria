@@ -18,6 +18,8 @@ export interface Palette {
   note: string;
   /** 3–5 colours: the ground first, then an ink that reads on it, then an accent, then support colours */
   colours: string[];
+  /** changed by the person, colour by colour: kept in their order, readable or not */
+  edited?: boolean;
 }
 
 export interface TypePair {
@@ -129,8 +131,13 @@ export function readableOrder(colours: readonly string[]): string[] | null {
 
 export function normalizePalette(v: unknown): Palette | null {
   const r = o(v);
-  const colours = readableOrder(Array.isArray(r.colours) ? r.colours : [r.ground, r.ink, r.accent, ...(Array.isArray(r.support) ? r.support : [])]);
   const name = s(r.name, 40);
+  // colours the person changed themselves are theirs, in their order (the brief says when the ink may not read)
+  if (r.edited === true) {
+    const own = [...new Set((Array.isArray(r.colours) ? r.colours : []).map(hex).filter((c): c is string => !!c))].slice(0, 5);
+    return own.length >= 3 && name ? { name, note: s(r.note, 160), colours: own, edited: true } : null;
+  }
+  const colours = readableOrder(Array.isArray(r.colours) ? r.colours : [r.ground, r.ink, r.accent, ...(Array.isArray(r.support) ? r.support : [])]);
   if (!colours || !name) return null;
   return { name, note: s(r.note, 160), colours };
 }
@@ -228,4 +235,142 @@ export function choiceWords(kind: AidKind, x: Palette | TypePair | Mood): string
   }
   const m = x as Mood;
   return `${m.name} — ${m.note}`;
+}
+
+// ── the spatial brief: what SocriaUX shows while the work is being shaped ──
+//
+// Not a conversation. The person's idea stays at the top, editable; what is understood sits beside it, each line with
+// where it came from; and a few considerations are placed in it — each a question written for this work (by the
+// question model), sometimes with something to look at (an aid). Answering, picking, skipping, editing in place or
+// adding a note in their own words changes the brief; the model then returns it updated (lib/ux-v0/studio/discover.ts).
+
+export type ModuleKind = 'text' | 'choice' | 'palettes' | 'type' | 'moods';
+export const MODULE_KINDS: readonly ModuleKind[] = ['text', 'choice', 'palettes', 'type', 'moods'];
+export type BriefField = 'kind' | 'purpose' | 'audience' | 'content' | 'feel';
+export const BRIEF_FIELDS: readonly BriefField[] = ['kind', 'purpose', 'audience', 'content', 'feel'];
+
+/** One consideration placed in the brief: a question for this work, answered in words, by a pick, or skipped. */
+export interface BriefModule {
+  /** stable within the brief (the model reuses it to keep or retire the consideration) */
+  id: string;
+  /** a short label for where it sits ("Atmosphere", "Who it is for") */
+  topic: string;
+  question: string;
+  kind: ModuleKind;
+  /** the most valuable consideration open now: given the most room */
+  lead: boolean;
+  /** a choice's short answers */
+  options: string[];
+  /** a text question's example answer, in their voice */
+  placeholder: string;
+  /** palettes, pairings of faces or moods to look at */
+  aid: Aid | null;
+  status: 'open' | 'answered' | 'skipped';
+  /** what holds now: their words, or the option they picked (by its place) */
+  answer: { text: string; pick: number | null; at: number } | null;
+}
+
+/** Something the person added in their own words, outside any consideration ("darker, more mysterious"). */
+export interface BriefNote {
+  id: string;
+  text: string;
+  at: number;
+}
+
+export interface SpatialBrief {
+  /** one short line from SocriaUX about the latest change and what matters now (never a chat message) */
+  note: string;
+  modules: BriefModule[];
+  notes: BriefNote[];
+  /** nothing essential is missing (generating is always possible regardless) */
+  ready: boolean;
+  by: 'model' | 'reader';
+  /** considerations shown in all, and the kinds of aid shown (each at most once) */
+  asked: number;
+  shown: AidKind[];
+  /** fields of the brief the person set themselves, in place: kept in their words whatever the model returns */
+  own: BriefField[];
+  /** the person changed something the model has not yet seen */
+  stale: boolean;
+  /** what changed last, in a few words (the model reads it to say what it took from it) */
+  change: string;
+  /** Generate was pressed: the work is being made (a reload picks it up) */
+  making: boolean;
+  rev: number;
+}
+
+/** At most this many considerations are open at once, and this many are shown in all. */
+export const MAX_OPEN = 3;
+export const MAX_ASKED = 6;
+
+export const moduleId = (v: unknown) =>
+  s(v, 40)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 32);
+
+/** A consideration held to shape (an aid that does not hold up leaves the question standing, answered in words). */
+export function normalizeModule(v: unknown): BriefModule | null {
+  const r = o(v);
+  const id = moduleId(r.id);
+  const question = s(r.question, 240);
+  if (!id || question.length < 4) return null;
+  let kind: ModuleKind = MODULE_KINDS.includes(r.kind) ? r.kind : 'text';
+  let aid: Aid | null = null;
+  if (kind === 'palettes' || kind === 'type' || kind === 'moods') {
+    aid = normalizeAid(r.aid ? { ...o(r.aid), kind } : { kind, sample: r.sample, options: r.options });
+    if (!aid) kind = 'text';
+  }
+  let options = kind === 'choice' ? list(r.options, 4, 60) : [];
+  if (kind === 'choice' && options.length < 2) (kind = 'text'), (options = []);
+  const status = r.status === 'answered' || r.status === 'skipped' ? r.status : 'open';
+  const a = o(r.answer);
+  const pick = Number.isInteger(a.pick) && a.pick >= 0 && a.pick < 4 ? (a.pick as number) : null;
+  const answer = status === 'answered' && s(a.text, 400) ? { text: s(a.text, 400), pick, at: Number(a.at) || 0 } : null;
+  return {
+    id,
+    topic: s(r.topic, 40) || question.split(/[?.]/)[0].slice(0, 40),
+    question,
+    kind,
+    lead: r.lead === true,
+    options,
+    placeholder: kind === 'text' ? s(r.placeholder, 120) : '',
+    aid,
+    status: answer || status === 'skipped' ? status : 'open',
+    answer,
+  };
+}
+
+export function emptySpace(): SpatialBrief {
+  return { note: '', modules: [], notes: [], ready: false, by: 'reader', asked: 0, shown: [], own: [], stale: true, change: 'opened the brief', making: false, rev: 0 };
+}
+
+/** A spatial brief held to shape and size (undefined when there is none). */
+export function normalizeSpace(v: unknown): SpatialBrief | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const r = o(v);
+  const seen = new Set<string>();
+  const modules = (Array.isArray(r.modules) ? r.modules : [])
+    .map(normalizeModule)
+    .filter((m): m is BriefModule => !!m && !seen.has(m.id) && (seen.add(m.id), true))
+    .slice(0, 16);
+  const notes = (Array.isArray(r.notes) ? r.notes : [])
+    .map((n) => ({ id: s(o(n).id, 24) || 'n', text: s(o(n).text, 600), at: Number(o(n).at) || 0 }))
+    .filter((n) => n.text)
+    .slice(-12);
+  return {
+    note: s(r.note, 200),
+    modules,
+    notes,
+    ready: r.ready === true,
+    by: r.by === 'model' ? 'model' : 'reader',
+    asked: Math.max(0, Math.min(40, Math.floor(Number(r.asked) || 0))),
+    shown: (Array.isArray(r.shown) ? r.shown : []).filter((k: unknown): k is AidKind => (AID_KINDS as readonly unknown[]).includes(k)),
+    own: (Array.isArray(r.own) ? r.own : []).filter((k: unknown): k is BriefField => (BRIEF_FIELDS as readonly unknown[]).includes(k)),
+    stale: r.stale === true,
+    change: s(r.change, 200),
+    making: r.making === true,
+    rev: Math.max(0, Math.floor(Number(r.rev) || 0)),
+  };
 }

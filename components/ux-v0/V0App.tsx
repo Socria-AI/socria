@@ -38,6 +38,7 @@ import './home.css';
 import './studio.css';
 import './dna.css';
 import './studio/studio-home.css';
+import './studio/spatial-brief.css';
 
 const idFromUrl = () => {
   if (typeof window === 'undefined') return null;

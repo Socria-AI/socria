@@ -56,11 +56,11 @@ export interface ConversationProps {
   onSwitchMode: (mode: StudioMode) => void;
 }
 
-const ATTACH = '.png,.jpg,.jpeg,.webp,.gif,.svg,.json,.css,.scss,.pdf,.ttf,.otf,.woff,.woff2,.html,.htm,image/*,application/json,text/css,application/pdf,text/html';
+export const ATTACH = '.png,.jpg,.jpeg,.webp,.gif,.svg,.json,.css,.scss,.pdf,.ttf,.otf,.woff,.woff2,.html,.htm,image/*,application/json,text/css,application/pdf,text/html';
 const TAKE_LABEL: Record<RefTake, string> = { colour: 'Colours', type: 'Type', layout: 'Layout', mood: 'Mood' };
 
 /** What a search for references found: each page or picture with its source, to open, or to take as a reference. */
-function FoundList({ found, used, onUse }: { found: NonNullable<StudioMessage['found']>; used: ReadonlySet<string>; onUse?: (url: string) => void }) {
+export function FoundList({ found, used, onUse }: { found: NonNullable<StudioMessage['found']>; used: ReadonlySet<string>; onUse?: (url: string) => void }) {
   return (
     <ul className="sd-found" role="list" aria-label={`Found for “${found.query}” by ${found.provider}`}>
       {found.results.map((f, i) => (
@@ -87,7 +87,7 @@ function FoundList({ found, used, onUse }: { found: NonNullable<StudioMessage['f
   );
 }
 
-function ReferenceCard({ r, preview, onReference }: { r: StudioReference; preview?: string; onReference: ConversationProps['onReference'] }) {
+export function ReferenceCard({ r, preview, onReference }: { r: StudioReference; preview?: string; onReference: ConversationProps['onReference'] }) {
   const rejected = r.state === 'rejected';
   return (
     <figure className={`sd-refcard${rejected ? ' is-rejected' : ''}`} data-ref={r.id}>

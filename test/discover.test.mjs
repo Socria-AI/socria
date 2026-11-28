@@ -1,9 +1,9 @@
-// Creative discovery (lib/ux-v0/studio/discover.ts, discover-model.ts, brief.ts): the conversation before a graphic,
-// a logo, a campaign or a website is made.
+// The spatial creative brief (lib/ux-v0/studio/discover.ts, discover-model.ts, brief.ts): what SocriaUX understands
+// before a graphic, a logo, a campaign or a website is made, and how the brief changes as the person shapes it.
 //
-// No model is called. The model's answers are written here as it would write them (and badly, where that is the point),
-// held to shape by the same code the route and the browser use; the reader that decides when the model cannot be
-// reached is run as it is. Each scenario of the brief (A–L) is played through the conversation record and read back.
+// No model is called. The model's plans are written here as it would write them (and badly, where that is the point),
+// held to shape by the same code the route and the browser use; the reader that plans when the model cannot be reached
+// is run as it is. Every change a person can make is applied and read back, and the brief is handed to the designer.
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -18,224 +18,187 @@ const sec = (s) => console.log(`\n=== ${s} ===`);
 const J = JSON.stringify;
 const NOW = 1_800_000_000_000;
 
-/** A conversation begun as the home begins one: the person's words, kept as the first message. */
-const begin = (mode, words, modeBy = 'words') => S.said(S.emptyStudio(mode, words, { now: NOW, modeBy }), { from: 'person', kind: 'prompt', text: words, at: NOW });
-const last = (st) => st.transcript[st.transcript.length - 1];
-/** The model's answer, in the shape it writes (every field present). */
+/** A brief opened as the home opens one: the idea, kept, and an empty spatial brief waiting for its first plan. */
+const open = (mode, words, modeBy = 'words') => ({ ...S.said(S.emptyStudio(mode, words, { now: NOW, modeBy }), { from: 'person', kind: 'prompt', text: words, at: NOW }), space: S.emptySpace() });
+/** The model's plan, in the shape it writes (every field present). */
 const brief = (over = {}) => ({ kind: '', purpose: '', audience: '', content: '', feel: '', explicit: [], implied: [], tentative: [], avoid: [], references: [], open: [], clear: [], ...over });
-const askAns = (text, over = {}) => ({ action: 'ask', say: over.say ?? '', question: { text, suggestions: over.suggestions ?? [], aid: over.aid ?? null }, mode: over.mode ?? null, brief: brief(over.brief) });
-const makeAns = (say, b = {}, mode = null) => ({ action: 'make', say, question: null, mode, brief: brief(b) });
-/** One turn with a scripted model answer: the decision held to shape, then carried out. */
-const turn = (st, answer) => {
-  const c = S.discoverContextOf(st);
-  const d = S.normalizeDecision(answer, c) ?? S.readerDecision(st);
-  return { st: S.applyDecision(st, d, NOW + st.transcript.length), d };
+const raw = (o = {}) => ({ note: o.note ?? '', ready: !!o.ready, mode: o.mode ?? null, modules: o.modules ?? [], answers: o.answers ?? [], retire: o.retire ?? [], brief: brief(o.brief) });
+const m = (id, topic, question, o = {}) => ({ id, topic, question, kind: o.kind ?? 'text', lead: !!o.lead, options: o.options ?? null, placeholder: o.placeholder ?? null, sample: o.sample ?? null, palettes: o.palettes ?? null, faces: o.faces ?? null, moods: o.moods ?? null });
+/** One refinement with a scripted plan: held to shape against what was sent, then applied. */
+const refine = (st, r) => {
+  const c = S.spaceContextOf(st);
+  const p = S.normalizePlan(r, c) ?? S.readerPlan(st);
+  return { st: S.applyPlan(st, p), p, c };
 };
-const reply = (st, text) => S.personSays(st, text, { now: NOW + st.transcript.length });
+const openIds = (st) => st.space.modules.filter((x) => x.status === 'open').map((x) => x.id);
 
-sec('what hands the rest to SocriaUX');
+const PALS = [
+  { name: 'Acid night', note: 'near black with one acid green', colours: ['#0b0b0d', '#e9e6df', '#c6ff3d'] },
+  { name: 'Ink on cream, reversed order', note: 'the readable pair found and put first', colours: ['#f4efe4', '#f1e9d8', '#141414', '#c8102e'] },
+  { name: 'Grey on grey', note: 'nothing reads', colours: ['#777777', '#7a7a7a', '#7d7d7d'] },
+  { name: 'Not colours', note: '', colours: ['red', 'blue', 'green'] },
+];
+const MOODS = [
+  { name: 'Ethereal', note: 'soft white on pale sky', colours: ['#eef3f8', '#24324a', '#9bb7d4'], display: 'Cormorant Garamond' },
+  { name: 'Storm light', note: 'bruised greys, a seam of gold', colours: ['#2a2d34', '#f2efe6', '#d4a548'], display: 'Bodoni Moda' },
+  { name: 'Invented', note: 'not a library face', colours: ['#000000', '#ffffff', '#ff0000'], display: 'Comic Sans' },
+];
+const FACES = [
+  { name: 'Tight and loud', note: 'condensed capitals', display: 'Anton', body: 'Inter', weight: 400, upper: true },
+  { name: 'Book serif', note: '', display: 'Fraunces', body: 'Instrument Serif', weight: 650, upper: false },
+  { name: 'Made up', note: '', display: 'Helvetica Neue', body: 'Inter', weight: null, upper: false },
+];
+
+sec('what hands the rest to SocriaUX, and what passes on a consideration');
 {
-  const yes = ['Surprise me. Just make something.', 'You decide.', 'you choose', 'I trust your judgment', 'Honestly, up to you', 'just make it', 'Make it now', 'go ahead', 'whatever you think is best', 'ok, go for it!'];
-  const no = ['Make me a poster.', 'Surprise me with the colours but keep it minimal', 'You decide the colours, I want serif type', 'make it more futuristic', 'I want something premium', 'no idea what style'];
-  ok('“make it”, “you decide”, “surprise me”, “I trust your judgment” hand it over', yes.every((t) => S.wantsMake(t)), yes.filter((t) => !S.wantsMake(t)));
-  ok('…but a request, or a partial hand-over with a preference in it, is not', no.every((t) => !S.wantsMake(t)), no.filter((t) => S.wantsMake(t)));
+  const yes = ['Surprise me. Just make something.', 'You decide.', 'you choose', 'I trust your judgment', 'Honestly, up to you', 'just make it', 'generate it', 'go ahead'];
+  const no = ['Make me a poster.', 'Surprise me with the colours but keep it minimal', 'make it more futuristic', 'no idea what style'];
+  ok('“make it”, “you decide”, “surprise me” hand it over', yes.every((t) => S.wantsMake(t)) && !no.some((t) => S.wantsMake(t)), { yes: yes.filter((t) => !S.wantsMake(t)), no: no.filter((t) => S.wantsMake(t)) });
+  ok('“Skip”, “pass”, “next” — and a bare shrug — pass on a consideration; words about the work that start with “skip” or “not sure” are words about the work', ['Skip', 'skip this one', 'pass', 'Next question', 'not sure', 'idk', 'Whatever.', 'I don’t know', "i don't know"].every((t) => S.skips(t)) && !['Skip the gradients', 'skip the date, it is not set yet', 'not sure, maybe something with plants', 'idk, something that looks good'].some((t) => S.skips(t)));
 }
 
 sec('the reader (when the model cannot be reached): only what the work cannot do without');
 {
-  const a = S.readerDecision(begin('graphic', 'Make me a poster.'));
-  ok('A, “make me a poster”: what it is for — never what it should say', a.action === 'ask' && a.ask.text === 'What’s the poster for?' && a.stage === 'purpose', J(a));
-  let st = S.applyDecision(begin('graphic', 'Make me a poster.'), a, NOW + 1);
-  st = reply(st, 'An underground electronic music event.');
-  const a2 = S.readerDecision(st);
-  ok('…then it is made; the answer is kept as words, never set as a headline', a2.action === 'make' && a2.brief.content === '' && a2.brief.explicit.includes('An underground electronic music event.'), J(a2.brief));
-  const b = S.readerDecision(begin('graphic', 'Create a brutalist editorial poster for a contemporary architecture exhibition, with oversized condensed typography, black and cream colors, asymmetrical composition, and minimal decoration.'));
-  ok('B, a detailed brief: made at once, nothing asked', b.action === 'make', J(b));
-  const lg = S.readerDecision(begin('logo', 'A logo for a coffee roaster'));
-  ok('a logo with no name: its name, exactly as they write it', lg.action === 'ask' && /What’s it called/.test(lg.ask.text) && lg.stage === 'name');
-  const lgn = S.readerDecision(begin('logo', 'A logo for a coffee roaster called “Ember & Oak”'));
-  ok('…with its name: made', lgn.action === 'make');
-  const un = S.readerDecision(begin('graphic', 'something for my bakery', 'unsure'));
-  ok('nothing says what it is: what they are making, with three short replies', un.action === 'ask' && un.stage === 'what' && un.ask.suggestions.length === 3, J(un));
-  let st2 = S.applyDecision(begin('graphic', 'something for my bakery', 'unsure'), un, NOW + 1);
-  st2 = reply(st2, 'a logo, called Crumb');
-  const un2 = S.readerDecision(st2);
-  ok('…the answer read for the kind of work, then made', un2.mode === 'logo' && un2.action === 'make', J(un2));
-  let st3 = begin('graphic', 'A poster');
-  for (let i = 0; i < 3; i++) st3 = reply(S.applyDecision(st3, { ...S.readerDecision(st3), action: 'ask', ask: { text: `Question ${i}?`, aid: null, suggestions: [] } }, NOW + i), 'hmm');
-  ok('L: never more than two questions from the reader', S.readerDecision(st3).action === 'make');
+  let st = open('graphic', 'something for my bakery', 'unsure');
+  let r = refine(st, null);
+  ok('nothing says what it is: “What are you making?” with readings to choose, as the lead', J(openIds(r.st)) === '["what"]' && r.st.space.modules[0].kind === 'choice' && r.st.space.modules[0].options.length === 4 && r.st.space.modules[0].lead && r.st.space.by === 'reader', J(r.st.space.modules));
+  st = S.answerModule(r.st, 'what', 'A logo', NOW + 2);
+  r = refine(st, null);
+  ok('“A logo”: a logo now, and its name is raised (never twice)', r.st.mode === 'logo' && r.st.modeBy === 'recognised' && openIds(r.st).includes('name') && !openIds(r.st).includes('what'), J({ mode: r.st.mode, open: openIds(r.st) }));
+  st = S.answerModule(r.st, 'name', 'Halden', NOW + 3);
+  r = refine(st, null);
+  ok('its name given: nothing essential missing — ready', r.st.space.ready && openIds(r.st).length === 0, J(r.st.space));
+  r = refine(open('graphic', 'Make me a poster.'), null);
+  ok('a vague poster: what it is for (never its headline)', J(openIds(r.st)) === '["purpose"]' && /What’s the poster for\?/.test(r.st.space.modules[0].question), J(r.st.space.modules));
+  const skipped = refine(S.skipModule(r.st, 'purpose'), null).st;
+  ok('…skipped: ready, never raised again, and “Skip” never read as its subject', skipped.space.ready && !openIds(skipped).length && !/Skip/.test(S.designBriefOf(skipped)), S.designBriefOf(skipped));
+  r = refine(open('graphic', 'A bold poster for “Field Lines”, a festival of code that draws, 12–30 June 2027, Lisbon'), null);
+  ok('a detailed idea: nothing to raise — ready at once', r.st.space.ready && openIds(r.st).length === 0);
 }
 
-sec('what the model writes, held to shape and to the conversation’s rules');
+sec('what the model writes, held to shape and to the brief’s rules');
 {
-  const st = S.applyDecision(begin('graphic', 'Make me a poster.'), S.readerDecision(begin('graphic', 'Make me a poster.')), NOW + 1);
-  const c = S.discoverContextOf(reply(st, 'An underground electronic music event.'));
-  ok('the model reads the whole conversation in order, the questions asked and the aids shown', c.conversation.map((m) => m.who).join() === 'person,socria,person' && c.asked === 1 && c.shown.length === 0, J(c));
-  const pal = {
-    kind: 'palettes',
-    sample: null,
-    palettes: [
-      { name: 'Acid night', note: 'near black with one acid green', colours: ['#0b0b0d', '#e9e6df', '#c6ff3d'] },
-      { name: 'Ink on cream, reversed order', note: 'the readable pair found and put first', colours: ['#f4efe4', '#f1e9d8', '#141414', '#c8102e'] },
-      { name: 'Grey on grey', note: 'nothing reads', colours: ['#777777', '#7a7a7a', '#7d7d7d'] },
-      { name: 'Not colours', note: '', colours: ['red', 'blue', 'green'] },
-    ],
-    faces: null,
-    moods: null,
-  };
-  const d = S.normalizeDecision(askAns('What kind of colour atmosphere are you imagining?', { aid: pal, suggestions: ['dark'] }), c);
-  ok('palettes: only real colours whose ink reads on their ground (two of four kept), each put in order', d.ask.aid.options.length === 2 && d.ask.aid.options.every((p) => S.contrast(p.colours[0], p.colours[1]) >= 4.5), J(d.ask.aid));
-  ok('…and no tap-replies beside an aid', d.ask.suggestions.length === 0);
-  const faces = { kind: 'type', sample: 'Low Tide', palettes: null, moods: null, faces: [
-    { name: 'Tight and loud', note: 'condensed capitals', display: 'Anton', body: 'Inter', weight: 400, upper: true },
-    { name: 'Book serif', note: '', display: 'Fraunces', body: 'Instrument Serif', weight: 650, upper: false },
-    { name: 'Made up', note: '', display: 'Helvetica Neue', body: 'Inter', weight: null, upper: false },
-  ] };
-  const dt = S.normalizeDecision(askAns('Should the lettering carry the personality?', { aid: faces }), c);
-  ok('type: faces only from the library (an invented one dropped); a display-only face never sets the text — the pairing’s display face does', dt.action === 'ask' && dt.ask.aid?.options.length === 2 && dt.ask.aid.options[1].body === 'Fraunces', J(dt.ask));
-  const lone = S.normalizeDecision(askAns('Lettering?', { aid: { ...faces, faces: [faces.faces[0], faces.faces[2]] } }), c);
-  ok('…and with only one real pairing left, no aid at all (the question stands)', lone.action === 'ask' && lone.ask.aid === null, J(lone.ask));
-  const faces2 = { ...faces, faces: [faces.faces[0], { ...faces.faces[1], body: 'Newsreader' }] };
-  const dt2 = S.normalizeDecision(askAns('Should the lettering carry the personality?', { aid: faces2 }), c);
-  ok('…two real pairings: shown, the weight rounded to a real one', dt2.ask.aid?.kind === 'type' && dt2.ask.aid.options[1].weight === 700 && dt2.ask.aid.sample === 'Low Tide', J(dt2.ask.aid));
-  ok('an aid already shown in this conversation is not shown again', S.normalizeDecision(askAns('Colours?', { aid: pal }), { ...c, shown: ['palettes'] }).ask.aid === null);
-  ok('past the question limit, a question becomes the making', S.normalizeDecision(askAns('One more?'), { ...c, asked: 5 }).action === 'make');
-  ok('an answer that is not a decision is no decision (the reader decides)', S.normalizeDecision({ action: 'maybe' }, c) === null && S.normalizeDecision('prose', c) === null && S.normalizeDecision(askAns(''), c) === null);
-  ok('the work turned out to be another kind: said', S.normalizeDecision(makeAns('A logo, then.', {}, 'logo'), c).mode === 'logo');
-  // what was picked from an aid is kept by the conversation, not by the model's memory
-  const picked = { ...c, brief: { ...S.emptyBrief('a poster'), chosen: { palette: { name: 'Acid night', note: '', colours: ['#0b0b0d', '#e9e6df', '#c6ff3d'] } } } };
-  const kept = S.normalizeDecision(makeAns('Making it.', { kind: 'a poster' }), picked);
-  ok('a palette they picked stays in the brief whatever the model returns', kept.brief.chosen.palette?.name === 'Acid night');
-  ok('…unless they let it go (“not those colours”)', !S.normalizeDecision(makeAns('Other colours, then.', { clear: ['palette'] }), picked).brief.chosen.palette);
-  ok('…and no palettes are offered once colours are picked', S.normalizeDecision(askAns('Colours?', { aid: pal }), picked).ask.aid === null);
-  ok('…but never the pick their latest reply just made (a model reading “clear” as “this question is settled” cannot wipe it)', S.normalizeDecision(makeAns('Acid night, then.', { clear: ['palette'] }), { ...picked, justPicked: ['palette'] }).brief.chosen.palette?.name === 'Acid night');
-  // the context says what the latest reply picked, from the aid the question before it showed
-  let pk = S.said(S.emptyStudio('graphic', 'A gig poster', { now: 1, modeBy: 'words' }), { from: 'person', kind: 'prompt', text: 'A gig poster', at: 1 });
-  pk = S.applyDecision(pk, { action: 'ask', say: '', ask: { text: 'Which colours?', aid: S.normalizeAid({ kind: 'palettes', options: pal.palettes }), suggestions: [] }, brief: S.emptyBrief('a poster'), mode: null, by: 'model' }, 2);
-  ok('a pick from the aid shown: the context says it was just picked', J(S.discoverContextOf(S.chooseAid(pk, 0, 3)).justPicked) === '["palette"]');
-  ok('…a reply in words after an aid picks nothing', J(S.discoverContextOf(S.personSays(pk, 'Something greener', { now: 3 })).justPicked) === '[]');
-  ok('…and once something more is said, it is no longer the latest pick', J(S.discoverContextOf(S.personSays(S.chooseAid(pk, 0, 3), 'and make it loud', { now: 4 })).justPicked) === '[]');
-  const sys = S.normalizeDecision(askAns('Colours?', { aid: pal }), { ...c, system: 'Halden' });
-  ok('in a design system: no palettes or lettering to pick (the system decides them)', sys.ask.aid === null);
-  // what the route sent, checked again in the browser
-  const routeD = S.normalizeDecision(askAns('What kind of colour atmosphere?', { aid: pal, say: 'A club night.' }), c);
-  const revived = S.reviveDecision(JSON.parse(J(routeD)), c);
-  ok('the route’s decision, held to shape again in the browser, is the same decision', revived && revived.action === 'ask' && revived.ask.aid.options.length === 2 && revived.say === 'A club night.', J(revived));
-  ok('the context the browser sends is held to its shape by the route (a conversation is needed; the mode one of four)', S.normalizeDiscoverContext({ ...c, mode: 'critique' }) === null && S.normalizeDiscoverContext({ ...c, conversation: [] }) === null && S.normalizeDiscoverContext(JSON.parse(J(c)))?.conversation.length === 3);
-  ok('the schema lets the model name only library faces', J(S.DISCOVER_SCHEMA.properties.question.anyOf[0].properties.aid.anyOf[0].properties.faces.anyOf[0].items.properties.display.enum) === J(S.FONTS.map((f) => f.name)));
-  const sys2 = S.discoverSystem();
-  ok('the model is told how to decide, how to ask, the voice, the aids, the brief and the font library', ['Each turn, decide one thing', 'Good questions', 'Never perform enthusiasm', 'Visual aids', 'tentative', 'FONT LIBRARY', 'Fraunces'].every((w) => sys2.includes(w)));
+  const st = open('graphic', 'A poster for an underground electronic night');
+  const c = S.spaceContextOf(st);
+  const p = S.normalizePlan(raw({ note: 'An underground night.', modules: [m('atmosphere', 'Atmosphere', 'Dark and atmospheric, or chaotic?', { kind: 'moods', lead: true, sample: 'Subsonic', moods: MOODS }), m('words', 'Words', 'What must it say?', { lead: true }), m('colour', 'Colour', 'Which colours?', { kind: 'palettes', palettes: PALS }), m('fourth', 'Fourth', 'One too many?')] }), c);
+  ok('at most three open considerations, one lead', p.modules.length === 3 && p.modules.filter((x) => x.lead).length === 1 && p.modules[0].lead, J(p.modules.map((x) => [x.id, x.lead])));
+  ok('moods hold only real colours that read and faces from the library', p.modules[0].aid?.kind === 'moods' && p.modules[0].aid.options.map((x) => x.name).join() === 'Ethereal,Storm light', J(p.modules[0].aid));
+  ok('palettes: unreadable and non-colour options dropped, the readable pair put first', p.modules[2].aid?.options.length === 2 && p.modules[2].aid.options[1].colours[0] === '#f4efe4' && p.modules[2].aid.options[1].colours[1] === '#141414', J(p.modules[2].aid));
+  const tp = S.normalizePlan(raw({ modules: [m('type', 'Lettering', 'Which lettering?', { kind: 'type', sample: 'Halden', faces: FACES })] }), c);
+  ok('type: faces only from the library (the invented one dropped), a display-only face never sets text', tp.modules[0].aid?.kind === 'type' && tp.modules[0].aid.options.length === 2 && tp.modules[0].aid.options[1].body === 'Fraunces', J(tp.modules[0].aid));
+  const lone = S.normalizePlan(raw({ modules: [m('type', 'Lettering', 'Which lettering?', { kind: 'type', faces: [FACES[0], FACES[2]] })] }), c);
+  ok('…with fewer than two real options, the question stands, answered in words', lone.modules[0].kind === 'text' && lone.modules[0].aid === null);
+  const choice = S.normalizePlan(raw({ modules: [m('cloud', 'Atmosphere', 'Which kind of cloud?', { kind: 'choice', options: ['Ethereal and airy', 'Dark and dramatic', 'Abstract and futuristic'] })] }), c);
+  ok('a choice keeps its readings (two to four)', choice.modules[0].kind === 'choice' && choice.modules[0].options.length === 3);
+  ok('an aid kind already shown is not shown again (the question stands)', S.normalizePlan(raw({ modules: [m('colour', 'Colour', 'Colours?', { kind: 'palettes', palettes: PALS })] }), { ...c, shown: ['palettes'] }).modules[0].aid === null);
+  ok('in a design system: no palettes or lettering (the system decides them)', S.normalizePlan(raw({ modules: [m('colour', 'Colour', 'Colours?', { kind: 'palettes', palettes: PALS })] }), { ...c, system: 'Halden' }).modules[0].aid === null);
+  ok('six considerations shown already: no new one', S.normalizePlan(raw({ modules: [m('x', 'X', 'Another?')] }), { ...c, asked: 6 }).modules.length === 0);
+  const answered = { ...c, modules: [{ id: 'purpose', topic: 'What it is for', question: 'What’s it for?', kind: 'text', status: 'answered', answer: 'A club night', offers: [] }] };
+  const again = S.normalizePlan(raw({ modules: [m('purpose', 'What it is for', 'What is it for, really?'), m('purpose-2', 'What it is for', 'Tell me its purpose?'), m('audience', 'Who it is for', 'Who should stop for it?')], answers: [{ id: 'purpose', text: 'A club night in a warehouse' }, { id: 'nope', text: 'x' }], retire: ['purpose', 'audience', 'gone'] }), answered);
+  ok('never what is answered: not by its id, not by its subject under another id', J(again.modules.map((x) => x.id)) === '["audience"]', J(again.modules));
+  ok('answers rewritten only for answered considerations; retire only what is open', J(again.answers) === J([{ id: 'purpose', text: 'A club night in a warehouse' }]) && again.retire.length === 0, J({ a: again.answers, r: again.retire }));
+  const picked = { ...c, brief: { ...S.emptyBrief('a poster'), purpose: 'Their own words', chosen: { palette: { name: 'Acid night', note: '', colours: ['#0b0b0d', '#e9e6df', '#c6ff3d'] } } }, own: ['purpose'] };
+  const kept = S.normalizePlan(raw({ brief: { kind: 'a poster', purpose: 'The model’s rewording' } }), picked);
+  ok('a pick stays whatever the model returns; a line they wrote stays theirs', kept.brief.chosen.palette?.name === 'Acid night' && kept.brief.purpose === 'Their own words', J(kept.brief));
+  ok('…a pick is let go only when they took it back — never the one their latest change made', !S.normalizePlan(raw({ brief: { clear: ['palette'] } }), picked).brief.chosen.palette && S.normalizePlan(raw({ brief: { clear: ['palette'] } }), { ...picked, justPicked: ['palette'] }).brief.chosen.palette?.name === 'Acid night');
+  ok('no aid offered for what is already chosen', S.normalizePlan(raw({ modules: [m('colour', 'Colour', 'Colours?', { kind: 'palettes', palettes: PALS })] }), picked).modules[0].aid === null);
+  ok('the work turned out to be another kind: said', S.normalizePlan(raw({ mode: 'logo' }), c).mode === 'logo');
+  ok('an answer that is not a plan is no plan (the reader plans)', S.normalizePlan('prose', c) === null && S.normalizePlan({ modules: [] }, c) === null);
+  const routeP = S.normalizePlan(raw({ note: 'x', modules: [m('atmosphere', 'Atmosphere', 'Which night?', { kind: 'moods', sample: 'Subsonic', moods: MOODS, lead: true })] }), c);
+  const revived = S.revivePlan(JSON.parse(J(routeP)), c);
+  ok('what the route sent, held to shape again in the browser, unchanged', J(revived.modules) === J(routeP.modules), J(revived.modules));
 }
 
-sec('a decision carried out on the conversation');
+sec('a plan carried out on the brief: answered kept, open kept or retired, new ones added in their place');
 {
-  const st = begin('graphic', 'I want something dreamy.');
-  const moods = { kind: 'moods', sample: 'Dreamy', palettes: null, faces: null, moods: [
-    { name: 'Cloud hush', note: 'pale haze, soft serif, lots of air', colours: ['#eef0f6', '#2a2d3a', '#9fb4ff'], display: 'Cormorant Garamond' },
-    { name: 'Neon reverie', note: 'dusk violet, glowing pink, rounded sans', colours: ['#1c1530', '#f4ecff', '#ff6ec7'], display: 'Fraunces' },
-  ] };
-  const t = turn(st, askAns('Dreamy like drifting and soft, or dreamy like a surreal, late-night haze?', { say: 'Dreamy can go two ways.', aid: moods, brief: { kind: 'something dreamy', feel: 'dreamy', open: ['what it is', 'what it is for'] } }));
-  const q = last(t.st);
-  ok('F, “dreamy”: one question, the reading said first, two moods to look at', q.from === 'socria' && q.kind === 'question' && /^Dreamy can go two ways\. Dreamy like drifting/.test(q.text) && q.aid?.options.length === 2, J(q));
-  const back = S.normalizeStudio(JSON.parse(J(t.st)));
-  ok('the question and its aid, and the brief, survive a reload', back.transcript.at(-1).aid?.options[1].name === 'Neon reverie' && back.brief?.feel === 'dreamy');
-  ok('it is the person’s turn now (nothing is waiting on SocriaUX)', !S.awaitingTurn(t.st) && !S.makingNow(t.st));
-  const picked = S.chooseAid(t.st, 1, NOW + 9);
-  ok('a mood picked: said as their reply, kept as their taste', last(picked).from === 'person' && /This one: Neon reverie/.test(last(picked).text) && picked.brief.chosen.mood?.name === 'Neon reverie' && S.awaitingTurn(picked), J(last(picked)));
-  ok('an option that is not there picks nothing', S.chooseAid(t.st, 7) === null && S.chooseAid(picked, 0) === null);
-  const made = turn(picked, makeAns('Late-night haze it is — making it now.', { kind: 'a poster', feel: 'dreamy, a surreal late-night haze' }));
-  ok('then made: said, and the conversation’s last word is that it is being made', S.makingNow(made.st) && /Late-night haze/.test(last(made.st).text) && made.st.brief.chosen.mood?.name === 'Neon reverie');
+  let st = open('graphic', 'Make me a poster.');
+  st = refine(st, raw({ modules: [m('purpose', 'What it is for', 'What’s the poster for?', { lead: true }), m('audience', 'Who it is for', 'Who should stop for it?')] })).st;
+  ok('the first plan placed: two open, the lead first, counted', J(openIds(st)) === '["purpose","audience"]' && st.space.modules[0].lead && st.space.asked === 2 && !st.space.stale && st.space.rev === 1, J(st.space));
+  st = S.answerModule(st, 'purpose', 'An underground electronic music event.', NOW + 5);
+  ok('answered in words: settled at once, marked for the model', st.space.modules[0].status === 'answered' && st.space.stale && /answered “What it is for”/.test(st.space.change));
+  st = refine(st, raw({ note: 'An underground night.', modules: [m('atmosphere', 'Atmosphere', 'Which night?', { kind: 'moods', sample: 'Subsonic', moods: MOODS, lead: true })], retire: ['audience'] })).st;
+  ok('the next plan: the answered one kept, the retired one gone, the new one in its place as the lead', J(st.space.modules.map((x) => [x.id, x.status])) === J([['purpose', 'answered'], ['atmosphere', 'open']]) && st.space.modules[1].lead && J(st.space.shown) === '["moods"]' && st.space.asked === 3 && st.space.note === 'An underground night.', J(st.space.modules.map((x) => [x.id, x.status, x.lead])));
+  st = S.pickOption(st, 'atmosphere', 1, NOW + 9);
+  ok('a pick: the mood kept as their taste, the consideration settled with what was picked', st.brief.chosen.mood?.name === 'Storm light' && st.space.modules[1].answer.pick === 1 && /picked for “Atmosphere”/.test(st.space.change), J(st.space.modules[1]));
+  const c = S.spaceContextOf(st);
+  ok('the model is told the pick was just made, and sees the answer as a pick', J(c.justPicked) === '["mood"]' && /^picked Storm light/.test(c.modules[1].answer), J(c.modules));
+  st = refine(st, raw({ note: 'Storm light.', ready: true, brief: { kind: 'poster', purpose: 'An underground electronic music event', clear: ['mood'] } })).st;
+  ok('…and the pick survives a plan that tried to clear it', st.brief.chosen.mood?.name === 'Storm light' && st.space.ready);
+  st = S.addNote(st, 'Actually darker and more mysterious', NOW + 12);
+  st = refine(st, raw({ note: 'Darker, then.', ready: true, answers: [{ id: 'atmosphere', text: 'Darker and more mysterious than Storm light' }], brief: { kind: 'poster', purpose: 'An underground electronic music event', feel: 'dark and mysterious', avoid: ['soft and dreamy'], clear: ['mood'] } })).st;
+  ok('a change of mind in a note: the superseded answer rewritten, its pick let go (now words), the rest kept', st.space.modules[1].answer.text === 'Darker and more mysterious than Storm light' && st.space.modules[1].answer.pick === null && !st.brief.chosen.mood && st.brief.feel === 'dark and mysterious' && st.space.modules[0].answer.text === 'An underground electronic music event.', J({ m: st.space.modules, b: st.brief }));
+  // the cap: at most three open at once, existing ones keep their places
+  let cap = refine(open('graphic', 'A poster'), raw({ modules: [m('a', 'A', 'First?'), m('b', 'B', 'Second?'), m('c', 'C', 'Third?')] })).st;
+  cap = refine(cap, raw({ modules: [m('d', 'D', 'Fourth?', { lead: true })] })).st;
+  ok('three open already: a fourth waits (no reshuffle of what is there)', J(openIds(cap)) === '["a","b","c"]', J(openIds(cap)));
 }
 
-sec('scenarios A–L, through the conversation');
+sec('the person shaping the brief in place');
 {
-  // A — vague: a relevant opening question, then a feel question with moods, then made
-  let a = begin('graphic', 'Make me a poster.');
-  a = turn(a, askAns('What’s the poster for?', { brief: { kind: 'a poster', open: ['what it is for'] } })).st;
-  a = reply(a, 'An underground electronic music event.');
-  a = turn(a, askAns('Do you imagine it dark and atmospheric, or more chaotic and experimental?', { say: 'Got it — a club night.', brief: { kind: 'a poster', purpose: 'an underground electronic music event', open: ['how it should feel'] } })).st;
-  a = reply(a, 'Definitely chaotic, but still sophisticated.');
-  const aEnd = turn(a, makeAns('Chaotic but controlled — making it now.', { kind: 'a poster', purpose: 'an underground electronic music event', feel: 'definitely chaotic, but still sophisticated' }));
-  ok('A: two questions, each acknowledged and built on the last answer, then made', S.questionsAsked(aEnd.st) === 2 && S.makingNow(aEnd.st), J(aEnd.st.transcript.map((m) => m.text)));
-  const aBrief = S.designBriefOf(aEnd.st);
-  ok('A: the designer reads the opening words, the conversation with its questions, and the feel in their words', /In their words: “Make me a poster\.”/.test(aBrief) && /SocriaUX asked: Got it — a club night\. Do you imagine/.test(aBrief) && /They said: Definitely chaotic, but still sophisticated\./.test(aBrief) && /How it should feel, in their words: definitely chaotic, but still sophisticated/.test(aBrief), aBrief);
-  ok('A: no words were given, so the designer writes stand-ins and says so — nothing blocks', /No words were given/.test(aBrief));
-  // B — detailed: made with no question
-  const bWords = 'Create a brutalist editorial poster for a contemporary architecture exhibition, with oversized condensed typography, black and cream colors, asymmetrical composition, and minimal decoration.';
-  const b = turn(begin('graphic', bWords), makeAns('Brutalist, black and cream, the type doing the work — making it now.', { kind: 'a brutalist editorial poster', purpose: 'a contemporary architecture exhibition', explicit: ['oversized condensed typography', 'black and cream colors', 'asymmetrical composition', 'minimal decoration'] }));
-  ok('B: a detailed brief is made at once', S.questionsAsked(b.st) === 0 && S.makingNow(b.st));
-  // C — premium, then an analogy understood
-  let c = begin('logo', 'I want to make a premium-looking brand, but I’m not really sure what style I want.');
-  c = turn(c, askAns('What should premium feel like for you — quiet and assured, or something with more theatre?', { brief: { kind: 'a brand identity', feel: 'premium', open: ['what premium means here', 'the name'] } })).st;
-  c = reply(c, 'Like an old luxury magazine, but futuristic.');
-  const cT = turn(c, askAns('What’s it called?', { say: 'So the poise of an old luxury magazine, pushed somewhere futuristic.', brief: { kind: 'a brand identity', feel: 'like an old luxury magazine, but futuristic', open: ['the name'] } }));
-  ok('C: the analogy is taken whole into the brief and said back, then the one thing a logo needs', /old luxury magazine, pushed somewhere futuristic/.test(last(cT.st).text) && cT.st.brief.feel === 'like an old luxury magazine, but futuristic');
-  // D — surprise me: made with no model at all (the home does this before the conversation opens)
-  ok('D: “Surprise me. Just make something.” is made at once, the rest left to SocriaUX', S.wantsMake('Surprise me. Just make something.') && S.makeNow(begin('graphic', 'Surprise me. Just make something.')).action === 'make');
-  // G — a paragraph answer understood
-  let g = begin('graphic', 'A poster for our community garden');
-  g = turn(g, askAns('What should someone feel when they first see it?', { brief: { kind: 'a poster', purpose: 'our community garden' } })).st;
-  const story = 'Honestly it started when my grandmother planted tomatoes in the vacant lot behind the laundromat, and now forty families grow food there; I want people to feel that warmth and a bit of rebellion, not a corporate flyer.';
-  g = reply(g, story);
-  const gT = turn(g, makeAns('Warmth with a streak of rebellion — homemade, never corporate. Making it now.', { kind: 'a poster', purpose: 'our community garden', feel: 'warmth and a bit of rebellion, not a corporate flyer', implied: ['the story of a vacant lot turned into a garden for forty families'], avoid: ['a corporate flyer look'] }));
-  ok('G: a long story is read for its meaning, never refused or set as a headline', gT.st.brief.avoid.includes('a corporate flyer look') && gT.st.brief.content === '' && S.designBriefOf(gT.st).includes(story.slice(0, 80)));
-  // H — "you decide"
-  ok('H: “You decide.” makes it now', S.wantsMake('You decide.'));
-  // I — changed preference: the latest wins, the old one goes to avoid
-  let i = begin('graphic', 'A playful poster for a children’s book fair');
-  i = turn(i, askAns('Who is it really for — the children, or the parents bringing them?', { brief: { kind: 'a poster', purpose: 'a children’s book fair', feel: 'playful' } })).st;
-  i = reply(i, 'Actually make it sophisticated and editorial instead.');
-  const iT = turn(i, makeAns('Sophisticated and editorial, then — making it now.', { kind: 'a poster', purpose: 'a children’s book fair', feel: 'sophisticated and editorial', avoid: ['playful'] }));
-  ok('I: the new preference replaces the old one, which is kept out', iT.st.brief.feel === 'sophisticated and editorial' && iT.st.brief.avoid.includes('playful') && /Avoid:\n- playful/.test(S.designBriefOf(iT.st)));
-  // K — an edit to existing work never comes here: the design workspace makes it directly (lib/ux-v0/design/flow.ts)
-  ok('K: discovery is only for work not yet made (a started conversation awaits nothing)', !S.awaitingTurn({ ...reply(begin('graphic', 'x'), 'y'), status: 'started' }));
-  // L — vague requests do not become endless interviews
-  let l = begin('graphic', 'something cool');
-  for (let k = 0; k < 6; k++) l = reply(turn(l, askAns(`Question ${k}?`)).st, 'not sure');
-  ok('L: after five questions it is made, whatever the model wanted to ask', S.questionsAsked(l) === 5 && turn(l, askAns('A sixth?')).d.action === 'make');
-  // E — never a critique or an import
-  ok('E: a critique or an import is not discovered (it keeps its own short exchange)', !S.isCreative('critique') && !S.isCreative('system') && !S.awaitingTurn(reply(begin('critique', 'look at this'), 'ok')));
+  let st = refine(open('graphic', 'A poster for the spring plant sale at our nursery'), raw({ modules: [m('colour', 'Colour', 'Which feels most like your nursery?', { kind: 'palettes', palettes: [PALS[0], PALS[1]], lead: true })], brief: { kind: 'poster', purpose: 'The spring plant sale', tentative: ['A hand-lettered feel'] } })).st;
+  st = S.editPrompt(st, 'A poster for the spring plant sale at our nursery, 3 May');
+  ok('the idea edited: kept, marked for the model', st.prompt === 'A poster for the spring plant sale at our nursery, 3 May' && /edited their idea/.test(st.space.change) && S.spaceContextOf(st).prompt.endsWith('3 May'));
+  st = S.editField(st, 'audience', 'Regulars and their neighbours');
+  ok('a line written in place: theirs from then on', st.brief.audience === 'Regulars and their neighbours' && st.space.own.includes('audience'));
+  st = S.pickOption(st, 'colour', 0, NOW + 20);
+  const was = st.brief.chosen.palette.colours;
+  st = S.setPaletteColour(st, 2, '#3fa34d');
+  ok('a colour of the picked palette changed: theirs, only that one changed, marked as changed', J(st.brief.chosen.palette.colours) === J([was[0], was[1], '#3fa34d']) && st.brief.chosen.palette.edited === true && /changed a colour/.test(st.space.change), J(st.brief.chosen.palette));
+  const unreadable = S.setPaletteColour(st, 1, '#111111');
+  ok('…even one whose ink no longer reads: kept, and the brief can say so', unreadable.brief.chosen.palette.colours[1] === '#111111' && !S.paletteReads(unreadable.brief.chosen.palette) && S.paletteReads(st.brief.chosen.palette));
+  const back = S.normalizeStudio(JSON.parse(J(unreadable)));
+  ok('…and it survives being stored and read back', J(back.brief.chosen.palette.colours) === J(unreadable.brief.chosen.palette.colours) && back.space.own.includes('audience'), J(back.brief.chosen.palette));
+  st = S.keepTentative(st, 'A hand-lettered feel');
+  ok('SocriaUX’s reading kept: theirs now', st.brief.explicit.includes('A hand-lettered feel') && !st.brief.tentative.includes('A hand-lettered feel'));
+  const dropped = S.dropTentative(S.editField(st, 'feel', 'x'), 'nothing');
+  ok('turning down a line that is not there changes nothing', dropped.brief.feel === 'x');
+  st = S.removeChosen(st, 'palette');
+  ok('a pick taken back: gone, its consideration open again to pick or answer', !st.brief.chosen.palette && st.space.modules[0].status === 'open' && st.space.modules[0].answer === null);
+  st = S.answerModule(st, 'colour', 'Earthy, like terracotta pots in the sun', NOW + 30);
+  st = S.reopenModule(st, 'colour');
+  ok('a settled consideration changed again: open where it was', st.space.modules[0].status === 'open' && !st.space.stale);
+  st = S.addNote(st, 'Must include the nursery’s fox mascot', NOW + 31);
+  const noteId = st.space.notes[0].id;
+  ok('a note kept, in their words', st.space.notes[0].text === 'Must include the nursery’s fox mascot' && S.spaceContextOf(st).notes[0] === 'Must include the nursery’s fox mascot');
+  st = S.removeNote(st, noteId);
+  ok('…and taken back', st.space.notes.length === 0 && /took back their note/.test(st.space.change));
+  ok('a skip in words is a skip', S.answerModule(st, 'colour', 'skip').space.modules[0].status === 'skipped');
 }
 
 sec('the brief, as the designer reads it');
 {
-  let st = begin('graphic', 'A poster for “Low Tide”, three bands, Saturday 12 April, The Boiler Room');
-  st = turn(st, askAns('Should it convey the sound, or create intrigue without explaining too much?', { brief: { kind: 'a gig poster', content: 'Low Tide\nSaturday 12 April\nThe Boiler Room' } })).st;
-  st = reply(st, 'Intrigue, but not cold');
-  st = S.chooseAid(S.applyDecision(st, S.normalizeDecision(askAns('Colours?', { aid: { kind: 'palettes', sample: null, faces: null, moods: null, palettes: [{ name: 'Tidal', note: 'deep teal and sand', colours: ['#0f2a2e', '#efe6d4', '#e0a458'] }, { name: 'Salt', note: 'white and slate', colours: ['#f5f5f2', '#1f2a30', '#3c7a89'] }] } }), S.discoverContextOf(st)), NOW + 50), 0, NOW + 51);
-  const made = turn(st, makeAns('Intriguing, warm underneath — making it now.', { kind: 'a gig poster', content: 'Low Tide\nSaturday 12 April\nThe Boiler Room', feel: 'intrigue, but not cold', tentative: ['a tide line as the image'] }));
-  const text = S.designBriefOf(made.st);
-  ok('their words to set, exactly; their feel; SocriaUX’s reading marked as not theirs; their pick as taste, not a layout', /Words to set, exactly as given:\nLow Tide\nSaturday 12 April\nThe Boiler Room/.test(text) && /SocriaUX’s own reading, not confirmed by them[^\n]*\n- a tide line as the image/.test(text) && /not a layout to copy[^\n]*\n- Colours they picked \(Tidal\): #0f2a2e, #efe6d4, #e0a458/.test(text), text);
+  let st = refine(open('graphic', 'A poster for “Low Tide”, three bands, Saturday 12 April, The Boiler Room'), raw({ modules: [m('feel', 'The feeling', 'Should it convey the sound, or create intrigue?', { lead: true }), m('colour', 'Colour', 'Which colours?', { kind: 'palettes', palettes: [{ name: 'Tidal', note: 'deep teal and sand', colours: ['#0f2a2e', '#efe6d4', '#e0a458'] }, { name: 'Salt', note: 'white and slate', colours: ['#f5f5f2', '#1f2a30', '#3c7a89'] }] }), m('venue', 'The venue', 'Anything about the room?')], brief: { kind: 'a gig poster', content: 'Low Tide\nSaturday 12 April\nThe Boiler Room' } })).st;
+  st = S.answerModule(st, 'feel', 'Intrigue, but not cold', NOW + 40);
+  st = S.pickOption(st, 'colour', 0, NOW + 41);
+  st = S.skipModule(st, 'venue');
+  st = S.addNote(st, 'No band photos', NOW + 42);
+  st = refine(st, raw({ ready: true, brief: { kind: 'a gig poster', content: 'Low Tide\nSaturday 12 April\nThe Boiler Room', feel: 'intrigue, but not cold', tentative: ['a tide line as the image'], avoid: ['band photos'] } })).st;
+  const text = S.designBriefOf(S.startMaking(st, NOW + 50));
+  ok('their idea in quotes; what they settled (a skip left to SocriaUX); their notes, the later holding', /^In their words: “A poster for “Low Tide”/.test(text) && /- The feeling \(“Should it convey the sound, or create intrigue\?”\): Intrigue, but not cold/.test(text) && /- The venue[^\n]*: left to SocriaUX/.test(text) && /the later one holds\):\n- No band photos/.test(text), text);
+  ok('their words to set, exactly; SocriaUX’s reading marked as not theirs; their pick as taste; what to avoid', /Words to set, exactly as given:\nLow Tide\nSaturday 12 April\nThe Boiler Room/.test(text) && /SocriaUX’s own reading, not confirmed by them[^\n]*\n- a tide line as the image/.test(text) && /Colours they picked \(Tidal\): #0f2a2e, #efe6d4, #e0a458/.test(text) && /Avoid:\n- band photos/.test(text) && /left to SocriaUX’s judgement/.test(text), text);
   ok('kept within what the designer’s memory holds', text.length <= 4000);
-  const p = S.designFromStudio(S.makeProject('create', 'Untitled design', NOW), made.st, { now: NOW });
-  ok('handed to the design workspace: named from its words, a poster format, the brief in its memory', p.ok && p.project.medium === 'design' && p.project.name === 'Low Tide' && p.project.design.kind === 'poster' && p.project.design.memory.brief === text, p.ok ? { name: p.project.name, kind: p.project.design.kind, format: p.project.design.format } : p);
-  const lg = S.designFromStudio(S.makeProject('create', 'Untitled design', NOW), S.applyDecision(begin('logo', 'Surprise me — a logo for a bakery'), S.makeNow(begin('logo', 'Surprise me — a logo for a bakery'))), { now: NOW });
-  ok('a logo with no name is not refused: the designer invents one and says so (on a logo sheet)', lg.ok && lg.project.design.kind === 'logo' && lg.project.design.format === 'logo-sheet', lg);
+  const made = S.startMaking(st, NOW + 50);
+  ok('Generate: marked as making (a reload picks it up), the model no longer awaited', S.makingNow(made) && !S.awaitingPlan(made));
+  const p = S.designFromStudio(S.makeProject('create', 'Untitled design', NOW), made, { now: NOW });
+  ok('handed to the design workspace: named from its words, a poster format, the brief in its memory', p.ok && p.project.medium === 'design' && p.project.name === 'Low Tide' && p.project.design.kind === 'poster' && p.project.design.memory.brief === S.designBriefOf(made), p.ok ? { name: p.project.name, kind: p.project.design.kind } : p);
+  const edited = S.setPaletteColour(made, 0, '#102030');
+  ok('colours they changed are said to be theirs, in role order', /colours adjusted by them, in this order: ground, ink, accent, support/.test(S.designBriefOf(edited)));
+  const bare = S.startMaking(open('graphic', 'A poster'), NOW);
+  ok('Generate with nothing answered: stand-in words, everything left to SocriaUX', /stand-in words/.test(S.designBriefOf(bare)) && /left to SocriaUX’s judgement/.test(S.designBriefOf(bare)));
+  const lg = S.designFromStudio(S.makeProject('create', 'Untitled design', NOW), S.startMaking(open('logo', 'Surprise me — a logo for a bakery'), NOW), { now: NOW });
+  ok('a logo with no name is not refused: the designer invents one (on a logo sheet)', lg.ok && lg.project.design.kind === 'logo' && lg.project.design.format === 'logo-sheet', lg);
 }
 
-sec('a question skipped');
+sec('the model reads the brief as it stands');
 {
-  const yes = ['Skip', 'skip', 'Skip this one', 'skip it.', 'pass', 'Next question', 'ok, skip'];
-  const no = ['Skip the gradients', 'skip the date, it is not set yet', 'Make me a poster.', 'not sure'];
-  ok('“Skip”, “pass”, “next” pass on the question — and words about the work that start with “skip” are words about the work', yes.every((t) => S.skips(t)) && !no.some((t) => S.skips(t)), { yes: yes.filter((t) => !S.skips(t)), no: no.filter((t) => S.skips(t)) });
-  // the reader (no model): what a poster is for, skipped → made; never asked again, and "Skip" is never its subject
-  let st = begin('graphic', 'Make me a poster.');
-  st = S.applyDecision(st, S.readerDecision(st), NOW + 1);
-  const q1 = last(st).text;
-  st = reply(st, 'Skip');
-  const d = S.readerDecision(st);
-  st = S.applyDecision(st, d, NOW + 3);
-  const db = S.designBriefOf(st);
-  ok('signed out: what the poster is for, skipped — made, not asked again', /for\?/.test(q1) && d.action === 'make' && S.questionsAsked(st) === 1, J({ q1, d: d.action }));
-  ok('…“Skip” is never read as what it is about, its words or its name (the designer writes stand-ins)', !/What it is for: Skip|Words to set[^\n]*\nSkip/.test(db) && /stand-in words/.test(db) && !/^skip$/i.test(S.nameOf(st)), db);
-  // a logo's name, skipped: made, the designer invents one
-  let lg = begin('logo', 'A logo for a coffee roastery');
-  lg = S.applyDecision(lg, S.readerDecision(lg), NOW + 1);
-  const qn = last(lg).text;
-  lg = reply(lg, 'skip this one');
-  const dl = S.readerDecision(lg);
-  ok('a logo’s name, skipped: no second asking of it, and no name taken from “skip this one”', /called/.test(qn) && !(dl.action === 'ask' && /called/.test(dl.ask?.text ?? '')) && !/skip/i.test(dl.brief.content), J({ qn, dl: dl.action, content: dl.brief.content }));
-  ok('the model is told what a skip means: settle it, never ask it again, move on or make it', /If they skip a question \("Skip"\), settle that point yourself, never ask it again/.test(S.discoverSystem()));
+  let st = refine(open('logo', 'A premium brand, not sure of the style'), raw({ modules: [m('premium', 'Premium', 'Which kind of premium?', { kind: 'moods', sample: 'Aa', moods: MOODS, lead: true })] })).st;
+  st = S.editField(st, 'purpose', 'A small fragrance house');
+  const c = S.spaceContextOf(st, { systemName: 'Velour Brand' });
+  const user = S.discoverUser(c);
+  ok('its idea, each consideration with its status and what it offers, its own lines marked, the latest change, the design system', /THEIR IDEA: “A premium brand, not sure of the style”/.test(user) && /\[premium\] Premium — “Which kind of premium\?” \(moods\) — OPEN, offering: Ethereal \/ Storm light/.test(user) && /purpose: A small fragrance house \(they set this themselves\)/.test(user) && /LATEST CHANGE: set “purpose” themselves/.test(user) && /DESIGN SYSTEM: made in “Velour Brand”/.test(user), user);
+  const sys = S.discoverSystem();
+  ok('told what to return, how to choose what to raise, the visual kinds, and the font library — with no copied example lines', /What you return each time/.test(sys) && /at most three, usually one or two, often none/.test(sys) && /FONT LIBRARY/.test(sys) && !/An underground night/.test(sys), sys.slice(0, 200));
+  ok('a critique or an import is never a spatial brief', !S.isCreative('critique') && !S.isCreative('system') && !S.awaitingPlan({ ...open('graphic', 'x'), mode: 'critique' }));
 }
 
 console.log(`\ndiscover: ${pass} passed, ${fail} failed`);

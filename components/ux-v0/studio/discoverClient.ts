@@ -1,18 +1,18 @@
 'use client';
-// components/ux-v0/studio/discoverClient.ts — who decides the next turn of creative discovery: the question model when
-// it can be reached, the reader always.
+// components/ux-v0/studio/discoverClient.ts — who updates the spatial brief: the question model when it can be
+// reached, the reader always.
 //
-// The conversation as it stands (and up to two of the person's pictures, made small, so they are actually looked at)
-// goes to /api/ux-v0/studio-questions; its decision — one question, or make it — is held to shape again here. When the
-// model cannot be reached (signed out, not configured, busy, over a limit, the connection lost) the reader in
-// lib/ux-v0/studio/discover.ts decides instead, and the model is left alone for a while. The person never hears about
-// any of this: they see one question, or the work.
+// The brief as it stands (and up to two of the person's pictures, made small, so they are actually looked at) goes to
+// /api/ux-v0/studio-questions; its plan — the considerations worth showing now, a short line, the brief in their words —
+// is held to shape again here. When the model cannot be reached (signed out, not configured, busy, over a limit, the
+// connection lost) the reader in lib/ux-v0/studio/discover.ts plans instead, and the model is left alone for a while.
+// The person never hears about any of this: the brief simply updates.
 
 import { operationId, post } from '../api';
 import { getArtifact } from '@/lib/ux-v0/store';
 import type { StudioState } from '@/lib/ux-v0/studio/schema';
-import { discoverContextOf, readerDecision } from '@/lib/ux-v0/studio/discover';
-import { reviveDecision, type Decision } from '@/lib/ux-v0/studio/discover-model';
+import { readerPlan, spaceContextOf } from '@/lib/ux-v0/studio/discover';
+import { revivePlan, type Plan } from '@/lib/ux-v0/studio/discover-model';
 
 let quietUntil = 0;
 export const modelWorthAsking = (now = Date.now()) => now >= quietUntil;
@@ -37,22 +37,22 @@ async function smallPicture(upload: string): Promise<string | null> {
 
 export class TurnCancelled extends Error {}
 
-/** The next turn: the model's decision, or the reader's when the model cannot be reached. */
-export async function decideTurn(st: StudioState, o: { systemName?: string; projectId?: string; signal?: AbortSignal } = {}): Promise<Decision> {
+/** The brief updated: the model's plan, or the reader's when the model cannot be reached. */
+export async function planBrief(st: StudioState, o: { systemName?: string; projectId?: string; signal?: AbortSignal } = {}): Promise<Plan> {
   if (modelWorthAsking()) {
-    const context = discoverContextOf(st, { ...(o.systemName ? { systemName: o.systemName } : {}) });
+    const context = spaceContextOf(st, { ...(o.systemName ? { systemName: o.systemName } : {}) });
     const pics = st.attachments.filter((a) => a.kind === 'image' && a.upload).slice(-2);
     const images = (await Promise.all(pics.map((a) => smallPicture(a.upload!)))).filter((x): x is string => !!x);
-    const r = await post<{ decision?: unknown }>('/api/ux-v0/studio-questions', { context, images, projectId: o.projectId }, { signal: o.signal, operationId: operationId('question'), timeoutMs: 30_000 });
+    const r = await post<{ plan?: unknown }>('/api/ux-v0/studio-questions', { context, images, projectId: o.projectId }, { signal: o.signal, operationId: operationId('question'), timeoutMs: 30_000 });
     if (r.ok) {
-      const d = reviveDecision(r.data?.decision, context);
-      if (d) return d;
+      const p = revivePlan(r.data?.plan, context);
+      if (p) return p;
     } else if (r.cancelled) {
       throw new TurnCancelled();
     } else {
-      // not reachable: the reader decides; the model is left alone for a while (long when it cannot answer at all)
+      // not reachable: the reader plans; the model is left alone for a while (long when it cannot answer at all)
       quietUntil = Date.now() + (r.signIn || r.limit || r.status === 401 || r.status === 403 || r.status === 500 ? 30 * 60_000 : 2 * 60_000);
     }
   }
-  return readerDecision(st);
+  return readerPlan(st);
 }

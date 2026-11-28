@@ -872,7 +872,7 @@ console.log('\n=== how demanding a generation is: read in code, said, and the mo
   ok('each generation is in the call log with the tier it ran on', logged.length === 4 && J(logged.map((r) => r.tier)) === J(['premium', 'economy', 'premium', 'premium']), J(logged.map((r) => [r.tier, r.model])));
 }
 
-console.log('\n=== creative discovery: the next turn, decided by the question model, held to its shape ===');
+console.log('\n=== the spatial brief: updated by the question model, held to its shape ===');
 {
   const Q = 'user_v0_studio';
   const was = { routing: process.env.SOCRIAUX_ROUTING, model: process.env.SOCRIAUX_MODEL };
@@ -880,66 +880,64 @@ console.log('\n=== creative discovery: the next turn, decided by the question mo
   process.env.SOCRIAUX_MODEL = 'gpt-6.1-sol';
   const context = {
     mode: 'graphic',
-    conversation: [
-      { who: 'person', text: 'Make me a poster.' },
-      { who: 'socria', text: 'What’s the poster for?' },
-      { who: 'person', text: 'An underground electronic music event.' },
-    ],
+    system: null,
+    prompt: 'Make me a poster.',
+    modules: [{ id: 'purpose', topic: 'What it is for', question: 'What’s the poster for?', kind: 'text', status: 'answered', answer: 'An underground electronic music event.', offers: [] }],
+    notes: [],
+    change: 'answered “What it is for” in their words: An underground electronic music event.',
     brief: null,
+    own: [],
     asked: 1,
     shown: [],
     pictures: [],
     sites: [],
-    system: null,
+    justPicked: [],
   };
   const BRIEF = { kind: 'a poster', purpose: 'an underground electronic music event', audience: '', content: '', feel: '', explicit: ['a poster for an underground electronic music event'], implied: ['a night-time, club audience'], tentative: [], avoid: [], references: [], open: ['how it should feel'], clear: [] };
-  const ASK = {
-    action: 'ask',
-    say: 'Got it — a club night.',
-    question: {
-      text: 'Do you imagine it dark and atmospheric, or more chaotic and experimental?',
-      suggestions: [],
-      aid: {
-        kind: 'moods',
-        sample: 'Underground',
-        palettes: null,
-        faces: null,
-        moods: [
-          { name: 'Fog and strobe', note: 'near-black ground, one acid accent, condensed type', colours: ['#0b0b0d', '#e9e6df', '#c6ff3d'], display: 'Anton' },
-          { name: 'Photocopy riot', note: 'xeroxed greys, red marks, type that collides', colours: ['#d9d6cf', '#151515', '#e2261c'], display: 'Archivo Black' },
-          { name: 'Unreadable', note: 'ink the same as the ground', colours: ['#777777', '#787878', '#797979'], display: 'Anton' },
-          { name: 'Invented face', note: 'not a library face', colours: ['#000000', '#ffffff', '#ff0000'], display: 'Comic Sans' },
-        ],
-      },
-    },
+  const MOODS = [
+    { name: 'Fog and strobe', note: 'near-black ground, one acid accent, condensed type', colours: ['#0b0b0d', '#e9e6df', '#c6ff3d'], display: 'Anton' },
+    { name: 'Photocopy riot', note: 'xeroxed greys, red marks, type that collides', colours: ['#d9d6cf', '#151515', '#e2261c'], display: 'Archivo Black' },
+    { name: 'Unreadable', note: 'ink the same as the ground', colours: ['#777777', '#787878', '#797979'], display: 'Anton' },
+    { name: 'Invented face', note: 'not a library face', colours: ['#000000', '#ffffff', '#ff0000'], display: 'Comic Sans' },
+  ];
+  const consider = (o) => ({ id: 'atmosphere', topic: 'Atmosphere', question: 'Dark and atmospheric, or chaotic and experimental?', kind: 'moods', lead: true, options: null, placeholder: null, sample: 'Underground', palettes: null, faces: null, moods: MOODS, ...o });
+  const PLAN = {
+    note: 'An underground night — how it feels is most of it.',
+    ready: false,
     mode: null,
+    modules: [consider({}), { id: 'purpose', topic: 'What it is for', question: 'What’s the poster for?', kind: 'text', lead: false, options: null, placeholder: 'x', sample: null, palettes: null, faces: null, moods: null }],
+    answers: [],
+    retire: [],
     brief: BRIEF,
   };
-  const signedOut = await post('studio-questions', { context }, null, [ASK]);
+  const signedOut = await post('studio-questions', { context }, null, [PLAN]);
   ok('signed out: refused, told to sign in, nothing asked', signedOut.status === 401 && signedOut.calls.length === 0, J(signedOut));
-  ok('no conversation: no call', (await post('studio-questions', {}, Q, [ASK])).status === 400 && (await post('studio-questions', { context: { ...context, mode: 'critique' } }, Q, [ASK])).status === 400 && (await post('studio-questions', { context: { ...context, conversation: [] } }, Q, [ASK])).status === 400);
+  ok('no brief: no call', (await post('studio-questions', {}, Q, [PLAN])).status === 400 && (await post('studio-questions', { context: { ...context, mode: 'critique' } }, Q, [PLAN])).status === 400 && (await post('studio-questions', { context: { ...context, prompt: '' } }, Q, [PLAN])).status === 400);
 
-  const r = await post('studio-questions', { projectId: 'uxv0_studio', context }, Q, [ASK]);
-  const d = r.json?.decision;
-  ok('a question comes back, decided by the model, with what it took from the reply', r.status === 200 && d?.action === 'ask' && d.by === 'model' && /club night/.test(d.say) && /chaotic/.test(d.ask.text), J(r.json));
-  ok('  its moods hold only real colours that read and faces from the library (two of four kept)', d?.ask?.aid?.kind === 'moods' && d.ask.aid.options.length === 2 && d.ask.aid.options.every((m) => /^#[0-9a-f]{6}$/.test(m.colours[0]) && ['Anton', 'Archivo Black'].includes(m.display)), J(d?.ask?.aid));
+  const r = await post('studio-questions', { projectId: 'uxv0_studio', context }, Q, [PLAN]);
+  const d = r.json?.plan;
+  ok('the brief comes back updated by the model: its line on the change, the consideration to show now', r.status === 200 && d?.by === 'model' && /how it feels/.test(d.note) && d.modules.length === 1 && d.modules[0].id === 'atmosphere' && d.modules[0].lead, J(r.json));
+  ok('  a consideration already answered is never raised again (dropped, by id)', !d?.modules?.some((m) => m.id === 'purpose'), J(d?.modules));
+  ok('  its moods hold only real colours that read and faces from the library (two of four kept)', d?.modules?.[0]?.aid?.kind === 'moods' && d.modules[0].aid.options.length === 2 && d.modules[0].aid.options.every((m) => /^#[0-9a-f]{6}$/.test(m.colours[0]) && ['Anton', 'Archivo Black'].includes(m.display)), J(d?.modules?.[0]?.aid));
   ok('  the brief comes back in the person’s words', d?.brief?.purpose === 'an underground electronic music event' && d.brief.open.includes('how it should feel'), J(d?.brief));
   const sent = r.calls[0] ?? {};
   ok('the model is asked under a strict schema', sent.text?.format?.type === 'json_schema' && sent.text.format.name === 'socriaux_studio_questions' && sent.text.format.strict === true, J(sent.text));
-  ok('  told how to decide, how to ask and the font library; given the conversation in order', /Each turn, decide one thing/.test(sent.instructions ?? '') && /FONT LIBRARY/.test(sent.instructions ?? '') && /Fraunces/.test(sent.instructions ?? '') && /PERSON: Make me a poster\.[\s\S]*SOCRIAUX: What’s the poster for\?[\s\S]*PERSON: An underground/.test(J(sent.input ?? '')), J(sent.input).slice(0, 600));
+  ok('  told what to return and the font library; given the brief as it stands (the idea, each consideration with its status, the latest change)', /What you return each time/.test(sent.instructions ?? '') && /FONT LIBRARY/.test(sent.instructions ?? '') && /Fraunces/.test(sent.instructions ?? '') && /THEIR IDEA: “Make me a poster\.”[\s\S]*\[purpose\] What it is for[\s\S]*ANSWERED: An underground[\s\S]*LATEST CHANGE: answered/.test(J(sent.input ?? '')), J(sent.input).slice(0, 700));
 
-  const shown = await post('studio-questions', { projectId: 'uxv0_studio', context: { ...context, shown: ['moods'] } }, Q, [ASK]);
-  ok('an aid already shown is not shown again (the question stands without it)', shown.status === 200 && shown.json.decision.action === 'ask' && shown.json.decision.ask.aid === null, J(shown.json));
-  const late = await post('studio-questions', { projectId: 'uxv0_studio', context: { ...context, asked: 5 } }, Q, [ASK]);
-  ok('past the question limit: made, whatever the model asked', late.status === 200 && late.json.decision.action === 'make', J(late.json));
-  const make = await post('studio-questions', { projectId: 'uxv0_studio', context }, Q, [{ action: 'make', say: 'That’s enough — chaotic, but controlled.', question: null, mode: null, brief: { ...BRIEF, feel: 'chaotic, but still sophisticated' } }]);
-  ok('“make it”: said, with the brief to make it from', make.status === 200 && make.json.decision.action === 'make' && make.json.decision.brief.feel === 'chaotic, but still sophisticated', J(make.json));
+  const shown = await post('studio-questions', { projectId: 'uxv0_studio', context: { ...context, shown: ['moods'] } }, Q, [PLAN]);
+  ok('an aid already shown is not shown again (the question stands, answered in words)', shown.status === 200 && shown.json.plan.modules[0].aid === null && shown.json.plan.modules[0].kind === 'text', J(shown.json));
+  const late = await post('studio-questions', { projectId: 'uxv0_studio', context: { ...context, asked: 6 } }, Q, [PLAN]);
+  ok('six considerations shown already: no new one, whatever the model raised', late.status === 200 && late.json.plan.modules.length === 0, J(late.json));
+  const ready = await post('studio-questions', { projectId: 'uxv0_studio', context }, Q, [{ ...PLAN, ready: true, modules: [], brief: { ...BRIEF, feel: 'chaotic, but still sophisticated' } }]);
+  ok('nothing left to raise: ready, with the brief to make it from', ready.status === 200 && ready.json.plan.ready && ready.json.plan.modules.length === 0 && ready.json.plan.brief.feel === 'chaotic, but still sophisticated', J(ready.json));
+  const own = await post('studio-questions', { projectId: 'uxv0_studio', context: { ...context, own: ['purpose'], brief: { ...BRIEF, purpose: 'Their own words', chosen: {} } } }, Q, [{ ...PLAN, brief: { ...BRIEF, purpose: 'The model’s rewording' } }]);
+  ok('a line the person wrote themselves stays theirs, whatever the model returns', own.status === 200 && own.json.plan.brief.purpose === 'Their own words', J(own.json?.plan?.brief));
   const pic = 'data:image/jpeg;base64,' + Buffer.from('not really a jpeg but shaped like one').toString('base64');
-  const withPic = await post('studio-questions', { projectId: 'uxv0_studio', context: { ...context, pictures: ['moodboard.jpg'] }, images: [pic, pic, pic, 'https://example.com/x.jpg'] }, Q, [ASK]);
+  const withPic = await post('studio-questions', { projectId: 'uxv0_studio', context: { ...context, pictures: ['moodboard.jpg'] }, images: [pic, pic, pic, 'https://example.com/x.jpg'] }, Q, [PLAN]);
   const parts = J(withPic.calls[0]?.input ?? '');
   ok('the person’s pictures go to the model to be looked at (at most two, data addresses only)', withPic.status === 200 && (parts.match(/data:image\/jpeg;base64/g) ?? []).length === 2 && !/example\.com\/x\.jpg/.test(parts), parts.slice(0, 300));
   const prose = await post('studio-questions', { projectId: 'uxv0_studio', context }, Q, ['I would ask about the mood.']);
-  ok('an answer that is not a decision: refused, nothing made up', prose.status !== 200 && !prose.json?.decision, J(prose));
+  ok('an answer that is not a plan: refused, nothing made up', prose.status !== 200 && !prose.json?.plan, J(prose));
   const broken = await post('studio-questions', { projectId: 'uxv0_studio', context }, Q, [new Error('upstream down')]);
   ok('a model failure is a calm error the browser falls back from', broken.status >= 500 && !!broken.json?.error && !/without a model/i.test(broken.json.error), J(broken));
   const logged = db.rows('ux_v0_calls').filter((x) => x.user_id === Q);

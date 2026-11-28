@@ -10,7 +10,7 @@
 import type { DesignProject } from '../types';
 import type { StudioState } from '../studio/schema';
 import { said } from '../studio/schema';
-import { designBriefOf, nameOf } from '../studio/discover';
+import { designBriefOf, nameOf, personWordsOf } from '../studio/discover';
 import { readFacts } from '../studio/facts';
 import { emptyState, type DesignAsset, type DesignState } from './doc';
 import { formatFromWords, formatOf, DEFAULT_FORMAT } from './formats';
@@ -38,7 +38,7 @@ function graphicKind(words: string): string {
  */
 export function designFromStudio(p: DesignProject, st: StudioState, o: { assets?: { id: string; src: string; name: string; width: number; height: number }[]; now?: number } = {}): { ok: true; project: DesignProject; said: string } | { ok: false; error: string } {
   const now = o.now ?? Date.now();
-  const words = st.transcript.filter((m) => m.from === 'person').map((m) => m.text).join('\n') || st.prompt;
+  const words = personWordsOf(st).join('\n') || st.prompt;
   const kindWords = `${st.brief?.kind ?? ''} ${words}`;
   const kind = st.mode === 'logo' ? 'logo' : st.mode === 'board' ? 'campaign' : graphicKind(kindWords);
   const format = st.mode === 'logo' ? 'logo-sheet' : formatFromWords(kindWords)?.id ?? (st.mode === 'board' ? 'instagram-portrait' : DEFAULT_FORMAT);

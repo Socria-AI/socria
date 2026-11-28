@@ -7,7 +7,7 @@
 // read like the rest of the project, so a stored record can never break the page.
 
 import { cleanResult } from '../research/schema';
-import { normalizeAid, normalizeCreativeBrief, type Aid, type CreativeBrief } from './brief';
+import { normalizeAid, normalizeCreativeBrief, normalizeSpace, type Aid, type CreativeBrief, type SpatialBrief } from './brief';
 
 export const STUDIO_MODES = ['graphic', 'website', 'logo', 'system', 'board', 'critique'] as const;
 export type StudioMode = (typeof STUDIO_MODES)[number];
@@ -165,6 +165,8 @@ export interface StudioState {
   references?: StudioReference[];
   /** what is understood about the work so far, in the person's words (./brief.ts, ./discover.ts) */
   brief?: CreativeBrief;
+  /** the spatial brief a graphic, a logo, a campaign or a website is shaped in (./brief.ts, ./discover.ts) */
+  space?: SpatialBrief;
   createdAt: number;
 }
 
@@ -336,6 +338,7 @@ export function normalizeStudio(v: unknown): StudioState | undefined {
         .slice(0, MAX_REFERENCES),
     ),
     ...((b) => (b ? { brief: b } : {}))(normalizeCreativeBrief(r.brief)),
+    ...((sp) => (sp ? { space: sp } : {}))(normalizeSpace(r.space)),
     createdAt: n(r.createdAt, 0, 8.64e15) ?? 0,
   };
 }
